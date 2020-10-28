@@ -7,6 +7,10 @@ add_subdirectory(target)
 add_subdirectory(tools)
 add_subdirectory(util)
 
+
+get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
+get_property(conversion_libs GLOBAL PROPERTY MLIR_CONVERSION_LIBS)
+
 pml_cc_library(
   NAME init_passes_and_dialects
   HDRS
@@ -15,26 +19,11 @@ pml_cc_library(
   SRCS
     all_dialects.cc
   DEPS
-    MLIRAffine
-    MLIRAffineTransforms
-    MLIRGPU
-    MLIRGPUToSPIRVTransforms
-    MLIRLLVMIR
-    MLIRLinalg
-    MLIRLinalgToLLVM
-    MLIRLinalgToSPIRVTransforms
-    MLIRLinalgTransforms
-    MLIRSCF
-    MLIRSCFToGPU
-    MLIRSCFTransforms
-    MLIRSPIRV
-    MLIRSPIRVTransforms
-    MLIRStandard
-    MLIRStandardOpsTransforms
-    MLIRStandardToLLVM
-    MLIRStandardToSPIRVTransforms
+    ${dialect_libs}
+    ${conversion_libs}
     MLIRTransforms
-    MLIRVector
+    pmlc::conversion::gpu_to_comp
+    pmlc::conversion::gpu_to_spirv
     pmlc::conversion::pxa_to_affine
     pmlc::conversion::scf_to_omp
     pmlc::conversion::stdx_to_llvm

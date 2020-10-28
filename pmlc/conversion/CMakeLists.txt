@@ -1,3 +1,5 @@
+add_subdirectory(gpu_to_comp)
+add_subdirectory(gpu_to_spirv)
 add_subdirectory(pxa_to_affine)
 add_subdirectory(scf_to_omp)
 add_subdirectory(stdx_to_llvm)

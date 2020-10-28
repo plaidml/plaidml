@@ -1,3 +1,4 @@
+add_subdirectory(pmlc-jit)
 add_subdirectory(pmlc-opt)
 
 add_custom_target(pmlc_tools_FileCheck ALL

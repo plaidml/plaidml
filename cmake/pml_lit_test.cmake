@@ -21,7 +21,7 @@ set(PML_TEST_DEPENDS
 # )
 
 add_custom_target(check-pml
-  COMMAND ${llvm-project_BINARY_DIR}/bin/llvm-lit pmlc/dialect -v
+  COMMAND ${llvm-project_BINARY_DIR}/bin/llvm-lit pmlc -v
   COMMENT "Running the PML regression tests"
   USES_TERMINAL
 )

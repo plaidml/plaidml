@@ -2,7 +2,7 @@
 
 #pragma once
 
-// #include "mlir/Conversion/Passes.h"
+#include "mlir/Conversion/Passes.h"
 #include "mlir/Dialect/Affine/Passes.h"
 #include "mlir/Dialect/GPU/Passes.h"
 #include "mlir/Dialect/LLVMIR/Transforms/Passes.h"
@@ -14,8 +14,8 @@
 
 // #include "pmlc/conversion/comp_to_llvm/passes.h"
 // #include "pmlc/conversion/gpu/lowering.h"
-// #include "pmlc/conversion/gpu_to_comp/passes.h"
-// #include "pmlc/conversion/gpu_to_spirv/passes.h"
+#include "pmlc/conversion/gpu_to_comp/passes.h"
+#include "pmlc/conversion/gpu_to_spirv/passes.h"
 #include "pmlc/conversion/pxa_to_affine/passes.h"
 #include "pmlc/conversion/scf_to_omp/passes.h"
 #include "pmlc/conversion/stdx_to_llvm/passes.h"
@@ -44,7 +44,7 @@ inline void registerAllPasses() {
   mlir::registerTransformsPasses();
 
   // Conversion passes
-  // mlir::registerConversionPasses();
+  mlir::registerConversionPasses();
 
   // Dialect passes
   mlir::registerAffinePasses();
@@ -65,8 +65,8 @@ inline void registerAllPasses() {
   pmlc::conversion::scf_to_omp::registerPasses();
   pmlc::conversion::stdx_to_llvm::registerPasses();
   pmlc::conversion::tile_to_pxa::registerPasses();
-  // pmlc::conversion::gpu_to_spirv::registerPasses();
-  // pmlc::conversion::gpu_to_comp::registerPasses();
+  pmlc::conversion::gpu_to_spirv::registerPasses();
+  pmlc::conversion::gpu_to_comp::registerPasses();
   // pmlc::conversion::gpu::registerPasses();
 
   // Dialect passes

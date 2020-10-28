@@ -62,6 +62,7 @@ tool_dirs = [
     config.llvm_tools_dir,
 ]
 tools = [
+    'pmlc-jit',
     'pmlc-opt',
 ]
 
