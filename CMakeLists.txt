@@ -38,7 +38,9 @@ list(APPEND CMAKE_MODULE_PATH
 #-------------------------------------------------------------------------------
 include(easylogging)
 include(googletest)
+include(half)
 include(llvm-project)
+include(xsmm)
 
 #-------------------------------------------------------------------------------
 # cmake modules

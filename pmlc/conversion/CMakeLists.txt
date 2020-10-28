@@ -1,11 +1,4 @@
-add_all_subdirs()
-
-pml_cc_library(
-  NAME
-    all_conversions
-  DEPS
-    ::comp_to_llvm
-    ::gpu
-    ::gpu_to_comp
-    ::gpu_to_spirv
-)
+add_subdirectory(pxa_to_affine)
+add_subdirectory(scf_to_omp)
+add_subdirectory(stdx_to_llvm)
+add_subdirectory(tile_to_pxa)

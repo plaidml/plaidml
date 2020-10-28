@@ -1,6 +1,9 @@
 add_subdirectory(ast)
 add_subdirectory(compiler)
+add_subdirectory(conversion)
 add_subdirectory(dialect)
+add_subdirectory(rt)
+add_subdirectory(target)
 add_subdirectory(tools)
 add_subdirectory(util)
 
@@ -28,9 +31,14 @@ pml_cc_library(
     MLIRSPIRVTransforms
     MLIRStandard
     MLIRStandardOpsTransforms
+    MLIRStandardToLLVM
     MLIRStandardToSPIRVTransforms
     MLIRTransforms
     MLIRVector
+    pmlc::conversion::pxa_to_affine
+    pmlc::conversion::scf_to_omp
+    pmlc::conversion::stdx_to_llvm
+    pmlc::conversion::tile_to_pxa
     pmlc::dialect::comp::ir
     pmlc::dialect::comp::transforms
     pmlc::dialect::pxa::ir
@@ -39,4 +47,6 @@ pml_cc_library(
     pmlc::dialect::stdx::transforms
     pmlc::dialect::tile::ir
     pmlc::dialect::tile::transforms
+    pmlc::dialect::xsmm::ir
+    pmlc::target::x86
 )

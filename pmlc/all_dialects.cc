@@ -17,7 +17,7 @@
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/dialect/stdx/ir/ops.h"
 #include "pmlc/dialect/tile/ir/ops.h"
-// #include "pmlc/dialect/xsmm/ir/ops.h"
+#include "pmlc/dialect/xsmm/ir/ops.h"
 
 using namespace mlir; // NOLINT [build/namespaces]
 
@@ -34,9 +34,9 @@ void registerAllDialects(DialectRegistry &registry) {
                   vector::VectorDialect,            //
                   pmlc::dialect::comp::COMPDialect, //
                   pmlc::dialect::pxa::PXADialect,   //
-                  pmlc::dialect::stdx::StdXDialect,
-                  pmlc::dialect::tile::TileDialect>();
-  //, pmlc::dialect::xsmm::XSMMDialect>();
+                  pmlc::dialect::stdx::StdXDialect, //
+                  pmlc::dialect::tile::TileDialect, //
+                  pmlc::dialect::xsmm::XSMMDialect>();
 }
 
 // This function should be called before creating any MLIRContext if one expect

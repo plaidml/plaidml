@@ -15,6 +15,7 @@
     nest_loops.cc
     normalize.cc
     resize_tmps.cc
+    stencil_gemm.cc
     stencil.cc
     subgroups.cc
     test_analysis.cc
