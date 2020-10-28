@@ -14,10 +14,19 @@ pml_cc_library(
     MLIRAffineTransforms
     MLIRGPU
     MLIRGPUToSPIRVTransforms
+    MLIRLLVMIR
     MLIRLinalg
+    MLIRLinalgToLLVM
+    MLIRLinalgToSPIRVTransforms
     MLIRLinalgTransforms
+    MLIRSCF
+    MLIRSCFToGPU
+    MLIRSCFTransforms
+    MLIRSPIRV
+    MLIRSPIRVTransforms
     MLIRStandard
     MLIRStandardOpsTransforms
+    MLIRStandardToSPIRVTransforms
     MLIRTransforms
     MLIRVector
     pmlc::dialect::tile::transforms

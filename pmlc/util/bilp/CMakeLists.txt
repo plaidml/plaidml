@@ -8,5 +8,6 @@ pml_cc_library(
     tableau.cc
   DEPS
     pmlc::util
-    googletest
+    pmlc::util::math
+    # googletest
 )

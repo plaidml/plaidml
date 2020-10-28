@@ -13,6 +13,8 @@ pml_cc_library(
     LLVMSupport
     MLIRIR
     pmlc::dialect::tile::ir
+    pmlc::util::bilp
+    pmlc::util::math
     ::passes-gen
   PUBLIC
 )

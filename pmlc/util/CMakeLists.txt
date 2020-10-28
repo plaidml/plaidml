@@ -25,6 +25,7 @@ pml_cc_library(
     tags.cc
     util.cc
   DEPS
+    easyloggingpp
     MLIRIR
     MLIRStandard
     ::enums-gen

@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "mlir/Conversion/Passes.h"
+// #include "mlir/Conversion/Passes.h"
 #include "mlir/Dialect/Affine/Passes.h"
 #include "mlir/Dialect/GPU/Passes.h"
 #include "mlir/Dialect/LLVMIR/Transforms/Passes.h"
@@ -44,7 +44,7 @@ inline void registerAllPasses() {
   mlir::registerTransformsPasses();
 
   // Conversion passes
-  mlir::registerConversionPasses();
+  // mlir::registerConversionPasses();
 
   // Dialect passes
   mlir::registerAffinePasses();
