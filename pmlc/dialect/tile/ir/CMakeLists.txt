@@ -15,6 +15,7 @@ pml_cc_library(
     ops.cc
     util.cc
   DEPS
+    pmlc::dialect::stdx::transforms
     pmlc::util
     ::interfaces-gen
     ::ops-gen

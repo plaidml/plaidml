@@ -14,8 +14,8 @@
 #include "mlir/IR/Dialect.h"
 
 // #include "pmlc/dialect/comp/ir/dialect.h"
-// #include "pmlc/dialect/pxa/ir/ops.h"
-// #include "pmlc/dialect/stdx/ir/ops.h"
+#include "pmlc/dialect/pxa/ir/ops.h"
+#include "pmlc/dialect/stdx/ir/ops.h"
 #include "pmlc/dialect/tile/ir/ops.h"
 // #include "pmlc/dialect/xsmm/ir/ops.h"
 
@@ -33,8 +33,8 @@ void registerAllDialects(DialectRegistry &registry) {
                   StandardOpsDialect,    //
                   vector::VectorDialect, //
                   // pmlc::dialect::comp::COMPDialect, //
-                  // pmlc::dialect::pxa::PXADialect,   //
-                  // pmlc::dialect::stdx::StdXDialect, //
+                  pmlc::dialect::pxa::PXADialect, //
+                  pmlc::dialect::stdx::StdXDialect,
                   pmlc::dialect::tile::TileDialect>();
   //, pmlc::dialect::xsmm::XSMMDialect>();
 }

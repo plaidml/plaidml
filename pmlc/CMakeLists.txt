@@ -30,4 +30,5 @@ pml_cc_library(
     MLIRTransforms
     MLIRVector
     pmlc::dialect::tile::transforms
+    pmlc::dialect::stdx::transforms
 )

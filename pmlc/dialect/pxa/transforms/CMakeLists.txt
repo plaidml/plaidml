@@ -1,21 +1,28 @@
-#file(GLOB GLOB_SRCS ${CMAKE_CURRENT_SOURCE_DIR} *.cc)
-LIST(APPEND PXA_TXF_SRCS
-  autotile.cc
-  dataflow_opt.cc
-  fusion.cc
-  localize.cc
-  pass_detail.h
-  resize_tmps.cc
-  stencil.cc
-  test_analysis.cc
-  tile.cc
+ pml_cc_library(
+  NAME transforms
+  HRDS
+    pass_detail.h
+    passes.h
+  SRCS
+    autotile.cc
+    dataflow_opt.cc
+    fusion.cc
+    localize.cc
+    resize_tmps.cc
+    stencil.cc
+    test_analysis.cc
+    tile.cc
+  DEPS
+    LLVMSupport
+    MLIRIR
+    pmlc::dialect::pxa::ir
+    ::passes-gen
 )
 
-#TODO - stencil / xsmm
 
-pml_mlir_transforms(
-  SRCS
-    ${PXA_TXF_SRCS}
-  DEPS
-    pmlc::dialect::pxa::ir
+pml_tblgen_library(
+  NAME passes-gen
+  TD_FILE passes.td
+  OUTS
+    -gen-pass-decls passes.h.inc
 )
