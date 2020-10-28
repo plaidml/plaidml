@@ -5,16 +5,26 @@
     passes.h
   SRCS
     autotile.cc
+    buffer_placement.cc
+    cache.cc
+    cpu_thread.cc
     dataflow_opt.cc
     fusion.cc
+    gpu_thread.cc
     localize.cc
+    nest_loops.cc
+    normalize.cc
     resize_tmps.cc
     stencil.cc
+    subgroups.cc
     test_analysis.cc
     tile.cc
+    tile_accumulate.cc
+    vectorize.cc
   DEPS
     LLVMSupport
     MLIRIR
+    pmlc::dialect::pxa::analysis
     pmlc::dialect::pxa::ir
     ::passes-gen
 )

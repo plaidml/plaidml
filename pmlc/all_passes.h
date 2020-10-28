@@ -71,7 +71,7 @@ inline void registerAllPasses() {
 
   // Dialect passes
   // pmlc::dialect::comp::registerPasses();
-  // pmlc::dialect::pxa::registerPasses();
+  pmlc::dialect::pxa::registerPasses();
   pmlc::dialect::stdx::registerPasses();
   pmlc::dialect::tile::registerPasses();
 
