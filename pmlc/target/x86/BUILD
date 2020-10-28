@@ -36,6 +36,8 @@ plaidml_cc_library(
         "pass_detail.h",
         "pipeline.cc",
         "trace_linking.cc",
+        "utils.h",
+        "utils.cc",
         "xsmm_lowering.cc",
         ":heatmap",
     ],
