@@ -1,3 +1,5 @@
+add_subdirectory(ast)
+add_subdirectory(compiler)
 add_subdirectory(dialect)
 add_subdirectory(tools)
 add_subdirectory(util)
@@ -29,12 +31,12 @@ pml_cc_library(
     MLIRStandardToSPIRVTransforms
     MLIRTransforms
     MLIRVector
-    pmlc::dialect::comp::transforms
     pmlc::dialect::comp::ir
-    pmlc::dialect::pxa::transforms
+    pmlc::dialect::comp::transforms
     pmlc::dialect::pxa::ir
-    pmlc::dialect::stdx::transforms
+    pmlc::dialect::pxa::transforms
     pmlc::dialect::stdx::ir
-    pmlc::dialect::tile::transforms
+    pmlc::dialect::stdx::transforms
     pmlc::dialect::tile::ir
+    pmlc::dialect::tile::transforms
 )
