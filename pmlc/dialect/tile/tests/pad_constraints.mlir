@@ -21,7 +21,7 @@
   100 - x - i - y - j >= 0
 )>
 
-// CHECK: #[[complexOut:.*]] = affine_set<(d0, d1, d2, d3) : (d0 + d1 - 4 >= 0)>
+// CHECK: #[[$complexOut:.*]] = affine_set<(d0, d1, d2, d3) : (d0 + d1 - 4 >= 0)>
 
 func @pad_input(%arg0: tensor<10xf32>) -> tensor<10xf32> {
   %c0 = tile.constant(0.0 : f64) : tensor<f32>
@@ -210,5 +210,5 @@ func @check_cons_removal(%A: tensor<10x10xf32>, %B: tensor<3x3xf32>) -> tensor<1
   // CHECK-SAME: padType = 1
   // CHECK-SAME: padUpper = [1, 1]
   // CHECK: tile.contract
-  // CHECK-SAME: cons = #[[complexOut]]
+  // CHECK-SAME: cons = #[[$complexOut]]
 }
