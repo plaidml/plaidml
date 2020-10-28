@@ -1,3 +1,5 @@
+# Copyright 2020 Intel Corporation
+
 # Heavily inspired by and with gratitude to the IREE project:
 # https://github.com/google/iree/blob/main/build_tools/cmake/iree_cc_library.cmake
 
@@ -20,7 +22,7 @@ include(CMakeParseArguments)
 # LINKOPTS: List of link options
 # ALWAYSLINK: Always link the library into any binary with a direct dep.
 # PUBLIC: Add this so that this library will be exported under pml::
-# Also in IDE, target will appear in PML folder while non PUBLIC will be in IREE/internal.
+# Also in IDE, target will appear in PML folder while non PUBLIC will be in PML/internal.
 # TESTONLY: When added, this target will only be built if user passes -DPML_BUILD_TESTS=ON to CMake.
 # SHARED: If set, will compile to a shared object.
 # WHOLEARCHIVE: If set, links all symbols from "ALWAYSLINK" libraries.

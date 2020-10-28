@@ -1,3 +1,5 @@
+# Copyright 2020 Intel Corporation
+
 # Lists all transitive dependencies of DIRECT_DEPS in TRANSITIVE_DEPS.
 function(_pml_transitive_dependencies DIRECT_DEPS TRANSITIVE_DEPS)
   set(_TRANSITIVE "")

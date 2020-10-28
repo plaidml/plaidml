@@ -8,15 +8,5 @@ pml_cc_library(
   DEPS
     pmlc::compiler
     pmlc::rt
-    # ::openmp
     omp
 )
-
-# pml_cc_library(
-#   NAME openmp
-#   SRCS
-#     openmp.cc
-#   DEPS
-#     pmlc::rt
-#     omp
-# )

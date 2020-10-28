@@ -1,4 +1,6 @@
-# Heavily inspired by and with gratitude to the PML project:
+# Copyright 2020 Intel Corporation
+
+# Heavily inspired by and with gratitude to the IREE project:
 # https://github.com/google/iree/blob/main/build_tools/cmake/
 
 include(CMakeParseArguments)

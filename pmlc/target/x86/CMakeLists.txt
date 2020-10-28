@@ -30,6 +30,7 @@ pml_cc_library(
     MLIRStandardOpsTransforms
     MLIRStandardToLLVM
     MLIROpenMPToLLVM
+    omp
 )
 
 pml_tblgen_library(

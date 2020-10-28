@@ -1,3 +1,8 @@
+# Copyright 2020 Intel Corporation
+
+# Heavily inspired by and with gratitude to the IREE project:
+# https://github.com/google/iree/blob/main/build_tools/cmake/iree_cc_binary.cmake
+
 include(CMakeParseArguments)
 
 if (NOT DEFINED _PML_CC_BINARY_NAMES)

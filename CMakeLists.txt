@@ -37,6 +37,7 @@ list(APPEND CMAKE_MODULE_PATH
 # Third party dependencies
 #-------------------------------------------------------------------------------
 include(easylogging)
+include(gflags)
 include(googletest)
 include(half)
 include(llvm-project)
@@ -57,6 +58,7 @@ if(${PML_BUILD_TESTS})
   enable_testing(pmlc)
 endif()
 
+add_subdirectory(plaidml)
 add_subdirectory(pmlc)
 
 # Note: this must be called after all libraries have been declared.
