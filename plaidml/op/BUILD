@@ -69,6 +69,7 @@ py_library(
 
 plaidml_cc_test(
     name = "op_test",
+    size = "medium",
     srcs = ["op_test.cc"],
     linkstatic = True,
     deps = [

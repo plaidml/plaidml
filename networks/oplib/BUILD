@@ -29,6 +29,7 @@ plaidml_cc_binary(
 
 plaidml_cc_test(
     name = "resnet50_test",
+    size = "medium",
     srcs = ["run.cc"],
     linkstatic = 1,
     deps = [
