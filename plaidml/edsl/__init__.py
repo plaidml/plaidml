@@ -786,7 +786,7 @@ def argsort(x, axis=-1, direction=SortDirection.ASC):
     Returns:
         Tensor: An integer tensor with the same shape as ``x``.
     """
-    return intrinsic('sort', x, axis, direction)
+    return intrinsic('argsort', x, axis, direction)
 
 
 def cast(x, dtype):

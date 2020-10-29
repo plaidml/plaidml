@@ -618,33 +618,186 @@ class TestEdsl(unittest.TestCase):
 
     def test_argsort_1d(self):
         I = Placeholder(plaidml.DType.FLOAT32, [20])
-        O = argsort(I, axis=0, mode=SortMode.ASC)
+        O = argsort(I, axis=0, direction=SortDirection.ASC)
         program = Program('argsort_1d', [I], [O])
+        input = np.array([
+            81.69,
+            95.74,
+            27.74,
+            43.69,
+            55.79,
+            56.79,
+            57.52,
+            5.9,
+            39.48,
+            7.11,
+            14.81,
+            66.23,
+            20.25,
+            66.05,
+            64.5,
+            71.07,
+            67.6,
+            54.42,
+            87.59,
+            80.02,
+        ])
+        expected = [
+            7,
+            9,
+            10,
+            12,
+            2,
+            8,
+            3,
+            17,
+            4,
+            5,
+            6,
+            14,
+            13,
+            11,
+            16,
+            15,
+            19,
+            0,
+            18,
+            1,
+        ]
+        self.checkProgram(program, [input], [expected])
 
     def test_argsort_2d_axis_0(self):
         I = Placeholder(plaidml.DType.FLOAT32, [5, 4])
-        O = argsort(I, axis=0, mode=SortMode.DESC)
+        O = argsort(I, axis=0, direction=SortDirection.ASC)
         program = Program('argsort_2d_axis_0', [I], [O])
+        input = np.array([
+            [81.69, 95.74, 27.74, 43.69],
+            [55.79, 56.79, 57.52, 5.9],
+            [39.48, 7.11, 14.81, 66.23],
+            [20.25, 66.05, 64.5, 71.07],
+            [67.6, 54.42, 87.59, 80.02],
+        ])
+        expected = [
+            [3, 2, 2, 1],
+            [2, 4, 0, 0],
+            [1, 1, 1, 2],
+            [4, 3, 3, 3],
+            [0, 0, 4, 4],
+        ]
+        self.checkProgram(program, [input], [expected])
 
     def test_argsort_2d_axis_1(self):
         I = Placeholder(plaidml.DType.FLOAT32, [5, 4])
         O = argsort(I, axis=1)
         program = Program('argsort_2d_axis_1', [I], [O])
+        input = np.array([
+            [81.69, 95.74, 27.74, 43.69],
+            [55.79, 56.79, 57.52, 5.9],
+            [39.48, 7.11, 14.81, 66.23],
+            [20.25, 66.05, 64.5, 71.07],
+            [67.6, 54.42, 87.59, 80.02],
+        ])
+        expected = [
+            [2, 3, 0, 1],
+            [3, 0, 1, 2],
+            [1, 2, 0, 3],
+            [0, 2, 1, 3],
+            [1, 0, 3, 2],
+        ]
+        self.checkProgram(program, [input], [expected])
 
-    def test_argsort_3d_axis_1_asc(self):
-        I = Placeholder(plaidml.DType.FLOAT32, [5, 4, 3])
-        O = argsort(I, axis=1, mode=SortMode.ASC)
-        program = Program('argsort_3d_axis_1_asc', [I], [O])
+    def test_argsort_3d_axis_0_asc(self):
+        I = Placeholder(plaidml.DType.FLOAT32, [3, 4, 5])
+        O = argsort(I, axis=0, direction=SortDirection.ASC)
+        program = Program('argsort_3d_axis_0_asc', [I], [O])
+        input = np.array([
+            [
+                [0.508, 0.001, 0.833, 0.186, 0.960],
+                [0.405, 0.621, 0.183, 0.769, 0.331],
+                [0.726, 0.678, 0.027, 0.789, 0.544],
+                [0.151, 0.453, 0.512, 0.513, 0.451],
+            ],
+            [
+                [0.875, 0.089, 0.909, 0.353, 0.829],
+                [0.238, 0.511, 0.619, 0.214, 0.818],
+                [0.085, 0.713, 0.649, 0.373, 0.654],
+                [0.615, 0.865, 0.268, 0.713, 0.171],
+            ],
+            [
+                [0.218, 0.272, 0.702, 0.621, 0.224],
+                [0.236, 0.746, 0.508, 0.189, 0.503],
+                [0.177, 0.096, 0.466, 0.228, 0.759],
+                [0.771, 0.567, 0.594, 0.211, 0.183],
+            ],
+        ])
+        expected = [
+            [
+                [2, 0, 2, 0, 2],
+                [2, 1, 0, 2, 0],
+                [1, 2, 0, 2, 0],
+                [0, 0, 1, 2, 1],
+            ],
+            [
+                [0, 1, 0, 1, 1],
+                [1, 0, 2, 1, 2],
+                [2, 0, 2, 1, 1],
+                [1, 2, 0, 0, 2],
+            ],
+            [
+                [1, 2, 1, 2, 0],
+                [0, 2, 1, 0, 1],
+                [0, 1, 1, 0, 2],
+                [2, 1, 2, 1, 0],
+            ],
+        ]
 
-    def test_argsort_3d_axis_1_desc(self):
-        I = Placeholder(plaidml.DType.FLOAT32, [5, 4, 3])
-        O = argsort(I, axis=1, mode=SortMode.DESC)
-        program = Program('argsort_3d_axis_1_desc', [I], [O])
+        self.checkProgram(program, [input], [expected])
 
-    def test_argsort_3d_last_axis(self):
-        I = Placeholder(plaidml.DType.FLOAT32, [5, 4, 3])
-        O = argsort(I, axis=-1)
-        program = Program('argsort_3d_last_axis', [I], [O])
+    def test_argsort_3d_axis_2_desc(self):
+        I = Placeholder(plaidml.DType.FLOAT32, [3, 4, 5])
+        O = argsort(I, axis=2, direction=SortDirection.DESC)
+        program = Program('argsort_3d_axis_2_desc', [I], [O])
+        input = np.array([
+            [
+                [0.508, 0.001, 0.833, 0.186, 0.960],
+                [0.405, 0.621, 0.183, 0.769, 0.331],
+                [0.726, 0.678, 0.027, 0.789, 0.544],
+                [0.151, 0.453, 0.512, 0.513, 0.451],
+            ],
+            [
+                [0.875, 0.089, 0.909, 0.353, 0.829],
+                [0.238, 0.511, 0.619, 0.214, 0.818],
+                [0.085, 0.713, 0.649, 0.373, 0.654],
+                [0.615, 0.865, 0.268, 0.713, 0.171],
+            ],
+            [
+                [0.218, 0.272, 0.702, 0.621, 0.224],
+                [0.236, 0.746, 0.508, 0.189, 0.503],
+                [0.177, 0.096, 0.466, 0.228, 0.759],
+                [0.771, 0.567, 0.594, 0.211, 0.183],
+            ],
+        ])
+        expected = [
+            [
+                [4, 2, 0, 3, 1],
+                [3, 1, 0, 4, 2],
+                [3, 0, 1, 4, 2],
+                [3, 2, 1, 4, 0],
+            ],
+            [
+                [2, 0, 4, 3, 1],
+                [4, 2, 1, 0, 3],
+                [1, 4, 2, 3, 0],
+                [1, 3, 0, 2, 4],
+            ],
+            [
+                [2, 3, 1, 4, 0],
+                [1, 2, 4, 0, 3],
+                [4, 2, 3, 0, 1],
+                [0, 2, 1, 3, 4],
+            ],
+        ]
+        self.checkProgram(program, [input], [expected])
 
 
 if __name__ == '__main__':
