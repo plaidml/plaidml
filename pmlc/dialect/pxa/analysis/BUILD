@@ -8,11 +8,13 @@ plaidml_cc_library(
     name = "analysis",
     srcs = [
         "affine_expr.cc",
+        "affine_constraints.cc",
         "strides.cc",
         "uses.cc",
     ],
     hdrs = [
         "affine_expr.h",
+        "affine_constraints.h",
         "strides.h",
         "uses.h",
     ],
