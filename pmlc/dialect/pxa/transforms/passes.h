@@ -70,6 +70,9 @@ std::unique_ptr<mlir::Pass> createVectorizePass(mlir::StringRef strategy,
 
 std::unique_ptr<mlir::Pass> createSimplifyWithConstraintsPass();
 
+std::unique_ptr<mlir::Pass> createReorderLayoutsPass();
+std::unique_ptr<mlir::Pass> createReorderLayoutsPass(bool allowReorder);
+
 /// Generate the code for registering passes.
 #define GEN_PASS_REGISTRATION
 #include "pmlc/dialect/pxa/transforms/passes.h.inc"
