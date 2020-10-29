@@ -20,6 +20,8 @@
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/Interfaces/LoopLikeInterface.h"
 
+#include "pmlc/util/loop_with_epilog.h"
+
 namespace pmlc::dialect::abi {
 
 /*

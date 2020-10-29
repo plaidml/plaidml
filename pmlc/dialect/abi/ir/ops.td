@@ -1,10 +1,12 @@
-// Copyright 2019, Intel Corporation
+// Copyright 2020 Intel Corporation
 
 #ifndef __PML_ABI_OPS__
 #define __PML_ABI_OPS__
 
 include "mlir/Dialect/StandardOps/IR/StandardOpsBase.td"
 include "mlir/Interfaces/LoopLikeInterface.td"
+
+include "pmlc/util/loop_with_epilog.td"
 
 include "pmlc/util/enums.td"
 
@@ -18,6 +20,7 @@ class ABI_Op<string mnemonic, list<OpTrait> traits = []> :
 
 def ABI_LoopOp : ABI_Op<"loop", [
   DeclareOpInterfaceMethods<LoopLikeOpInterface>,
+  DeclareOpInterfaceMethods<LoopWithEpilogInterface>,
   IsolatedFromAbove, HasParent<"ModuleOp">]> {
   let summary = "Repeat runs of a network";
   let description = [{
