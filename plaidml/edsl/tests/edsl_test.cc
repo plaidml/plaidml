@@ -2252,6 +2252,45 @@ TEST_F(CppEdsl, ArgSort2dAxis1) {
   checkExact(program, {input}, {output});
 }
 
+TEST_F(CppEdsl, ArgSort3dAxis0Asc) {
+  auto I = Placeholder(DType::FLOAT32, {3, 4, 5});
+  auto O = argsort(I, /*axis=*/0, SortDirection::ASC);
+  auto program = makeProgram("argsort", {I}, {O});
+  std::vector<float> input = {
+      0.508, 0.001, 0.833, 0.186, 0.960,  //
+      0.405, 0.621, 0.183, 0.769, 0.331,  //
+      0.726, 0.678, 0.027, 0.789, 0.544,  //
+      0.151, 0.453, 0.512, 0.513, 0.451,  //
+      //
+      0.875, 0.089, 0.909, 0.353, 0.829,  //
+      0.238, 0.511, 0.619, 0.214, 0.818,  //
+      0.085, 0.713, 0.649, 0.373, 0.654,  //
+      0.615, 0.865, 0.268, 0.713, 0.171,  //
+      //
+      0.218, 0.272, 0.702, 0.621, 0.224,  //
+      0.236, 0.746, 0.508, 0.189, 0.503,  //
+      0.177, 0.096, 0.466, 0.228, 0.759,  //
+      0.771, 0.567, 0.594, 0.211, 0.183,  //
+  };
+  std::vector<int32_t> output = {
+      2, 0, 2, 0, 2,  //
+      2, 1, 0, 2, 0,  //
+      1, 2, 0, 2, 0,  //
+      0, 0, 1, 2, 1,  //
+      //
+      0, 1, 0, 1, 1,  //
+      1, 0, 2, 1, 2,  //
+      2, 0, 2, 1, 1,  //
+      1, 2, 0, 0, 2,  //
+      //
+      1, 2, 1, 2, 0,  //
+      0, 2, 1, 0, 1,  //
+      0, 1, 1, 0, 2,  //
+      2, 1, 2, 1, 0,  //
+  };
+  checkExact(program, {input}, {output});
+}
+
 TEST_F(CppEdsl, ArgSort3dAxis2Desc) {
   auto I = Placeholder(DType::FLOAT32, {3, 4, 5});
   auto O = argsort(I, /*axis=*/2, SortDirection::DESC);
