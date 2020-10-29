@@ -1,5 +1,6 @@
 pml_cc_library(
   NAME exec
+  TYPE OBJECT
   HDRS
     exec.h
     ffi.h

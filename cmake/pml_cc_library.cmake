@@ -24,7 +24,6 @@ include(CMakeParseArguments)
 # PUBLIC: Add this so that this library will be exported under pml::
 # Also in IDE, target will appear in PML folder while non PUBLIC will be in PML/internal.
 # TESTONLY: When added, this target will only be built if user passes -DPML_BUILD_TESTS=ON to CMake.
-# SHARED: If set, will compile to a shared object.
 # WHOLEARCHIVE: If set, links all symbols from "ALWAYSLINK" libraries.
 #
 # Note:
@@ -60,9 +59,9 @@ include(CMakeParseArguments)
 function(pml_cc_library)
   cmake_parse_arguments(
     _RULE
-    "PUBLIC;ALWAYSLINK;TESTONLY;SHARED;WHOLEARCHIVE"
-    "NAME"
-    "HDRS;TEXTUAL_HDRS;SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS;INCLUDES"
+    "PUBLIC;ALWAYSLINK;TESTONLY;WHOLEARCHIVE"
+    "NAME;TYPE"
+    "HDRS;TEXTUAL_HDRS;SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS;INCLUDES;PROPS"
     ${ARGN}
   )
 
@@ -89,21 +88,23 @@ function(pml_cc_library)
       list(REMOVE_ITEM _CC_SRCS "${src_file}")
     endif()
   endforeach()
-  if("${_CC_SRCS}" STREQUAL "")
-    set(_RULE_IS_INTERFACE 1)
-  else()
-    set(_RULE_IS_INTERFACE 0)
+
+  if(NOT _RULE_TYPE)
+    if("${_CC_SRCS}" STREQUAL "")
+      set(_RULE_TYPE INTERFACE)
+    else()
+      set(_RULE_TYPE STATIC)
+    endif()
   endif()
 
-  if(NOT _RULE_IS_INTERFACE)
-    if (_RULE_SHARED)
-      add_library(${_NAME} SHARED "")
-    else()
-      add_library(${_NAME} STATIC "")
-      if (_RULE_WHOLEARCHIVE)
-        message(FATAL_ERROR "WHOLEARCHIVE must be set together with SHARED")
-      endif()
+  if (${_RULE_TYPE} STREQUAL SHARED)
+    if (_RULE_WHOLEARCHIVE)
+      message(FATAL_ERROR "WHOLEARCHIVE must be set together with SHARED")
     endif()
+  endif()
+
+  if(NOT ${_RULE_TYPE} STREQUAL INTERFACE)
+    add_library(${_NAME} ${_RULE_TYPE} "")
 
     target_sources(${_NAME}
       PRIVATE
@@ -180,6 +181,10 @@ function(pml_cc_library)
       INTERFACE
         ${_RULE_DEFINES}
     )
+  endif()
+
+  if (_RULE_PROPS)
+    set_target_properties(${_NAME} PROPERTIES ${_RULE_PROPS})
   endif()
 
   # Alias the pml_package_name library to pml::package::name.

@@ -22,7 +22,6 @@ pml_cc_library(
     pmlc::dialect::stdx::transforms
     pmlc::dialect::tile::transforms
     pmlc::dialect::xsmm::ir
-    pmlc::rt
     MLIRAffineToStandard
     MLIRAffineTransforms
     MLIRLLVMIRTransforms
@@ -36,20 +35,16 @@ pml_cc_library(
 pml_tblgen_library(
   NAME passes-gen
   TD_FILE passes.td
-  OUTS
-    -gen-pass-decls passes.h.inc
+  OUTS -gen-pass-decls passes.h.inc
 )
 
 pml_cc_library(
   NAME prng_lowering
-  HDRS
-    passes.h
-  SRCS
-    prng_lowering.cc
+  HDRS passes.h
+  SRCS prng_lowering.cc
   DEPS
     ::passes-gen
     pmlc::dialect::pxa::ir
-    pmlc::rt
 )
 
 add_custom_command(

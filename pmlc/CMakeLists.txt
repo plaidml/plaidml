@@ -4,9 +4,9 @@ add_subdirectory(conversion)
 add_subdirectory(dialect)
 add_subdirectory(rt)
 add_subdirectory(target)
+add_subdirectory(testing)
 add_subdirectory(tools)
 add_subdirectory(util)
-
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
 get_property(conversion_libs GLOBAL PROPERTY MLIR_CONVERSION_LIBS)

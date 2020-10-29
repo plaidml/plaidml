@@ -37,3 +37,9 @@ pml_cc_library(
     MLIRTransforms
     mlir_runner_utils
 )
+
+set_property(SOURCE xsmm.cc
+  PROPERTY COMPILE_DEFINITIONS
+    __BLAS=0
+    LIBXSMM_DEFAULT_CONFIG
+)

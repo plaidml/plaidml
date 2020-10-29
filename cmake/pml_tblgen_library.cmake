@@ -19,19 +19,19 @@ function(pml_tblgen_library)
     ${ARGN}
   )
 
-  # if(_RULE_TESTONLY AND NOT PML_BUILD_TESTS)
-  #   return()
-  # endif()
+  if(_RULE_TESTONLY AND NOT PML_BUILD_TESTS)
+    return()
+  endif()
 
   # Prefix the library with the package name, so we get: pml_package_name
   pml_package_name(_PACKAGE_NAME)
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
 
-  # if(${_RULE_TBLGEN} MATCHES "IREE")
-  #   set(_TBLGEN "IREE")
-  # else()
-  set(_TBLGEN "MLIR")
-  # endif()
+  if(_RULE_TBLGEN)
+    set(_TBLGEN "${_RULE_TBLGEN}")
+  else()
+    set(_TBLGEN "MLIR")
+  endif()
 
   set(LLVM_TARGET_DEFINITIONS ${_RULE_TD_FILE})
   set(_INCLUDE_DIRS ${PML_COMMON_INCLUDE_DIRS})

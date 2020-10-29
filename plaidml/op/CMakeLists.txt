@@ -2,6 +2,7 @@ add_subdirectory(lib)
 
 pml_cc_library(
   NAME op
+  TYPE OBJECT
   HDRS
     ffi.h
     op.h

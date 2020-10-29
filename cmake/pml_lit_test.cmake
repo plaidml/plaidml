@@ -23,10 +23,17 @@ set(PML_TEST_DEPENDS
 #   DEPENDS ${PML_TEST_DEPENDS}
 # )
 
+add_custom_target(check-plaidml
+  COMMAND ${llvm-project_BINARY_DIR}/bin/llvm-lit plaidml -v
+  USES_TERMINAL
+)
+add_dependencies(check-plaidml ${PML_TEST_DEPENDS})
+set_target_properties(check-plaidml PROPERTIES FOLDER "Tests")
+
 add_custom_target(check-pml
   COMMAND ${llvm-project_BINARY_DIR}/bin/llvm-lit pmlc -v
-  COMMENT "Running the PML regression tests"
   USES_TERMINAL
 )
 add_dependencies(check-pml ${PML_TEST_DEPENDS})
 set_target_properties(check-pml PROPERTIES FOLDER "Tests")
+
