@@ -30,6 +30,8 @@
 
 #include "omp.h" // NOLINT
 
+#include "pmlc/target/x86/utils.h"
+
 using namespace mlir; // NOLINT[build/namespaces]
 
 namespace pmlc::target::x86 {
@@ -173,13 +175,14 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
 
   // Use OMP thread count
-  auto maxThreads = omp_get_max_threads();
-  // TODO: Get the physical core count (coming in the next commit)
-  // TODO: The hyperthreading is very harmful on perf, so exclude the
-  //       hyper threads.
-  maxThreads = maxThreads / 2;
-  maxThreads = std::max(1, maxThreads);
+  unsigned maxThreads = omp_get_max_threads();
+  unsigned physCores = getPhysicalCoreNumber();
+  if (0 != physCores) {
+    maxThreads = std::min(physCores, maxThreads);
+  }
+
   pm.addPass(pxa::createCPUThreadPass(maxThreads));
+
   pm.addPass(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
 
