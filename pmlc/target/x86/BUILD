@@ -55,7 +55,7 @@ plaidml_cc_library(
         "@llvm-project//mlir:OpenMPToLLVM",
         "@llvm-project//mlir:SCFToStandard",
         "@llvm-project//mlir:StandardOpsTransforms",
-        "@llvm-project//openmp:openmp",
+        "@llvm-project//openmp",
     ],
 )
 
