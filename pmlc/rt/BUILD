@@ -13,7 +13,6 @@ plaidml_cc_library(
         "internal.h",
         "jit_executable.cc",
         "jit_executable.h",
-        "openmp.cc",
         "prng.cc",
         "runtime_registry.cc",
         "symbol_registry.cc",
@@ -26,6 +25,7 @@ plaidml_cc_library(
         "runtime_registry.h",
         "symbol_registry.h",
     ],
+    copts = ["-w"],
     visibility = ["//visibility:public"],
     deps = [
         "//pmlc/compiler",
@@ -42,10 +42,8 @@ plaidml_cc_library(
         "@llvm-project//mlir:TargetLLVMIR",
         "@llvm-project//mlir:Transforms",
         "@llvm-project//mlir:mlir_runner_utils",
-        "@llvm-project//openmp",
         "@xsmm",
     ],
-    copts = ["-w"],
     alwayslink = 1,
 )
 

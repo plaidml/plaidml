@@ -1,0 +1,15 @@
+pml_cc_library(
+  NAME
+    analysis
+  SRCS
+    affine_expr.cc
+    strides.cc
+    uses.cc
+  HDRS
+    affine_expr.h
+    strides.h
+    uses.h
+  DEPS
+    pmlc::util::bilp
+    pmlc::dialect::pxa::ir
+)

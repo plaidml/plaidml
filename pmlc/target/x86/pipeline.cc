@@ -28,7 +28,7 @@
 #include "pmlc/util/env.h"
 #include "pmlc/util/logging.h"
 
-#include "openmp/runtime/src/omp.h"
+#include "omp.h" // NOLINT
 
 #include "pmlc/target/x86/utils.h"
 
