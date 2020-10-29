@@ -120,7 +120,6 @@ getLowerUpperBounds(mlir::AffineExpr expr,
                            std::multiplies<int64_t>());
     }
     case mlir::AffineExprKind::Mod: {
-      auto lhsBounds = getLowerUpperBounds(binExpr.getLHS(), constraints);
       auto rhsBounds = getLowerUpperBounds(binExpr.getRHS(), constraints);
       // TODO: Take lhs bounds into account.
       mlir::Optional<int64_t> lower = 0;
