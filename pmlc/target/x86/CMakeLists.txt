@@ -8,7 +8,8 @@ pml_cc_library(
     pipeline.cc
     register.cc
     trace_linking.cc
-    xsmm_lowering.cc  
+    xsmm_lowering.cc
+    utils.cc
   DEPS
     ::passes-gen
     ::prng_lowering
