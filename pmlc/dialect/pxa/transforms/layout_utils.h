@@ -30,7 +30,7 @@ struct ReorderDesc {
 /// 3. `pxa.load` reading input memory with identity map;
 /// 4. `pxa.reduce` writing to output memory with transformed map.
 /// Returns reordered memory.
-mlir::Value createReorder(mlir::Location &loc, mlir::OpBuilder &builder,
+mlir::Value createReorder(mlir::Location loc, mlir::OpBuilder &builder,
                           ReorderDesc &desc, mlir::Value srcMem);
 
 /// Reorders memory `srcMem` to new layout and uses it in all operations

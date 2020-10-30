@@ -10,7 +10,7 @@
 
 namespace pmlc::dialect::pxa {
 
-mlir::Value createReorder(mlir::Location &loc, mlir::OpBuilder &builder,
+mlir::Value createReorder(mlir::Location loc, mlir::OpBuilder &builder,
                           ReorderDesc &desc, mlir::Value srcMem) {
   // Allocate new memory.
   auto srcMemType = srcMem.getType().cast<mlir::MemRefType>();
