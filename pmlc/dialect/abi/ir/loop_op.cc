@@ -31,9 +31,10 @@ struct DenormalizeConstantsPattern final
         //      result, and no operands.
         auto *denormOp = definingOp->clone();
         rewriter.insert(denormOp);
-        auto arg = loopOp.bodyEntryBlock()->getArgument(idx);
+        auto arg = loopOp.getBodyEntryBlock()->getArgument(idx);
         arg.replaceAllUsesWith(denormOp->getResult(0));
-        loopOp.bodyEntryBlock()->eraseArgument(idx);
+        loopOp.getBodyEntryBlock()->eraseArgument(idx);
+        loopOp.getFiniEntryBlock()->eraseArgument(idx);
         networkOp.getOperation()->eraseOperand(idx);
       } else {
         newNetworkFieldTypes.emplace_back(tyAttr);
@@ -51,11 +52,50 @@ struct DenormalizeConstantsPattern final
   }
 };
 
+struct RemoveUnusedNetworkFieldsPattern final
+    : public mlir::OpRewritePattern<LoopOp> {
+  using mlir::OpRewritePattern<LoopOp>::OpRewritePattern;
+
+  mlir::LogicalResult match(LoopOp loopOp) const final {
+    auto networkOp = loopOp.getInitTerminator();
+    auto *bodyEntryBlock = loopOp.getBodyEntryBlock();
+    auto *finiEntryBlock = loopOp.getFiniEntryBlock();
+    for (unsigned idx = 0; idx < networkOp.getNumOperands(); ++idx) {
+      if (bodyEntryBlock->getArgument(idx).use_empty() &&
+          finiEntryBlock->getArgument(idx).use_empty()) {
+        return mlir::success();
+      }
+    }
+    return mlir::failure();
+  }
+
+  void rewrite(LoopOp loopOp, mlir::PatternRewriter &rewriter) const final {
+    rewriter.updateRootInPlace(loopOp, [&] {
+      auto networkOp = loopOp.getInitTerminator();
+      auto *bodyEntryBlock = loopOp.getBodyEntryBlock();
+      auto *finiEntryBlock = loopOp.getFiniEntryBlock();
+      unsigned idx = 0;
+      while (idx < networkOp.getNumOperands()) {
+        if (bodyEntryBlock->getArgument(idx).use_empty() &&
+            finiEntryBlock->getArgument(idx).use_empty()) {
+          networkOp.getOperation()->eraseOperand(idx);
+          bodyEntryBlock->eraseArgument(idx);
+          finiEntryBlock->eraseArgument(idx);
+        } else {
+          ++idx;
+        }
+      }
+      loopOp.setNetworkFieldTypes(networkOp.getOperandTypes());
+    });
+  }
+};
+
 } // namespace
 
 void LoopOp::getCanonicalizationPatterns(
     mlir::OwningRewritePatternList &patterns, mlir::MLIRContext *ctx) {
   patterns.insert<DenormalizeConstantsPattern>(ctx);
+  patterns.insert<RemoveUnusedNetworkFieldsPattern>(ctx);
 }
 
 mlir::Region &LoopOp::getLoopBody() { return bodyRegion(); }
@@ -81,7 +121,8 @@ bool LoopOp::isDefinedOutsideOfLoop(mlir::Value value) {
 
 LogicalResult LoopOp::moveOutOfLoop(mlir::ArrayRef<mlir::Operation *> ops) {
   auto networkOp = getInitTerminator();
-  mlir::Block *bodyEntryBlock = &bodyRegion().front();
+  mlir::Block *bodyEntryBlock = getBodyEntryBlock();
+  mlir::Block *finiEntryBlock = getFiniEntryBlock();
   for (auto op : ops) {
     for (auto &operand : op->getOpOperands()) {
       auto blockArg = operand.get().dyn_cast<mlir::BlockArgument>();
@@ -93,18 +134,13 @@ LogicalResult LoopOp::moveOutOfLoop(mlir::ArrayRef<mlir::Operation *> ops) {
         continue;
       }
       operand.set(networkOp.getOperand(blockArg.getArgNumber()));
-      if (blockArg.use_empty()) {
-        // After hoisting this op to the init region, we will no longer need
-        // this body argument.
-        networkOp.getOperation()->eraseOperand(blockArg.getArgNumber());
-        bodyEntryBlock->eraseArgument(blockArg.getArgNumber());
-      }
     }
     for (auto result : op->getResults()) {
       if (result.use_empty()) {
         continue;
       }
       unsigned idx = networkOp.getNumOperands();
+      finiEntryBlock->insertArgument(idx, result.getType());
       auto plumbedValue = bodyEntryBlock->insertArgument(idx, result.getType());
       result.replaceAllUsesWith(plumbedValue);
       networkOp.getOperation()->insertOperands(idx, mlir::ValueRange{result});
@@ -112,6 +148,36 @@ LogicalResult LoopOp::moveOutOfLoop(mlir::ArrayRef<mlir::Operation *> ops) {
     op->moveBefore(networkOp);
   }
   setNetworkFieldTypes(networkOp.getOperandTypes());
+  return mlir::success();
+}
+
+LogicalResult LoopOp::moveToLoopEpilog(mlir::ArrayRef<mlir::Operation *> ops) {
+  auto networkOp = getInitTerminator();
+  auto finiTerminator = getFiniTerminator();
+  mlir::Block *bodyEntryBlock = getBodyEntryBlock();
+  mlir::Block *finiEntryBlock = getFiniEntryBlock();
+  for (auto op : ops) {
+    for (auto &operand : op->getOpOperands()) {
+      auto blockArg = operand.get().dyn_cast<mlir::BlockArgument>();
+      if (!blockArg || blockArg.getParentBlock() != bodyEntryBlock ||
+          networkOp.getNumOperands() <= blockArg.getArgNumber()) {
+        // N.B. It's unclear that this should ever happen (where could the
+        // operand have come from, if we're hoisting it?), but if it does,
+        // we handle it.
+        continue;
+      }
+      operand.set(finiEntryBlock->getArgument(blockArg.getArgNumber()));
+    }
+    for (auto result : op->getResults()) {
+      if (result.use_empty()) {
+        continue;
+      }
+      // If the results of the operation are in use, we don't know how to
+      // hoist it.
+      return mlir::failure();
+    }
+    op->moveBefore(finiTerminator);
+  }
   return mlir::success();
 }
 

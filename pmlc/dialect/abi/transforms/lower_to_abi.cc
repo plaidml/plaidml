@@ -67,7 +67,7 @@ void LowerToABIPass::runOnOperation() {
   // At this point, all of the arguments should be memrefs, except for a
   // possible initial device argument -- which, if present, is always passed
   // to the initialization block.
-  auto *bodyEntryBlock = loopOp.bodyEntryBlock();
+  auto *bodyEntryBlock = loopOp.getBodyEntryBlock();
   unsigned argIdx = 0;
   mlir::Identifier constAttrId = builder.getIdentifier("tile.const");
   if (bodyEntryBlock->getNumArguments() == 0 ||
@@ -112,8 +112,12 @@ void LowerToABIPass::runOnOperation() {
   // Terminate the init block using a passthrough of the
   // init block's arguments.
   builder.create<abi::CreateNetworkOp>(loc, networkArgs);
-
   loopOp.setNetworkFieldTypes(networkTypes);
+
+  // Add the fini region.
+  auto *finiEntryBlock = builder.createBlock(&loopOp.finiRegion());
+  finiEntryBlock->addArguments(networkTypes);
+  builder.create<abi::DoneOp>(loc);
 
   // We no longer need the main function.
   mainFunc.erase();

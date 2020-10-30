@@ -5,6 +5,7 @@
 
 include "mlir/Dialect/StandardOps/IR/StandardOpsBase.td"
 include "mlir/Interfaces/LoopLikeInterface.td"
+include "mlir/Interfaces/SideEffectInterfaces.td"
 
 include "pmlc/util/loop_with_epilog.td"
 
@@ -21,7 +22,7 @@ class ABI_Op<string mnemonic, list<OpTrait> traits = []> :
 def ABI_LoopOp : ABI_Op<"loop", [
   DeclareOpInterfaceMethods<LoopLikeOpInterface>,
   DeclareOpInterfaceMethods<LoopWithEpilogInterface>,
-  IsolatedFromAbove, HasParent<"ModuleOp">]> {
+  IsolatedFromAbove, HasParent<"ModuleOp">, RecursiveSideEffects]> {
   let summary = "Repeat runs of a network";
   let description = [{
     The "abi.loop" operation represents repeated runs of a program,
@@ -30,9 +31,7 @@ def ABI_LoopOp : ABI_Op<"loop", [
     operations outside of the loop, so that their cost is ammortized over
     many runs of the program.
   }];
-  // TODO: Add a region for finalization operations, once we have
-  // anything to put into such a region.
-  let regions = (region AnyRegion:$initRegion, AnyRegion:$bodyRegion);
+  let regions = (region AnyRegion:$initRegion, AnyRegion:$bodyRegion, AnyRegion:$finiRegion);
   let hasCanonicalizer = 1;
   let extraClassDeclaration = [{
     static mlir::StringRef getNetworkFieldTypesAttrName() { return "networkFieldTypes"; }
@@ -67,10 +66,15 @@ def ABI_LoopOp : ABI_Op<"loop", [
       setAttr(getNetworkFieldTypesAttrName(), arrayAttr);
     }
 
-    mlir::Block* bodyEntryBlock() { return &bodyRegion().front(); }
+    mlir::Block* getBodyEntryBlock() { return &bodyRegion().front(); }
+    mlir::Block* getFiniEntryBlock() { return &finiRegion().front(); }
     
     CreateNetworkOp getInitTerminator() {
       return mlir::cast<CreateNetworkOp>(initRegion().back().getTerminator());
+    }
+
+    DoneOp getFiniTerminator() {
+      return mlir::cast<DoneOp>(finiRegion().back().getTerminator());
     }
   }];
 }
