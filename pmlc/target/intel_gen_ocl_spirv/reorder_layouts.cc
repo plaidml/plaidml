@@ -72,7 +72,7 @@ struct ThreadedReorderCreator {
   explicit ThreadedReorderCreator(unsigned maxThreads)
       : maxThreads(maxThreads) {}
 
-  mlir::Value operator()(mlir::Location &loc, mlir::OpBuilder &builder,
+  mlir::Value operator()(mlir::Location loc, mlir::OpBuilder &builder,
                          pxa::ReorderDesc &reorderDesc, mlir::Value srcMem) {
     mlir::Value newMem = pxa::createReorder(loc, builder, reorderDesc, srcMem);
     auto reorderParallel = newMem.getDefiningOp<mlir::AffineParallelOp>();
