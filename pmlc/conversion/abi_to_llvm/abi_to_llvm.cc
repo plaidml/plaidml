@@ -89,14 +89,19 @@ struct CreateNetworkOpLowering final
       mlir::SmallVector<LLVMType, 8> networkFieldTypes;
       mlir::SmallVector<mlir::Value, 8> networkFieldValues;
       for (auto srcValue : createNetworkOp.getOperands()) {
+        auto convTy = typeConverter.convertType(srcValue.getType())
+                          .dyn_cast_or_null<LLVMType>();
+        if (!convTy) {
+          rewriter.cancelRootUpdate(createNetworkOp);
+          return mlir::failure();
+        }
         auto convValue = typeConverter.materializeTargetConversion(
-            rewriter, createNetworkOp.getLoc(),
-            typeConverter.convertType(srcValue.getType()), srcValue);
+            rewriter, createNetworkOp.getLoc(), convTy, srcValue);
         if (!convValue) {
           rewriter.cancelRootUpdate(createNetworkOp);
           return mlir::failure();
         }
-        networkFieldTypes.emplace_back(convValue.getType().cast<LLVMType>());
+        networkFieldTypes.emplace_back(convTy);
         networkFieldValues.emplace_back(convValue);
       }
 
@@ -171,17 +176,19 @@ struct LoopOpLowering final : public mlir::ConvertOpToLLVMPattern<abi::LoopOp> {
     // llvm::errs() << "Lowering " << loopOp << "\n";
     // llvm::DebugFlag = true;
 
-    rewriter.startRootUpdate(loopOp);
-
     mlir::SmallVector<LLVMType, 8> networkFieldTypes;
     for (auto ty : loopOp.getNetworkFieldTypes()) {
-      networkFieldTypes.emplace_back(
-          typeConverter.convertType(ty).cast<LLVMType>());
+      auto newTy = typeConverter.convertType(ty).dyn_cast_or_null<LLVMType>();
+      if (!newTy) {
+        return mlir::failure();
+      }
+      networkFieldTypes.emplace_back(newTy);
     }
 
     auto networkTy =
         LLVMType::getStructTy(rewriter.getContext(), networkFieldTypes);
 
+    rewriter.startRootUpdate(loopOp);
     rewriter.setInsertionPoint(loopOp);
 
     bool hasNetworkFields = networkFieldTypes.size() != 0;
@@ -228,7 +235,11 @@ private:
     } else {
       for (unsigned idx = 1; idx < loopOp.initRegion().getNumArguments();
            ++idx) {
-        auto ty = typeConverter.convertType(*argIt++).cast<LLVMType>();
+        auto ty =
+            typeConverter.convertType(*argIt++).dyn_cast_or_null<LLVMType>();
+        if (!ty) {
+          return mlir::failure();
+        }
         initFieldTypes.emplace_back(ty.getPointerTo());
       }
       initTy = LLVMType::getStructTy(rewriter.getContext(), initFieldTypes);
@@ -306,7 +317,10 @@ private:
          idx < loopOp.bodyRegion().getNumArguments(); ++idx) {
       auto ty = typeConverter
                     .convertType(loopOp.bodyRegion().getArgument(idx).getType())
-                    .cast<LLVMType>();
+                    .dyn_cast_or_null<LLVMType>();
+      if (!ty) {
+        return mlir::failure();
+      }
       iterationFieldTypes.emplace_back(ty.getPointerTo());
     }
     auto iterationTy =
