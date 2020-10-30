@@ -189,8 +189,8 @@ canBeHoistedToProlog(Operation *op, bool allowAllocs,
                 // writes to the value have been hoisted out of the loop.
                 // (Technically, we could be more lenient, but this check
                 // suffices for now.)
-                return verifyNoBodyWritersExcept(effectInstance.getValue(), op,
-                                                 opOutside);
+                return verifyNoBodyWritersExcept(effectInstance.getValue(),
+                                                 nullptr, opOutside);
               })
               .Case<MemoryEffects::Write>(
                   [&](MemoryEffects::Write * /* write */) {
@@ -201,62 +201,116 @@ canBeHoistedToProlog(Operation *op, bool allowAllocs,
                     return verifyNoBodyWritersExcept(effectInstance.getValue(),
                                                      op, opOutside);
                   })
-              .Case<MemoryEffects::Allocate>(
-                  [&](MemoryEffects::Allocate * /* alloc */) {
-                    if (!allowAllocs) {
-                      return failure();
-                    }
-                    if (epilogOp) {
-                      // We already have a free for this operation!  We don't
-                      // currently support multiple allocations from a single
-                      // operation.
-                      return failure();
-                    }
-                    auto value = effectInstance.getValue();
-                    if (!value) {
-                      // Unhoistable, since we can't pair this allocation
-                      // with a corresponding free.
-                      return failure();
-                    }
-                    if (value.getDefiningOp() != op) {
-                      // We only hoist allocs where the allocating operation
-                      // is the operation producing the value.
-                      return failure();
-                    }
-                    Operation *freeOp = nullptr;
-                    for (auto &use : value.getUses()) {
-                      Operation *userOp = use.getOwner();
-                      auto userMemInterface =
-                          dyn_cast<MemoryEffectOpInterface>(userOp);
-                      if (!userMemInterface) {
-                        // This user doesn't provide memory effect information.
-                        // Since the allocation provided memory effect
-                        // information, we'll assume that this use is a read or
-                        // a write, not the free that we're looking for.
-                        continue;
+              .Case<MemoryEffects::Allocate>([&](MemoryEffects::Allocate
+                                                     * /* alloc */) {
+                if (!allowAllocs) {
+                  return failure();
+                }
+                if (epilogOp) {
+                  // We already have a free for this operation!  We don't
+                  // currently support multiple allocations from a single
+                  // operation.
+                  return failure();
+                }
+                auto value = effectInstance.getValue();
+                if (!value) {
+                  // Unhoistable, since we can't pair this allocation
+                  // with a corresponding free.
+                  return failure();
+                }
+                if (value.getDefiningOp() != op) {
+                  // We only hoist allocs where the allocating operation
+                  // is the operation producing the value.
+                  return failure();
+                }
+                Operation *freeOp = nullptr;
+                MemoryEffectOpInterface freeOpMemEffectInterface;
+                for (auto &use : value.getUses()) {
+                  Operation *userOp = use.getOwner();
+                  auto userMemInterface =
+                      dyn_cast<MemoryEffectOpInterface>(userOp);
+                  if (!userMemInterface) {
+                    // This user doesn't provide memory effect information.
+                    // Since the allocation provided memory effect
+                    // information, we'll assume that this use is a read or
+                    // a write, not the free that we're looking for.
+                    continue;
+                  }
+                  SmallVector<MemoryEffects::EffectInstance, 2> userEffects;
+                  userMemInterface.getEffectsOnValue(value, userEffects);
+                  for (auto &userEffectInstance : userEffects) {
+                    auto *userEffect = userEffectInstance.getEffect();
+                    if (userEffect && isa<MemoryEffects::Free>(userEffect)) {
+                      // This is the freeing operation.
+                      if (freeOp) {
+                        return failure();
                       }
-                      SmallVector<MemoryEffects::EffectInstance, 2> userEffects;
-                      userMemInterface.getEffectsOnValue(value, userEffects);
-                      for (auto &userEffectInstance : userEffects) {
-                        auto *userEffect = userEffectInstance.getEffect();
-                        if (userEffect &&
-                            isa<MemoryEffects::Free>(userEffect)) {
-                          // This is the freeing operation.
-                          if (freeOp) {
+                      freeOp = userOp;
+                      freeOpMemEffectInterface = userMemInterface;
+                    }
+                  }
+                }
+                if (!freeOp) {
+                  // The value was not declared to be freed.
+                  return failure();
+                }
+                // Validate that the free operation can be hoisted.
+                if (!llvm::all_of(freeOp->getOperands(),
+                                  [&](Value freeOperand) {
+                                    return freeOperand == value ||
+                                           definedOutside(freeOperand);
+                                  })) {
+                  return failure();
+                }
+                if (freeOp->getNumRegions() != 0) {
+                  // We don't hoist free operations with regions.
+                  return failure();
+                }
+                SmallVector<MemoryEffects::EffectInstance, 8>
+                    freeEffectInstances;
+                freeOpMemEffectInterface.getEffects(freeEffectInstances);
+                for (auto &freeEffectInstance : freeEffectInstances) {
+                  auto result =
+                      TypeSwitch<MemoryEffects::Effect *, LogicalResult>(
+                          freeEffectInstance.getEffect())
+                          .Case<MemoryEffects::Read>(
+                              [&](MemoryEffects::Read * /* read */) {
+                                return verifyNoBodyWritersExcept(
+                                    freeEffectInstance.getValue(), nullptr,
+                                    opOutside);
+                              })
+                          .Case<MemoryEffects::Write>(
+                              [&](MemoryEffects::Write * /* write */) {
+                                // We don't hoist free operations that write
+                                // anything.
+                                return failure();
+                              })
+                          .Case<MemoryEffects::Allocate>(
+                              [&](MemoryEffects::Allocate * /* allocate */) {
+                                // We don't hoist free operations that allocate
+                                // anything.
+                                return failure();
+                              })
+                          .Case<MemoryEffects::Free>(
+                              [&](MemoryEffects::Free * /* free */) {
+                                if (freeEffectInstance.getValue() == value) {
+                                  return success();
+                                }
+                                // Otherwise, this operation is also freeing
+                                // something else. We could possibly handle this
+                                // in the future, but not at present.
+                                return failure();
+                              })
+                          .Default([&](MemoryEffects::Effect * /* effect */) {
                             return failure();
-                          }
-                          freeOp = userOp;
-                        }
-                      }
-                    }
-                    if (!freeOp) {
-                      // The value was not declared to be freed.
-                      return failure();
-                    }
-                    // TODO: Ensure that the freeing operation can be hoisted!
-                    epilogOp = freeOp;
-                    return success();
-                  })
+                          });
+                  if (failed(result)) {
+                    return failure();
+                  }
+                }
+                epilogOp = freeOp;
+                return success();
+              })
               .Case<MemoryEffects::Free>([&](MemoryEffects::Free * /* free */) {
                 // We never hoist free ops here; they're filtered out (due to
                 // already being hoisted) in hoistOps() before this function
