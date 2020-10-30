@@ -1,6 +1,5 @@
 pml_cc_binary(
   NAME pmlc-opt
-  ALIAS pmlc-opt
   SRCS pmlc-opt.cc
   DEPS
     LLVMSupport
