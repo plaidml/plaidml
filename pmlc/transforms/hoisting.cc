@@ -164,7 +164,8 @@ using HoistResult = llvm::PointerIntPair<Operation *, 1, bool>;
 // supplied operation.  (This is used for hoisting allocation/deallocation
 // pairs.)
 static HoistResult
-canBeHoistedToProlog(Operation *op, function_ref<bool(Value)> definedOutside,
+canBeHoistedToProlog(Operation *op, bool allowAllocs,
+                     function_ref<bool(Value)> definedOutside,
                      function_ref<bool(Operation *)> opOutside) {
   // Check that dependencies are defined outside of loop.
   if (!llvm::all_of(op->getOperands(), definedOutside)) {
@@ -202,6 +203,9 @@ canBeHoistedToProlog(Operation *op, function_ref<bool(Value)> definedOutside,
                   })
               .Case<MemoryEffects::Allocate>(
                   [&](MemoryEffects::Allocate * /* alloc */) {
+                    if (!allowAllocs) {
+                      return failure();
+                    }
                     if (epilogOp) {
                       // We already have a free for this operation!  We don't
                       // currently support multiple allocations from a single
@@ -285,7 +289,8 @@ canBeHoistedToProlog(Operation *op, function_ref<bool(Value)> definedOutside,
   for (auto &region : op->getRegions()) {
     for (auto &block : region) {
       for (auto &innerOp : block.without_terminator()) {
-        if (!canBeHoistedToProlog(&innerOp, definedOutside, opOutside)
+        if (!canBeHoistedToProlog(&innerOp, allowAllocs, definedOutside,
+                                  opOutside)
                  .getInt()) {
           return HoistResult{nullptr, false};
         }
@@ -308,6 +313,7 @@ void HoistingPass::runOnOperation() {
 LogicalResult HoistingPass::hoistOps(LoopLikeOpInterface loopOp) {
   auto loopWithEpilog =
       dyn_cast<util::LoopWithEpilogInterface>(loopOp.getOperation());
+  bool hasLoopWithEpilog = loopWithEpilog;
   auto &loopBody = loopOp.getLoopBody();
 
   // The set of operations to be moved before the loop (making their
@@ -358,7 +364,8 @@ LogicalResult HoistingPass::hoistOps(LoopLikeOpInterface loopOp) {
         continue;
       }
       auto result =
-          canBeHoistedToProlog(&op, isDefinedOutsideOfBody, isOpOutsideOfBody);
+          canBeHoistedToProlog(&op, /*allowAllocs=*/hasLoopWithEpilog,
+                               isDefinedOutsideOfBody, isOpOutsideOfBody);
       if (result.getInt()) {
         opsToMoveToProlog.emplace_back(&op);
         willBeMovedToPrologSet.insert(&op);
