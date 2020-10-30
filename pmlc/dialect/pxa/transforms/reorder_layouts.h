@@ -108,7 +108,7 @@ mlir::Optional<ReorderDesc> optimizeLayoutForReads(MemoryUsageDesc &desc);
 /// from "srcMemory" to layout described by "reorderDesc".
 /// See: `createReorder` in `pmlc/dialect/pxa/transforms/layout_utils.h`.
 using ReorderCreator = std::function<mlir::Value(
-    mlir::Location & /*location*/, mlir::OpBuilder & /*builder*/,
+    mlir::Location /*location*/, mlir::OpBuilder & /*builder*/,
     ReorderDesc & /*reorderDesc*/, mlir::Value /*srcMemory*/)>;
 
 /// Helper function that reorders memory for all reads to layout specified
