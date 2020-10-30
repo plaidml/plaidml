@@ -43,3 +43,5 @@ pml_cc_library(
     pmlc::target::intel_gen_ocl_spirv
     pmlc::target::x86
 )
+
+pml_lit_test(NAME lit)

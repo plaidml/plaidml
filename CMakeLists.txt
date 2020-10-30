@@ -23,11 +23,12 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(PML_IDE_FOLDER PML)
 set(PLAIDML_VERSION 1.0.0)
+set(MAIN_BRANCH plaidml-v1)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
-#-------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------
 # Project component configuration
-#-------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------
 option(PML_BUILD_TESTS "Builds PML unit tests." ON)
 
 list(APPEND CMAKE_MODULE_PATH
@@ -35,9 +36,26 @@ list(APPEND CMAKE_MODULE_PATH
   ${CMAKE_CURRENT_LIST_DIR}/cmake/third_party
 )
 
-#-------------------------------------------------------------------------------
+find_program(CCACHE_PROGRAM ccache)
+if(CCACHE_PROGRAM)
+  set(CMAKE_C_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
+  set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
+endif()
+
+if(${PML_BUILD_TESTS})
+  enable_testing()
+endif()
+
+add_custom_target(check-test
+  COMMAND ${CMAKE_CTEST_COMMAND}
+  USES_TERMINAL
+)
+
+# -------------------------------------------------------------------------------
 # Third party dependencies
-#-------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------
+include(CPM)
+include(boost)
 include(easylogging)
 include(gflags)
 include(googletest)
@@ -45,20 +63,23 @@ include(half)
 include(llvm-project)
 include(xsmm)
 
-#-------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------
 # cmake modules
-#-------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------
+include(pml_format)
 include(pml_copts)
 include(pml_macros)
 include(pml_cc_binary)
 include(pml_cc_library)
+include(pml_cc_test)
+include(pml_lit_test)
 include(pml_tblgen_library)
 include(pml_whole_archive_link)
-include(pml_lit_test)
 
-if(${PML_BUILD_TESTS})
-  enable_testing(pmlc)
-endif()
+add_custom_target(check DEPENDS
+  check-test
+  check-clang-format
+)
 
 add_subdirectory(plaidml)
 add_subdirectory(pmlc)

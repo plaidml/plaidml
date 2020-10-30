@@ -24,6 +24,7 @@ plaidml_cc_test(
         "//plaidml:intel_gen_ocl_spirv": ["--skip_test_file=$(location edsl_test-skip.intel_gen_ocl_spirv.txt)"],
         "//conditions:default": [],
     }),
+    copts = ["-Wno-comment"],
     data = select({
         "//plaidml:intel_gen": [":edsl_test-skip.intel_gen.txt"],
         "//plaidml:intel_gen_ocl_spirv": [":edsl_test-skip.intel_gen_ocl_spirv.txt"],
