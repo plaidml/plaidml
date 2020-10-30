@@ -79,6 +79,11 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
+  pm.addPass(pxa::createVectorizeMemPass());
+  pm.addPass(pxa::createAffineNormalizePass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+
   // Assign GPU blocks + threads to outermost loop
   pm.addPass(pmlc::dialect::pxa::createGPUThreadPass(/*maxThreads=*/64));
   pm.addPass(pmlc::dialect::pxa::createAffineNormalizePass());
