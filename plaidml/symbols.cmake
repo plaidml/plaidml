@@ -90,7 +90,7 @@ set(API_SYMBOLS
   plaidml_value_str
   plaidml_value_str_get
   plaidml_value_tuple
-  plaidml_value_tuple_get  
+  plaidml_value_tuple_get
   # op/ffi.h
   plaidml_op_make
   # exec/ffi.h

@@ -33,8 +33,6 @@ list(APPEND MLIR_INCLUDE_DIRS
   ${llvm-project_BINARY_DIR}/tools/mlir/include
 )
 
-# add_library(LLVM INTERFACE)
-
 include_directories(${LLVM_INCLUDE_DIRS})
 include_directories(${MLIR_INCLUDE_DIRS})
 include_directories(${LIBOMP_INCLUDE_DIR})
