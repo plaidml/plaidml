@@ -84,8 +84,8 @@ Program::Program(llvm::StringRef name)
 
 Program::Program(mlir::ModuleOp module) : module(module) {}
 
-Program Program::fromSource(mlir::StringRef source) {
-  return Program(llvm::MemoryBuffer::getMemBuffer(source));
+std::unique_ptr<Program> Program::fromSource(mlir::StringRef source) {
+  return std::make_unique<Program>(llvm::MemoryBuffer::getMemBuffer(source));
 }
 
 Program::Program(std::unique_ptr<llvm::MemoryBuffer> buffer) {
