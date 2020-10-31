@@ -63,7 +63,7 @@ inline auto m_Capture(mlir::Value *value) {
 
 template <typename Pattern>
 inline auto m_Capture(mlir::Value *value, Pattern pattern) {
-  return detail::CaptureAndContinueMatcher(value, pattern);
+  return detail::CaptureAndContinueMatcher<Pattern>(value, pattern);
 }
 
 } // namespace mlir
