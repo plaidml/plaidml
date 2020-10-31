@@ -224,7 +224,11 @@ private:
     if (loopOp.initRegion().getNumArguments() == 0) {
       devicePtrTy = getVoidPtrType();
     } else {
-      devicePtrTy = (*argIt++).cast<LLVMType>();
+      devicePtrTy =
+          typeConverter.convertType(*argIt++).dyn_cast_or_null<LLVMType>();
+      if (!devicePtrTy) {
+        return mlir::failure();
+      }
     }
 
     mlir::SmallVector<LLVMType, 8> initFieldTypes;
