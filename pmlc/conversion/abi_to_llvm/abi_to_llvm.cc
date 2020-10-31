@@ -199,7 +199,8 @@ struct LoopOpLowering final : public mlir::ConvertOpToLLVMPattern<abi::LoopOp> {
             buildExec(loopOp, networkTy, hasNetworkFields, networkFieldTypes,
                       rewriter)) ||
         mlir::failed( //
-            buildFini(loopOp, networkTy, hasNetworkFields, rewriter))) {
+            buildFini(loopOp, networkTy, hasNetworkFields, networkFieldTypes,
+                      rewriter))) {
       rewriter.cancelRootUpdate(loopOp);
       return mlir::failure();
     }
@@ -300,7 +301,7 @@ private:
 
     auto result =
         rewriter.convertRegionTypes(&initFunc.getBody(), typeConverter);
-    // lvm::errs() << "Constructed " << initFunc << "\n";
+    llvm::errs() << "Constructed " << initFunc << "\n";
     return result;
   }
 
@@ -397,12 +398,13 @@ private:
 
     auto result =
         rewriter.convertRegionTypes(&execFunc.getBody(), typeConverter);
-    // llvm::errs() << "Constructed " << execFunc << "\n";
+    llvm::errs() << "Constructed " << execFunc << "\n";
     return result;
   }
 
   mlir::LogicalResult
   buildFini(abi::LoopOp loopOp, LLVMType networkTy, bool hasNetworkFields,
+            const mlir::SmallVectorImpl<LLVMType> &networkFieldTypes,
             mlir::ConversionPatternRewriter &rewriter) const {
     // Create plaidml_fini().
     //
@@ -422,25 +424,56 @@ private:
         rewriter.createBlock(&finiFunc.getBody(), finiFunc.getBody().end(),
                              mlir::TypeRange{argType});
 
+    mlir::BlockAndValueMapping mapping;
+    unsigned finiArgIdx = 0;
+
     if (hasNetworkFields) {
+      // Materialize the network structure arguments.
+      auto networkValue = rewriter.create<LLVM::LoadOp>(
+          rewriter.getUnknownLoc(), entryBlock->getArgument(0));
+      for (auto fieldIdx = 0; fieldIdx < networkFieldTypes.size(); ++fieldIdx) {
+        auto fieldVal = rewriter.create<LLVM::ExtractValueOp>(
+            rewriter.getUnknownLoc(), networkFieldTypes[fieldIdx], networkValue,
+            rewriter.getI64ArrayAttr(fieldIdx));
+        auto finiArg = loopOp.finiRegion().getArgument(finiArgIdx++);
+        auto argVal = typeConverter.materializeSourceConversion(
+            rewriter, rewriter.getUnknownLoc(), finiArg.getType(),
+            mlir::ValueRange{fieldVal});
+        mapping.map(finiArg, argVal);
+      }
+
+      // Now that all of the network fields have been extracted, we can dispose
+      // of the actual network object.
       auto freeFunc = importFunc(
           "free", loopOp,
           LLVMType::getFunctionTy(getVoidType(),
                                   mlir::ArrayRef<LLVMType>{getVoidPtrType()},
                                   /*isVarArg=*/false),
           rewriter);
-
-      rewriter.setInsertionPointToStart(entryBlock);
-
       auto networkRawPtr = rewriter.create<LLVM::BitcastOp>(
           loopOp.getLoc(), getVoidPtrType(), entryBlock->getArgument(0));
       rewriter.create<LLVM::CallOp>(loopOp.getLoc(), freeFunc,
                                     mlir::ValueRange{networkRawPtr});
     }
 
-    rewriter.create<LLVM::ReturnOp>(loopOp.getLoc(), mlir::None);
+    // Clone the loop fini region, replacing the entry block arguments
+    // with our materialized mappings.
+    rewriter.cloneRegionBefore(loopOp.finiRegion(), finiFunc.getBody(),
+                               finiFunc.getBody().end(), mapping);
 
-    return mlir::success();
+    // Connect the entry block to the initial loop block.  Note that it's
+    // always safe to merge the blocks: the entry block has no terminator,
+    // the loop's entry block has no predecessors (since it's an entry
+    // block), and the loop's entry block's arguments were remapped in
+    // the cloning process.
+    auto it = finiFunc.getRegion().begin();
+    ++it;
+    rewriter.mergeBlocks(&*it, entryBlock, mlir::None);
+
+    auto result =
+        rewriter.convertRegionTypes(&finiFunc.getBody(), typeConverter);
+    llvm::errs() << "Constructed " << finiFunc << "\n";
+    return result;
   }
 };
 
