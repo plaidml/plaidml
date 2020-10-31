@@ -45,7 +45,7 @@ include(CMakeParseArguments)
 #     pml::awesome
 # )
 function(pml_cc_test)
-  if(NOT PML_BUILD_TESTS)
+  if(NOT PML_BUILD_TESTS OR IS_SUBPROJECT)
     return()
   endif()
 
@@ -98,8 +98,6 @@ function(pml_cc_test)
     COMMAND "$<TARGET_FILE:${_NAME}>"
     WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
   )
-  # set_property(TEST ${_TEST_NAME} PROPERTY ENVIRONMENT "TEST_TMPDIR=${CMAKE_BINARY_DIR}/${_NAME}_test_tmpdir")
-  # pml_add_test_environment_properties(${_TEST_NAME})
 
   list(APPEND _RULE_LABELS "${_PACKAGE_PATH}")
   set_property(TEST ${_TEST_NAME} PROPERTY LABELS "${_RULE_LABELS}")

@@ -44,12 +44,12 @@ endif()
 
 if(${PML_BUILD_TESTS})
   enable_testing()
+  add_custom_target(check-test
+    COMMAND ${CMAKE_CTEST_COMMAND}
+    USES_TERMINAL
+  )
 endif()
 
-add_custom_target(check-test
-  COMMAND ${CMAKE_CTEST_COMMAND}
-  USES_TERMINAL
-)
 
 # -------------------------------------------------------------------------------
 # Third party dependencies
@@ -76,13 +76,33 @@ include(pml_lit_test)
 include(pml_tblgen_library)
 include(pml_whole_archive_link)
 
-add_custom_target(check DEPENDS
-  check-test
-  check-clang-format
-)
+get_directory_property(HAS_PARENT PARENT_DIRECTORY)
+if(HAS_PARENT)
+  set(IS_SUBPROJECT TRUE)
+else()
+  add_custom_target(check DEPENDS
+    check-test
+    check-clang-format
+  )
+endif()
 
 add_subdirectory(plaidml)
 add_subdirectory(pmlc)
 
 # Note: this must be called after all libraries have been declared.
 pml_complete_binary_link_options()
+
+configure_lit_site_cfg(
+  ${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.py.in
+  ${CMAKE_CURRENT_BINARY_DIR}/lit.site.cfg.py
+  MAIN_CONFIG
+  ${CMAKE_CURRENT_SOURCE_DIR}/lit.cfg.py
+)
+
+if(PML_BUILD_TESTS AND NOT IS_SUBPROJECT)
+  add_dependencies(check-test
+    FileCheck count not
+    pmlc-jit
+    pmlc-opt
+  )
+endif()
