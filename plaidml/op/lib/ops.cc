@@ -2234,8 +2234,16 @@ Value repeat(const Value& value) {
     throw std::runtime_error(llvm::formatv("PlaidML repeat op expects 3 arguments (received {0})", args.size()));
   }
   auto I = args[0].as_tensor();
-  auto repeats = args[1].as_int();
   auto raw_axis = args[2].as_int();
+
+  TensorDim repeats;
+  if (args[1].is_int()) {
+    repeats = TensorDim(args[1].as_int());
+  } else if (args[1].is_dim()) {
+    repeats = args[1].as_dim();
+  } else {
+    throw std::runtime_error("Repeat only accepts int or TensorDim for repeats parameter");
+  }
 
   // Set up useful variables
   auto ndims = I.rank();
