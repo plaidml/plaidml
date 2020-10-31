@@ -2,13 +2,11 @@
 
 include(CMakeParseArguments)
 
-set(PML_TEST_DEPENDS
-  FileCheck count not
-  pmlc-jit
-  pmlc-opt
-)
-
 function(pml_lit_test)
+  if(NOT PML_BUILD_TESTS OR IS_SUBPROJECT)
+    return()
+  endif()
+
   cmake_parse_arguments(
     _RULE
     ""
@@ -25,7 +23,7 @@ function(pml_lit_test)
   pml_package_name(_PACKAGE_NAME)
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
 
-  set(_COMMAND ${llvm-project_BINARY_DIR}/bin/llvm-lit ${CMAKE_CURRENT_BINARY_DIR} -v)
+  set(_COMMAND ${LLVM_BINARY_DIR}/bin/llvm-lit ${CMAKE_CURRENT_BINARY_DIR} -v)
   add_custom_target(${_NAME}
     COMMAND ${_COMMAND}
     WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
@@ -43,12 +41,3 @@ function(pml_lit_test)
   )
   set_target_properties(${_NAME} PROPERTIES FOLDER "Tests")
 endfunction()
-
-configure_lit_site_cfg(
-  ${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.py.in
-  ${CMAKE_CURRENT_BINARY_DIR}/lit.site.cfg.py
-  MAIN_CONFIG
-  ${CMAKE_CURRENT_SOURCE_DIR}/lit.cfg.py
-)
-
-add_dependencies(check-test ${PML_TEST_DEPENDS})
