@@ -28,6 +28,10 @@
 #include "pmlc/util/env.h"
 #include "pmlc/util/logging.h"
 
+#include "omp.h" // NOLINT
+
+#include "pmlc/target/x86/utils.h"
+
 using namespace mlir; // NOLINT[build/namespaces]
 
 namespace pmlc::target::x86 {
@@ -170,13 +174,15 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(pxa::createAffineNormalizePass(/*promote=*/false));
   pm.addPass(createCanonicalizerPass());
 
-  // TODO: Figure out a better way to prevent 'overthreading'
-  auto maxThreads = std::thread::hardware_concurrency();
-  if (maxThreads > 8) {
-    maxThreads = 8;
+  // Use OMP thread count
+  unsigned maxThreads = omp_get_max_threads();
+  unsigned physCores = getPhysicalCoreNumber();
+  if (0 != physCores) {
+    maxThreads = std::min(physCores, maxThreads);
   }
-  std::min(std::thread::hardware_concurrency(), maxThreads);
+
   pm.addPass(pxa::createCPUThreadPass(maxThreads));
+
   pm.addPass(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
 

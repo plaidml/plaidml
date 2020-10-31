@@ -25,6 +25,7 @@ plaidml_cc_library(
     srcs = [
         "common.cc",
         "comp_to_ocl.cc",
+        "comp_to_vulkan.cc",
         "pass_detail.h",
         "utils.h",
         "utils.cc",

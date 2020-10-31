@@ -15,17 +15,10 @@ heatmap(
 
 gentbl(
     name = "gen-pass",
-    tbl_outs = [
-        (
-            "-gen-pass-decls",
-            "passes.h.inc",
-        ),
-    ],
+    tbl_outs = [("-gen-pass-decls", "passes.h.inc")],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "passes.td",
-    td_srcs = [
-        "@llvm-project//mlir:PassBaseTdFiles",
-    ],
+    td_srcs = ["@llvm-project//mlir:PassBaseTdFiles"],
 )
 
 plaidml_cc_library(
@@ -36,6 +29,8 @@ plaidml_cc_library(
         "pass_detail.h",
         "pipeline.cc",
         "trace_linking.cc",
+        "utils.h",
+        "utils.cc",
         "xsmm_lowering.cc",
         ":heatmap",
     ],
@@ -59,9 +54,10 @@ plaidml_cc_library(
         "@llvm-project//mlir:AffineToStandardTransforms",
         "@llvm-project//mlir:AffineTransforms",
         "@llvm-project//mlir:LLVMTransforms",
+        "@llvm-project//mlir:OpenMPToLLVM",
         "@llvm-project//mlir:SCFToStandard",
         "@llvm-project//mlir:StandardOpsTransforms",
-        "@llvm-project//mlir:OpenMPToLLVM",
+        "@llvm-project//openmp",
     ],
 )
 

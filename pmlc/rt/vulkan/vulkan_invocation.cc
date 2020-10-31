@@ -98,8 +98,9 @@ void VulkanInvocation::createQueryPool() {
 void VulkanInvocation::createLaunchKernelAction(uint8_t *shader, uint32_t size,
                                                 const char *entryPoint,
                                                 NumWorkGroups numWorkGroups) {
-  curr = std::make_shared<LaunchKernelAction>();
-
+  if (!curr) {
+    curr = std::make_shared<LaunchKernelAction>();
+  }
   curr->binary = shader;
   curr->binarySize = size;
   curr->entryPoint = entryPoint;
@@ -289,8 +290,7 @@ void VulkanInvocation::setResourceData(
     const DescriptorSetIndex desIndex, const BindingIndex bindIndex,
     const VulkanHostMemoryBuffer &hostMemBuffer) {
   if (!curr) {
-    throw std::runtime_error{
-        "setResourceData: current LaunchKernelAction has not been created"};
+    curr = std::make_shared<LaunchKernelAction>();
   }
   curr->resourceData[desIndex][bindIndex] = hostMemBuffer;
   curr->resourceStorageClassData[desIndex][bindIndex] =

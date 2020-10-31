@@ -441,6 +441,10 @@ struct ProgramBuilder {
     FunctionType funcType =
         FunctionType::get(inputTypes, program->outputs, context);
     FuncOp funcOp = FuncOp::create(loc, kEntrypoint, funcType, {});
+    size_t numInputs = inputTypes.size() - program->constants.size();
+    for (size_t i = 0; i < program->constants.size(); i++) {
+      funcOp.setArgAttr(numInputs + i, "tile.const", builder.getIndexAttr(i));
+    }
     Block *body = funcOp.addEntryBlock();
     builder.setInsertionPointToStart(body);
     module.push_back(funcOp);

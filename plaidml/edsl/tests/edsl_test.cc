@@ -1,7 +1,11 @@
 // Copyright 2020 Intel Corporation
 //
 // N.B. When running via lit, we always use the llvm_cpu device.
-// RUN: cc_test --plaidml_device=llvm_cpu.0 --plaidml_target=llvm_cpu --generate_filecheck_input | FileCheck %s
+// RUN: cc_test \
+// RUN:   --plaidml_device=llvm_cpu.0 \
+// RUN:   --plaidml_target=llvm_cpu \
+// RUN:   --generate_filecheck_input \
+// RUN: | FileCheck %s
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
