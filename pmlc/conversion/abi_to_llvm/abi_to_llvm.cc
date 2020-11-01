@@ -88,21 +88,14 @@ struct CreateNetworkOpLowering final
       // Figure out the type of the network structure.
       mlir::SmallVector<LLVMType, 8> networkFieldTypes;
       mlir::SmallVector<mlir::Value, 8> networkFieldValues;
-      for (auto srcValue : createNetworkOp.getOperands()) {
-        auto convTy = typeConverter.convertType(srcValue.getType())
-                          .dyn_cast_or_null<LLVMType>();
-        if (!convTy) {
+      for (auto operand : operands) {
+        auto ty = operand.getType().dyn_cast_or_null<LLVMType>();
+        if (!ty) {
           rewriter.cancelRootUpdate(createNetworkOp);
           return mlir::failure();
         }
-        auto convValue = typeConverter.materializeTargetConversion(
-            rewriter, createNetworkOp.getLoc(), convTy, srcValue);
-        if (!convValue) {
-          rewriter.cancelRootUpdate(createNetworkOp);
-          return mlir::failure();
-        }
-        networkFieldTypes.emplace_back(convTy);
-        networkFieldValues.emplace_back(convValue);
+        networkFieldTypes.emplace_back(ty);
+        networkFieldValues.emplace_back(operand);
       }
 
       auto networkTy =
