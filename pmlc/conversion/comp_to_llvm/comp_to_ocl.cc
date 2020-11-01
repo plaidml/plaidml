@@ -102,7 +102,6 @@ struct ConvertToFuncCallPattern : ConvertCompToOclBasePattern<Op> {
 
 using ConvertCreateExecEnv = ConvertToFuncCallPattern<comp::CreateExecEnv>;
 using ConvertDestroyExecEnv = ConvertToFuncCallPattern<comp::DestroyExecEnv>;
-using ConvertDealloc = ConvertToFuncCallPattern<comp::Dealloc>;
 using ConvertScheduleBarrier = ConvertToFuncCallPattern<comp::ScheduleBarrier>;
 using ConvertSubmit = ConvertToFuncCallPattern<comp::Submit>;
 using ConvertWait = ConvertToFuncCallPattern<comp::Wait>;
@@ -137,6 +136,14 @@ using ConvertScheduleWrite = ConvertScheduleReadWrite<comp::ScheduleWrite>;
 
 struct ConvertAlloc final : mlir::ConvertOpToLLVMPattern<comp::Alloc> {
   using ConvertOpToLLVMPattern<comp::Alloc>::ConvertOpToLLVMPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::Operation *op, mlir::ArrayRef<mlir::Value> operands,
+                  mlir::ConversionPatternRewriter &rewriter) const final;
+};
+
+struct ConvertDealloc final : mlir::ConvertOpToLLVMPattern<comp::Dealloc> {
+  using ConvertOpToLLVMPattern<comp::Dealloc>::ConvertOpToLLVMPattern;
 
   mlir::LogicalResult
   matchAndRewrite(mlir::Operation *op, mlir::ArrayRef<mlir::Value> operands,
@@ -180,7 +187,7 @@ void populateCompToOclPatterns(mlir::MLIRContext *context,
   // Populate operation conversion patterns.
   patterns.insert<ConvertCreateExecEnv>(kOclCreate, typeConverter, context);
   patterns.insert<ConvertDestroyExecEnv>(kOclDestroy, typeConverter, context);
-  patterns.insert<ConvertDealloc>(kOclDealloc, typeConverter, context);
+  patterns.insert<ConvertDealloc>(typeConverter);
   patterns.insert<ConvertScheduleBarrier>(kOclBarrier, typeConverter, context,
                                           /*varArg=*/true, /*nonVarArgs=*/1);
   patterns.insert<ConvertSubmit>(kOclSubmit, typeConverter, context);
@@ -383,20 +390,38 @@ ConvertAlloc::matchAndRewrite(mlir::Operation *opPtr,
                                               sizes, rewriter);
 
   // Build the call to allocate memory on the device.
-  mlir::Value memory =
-      rewriter
-          .create<LLVM::CallOp>(
-              loc, mlir::TypeRange{getVoidPtrType()},
-              rewriter.getSymbolRefAttr(kOclAlloc),
-              mlir::ValueRange{operands[0], // Execution environment
-                               sizeToAlloc})
-          .getResult(0);
+  auto alloc =
+      rewriter.create<LLVM::CallOp>(loc, mlir::TypeRange{getVoidPtrType()},
+                                    rewriter.getSymbolRefAttr(kOclAlloc),
+                                    mlir::ValueRange{operands[0], sizeToAlloc});
+  mlir::Value memory = alloc.getResult(0);
 
   // Build a memref descriptor for the result.
   auto memref = mlir::MemRefDescriptor::fromStaticShape(
       rewriter, loc, typeConverter, resultType, memory);
 
   rewriter.replaceOp(op, {memref});
+  return mlir::success();
+}
+
+mlir::LogicalResult ConvertDealloc::matchAndRewrite(
+    mlir::Operation *opPtr, mlir::ArrayRef<mlir::Value> operands,
+    mlir::ConversionPatternRewriter &rewriter) const {
+  auto op = mlir::cast<comp::Dealloc>(opPtr);
+  mlir::Location loc = op.getLoc();
+
+  // Extract the underlying buffer pointer.
+  mlir::Value buffer =
+      mlir::MemRefDescriptor{operands[1]}.allocatedPtr(rewriter, loc);
+  mlir::Value bufferRaw =
+      rewriter.create<LLVM::BitcastOp>(loc, getVoidPtrType(), buffer);
+
+  // Build the dealloc call.
+  rewriter.create<LLVM::CallOp>(loc, mlir::TypeRange{getVoidType()},
+                                rewriter.getSymbolRefAttr(kOclDealloc),
+                                mlir::ValueRange{operands[0], bufferRaw});
+
+  rewriter.eraseOp(op);
   return mlir::success();
 }
 
