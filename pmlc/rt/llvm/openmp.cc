@@ -1,8 +1,12 @@
 // Copyright 2020 Intel Corporation
 
-#include "openmp/runtime/src/kmp.h"
+#include <kmp.h>
 
 #include "pmlc/rt/symbol_registry.h"
+
+extern "C" uint64_t _mlir_ciface_plaidml_rt_thread_num() {
+  return __kmpc_bound_thread_num(nullptr);
+}
 
 namespace {
 
@@ -22,6 +26,9 @@ struct Registration {
                    reinterpret_cast<void *>(__kmpc_omp_taskyield));
     registerSymbol("__kmpc_push_num_threads",
                    reinterpret_cast<void *>(__kmpc_push_num_threads));
+    registerSymbol(
+        "_mlir_ciface_plaidml_rt_thread_num",
+        reinterpret_cast<void *>(_mlir_ciface_plaidml_rt_thread_num));
   }
 };
 

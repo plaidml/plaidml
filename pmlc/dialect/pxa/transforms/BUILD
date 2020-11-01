@@ -35,6 +35,7 @@ plaidml_cc_library(
         "normalize.cc",
         "pass_detail.h",
         "resize_tmps.cc",
+        "simplify_with_constraints.cc",
         "stencil.cc",
         "stencil_gemm.cc",
         "subgroups.cc",
@@ -46,8 +47,10 @@ plaidml_cc_library(
     hdrs = [
         "autotile.h",
         "cache.h",
+        "gpu_thread.h",
         "normalize.h",
         "passes.h",
+        "simplify_with_constraints.h",
         "stencil.h",
         "tile.h",
         "tile_accumulate.h",

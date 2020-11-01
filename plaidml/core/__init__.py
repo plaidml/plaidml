@@ -287,7 +287,7 @@ class Buffer(ForeignObject):
     def copy_from_ndarray(self, src):
         dst = np.frombuffer(self.data, dtype=self.shape.dtype.into_numpy())
         dst = dst.reshape(self.shape.sizes)
-        np.copyto(dst, src)
+        np.copyto(dst, src, casting='unsafe')
 
 
 class Program(ForeignObject):
@@ -315,6 +315,9 @@ class Program(ForeignObject):
 
     def compile(self, target='', debug=False):
         self._methodcall(lib.plaidml_program_compile, debug, target.encode())
+
+    def save(self):
+        return Buffer(ptr=self._methodcall(lib.plaidml_program_save))
 
     @property
     def inputs(self):

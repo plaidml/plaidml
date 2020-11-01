@@ -34,7 +34,6 @@ plaidml_cc_library(
     name = "targets",
     visibility = ["//visibility:public"],
     deps = [
-        "//pmlc/target/demo",
         "//pmlc/target/intel_gen",
         "//pmlc/target/intel_gen_ocl_spirv",
         "//pmlc/target/x86",
@@ -98,13 +97,13 @@ pkg_tar(
     srcs = [
         ":plaidml",
     ],
+    visibility = ["//visibility:public"],
     deps = [
         "//plaidml/core:sdk_tar",
-        "//plaidml/exec:sdk_tar",
         "//plaidml/edsl:sdk_tar",
+        "//plaidml/exec:sdk_tar",
         "//plaidml/op:sdk_tar",
     ],
-    visibility = ["//visibility:public"],
 )
 
 py_library(
