@@ -266,7 +266,7 @@ private:
       unsigned initArgIdx = 1;
       auto initValue = rewriter.create<LLVM::LoadOp>(
           rewriter.getUnknownLoc(), initEntryBlock->getArgument(1));
-      for (auto fieldIdx = 0; fieldIdx < initFieldTypes.size(); ++fieldIdx) {
+      for (size_t fieldIdx = 0; fieldIdx < initFieldTypes.size(); ++fieldIdx) {
         auto ptrVal = rewriter.create<LLVM::ExtractValueOp>(
             rewriter.getUnknownLoc(), initFieldTypes[fieldIdx], initValue,
             rewriter.getI64ArrayAttr(fieldIdx));
@@ -347,7 +347,8 @@ private:
       // Materialize the network structure arguments.
       auto networkValue = rewriter.create<LLVM::LoadOp>(
           rewriter.getUnknownLoc(), execEntryBlock->getArgument(0));
-      for (auto fieldIdx = 0; fieldIdx < networkFieldTypes.size(); ++fieldIdx) {
+      for (size_t fieldIdx = 0; fieldIdx < networkFieldTypes.size();
+           ++fieldIdx) {
         auto fieldVal = rewriter.create<LLVM::ExtractValueOp>(
             rewriter.getUnknownLoc(), networkFieldTypes[fieldIdx], networkValue,
             rewriter.getI64ArrayAttr(fieldIdx));
@@ -362,7 +363,8 @@ private:
     // Materialize the iteration arguments.
     auto iterationValue = rewriter.create<LLVM::LoadOp>(
         rewriter.getUnknownLoc(), execEntryBlock->getArgument(1));
-    for (auto fieldIdx = 0; fieldIdx < iterationFieldTypes.size(); ++fieldIdx) {
+    for (size_t fieldIdx = 0; fieldIdx < iterationFieldTypes.size();
+         ++fieldIdx) {
       auto ptrVal = rewriter.create<LLVM::ExtractValueOp>(
           rewriter.getUnknownLoc(), iterationFieldTypes[fieldIdx],
           iterationValue, rewriter.getI64ArrayAttr(fieldIdx));
@@ -424,7 +426,8 @@ private:
       // Materialize the network structure arguments.
       auto networkValue = rewriter.create<LLVM::LoadOp>(
           rewriter.getUnknownLoc(), entryBlock->getArgument(0));
-      for (auto fieldIdx = 0; fieldIdx < networkFieldTypes.size(); ++fieldIdx) {
+      for (size_t fieldIdx = 0; fieldIdx < networkFieldTypes.size();
+           ++fieldIdx) {
         auto fieldVal = rewriter.create<LLVM::ExtractValueOp>(
             rewriter.getUnknownLoc(), networkFieldTypes[fieldIdx], networkValue,
             rewriter.getI64ArrayAttr(fieldIdx));
