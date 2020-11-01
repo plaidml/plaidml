@@ -85,29 +85,7 @@ void inSyncReuse(mlir::Block &block) {
           // which memories are synchronized even after they are deallocated.
           deallocTracker.deallocMemory(op);
         })
-        .Case<Alloc>([&](Alloc op) {
-          if (!op.hostMem()) {
-            syncTracker.handleAllocOp(op);
-            return;
-          }
-          auto deallocRange = deallocTracker.findAllReuses(op);
-          auto deallocIt = deallocRange.first;
-          while (deallocIt != deallocRange.second) {
-            Dealloc deallocOp = deallocIt->second;
-            if (!syncTracker.areInSync(deallocOp.deviceMem(), op.hostMem())) {
-              deallocIt++;
-              continue;
-            }
-            // We found memory that is already in sync, reuse it.
-            op.replaceAllUsesWith(deallocOp.deviceMem());
-            op.erase();
-            deallocOp.erase();
-            deallocTracker.reuseMemory(deallocIt);
-            return;
-          }
-          // If no reuse is possible track synchronization status of allocation.
-          syncTracker.handleAllocOp(op);
-        })
+        .Case<Alloc>([&](Alloc op) { syncTracker.handleAllocOp(op); })
         .Default([&](mlir::Operation *op) { syncTracker.handleOperation(op); });
   }
 }
