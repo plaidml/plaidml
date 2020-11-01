@@ -110,19 +110,27 @@ using ConvertWait = ConvertToFuncCallPattern<comp::Wait>;
 /// Template pattern common for both comp::ScheduleRead and
 /// comp::ScheduleWrite.
 template <class Op>
-struct ConvertScheduleReadWrite : ConvertCompToOclBasePattern<Op> {
-  ConvertScheduleReadWrite(mlir::StringRef funcName,
-                           mlir::TypeConverter &typeConverter,
-                           mlir::MLIRContext *context)
-      : ConvertCompToOclBasePattern<Op>(typeConverter, context),
-        funcName(funcName) {}
+struct ConvertScheduleReadWrite final
+    : public mlir::ConvertOpToLLVMPattern<Op> {
+  using mlir::ConvertOpToLLVMPattern<Op>::ConvertOpToLLVMPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(Op op, mlir::ArrayRef<mlir::Value> operands,
-                  mlir::ConversionPatternRewriter &rewriter) const override;
+  matchAndRewrite(mlir::Operation *op, mlir::ArrayRef<mlir::Value> operands,
+                  mlir::ConversionPatternRewriter &rewriter) const final;
 
-  mlir::StringRef funcName;
+private:
+  static mlir::StringRef funcName();
 };
+
+template <>
+mlir::StringRef ConvertScheduleReadWrite<comp::ScheduleRead>::funcName() {
+  return kOclRead;
+}
+
+template <>
+mlir::StringRef ConvertScheduleReadWrite<comp::ScheduleWrite>::funcName() {
+  return kOclWrite;
+}
 
 using ConvertScheduleRead = ConvertScheduleReadWrite<comp::ScheduleRead>;
 using ConvertScheduleWrite = ConvertScheduleReadWrite<comp::ScheduleWrite>;
@@ -179,8 +187,8 @@ void populateCompToOclPatterns(mlir::MLIRContext *context,
   patterns.insert<ConvertWait>(kOclWait, typeConverter, context,
                                /*varArg=*/true, /*nonVarArgs=*/0);
 
-  patterns.insert<ConvertScheduleRead>(kOclRead, typeConverter, context);
-  patterns.insert<ConvertScheduleWrite>(kOclWrite, typeConverter, context);
+  patterns.insert<ConvertScheduleRead>(typeConverter);
+  patterns.insert<ConvertScheduleWrite>(typeConverter);
 
   patterns.insert<ConvertAlloc>(typeConverter);
   patterns.insert<ConvertScheduleFunc>(modulesMap, typeConverter, context);
@@ -320,21 +328,26 @@ mlir::LogicalResult ConvertToFuncCallPattern<Op>::matchAndRewrite(
 
 template <class Op>
 mlir::LogicalResult ConvertScheduleReadWrite<Op>::matchAndRewrite(
-    Op op, mlir::ArrayRef<mlir::Value> operands,
+    mlir::Operation *opPtr, mlir::ArrayRef<mlir::Value> operands,
     mlir::ConversionPatternRewriter &rewriter) const {
-  if (!this->isMatchingRuntime(op))
-    return mlir::failure();
+  auto op = mlir::cast<Op>(opPtr);
+  auto loc = op.getLoc();
 
   constexpr unsigned nonVarArgs = 3;
-  mlir::SmallVector<mlir::Value, nonVarArgs + 2> castOperands(
+  mlir::SmallVector<mlir::Value, nonVarArgs + 2> callOperands(
       operands.begin(), operands.begin() + nonVarArgs);
 
-  // Convert host memref to pointer.
-  mlir::Value hostPtr =
-      this->materializeConversion(rewriter, op.getLoc(), operands[0]);
-  if (!hostPtr)
-    return mlir::failure();
-  castOperands[0] = hostPtr;
+  // Extract the host memref memory pointer.
+  mlir::MemRefDescriptor hostMemDesc{operands[0]};
+  auto hostPtr = hostMemDesc.allocatedPtr(rewriter, loc);
+  callOperands[0] =
+      rewriter.create<LLVM::BitcastOp>(loc, this->getVoidPtrType(), hostPtr);
+
+  // Extract the device memref memory pointer.
+  mlir::MemRefDescriptor devMemDesc{operands[1]};
+  auto devPtr = devMemDesc.allocatedPtr(rewriter, loc);
+  callOperands[1] =
+      rewriter.create<LLVM::BitcastOp>(loc, this->getVoidPtrType(), devPtr);
 
   // Add event dependencies as variadic operands.
   LLVM::LLVMType llvmInt32Ty =
@@ -342,14 +355,14 @@ mlir::LogicalResult ConvertScheduleReadWrite<Op>::matchAndRewrite(
   mlir::Value eventsCnt = rewriter.create<LLVM::ConstantOp>(
       op.getLoc(), llvmInt32Ty,
       rewriter.getI32IntegerAttr(operands.size() - nonVarArgs));
-  castOperands.push_back(eventsCnt);
-  castOperands.insert(castOperands.end(), operands.begin() + nonVarArgs,
+  callOperands.push_back(eventsCnt);
+  callOperands.insert(callOperands.end(), operands.begin() + nonVarArgs,
                       operands.end());
 
-  mlir::Type llvmEventType = this->convertType(op.getType());
+  mlir::Type llvmEventType = this->typeConverter.convertType(op.getType());
   rewriter.replaceOpWithNewOp<LLVM::CallOp>(
       op.getOperation(), mlir::ArrayRef<mlir::Type>{llvmEventType},
-      rewriter.getSymbolRefAttr(funcName), castOperands);
+      rewriter.getSymbolRefAttr(funcName()), callOperands);
   return mlir::success();
 }
 
