@@ -28,6 +28,7 @@
 #include "pmlc/conversion/stdx_to_llvm/passes.h"
 #include "pmlc/conversion/tile_to_pxa/passes.h"
 #include "pmlc/dialect/abi/transforms/passes.h"
+#include "pmlc/dialect/comp/ir/dialect.h"
 #include "pmlc/dialect/comp/ir/types.h"
 #include "pmlc/dialect/comp/transforms/passes.h"
 #include "pmlc/dialect/pxa/transforms/passes.h"
@@ -74,6 +75,9 @@ struct ConvertStandardToLLVMPass
     auto module = getOperation();
     auto *context = module.getContext();
 
+    uint32_t scheduleFuncNum = 0;
+    module.walk([&](comp::ScheduleFunc op) { scheduleFuncNum++; });
+
     LowerToLLVMOptions options = {
         /*useBarePtrCallConv=*/false,
         /*emitCWrappers=*/true,
@@ -81,7 +85,13 @@ struct ConvertStandardToLLVMPass
         /*useAlignedAlloc=*/false,
     };
     LLVMTypeConverter typeConverter(context, options);
-
+    mlir::TypeConverter signatureConverter;
+    auto binaryModulesMap = conversion::comp_to_llvm::getEmptyModulesMap();
+    if (failed(conversion::comp_to_llvm::serializeSpirvKernels(
+            module, *binaryModulesMap))) {
+      signalPassFailure();
+      return;
+    }
     OwningRewritePatternList patterns;
     populateExpandTanhPattern(patterns, context);
     populateStdToLLVMConversionPatterns(typeConverter, patterns);
@@ -89,12 +99,21 @@ struct ConvertStandardToLLVMPass
         typeConverter, patterns);
     conversion::abi_to_llvm::populateABIToLLVMConversionPatterns(typeConverter,
                                                                  patterns);
-
+    conversion::comp_to_llvm::populateCommonPatterns(
+        context, typeConverter, signatureConverter, patterns);
+    conversion::comp_to_llvm::populateCompToVkPatterns(
+        context, *binaryModulesMap, module, scheduleFuncNum, typeConverter,
+        patterns);
     LLVMConversionTarget target(*context);
     target.addIllegalDialect<abi::ABIDialect>();
+    target.addIllegalDialect<comp::COMPDialect>();
+    target.addDynamicallyLegalOp<mlir::FuncOp>([&](mlir::FuncOp op) -> bool {
+      return signatureConverter.isSignatureLegal(op.getType());
+    });
     if (failed(applyPartialConversion(module, target, patterns))) {
       signalPassFailure();
     }
+    conversion::comp_to_llvm::addVkFunctionDeclarations(module);
   }
 };
 
@@ -220,11 +239,7 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(spirv::createLowerABIAttributesPass());
   pm.addPass(spirv::createUpdateVersionCapabilityExtensionPass());
 
-  // Comp to LLVM - Vulkan function calls.
-  pm.addPass(pmlc::conversion::comp_to_llvm::createConvertCompToVulkanPass());
-
-  // Look at the network as being run repeatedly, and optimize to
-  // take that into account.
+  // Refactor and optimize for multiple runs.
   pm.addPass(abi::createLowerToABIPass());
   pm.addPass(pmlc::transforms::createHoistingPass());
   pm.addPass(createCanonicalizerPass());

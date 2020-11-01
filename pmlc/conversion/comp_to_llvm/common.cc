@@ -128,55 +128,61 @@ void populateCommonPatterns(mlir::MLIRContext *context,
       });
   // Identity conversion for LLVM types.
   typeConverter.addConversion([](LLVM::LLVMType type) { return type; });
+
+  // TODO: Remove these memref conversions.  LLVMIR provides standard
+  // conversions for memrefs and accessors for memref components.
+
   // Conversion between memref and int8 pointer.
-  typeConverter.addConversion(
-      [=](mlir::MemRefType type) { return llvmInt8Ptr; });
+  // typeConverter.addConversion(
+  //     [=](mlir::MemRefType type) { return llvmInt8Ptr; });
   // Noop materialization for identity conversion between LLVM types.
-  typeConverter.addTargetMaterialization(
-      [](mlir::OpBuilder &builder, LLVM::LLVMType type, mlir::ValueRange values,
-         mlir::Location loc) -> mlir::Optional<mlir::Value> {
-        if (values.size() != 1)
-          return llvm::None;
-        if (auto llvmSrcType = values[0].getType().dyn_cast<LLVM::LLVMType>()) {
-          if (llvmSrcType == type)
-            return values[0];
-        }
-        return llvm::None;
-      });
+  // typeConverter.addTargetMaterialization(
+  //     [](mlir::OpBuilder &builder, LLVM::LLVMType type, mlir::ValueRange
+  //     values,
+  //        mlir::Location loc) -> mlir::Optional<mlir::Value> {
+  //       if (values.size() != 1)
+  //         return llvm::None;
+  //       if (auto llvmSrcType =
+  //       values[0].getType().dyn_cast<LLVM::LLVMType>()) {
+  //         if (llvmSrcType == type)
+  //           return values[0];
+  //       }
+  //       return llvm::None;
+  //     });
   // Materialization for memref -> int8 pointer conversion.
   // TODO: This should materialize to dialect cast and pointer cast
   //       when support will be added to upstream.
-  typeConverter.addTargetMaterialization(
-      [=](mlir::OpBuilder &builder, LLVM::LLVMType type,
-          mlir::ValueRange values,
-          mlir::Location loc) -> mlir::Optional<mlir::Value> {
-        if (type != llvmInt8Ptr || values.size() != 1)
-          return llvm::None;
-        mlir::MemRefType memRefType =
-            values[0].getType().dyn_cast<mlir::MemRefType>();
-        if (!memRefType)
-          return llvm::None;
+  // typeConverter.addTargetMaterialization(
+  //     [=](mlir::OpBuilder &builder, LLVM::LLVMType type,
+  //         mlir::ValueRange values,
+  //         mlir::Location loc) -> mlir::Optional<mlir::Value> {
+  //       if (type != llvmInt8Ptr || values.size() != 1)
+  //         return llvm::None;
+  //       mlir::MemRefType memRefType =
+  //           values[0].getType().dyn_cast<mlir::MemRefType>();
+  //       if (!memRefType)
+  //         return llvm::None;
 
-        mlir::Type unrankedMemRefType = mlir::UnrankedMemRefType::get(
-            memRefType.getElementType(), /*memorySpace=*/0);
-        mlir::Value unrankedBuffer = builder.create<mlir::MemRefCastOp>(
-            loc, values[0], unrankedMemRefType);
-        mlir::FailureOr<mlir::StringRef> typeManglingOr =
-            getTypeMangling(memRefType.getElementType());
-        if (mlir::failed(typeManglingOr))
-          return llvm::None;
-        mlir::StringRef typeMangling = typeManglingOr.getValue();
+  //       mlir::Type unrankedMemRefType = mlir::UnrankedMemRefType::get(
+  //           memRefType.getElementType(), /*memorySpace=*/0);
+  //       mlir::Value unrankedBuffer = builder.create<mlir::MemRefCastOp>(
+  //           loc, values[0], unrankedMemRefType);
+  //       mlir::FailureOr<mlir::StringRef> typeManglingOr =
+  //           getTypeMangling(memRefType.getElementType());
+  //       if (mlir::failed(typeManglingOr))
+  //         return llvm::None;
+  //       mlir::StringRef typeMangling = typeManglingOr.getValue();
 
-        mlir::Twine castFuncName = kCastMemrefPrefix + typeMangling;
-        auto castOp = builder.create<mlir::CallOp>(
-            loc, mlir::ArrayRef<mlir::Type>{llvmInt8Ptr},
-            builder.getSymbolRefAttr(castFuncName.str()), unrankedBuffer);
-        return castOp.getResult(0);
-      });
+  //       mlir::Twine castFuncName = kCastMemrefPrefix + typeMangling;
+  //       auto castOp = builder.create<mlir::CallOp>(
+  //           loc, mlir::ArrayRef<mlir::Type>{llvmInt8Ptr},
+  //           builder.getSymbolRefAttr(castFuncName.str()), unrankedBuffer);
+  //       return castOp.getResult(0);
+  //     });
   // ==========================================================================
   // Signature conversion patterns.
   // ==========================================================================
-  signatureConverter.addConversion([](mlir::Type type) { return type; });
+  // signatureConverter.addConversion([](mlir::Type type) { return type; });
   signatureConverter.addConversion(
       [&](mlir::Type type) -> mlir::Optional<mlir::Type> {
         if (mlir::isa<comp::COMPDialect>(type.getDialect()))

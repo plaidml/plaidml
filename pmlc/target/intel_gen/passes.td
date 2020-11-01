@@ -43,4 +43,4 @@ def ConvertPXAToAffine : Pass<"intel-gen-convert-pxa-to-affine", "mlir::ModuleOp
   let dependentDialects = ["mlir::AffineDialect"];
 }
 
-#endif
+#endif // __PMLC_TARGET_INTEL_GEN_PASSES__

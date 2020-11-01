@@ -11,6 +11,7 @@
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "pmlc/conversion/comp_to_llvm/pass_detail.h"
+#include "pmlc/conversion/comp_to_llvm/passes.h"
 #include "pmlc/dialect/comp/ir/dialect.h"
 
 namespace mlir {

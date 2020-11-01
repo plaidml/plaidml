@@ -19,6 +19,7 @@
 #include "mlir/Transforms/Passes.h"
 
 #include "pmlc/compiler/registry.h"
+#include "pmlc/conversion/abi_to_llvm/passes.h"
 #include "pmlc/conversion/comp_to_llvm/passes.h"
 #include "pmlc/conversion/gpu/lowering.h"
 #include "pmlc/conversion/gpu_to_comp/passes.h"
@@ -27,6 +28,7 @@
 #include "pmlc/conversion/stdx_to_llvm/passes.h"
 #include "pmlc/conversion/tile_to_pxa/passes.h"
 #include "pmlc/dialect/abi/transforms/passes.h"
+#include "pmlc/dialect/comp/ir/dialect.h"
 #include "pmlc/dialect/comp/ir/types.h"
 #include "pmlc/dialect/comp/transforms/passes.h"
 #include "pmlc/dialect/pxa/transforms/passes.h"
@@ -34,6 +36,7 @@
 #include "pmlc/dialect/stdx/transforms/passes.h"
 #include "pmlc/dialect/tile/transforms/passes.h"
 #include "pmlc/target/intel_gen/passes.h"
+#include "pmlc/target/intel_gen_ocl_spirv/pass_detail.h"
 #include "pmlc/target/intel_gen_ocl_spirv/passes.h"
 #include "pmlc/transforms/passes.h"
 
@@ -44,6 +47,50 @@ namespace pmlc::target::intel_gen_ocl_spirv {
 namespace abi = pmlc::dialect::abi;
 namespace comp = pmlc::dialect::comp;
 namespace pxa = pmlc::dialect::pxa;
+
+struct ConvertStandardToLLVMPass
+    : public ConvertStandardToLLVMBase<ConvertStandardToLLVMPass> {
+  void runOnOperation() override {
+    auto module = getOperation();
+    auto *context = module.getContext();
+
+    LowerToLLVMOptions options = {
+        /*useBarePtrCallConv=*/false,
+        /*emitCWrappers=*/true,
+        /*indexBitwidth=*/kDeriveIndexBitwidthFromDataLayout,
+        /*useAlignedAlloc=*/false,
+    };
+    LLVMTypeConverter typeConverter(context, options);
+    mlir::TypeConverter signatureConverter;
+    auto binaryModulesMap = conversion::comp_to_llvm::getEmptyModulesMap();
+    if (failed(conversion::comp_to_llvm::serializeSpirvKernels(
+            module, *binaryModulesMap))) {
+      signalPassFailure();
+      return;
+    }
+    OwningRewritePatternList patterns;
+    populateExpandTanhPattern(patterns, context);
+    populateStdToLLVMConversionPatterns(typeConverter, patterns);
+    conversion::stdx_to_llvm::populateStdXToLLVMConversionPatterns(
+        typeConverter, patterns);
+    conversion::abi_to_llvm::populateABIToLLVMConversionPatterns(typeConverter,
+                                                                 patterns);
+    conversion::comp_to_llvm::populateCommonPatterns(
+        context, typeConverter, signatureConverter, patterns);
+    conversion::comp_to_llvm::populateCompToOclPatterns(
+        context, *binaryModulesMap, typeConverter, patterns);
+    LLVMConversionTarget target(*context);
+    target.addIllegalDialect<abi::ABIDialect>();
+    target.addIllegalDialect<comp::COMPDialect>();
+    target.addDynamicallyLegalOp<mlir::FuncOp>([&](mlir::FuncOp op) -> bool {
+      return signatureConverter.isSignatureLegal(op.getType());
+    });
+    if (failed(applyPartialConversion(module, target, patterns))) {
+      signalPassFailure();
+    }
+    conversion::comp_to_llvm::addOclFunctionDeclarations(module);
+  }
+};
 
 void pipelineBuilder(OpPassManager &pm) {
   // Bound + pad initial tile code
@@ -146,11 +193,8 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(pmlc::transforms::createHoistingPass());
   pm.addPass(createCanonicalizerPass());
 
-  // Comp to LLVM - OpenCL function calls.
-  pm.addPass(pmlc::conversion::comp_to_llvm::createConvertCompToOclPass());
-
   // Convert to LLVM code.
-  pm.addPass(pmlc::target::intel_gen::createConvertStandardToLLVM());
+  pm.addPass(createConvertStandardToLLVM());
 }
 
 static PassPipelineRegistration<>

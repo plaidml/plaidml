@@ -22,4 +22,10 @@ def IntelGenOclLegalizeSpirv : Pass<"intel-gen-ocl-legalize-spirv", "mlir::spirv
   let dependentDialects = ["mlir::spirv::SPIRVDialect"];
 }
 
+def ConvertStandardToLLVM : Pass<"intel-gen-ocl-convert-std-to-llvm", "mlir::ModuleOp"> {
+  let summary = "Convert Standard + StandardX dialects to LLVM dialect";
+  let constructor = "pmlc::target::intel_gen_ocl_spirv::createConvertStandardToLLVM()";
+  let dependentDialects = ["mlir::LLVM::LLVMDialect"];
+}
+
 #endif // __PMLC_TARGET_INTEL_GEN__OCL_SPIRV_PASSES__
