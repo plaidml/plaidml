@@ -90,7 +90,7 @@ struct ConvertStandardToLLVMPass
     if (failed(applyPartialConversion(module, target, patterns))) {
       signalPassFailure();
     }
-    conversion::comp_to_llvm::addOclFunctionDeclarations(module);
+    conversion::comp_to_llvm::addOclFunctionDeclarations(module, typeConverter);
   }
 };
 

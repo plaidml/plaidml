@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 
+#include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Support/LogicalResult.h"
@@ -65,11 +66,12 @@ void addCommonFunctionDeclarations(mlir::ModuleOp &module);
 /// perform lowering for OpenCL runtime.
 void populateCompToOclPatterns(mlir::MLIRContext *context,
                                const BinaryModulesMap &modulesMap,
-                               mlir::TypeConverter &typeConverter,
+                               mlir::LLVMTypeConverter &typeConverter,
                                mlir::OwningRewritePatternList &patterns);
 
 /// Adds declarations of functions specific to OpenCL runtime.
-void addOclFunctionDeclarations(mlir::ModuleOp &module);
+void addOclFunctionDeclarations(mlir::ModuleOp &module,
+                                mlir::LLVMTypeConverter &typeConverter);
 
 /// Returns pass that will perform lowering for OpenCL runtime.
 /// To provide stronger guarantees any comp operation with runtime different

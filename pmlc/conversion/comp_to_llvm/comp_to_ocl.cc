@@ -50,7 +50,8 @@ void ConvertCompToOcl::runOnOperation() {
     return signalPassFailure();
   // Populate conversion patterns.
   mlir::MLIRContext *context = &getContext();
-  mlir::TypeConverter typeConverter, signatureConverter;
+  mlir::LLVMTypeConverter typeConverter{context};
+  mlir::TypeConverter signatureConverter;
   mlir::OwningRewritePatternList patterns;
   populateCommonPatterns(context, typeConverter, signatureConverter, patterns);
   populateCompToOclPatterns(context, modulesMap, typeConverter, patterns);
@@ -66,7 +67,7 @@ void ConvertCompToOcl::runOnOperation() {
     signalPassFailure();
   // Insert runtime function declarations.
   addCommonFunctionDeclarations(module);
-  addOclFunctionDeclarations(module);
+  addOclFunctionDeclarations(module, typeConverter);
 }
 
 template <class Op>
@@ -126,12 +127,12 @@ struct ConvertScheduleReadWrite : ConvertCompToOclBasePattern<Op> {
 using ConvertScheduleRead = ConvertScheduleReadWrite<comp::ScheduleRead>;
 using ConvertScheduleWrite = ConvertScheduleReadWrite<comp::ScheduleWrite>;
 
-struct ConvertAlloc : ConvertCompToOclBasePattern<comp::Alloc> {
-  using ConvertCompToOclBasePattern<comp::Alloc>::ConvertCompToOclBasePattern;
+struct ConvertAlloc final : mlir::ConvertOpToLLVMPattern<comp::Alloc> {
+  using ConvertOpToLLVMPattern<comp::Alloc>::ConvertOpToLLVMPattern;
 
   mlir::LogicalResult
-  matchAndRewrite(comp::Alloc op, mlir::ArrayRef<mlir::Value> operands,
-                  mlir::ConversionPatternRewriter &rewriter) const override;
+  matchAndRewrite(mlir::Operation *op, mlir::ArrayRef<mlir::Value> operands,
+                  mlir::ConversionPatternRewriter &rewriter) const final;
 };
 
 struct ConvertScheduleFunc : ConvertCompToOclBasePattern<comp::ScheduleFunc> {
@@ -152,7 +153,7 @@ struct ConvertScheduleFunc : ConvertCompToOclBasePattern<comp::ScheduleFunc> {
 
 void populateCompToOclPatterns(mlir::MLIRContext *context,
                                const BinaryModulesMap &modulesMap,
-                               mlir::TypeConverter &typeConverter,
+                               mlir::LLVMTypeConverter &typeConverter,
                                mlir::OwningRewritePatternList &patterns) {
   // Populate type conversion patterns.
   LLVM::LLVMType llvmInt8Ptr = LLVM::LLVMType::getInt8PtrTy(context);
@@ -181,11 +182,12 @@ void populateCompToOclPatterns(mlir::MLIRContext *context,
   patterns.insert<ConvertScheduleRead>(kOclRead, typeConverter, context);
   patterns.insert<ConvertScheduleWrite>(kOclWrite, typeConverter, context);
 
-  patterns.insert<ConvertAlloc>(typeConverter, context);
+  patterns.insert<ConvertAlloc>(typeConverter);
   patterns.insert<ConvertScheduleFunc>(modulesMap, typeConverter, context);
 }
 
-void addOclFunctionDeclarations(mlir::ModuleOp &module) {
+void addOclFunctionDeclarations(mlir::ModuleOp &module,
+                                mlir::LLVMTypeConverter &typeConverter) {
   mlir::Location loc = module.getLoc();
   mlir::OpBuilder builder(module.getBody()->getTerminator());
   mlir::MLIRContext *context = builder.getContext();
@@ -208,9 +210,9 @@ void addOclFunctionDeclarations(mlir::ModuleOp &module) {
   if (!module.lookupSymbol(kOclAlloc)) {
     builder.create<LLVM::LLVMFuncOp>(
         loc, kOclAlloc,
-        LLVM::LLVMType::getFunctionTy(llvmInt8Ptr,
-                                      {llvmInt8Ptr, llvmInt32, llvmInt8Ptr},
-                                      /*isVarArg=*/false));
+        LLVM::LLVMType::getFunctionTy(
+            llvmInt8Ptr, {llvmInt8Ptr, typeConverter.getIndexType()},
+            /*isVarArg=*/false));
   }
   if (!module.lookupSymbol(kOclDealloc)) {
     builder.create<LLVM::LLVMFuncOp>(
@@ -352,46 +354,35 @@ mlir::LogicalResult ConvertScheduleReadWrite<Op>::matchAndRewrite(
 }
 
 mlir::LogicalResult
-ConvertAlloc::matchAndRewrite(comp::Alloc op,
+ConvertAlloc::matchAndRewrite(mlir::Operation *opPtr,
                               mlir::ArrayRef<mlir::Value> operands,
                               mlir::ConversionPatternRewriter &rewriter) const {
-  if (!isMatchingRuntime(op))
-    return mlir::failure();
+  auto op = mlir::cast<comp::Alloc>(opPtr);
 
   mlir::Location loc = op.getLoc();
   mlir::MemRefType resultType = op.getType().cast<mlir::MemRefType>();
 
-  mlir::SmallVector<mlir::Value, 3> castOperands;
-  // Operand 0 - execution environment.
-  castOperands.push_back(operands[0]);
-  // Operand 1 - size of allocated memory in bytes.
-  auto shape = resultType.getShape();
-  uint32_t numElement = 1;
-  for (auto dim : shape)
-    numElement *= dim;
-  uint32_t elementTypeSize =
-      llvm::divideCeil(resultType.getElementTypeBitWidth(), 8);
-  mlir::Value bufferByteSize = rewriter.create<LLVM::ConstantOp>(
-      loc, LLVM::LLVMType::getInt32Ty(rewriter.getContext()),
-      rewriter.getI32IntegerAttr(numElement * elementTypeSize));
-  castOperands.push_back(bufferByteSize);
-  // Operand 2 - pointer to data on host or null.
-  if (operands.size() > 1) {
-    mlir::Value hostPtr = materializeConversion(rewriter, loc, operands[1]);
-    if (!hostPtr)
-      return mlir::failure();
-    castOperands.push_back(hostPtr);
-  } else {
-    LLVM::LLVMType llvmPointerType =
-        LLVM::LLVMType::getInt8PtrTy(rewriter.getContext());
-    mlir::Value nullPtr = rewriter.create<LLVM::NullOp>(loc, llvmPointerType);
-    castOperands.push_back(nullPtr);
-  }
+  // Figure out the amount of memory we need to allocate.
+  mlir::SmallVector<mlir::Value, 4> sizes;
+  getMemRefDescriptorSizes(loc, resultType, {}, rewriter, sizes);
+  auto sizeToAlloc = getCumulativeSizeInBytes(loc, resultType.getElementType(),
+                                              sizes, rewriter);
 
-  mlir::Type llvmResultType = convertType(op.getType());
-  rewriter.replaceOpWithNewOp<LLVM::CallOp>(
-      op.getOperation(), mlir::ArrayRef<mlir::Type>{llvmResultType},
-      rewriter.getSymbolRefAttr(kOclAlloc), castOperands);
+  // Build the call to allocate memory on the device.
+  mlir::Value memory =
+      rewriter
+          .create<LLVM::CallOp>(
+              loc, mlir::TypeRange{getVoidPtrType()},
+              rewriter.getSymbolRefAttr(kOclAlloc),
+              mlir::ValueRange{operands[0], // Execution environment
+                               sizeToAlloc})
+          .getResult(0);
+
+  // Build a memref descriptor for the result.
+  auto memref = mlir::MemRefDescriptor::fromStaticShape(
+      rewriter, loc, typeConverter, resultType, memory);
+
+  rewriter.replaceOp(op, {memref});
   return mlir::success();
 }
 
