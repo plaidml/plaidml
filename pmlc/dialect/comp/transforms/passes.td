@@ -45,4 +45,9 @@ def MinimizeAllocations : FunctionPass<"comp-minimize-allocations"> {
   let constructor = "pmlc::dialect::comp::createMinimizeAllocationsPass()";
 }
 
+def RemoveRedundantRW : FunctionPass<"comp-remove-redundant-rw"> {
+  let summary = "Remove memory transfer operations that don't have any effect";
+  let constructor = "pmlc::dialect::comp::createRemoveRedundantRWPass()";
+}
+
 #endif // __PMLC_DIALECT_COMP_TRANSFORMS__
