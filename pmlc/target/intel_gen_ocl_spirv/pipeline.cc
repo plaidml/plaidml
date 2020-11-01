@@ -48,6 +48,8 @@ namespace abi = pmlc::dialect::abi;
 namespace comp = pmlc::dialect::comp;
 namespace pxa = pmlc::dialect::pxa;
 
+namespace {
+
 struct ConvertStandardToLLVMPass
     : public ConvertStandardToLLVMBase<ConvertStandardToLLVMPass> {
   void runOnOperation() override {
@@ -91,6 +93,12 @@ struct ConvertStandardToLLVMPass
     conversion::comp_to_llvm::addOclFunctionDeclarations(module);
   }
 };
+
+} // namespace
+
+std::unique_ptr<Pass> createConvertStandardToLLVM() {
+  return std::make_unique<ConvertStandardToLLVMPass>();
+}
 
 void pipelineBuilder(OpPassManager &pm) {
   // Bound + pad initial tile code
