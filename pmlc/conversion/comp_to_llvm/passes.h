@@ -85,10 +85,11 @@ std::unique_ptr<mlir::Pass> createConvertCompToOclPass();
 void populateCompToVkPatterns(mlir::MLIRContext *context,
                               const BinaryModulesMap &modulesMap,
                               mlir::ModuleOp moduleOp, uint32_t numKernel,
-                              mlir::TypeConverter &typeConverter,
+                              mlir::LLVMTypeConverter &typeConverter,
                               mlir::OwningRewritePatternList &patterns);
 
-void addVkFunctionDeclarations(mlir::ModuleOp &module);
+void addVkFunctionDeclarations(mlir::ModuleOp &module,
+                               mlir::LLVMTypeConverter &typeConverter);
 
 /// Returns pass that will perform lowering for Vulkan runtime.
 /// To provide stronger guarantees any comp operation with runtime different

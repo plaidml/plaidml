@@ -29,20 +29,6 @@
 using pmlc::rt::Device;
 
 namespace pmlc::rt::vulkan {
-namespace {
-
-template <typename T>
-void bindBuffer(void *vkInvocation, DescriptorSetIndex setIndex,
-                BindingIndex bindIndex, uint32_t bufferByteSize,
-                ::UnrankedMemRefType<T> *unrankedMemRef) {
-  DynamicMemRefType<T> memRef(*unrankedMemRef);
-  T *ptr = memRef.data + memRef.offset;
-  VulkanHostMemoryBuffer memBuffer{ptr, bufferByteSize};
-  static_cast<VulkanInvocation *>(vkInvocation)
-      ->setResourceData(setIndex, bindIndex, memBuffer);
-}
-
-} // namespace
 
 extern "C" {
 
@@ -88,21 +74,12 @@ void vkWait(uint32_t count, ...) {
   // vkCmdSetEvent + vkCmdWaitEvents
 }
 
-#define BIND_BUFFER_IMPL(_name_, _type_)                                       \
-  void _mlir_ciface_bindBuffer##_name_(                                        \
-      void *vkInvocation, DescriptorSetIndex setIndex, BindingIndex bindIndex, \
-      uint32_t bufferByteSize, ::UnrankedMemRefType<_type_> *unrankedMemRef) { \
-    bindBuffer(vkInvocation, setIndex, bindIndex, bufferByteSize,              \
-               unrankedMemRef);                                                \
-  }
-
-BIND_BUFFER_IMPL(Float16, half_float::half);
-BIND_BUFFER_IMPL(Float32, float);
-BIND_BUFFER_IMPL(Float64, double);
-BIND_BUFFER_IMPL(Integer8, int8_t);
-BIND_BUFFER_IMPL(Integer16, int16_t);
-BIND_BUFFER_IMPL(Integer32, int32_t);
-BIND_BUFFER_IMPL(Integer64, int64_t);
+void vkBindBuffer(void *vkInvocation, DescriptorSetIndex setIndex,
+                  BindingIndex bindIndex, size_t bufferByteSize, void *ptr) {
+  VulkanHostMemoryBuffer memBuffer{ptr, static_cast<uint32_t>(bufferByteSize)};
+  static_cast<VulkanInvocation *>(vkInvocation)
+      ->setResourceData(setIndex, bindIndex, memBuffer);
+}
 
 void _mlir_ciface_fillResourceFloat32(
     ::UnrankedMemRefType<float> *unrankedMemRef, int32_t size, float value) {
@@ -130,20 +107,7 @@ struct Registration {
     registerSymbol("vkRun", reinterpret_cast<void *>(vkRun));
     registerSymbol("vkWait", reinterpret_cast<void *>(vkWait));
     registerSymbol("vkScheduleFunc", reinterpret_cast<void *>(vkScheduleFunc));
-    registerSymbol("_mlir_ciface_bindBufferFloat16",
-                   reinterpret_cast<void *>(_mlir_ciface_bindBufferFloat16));
-    registerSymbol("_mlir_ciface_bindBufferFloat32",
-                   reinterpret_cast<void *>(_mlir_ciface_bindBufferFloat32));
-    registerSymbol("_mlir_ciface_bindBufferFloat64",
-                   reinterpret_cast<void *>(_mlir_ciface_bindBufferFloat64));
-    registerSymbol("_mlir_ciface_bindBufferInteger8",
-                   reinterpret_cast<void *>(_mlir_ciface_bindBufferInteger8));
-    registerSymbol("_mlir_ciface_bindBufferInteger16",
-                   reinterpret_cast<void *>(_mlir_ciface_bindBufferInteger16));
-    registerSymbol("_mlir_ciface_bindBufferInteger32",
-                   reinterpret_cast<void *>(_mlir_ciface_bindBufferInteger32));
-    registerSymbol("_mlir_ciface_bindBufferInteger64",
-                   reinterpret_cast<void *>(_mlir_ciface_bindBufferInteger64));
+    registerSymbol("vkBindBuffer", reinterpret_cast<void *>(vkBindBuffer));
     registerSymbol("_mlir_ciface_fillResourceFloat32",
                    reinterpret_cast<void *>(_mlir_ciface_fillResourceFloat32));
   }

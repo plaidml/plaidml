@@ -113,7 +113,7 @@ struct ConvertStandardToLLVMPass
     if (failed(applyPartialConversion(module, target, patterns))) {
       signalPassFailure();
     }
-    conversion::comp_to_llvm::addVkFunctionDeclarations(module);
+    conversion::comp_to_llvm::addVkFunctionDeclarations(module, typeConverter);
   }
 };
 
