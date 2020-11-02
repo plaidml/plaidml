@@ -1,4 +1,5 @@
-add_all_subdirs()
+add_subdirectory(bilp)
+add_subdirectory(math)
 
 pml_cc_library(
   NAME util

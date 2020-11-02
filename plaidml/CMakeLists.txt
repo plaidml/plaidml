@@ -19,10 +19,10 @@ pml_cc_library(
     OUTPUT_NAME plaidml
     SOVERSION 1
   DEPS
-    plaidml::core
-    plaidml::edsl
-    plaidml::exec
-    plaidml::op
+    plaidml::core::obj
+    plaidml::edsl::obj
+    plaidml::exec::obj
+    plaidml::op::obj
     pmlc::rt::llvm
     pmlc::target::x86
 )

@@ -15,7 +15,7 @@ endif()
 
 include(FetchContent)
 
-project(PlaidML LANGUAGES CXX C)
+project(PlaidML LANGUAGES C CXX)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -25,6 +25,16 @@ set(PML_IDE_FOLDER PML)
 set(PLAIDML_VERSION 1.0.0)
 set(MAIN_BRANCH plaidml-v1)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+
+if("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
+  # Support for ninja on windows
+  enable_language(ASM)
+  add_compile_definitions(
+    _SILENCE_ALL_CXX17_DEPRECATION_WARNINGS
+    NOMINMAX
+    WIN32_LEAN_AND_MEAN
+  )
+endif()
 
 # -------------------------------------------------------------------------------
 # Project component configuration

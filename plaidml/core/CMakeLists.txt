@@ -1,13 +1,31 @@
+set(_HDRS
+  core.h
+  ffi.h
+)
+
+set(_SRCS
+  ffi.cc
+  settings.cc
+  version.cc
+)
+
 pml_cc_library(
   NAME core
+  TYPE STATIC
+  HDRS ${_HDRS}
+  SRCS ${_SRCS}
+  DEPS
+    pmlc::ast
+    pmlc::compiler
+    pmlc::util
+    LLVMSupport
+)
+
+pml_cc_library(
+  NAME obj
   TYPE OBJECT
-  HDRS
-    core.h
-    ffi.h
-  SRCS
-    ffi.cc
-    settings.cc
-    version.cc
+  HDRS ${_HDRS}
+  SRCS ${_SRCS}
   DEPS
     pmlc::ast
     pmlc::compiler
