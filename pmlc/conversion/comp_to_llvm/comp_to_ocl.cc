@@ -276,7 +276,7 @@ void addOclFunctionDeclarations(mlir::ModuleOp &module,
                                       {llvmInt8Ptr, llvmInt8Ptr, llvmIndex,
                                        llvmIndex, llvmIndex, llvmIndex,
                                        llvmIndex, llvmIndex},
-                                      /*isVarArg=*/true));
+                                      /*isVarArg=*/false));
   }
   if (!module.lookupSymbol(kOclBarrier)) {
     builder.create<LLVM::LLVMFuncOp>(
@@ -353,7 +353,12 @@ mlir::LogicalResult ConvertScheduleReadWrite<Op>::matchAndRewrite(
 
   // Extract the device memref memory pointer.
   mlir::MemRefDescriptor devMemDesc{operands[1]};
-  auto devPtr = devMemDesc.allocatedPtr(rewriter, loc);
+  mlir::Value devOnDev = devMemDesc.allocatedPtr(rewriter, loc);
+  mlir::Value devPtr = rewriter.create<LLVM::AddrSpaceCastOp>(
+      loc,
+      LLVM::LLVMPointerType::get(
+          devOnDev.getType().cast<LLVM::LLVMPointerType>().getElementType()),
+      devOnDev);
   callOperands[1] =
       rewriter.create<LLVM::BitcastOp>(loc, this->getVoidPtrType(), devPtr);
 
@@ -394,11 +399,21 @@ ConvertAlloc::matchAndRewrite(mlir::Operation *opPtr,
       rewriter.create<LLVM::CallOp>(loc, mlir::TypeRange{getVoidPtrType()},
                                     rewriter.getSymbolRefAttr(kOclAlloc),
                                     mlir::ValueRange{operands[0], sizeToAlloc});
-  mlir::Value memory = alloc.getResult(0);
+  mlir::Value memRaw = alloc.getResult(0);
+  auto targetType = typeConverter.convertType(resultType.getElementType())
+                        .dyn_cast_or_null<LLVM::LLVMType>();
+  if (!targetType) {
+    return mlir::failure();
+  }
+  mlir::Value memTyped =
+      rewriter.create<LLVM::BitcastOp>(loc, targetType.getPointerTo(), memRaw);
+  mlir::Value memOnDev = rewriter.create<LLVM::AddrSpaceCastOp>(
+      loc, LLVM::LLVMPointerType::get(targetType, resultType.getMemorySpace()),
+      memTyped);
 
   // Build a memref descriptor for the result.
   auto memref = mlir::MemRefDescriptor::fromStaticShape(
-      rewriter, loc, typeConverter, resultType, memory);
+      rewriter, loc, typeConverter, resultType, memOnDev);
 
   rewriter.replaceOp(op, {memref});
   return mlir::success();
@@ -411,10 +426,15 @@ mlir::LogicalResult ConvertDealloc::matchAndRewrite(
   mlir::Location loc = op.getLoc();
 
   // Extract the underlying buffer pointer.
-  mlir::Value buffer =
+  mlir::Value bufferOnDev =
       mlir::MemRefDescriptor{operands[1]}.allocatedPtr(rewriter, loc);
+  mlir::Value bufferPtr = rewriter.create<LLVM::AddrSpaceCastOp>(
+      loc,
+      LLVM::LLVMPointerType::get(
+          bufferOnDev.getType().cast<LLVM::LLVMPointerType>().getElementType()),
+      bufferOnDev);
   mlir::Value bufferRaw =
-      rewriter.create<LLVM::BitcastOp>(loc, getVoidPtrType(), buffer);
+      rewriter.create<LLVM::BitcastOp>(loc, getVoidPtrType(), bufferPtr);
 
   // Build the dealloc call.
   rewriter.create<LLVM::CallOp>(loc, mlir::TypeRange{getVoidType()},
@@ -465,10 +485,16 @@ mlir::LogicalResult ConvertScheduleFunc::matchAndRewrite(
         loc, llvmInt32Type, rewriter.getI32IntegerAttr(argI));
     mlir::Value remappedArg =
         rewriter.getRemappedValue(launchOp.getKernelOperand(argI));
-    mlir::Value buffer =
+    mlir::Value bufferOnDev =
         mlir::MemRefDescriptor{remappedArg}.allocatedPtr(rewriter, loc);
+    mlir::Value bufferPtr = rewriter.create<LLVM::AddrSpaceCastOp>(
+        loc,
+        LLVM::LLVMPointerType::get(bufferOnDev.getType()
+                                       .cast<LLVM::LLVMPointerType>()
+                                       .getElementType()),
+        bufferOnDev);
     mlir::Value bufferRaw =
-        rewriter.create<LLVM::BitcastOp>(loc, getVoidPtrType(), buffer);
+        rewriter.create<LLVM::BitcastOp>(loc, getVoidPtrType(), bufferPtr);
 
     rewriter.create<LLVM::CallOp>(
         loc, mlir::ArrayRef<mlir::Type>{},

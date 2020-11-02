@@ -120,7 +120,7 @@ struct Registration {
                    reinterpret_cast<void *>(oclSetKernelArg));
     registerSymbol("oclAddKernelDep",
                    reinterpret_cast<void *>(oclAddKernelDep));
-    registerSymbol("_mlir_ciface_oclScheduleFunc",
+    registerSymbol("oclScheduleFunc",
                    reinterpret_cast<void *>(oclScheduleFunc));
     registerSymbol("oclBarrier", reinterpret_cast<void *>(oclBarrier));
     registerSymbol("oclSubmit", reinterpret_cast<void *>(oclSubmit));
