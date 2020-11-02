@@ -604,6 +604,11 @@ inline edsl::Tensor repeat(const edsl::Tensor& I, int repeats, int axis) {
   return details::op("repeat", args).as_tensor();
 }
 
+inline edsl::Tensor repeat(const edsl::Tensor& I, const edsl::Value& repeats, int axis) {
+  auto args = edsl::make_tuple(I, repeats, axis);
+  return details::op("repeat", args).as_tensor();
+}
+
 inline edsl::Tensor reshape(const edsl::Tensor& I, const edsl::Value& dims) {
   auto args = edsl::make_tuple(I, dims);
   return details::op("reshape", args).as_tensor();
