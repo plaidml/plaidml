@@ -1,13 +1,28 @@
+set(_SRCS ffi.cc)
+set(_HDRS
+  exec.h
+  ffi.h
+)
+
 pml_cc_library(
   NAME exec
-  TYPE OBJECT
-  HDRS
-    exec.h
-    ffi.h
-  SRCS
-    ffi.cc
+  TYPE STATIC
+  HDRS ${_HDRS}
+  SRCS ${_SRCS}
   DEPS
     plaidml::core
+    pmlc::compiler
+    pmlc::rt
+    pmlc::util
+)
+
+pml_cc_library(
+  NAME obj
+  TYPE OBJECT
+  HDRS ${_HDRS}
+  SRCS ${_SRCS}
+  DEPS
+    plaidml::core::obj
     pmlc::compiler
     pmlc::rt
     pmlc::util
