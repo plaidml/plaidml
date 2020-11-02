@@ -416,6 +416,7 @@ struct FusionInfo {
           if (singleOutput) {
             // If the use is not inside B, we have to keep the write as an output
             // and the other output in B after fusion. Then there would be multiple outputs
+            aInfo.op.emitRemark("Multiple outputs");
             return false;
           }
           continue;
