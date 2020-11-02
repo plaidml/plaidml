@@ -868,18 +868,18 @@ struct ArgSortOpConversion : public OpConversionPattern<tile::ArgSortOp> {
     auto loc = op.getLoc();
     auto i32Type = rewriter.getI32Type();
     auto indexType = rewriter.getIndexType();
-    // auto ctx = rewriter.getContext();
 
     // Axis represents one of the tensor dimensions.
-    int64_t axis = op.axis().getSExtValue();
+    int64_t axisAttr = op.axis().getSExtValue();
 
     // Special case value -1 indicates the last axis.
     Value tensor = adaptor.tensor();
     auto shape = tensor.getType().cast<MemRefType>().getShape();
     size_t tensorDims = shape.size();
-    if (-1 == axis) {
-      axis += tensorDims;
-    } else if (axis < 0 || axis >= tensorDims) {
+    size_t axis = static_cast<size_t>(axisAttr);
+    if (-1 == axisAttr) {
+      axis = axisAttr + static_cast<int64_t>(tensorDims);
+    } else if (axisAttr < 0 || axis >= tensorDims) {
       return failure();
     }
     auto elementType = tensor.getType().cast<MemRefType>().getElementType();
@@ -890,7 +890,7 @@ struct ArgSortOpConversion : public OpConversionPattern<tile::ArgSortOp> {
 
     // Create an affine loop nest over all the dimensions, including the one
     // we are sorting on. We will use a single iteration for the sort axis,
-    // since the body of the loop will contain the sorting loop, but we will
+    // since the body of the nest will contain the sorting loop, but we will
     // keep the number of IVs equal to the tensor rank to simplify accounting.
     SmallVector<int64_t, 4> outerLoopShape;
     for (size_t i = 0; i < tensorDims; ++i) {
@@ -995,7 +995,7 @@ struct ArgSortOpConversion : public OpConversionPattern<tile::ArgSortOp> {
       // Is compVal smaller than minVal? If so, update the allocs
       Value orderPred;
       if (elementType.isSignedInteger()) {
-        CmpIPredicate dir;
+        CmpIPredicate dir{};
         switch (op.direction()) {
         case tile::SortDirection::asc:
           dir = CmpIPredicate::slt;
@@ -1007,7 +1007,7 @@ struct ArgSortOpConversion : public OpConversionPattern<tile::ArgSortOp> {
         orderPred = rewriter.create<mlir::CmpIOp>(loc, dir, compVal, minVal)
                         .getResult();
       } else if (elementType.isUnsignedInteger()) {
-        CmpIPredicate dir;
+        CmpIPredicate dir{};
         switch (op.direction()) {
         case tile::SortDirection::asc:
           dir = CmpIPredicate::ult;
@@ -1020,7 +1020,7 @@ struct ArgSortOpConversion : public OpConversionPattern<tile::ArgSortOp> {
                         .getResult();
       } else {
         // Assume float; verifier will fail the conversion if not float
-        CmpFPredicate dir;
+        CmpFPredicate dir{};
         switch (op.direction()) {
         case tile::SortDirection::asc:
           dir = CmpFPredicate::OLT;
@@ -1039,9 +1039,10 @@ struct ArgSortOpConversion : public OpConversionPattern<tile::ArgSortOp> {
       rewriter.create<StoreOp>(loc, minIV, minIdxVar, zeroIndex);
       // store compVal -> minValVar
       rewriter.create<StoreOp>(loc, compVal, minValVar, zeroIndex);
-      rewriter.setInsertionPointAfter(ifReorder);
-
-      // End the inner sort loop, finding smallest value in the unsorted region
+      // End the conditional block. We would set the insertion point after
+      // the ifReorder block, except that we are about to...
+      // End the inner sort loop, which found the smallest value in the
+      // unsorted region, by setting the insertion point after its block.
       rewriter.setInsertionPointAfter(minLoop);
 
       // Swap the sort position with the minimum position.
