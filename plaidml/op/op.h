@@ -599,10 +599,35 @@ inline edsl::Tensor reorg_yolo(const edsl::Tensor& I, int stride, bool decrease,
   return details::op("reorg_yolo", args).as_tensor();
 }
 
-inline edsl::Tensor repeat(const edsl::Tensor& I, int repeats, int axis) {
-  auto args = edsl::make_tuple(I, repeats, axis);
-  return details::op("repeat", args).as_tensor();
-}
+class repeat {
+ public:
+  explicit repeat(const edsl::Tensor& I) : I_(I) {}
+
+  repeat& repeats(int repeats) {
+    repeats_ = edsl::Value(repeats);
+    return *this;
+  }
+
+  repeat& repeats(const edsl::TensorDim& repeats) {
+    repeats_ = edsl::Value(repeats);
+    return *this;
+  }
+
+  repeat& axis(int axis) {
+    axis_ = edsl::Value(axis);
+    return *this;
+  }
+
+  operator edsl::Tensor() const {
+    auto args = edsl::make_tuple(I_, repeats_, axis_);
+    return details::op("repeat", args).as_tensor();
+  }
+
+ private:
+  edsl::Tensor I_;
+  edsl::Value repeats_ = edsl::Value(1);
+  edsl::Value axis_ = edsl::Value(0);
+};
 
 inline edsl::Tensor reshape(const edsl::Tensor& I, const edsl::Value& dims) {
   auto args = edsl::make_tuple(I, dims);
