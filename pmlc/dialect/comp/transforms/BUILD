@@ -24,8 +24,8 @@ plaidml_cc_library(
     name = "transforms",
     srcs = [
         "execenv_coalescing.cc",
-        "pass_detail.h",
         "minimize_allocations.cc",
+        "pass_detail.h",
         "remove_redundant_rw.cc",
     ],
     hdrs = [
@@ -33,7 +33,7 @@ plaidml_cc_library(
     ],
     deps = [
         ":gen-pass",
+        "//pmlc/dialect/comp/analysis",
         "//pmlc/dialect/comp/ir",
-        "//pmlc/dialect/comp/analysis"
     ],
 )
