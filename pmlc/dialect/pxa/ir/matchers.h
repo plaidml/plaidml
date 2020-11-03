@@ -27,7 +27,7 @@ struct PxaReduceOpMatcher {
 
 template <typename A, typename B>
 inline auto m_PxaReduceOp(mlir::AtomicRMWKind agg, A aMatcher, B bMatcher) {
-  return PxaReduceOpMatcher(agg, aMatcher, bMatcher);
+  return PxaReduceOpMatcher<A, B>(agg, aMatcher, bMatcher);
 }
 
 } // namespace pmlc::dialect::pxa

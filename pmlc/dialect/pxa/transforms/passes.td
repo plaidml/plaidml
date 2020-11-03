@@ -65,6 +65,9 @@ def Fusion : FunctionPass<"pxa-fusion"> {
     Option<"loopDepth", "loop-depth", "int64_t",
            /*default=*/"0",
            "How deep the fusion should perform">,
+    Option<"singleOutput", "single-output", "bool",
+           /*default=*/"false",
+           "Allow single output only">,
   ];
 }
 
@@ -165,6 +168,7 @@ def SimplifyWithConstraints : FunctionPass<"pxa-simplify-with-constraints"> {
   let constructor = "pmlc::dialect::pxa::createSimplifyWithConstraintsPass()";
 }
 
+
 def ReorderLayouts : FunctionPass<"pxa-reorder-layouts"> {
   let summary = "Optimize data layouts for efficient reading";
   let description = [{
@@ -238,5 +242,6 @@ def ReorderLayouts : FunctionPass<"pxa-reorder-layouts"> {
            "Allow for creating separate reorder">
   ];
 }
+
 
 #endif // __PMLC_DIALECT_PXA_PASSES__
