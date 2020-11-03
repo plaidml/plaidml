@@ -8,4 +8,5 @@ pml_cc_library(
     registry.cc
   DEPS
     pmlc::util
+    MLIRParser
 )
