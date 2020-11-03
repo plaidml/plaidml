@@ -105,6 +105,10 @@ void pipelineBuilder(OpPassManager &pm) {
   // pm.addPass(pmlc::dialect::pxa::createAffineNormalizePass());
   // pm.addPass(createCanonicalizerPass());
   // pm.addPass(createCSEPass());
+  pm.addPass(pxa::createVectorizeMemPass());
+  pm.addPass(pmlc::dialect::pxa::createAffineNormalizePass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
 
   // Lower out of PXA memory semantics
   pm.addPass(pmlc::target::intel_gen::createLowerPXAToAffinePass());
