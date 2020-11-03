@@ -79,11 +79,6 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
-  pm.addPass(pxa::createVectorizeMemPass());
-  pm.addPass(pxa::createAffineNormalizePass());
-  pm.addPass(createCanonicalizerPass());
-  pm.addPass(createCSEPass());
-
   // Assign GPU blocks + threads to outermost loop
   pm.addPass(pmlc::dialect::pxa::createGPUThreadPass(/*maxThreads=*/64));
   pm.addPass(pmlc::dialect::pxa::createAffineNormalizePass());
@@ -97,6 +92,19 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(pmlc::dialect::pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
+
+  // Data layout optimization.
+  pm.addPass(createIntelGenOclReorderLayoutsPass(/*maxThreads=*/64,
+                                                 /*allowReorder=*/false));
+  pm.addPass(pxa::createSimplifyWithConstraintsPass());
+  pm.addPass(pmlc::dialect::pxa::createAffineNormalizePass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+
+  // pm.addPass(pxa::createVectorizeMemPass());
+  // pm.addPass(pmlc::dialect::pxa::createAffineNormalizePass());
+  // pm.addPass(createCanonicalizerPass());
+  // pm.addPass(createCSEPass());
 
   // Lower out of PXA memory semantics
   pm.addPass(pmlc::target::intel_gen::createLowerPXAToAffinePass());
