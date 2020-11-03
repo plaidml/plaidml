@@ -6,9 +6,11 @@ pml_cc_library(
   SRCS
     execenv_coalescing.cc
     minimize_allocations.cc
+    remove_redundant_rw.cc
   DEPS
     LLVMSupport
     MLIRIR
+    pmlc::dialect::comp::analysis
     pmlc::dialect::comp::ir
     ::passes-gen
 )
