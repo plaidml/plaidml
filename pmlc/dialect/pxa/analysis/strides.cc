@@ -212,23 +212,34 @@ StrideRange StrideInfo::range() const {
   return ret;
 }
 
-AffineValueExpr StrideInfo::toValueExpr(MLIRContext *ctx) const {
+AffineValueExpr StrideInfo::toValueExpr(MLIRContext *ctx,
+                                        mlir::Block *relative) const {
+  assert(relative);
+  std::map<std::string, std::pair<mlir::BlockArgument, int64_t>> ordered;
+  for (auto kvp : strides) {
+    ordered.emplace(
+        getUniqueName(relative, kvp.first),
+        std::pair<mlir::BlockArgument, int64_t>(kvp.first, kvp.second));
+  }
+
   auto tot = AffineValueExpr(ctx, offset);
-  for (const auto &kvp : strides) {
-    Operation *baseOp = kvp.first.getOwner()->getParentOp();
-    AffineValueExpr idx(kvp.first);
+  for (auto item : llvm::enumerate(ordered)) {
+    auto blockArgAndStride = item.value().second;
+    Operation *baseOp = blockArgAndStride.first.getOwner()->getParentOp();
+    AffineValueExpr idx(blockArgAndStride.first);
     if (auto op = dyn_cast<AffineParallelOp>(baseOp)) {
       idx = idx - AffineValueExpr(op.getLowerBoundsValueMap(),
-                                  kvp.first.getArgNumber());
+                                  blockArgAndStride.first.getArgNumber());
     } else if (auto op = dyn_cast<AffineForOp>(baseOp)) {
       auto map = op.getLowerBoundMap();
       idx = idx - AffineValueExpr(map.getResult(0), op.getLowerBoundOperands());
     } else {
       llvm_unreachable("Invalid op type in toValueMap");
     }
-    int64_t step = getIVStep(kvp.first);
-    assert(kvp.second % step == 0 && "Stride not divisible by step");
-    tot = tot + idx * (kvp.second / step);
+    int64_t step = getIVStep(blockArgAndStride.first);
+    assert(blockArgAndStride.second % step == 0 &&
+           "Stride not divisible by step");
+    tot = tot + idx * (blockArgAndStride.second / step);
   }
   return tot;
 }
@@ -263,10 +274,12 @@ std::ostream &operator<<(std::ostream &os, const StrideInfo &x) {
   return os;
 }
 
-AffineValueMap convertToValueMap(MLIRContext *ctx, ArrayRef<StrideInfo> dims) {
+AffineValueMap convertToValueMap(MLIRContext *ctx, ArrayRef<StrideInfo> dims,
+                                 mlir::Block *relative) {
+  assert(relative);
   SmallVector<AffineValueExpr, 4> exprs;
   for (const auto &si : dims) {
-    exprs.push_back(si.toValueExpr(ctx));
+    exprs.push_back(si.toValueExpr(ctx, relative));
   }
   return jointValueMap(ctx, exprs);
 }

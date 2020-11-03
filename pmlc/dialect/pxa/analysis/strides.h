@@ -122,7 +122,8 @@ struct StrideInfo {
   StrideRange range() const;
 
   // Convert a StrideInfo back into an affine expression
-  mlir::AffineValueExpr toValueExpr(mlir::MLIRContext *ctx) const;
+  mlir::AffineValueExpr toValueExpr(mlir::MLIRContext *ctx,
+                                    mlir::Block *relative) const;
 
   void print(mlir::raw_ostream &os, mlir::Block *relative = nullptr) const;
 };
@@ -131,7 +132,8 @@ std::ostream &operator<<(std::ostream &os, const StrideInfo &x);
 
 // Convert a vector of StrideInfo's into a value map
 mlir::AffineValueMap convertToValueMap(mlir::MLIRContext *ctx,
-                                       mlir::ArrayRef<StrideInfo> dims);
+                                       mlir::ArrayRef<StrideInfo> dims,
+                                       mlir::Block *relative);
 
 // Compute stride info for a given affine value (such an an induction variable
 // or the result of an affine.apply). Return None if the expression is not a
