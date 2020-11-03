@@ -55,16 +55,18 @@ struct FusionInfo {
   // Perform tiled fusions, including additional loop transformations from
   // subgroups pass
   bool tiledFusion;
+  // Allow single output only
+  bool singleOutput;
 
   bool reverseFusion;
 
   FusionInfo(AffineParallelOp aBand, AffineParallelOp bBand,
              int64_t memoryActivityThreshold, bool exactlyMatch,
-             bool tiledFusion)
+             bool tiledFusion, bool singleOutput)
       : aInfo{aBand}, bInfo{bBand}, hasPlan(false),
         memoryActivityThreshold(memoryActivityThreshold),
         exactlyMatch(exactlyMatch), tiledFusion(tiledFusion),
-        reverseFusion(false) {}
+        singleOutput(singleOutput), reverseFusion(false) {}
 
   // Helper method to find the original source write of a state update.
   static PxaReduceOpInterface findSourceWrite(Value val) {
@@ -410,8 +412,15 @@ struct FusionInfo {
       // For each use of the write:
       for (Operation *user : result.getUsers()) {
         // Check if it is inside B, if not, we don't care, check next use.
-        if (!bInfo.op.getOperation()->isAncestor(user))
+        if (!bInfo.op.getOperation()->isAncestor(user)) {
+          if (singleOutput) {
+            // If the use is not inside B, we have to keep the write as an output
+            // and the other output in B after fusion. Then there would be multiple outputs
+            aInfo.op.emitRemark("Multiple outputs");
+            return false;
+          }
           continue;
+        }
         // Now we make sure it's a read or a write, if not, we can't do fusion,
         // bail.
         if (isa<PxaReadOpInterface>(user)) {
@@ -605,11 +614,12 @@ struct FusionPass : public FusionBase<FusionPass> {
   FusionPass() = default;
 
   explicit FusionPass(int64_t memoryActivityThreshold, bool exactlyMatch,
-                      bool tiledFusion, int64_t loopDepth) {
+                      bool tiledFusion, int64_t loopDepth, bool singleOutput) {
     this->memoryActivityThreshold = memoryActivityThreshold;
     this->exactlyMatch = exactlyMatch;
     this->tiledFusion = tiledFusion;
     this->loopDepth = loopDepth;
+    this->singleOutput = singleOutput;
   }
 
   // Attempts to fuse two ops if they look good.  Returns the new fused loop
@@ -620,7 +630,7 @@ struct FusionPass : public FusionBase<FusionPass> {
                  << debugString(*aBand) << "\nB:\n"
                  << debugString(*bBand));
     FusionInfo fusionInfo(aBand, bBand, memoryActivityThreshold.getValue(),
-                          exactlyMatch, tiledFusion);
+                          exactlyMatch, tiledFusion, singleOutput);
     bool canFuse = fusionInfo.computeFusion();
     if (!canFuse) {
       return nullptr;
@@ -710,9 +720,9 @@ struct FusionPass : public FusionBase<FusionPass> {
 
 std::unique_ptr<Pass> createFusionPass(int64_t memoryActivityThreshold,
                                        bool exactlyMatch, bool tiledFusion,
-                                       int64_t loopDepth) {
+                                       int64_t loopDepth, bool singleOutput) {
   return std::make_unique<FusionPass>(memoryActivityThreshold, exactlyMatch,
-                                      tiledFusion, loopDepth);
+                                      tiledFusion, loopDepth, singleOutput);
 }
 
 } // namespace pmlc::dialect::pxa
