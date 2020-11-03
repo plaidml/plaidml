@@ -17,11 +17,11 @@ namespace fs = llvm::sys::fs;
 namespace plaidml::core {
 
 Settings::Settings() {
-  auto path = pmlc::util::getEnvVar("PLAIDML_SETTINGS");
+  std::string path = pmlc::util::getEnvVar("PLAIDML_SETTINGS");
   if (path.empty()) {
     llvm::SmallString<64> expandedPath;
     fs::expand_tilde("~/.plaidml2", expandedPath);
-    path = expandedPath.str();
+    path = static_cast<std::string>(expandedPath);
   }
   settings_.emplace("PLAIDML_SETTINGS", path);
 }

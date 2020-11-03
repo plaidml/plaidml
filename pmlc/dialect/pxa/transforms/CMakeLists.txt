@@ -15,6 +15,7 @@
     nest_loops.cc
     normalize.cc
     resize_tmps.cc
+    simplify_with_constraints.cc
     stencil_gemm.cc
     stencil.cc
     subgroups.cc
@@ -33,6 +34,5 @@
 pml_tblgen_library(
   NAME passes-gen
   TD_FILE passes.td
-  OUTS
-    -gen-pass-decls passes.h.inc
+  OUTS -gen-pass-decls passes.h.inc
 )
