@@ -603,13 +603,13 @@ class repeat {
  public:
   explicit repeat(const edsl::Tensor& I) : I_(I) {}
 
-  repeat& repeats(int repeats) {
-    repeats_ = edsl::Value(repeats);
+  repeat& count(int count) {
+    count_ = edsl::Value(count);
     return *this;
   }
 
-  repeat& repeats(const edsl::TensorDim& repeats) {
-    repeats_ = edsl::Value(repeats);
+  repeat& count(const edsl::TensorDim& count) {
+    count_ = edsl::Value(count);
     return *this;
   }
 
@@ -619,13 +619,13 @@ class repeat {
   }
 
   operator edsl::Tensor() const {
-    auto args = edsl::make_tuple(I_, repeats_, axis_);
+    auto args = edsl::make_tuple(I_, count_, axis_);
     return details::op("repeat", args).as_tensor();
   }
 
  private:
   edsl::Tensor I_;
-  edsl::Value repeats_ = edsl::Value(1);
+  edsl::Value count_ = edsl::Value(1);
   edsl::Value axis_ = edsl::Value(0);
 };
 
