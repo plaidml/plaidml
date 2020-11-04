@@ -1,5 +1,5 @@
 ngraph_tensorflow_bridge
-tensorflow == 1.14.0
+tensorflow == 1.15.2
 plaidml-keras
 pillow
 matplotlib
