@@ -800,11 +800,11 @@ enum class SortDirection {
 /// Returns the indices of `x` which give its sorted order along `axis` in
 /// the specified `direction`, where -1 represents the last axis.
 /// \param x Tensor
-/// \param axis ssize_t
+/// \param axis int
 /// \param direction SortDirection
 /// \return Tensor
 ///
-inline Tensor argsort(const Tensor& x, ssize_t axis = -1, SortDirection direction = SortDirection::ASC) {
+inline Tensor argsort(const Tensor& x, int axis = -1, SortDirection direction = SortDirection::ASC) {
   return intrinsic("argsort", x, static_cast<int64_t>(axis), static_cast<int64_t>(direction));
 }
 
