@@ -11,9 +11,11 @@
     dataflow_opt.cc
     fusion.cc
     gpu_thread.cc
+    layout_utils.cc
     localize.cc
     nest_loops.cc
     normalize.cc
+    reorder_layouts.cc
     resize_tmps.cc
     simplify_with_constraints.cc
     stencil_gemm.cc
