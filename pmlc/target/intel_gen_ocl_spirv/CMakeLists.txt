@@ -5,6 +5,7 @@ pml_cc_library(
   SRCS
     legalize_spirv.cc
     pipeline.cc
+    reorder_layouts.cc
     spirv_target.cc
     sub_group_size.cc
   DEPS
