@@ -22,4 +22,25 @@ def IntelGenOclLegalizeSpirv : Pass<"intel-gen-ocl-legalize-spirv", "mlir::spirv
   let dependentDialects = ["mlir::spirv::SPIRVDialect"];
 }
 
+def IntelGenOclReorderLayouts : FunctionPass<"intel-gen-ocl-reorder-layouts"> {
+  let summary = "Optimize data layouts for Intel GPUs";
+  let description = [{
+    Specialization of pxa-reorder-layouts for Intel GPUs with OpenCL backend.
+    It extends scheduling operation to take into account reversed order
+    global and local dimensions are processed by backend.
+    Additionally it interleaves global and local loops with sequential ones
+    to account for parallel execution - assuming difference of one
+    in thread id is equal to one iteration of innermost loop.
+    Reorders created by this pass conform to GPU threading semantics with
+    separate global and local loops.
+  }];
+  let constructor = "pmlc::target::intel_gen_ocl_spirv::createIntelGenOclReorderLayoutsPass()";
+  let options = [
+    Option<"maxThreads", "max-threads", "unsigned", /*default=*/"64",
+           "Set maximum/goal inner threads for created reorders">,
+    Option<"allowReorder", "allow-reorder", "bool", /*default=*/"false",
+           "Allow for creating separate reorder">
+  ];
+}
+
 #endif // __PMLC_TARGET_INTEL_GEN__OCL_SPIRV_PASSES__

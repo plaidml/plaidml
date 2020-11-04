@@ -32,7 +32,8 @@ std::unique_ptr<mlir::Pass> createCPUThreadPass(unsigned threads);
 
 std::unique_ptr<mlir::Pass>
 createFusionPass(int64_t memoryActivityThreshold = 0, bool exactlyMatch = false,
-                 bool tiledFusion = false, int64_t loopDepth = 0, bool singleOutput = false);
+                 bool tiledFusion = false, int64_t loopDepth = 0,
+                 bool singleOutput = false);
 
 std::unique_ptr<mlir::Pass> createGPUThreadPass();
 std::unique_ptr<mlir::Pass> createGPUThreadPass(unsigned maxThreads);
@@ -69,6 +70,9 @@ std::unique_ptr<mlir::Pass> createVectorizePass(mlir::StringRef strategy,
                                                 unsigned vectorWidth = 8);
 
 std::unique_ptr<mlir::Pass> createSimplifyWithConstraintsPass();
+
+std::unique_ptr<mlir::Pass> createReorderLayoutsPass();
+std::unique_ptr<mlir::Pass> createReorderLayoutsPass(bool allowReorder);
 
 /// Generate the code for registering passes.
 #define GEN_PASS_REGISTRATION
