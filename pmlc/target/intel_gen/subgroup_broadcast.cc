@@ -107,8 +107,6 @@ public:
         // Change vector dimension, we already checked earlier that dimsize %
         // vecsize == 0
         auto newVectorSize = op.getVectorType().getDimSize(0) / vectorSize;
-        auto vectorType = VectorType::get({newVectorSize},
-                                          op.getVectorType().getElementType());
         SmallVector<int64_t, 1> newShape;
         newShape.push_back(newVectorSize);
         auto newMemrefType =
