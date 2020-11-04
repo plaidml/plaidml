@@ -236,6 +236,9 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(
       pmlc::conversion::comp_to_llvm::createConvertCompToLLVMPass("vlk_"));
 
+  // Lower SCF to Standard before converting to LLVM
+  pm.addPass(createLowerToCFGPass());
+
   // Convert Vulkan calls to LLVM code
   pm.addPass(createConvertStandardToLLVM());
 }
