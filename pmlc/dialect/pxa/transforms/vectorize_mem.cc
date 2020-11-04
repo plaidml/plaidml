@@ -88,11 +88,9 @@ void vectorizeReads(AffineParallelOp loopOp,
     IVLOG(3, "StrideInfo: " << debugString(*maybeSI));
 
     // Check if read op uses parallel op IV for a single dimension
-    auto strideVal = 0;
     SmallVector<BlockArgument, 4> blockArgs;
     for (auto ba : loopOp.getIVs()) {
       if (maybeSI->strides.count(ba)) {
-        strideVal = maybeSI->strides.find(ba)->second;
         blockArgs.push_back(ba);
       }
     }
@@ -146,7 +144,7 @@ void vectorizeReads(AffineParallelOp loopOp,
       return;
 
     // Finished with checks, now perform actual tiling if needed
-    BlockArgument tiledBlockArg;
+    Value tiledBlockArg;
     if (tileSize != loopVectorSize) {
       performTiling(loopOp, llvm::ArrayRef<int64_t>({tileSize}));
       for (auto newLoopOp : loopOp.getOps<AffineParallelOp>()) {
@@ -171,8 +169,7 @@ void vectorizeReads(AffineParallelOp loopOp,
         idxNoChange.insert(user);
     }
     blockArgs[0].replaceAllUsesExcept(
-        tileSize != loopVectorSize ? dyn_cast<Value>(tiledBlockArg) : const0,
-        idxNoChange);
+        tileSize != loopVectorSize ? tiledBlockArg : const0, idxNoChange);
 
     // Create new vector that would be of subgroup size x loop size
     auto vectorType = VectorType::get(
