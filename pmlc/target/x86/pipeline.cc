@@ -98,11 +98,6 @@ struct ConvertStandardToLLVMPass
     });
     target.addLegalOp<omp::TerminatorOp, omp::TaskyieldOp, omp::FlushOp,
                       omp::BarrierOp, omp::TaskwaitOp>();
-    target.addDynamicallyLegalOp<LLVM::ExtractValueOp>(
-        [](LLVM::ExtractValueOp op) {
-          return !mlir::dyn_cast_or_null<LLVM::InsertValueOp>(
-              op.container().getDefiningOp());
-        });
     if (failed(applyPartialConversion(module, target, patterns))) {
       signalPassFailure();
     }
