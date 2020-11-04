@@ -130,11 +130,12 @@ public:
       // Case3: Used buffer was allocated inside the kernel, no block reads
       // allowed. Check if element type of the allocated memory is vector, if so
       // then it is needed to use vector TransferReadOp for writing
-    } else if (auto allocVecType =
-                   dyn_cast<AllocOp>(op.memref().getDefiningOp())
-                       .getType()
-                       .getElementType()
-                       .dyn_cast<VectorType>()) {
+    } else if (op.memref().getDefiningOp() &&
+               dyn_cast<AllocOp>(op.memref().getDefiningOp())
+                   .getType()
+                   .getElementType()
+                   .dyn_cast<VectorType>() &&
+               op.getVectorType().getDimSize(0) != vectorSize) {
       auto newVectorSize = op.getVectorType().getDimSize(0) / vectorSize;
       auto vectorType =
           VectorType::get({newVectorSize}, op.getVectorType().getElementType());
