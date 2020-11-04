@@ -11,6 +11,7 @@ pml_cc_library(
   DEPS
     pmlc::compiler
     pmlc::dialect::tile::ir
+    pmlc::dialect::tile::transforms
     pmlc::util
     LLVMSupport
     MLIRTransforms

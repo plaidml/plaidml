@@ -14,5 +14,5 @@ pml_cc_library(
     util.cc
   DEPS
     pmlc::util
-  PUBLIC
+    Boost::boost
 )

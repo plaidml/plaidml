@@ -65,6 +65,9 @@ def Fusion : FunctionPass<"pxa-fusion"> {
     Option<"loopDepth", "loop-depth", "int64_t",
            /*default=*/"0",
            "How deep the fusion should perform">,
+    Option<"singleOutput", "single-output", "bool",
+           /*default=*/"false",
+           "Allow single output only">,
   ];
 }
 
