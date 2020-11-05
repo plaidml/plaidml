@@ -9,6 +9,7 @@
 
 #include <boost/format.hpp>
 
+#include "tile/lang/ast/gradient.h"
 #include "tile/lang/ast/traversal.h"
 
 namespace vertexai {
