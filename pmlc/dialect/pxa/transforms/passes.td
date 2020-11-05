@@ -168,7 +168,6 @@ def SimplifyWithConstraints : FunctionPass<"pxa-simplify-with-constraints"> {
   let constructor = "pmlc::dialect::pxa::createSimplifyWithConstraintsPass()";
 }
 
-
 def ReorderLayouts : FunctionPass<"pxa-reorder-layouts"> {
   let summary = "Optimize data layouts for efficient reading";
   let description = [{
@@ -242,6 +241,5 @@ def ReorderLayouts : FunctionPass<"pxa-reorder-layouts"> {
            "Allow for creating separate reorder">
   ];
 }
-
 
 #endif // __PMLC_DIALECT_PXA_PASSES__
