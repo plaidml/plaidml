@@ -1,4 +1,4 @@
-// RUN: pmlc-opt -pmlc-convert-comp-to-ocl --split-input-file %s | FileCheck %s
+// RUN: pmlc-opt -pmlc-convert-comp-to-ocl --canonicalize --cse --split-input-file %s | FileCheck --dump-input=fail --dump-input-filter=all %s
 
 module {
   // CHECK-LABEL: func @create_destroy
@@ -40,9 +40,7 @@ module {
   // CHECK-LABEL: func @alloc_dealloc
   //  CHECK-SAME:     %[[DEV:.*]]: !llvm.ptr<i8>
   //       CHECK:   %[[ENV:.*]] = llvm.call @oclCreate(%[[DEV]])
-  //       CHECK:   %[[CNT:.*]] = llvm.mlir.constant(1024
-  //       CHECK:   %[[NUL:.*]] = llvm.mlir.null
-  //       CHECK:   %[[MEM:.*]] = llvm.call @oclAlloc(%[[ENV]], %[[CNT]], %[[NUL]])
+  //       CHECK:   %[[MEM:.*]] = llvm.call @oclAlloc(%[[ENV]], %{{.*}})
   //       CHECK:   llvm.call @oclDealloc(%[[ENV]], %[[MEM]])
   //       CHECK:   llvm.call @oclDestroy(%[[ENV]])
   func @alloc_dealloc(%dev: !comp.device) {
@@ -59,17 +57,16 @@ module {
 module attributes {gpu.container_module} {
   // CHECK-LABEL: func @one_gpu_func
   //  CHECK-SAME:     %[[DEV:[a-zA-Z0-9]*]]: !llvm.ptr<i8>
-  //  CHECK-SAME:     %{{[a-zA-Z0-9]*}}: memref<8x32xf32>
+  //  CHECK-SAME:     %{{[a-zA-Z0-9]*}}: !llvm.struct<(ptr<float>, ptr<float>, i64, array<2 x i64>, array<2 x i64>)>
   //       CHECK:   %[[ENV:.*]] = llvm.call @oclCreate(%[[DEV]])
-  //       CHECK:   %[[CNT:.*]] = llvm.mlir.constant(1024
-  //       CHECK:   %[[MEM:.*]] = llvm.call @oclAlloc(%[[ENV]], %[[CNT]], %{{.*}})
+  //       CHECK:   %[[CST1:.*]] = llvm.mlir.constant(1
+  //       CHECK:   %[[MEM:.*]] = llvm.call @oclAlloc(%[[ENV]], %{{.*}})
   //       CHECK:   %[[CST0:.*]] = llvm.mlir.constant(0
   //       CHECK:   %[[WEV:.*]] = llvm.call @oclWrite(%{{.*}}, %[[MEM]], %[[ENV]], %[[CST0]])
   //       CHECK:   %[[KRNL:.*]] = llvm.call @oclCreateKernel(%[[ENV]]
   //       CHECK:   llvm.call @oclSetKernelArg(%[[KRNL]], {{.*}}, %[[MEM]])
   //       CHECK:   llvm.call @oclAddKernelDep(%[[KRNL]], %[[WEV]])
-  //       CHECK:   %[[FEV:.*]] = call @oclScheduleFunc(%[[ENV]], %[[KRNL]]
-  //       CHECK:   %[[CST1:.*]] = llvm.mlir.constant(1
+  //       CHECK:   %[[FEV:.*]] = llvm.call @oclScheduleFunc(%[[ENV]], %[[KRNL]]
   //       CHECK:   %[[REV:.*]] = llvm.call @oclRead(%{{.*}}, %[[MEM]], %[[ENV]], %[[CST1]], %[[FEV]])
   //       CHECK:   %[[CST1:.*]] = llvm.mlir.constant(1
   //       CHECK:   llvm.call @oclWait(%[[CST1]], %[[REV]])
@@ -80,7 +77,7 @@ module attributes {gpu.container_module} {
     %c32 = constant 32 : index
     %c1 = constant 1 : index
     %env = comp.create_execenv %dev : (!comp.device) -> !comp.execenv<ocl:0,(11)>
-    %mem0 = comp.alloc %env %arg0 : (!comp.execenv<ocl:0,(11)>, memref<8x32xf32>) -> memref<8x32xf32, 11>
+    %mem0 = comp.alloc %env : (!comp.execenv<ocl:0,(11)>) -> memref<8x32xf32, 11>
     %wev = comp.schedule_write %arg0 to %mem0 on %env : (memref<8x32xf32>, memref<8x32xf32, 11>, !comp.execenv<ocl:0,(11)>) -> !comp.event<ocl>
     %fev = "comp.schedule_func"(%env, %wev) ( {
       "gpu.launch_func"(%c8, %c1, %c1, %c32, %c1, %c1, %mem0) {kernel = @gpu_module::@zero} : (index, index, index, index, index, index, memref<8x32xf32, 11>) -> ()
@@ -137,18 +134,16 @@ module attributes {gpu.container_module} {
 module attributes {gpu.container_module} {
   // CHECK-LABEL: func @one_gpu_func
   //  CHECK-SAME:     %[[DEV:[a-zA-Z0-9]*]]: !llvm.ptr<i8>
-  //  CHECK-SAME:     %{{[a-zA-Z0-9]*}}: memref<8x32xf16>
+  //  CHECK-SAME:     %{{[a-zA-Z0-9]*}}: !llvm.struct<(ptr<half>, ptr<half>, i64, array<2 x i64>, array<2 x i64>)>
   //       CHECK:   %[[ENV:.*]] = llvm.call @oclCreate(%[[DEV]])
-  //       CHECK:   %[[CNT:.*]] = llvm.mlir.constant(512
-  //       CHECK:   %[[MEM:.*]] = llvm.call @oclAlloc(%[[ENV]], %[[CNT]], %{{.*}})
+  //       CHECK:   %[[MEM:.*]] = llvm.call @oclAlloc(%[[ENV]], %{{.*}})
   //       CHECK:   %[[CST0:.*]] = llvm.mlir.constant(0
   //       CHECK:   %[[WEV:.*]] = llvm.call @oclWrite(%{{.*}}, %[[MEM]], %[[ENV]], %[[CST0]])
   //       CHECK:   %[[KRNL:.*]] = llvm.call @oclCreateKernel(%[[ENV]]
   //       CHECK:   llvm.call @oclSetKernelArg(%[[KRNL]], {{.*}}, %[[MEM]])
   //       CHECK:   llvm.call @oclAddKernelDep(%[[KRNL]], %[[WEV]])
-  //       CHECK:   %[[FEV:.*]] = call @oclScheduleFunc(%[[ENV]], %[[KRNL]]
-  //       CHECK:   %[[CST1:.*]] = llvm.mlir.constant(1
-  //       CHECK:   %[[REV:.*]] = llvm.call @oclRead(%{{.*}}, %[[MEM]], %[[ENV]], %[[CST1]], %[[FEV]])
+  //       CHECK:   %[[FEV:.*]] = llvm.call @oclScheduleFunc(%[[ENV]], %[[KRNL]]
+  //       CHECK:   %[[REV:.*]] = llvm.call @oclRead(%{{.*}}, %[[MEM]], %[[ENV]], %{{.*}}, %[[FEV]])
   //       CHECK:   %[[CST1:.*]] = llvm.mlir.constant(1
   //       CHECK:   llvm.call @oclWait(%[[CST1]], %[[REV]])
   //       CHECK:   llvm.call @oclDealloc(%[[ENV]], %[[MEM]])
@@ -158,7 +153,7 @@ module attributes {gpu.container_module} {
     %c32 = constant 32 : index
     %c1 = constant 1 : index
     %env = comp.create_execenv %dev : (!comp.device) -> !comp.execenv<ocl:0,(11)>
-    %mem0 = comp.alloc %env %arg0 : (!comp.execenv<ocl:0,(11)>, memref<8x32xf16>) -> memref<8x32xf16, 11>
+    %mem0 = comp.alloc %env : (!comp.execenv<ocl:0,(11)>) -> memref<8x32xf16, 11>
     %wev = comp.schedule_write %arg0 to %mem0 on %env : (memref<8x32xf16>, memref<8x32xf16, 11>, !comp.execenv<ocl:0,(11)>) -> !comp.event<ocl>
     %fev = "comp.schedule_func"(%env, %wev) ( {
       "gpu.launch_func"(%c8, %c1, %c1, %c32, %c1, %c1, %mem0) {kernel = @gpu_module::@zero} : (index, index, index, index, index, index, memref<8x32xf16, 11>) -> ()

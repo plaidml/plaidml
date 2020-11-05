@@ -110,4 +110,30 @@ struct ConvertCompOpBasePattern : mlir::OpConversionPattern<Op> {
   pmlc::dialect::comp::ExecEnvRuntime runtime;
 };
 
+// deviceMemrefToMem takes an LLVM-struct memref value representing an on-device
+// buffer, and returns a value representing the actual memory buffer, casted
+// as appropriate for passing to a general device-access-framework function
+// call.
+//
+// In doing this translation, the function performs a simplistic trace to
+// identify the source of the value.  There are many cases where this trace
+// isn't possible, but doing this work greatly simplifies lit tests that
+// are themselves attempting to trace buffers as they're passed through multiple
+// function calls, while preserving our ability to write lit tests that
+// validate memref buffer wrappings.
+mlir::Value deviceMemrefToMem(mlir::OpBuilder &builder, mlir::Location loc,
+                              mlir::Value memref);
+
+// hostMemrefToMem takes an LLVM-struct memref value representing a host buffer,
+// and returns a value representing the actual memory buffer, casted as
+// appropriate for passing to a general device-access-framework function call.
+mlir::Value hostMemrefToMem(mlir::OpBuilder &builder, mlir::Location loc,
+                            mlir::Value memref);
+
+// Materializes a conversion from a standard integer type (possibly an index) to
+// an LLVM integer type.
+mlir::Value indexToInt(mlir::OpBuilder &builder, mlir::Location &loc,
+                       mlir::LLVMTypeConverter &typeConverter,
+                       mlir::Value value);
+
 } // namespace pmlc::conversion::comp_to_llvm

@@ -76,7 +76,7 @@ void ConvertCompToVulkanCall::runOnOperation() {
   target.addLegalDialect<mlir::StandardOpsDialect>();
   target.addIllegalDialect<comp::COMPDialect>();
   target.addDynamicallyLegalOp<mlir::FuncOp>([&](mlir::FuncOp op) -> bool {
-    return signatureConverter.isSignatureLegal(op.getType());
+    return typeConverter.isSignatureLegal(op.getType());
   });
   if (mlir::failed(mlir::applyPartialConversion(module, target, patterns)))
     signalPassFailure();

@@ -61,7 +61,7 @@ void ConvertCompToOcl::runOnOperation() {
   target.addLegalDialect<mlir::StandardOpsDialect>();
   target.addIllegalDialect<comp::COMPDialect>();
   target.addDynamicallyLegalOp<mlir::FuncOp>([&](mlir::FuncOp op) -> bool {
-    return signatureConverter.isSignatureLegal(op.getType());
+    return typeConverter.isSignatureLegal(op.getType());
   });
   if (mlir::failed(mlir::applyPartialConversion(module, target, patterns)))
     signalPassFailure();
@@ -239,14 +239,14 @@ void addOclFunctionDeclarations(mlir::ModuleOp &module,
     builder.create<LLVM::LLVMFuncOp>(
         loc, kOclRead,
         LLVM::LLVMType::getFunctionTy(
-            llvmInt8Ptr, {llvmInt8Ptr, llvmInt8Ptr, llvmInt8Ptr, llvmInt32},
+            llvmInt8Ptr, {llvmInt8Ptr, llvmInt8Ptr, llvmInt8Ptr, llvmIndex},
             /*isVarArg=*/true));
   }
   if (!module.lookupSymbol(kOclWrite)) {
     builder.create<LLVM::LLVMFuncOp>(
         loc, kOclWrite,
         LLVM::LLVMType::getFunctionTy(
-            llvmInt8Ptr, {llvmInt8Ptr, llvmInt8Ptr, llvmInt8Ptr, llvmInt32},
+            llvmInt8Ptr, {llvmInt8Ptr, llvmInt8Ptr, llvmInt8Ptr, llvmIndex},
             /*isVarArg=*/true));
   }
   if (!module.lookupSymbol(kOclCreateKernel)) {
@@ -260,7 +260,7 @@ void addOclFunctionDeclarations(mlir::ModuleOp &module,
     builder.create<LLVM::LLVMFuncOp>(
         loc, kOclSetKernelArg,
         LLVM::LLVMType::getFunctionTy(llvmVoid,
-                                      {llvmInt8Ptr, llvmInt32, llvmInt8Ptr},
+                                      {llvmInt8Ptr, llvmIndex, llvmInt8Ptr},
                                       /*isVarArg=*/false));
   }
   if (!module.lookupSymbol(kOclAddKernelDep)) {
@@ -346,28 +346,14 @@ mlir::LogicalResult ConvertScheduleReadWrite<Op>::matchAndRewrite(
       operands.begin(), operands.begin() + nonVarArgs);
 
   // Extract the host memref memory pointer.
-  mlir::MemRefDescriptor hostMemDesc{operands[0]};
-  auto hostPtr = hostMemDesc.allocatedPtr(rewriter, loc);
-  callOperands[0] =
-      rewriter.create<LLVM::BitcastOp>(loc, this->getVoidPtrType(), hostPtr);
+  callOperands[0] = hostMemrefToMem(rewriter, loc, operands[0]);
 
   // Extract the device memref memory pointer.
-  mlir::MemRefDescriptor devMemDesc{operands[1]};
-  mlir::Value devOnDev = devMemDesc.allocatedPtr(rewriter, loc);
-  mlir::Value devPtr = rewriter.create<LLVM::AddrSpaceCastOp>(
-      loc,
-      LLVM::LLVMPointerType::get(
-          devOnDev.getType().cast<LLVM::LLVMPointerType>().getElementType()),
-      devOnDev);
-  callOperands[1] =
-      rewriter.create<LLVM::BitcastOp>(loc, this->getVoidPtrType(), devPtr);
+  callOperands[1] = deviceMemrefToMem(rewriter, loc, operands[1]);
 
   // Add event dependencies as variadic operands.
-  LLVM::LLVMType llvmInt32Ty =
-      LLVM::LLVMType::getInt32Ty(rewriter.getContext());
-  mlir::Value eventsCnt = rewriter.create<LLVM::ConstantOp>(
-      op.getLoc(), llvmInt32Ty,
-      rewriter.getI32IntegerAttr(operands.size() - nonVarArgs));
+  mlir::Value eventsCnt = this->createIndexConstant(
+      rewriter, op.getLoc(), operands.size() - nonVarArgs);
   callOperands.push_back(eventsCnt);
   callOperands.insert(callOperands.end(), operands.begin() + nonVarArgs,
                       operands.end());
@@ -423,23 +409,12 @@ mlir::LogicalResult ConvertDealloc::matchAndRewrite(
     mlir::Operation *opPtr, mlir::ArrayRef<mlir::Value> operands,
     mlir::ConversionPatternRewriter &rewriter) const {
   auto op = mlir::cast<comp::Dealloc>(opPtr);
-  mlir::Location loc = op.getLoc();
-
-  // Extract the underlying buffer pointer.
-  mlir::Value bufferOnDev =
-      mlir::MemRefDescriptor{operands[1]}.allocatedPtr(rewriter, loc);
-  mlir::Value bufferPtr = rewriter.create<LLVM::AddrSpaceCastOp>(
-      loc,
-      LLVM::LLVMPointerType::get(
-          bufferOnDev.getType().cast<LLVM::LLVMPointerType>().getElementType()),
-      bufferOnDev);
-  mlir::Value bufferRaw =
-      rewriter.create<LLVM::BitcastOp>(loc, getVoidPtrType(), bufferPtr);
 
   // Build the dealloc call.
-  rewriter.create<LLVM::CallOp>(loc, mlir::TypeRange{getVoidType()},
-                                rewriter.getSymbolRefAttr(kOclDealloc),
-                                mlir::ValueRange{operands[0], bufferRaw});
+  rewriter.create<LLVM::CallOp>(
+      op.getLoc(), mlir::TypeRange{}, rewriter.getSymbolRefAttr(kOclDealloc),
+      mlir::ValueRange{operands[0],
+                       deviceMemrefToMem(rewriter, op.getLoc(), operands[1])});
 
   rewriter.eraseOp(op);
   return mlir::success();
@@ -454,7 +429,11 @@ mlir::LogicalResult ConvertScheduleFunc::matchAndRewrite(
   auto launchOp = mlir::cast<gpu::LaunchFuncOp>(op.body().front().front());
   std::string binaryName = launchOp.getKernelModuleName().str();
   std::string kernelName = launchOp.getKernelName().str();
-  mlir::Type llvmEventType = typeConverter.convertType(op.getType());
+  auto llvmEventType = typeConverter.convertType(op.getType())
+                           .dyn_cast_or_null<LLVM::LLVMType>();
+  if (!llvmEventType) {
+    return mlir::failure();
+  }
   LLVM::LLVMType llvmKernelType =
       LLVM::LLVMType::getInt8PtrTy(rewriter.getContext());
 
@@ -479,27 +458,14 @@ mlir::LogicalResult ConvertScheduleFunc::matchAndRewrite(
 
   // Set kernel arguments.
   for (unsigned argI = 0; argI < launchOp.getNumKernelOperands(); ++argI) {
-    mlir::Type llvmInt32Type =
-        LLVM::LLVMType::getInt32Ty(rewriter.getContext());
-    mlir::Value argIndex = rewriter.create<LLVM::ConstantOp>(
-        loc, llvmInt32Type, rewriter.getI32IntegerAttr(argI));
+    mlir::Value argIndex = createIndexConstant(rewriter, loc, argI);
     mlir::Value remappedArg =
         rewriter.getRemappedValue(launchOp.getKernelOperand(argI));
-    mlir::Value bufferOnDev =
-        mlir::MemRefDescriptor{remappedArg}.allocatedPtr(rewriter, loc);
-    mlir::Value bufferPtr = rewriter.create<LLVM::AddrSpaceCastOp>(
-        loc,
-        LLVM::LLVMPointerType::get(bufferOnDev.getType()
-                                       .cast<LLVM::LLVMPointerType>()
-                                       .getElementType()),
-        bufferOnDev);
-    mlir::Value bufferRaw =
-        rewriter.create<LLVM::BitcastOp>(loc, getVoidPtrType(), bufferPtr);
-
+    auto buffer = deviceMemrefToMem(rewriter, loc, remappedArg);
     rewriter.create<LLVM::CallOp>(
         loc, mlir::ArrayRef<mlir::Type>{},
         rewriter.getSymbolRefAttr(kOclSetKernelArg),
-        mlir::ArrayRef<mlir::Value>{kernel, argIndex, bufferRaw});
+        mlir::ArrayRef<mlir::Value>{kernel, argIndex, buffer});
   }
   // Set event dependencies. This is done with separate functions
   // on kernel as opposed to variadic argument in final function,
@@ -519,12 +485,16 @@ mlir::LogicalResult ConvertScheduleFunc::matchAndRewrite(
   auto globalY = rewriter.create<mlir::MulIOp>(loc, gridSize.y, blockSize.y);
   auto globalZ = rewriter.create<mlir::MulIOp>(loc, gridSize.z, blockSize.z);
 
-  mlir::SmallVector<mlir::Value, 8> scheduleArgs{
-      operands[0], kernel,      globalX,     globalY,
-      globalZ,     blockSize.x, blockSize.y, blockSize.z};
-  rewriter.replaceOpWithNewOp<mlir::CallOp>(
-      op.getOperation(), mlir::ArrayRef<mlir::Type>{llvmEventType},
-      rewriter.getSymbolRefAttr(kOclScheduleFunc), scheduleArgs);
+  rewriter.replaceOpWithNewOp<LLVM::CallOp>(
+      op.getOperation(), mlir::TypeRange{llvmEventType},
+      rewriter.getSymbolRefAttr(kOclScheduleFunc),
+      mlir::ValueRange{operands[0], kernel,
+                       indexToInt(rewriter, loc, typeConverter, globalX),
+                       indexToInt(rewriter, loc, typeConverter, globalY),
+                       indexToInt(rewriter, loc, typeConverter, globalZ),
+                       indexToInt(rewriter, loc, typeConverter, blockSize.x),
+                       indexToInt(rewriter, loc, typeConverter, blockSize.y),
+                       indexToInt(rewriter, loc, typeConverter, blockSize.z)});
   return mlir::success();
 }
 

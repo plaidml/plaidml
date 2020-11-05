@@ -127,7 +127,7 @@ void populateCommonPatterns(mlir::MLIRContext *context,
         return llvmInt8Ptr;
       });
   // Identity conversion for LLVM types.
-  typeConverter.addConversion([](LLVM::LLVMType type) { return type; });
+  // typeConverter.addConversion([](LLVM::LLVMType type) { return type; });
 
   // TODO: Remove these memref conversions.  LLVMIR provides standard
   // conversions for memrefs and accessors for memref components.
@@ -183,17 +183,16 @@ void populateCommonPatterns(mlir::MLIRContext *context,
   // Signature conversion patterns.
   // ==========================================================================
   // signatureConverter.addConversion([](mlir::Type type) { return type; });
-  signatureConverter.addConversion(
-      [&](mlir::Type type) -> mlir::Optional<mlir::Type> {
-        if (mlir::isa<comp::COMPDialect>(type.getDialect()))
-          return typeConverter.convertType(type);
-        return llvm::None;
-      });
+  // signatureConverter.addConversion(
+  //     [&](mlir::Type type) -> mlir::Optional<mlir::Type> {
+  //       if (mlir::isa<comp::COMPDialect>(type.getDialect()))
+  //         return typeConverter.convertType(type);
+  //       return llvm::None;
+  //     });
   // ==========================================================================
   // Operation conversion patterns.
   // ==========================================================================
-  mlir::populateFuncOpTypeConversionPattern(patterns, context,
-                                            signatureConverter);
+  mlir::populateFuncOpTypeConversionPattern(patterns, context, typeConverter);
 }
 
 void addCommonFunctionDeclarations(mlir::ModuleOp &module) {
