@@ -141,6 +141,13 @@ void plaidml_expr_gradient(  //
     plaidml_expr* loss,      //
     plaidml_expr** derivs);
 
+void plaidml_expr_jacobian(  //
+    plaidml_error* err,      //
+    size_t nwrts,            //
+    plaidml_expr** wrts,     //
+    plaidml_expr* loss,      //
+    plaidml_expr** derivs);
+
 typedef void (*plaidml_deriv)(  //
     void* user_ctx,             //
     plaidml_expr* Y,            //
