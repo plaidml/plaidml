@@ -1,7 +1,6 @@
 // Copyright 2020, Intel Corporation
 
 #include "llvm/ADT/TypeSwitch.h"
-#include "llvm/Support/Debug.h"
 
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -166,9 +165,6 @@ struct LoopOpLowering final : public mlir::ConvertOpToLLVMPattern<abi::LoopOp> {
   matchAndRewrite(mlir::Operation *op, mlir::ArrayRef<mlir::Value> operands,
                   mlir::ConversionPatternRewriter &rewriter) const final {
     auto loopOp = mlir::cast<abi::LoopOp>(op);
-    // llvm::errs() << "Lowering " << loopOp << "\n";
-    // llvm::DebugFlag = true;
-
     mlir::SmallVector<LLVMType, 8> networkFieldTypes;
     for (auto ty : loopOp.getNetworkFieldTypes()) {
       auto newTy = typeConverter.convertType(ty).dyn_cast_or_null<LLVMType>();
@@ -292,10 +288,7 @@ private:
     ++it;
     rewriter.mergeBlocks(&*it, initEntryBlock, mlir::None);
 
-    auto result =
-        rewriter.convertRegionTypes(&initFunc.getBody(), typeConverter);
-    llvm::errs() << "Constructed " << initFunc << "\n";
-    return result;
+    return rewriter.convertRegionTypes(&initFunc.getBody(), typeConverter);
   }
 
   mlir::LogicalResult
@@ -391,10 +384,7 @@ private:
     ++it;
     rewriter.mergeBlocks(&*it, execEntryBlock, mlir::None);
 
-    auto result =
-        rewriter.convertRegionTypes(&execFunc.getBody(), typeConverter);
-    llvm::errs() << "Constructed " << execFunc << "\n";
-    return result;
+    return rewriter.convertRegionTypes(&execFunc.getBody(), typeConverter);
   }
 
   mlir::LogicalResult
@@ -466,10 +456,7 @@ private:
     ++it;
     rewriter.mergeBlocks(&*it, entryBlock, mlir::None);
 
-    auto result =
-        rewriter.convertRegionTypes(&finiFunc.getBody(), typeConverter);
-    llvm::errs() << "Constructed " << finiFunc << "\n";
-    return result;
+    return rewriter.convertRegionTypes(&finiFunc.getBody(), typeConverter);
   }
 };
 

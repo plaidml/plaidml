@@ -111,7 +111,6 @@ struct OpenMPWorkaroundPass final
     : public OpenMPWorkaroundBase<OpenMPWorkaroundPass> {
   void runOnOperation() final {
     LLVM::LLVMFuncOp funcOp = getOperation();
-    llvm::errs() << "Running OpenMP Workaround pass on: " << funcOp << "\n";
     OpBuilder builder{&getContext()};
     funcOp.walk([&](omp::ParallelOp parOp) {
       // The values used to construct the smuggling struct.
