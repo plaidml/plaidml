@@ -1,4 +1,4 @@
-// RUN: pmlc-opt -pmlc-convert-comp-to-ocl --canonicalize --cse --split-input-file %s | FileCheck --dump-input=fail --dump-input-filter=all %s
+// RUN: pmlc-opt -pmlc-convert-comp-to-ocl --canonicalize --cse --split-input-file %s | FileCheck %s
 
 module {
   // CHECK-LABEL: func @create_destroy
