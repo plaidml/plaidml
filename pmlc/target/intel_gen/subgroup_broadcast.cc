@@ -53,7 +53,7 @@ public:
     OpBuilder builder(op);
     // Skip on std.extractelement as it will be removed with broadcast op
     // transformation
-    if (dyn_cast_or_null<ExtractElementOp>(op))
+    if (isa<ExtractElementOp>(op))
       return success();
     // Replace operands if they are still vectorized. This can happen for
     // constant ops.
@@ -129,18 +129,14 @@ public:
       }
       // Case3: Used buffer was allocated inside the kernel, no block reads
       // allowed. Check if element type of the allocated memory is vector, if so
-      // then it is needed to use vector TransferReadOp for writing
+      // then it is needed to use LoadOp with orginal indices
     } else if (op.memref().getDefiningOp() &&
                dyn_cast<AllocOp>(op.memref().getDefiningOp())
                    .getType()
                    .getElementType()
-                   .dyn_cast<VectorType>() &&
+                   .isa<VectorType>() &&
                op.getVectorType().getDimSize(0) != vectorSize) {
-      auto newVectorSize = op.getVectorType().getDimSize(0) / vectorSize;
-      auto vectorType =
-          VectorType::get({newVectorSize}, op.getVectorType().getElementType());
-      auto newLoadOp = builder.create<vector::TransferReadOp>(
-          op.getLoc(), vectorType, op.memref(), idxs);
+      auto newLoadOp = builder.create<LoadOp>(op.getLoc(), op.memref(), idxs);
       IVLOG(3, "Block read Op: " << debugString(*newLoadOp));
       op.replaceAllUsesWith(newLoadOp.getResult());
       // Case4: No block reads or vectors, use default devectorization
@@ -181,7 +177,7 @@ public:
       op.erase();
       // Case2: TODO: Change this condition to include memref being vector,
       // where it is needed to use vector write instead
-    } else if (dyn_cast<dialect::stdx::SubgroupBlockReadINTELOp>(
+    } else if (isa<dialect::stdx::SubgroupBlockReadINTELOp>(
                    op.vector().getDefiningOp())) {
       auto newStoreOp = builder.create<vector::TransferWriteOp>(
           op.getLoc(), op.vector(), op.memref(), idxs);
@@ -234,10 +230,9 @@ public:
   LogicalResult devectorizeExtractMap(vector::ExtractMapOp op) {
     OpBuilder builder(op);
     auto idVal = op.id();
-    IVLOG(3, "oldExtractOp: " << debugString(*op));
     // It is needed to use i32 type for extract element index. Use cast in case
     // it comes from index
-    if (op.id().getType().dyn_cast<IndexType>()) {
+    if (op.id().getType().isa<IndexType>()) {
       auto indexCast = builder.create<IndexCastOp>(op.getLoc(), idVal,
                                                    builder.getIntegerType(32));
       idVal = indexCast.getResult();
@@ -248,7 +243,44 @@ public:
     op.replaceAllUsesWith(newExtractOp.getResult());
     op.erase();
 
-    IVLOG(3, "newExtractOp: " << debugString(*newExtractOp));
+    return success();
+  }
+
+  LogicalResult devectorizeInsertMap(vector::InsertMapOp op) {
+    OpBuilder builder(op);
+    auto idVal = op.id();
+    // It is needed to use i32 type for extract element index. Use cast in case
+    // it comes from index
+    if (op.id().getType().dyn_cast<IndexType>()) {
+      auto indexCast = builder.create<IndexCastOp>(op.getLoc(), idVal,
+                                                   builder.getIntegerType(32));
+      idVal = indexCast.getResult();
+    }
+
+    // Assume that the user of insert_map of is TransferWriteOp,
+    // so the whole structure was modelled in the vectorizeMemPass
+    Operation *InsertMapUserOp;
+    for (auto user : op.getResult().getUsers())
+      InsertMapUserOp = user;
+    auto transferWriteOp = dyn_cast<vector::TransferWriteOp>(InsertMapUserOp);
+    if (!transferWriteOp)
+      return failure();
+    auto vecType = op.getResultType();
+    auto newVectorSize = vecType.getShape()[0] / vectorSize;
+    vecType = VectorType::get({newVectorSize}, vecType.getElementType());
+
+    transferWriteOp.memref().setType(MemRefType::get({1}, vecType));
+
+    // Read the vector first from temporary memory, and then do an
+    // element insert.
+    auto newReadOp = builder.create<LoadOp>(
+        op.getLoc(), transferWriteOp.memref(), transferWriteOp.indices());
+
+    auto newInsertOp = builder.create<vector::InsertElementOp>(
+        op.getLoc(), op.vector(), newReadOp.getResult(), idVal);
+    op.replaceAllUsesWith(newInsertOp.getResult());
+    op.erase();
+
     return success();
   }
 
@@ -284,6 +316,8 @@ public:
       return devectorizeBroadcast(vecBroadcastOp);
     } else if (auto extractMapOp = dyn_cast<vector::ExtractMapOp>(op)) {
       return devectorizeExtractMap(extractMapOp);
+    } else if (auto insertMapOp = dyn_cast<vector::InsertMapOp>(op)) {
+      return devectorizeInsertMap(insertMapOp);
     } else if (auto forOp = dyn_cast<scf::ForOp>(op)) {
       for (auto &innerOp : llvm::make_early_inc_range(forOp.getOps())) {
         if (failed(devectorizeOperation(&innerOp))) {

@@ -131,10 +131,7 @@ def SubgroupBlockReadINTELOp : StdX_Op<"subgroup_block_read_intel", [NoSideEffec
   let assemblyFormat = "$memref `[` $indices `]` attr-dict `:` type($memref)`,` type($result)";
 }
 
-def SubgroupBlockWriteINTELOp : StdX_Op<"subgroup_block_write_intel",
-     [TypesMatchWith<"type of 'value' matches element type of 'memref'",
-                     "memref", "value",
-                     "$_self.cast<mlir::MemRefType>().getElementType()">]> {
+def SubgroupBlockWriteINTELOp : StdX_Op<"subgroup_block_write_intel", [NoSideEffect]> {
   let summary = "See intel_subgroups extension.";
 
   let arguments = (ins AnyVectorOrScalar:$value,
@@ -160,7 +157,7 @@ def SubgroupBlockWriteINTELOp : StdX_Op<"subgroup_block_write_intel",
   }];
 
   let assemblyFormat = [{
-    $value `,` $memref `[` $indices `]` attr-dict `:` type($memref)
+    $value `,` $memref `[` $indices `]` attr-dict `:` type($value) `,` type($memref)
   }];
 }
 
