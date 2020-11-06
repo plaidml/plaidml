@@ -214,40 +214,40 @@ StrideRange StrideInfo::range() const {
 }
 
 AffineValueExpr StrideInfo::toValueExpr(MLIRContext *ctx) const {
-  std::map<int64_t, std::pair<mlir::BlockArgument, int64_t>> ordered;
+  typedef std::pair<unsigned, unsigned> nestedArgNumber;
+  std::map<nestedArgNumber, mlir::BlockArgument> ordered;
 
   for (auto kvp : strides) {
-    int64_t loopDepth = 0;
-    auto block = kvp.first.getOwner();
-    auto parent = block->getParentOp();
+    unsigned loopDepth = 0;
+    auto parent = kvp.first.getOwner()->getParentOp();
     while (!dyn_cast<FuncOp>(parent)) {
       loopDepth++;
       parent = parent->getParentOp();
     }
 
-    ordered.emplace(
-        loopDepth * strides.size() + kvp.first.getArgNumber(),
-        std::pair<mlir::BlockArgument, int64_t>(kvp.first, kvp.second));
+    ordered.emplace(nestedArgNumber(loopDepth, kvp.first.getArgNumber()),
+                    kvp.first);
   }
 
   auto tot = AffineValueExpr(ctx, offset);
   for (auto item : llvm::enumerate(ordered)) {
-    auto blockArgAndStride = item.value().second;
-    Operation *baseOp = blockArgAndStride.first.getOwner()->getParentOp();
-    AffineValueExpr idx(blockArgAndStride.first);
+    auto blockArg = item.value().second;
+    Operation *baseOp = blockArg.getOwner()->getParentOp();
+    AffineValueExpr idx(blockArg);
     if (auto op = dyn_cast<AffineParallelOp>(baseOp)) {
       idx = idx - AffineValueExpr(op.getLowerBoundsValueMap(),
-                                  blockArgAndStride.first.getArgNumber());
+                                  blockArg.getArgNumber());
     } else if (auto op = dyn_cast<AffineForOp>(baseOp)) {
       auto map = op.getLowerBoundMap();
       idx = idx - AffineValueExpr(map.getResult(0), op.getLowerBoundOperands());
     } else {
       llvm_unreachable("Invalid op type in toValueMap");
     }
-    int64_t step = getIVStep(blockArgAndStride.first);
-    assert(blockArgAndStride.second % step == 0 &&
-           "Stride not divisible by step");
-    tot = tot + idx * (blockArgAndStride.second / step);
+    int64_t step = getIVStep(blockArg);
+    auto si = strides.find(blockArg);
+    assert(si != strides.end());
+    assert(si->second % step == 0 && "Stride not divisible by step");
+    tot = tot + idx * (si->second / step);
   }
   return tot;
 }
