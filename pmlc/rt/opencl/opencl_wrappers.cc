@@ -28,7 +28,7 @@ void oclDealloc(void *invocation, void *memory) {
       ->deallocateMemory(static_cast<OpenCLMemory *>(memory));
 }
 
-void *oclRead(void *dst, void *src, void *invocation, uint32_t count, ...) {
+void *oclRead(void *dst, void *src, void *invocation, size_t count, ...) {
   std::vector<OpenCLEvent *> dependencies;
   va_list args;
   va_start(args, count);
@@ -39,7 +39,7 @@ void *oclRead(void *dst, void *src, void *invocation, uint32_t count, ...) {
       ->enqueueRead(static_cast<OpenCLMemory *>(src), dst, dependencies);
 }
 
-void *oclWrite(void *src, void *dst, void *invocation, uint32_t count, ...) {
+void *oclWrite(void *src, void *dst, void *invocation, size_t count, ...) {
   std::vector<OpenCLEvent *> dependencies;
   va_list args;
   va_start(args, count);
@@ -61,14 +61,13 @@ void oclAddKernelDep(void *kernel, void *event) {
       static_cast<OpenCLEvent *>(event));
 }
 
-void oclSetKernelArg(void *kernel, uint32_t idx, void *memory) {
+void oclSetKernelArg(void *kernel, size_t idx, void *memory) {
   static_cast<OpenCLKernel *>(kernel)->setArg(
       idx, static_cast<OpenCLMemory *>(memory));
 }
 
-void *oclScheduleFunc(void *invocation, void *kernel, uint64_t gws0,
-                      uint64_t gws1, uint64_t gws2, uint64_t lws0,
-                      uint64_t lws1, uint64_t lws2) {
+void *oclScheduleFunc(void *invocation, void *kernel, size_t gws0, size_t gws1,
+                      size_t gws2, size_t lws0, size_t lws1, size_t lws2) {
   cl::NDRange gws(gws0, gws1, gws2);
   cl::NDRange lws(lws0, lws1, lws2);
   return static_cast<OpenCLInvocation *>(invocation)
