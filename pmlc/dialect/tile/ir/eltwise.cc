@@ -70,7 +70,6 @@ OpFoldResult MulOp::fold(ArrayRef<Attribute> operands) {
       return rhs();
     }
   }
-
   // mul(x, 1) -> x
   if (matchPattern(rhs(), m_One())) {
     return lhs();
