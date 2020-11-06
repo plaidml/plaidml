@@ -4,11 +4,15 @@
 
 #pragma once
 
+#include <algorithm>
 #include <functional>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
-#include "details/caseless.hpp"  // Could be replaced with some work if necessary!!
+#include "ie_icnn_network.hpp"  // TODO
+
+// #include "plugin_api/caseless.hpp"  // Could be replaced with some work if necessary!!
 
 #include "ngraph/node.hpp"
 
@@ -31,11 +35,11 @@ class OpsRegistry {
   }
 
   void registerOp(const std::string& name, Op op) {  //
-    registry[name] = op;
+    registry[normalizedName(name)] = op;
   }
 
   const Op resolve(const std::string& name) {
-    auto it = registry.find(name);
+    auto it = registry.find(normalizedName(name));
     if (it == registry.end()) {
       return nullptr;
     }
@@ -43,7 +47,14 @@ class OpsRegistry {
   }
 
  private:
-  InferenceEngine::details::caseless_unordered_map<std::string, Op> registry;
+  std::unordered_map<std::string, Op> registry;
+
+  // TODO: Would perhaps be nicer to revert to caseless_unordered_map from plugin_api/caseless.hpp if we can get it
+  // building
+  std::string normalizedName(std::string name) {
+    std::transform(name.begin(), name.end(), name.begin(), [](unsigned char ch) { return std::tolower(ch); });
+    return name;
+  }
 };
 
 struct OpRegistration {

@@ -8,6 +8,9 @@
 #include <utility>
 #include <vector>
 
+#include "ngraph/function.hpp"
+#include "ngraph/opsets/opset1.hpp"
+
 #include "plaidml_ops.hpp"
 #include "plaidml_util.hpp"
 

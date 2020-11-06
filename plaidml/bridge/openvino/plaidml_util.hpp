@@ -6,6 +6,8 @@
 
 #include <vector>
 
+// #include "inference-engine/include/ie_layouts.h"  // NOLINT[build/include_subdir]
+// #include "include/ie_layouts.h"
 #include "ie_layouts.h"  // NOLINT[build/include_subdir]
 #include "ie_precision.hpp"
 
