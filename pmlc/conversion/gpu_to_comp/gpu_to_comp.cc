@@ -147,7 +147,6 @@ mlir::LogicalResult RewriteLaunchFunc::allocateDeviceMemory(
         mlir::MemRefType newMemRefType =
             mlir::MemRefType::Builder(memRefType)
                 .setMemorySpace(execEnvType.getDefaultMemorySpace());
-        // rewriter.create<comp::Alloc>(loc, newMemRefType, execEnv, hostArg);
         auto allocOp =
             rewriter.create<comp::Alloc>(loc, newMemRefType, execEnv);
         newArg = allocOp.getResult();

@@ -65,9 +65,8 @@ void ConvertCompToVulkanCall::runOnOperation() {
   // Populate conversion patterns.
   mlir::MLIRContext *context = &getContext();
   mlir::LLVMTypeConverter typeConverter{context};
-  mlir::TypeConverter signatureConverter;
   mlir::OwningRewritePatternList patterns;
-  populateCommonPatterns(context, typeConverter, signatureConverter, patterns);
+  populateCommonPatterns(context, typeConverter, patterns);
   populateCompToVkPatterns(context, modulesMap, module, scheduleFuncNum,
                            typeConverter, patterns);
   // Set conversion target.

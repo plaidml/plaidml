@@ -13,9 +13,6 @@
 #include "pmlc/dialect/abi/ir/dialect.h"
 #include "pmlc/util/ids.h"
 
-// #pragma GCC diagnostic ignored "-Wunused-function"
-// #pragma GCC diagnostic ignored "-Wunused-variable"
-
 namespace abi = pmlc::dialect::abi;
 namespace LLVM = mlir::LLVM;
 using LLVMType = LLVM::LLVMType;
@@ -37,7 +34,7 @@ static LLVM::LLVMFuncOp importFunc(mlir::StringRef name, mlir::Operation *op,
 
 namespace {
 
-constexpr char emptyNetworkSingletonName[] = "plaidml_empty_network";
+constexpr char kEmptyNetworkSingletonName[] = "plaidml_empty_network";
 
 struct CreateNetworkOpLowering final
     : public mlir::ConvertOpToLLVMPattern<abi::CreateNetworkOp> {
@@ -62,14 +59,14 @@ struct CreateNetworkOpLowering final
       // singleton, and return a pointer to it.
       auto moduleOp = op->getParentOfType<mlir::ModuleOp>();
       LLVM::GlobalOp emptyNetwork =
-          moduleOp.lookupSymbol<LLVM::GlobalOp>(emptyNetworkSingletonName);
+          moduleOp.lookupSymbol<LLVM::GlobalOp>(kEmptyNetworkSingletonName);
       if (!emptyNetwork) {
         mlir::OpBuilder::InsertionGuard insertionGuard{rewriter};
         rewriter.setInsertionPointToStart(moduleOp.getBody());
         emptyNetwork = rewriter.create<LLVM::GlobalOp>(
             rewriter.getUnknownLoc(),
             LLVMType::getInt8Ty(rewriter.getContext()), /*isConstant=*/true,
-            LLVM::Linkage::Internal, emptyNetworkSingletonName,
+            LLVM::Linkage::Internal, kEmptyNetworkSingletonName,
             rewriter.getI8IntegerAttr(0));
       }
 

@@ -52,7 +52,6 @@ mlir::LogicalResult serializeSpirvKernels(mlir::ModuleOp &op,
 /// comp lowerings.
 void populateCommonPatterns(mlir::MLIRContext *context,
                             mlir::TypeConverter &typeConverter,
-                            mlir::TypeConverter &signatureConverter,
                             mlir::OwningRewritePatternList &patterns);
 
 /// Adds declarations of functions common across lowerings

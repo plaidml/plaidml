@@ -87,7 +87,6 @@ struct ConvertStandardToLLVMPass
         /*useAlignedAlloc=*/false,
     };
     LLVMTypeConverter typeConverter(context, options);
-    mlir::TypeConverter signatureConverter;
     auto binaryModulesMap = conversion::comp_to_llvm::getEmptyModulesMap();
     if (failed(conversion::comp_to_llvm::serializeSpirvKernels(
             module, *binaryModulesMap))) {
@@ -101,8 +100,8 @@ struct ConvertStandardToLLVMPass
         typeConverter, patterns);
     conversion::abi_to_llvm::populateABIToLLVMConversionPatterns(typeConverter,
                                                                  patterns);
-    conversion::comp_to_llvm::populateCommonPatterns(
-        context, typeConverter, signatureConverter, patterns);
+    conversion::comp_to_llvm::populateCommonPatterns(context, typeConverter,
+                                                     patterns);
     conversion::comp_to_llvm::populateCompToVkPatterns(
         context, *binaryModulesMap, module, scheduleFuncNum, typeConverter,
         patterns);
@@ -110,7 +109,7 @@ struct ConvertStandardToLLVMPass
     target.addIllegalDialect<abi::ABIDialect>();
     target.addIllegalDialect<comp::COMPDialect>();
     target.addDynamicallyLegalOp<mlir::FuncOp>([&](mlir::FuncOp op) -> bool {
-      return signatureConverter.isSignatureLegal(op.getType());
+      return typeConverter.isSignatureLegal(op.getType());
     });
     if (failed(applyPartialConversion(module, target, patterns))) {
       signalPassFailure();

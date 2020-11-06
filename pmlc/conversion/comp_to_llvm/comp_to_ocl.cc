@@ -51,9 +51,8 @@ void ConvertCompToOcl::runOnOperation() {
   // Populate conversion patterns.
   mlir::MLIRContext *context = &getContext();
   mlir::LLVMTypeConverter typeConverter{context};
-  mlir::TypeConverter signatureConverter;
   mlir::OwningRewritePatternList patterns;
-  populateCommonPatterns(context, typeConverter, signatureConverter, patterns);
+  populateCommonPatterns(context, typeConverter, patterns);
   populateCompToOclPatterns(context, modulesMap, typeConverter, patterns);
   // Set conversion target.
   mlir::ConversionTarget target(*context);
