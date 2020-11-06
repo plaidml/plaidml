@@ -339,8 +339,6 @@ public:
       llvm::sys::DynamicLibrary::LoadLibraryPermanently(nullptr);
     });
 
-    IVLOG(3, "In JitExecutable::JitExecutable");
-
     EngineKind kind = EngineKind::OrcJIT;
     auto jit = pmlc::util::getEnvVar("LLVM_JIT");
     if (jit == "ORC") {
@@ -360,35 +358,28 @@ public:
       throw std::runtime_error("Invalid EngineKind");
     }
 
-    IVLOG(3, "Translating to LLVMIR");
-
     auto ctx = std::make_unique<llvm::LLVMContext>();
     auto llvmModule = translateModuleToLLVMIR(*program->module, *ctx);
     if (!llvmModule) {
       throw std::runtime_error("could not convert to LLVM IR");
     }
-    IVLOG(3, "Setting target triple");
 
     setupTargetTriple(llvmModule.get());
 
-    if (VLOG_IS_ON(3)) {
+    if (VLOG_IS_ON(6)) {
       llvmModule->print(llvm::errs(), nullptr);
     }
 
-    IVLOG(3, "Compiling");
     abi = impl->compile(std::move(llvmModule), std::move(ctx));
     if (!abi) {
       throw std::runtime_error("Entrypoint functions not found");
     }
 
-    IVLOG(3, "Building memref descriptors");
     buildMemRefDescriptors();
-    IVLOG(3, "Calling setup");
     network = abi.setupFunc(this->device.get(), initDescriptors.data());
     if (!network) {
       throw std::runtime_error("Unable to initialize the network");
     }
-    IVLOG(3, "Compiled");
   }
 
   ~JitExecutable() {
@@ -417,11 +408,8 @@ public:
     for (auto &bp : outputBuffers) {
       (memrefIt++)->setDataPtr(bp->data());
     }
-    IVLOG(3, "Running executable - inputs="
-                 << inputBuffers.size() << " outputs=" << outputBuffers.size());
     auto *data = execDescriptors.data();
     abi.executeFunc(network, data);
-    IVLOG(3, "Executable complete");
     if (VLOG_IS_ON(1)) {
       stopWatch.stop();
       IVLOG(1, "Execution time: " << stopWatch.delta_ms() << "ms");
@@ -430,11 +418,6 @@ public:
   }
 
   void buildMemRefDescriptors() {
-    IVLOG(3, "Building descriptors - inputs="
-                 << program->inputs.size()
-                 << " outputs=" << program->outputs.size()
-                 << " constants=" << program->constants.size());
-
     for (auto type : program->inputs) {
       memrefs.emplace_back(type.cast<RankedTensorType>());
       execDescriptors.push_back(memrefs.back().getDescriptor());
