@@ -352,8 +352,9 @@ struct VectorizeMemImpl {
       // Set tile sizes, care only about the last dim, rest should be set to 1
       // If there are multiple arguments used in the vector op, we still do
       // tiling but only with 1's, as we need additional loop to extract from
-      for (auto i = 0; i < loopOp.getIVs().size(); i++) {
-        if (i == loopOp.getIVs().size() - 1 && memOpsPlan.tileSize != 0)
+      for (int i = 0; i < static_cast<int>(loopOp.getIVs().size()); i++) {
+        if (i == static_cast<int>(loopOp.getIVs().size()) - 1 &&
+            memOpsPlan.tileSize != 0)
           tileSizes.push_back(memOpsPlan.tileSize);
         else
           tileSizes.push_back(1);
