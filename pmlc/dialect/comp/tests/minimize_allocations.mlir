@@ -1,4 +1,4 @@
-// RUN: pmlc-opt --comp-minimize-allocations --allow-unregistered-dialect %s | FileCheck --dump-input=fail --dump-input-filter=all %s
+// RUN: pmlc-opt --comp-minimize-allocations --allow-unregistered-dialect %s | FileCheck %s
 
 // CHECK-LABEL: func @two_wo_host
 //  CHECK-SAME:     %[[ENV:[a-zA-Z0-9]*]]: !comp.execenv
