@@ -15,7 +15,7 @@ func @subgroup_block_read_write(%arg0: memref<64xf32>, %arg1: memref<64xf32>) {
       %0 = vector.transfer_read %arg0[%i], %cst : memref<64xf32>, vector<8xf32>
       %1 = extract_element %0[%c1] : vector<8xf32>
       %2 = vector.broadcast %1 : f32 to vector<8xf32>
-      // CHECK: stdx.subgroup_block_write_intel %{{.*}}, %{{.*}}[%[[IDX]]] : memref<64xf32>
+      // CHECK: stdx.subgroup_block_write_intel %{{.*}}, %{{.*}}[%[[IDX]]] : f32, memref<64xf32>
       vector.transfer_write %2, %arg1[%i] : vector<8xf32>, memref<64xf32>
       scf.yield
     }  {tags = {gpuThread, subgroupSize=8}}

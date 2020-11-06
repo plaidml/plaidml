@@ -26,10 +26,10 @@ addAffineParallelIVDomain(mlir::AffineParallelOp parallelOp, unsigned idx,
   mlir::AffineValueMap lowerMap = parallelOp.getLowerBoundsValueMap();
   mlir::AffineValueMap upperMap = parallelOp.getUpperBoundsValueMap();
   if (auto constLower =
-          lowerMap.getResult(idx).cast<mlir::AffineConstantExpr>())
+          lowerMap.getResult(idx).dyn_cast<mlir::AffineConstantExpr>())
     constraints.addConstantLowerBound(pos, constLower.getValue());
   if (auto constUpper =
-          upperMap.getResult(idx).cast<mlir::AffineConstantExpr>())
+          upperMap.getResult(idx).dyn_cast<mlir::AffineConstantExpr>())
     constraints.addConstantUpperBound(pos, constUpper.getValue() - 1);
   return mlir::success();
 }
