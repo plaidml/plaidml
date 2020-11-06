@@ -14,7 +14,9 @@ func @main() {
 // CHECK:        llvm.mlir.constant
 // CHECK:        llvm.getelementptr
 // CHECK:        llvm.call @plaidml_rt_trace(%{{.*}})
-// CHECK:      llvm.func @main
+// CHECK:      llvm.func @plaidml_init
+// CHECK:      llvm.func @plaidml_exec
 // CHECK:        llvm.call @__trace{{.*}}()
+// CHECK:      llvm.func @plaidml_fini
 
 // JIT: msg
