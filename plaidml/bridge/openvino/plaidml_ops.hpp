@@ -10,9 +10,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "ie_icnn_network.hpp"  // TODO
-
-// #include "plugin_api/caseless.hpp"  // Could be replaced with some work if necessary!!
+#include "ie_icnn_network.hpp"
 
 #include "ngraph/node.hpp"
 

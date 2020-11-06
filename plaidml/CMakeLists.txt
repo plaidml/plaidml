@@ -1,4 +1,4 @@
-add_subdirectory(bridge)  # TODO?
+add_subdirectory(bridge)
 add_subdirectory(core)
 add_subdirectory(edsl)
 add_subdirectory(exec)

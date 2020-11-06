@@ -1,1 +1,1 @@
-add_subdirectory(openvino)  # TODO?
+add_subdirectory(openvino)  # TODO? Some way to control this?
