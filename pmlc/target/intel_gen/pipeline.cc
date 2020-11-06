@@ -1,5 +1,7 @@
 // Copyright 2020, Intel Corporation
 
+#include "llvm/Support/FormatVariadic.h"
+
 #include "mlir/Conversion/GPUToVulkan/ConvertGPUToVulkanPass.h"
 #include "mlir/Conversion/SCFToGPU/SCFToGPU.h"
 #include "mlir/Conversion/SCFToGPU/SCFToGPUPass.h"
@@ -14,6 +16,7 @@
 #include "mlir/Dialect/SPIRV/SPIRVDialect.h"
 #include "mlir/Dialect/SPIRV/SPIRVOps.h"
 #include "mlir/Dialect/StandardOps/Transforms/Passes.h"
+#include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
@@ -102,6 +105,7 @@ struct ParallelLoopToGpuPass
     target.addLegalDialect<AffineDialect>();
     target.addLegalDialect<gpu::GPUDialect>();
     target.addLegalDialect<scf::SCFDialect>();
+    target.addLegalOp<vector::InsertElementOp>();
     target.addIllegalOp<scf::ParallelOp>();
     if (failed(applyPartialConversion(getOperation(), target, patterns)))
       signalPassFailure();
@@ -220,10 +224,26 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(createConvertStandardToLLVM());
 }
 
-static PassPipelineRegistration<>
-    passPipelineReg("target-intel_gen", "Target pipeline for Intel GEN iGPUs",
-                    pipelineBuilder);
+static constexpr const char *kTargetName = "intel_gen";
+static constexpr const char *kPassPipelineTargetName = "target-intel_gen";
 
-static compiler::TargetRegistration targetReg("intel_gen", pipelineBuilder);
+static PassPipelineRegistration<>
+    passPipelineReg(kPassPipelineTargetName,
+                    "Target pipeline for Intel GEN iGPUs", pipelineBuilder);
+
+class Target : public compiler::Target {
+public:
+  void buildPipeline(mlir::OpPassManager &pm) { pipelineBuilder(pm); }
+
+  util::BufferPtr save(compiler::Program &program) {
+    throw std::runtime_error(
+        llvm::formatv("Target '{0}' does not have 'save' support.", kTargetName)
+            .str());
+  }
+};
+
+static compiler::TargetRegistration targetReg(kTargetName, []() {
+  return std::make_shared<Target>();
+});
 
 } // namespace pmlc::target::intel_gen

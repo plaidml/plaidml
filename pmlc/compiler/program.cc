@@ -84,8 +84,8 @@ Program::Program(llvm::StringRef name)
 
 Program::Program(mlir::ModuleOp module) : module(module) {}
 
-Program Program::fromSource(mlir::StringRef source) {
-  return Program(llvm::MemoryBuffer::getMemBuffer(source));
+std::unique_ptr<Program> Program::fromSource(mlir::StringRef source) {
+  return std::make_unique<Program>(llvm::MemoryBuffer::getMemBuffer(source));
 }
 
 Program::Program(std::unique_ptr<llvm::MemoryBuffer> buffer) {
@@ -108,8 +108,9 @@ static StringRef getDiagKindStr(DiagnosticSeverity kind) {
   llvm_unreachable("Unknown DiagnosticSeverity");
 }
 
-void Program::compile(StringRef target, bool collectPasses, StringRef dumpDir) {
-  if (target.empty()) {
+void Program::compile(StringRef targetName, bool collectPasses,
+                      StringRef dumpDir) {
+  if (targetName.empty()) {
     return;
   }
 
@@ -148,9 +149,8 @@ void Program::compile(StringRef target, bool collectPasses, StringRef dumpDir) {
                         /*out=*/llvm::errs());
   }
 
-  auto pipelineBuilder = resolveTarget(target);
-  pipelineBuilder(pm);
-
+  target = resolveTarget(targetName);
+  target->buildPipeline(pm);
   if (failed(pm.run(*module))) {
     throw std::runtime_error("Compilation failure");
   }
@@ -175,6 +175,13 @@ void Program::compile(StringRef target, bool collectPasses, StringRef dumpDir) {
       file->keep();
     }
   }
+}
+
+util::BufferPtr Program::save() {
+  if (!target) {
+    throw std::runtime_error("Program must be compiled to be saved.");
+  }
+  return target->save(*this);
 }
 
 } // namespace pmlc::compiler

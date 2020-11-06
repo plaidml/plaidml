@@ -15,6 +15,10 @@ std::unique_ptr<mlir::Pass> createSetSubgroupSizePass();
 
 std::unique_ptr<mlir::Pass> createLegalizeSpirvPass();
 
+std::unique_ptr<mlir::Pass> createIntelGenOclReorderLayoutsPass();
+std::unique_ptr<mlir::Pass>
+createIntelGenOclReorderLayoutsPass(unsigned maxThreads, bool allowReorder);
+
 /// Generate the code for registering passes.
 #define GEN_PASS_REGISTRATION
 #include "pmlc/target/intel_gen_ocl_spirv/passes.h.inc"
