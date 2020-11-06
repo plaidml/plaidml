@@ -257,12 +257,11 @@ public:
       idVal = indexCast.getResult();
     }
 
-    // Assume that the user of insert_map of is TransferWriteOp,
+    // Assume that the user of insert_map is TransferWriteOp,
     // so the whole structure was modelled in the vectorizeMemPass
-    Operation *InsertMapUserOp;
-    for (auto user : op.getResult().getUsers())
-      InsertMapUserOp = user;
-    auto transferWriteOp = dyn_cast<vector::TransferWriteOp>(InsertMapUserOp);
+    auto &insertMapUser = *op.getResult().use_begin();
+    auto transferWriteOp =
+        dyn_cast<vector::TransferWriteOp>(insertMapUser.getOwner());
     if (!transferWriteOp)
       return failure();
     auto vecType = op.getResultType();
