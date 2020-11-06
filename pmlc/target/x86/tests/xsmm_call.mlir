@@ -1,19 +1,19 @@
 // RUN: pmlc-opt -convert-linalg-to-loops -x86-convert-pxa-to-affine -lower-affine \
-// RUN:     -canonicalize -convert-scf-to-std -pmlc-make-entrypoints=main=baseline \
+// RUN:     -canonicalize -convert-scf-to-std -lower-to-abi=main=baseline \
 // RUN:     -x86-convert-std-to-llvm %s | \
-// RUN:   pmlc-jit -e baseline | FileCheck %s
+// RUN:   pmlc-jit -e baseline | FileCheck --dump-input=fail --dump-input-filter=all %s
 // RUN: pmlc-opt -convert-linalg-to-loops -x86-convert-pxa-to-affine -lower-affine \
-// RUN:     -canonicalize -convert-scf-to-std -pmlc-make-entrypoints=main=tiled \
+// RUN:     -canonicalize -convert-scf-to-std -lower-to-abi=main=tiled \
 // RUN:     -x86-convert-std-to-llvm %s | \
-// RUN:   pmlc-jit -e tiled | FileCheck %s
+// RUN:   pmlc-jit -e tiled | FileCheck --dump-input=fail --dump-input-filter=all %s
 // RUN: pmlc-opt -convert-linalg-to-loops -x86-convert-pxa-to-affine -lower-affine \
-// RUN:     -canonicalize -convert-scf-to-std -pmlc-make-entrypoints=main=xsmm \
+// RUN:     -canonicalize -convert-scf-to-std -lower-to-abi=main=xsmm \
 // RUN:     -x86-convert-std-to-llvm %s | \
-// RUN:   pmlc-jit -e xsmm | FileCheck %s
+// RUN:   pmlc-jit -e xsmm | FileCheck --dump-input=fail --dump-input-filter=all %s
 // RUN: pmlc-opt -convert-linalg-to-loops --pass-pipeline='x86-affine-stencil-xsmm{batched=true}' \
-// RUN:     -x86-convert-pxa-to-affine -lower-affine \
-// RUN:     -canonicalize -convert-scf-to-std -x86-convert-std-to-llvm %s | \
-// RUN:   pmlc-jit -e baseline | FileCheck %s
+// RUN:     -x86-convert-pxa-to-affine -lower-affine -canonicalize -convert-scf-to-std \
+// RUN:     -lower-to-abi=main=baseline -x86-convert-std-to-llvm %s | \
+// RUN:   pmlc-jit -e baseline | FileCheck --dump-input=fail --dump-input-filter=all %s
 
 !I_memref = type memref<1x6x5x7xf32>
 !K_memref = type memref<1x1x7x11xf32>
