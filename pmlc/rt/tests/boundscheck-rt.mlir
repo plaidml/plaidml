@@ -1,4 +1,4 @@
-// RUN: pmlc-opt -stdx-check-bounds -pmlc-make-entrypoints -convert-std-to-llvm='emit-c-wrappers' -print-ir-after-all %s \
+// RUN: pmlc-opt -stdx-check-bounds -lower-to-abi -x86-convert-std-to-llvm %s \
 // RUN: | pmlc-jit | FileCheck %s
 
 func @main() {
