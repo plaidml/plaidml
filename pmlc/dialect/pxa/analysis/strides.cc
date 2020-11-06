@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "mlir/Dialect/Affine/IR/AffineValueMap.h"
+#include "mlir/IR/Function.h"
 #include "mlir/Support/DebugStringHelper.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -216,17 +217,16 @@ AffineValueExpr StrideInfo::toValueExpr(MLIRContext *ctx) const {
   std::map<int64_t, std::pair<mlir::BlockArgument, int64_t>> ordered;
 
   for (auto kvp : strides) {
-    int64_t nestLevel = 0;
+    int64_t loopDepth = 0;
     auto block = kvp.first.getOwner();
-    assert(block);
     auto parent = block->getParentOp();
-    while (parent != nullptr) {
-      nestLevel++;
+    while (!dyn_cast<FuncOp>(parent)) {
+      loopDepth++;
       parent = parent->getParentOp();
     }
 
     ordered.emplace(
-        nestLevel * 10000 + kvp.first.getArgNumber(),
+        loopDepth * strides.size() + kvp.first.getArgNumber(),
         std::pair<mlir::BlockArgument, int64_t>(kvp.first, kvp.second));
   }
 
