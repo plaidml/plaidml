@@ -212,13 +212,21 @@ StrideRange StrideInfo::range() const {
   return ret;
 }
 
-AffineValueExpr StrideInfo::toValueExpr(MLIRContext *ctx,
-                                        mlir::Block *relative) const {
-  assert(relative);
-  std::map<std::string, std::pair<mlir::BlockArgument, int64_t>> ordered;
+AffineValueExpr StrideInfo::toValueExpr(MLIRContext *ctx) const {
+  std::map<int64_t, std::pair<mlir::BlockArgument, int64_t>> ordered;
+
   for (auto kvp : strides) {
+    int64_t nestLevel = 0;
+    auto block = kvp.first.getOwner();
+    assert(block);
+    auto parent = block->getParentOp();
+    while (parent) {
+      nestLevel++;
+      parent = parent->getParentOp();
+    }
+
     ordered.emplace(
-        getUniqueName(relative, kvp.first),
+        nestLevel * 10000 + kvp.first.getArgNumber(),
         std::pair<mlir::BlockArgument, int64_t>(kvp.first, kvp.second));
   }
 
@@ -274,12 +282,10 @@ std::ostream &operator<<(std::ostream &os, const StrideInfo &x) {
   return os;
 }
 
-AffineValueMap convertToValueMap(MLIRContext *ctx, ArrayRef<StrideInfo> dims,
-                                 mlir::Block *relative) {
-  assert(relative);
+AffineValueMap convertToValueMap(MLIRContext *ctx, ArrayRef<StrideInfo> dims) {
   SmallVector<AffineValueExpr, 4> exprs;
   for (const auto &si : dims) {
-    exprs.push_back(si.toValueExpr(ctx, relative));
+    exprs.push_back(si.toValueExpr(ctx));
   }
   return jointValueMap(ctx, exprs);
 }

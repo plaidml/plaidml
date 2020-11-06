@@ -56,9 +56,9 @@ static AffineParallelOp createCopyLoop(OpBuilder &builder,               //
     srcAccess.push_back(srcOffset[i] + offset);
     dstAccess.push_back(dstOffset[i] + offset);
   }
+  auto loadMap = convertToValueMap(ctx, srcAccess);
+  auto reduceMap = convertToValueMap(ctx, dstAccess);
   auto txBuilder = loop.getBodyBuilder();
-  auto loadMap = convertToValueMap(ctx, srcAccess, txBuilder.getBlock());
-  auto reduceMap = convertToValueMap(ctx, dstAccess, txBuilder.getBlock());
   auto loaded = txBuilder.create<PxaLoadOp>(
       loc, srcMemRef, loadMap.getAffineMap(), loadMap.getOperands());
   auto stored = txBuilder.create<PxaReduceOp>(loc, agg, loaded, dstMemRef,
@@ -108,9 +108,8 @@ LogicalResult cacheLoad(AffineParallelOp par, PxaLoadOp load) {
                      rap.outer, zeroOffset, AtomicRMWKind::assign);
 
   // Make a new load and remove the old one
+  auto innerMap = convertToValueMap(par.getContext(), rap.inner);
   OpBuilder newLoadBuilder(load);
-  auto innerMap =
-      convertToValueMap(par.getContext(), rap.inner, newLoadBuilder.getBlock());
   auto newLoad = newLoadBuilder.create<PxaLoadOp>(loc, copyLoop.getResult(0),
                                                   innerMap.getAffineMap(),
                                                   innerMap.getOperands());
@@ -164,8 +163,7 @@ LogicalResult cacheLoadAsVector(AffineParallelOp par, PxaLoadOp load,
   auto loc = load.getLoc();
   auto builder = OpBuilder::atBlockBegin(par.getBody());
   // Load as a vector
-  auto loadMap =
-      convertToValueMap(load.getContext(), rap.outer, builder.getBlock());
+  auto loadMap = convertToValueMap(load.getContext(), rap.outer);
   IVLOG(2, "Making vector load");
   auto loadVec = builder.create<PxaVectorLoadOp>(loc, vecType, load.getMemRef(),
                                                  loadMap.getAffineMap(),
@@ -173,8 +171,7 @@ LogicalResult cacheLoadAsVector(AffineParallelOp par, PxaLoadOp load,
   // Make a new load and remove the old one
   OpBuilder newLoadBuilder(load);
   // Do an affine apply to get the index
-  auto innerMap =
-      convertToValueMap(par.getContext(), rap.inner, newLoadBuilder.getBlock());
+  auto innerMap = convertToValueMap(par.getContext(), rap.inner);
   // Extract the right element of the vector
   Value idx = newLoadBuilder.create<AffineApplyOp>(
       loc, innerMap.getAffineMap().getSubMap({last}), innerMap.getOperands());
@@ -245,9 +242,8 @@ LogicalResult cacheReduce(AffineParallelOp par, PxaReduceOp reduce) {
   }
 
   // Make a new load and remove the old one
+  auto innerMap = convertToValueMap(par.getContext(), rap.inner);
   OpBuilder newReduceBuilder(reduce);
-  auto innerMap = convertToValueMap(par.getContext(), rap.inner,
-                                    newReduceBuilder.getBlock());
   auto newReduce = newReduceBuilder.create<PxaReduceOp>(
       loc, reduce.agg(), reduce.val(), initBuf, innerMap.getAffineMap(),
       innerMap.getOperands());
@@ -348,8 +344,7 @@ static void replaceLoad(PxaLoadOp load, Value source,
                         const RelativeAccessPattern &rap) {
   // Make a new load and remove the old one
   OpBuilder builder(load);
-  auto innerMap =
-      convertToValueMap(load.getContext(), rap.inner, builder.getBlock());
+  auto innerMap = convertToValueMap(load.getContext(), rap.inner);
   auto newLoad = builder.create<PxaLoadOp>(
       load.getLoc(), source, innerMap.getAffineMap(), innerMap.getOperands());
   load.replaceAllUsesWith(newLoad.result());
@@ -360,9 +355,8 @@ static Value replaceReduce(AffineParallelOp band, PxaReduceOp reduce,
                            Value cache, const RelativeAccessPattern &rap) {
   // Make a new reduce and remove the old one
   auto loc = reduce.getLoc();
+  auto innerMap = convertToValueMap(band.getContext(), rap.inner);
   OpBuilder builder(reduce);
-  auto innerMap =
-      convertToValueMap(band.getContext(), rap.inner, builder.getBlock());
   auto newReduce = builder.create<PxaReduceOp>(loc, reduce.agg(), reduce.val(),
                                                cache, innerMap.getAffineMap(),
                                                innerMap.getOperands());
