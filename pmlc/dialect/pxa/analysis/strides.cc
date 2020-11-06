@@ -220,7 +220,7 @@ AffineValueExpr StrideInfo::toValueExpr(MLIRContext *ctx) const {
     auto block = kvp.first.getOwner();
     assert(block);
     auto parent = block->getParentOp();
-    while (parent) {
+    while (parent != nullptr) {
       nestLevel++;
       parent = parent->getParentOp();
     }
