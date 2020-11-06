@@ -369,7 +369,8 @@ struct VectorizeMemImpl {
         // needed to keep the old arguments instead of the new ones since the
         // vector op will be extracted from the orginal loop.
         if (loopOp.getIVs().size() > 1) {
-          for (auto i = 0; i < loopOp.getIVs().size() - 1; i++) {
+          for (int i = 0; i < static_cast<int>(loopOp.getIVs().size()) - 1;
+               i++) {
             loopOp.getIVs()[i].replaceAllUsesWith(orgBlockArgs[i]);
           }
         }
