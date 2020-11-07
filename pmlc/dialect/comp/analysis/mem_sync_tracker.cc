@@ -32,11 +32,7 @@ bool MemorySynchronizationTracker::handleTransferOp(
   return syncMemory(src, dst);
 }
 
-bool MemorySynchronizationTracker::handleAllocOp(Alloc op) {
-  if (mlir::Value hostMem = op.hostMem())
-    return syncMemory(hostMem, op.getResult());
-  return false;
-}
+bool MemorySynchronizationTracker::handleAllocOp(Alloc op) { return false; }
 
 bool MemorySynchronizationTracker::handleGeneralOp(mlir::Operation *op) {
   bool changed = false;

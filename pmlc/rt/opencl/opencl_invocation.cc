@@ -118,12 +118,8 @@ OpenCLInvocation::~OpenCLInvocation() {
   device->execTimeInMS = fp_milliseconds(totalExecuteTime).count();
 }
 
-OpenCLMemory *OpenCLInvocation::allocateMemory(size_t bytes, void *data) {
-  cl_mem_flags flags = CL_MEM_READ_WRITE;
-  if (data)
-    flags |= CL_MEM_COPY_HOST_PTR;
-
-  cl::Buffer buffer(device->getOclContext(), flags, bytes, data);
+OpenCLMemory *OpenCLInvocation::allocateMemory(size_t bytes) {
+  cl::Buffer buffer(device->getOclContext(), CL_MEM_READ_WRITE, bytes, nullptr);
   return new OpenCLMemory(buffer, bytes);
 }
 
