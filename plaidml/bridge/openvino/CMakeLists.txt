@@ -22,3 +22,9 @@ pml_cc_library(
     IE::ngraph
     plaidml::core
 )
+
+# TODO: Plugin stuff
+add_subdirectory(plugin)
+
+# TODO: Test stuff
+add_subdirectory(tests/functional)
