@@ -74,6 +74,7 @@ plaidml_cc_library(
         "//pmlc/target/intel_gen",
         "//pmlc/target/intel_gen_ocl_spirv",
         "//pmlc/target/x86",
+        "//pmlc/transforms",
         "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:AffineToStandard",
         "@llvm-project//mlir:AffineTransforms",
