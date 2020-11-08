@@ -1,1 +1,3 @@
-add_subdirectory(openvino)  # TODO? Some way to control this?
+# if(ENABLE_OPENVINO_BRIDGE)
+  add_subdirectory(openvino)
+# endif()

@@ -6,13 +6,13 @@
 set(TARGET_NAME PlaidMLFuncTests)
 
 addIeTargetTest(
-        NAME ${TARGET_NAME}
-        ROOT ${CMAKE_CURRENT_SOURCE_DIR}
-        DEPENDENCIES
-            plaidmlPlugin
-        LINK_LIBRARIES
-            IE::funcSharedTests
-        ADD_CPPLINT
-        LABELS
-            PLAIDML
+  NAME ${TARGET_NAME}
+  ROOT ${CMAKE_CURRENT_SOURCE_DIR}
+  DEPENDENCIES
+    plaidmlPlugin
+  LINK_LIBRARIES
+    IE::funcSharedTests
+  ADD_CPPLINT
+  LABELS
+    PLAIDML
 )

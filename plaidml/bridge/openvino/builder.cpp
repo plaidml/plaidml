@@ -2,57 +2,79 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include "plaidml_program_builder.hpp"
+#include "plaidml/bridge/openvino/builder.hpp"
 
+#include <map>
 #include <memory>
+#include <string>
 #include <utility>
 #include <vector>
 
 #include "ngraph/function.hpp"
 #include "ngraph/opsets/opset1.hpp"
+// #include "ngraph/node.hpp"
 
-#include "plaidml_ops.hpp"
-#include "plaidml_util.hpp"
+#include "plaidml/bridge/openvino/ops.hpp"
+#include "plaidml/bridge/openvino/util.hpp"
 
-using namespace plaidml;  // NOLINT[build/namespaces]
+namespace plaidml::bridge::openvino {
 
-namespace PlaidMLPlugin {
+namespace {
 
-PlaidMLProgramBuilder::PlaidMLProgramBuilder(const InferenceEngine::ICNNNetwork& network)
-    : fcn_(network.getFunction()) {
-  IE_ASSERT(fcn_);  // PlaidML requires that the nGraph-based API be used
-  network.getInputsInfo(networkInputs_);
-  network.getOutputsInfo(networkOutputs_);
+class ProgramBuilder {
+ public:
+  explicit ProgramBuilder(const InferenceEngine::ICNNNetwork& network);
+
+  Program build();
+
+ private:
+  void handleConstant(const std::shared_ptr<ngraph::Node>& node);
+  void handleParameter(const std::shared_ptr<ngraph::Node>& node);
+  void handleOutput(const std::shared_ptr<ngraph::Node>& node);
+  void handleOp(const std::shared_ptr<ngraph::Node>& node);
+
+  std::shared_ptr<const ngraph::Function> func;
+  InferenceEngine::InputsDataMap networkInputs;
+  InferenceEngine::OutputsDataMap networkOutputs;
+
+  // Lets us look up the PlaidML tensor by the name of the node that produces it and the index of which output it is
+  std::map<std::pair<std::string, size_t>, edsl::Tensor> tensorMap_;
+
+  // Go from the names OV uses for a networks inputs and outputs to the corresponding PlaidML Tensor
+  std::map<std::string, edsl::Tensor> tensorIONameMap_;
+};
+
+ProgramBuilder::ProgramBuilder(const InferenceEngine::ICNNNetwork& network) : func(network.getFunction()) {
+  IE_ASSERT(func);  // PlaidML requires that the nGraph-based API be used
+  network.getInputsInfo(networkInputs);
+  network.getOutputsInfo(networkOutputs);
 }
 
-Program PlaidMLProgramBuilder::program() {
-  if (!graph_parsed) {
-    for (const std::shared_ptr<ngraph::Node>& node : fcn_->get_ordered_ops()) {
-      if (node->description() == "Constant") {
-        handleConstant(node);
-      } else if (node->description() == "Parameter") {
-        handleParameter(node);
-      } else if (node->description() == "Result") {
-        handleOutput(node);
-      } else {
-        handleOp(node);
-      }
+Program ProgramBuilder::build() {
+  for (const std::shared_ptr<ngraph::Node>& node : func->get_ordered_ops()) {
+    if (node->description() == "Constant") {
+      handleConstant(node);
+    } else if (node->description() == "Parameter") {
+      handleParameter(node);
+    } else if (node->description() == "Result") {
+      handleOutput(node);
+    } else {
+      handleOp(node);
     }
-    graph_parsed = true;
   }
 
   std::vector<edsl::Tensor> inputs;
-  for (const auto& kvp : networkInputs_) {
+  for (const auto& kvp : networkInputs) {
     inputs.push_back(tensorIONameMap_.at(kvp.first));
   }
   std::vector<edsl::Tensor> outputs;
-  for (const auto& kvp : networkOutputs_) {
+  for (const auto& kvp : networkOutputs) {
     outputs.push_back(tensorIONameMap_.at(kvp.first));
   }
   return edsl::buildProgram("ie", inputs, outputs);
 }
 
-void PlaidMLProgramBuilder::handleConstant(const std::shared_ptr<ngraph::Node>& node) {
+void ProgramBuilder::handleConstant(const std::shared_ptr<ngraph::Node>& node) {
   IE_ASSERT(node->get_output_size() == 1);
   IE_ASSERT(node->description() == "Constant");
   auto type = to_plaidml(node->get_element_type());
@@ -66,7 +88,7 @@ void PlaidMLProgramBuilder::handleConstant(const std::shared_ptr<ngraph::Node>& 
   tensorMap_[std::make_pair(node->get_name(), 0)] = tensor;
 }
 
-void PlaidMLProgramBuilder::handleParameter(const std::shared_ptr<ngraph::Node>& node) {
+void ProgramBuilder::handleParameter(const std::shared_ptr<ngraph::Node>& node) {
   IE_ASSERT(node->get_output_size() == 1);
   std::vector<int64_t> dims{node->get_shape().begin(), node->get_shape().end()};
   auto type = to_plaidml(node->get_element_type());
@@ -75,7 +97,7 @@ void PlaidMLProgramBuilder::handleParameter(const std::shared_ptr<ngraph::Node>&
   tensorIONameMap_[node->get_friendly_name()] = tensor;
 }
 
-void PlaidMLProgramBuilder::handleOutput(const std::shared_ptr<ngraph::Node>& node) {
+void ProgramBuilder::handleOutput(const std::shared_ptr<ngraph::Node>& node) {
   // The OV output name is the name of the node _prior_ to the result
   // When there are multiple outputs, it has .# appended, where # is the output index
   const auto& src_output = node->input(0).get_source_output();
@@ -87,7 +109,7 @@ void PlaidMLProgramBuilder::handleOutput(const std::shared_ptr<ngraph::Node>& no
   tensorIONameMap_[name] = tensorMap_.at(std::make_pair(src_node->get_name(), src_output.get_index()));
 }
 
-void PlaidMLProgramBuilder::handleOp(const std::shared_ptr<ngraph::Node>& node) {
+void ProgramBuilder::handleOp(const std::shared_ptr<ngraph::Node>& node) {
   auto op = OpsRegistry::instance()->resolve(node->description());
   if (!op) {
     THROW_IE_EXCEPTION << "Unsupported operation: " << node->description();
@@ -110,8 +132,8 @@ void PlaidMLProgramBuilder::handleOp(const std::shared_ptr<ngraph::Node>& node) 
   }
 }
 
-Program makePlaidMLProgram(const InferenceEngine::ICNNNetwork& network) {
-  return PlaidMLProgramBuilder(network).program();
-}
+}  // namespace
 
-}  // namespace PlaidMLPlugin
+Program buildProgram(const InferenceEngine::ICNNNetwork& network) { return ProgramBuilder(network).build(); }
+
+}  // namespace plaidml::bridge::openvino

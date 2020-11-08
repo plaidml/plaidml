@@ -10,13 +10,13 @@
 #include <unordered_map>
 #include <vector>
 
-#include "ie_icnn_network.hpp"
+// #include "ie_icnn_network.hpp"
 
 #include "ngraph/node.hpp"
 
 #include "plaidml/edsl/edsl.h"
 
-namespace PlaidMLPlugin {
+namespace plaidml::bridge::openvino {
 
 struct Context {
   ngraph::Node* layer;
@@ -59,4 +59,4 @@ struct OpRegistration {
   OpRegistration(const std::string& name, Op op) { OpsRegistry::instance()->registerOp(name, op); }
 };
 
-}  // namespace PlaidMLPlugin
+}  // namespace plaidml::bridge::openvino

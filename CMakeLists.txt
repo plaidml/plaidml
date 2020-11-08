@@ -26,6 +26,8 @@ set(PLAIDML_VERSION 1.0.0)
 set(MAIN_BRANCH plaidml-v1)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
+option(ENABLE_OPENVINO_BRIDGE "Enable the OpenVINO plugin")
+
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
   # Support for ninja on windows
   enable_language(ASM)
