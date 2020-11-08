@@ -56,6 +56,7 @@ mlir::Value deviceMemrefToMem(mlir::OpBuilder &builder, mlir::Location loc,
       mlir::MemRefDescriptor{memref}.allocatedPtr(builder, loc);
   while (memref) {
     // Attempt to trace the memref to a source buffer.
+    auto prevBuffer = buffer;
     do {
       auto srcOp = memref.getDefiningOp();
       if (!srcOp) {
@@ -77,6 +78,11 @@ mlir::Value deviceMemrefToMem(mlir::OpBuilder &builder, mlir::Location loc,
                      return mlir::Value{};
                    });
     } while (memref);
+
+    if (prevBuffer == buffer) {
+      // We weren't able to trace the defining memref back to an earlier buffer.
+      break;
+    }
 
     // Attempt to trace the buffer to a source memref.
     for (;;) {
