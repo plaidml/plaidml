@@ -1,2 +1,4 @@
 build-dbg/
+build-fast/
 build-opt/
+vendor/openvino/

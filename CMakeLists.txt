@@ -26,8 +26,6 @@ set(PLAIDML_VERSION 1.0.0)
 set(MAIN_BRANCH plaidml-v1)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
-option(ENABLE_OPENVINO_BRIDGE "Enable the OpenVINO plugin")
-
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
   # Support for ninja on windows
   enable_language(ASM)
@@ -41,6 +39,7 @@ endif()
 # -------------------------------------------------------------------------------
 # Project component configuration
 # -------------------------------------------------------------------------------
+option(ENABLE_OPENVINO_BRIDGE "Enable the OpenVINO plugin" ON)
 option(PML_BUILD_TESTS "Builds PML unit tests." ON)
 
 list(APPEND CMAKE_MODULE_PATH

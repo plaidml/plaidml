@@ -1,3 +1,3 @@
-# if(ENABLE_OPENVINO_BRIDGE)
+if(ENABLE_OPENVINO_BRIDGE)
   add_subdirectory(openvino)
-# endif()
+endif()

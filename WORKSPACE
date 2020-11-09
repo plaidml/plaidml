@@ -57,10 +57,6 @@ load("@llvm_toolchain//:toolchains.bzl", "llvm_register_toolchains")
 
 llvm_register_toolchains()
 
-load("//vendor/openvino:workspace.bzl", "openvino_workspace")
-
-openvino_workspace()
-
 load("//vendor/tensorflow:workspace.bzl", "plaidml_tf_workspace")
 
 plaidml_tf_workspace()
