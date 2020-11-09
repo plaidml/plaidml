@@ -1,0 +1,3 @@
+[submodule "vendor/openvino"]
+	path = vendor/openvino
+	url = git@github.com:plaidml/openvino.git

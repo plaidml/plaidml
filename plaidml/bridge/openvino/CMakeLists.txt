@@ -1,48 +1,68 @@
-# add_subdirectory(ops)
-# add_subdirectory(plugin)
-# add_subdirectory(tests/functional)
-
-# CPMFindPackage(
-#   NAME InferenceEngineDeveloperPackage
-#   GITHUB_REPOSITORY plaidml/openvino
-#   GIT_TAG a2d0a79535e96ba7ae6f552cbda670501d6f2cad
-#   DOWNLOAD_ONLY
-#   OPTIONS
-#     "ENABLE_CLDNN OFF"
-#     "ENABLE_DATA OFF"
-#     "ENABLE_FUNCTIONAL_TESTS ON"
-#     "ENABLE_GAPI_TESTS OFF"
-#     "ENABLE_GNA OFF"
-#     "ENABLE_MKL_DNN OFF"
-#     "ENABLE_MYRIAD OFF"
-#     "ENABLE_PROFILING_ITT OFF"
-#     "ENABLE_SPEECH_DEMO OFF"
-#     "ENABLE_TESTS ON"
-#     "ENABLE_VPU ON"
-#     "NGRAPH_EXPORT_TARGETS_ENABLE OFF"
-#     "VERBOSE_BUILD ON"
-# )
+set(OUTPUT_ROOT ${CMAKE_BINARY_DIR})
 
 find_package(InferenceEngineDeveloperPackage)
 if(NOT InferenceEngineDeveloperPackage_FOUND)
-  message("HEY!")
+  set(OPENVINO_SOURCE_DIR "${CMAKE_SOURCE_DIR}/vendor/openvino")
+  set(OPENVINO_BINARY_DIR "${CMAKE_BINARY_DIR}/_deps/openvino-build")
+  file(MAKE_DIRECTORY ${OPENVINO_BINARY_DIR})
+
+  set(OPENVINO_CMAKE_OPTIONS
+    -G ${CMAKE_GENERATOR}
+    -D CMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+    -D ENABLE_CLDNN=OFF
+    -D ENABLE_DATA=OFF
+    -D ENABLE_FUNCTIONAL_TESTS=ON
+    -D ENABLE_GAPI_TESTS=OFF
+    -D ENABLE_GNA=OFF
+    -D ENABLE_MKL_DNN=OFF
+    -D ENABLE_MYRIAD=OFF
+    -D ENABLE_PROFILING_ITT=OFF
+    -D ENABLE_SPEECH_DEMO=OFF
+    -D ENABLE_TESTS=ON
+    -D ENABLE_VPU=ON
+    -D OUTPUT_ROOT=${OUTPUT_ROOT}
+  )
+
+  execute_process(
+    COMMAND ${CMAKE_COMMAND} ${OPENVINO_CMAKE_OPTIONS} ${OPENVINO_SOURCE_DIR}
+    RESULT_VARIABLE result
+    WORKING_DIRECTORY "${OPENVINO_BINARY_DIR}"
+  )
+  if(result)
+    message(FATAL_ERROR "Failed to configure OpenVINO: ${result}")
+  endif()
+
+  execute_process(
+    COMMAND ${CMAKE_COMMAND} --build .
+    RESULT_VARIABLE result
+    WORKING_DIRECTORY "${OPENVINO_BINARY_DIR}"
+  )
+  if(result)
+    message(FATAL_ERROR "Failed to build OpenVINO: ${result}")
+  endif()
+
+  set(InferenceEngineDeveloperPackage_DIR ${OPENVINO_BINARY_DIR})
+  find_package(InferenceEngineDeveloperPackage REQUIRED)
 endif()
+
+file(GLOB_RECURSE _OPS_SRCS CONFIGURE_DEPENDS "ops/*.cpp")
 
 pml_cc_library(
   NAME openvino
-  TYPE STATIC
   HDRS
-    ops.hpp
-    builder.hpp
-    util.hpp
+    plaidml_ops.hpp
+    plaidml_builder.hpp
+    plaidml_util.hpp
   SRCS
-    builder.cpp
-    util.cpp
-    ops/add.cpp
+    plaidml_builder.cpp
+    plaidml_util.cpp
+    ${_OPS_SRCS}
+  INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}
   DEPS
     IE::inference_engine
-    # IE::ngraph
-    plaidml::core
-    plaidml::edsl
-    plaidml::op
+    IE::ngraph
+    plaidml::plaidml
 )
+
+add_subdirectory(plugin)
+add_subdirectory(tests/functional)

@@ -10,10 +10,9 @@
 #include <memory>  // NOLINT[build/include_order]
 #include <vector>  // NOLINT[build/include_order]
 
+#include "plaidml_builder.hpp"
 #include "plaidml_infer_request.hpp"
-#include "plaidml_program_builder.hpp"
 
-using namespace plaidml;          // NOLINT[build/namespaces]
 using namespace InferenceEngine;  // NOLINT[build/namespaces]
 
 namespace PlaidMLPlugin {
@@ -24,7 +23,7 @@ InferRequestInternal::Ptr PlaidMLExecutableNetwork::CreateInferRequestImpl(Input
 }
 
 PlaidMLExecutableNetwork::PlaidMLExecutableNetwork(const ICNNNetwork& network, const std::string& device)
-    : program_(makePlaidMLProgram(network)) {
+    : program_(buildProgram(network)) {
   program_.compile();
 }
 

@@ -14,7 +14,6 @@
 #include "ngraph/descriptor/tensor.hpp"
 
 #include "plaidml/core/core.h"
-#include "plaidml/edsl/edsl.h"
 #include "plaidml/exec/exec.h"
 
 namespace PlaidMLPlugin {

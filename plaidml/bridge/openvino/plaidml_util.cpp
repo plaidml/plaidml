@@ -2,15 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include "plaidml/bridge/openvino/util.hpp"
+#include "plaidml_util.hpp"
 
 #include "ngraph/op/constant.hpp"
 
-#include "plaidml/edsl/edsl.h"
-
 using namespace InferenceEngine;  // NOLINT[build/namespaces]
 
-namespace plaidml::bridge::openvino {
+namespace PlaidMLPlugin {
 
 ngraph::AxisSet get_axis_set_from_constant_operand(size_t operand_idx, ngraph::Node* layer) {
   auto* axis_ngraph_op = ngraph::as_type<ngraph::op::Constant>(layer->get_input_node_ptr(operand_idx));
@@ -114,4 +112,4 @@ ngraph::Coordinate get_coords_from_constant_operand(size_t operand_idx, ngraph::
   }
 }
 
-}  // namespace plaidml::bridge::openvino
+}  // namespace PlaidMLPlugin

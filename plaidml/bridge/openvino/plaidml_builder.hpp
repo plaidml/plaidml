@@ -7,8 +7,8 @@
 #include "ie_icnn_network.hpp"
 #include "plaidml/core/core.h"
 
-namespace plaidml::bridge::openvino {
+namespace PlaidMLPlugin {
 
-Program buildProgram(const InferenceEngine::ICNNNetwork& network);
+plaidml::Program buildProgram(const InferenceEngine::ICNNNetwork& network);
 
-}  // namespace plaidml::bridge::openvino
+}  // namespace PlaidMLPlugin

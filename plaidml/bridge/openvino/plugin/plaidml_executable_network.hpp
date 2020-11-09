@@ -9,7 +9,7 @@
 
 #include "cpp_interfaces/impl/ie_executable_network_thread_safe_default.hpp"
 
-#include "plaidml/edsl/edsl.h"
+#include "plaidml/core/core.h"
 
 namespace PlaidMLPlugin {
 

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include "plaidml/bridge/openvino/ops.hpp"
+#include "plaidml_ops.hpp"
 
 #include "ngraph/opsets/opset.hpp"
 #include "ngraph/opsets/opset1.hpp"

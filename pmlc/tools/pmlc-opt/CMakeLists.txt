@@ -10,5 +10,5 @@ pml_cc_binary(
     MLIRTransformUtils
     MLIRSupport
     pmlc::init_passes_and_dialects
-    pmlc::util::util
+    pmlc::util
 )

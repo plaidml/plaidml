@@ -4,8 +4,6 @@
 
 #pragma once
 
-#include <vector>
-
 #include "ie_layouts.h"  // NOLINT[build/include_subdir]
 #include "ie_precision.hpp"
 
@@ -17,10 +15,10 @@
 #include "ngraph/shape.hpp"
 #include "ngraph/type/element_type.hpp"
 
-#include "plaidml/edsl/edsl.h"
+#include "plaidml/core/core.h"
 #include "plaidml/op/op.h"
 
-namespace plaidml::bridge::openvino {
+namespace PlaidMLPlugin {
 
 ngraph::AxisSet get_axis_set_from_constant_operand(size_t operand_idx, ngraph::Node* layer);
 ngraph::AxisVector get_axis_vector_from_constant_operand(size_t operand_idx, ngraph::Node* layer);
@@ -32,4 +30,4 @@ plaidml::op::PadMode to_plaidml(const ngraph::op::PadMode& ng_type);
 ngraph::Shape get_shape_from_constant_operand(size_t operand_idx, ngraph::Node* layer);
 ngraph::Coordinate get_coords_from_constant_operand(size_t operand_idx, ngraph::Node* layer);
 
-}  // namespace plaidml::bridge::openvino
+}  // namespace PlaidMLPlugin

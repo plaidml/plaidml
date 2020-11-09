@@ -3,16 +3,13 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-set(TARGET_NAME PlaidMLFuncTests)
-
 addIeTargetTest(
-  NAME ${TARGET_NAME}
+  NAME PlaidMLFuncTests
   ROOT ${CMAKE_CURRENT_SOURCE_DIR}
-  DEPENDENCIES
-    plaidmlPlugin
-  LINK_LIBRARIES
-    IE::funcSharedTests
+  DEPENDENCIES plaidmlPlugin
+  LINK_LIBRARIES IE::funcSharedTests
   ADD_CPPLINT
-  LABELS
-    PLAIDML
+  LABELS OpenVINO
 )
+
+add_dependencies(check-test PlaidMLFuncTests)
