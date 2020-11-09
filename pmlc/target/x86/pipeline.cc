@@ -63,26 +63,6 @@ struct LowerPXAToAffinePass
   }
 };
 
-struct ExtractLoweringPattern
-    : public OpConversionPattern<LLVM::ExtractValueOp> {
-  using OpConversionPattern<LLVM::ExtractValueOp>::OpConversionPattern;
-
-  LogicalResult
-  matchAndRewrite(LLVM::ExtractValueOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const final {
-    Value src = operands[0];
-    while (auto insertOp = mlir::dyn_cast_or_null<LLVM::InsertValueOp>(
-               src.getDefiningOp())) {
-      if (op.position() == insertOp.position()) {
-        rewriter.replaceOp(op, insertOp.value());
-        return success();
-      }
-      src = insertOp.container();
-    }
-    return failure();
-  }
-};
-
 struct ConvertStandardToLLVMPass
     : public ConvertStandardToLLVMBase<ConvertStandardToLLVMPass> {
   void runOnOperation() override {
@@ -104,7 +84,6 @@ struct ConvertStandardToLLVMPass
     conversion::stdx_to_llvm::populateStdXToLLVMConversionPatterns(
         typeConverter, patterns);
     populateOpenMPToLLVMConversionPatterns(context, typeConverter, patterns);
-    patterns.insert<ExtractLoweringPattern>(context);
 
     LLVMConversionTarget target(*context);
     target.addDynamicallyLegalOp<omp::ParallelOp>([&](omp::ParallelOp op) {
@@ -112,14 +91,114 @@ struct ConvertStandardToLLVMPass
     });
     target.addLegalOp<omp::TerminatorOp, omp::TaskyieldOp, omp::FlushOp,
                       omp::BarrierOp, omp::TaskwaitOp>();
-    target.addDynamicallyLegalOp<LLVM::ExtractValueOp>(
-        [](LLVM::ExtractValueOp op) {
-          return !mlir::dyn_cast_or_null<LLVM::InsertValueOp>(
-              op.container().getDefiningOp());
-        });
     if (failed(applyPartialConversion(module, target, patterns))) {
       signalPassFailure();
     }
+  }
+};
+
+// OpenMP has issues passing values through to OpenMP blocks.  As a workaround,
+// we have a simple pass to smuggle values that cross the boundary via an
+// alloca()'d struct.
+struct OpenMPWorkaroundPass final
+    : public OpenMPWorkaroundBase<OpenMPWorkaroundPass> {
+  void runOnOperation() final {
+    LLVM::LLVMFuncOp funcOp = getOperation();
+    OpBuilder builder{&getContext()};
+    funcOp.walk([&](omp::ParallelOp parOp) {
+      // The values used to construct the smuggling struct.
+      SmallVector<LLVM::LLVMType, 8> fieldTypes;
+      SmallVector<Value, 8> fieldSrcs;
+
+      // A mapping from original values to the OpOperands within the
+      // parallel region that use those values, for value replacement.
+      std::unordered_map<void *, std::list<OpOperand *>> valueMap;
+
+      // Find values that cross the loop
+      parOp.walk([&](mlir::Operation *childOp) {
+        if (childOp == parOp.getOperation()) {
+          return;
+        }
+        for (auto &opOperand : childOp->getOpOperands()) {
+          auto value = opOperand.get();
+
+          // Simple check: if it's not an LLVM type, or if it's an LLVM
+          // pointer type, we don't need or want to smuggle this value in
+          // via a struct.
+          auto llvmType = value.getType().dyn_cast<LLVM::LLVMType>();
+          if (!llvmType || llvmType.isPointerTy()) {
+            continue;
+          }
+
+          Region *region = nullptr;
+          if (auto blockArg = value.dyn_cast<BlockArgument>()) {
+            region = blockArg.getParentRegion();
+          } else {
+            region = value.getDefiningOp()->getParentRegion();
+          }
+
+          // Check the value's source's nested region chain: if we encounter the
+          // parOp's region, then the value is defined within the parOp and
+          // doesn't need to be (can't be) smuggled.
+          bool definedInsideParOp = false;
+          while (region) {
+            if (region == &parOp.region()) {
+              definedInsideParOp = true;
+              break;
+            }
+            region = region->getParentRegion();
+          }
+          if (definedInsideParOp) {
+            continue;
+          }
+
+          // Otherwise, we need to smuggle the value through an alloca'd struct.
+          auto [it, inserted] = valueMap.try_emplace(value.getAsOpaquePointer(),
+                                                     std::list<OpOperand *>{});
+          if (inserted) {
+            fieldTypes.emplace_back(llvmType);
+            fieldSrcs.emplace_back(value);
+          }
+          it->second.emplace_back(&opOperand);
+        }
+      });
+
+      if (!fieldTypes.size()) {
+        return; // Nothing to do.
+      }
+
+      // Build the structure.
+      builder.setInsertionPoint(parOp);
+      auto structTy = LLVM::LLVMType::getStructTy(&getContext(), fieldTypes);
+      auto structPtrTy = structTy.getPointerTo();
+      auto numElements = builder.create<LLVM::ConstantOp>(
+          parOp.getLoc(), LLVM::LLVMType::getInt64Ty(&getContext()),
+          builder.getIndexAttr(1));
+      auto structPtr = builder.create<LLVM::AllocaOp>(
+          parOp.getLoc(), structPtrTy, numElements, 0);
+      Value srcStructVal =
+          builder.create<LLVM::UndefOp>(parOp.getLoc(), structTy);
+      for (auto srcIdx : llvm::enumerate(fieldSrcs)) {
+        srcStructVal = builder.create<LLVM::InsertValueOp>(
+            parOp.getLoc(), srcStructVal, srcIdx.value(),
+            builder.getI64ArrayAttr(srcIdx.index()));
+      }
+      builder.create<LLVM::StoreOp>(parOp.getLoc(), srcStructVal, structPtr);
+
+      // Unpack the structure, rewriting the affected values.
+      builder.setInsertionPointToStart(&parOp.region().front());
+      auto dstStructVal =
+          builder.create<LLVM::LoadOp>(parOp.getLoc(), structPtr);
+      for (auto srcIdx : llvm::enumerate(fieldSrcs)) {
+        auto dstVal = builder.create<LLVM::ExtractValueOp>(
+            parOp.getLoc(), srcIdx.value().getType(), dstStructVal,
+            builder.getI64ArrayAttr(srcIdx.index()));
+        for (OpOperand *opOperand :
+             valueMap[srcIdx.value().getAsOpaquePointer()]) {
+          opOperand->set(dstVal);
+        }
+      }
+    });
   }
 };
 
@@ -153,6 +232,10 @@ std::unique_ptr<Pass> createLowerPXAToAffinePass() {
 
 std::unique_ptr<Pass> createLowerToLLVMPass() {
   return std::make_unique<ConvertStandardToLLVMPass>();
+}
+
+std::unique_ptr<Pass> createOpenMPWorkaroundPass() {
+  return std::make_unique<OpenMPWorkaroundPass>();
 }
 
 void pipelineBuilder(OpPassManager &pm) {
@@ -190,12 +273,8 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
 
-  // Currently these MemRefDataFlowOptPass is disabled because it will turn
-  // 0-dim tensors into actual floats, which do not correctly pass through
-  // OpenMP due to calling convention issues.  TODO: Fix OpenMP upstream and
-  // re-enable.
-  // pm.addPass(pxa::createMemRefDataFlowOptPass());
-  // pm.addPass(createCanonicalizerPass());
+  pm.addPass(pxa::createMemRefDataFlowOptPass());
+  pm.addPass(createCanonicalizerPass());
 
   pm.addPass(pxa::createLocalizePass());
   pm.addPass(pxa::createResizeTmpsPass());
@@ -232,6 +311,7 @@ void pipelineBuilder(OpPassManager &pm) {
 
   pm.addPass(createLowerToLLVMPass());
   pm.addPass(createTraceLinkingPass());
+  pm.addPass(createOpenMPWorkaroundPass());
 }
 
 } // namespace pmlc::target::x86
