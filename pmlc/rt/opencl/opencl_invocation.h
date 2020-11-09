@@ -94,8 +94,7 @@ public:
   ~OpenCLInvocation();
 
   /// Allocates memory on OpenCL device with specified size in bytes.
-  /// If data is not NULL, then its content is copied to allocated memory.
-  OpenCLMemory *allocateMemory(size_t bytes, void *data = NULL);
+  OpenCLMemory *allocateMemory(size_t bytes);
   /// Releases memory obtained from `allocateMemory` call.
   /// Any further use of `memory` is invalid.
   void deallocateMemory(OpenCLMemory *memory);

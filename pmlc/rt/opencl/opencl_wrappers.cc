@@ -19,9 +19,8 @@ void oclDestroy(void *invocation) {
   delete static_cast<OpenCLInvocation *>(invocation);
 }
 
-void *oclAlloc(void *invocation, uint32_t bytes, void *hostPtr) {
-  return static_cast<OpenCLInvocation *>(invocation)
-      ->allocateMemory(bytes, hostPtr);
+void *oclAlloc(void *invocation, size_t bytes) {
+  return static_cast<OpenCLInvocation *>(invocation)->allocateMemory(bytes);
 }
 
 void oclDealloc(void *invocation, void *memory) {

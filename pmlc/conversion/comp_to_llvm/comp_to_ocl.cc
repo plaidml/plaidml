@@ -208,8 +208,7 @@ void addOclFunctionDeclarations(mlir::ModuleOp &module) {
   if (!module.lookupSymbol(kOclAlloc)) {
     builder.create<LLVM::LLVMFuncOp>(
         loc, kOclAlloc,
-        LLVM::LLVMType::getFunctionTy(llvmInt8Ptr,
-                                      {llvmInt8Ptr, llvmInt32, llvmInt8Ptr},
+        LLVM::LLVMType::getFunctionTy(llvmInt8Ptr, {llvmInt8Ptr, llvmInt32},
                                       /*isVarArg=*/false));
   }
   if (!module.lookupSymbol(kOclDealloc)) {
@@ -375,18 +374,6 @@ ConvertAlloc::matchAndRewrite(comp::Alloc op,
       loc, LLVM::LLVMType::getInt32Ty(rewriter.getContext()),
       rewriter.getI32IntegerAttr(numElement * elementTypeSize));
   castOperands.push_back(bufferByteSize);
-  // Operand 2 - pointer to data on host or null.
-  if (operands.size() > 1) {
-    mlir::Value hostPtr = materializeConversion(rewriter, loc, operands[1]);
-    if (!hostPtr)
-      return mlir::failure();
-    castOperands.push_back(hostPtr);
-  } else {
-    LLVM::LLVMType llvmPointerType =
-        LLVM::LLVMType::getInt8PtrTy(rewriter.getContext());
-    mlir::Value nullPtr = rewriter.create<LLVM::NullOp>(loc, llvmPointerType);
-    castOperands.push_back(nullPtr);
-  }
 
   mlir::Type llvmResultType = convertType(op.getType());
   rewriter.replaceOpWithNewOp<LLVM::CallOp>(

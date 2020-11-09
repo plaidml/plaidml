@@ -72,25 +72,6 @@ private:
   DeallocMap deallocated;
 };
 
-// Replaces Alloc `op` with already allocated `memory`.
-// Inserts copying of host memory if needed.
-void replaceAlloc(Alloc op, mlir::Value memory, bool needsCopy = true) {
-  mlir::Value hostMem = op.hostMem();
-  if (hostMem && needsCopy) {
-    // Write host content to reused memory.
-    mlir::OpBuilder builder(op.getOperation());
-    mlir::Value execEnv = op.execEnv();
-    ExecEnvType execEnvType = execEnv.getType().cast<ExecEnvType>();
-    EventType eventType = execEnvType.getEventType();
-    mlir::Value event = builder.create<ScheduleWrite>(
-        op.getLoc(), eventType, hostMem, memory, execEnv, mlir::ValueRange{});
-    // Insert wait and let other passes clean it up.
-    builder.create<Wait>(op.getLoc(), event);
-  }
-  op.replaceAllUsesWith(memory);
-  op.erase();
-}
-
 /// Performs linear scan looking for memory that doesn't need
 /// extra copy to be reused - new content and content at time
 /// of deallocation is the same.
@@ -104,29 +85,7 @@ void inSyncReuse(mlir::Block &block) {
           // which memories are synchronized even after they are deallocated.
           deallocTracker.deallocMemory(op);
         })
-        .Case<Alloc>([&](Alloc op) {
-          if (!op.hostMem()) {
-            syncTracker.handleAllocOp(op);
-            return;
-          }
-          auto deallocRange = deallocTracker.findAllReuses(op);
-          auto deallocIt = deallocRange.first;
-          while (deallocIt != deallocRange.second) {
-            Dealloc deallocOp = deallocIt->second;
-            if (!syncTracker.areInSync(deallocOp.deviceMem(), op.hostMem())) {
-              deallocIt++;
-              continue;
-            }
-            // We found memory that is already in sync, reuse it.
-            // No need to do extra copy, memory already has correct contents.
-            replaceAlloc(op, deallocOp.deviceMem(), /*needsCopy=*/false);
-            deallocOp.erase();
-            deallocTracker.reuseMemory(deallocIt);
-            return;
-          }
-          // If no reuse is possible track synchronization status of allocation.
-          syncTracker.handleAllocOp(op);
-        })
+        .Case<Alloc>([&](Alloc op) { syncTracker.handleAllocOp(op); })
         .Default([&](mlir::Operation *op) { syncTracker.handleOperation(op); });
   }
 }
@@ -145,7 +104,8 @@ void greedyInPlaceReuse(mlir::Block &block) {
         continue;
       DeallocatedMemoryTracker::Iterator reuseIt = optReuseIt.getValue();
       Dealloc deallocOp = reuseIt->second;
-      replaceAlloc(allocOp, deallocOp.deviceMem());
+      allocOp.replaceAllUsesWith(deallocOp.deviceMem());
+      allocOp.erase();
       deallocOp.erase();
       deallocTracker.reuseMemory(reuseIt);
     }
