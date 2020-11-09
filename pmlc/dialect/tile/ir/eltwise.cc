@@ -66,7 +66,9 @@ OpFoldResult DivOp::fold(ArrayRef<Attribute> operands) {
 OpFoldResult MulOp::fold(ArrayRef<Attribute> operands) {
   // mul(x, 0) -> 0
   if (matchPattern(rhs(), m_Zero())) {
-    return rhs();
+    if (result().getType() == rhs().getType()) {
+      return rhs();
+    }
   }
   // mul(x, 1) -> x
   if (matchPattern(rhs(), m_One())) {

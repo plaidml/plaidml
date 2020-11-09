@@ -16,6 +16,7 @@
 #include "mlir/Dialect/SPIRV/SPIRVDialect.h"
 #include "mlir/Dialect/SPIRV/SPIRVOps.h"
 #include "mlir/Dialect/StandardOps/Transforms/Passes.h"
+#include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
@@ -104,6 +105,7 @@ struct ParallelLoopToGpuPass
     target.addLegalDialect<AffineDialect>();
     target.addLegalDialect<gpu::GPUDialect>();
     target.addLegalDialect<scf::SCFDialect>();
+    target.addLegalOp<vector::InsertElementOp>();
     target.addIllegalOp<scf::ParallelOp>();
     if (failed(applyPartialConversion(getOperation(), target, patterns)))
       signalPassFailure();
