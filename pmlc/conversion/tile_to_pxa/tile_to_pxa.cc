@@ -859,6 +859,7 @@ struct ContractionOpConversion
 
 struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
   using OpConversionPattern<tile::GatherOp>::OpConversionPattern;
+
   LogicalResult
   matchAndRewrite(tile::GatherOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
