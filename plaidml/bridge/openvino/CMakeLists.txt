@@ -1,9 +1,26 @@
 set(OUTPUT_ROOT ${CMAKE_BINARY_DIR})
 
+function(git_command CWD)
+  string(JOIN " " _COMMAND ${ARGN})
+  message("git ${_COMMAND}")
+  execute_process(
+    COMMAND ${GIT_EXECUTABLE} ${ARGN}
+    RESULT_VARIABLE result
+    WORKING_DIRECTORY "${CWD}"
+    OUTPUT_QUIET
+  )
+  if(result)
+    message(FATAL_ERROR "git command failed: \"${_COMMAND}\"")
+  endif()
+endfunction()
+
 find_package(InferenceEngineDeveloperPackage)
 if(NOT InferenceEngineDeveloperPackage_FOUND)
-  set(OPENVINO_SOURCE_DIR "${CMAKE_SOURCE_DIR}/vendor/openvino")
+  set(OPENVINO_GIT_REMOTE git@github.com:plaidml/openvino.git)
+  set(OPENVINO_GIT_TAG    a2d0a79535e96ba7ae6f552cbda670501d6f2cad)
+  set(OPENVINO_SOURCE_DIR "${CMAKE_BINARY_DIR}/_deps/openvino-src")
   set(OPENVINO_BINARY_DIR "${CMAKE_BINARY_DIR}/_deps/openvino-build")
+  file(MAKE_DIRECTORY ${OPENVINO_SOURCE_DIR})
   file(MAKE_DIRECTORY ${OPENVINO_BINARY_DIR})
 
   set(OPENVINO_CMAKE_OPTIONS
@@ -22,6 +39,15 @@ if(NOT InferenceEngineDeveloperPackage_FOUND)
     -D ENABLE_VPU=ON
     -D OUTPUT_ROOT=${OUTPUT_ROOT}
   )
+
+  if(NOT IS_DIRECTORY "${OPENVINO_SOURCE_DIR}/.git")
+    git_command(${OPENVINO_SOURCE_DIR} init)
+    git_command(${OPENVINO_SOURCE_DIR} remote add origin ${OPENVINO_GIT_REMOTE})
+  endif()
+
+  git_command(${OPENVINO_SOURCE_DIR} fetch --depth=1 --prune --tags origin ${OPENVINO_GIT_TAG})
+  git_command(${OPENVINO_SOURCE_DIR} checkout --force ${OPENVINO_GIT_TAG})
+  git_command(${OPENVINO_SOURCE_DIR} submodule update --init --depth=1 --recursive --force)
 
   execute_process(
     COMMAND ${CMAKE_COMMAND} ${OPENVINO_CMAKE_OPTIONS} ${OPENVINO_SOURCE_DIR}
