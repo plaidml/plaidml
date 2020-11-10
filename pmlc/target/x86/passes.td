@@ -25,4 +25,11 @@ def XSMMStencil : FunctionPass<"x86-affine-stencil-xsmm"> {
   let constructor = "pmlc::target::x86::createXSMMStencilPass()";
 }
 
+def OpenMPWorkaround : Pass<"x86-openmp-workaround", "mlir::LLVM::LLVMFuncOp"> {
+  let summary = "Packs/unpacks values crossing OpenMP parallel blocks";
+  let constructor = "pmlc::target::x86::createOpenMPWorkaroundPass()";
+  let dependentDialects = ["mlir::LLVM::LLVMDialect",
+                           "mlir::omp::OpenMPDialect"];
+}
+
 #endif // __PMLC_TARGET_X86_PASSES__
