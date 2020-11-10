@@ -722,6 +722,14 @@ def gradients(loss, variables):
     return [Tensor(expr=x) for x in raw_grads]
 
 
+def ident(x):
+    return call('ident', x)
+
+
+def index(x, axis):
+    return call('index', x, axis)
+
+
 def jacobian(loss, variables):
     wrts = [x.as_ptr() for x in variables]
     raw_grads = ffi.new('plaidml_expr*[]', len(wrts))
@@ -733,14 +741,6 @@ def jacobian(loss, variables):
         raw_grads,
     )
     return [Tensor(expr=x) for x in raw_grads]
-
-
-def ident(x):
-    return call('ident', x)
-
-
-def index(x, axis):
-    return call('index', x, axis)
 
 
 def log(x):
