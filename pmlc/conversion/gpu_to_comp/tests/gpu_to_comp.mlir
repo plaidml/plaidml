@@ -48,7 +48,7 @@ module attributes {gpu.container_module} {
 
   //        CHECK:   %[[ENV0:.*]] = comp.create_execenv %[[DEV]]
   //      SPACE11:   %[[MEM02:.*]] = comp.alloc %[[ENV0]]
-  //      SPACE11:   %[[WEV02:.*]] = comp.schedule_write %[[ARG2]] to %[[MEM02]] on %[[ENV]]
+  //      SPACE11:   %[[WEV02:.*]] = comp.schedule_write %[[ARG2]] to %[[MEM02]] on %[[ENV0]]
   //      SPACE11:   comp.wait %[[WEV02]]
   //        CHECK:   %[[FEV0:.*]] = "comp.schedule_func"(%[[ENV0]])
   //        CHECK:     gpu.launch_func
