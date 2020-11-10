@@ -38,6 +38,7 @@ if(NOT InferenceEngineDeveloperPackage_FOUND)
     -D ENABLE_TESTS=ON
     -D ENABLE_VPU=ON
     -D OUTPUT_ROOT=${OUTPUT_ROOT}
+    -D TREAT_WARNING_AS_ERROR=OFF
   )
 
   if(NOT IS_DIRECTORY "${OPENVINO_SOURCE_DIR}/.git")
