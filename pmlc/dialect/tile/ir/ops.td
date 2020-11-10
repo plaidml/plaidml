@@ -90,10 +90,14 @@ def GatherOp : MaterializeOp<"gather"> {
   let summary = "special gather operation";
   let arguments = (ins
     RankedTensorOf<[AnyScalar]>:$tensor,
-    RankedTensorOf<[AnyInteger]>:$dims);
+    RankedTensorOf<[AnyScalar]>:$indices,
+    DefaultValuedAttr<IndexAttr,"0">:$axis,
+    DefaultValuedAttr<InterpolationMode,"InterpolationMode::nearest">:$mode,
+    DefaultValuedAttr<F32Attr,"-0.5">:$cubicCoeff
+  );
   let results = (outs RankedTensorOf<[AnyScalar]>:$result);
   let assemblyFormat = [{
-    $tensor $dims attr-dict `:` functional-type(operands, $result)
+    $tensor $indices attr-dict `:` functional-type(operands, $result)
   }];
 }
 

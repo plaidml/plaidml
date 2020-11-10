@@ -33,6 +33,7 @@ using namespace mlir; // NOLINT
 
 using util::AggregationKind;
 using util::CombinationKind;
+using util::InterpolationMode;
 
 namespace {
 
@@ -858,7 +859,6 @@ struct ContractionOpConversion
 
 struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
   using OpConversionPattern<tile::GatherOp>::OpConversionPattern;
-
   LogicalResult
   matchAndRewrite(tile::GatherOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
@@ -872,7 +872,7 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
     auto tensor = adaptor.tensor();
     // index values for the last dimension
     // this is a one-dimensional array of integers
-    auto indexes = adaptor.dims();
+    auto indices = adaptor.indices();
 
     TypeConverter typeConverter;
     auto resultType = typeConverter.convertType(op.result().getType());
@@ -890,45 +890,224 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
     rewriter.setInsertionPointToStart(loop.getBody());
 
     // create an affine map for loading the index, using the leading counters
-    size_t idxDims = indexes.getType().cast<MemRefType>().getShape().size();
+    int dim = *(op.axis().getRawData());
+    size_t idxDims = indices.getType().cast<MemRefType>().getShape().size();
     auto idxLoadMap = AffineMap::getMultiDimIdentityMap(idxDims, ctx);
-    auto idxLoadOps = loop.getIVs().take_front(idxDims);
+    auto idxLoadOps = loop.getIVs()[dim];
 
     // load the value from the indexes array
-    Value indexVal =
-        rewriter.create<pxa::PxaLoadOp>(loc, indexes, idxLoadMap, idxLoadOps)
+    Value index =
+        rewriter.create<pxa::PxaLoadOp>(loc, indices, idxLoadMap, idxLoadOps)
             .getResult();
 
-    if (!indexVal.getType().isa<IndexType>()) {
-      // cast from whatever integer type it has to index type
-      auto indexType = rewriter.getIndexType();
-      indexVal = rewriter.create<mlir::IndexCastOp>(loc, indexVal, indexType)
-                     .getResult();
-    }
-
-    // mix the indexVal in with the loop indexes to create source map
+    // create default source map
     size_t dstDims = size.size();
-    SmallVector<Value, 4> srcOps;
-    srcOps.push_back(indexVal);
-    for (size_t i = idxDims; i < dstDims; ++i) {
+    std::vector<Value> srcOps;
+    for (size_t i = 0; i < dstDims; ++i) {
       srcOps.push_back(loop.getIVs()[i]);
     }
 
-    // load the specified value from the source tensor
-    auto loaded = rewriter.create<mlir::LoadOp>(loc, tensor, srcOps);
+    // create std ops for 1D interpolation
+    Value interpVal;
+    if (index.getType().isa<FloatType>()) {
+      switch (op.mode()) {
+      case InterpolationMode::linear:
+        interpVal = buildLinearInterpolationOps(loc, rewriter, tensor, index,
+                                                srcOps, dim);
+        break;
+      case InterpolationMode::cubic:
+        interpVal = buildCubicInterpolationOps(
+            loc, rewriter, tensor, index, srcOps, dim, op.cubicCoeffAttr());
+        break;
+      case InterpolationMode::nearest:
+      default:
+        interpVal = buildNearestInterpolationOps(loc, rewriter, tensor, index,
+                                                 srcOps, dim);
+        break;
+      }
+    } else {
+      if (!index.getType().isa<IndexType>()) {
+        auto indexType = rewriter.getIndexType();
+        // cast from whatever integer type it has to index type
+        index = rewriter.create<mlir::IndexCastOp>(loc, index, indexType)
+                    .getResult();
+      }
+      srcOps.at(dim) = index;
+      interpVal = rewriter.create<mlir::LoadOp>(loc, tensor, srcOps);
+    }
 
     // create a destination map using all of the dimensions
     auto dstStoreMap = AffineMap::getMultiDimIdentityMap(dstDims, ctx);
 
     // create a destination map from the whole loop
     auto stored = rewriter.create<pxa::PxaReduceOp>(loc, AtomicRMWKind::assign,
-                                                    loaded, resultMemRef,
+                                                    interpVal, resultMemRef,
                                                     dstStoreMap, loop.getIVs());
     rewriter.create<AffineYieldOp>(loc, ArrayRef<Value>{stored.getResult()});
 
     rewriter.replaceOp(op, loop.getResult(0));
 
     return success();
+  }
+
+  Value buildNearestInterpolationOps(Location loc,
+                                     ConversionPatternRewriter &rewriter,
+                                     Value tensor, Value index,
+                                     std::vector<Value> &srcOps,
+                                     int dim) const {
+    auto f32Type = rewriter.getF32Type();
+    auto i32Type = rewriter.getI32Type();
+    auto indexType = rewriter.getIndexType();
+
+    auto cstHalfF32 = rewriter.create<mlir::ConstantOp>(
+        loc, f32Type, rewriter.getFloatAttr(f32Type, 0.5));
+    index = rewriter.create<mlir::AddFOp>(loc, index, cstHalfF32);
+    index = rewriter.create<mlir::FPToUIOp>(loc, index, i32Type).getResult();
+    index =
+        rewriter.create<mlir::IndexCastOp>(loc, index, indexType).getResult();
+    srcOps.at(dim) = index;
+    return rewriter.create<mlir::LoadOp>(loc, tensor, srcOps);
+  }
+
+  Value buildLinearInterpolationOps(Location loc,
+                                    ConversionPatternRewriter &rewriter,
+                                    Value tensor, Value index,
+                                    std::vector<Value> &srcOps, int dim) const {
+    auto f32Type = rewriter.getF32Type();
+    auto i32Type = rewriter.getI32Type();
+    auto indexType = rewriter.getIndexType();
+
+    // calculate interpolation nodes: floorIndex and ceilIndex
+    auto cstOneI32 = rewriter
+                         .create<mlir::ConstantOp>(
+                             loc, i32Type, rewriter.getI32IntegerAttr(1))
+                         .getResult();
+    auto floorIndex =
+        rewriter.create<mlir::FPToUIOp>(loc, index, i32Type).getResult();
+    auto ceilIndex =
+        rewriter.create<mlir::AddIOp>(loc, floorIndex, cstOneI32).getResult();
+    floorIndex = rewriter.create<mlir::IndexCastOp>(loc, floorIndex, indexType)
+                     .getResult();
+    ceilIndex = rewriter.create<mlir::IndexCastOp>(loc, ceilIndex, indexType)
+                    .getResult();
+
+    // load sample data g0 and g1 at interpolation nodes
+    srcOps.at(dim) = ceilIndex;
+    auto g0 = rewriter.create<mlir::LoadOp>(loc, tensor, srcOps).getResult();
+    srcOps.at(dim) = floorIndex;
+    auto g1 = rewriter.create<mlir::LoadOp>(loc, tensor, srcOps).getResult();
+
+    // calculate coefficients of g0 and g1
+    auto cstOneF32 = rewriter
+                         .create<mlir::ConstantOp>(
+                             loc, f32Type, rewriter.getF32FloatAttr(1.0))
+                         .getResult();
+    auto floorF32 =
+        rewriter.create<mlir::FloorFOp>(loc, f32Type, index).getResult();
+    auto coeff0 =
+        rewriter.create<mlir::SubFOp>(loc, index, floorF32).getResult();
+    auto coeff1 =
+        rewriter.create<mlir::SubFOp>(loc, cstOneF32, coeff0).getResult();
+
+    // result = coeff0*g0 + coeff1*g1
+    auto part1 = rewriter.create<mlir::MulFOp>(loc, coeff0, g0).getResult();
+    auto part2 = rewriter.create<mlir::MulFOp>(loc, coeff1, g1).getResult();
+    return rewriter.create<mlir::AddFOp>(loc, part1, part2).getResult();
+  }
+
+  Value buildCubicInterpolationOps(Location loc,
+                                   ConversionPatternRewriter &rewriter,
+                                   Value tensor, Value index,
+                                   std::vector<Value> &srcOps, int dim,
+                                   FloatAttr aAttr) const {
+    // Follow the algorithm used in ngraph cubic interpolation (also see, e.g.
+    // [article](https://ieeexplore.ieee.org/document/1163711/).
+
+    auto f32Type = rewriter.getF32Type();
+    auto i32Type = rewriter.getI32Type();
+    auto indexType = rewriter.getIndexType();
+
+    auto a = rewriter.create<mlir::ConstantOp>(loc, f32Type, aAttr);
+
+    auto cst1I32 = rewriter
+                       .create<mlir::ConstantOp>(loc, i32Type,
+                                                 rewriter.getI32IntegerAttr(1))
+                       .getResult();
+    auto cst2I32 = rewriter
+                       .create<mlir::ConstantOp>(loc, i32Type,
+                                                 rewriter.getI32IntegerAttr(2))
+                       .getResult();
+
+    // calculate interpolation nodes x0, x1, x2, x3
+    auto x1 = rewriter.create<mlir::FPToUIOp>(loc, index, i32Type).getResult();
+    auto x0 = rewriter.create<mlir::SubIOp>(loc, x1, cst1I32).getResult();
+    auto x2 = rewriter.create<mlir::AddIOp>(loc, x1, cst1I32).getResult();
+    auto x3 = rewriter.create<mlir::AddIOp>(loc, x1, cst2I32).getResult();
+    x0 = rewriter.create<mlir::IndexCastOp>(loc, x0, indexType).getResult();
+    x1 = rewriter.create<mlir::IndexCastOp>(loc, x1, indexType).getResult();
+    x2 = rewriter.create<mlir::IndexCastOp>(loc, x2, indexType).getResult();
+    x3 = rewriter.create<mlir::IndexCastOp>(loc, x3, indexType).getResult();
+
+    // load sample data g0, g1, g2, g3 at interpolation nodes
+    srcOps.at(dim) = x0;
+    auto g0 = rewriter.create<mlir::LoadOp>(loc, tensor, srcOps).getResult();
+    srcOps.at(dim) = x1;
+    auto g1 = rewriter.create<mlir::LoadOp>(loc, tensor, srcOps).getResult();
+    srcOps.at(dim) = x2;
+    auto g2 = rewriter.create<mlir::LoadOp>(loc, tensor, srcOps).getResult();
+    srcOps.at(dim) = x3;
+    auto g3 = rewriter.create<mlir::LoadOp>(loc, tensor, srcOps).getResult();
+
+    // calculate intermediate terms
+    auto cst1F32 = rewriter
+                       .create<mlir::ConstantOp>(loc, f32Type,
+                                                 rewriter.getF32FloatAttr(1.0))
+                       .getResult();
+    auto cst2F32 = rewriter
+                       .create<mlir::ConstantOp>(loc, f32Type,
+                                                 rewriter.getF32FloatAttr(2.0))
+                       .getResult();
+    auto cst3F32 = rewriter
+                       .create<mlir::ConstantOp>(loc, f32Type,
+                                                 rewriter.getF32FloatAttr(3.0))
+                       .getResult();
+    auto floorF32 =
+        rewriter.create<mlir::FloorFOp>(loc, f32Type, index).getResult();
+    auto s = rewriter.create<mlir::SubFOp>(loc, index, floorF32).getResult();
+    auto s2 = rewriter.create<mlir::MulFOp>(loc, s, s).getResult();
+    auto s3 = rewriter.create<mlir::MulFOp>(loc, s2, s).getResult();
+    auto s_a = rewriter.create<mlir::MulFOp>(loc, a, s).getResult();
+    auto s2_a = rewriter.create<mlir::MulFOp>(loc, a, s2).getResult();
+    auto s3_a = rewriter.create<mlir::MulFOp>(loc, a, s3).getResult();
+    auto s3_a2 = rewriter.create<mlir::AddFOp>(loc, a, cst2F32).getResult();
+    s3_a2 = rewriter.create<mlir::MulFOp>(loc, s3_a2, s3).getResult();
+    auto s2_a3 = rewriter.create<mlir::AddFOp>(loc, a, cst3F32).getResult();
+    s2_a3 = rewriter.create<mlir::MulFOp>(loc, s2_a3, s2).getResult();
+    auto s2_2a3 = rewriter.create<mlir::AddFOp>(loc, a, a).getResult();
+    s2_2a3 = rewriter.create<mlir::AddFOp>(loc, s2_2a3, cst3F32).getResult();
+    s2_2a3 = rewriter.create<mlir::MulFOp>(loc, s2_2a3, s2).getResult();
+
+    // calculate 4 terms p0, p1, p2, p3 at 4 interpolation nodes
+    auto p0 = rewriter.create<mlir::MulFOp>(loc, s2_a, cst2F32).getResult();
+    p0 = rewriter.create<mlir::SubFOp>(loc, s3_a, p0).getResult();
+    p0 = rewriter.create<mlir::AddFOp>(loc, p0, s_a).getResult();
+    p0 = rewriter.create<mlir::MulFOp>(loc, p0, g0).getResult();
+
+    auto p1 = rewriter.create<mlir::SubFOp>(loc, s3_a2, s2_a3).getResult();
+    p1 = rewriter.create<mlir::AddFOp>(loc, p1, cst1F32).getResult();
+    p1 = rewriter.create<mlir::MulFOp>(loc, p1, g1).getResult();
+
+    auto p2 = rewriter.create<mlir::SubFOp>(loc, s2_2a3, s3_a2).getResult();
+    p2 = rewriter.create<mlir::SubFOp>(loc, p2, s_a).getResult();
+    p2 = rewriter.create<mlir::MulFOp>(loc, p2, g2).getResult();
+
+    auto p3 = rewriter.create<mlir::SubFOp>(loc, s2_a, s3_a).getResult();
+    p3 = rewriter.create<mlir::MulFOp>(loc, p3, g3).getResult();
+
+    // result = p0 + p1 + p2 + p3
+    auto r = rewriter.create<mlir::AddFOp>(loc, p0, p1).getResult();
+    r = rewriter.create<mlir::AddFOp>(loc, r, p2).getResult();
+    return rewriter.create<mlir::AddFOp>(loc, r, p3).getResult();
   }
 };
 

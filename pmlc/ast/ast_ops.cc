@@ -59,8 +59,9 @@ struct IndexOp : Intrinsic {
 struct GatherOp : Intrinsic {
   TensorShapes getShapes(Evaluator *evaluator, ArrayRef<ExprNodePtr> operands,
                          ArrayRef<TensorShape> shapes) const final {
-    if (operands.size() != 2) {
-      throw std::runtime_error("'gather' requires 2 arguments.");
+    auto operands_size = operands.size();
+    if (operands_size < 2 || operands_size > 5) {
+      throw std::runtime_error("'gather' requires 2-5 arguments.");
     }
     auto tensor = shapes[0];
     auto idxs = shapes[1];
@@ -68,15 +69,19 @@ struct GatherOp : Intrinsic {
       throw std::runtime_error(
           "'gather' requires first operand to have at least one dimension.");
     }
-    if (idxs.elementType != DataType::si32) {
-      // TODO: Handle other integer types?  Floor floats?
-      throw std::runtime_error("'gather' requires the data type for the second "
-                               "argument to be INT32.");
-    }
-    TensorShape shape{tensor.elementType, idxs.sizes};
-    for (size_t i = 1; i < tensor.getRank(); i++) {
+
+    TensorShape shape{tensor.elementType};
+    for (size_t i = 0; i < tensor.getRank(); i++) {
       shape.sizes.push_back(tensor.sizes[i]);
     }
+
+    if (operands_size >= 3) {
+      auto axis = getIntegerValue(evaluator, operands[2]);
+      shape.sizes.at(axis.getValue()) = idxs.sizes[0];
+    } else if (operands_size == 2) {
+      shape.sizes.at(0) = idxs.sizes[0];
+    }
+
     return {shape};
   }
 };

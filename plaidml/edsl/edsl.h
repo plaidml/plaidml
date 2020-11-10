@@ -806,7 +806,13 @@ inline Tensor floor(const Tensor& x) { return intrinsic("floor", x); }
 /// \param y Tensor
 /// \return Tensor
 ///
-inline Tensor gather(const Tensor& x, const Tensor& y) { return intrinsic("gather", x, y); }
+
+inline Tensor gather(const Tensor& x, const Tensor& y, const std::vector<Tensor>& attributes = {}) {
+  std::vector<Tensor> args = {x};
+  args.emplace_back(y);
+  args.insert(args.end(), attributes.begin(), attributes.end());
+  return intrinsicCall("gather", args);
+}
 
 ///
 /// Returns the identity of `x`.

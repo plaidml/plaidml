@@ -62,4 +62,17 @@ def DataType : I64EnumAttr<
   let convertFromStorage = "static_cast<" # returnType # ">($_self.getValue().getZExtValue())";
 }
 
+def InterpolationMode : I64EnumAttr<
+    "InterpolationMode",
+    "Modes that controls interpolation",
+    [
+     I64EnumAttrCase<"nearest", 0>,
+     I64EnumAttrCase<"linear", 1>,
+     I64EnumAttrCase<"cubic", 2>,
+    ]> {
+  let cppNamespace = "pmlc::util";
+  let returnType = "InterpolationMode";
+  let convertFromStorage = "static_cast<" # returnType # ">($_self.getValue().getZExtValue())";
+}
+
 #endif // __PML_UTIL_ENUMS__

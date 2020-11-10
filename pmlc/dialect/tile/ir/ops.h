@@ -22,6 +22,7 @@ using mlir::IntegerSet;
 using mlir::IntegerSetAttr;
 using util::AggregationKind;
 using util::CombinationKind;
+using util::InterpolationMode;
 
 } // namespace pmlc::dialect::tile
 

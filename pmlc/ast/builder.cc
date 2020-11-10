@@ -583,6 +583,7 @@ struct ProgramBuilder {
             .Case("prng", [&]() { return makePrngOp(node, operands); })
             .Case("reshape", [&]() { return makeReshapeOp(node, operands); })
             .Case("scatter", [&]() { return makeScatterOp(node, operands); })
+            .Case("gather", [&]() { return makeGatherOp(node, operands); })
             .Default([&]() {
               const AbstractOperation *abstractOp = lookupOperation(node->op);
               OperationState state(loc, abstractOp->name);
@@ -605,6 +606,53 @@ struct ProgramBuilder {
         .create<tile::PragmaOp>(loc, tensor, node->op,
                                 builder.getDictionaryAttr(attrs))
         .result();
+  }
+
+  Value makeGatherOp(ExprNodeIntrinsic *node, ArrayRef<Value> operands) {
+    auto operands_size = operands.size();
+    TensorShape shape = evaluator.getShape(node);
+    RankedTensorType resultType = builder.getRankedTensorType(shape);
+    auto op = builder.create<tile::GatherOp>(
+        loc, resultType, ValueRange{operands[0], operands[1]},
+        ArrayRef<NamedAttribute>{});
+
+    switch (operands_size) {
+    case 5: {
+      FloatAttr cubicCoeff;
+      if (!m_Constant(&cubicCoeff).match(operands[4].getDefiningOp())) {
+        throw std::runtime_error(
+            "'cubicCoeff' primitive expects argument 5 to be a constant float");
+      }
+      auto cubicCoeffFloat = static_cast<float>(cubicCoeff.getValueAsDouble());
+      op.setAttr("cubicCoeff", builder.getF32FloatAttr(cubicCoeffFloat));
+    }
+    // no break
+    case 4: {
+      IntegerAttr mode;
+      if (!m_Constant(&mode).match(operands[3].getDefiningOp())) {
+        throw std::runtime_error(
+            "'mode' primitive expects argument 4 to be a constant integer");
+      }
+      op.setAttr("mode", mode);
+    }
+    // no break
+    case 3: {
+      IntegerAttr axis;
+      if (!m_Constant(&axis).match(operands[2].getDefiningOp())) {
+        throw std::runtime_error(
+            "'axis' primitive expects argument 3 to be a constant integer");
+      }
+      op.setAttr("axis", builder.getIndexAttr(axis.getInt()));
+    }
+    // no break
+    case 2:
+      break;
+    default:
+      throw std::runtime_error("GatherOp expects 2-5 arguments");
+      break;
+    }
+
+    return op.result();
   }
 
   Value makeReshapeOp(ExprNodeIntrinsic *node, ArrayRef<Value> operands) {
