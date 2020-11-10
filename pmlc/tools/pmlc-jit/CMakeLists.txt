@@ -7,5 +7,5 @@ pml_cc_binary(
     pmlc::compiler
     pmlc::rt
     pmlc::rt::llvm
-    pmlc::util::util
+    pmlc::util
 )
