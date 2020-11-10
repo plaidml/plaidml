@@ -927,7 +927,6 @@ void plaidml_expr_jacobian(  //
       wrt_exprs[i] = wrts[i]->expr;
     }
     auto deriv_exprs = ComputeJacobian(wrt_exprs, loss->expr);
-    IVLOG(0, "ComputeJacobian returned: " << deriv_exprs[0]);
     for (size_t i = 0; i < nwrts; i++) {
       derivs[i] = new plaidml_expr{deriv_exprs[i]};
     }

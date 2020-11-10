@@ -85,8 +85,8 @@ class Jacobian {
  public:
   explicit Jacobian(const ExprPtr& err) : uses_(err) {
     IVLOG(2, "Gradient::Gradient> err: " << err);
-    // LogicalShape* into = LogicalShape(DataType::FLOAT32, {3});
-    auto fc = std::make_shared<FloatConst>(1.0);  // Make this the same of err!
+    // LogicalShape* into = LogicalShape(DataType::FLOAT32, {3});m
+    auto fc = std::make_shared<FloatConst>(1.0);  // Make this the same shape
     // MergeShapes(into, fc->shape);
     seen_[err.get()] = fc;
   }
@@ -177,30 +177,25 @@ class Jacobian {
     if (idx == op->srcs.size()) {
       throw std::logic_error("A default tensor fell through to the DeriveSum case during Gradient");
     }
-
+    std::vector<PolyExprPtr> oidxs;  // Indexes of new total Jacobian
+    std::vector<DimExprPtr> odims;   // Dimensions of new total Jacobian
     size_t noidx = IntoTensorShape(dout->shape).sizes().size();
-    IVLOG(2, "# of output dimensions: " << noidx);
-    std::vector<PolyExprPtr> oidxs;
-    for (size_t i = 0; i < noidx; i++) {  // Indexes corresponding to output dimensions
-      oidxs.push_back(std::make_shared<PolyIndex>(i));
-    }
 
-    auto output_ind = std::make_shared<PolyIndex>(0);
     for (size_t i = 0; i < op->srcs.size(); ++i) {
       if (idx == i) {
-        std::vector<PolyExprPtr> idxs;
-        // for (auto pidx : oidxs){
-        //   idxs.push_back(pidx);
-        // }
-        for (auto pidx : op->sink_idxs->idxs) {  // Indexes corresponding to input dimensions
-          idxs.push_back(pidx);
+        std::vector<PolyExprPtr> iidxs;
+        for (size_t j = 0; j < noidx; j++) {
+          iidxs.push_back(op->sink_idxs->idxs[j]);
         }
-        IVLOG(2, "Looking at wrt input");
-        dop->srcs.push_back(std::make_shared<IndexMapExpr>(dout, idxs));
+        dop->srcs.push_back(std::make_shared<IndexMapExpr>(dout, iidxs));
       } else {
         switch (op->combo_op) {
           case CombinationOp::MULTIPLY:
-            // For *, we multiply by the other (non-differentiated) input
+            // auto in_dims = op->srcs[i]->ref->shape.dims_as_exprs();
+            for (size_t j = noidx; j < op->srcs[i]->idxs.size(); j++) {
+              oidxs.push_back(op->srcs[i]->idxs[j]);
+              odims.push_back(op->srcs[i]->ref->shape.dims_as_exprs()[j]);
+            }
             dop->srcs.push_back(op->srcs[i]);
             dop->combo_op = CombinationOp::MULTIPLY;
             break;
@@ -221,29 +216,9 @@ class Jacobian {
       }
     }
     auto input = op->srcs[idx];
-    std::vector<PolyExprPtr> idxs;
-    for (auto pidx : oidxs) {  // Indexes corresponding to output dimensions
-      idxs.push_back(pidx);
-    }
-    for (auto pidx : input->idxs) {  // Indexes corresponding to input dimensions
-      idxs.push_back(pidx);
-    }
-    dop->sink_idxs = std::make_shared<IndexMapExpr>(nullptr, idxs);
-    std::vector<DimExprPtr> dims;
-
-    IVLOG(2, "Dout Shape: " << IntoTensorShape(dout->shape).sizes());
-    IVLOG(2, "Input Shape: " << IntoTensorShape(input->ref->shape).sizes());
-
-    // dims.push_back(dout->shape.dims_as_exprs().at(0));
-    for (auto dim : dout->shape.dims_as_exprs()) {
-      dims.push_back(dim);
-    }
-    for (auto dim : input->ref->shape.dims_as_exprs()) {
-      dims.push_back(dim);
-    }
-    dop->sink_dims = std::make_shared<SizeMapExpr>(dims);
+    dop->sink_idxs = std::make_shared<IndexMapExpr>(nullptr, oidxs);
+    dop->sink_dims = std::make_shared<SizeMapExpr>(odims);
     dop->ComputeShape(input->ref->shape.layout);
-    IVLOG(2, "Dop Shape: " << IntoTensorShape(dop->shape).sizes());
     return dop;
   }
 
@@ -300,6 +275,10 @@ std::vector<ExprPtr> ComputeJacobian(const std::vector<ExprPtr>& wrts, const Exp
   Jacobian grad(value);
   std::vector<ExprPtr> ret(wrts.size());
   for (size_t i = 0; i < wrts.size(); i++) {
+    auto wrt = wrts[i];
+    if (wrt->shape.dims_as_exprs().size() > 1) {
+      throw std::runtime_error("Jacobian not supported for wrt input of rank > 1");
+    }
     ret[i] = grad.GetDerivative(wrts[i]);
   }
   return ret;
