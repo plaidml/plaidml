@@ -7,7 +7,7 @@ dependencies:
   - ninja=1.10.1
   - numpy=1.19.2
   - pip=20.2.4
-  - pre_commit=1.17.0
+  - pre_commit=2.8.2
   - python=3.8
   - pystache=0.5.4
   - pyyaml=5.3.1
