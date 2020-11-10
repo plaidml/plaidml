@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-if [ "${BUILDKITE_AGENT_META_DATA_PLATFORM}" != "linux_x86_64" ]; then
+if [ "${BUILDKITE_STEP_KEY}" != "linux_x86_64_cmake" ]; then
     exit 0
 fi
 

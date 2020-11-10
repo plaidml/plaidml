@@ -26,6 +26,7 @@ steps:
         -D CMAKE_BUILD_TYPE=Release \
         -D ENABLE_OPENVINO_BRIDGE=ON
       ninja -C build-opt check-test
+    key: linux_x86_64_cmake
     agents:
       PLATFORM: linux_x86_64
 
