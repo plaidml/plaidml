@@ -20,12 +20,16 @@ steps:
 
   - label: ':hammer_and_wrench: :linux: :beer:'
     command: |
+      echo --- :building_construction: cmake configuration
       cmake \
         -B build-opt \
         -G Ninja \
         -D CMAKE_BUILD_TYPE=Release \
         -D ENABLE_OPENVINO_BRIDGE=ON
-      ninja -C build-opt check-test
+      --- :hammer_and_wrench: ninja build
+      ninja -C build-opt
+      --- :hammer_and_wrench: ninja test
+      ninja -C build-opt test
     key: linux_x86_64_cmake
     agents:
       PLATFORM: linux_x86_64
