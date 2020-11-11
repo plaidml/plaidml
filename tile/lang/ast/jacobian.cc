@@ -85,10 +85,7 @@ class Jacobian {
  public:
   explicit Jacobian(const ExprPtr& err) : uses_(err) {
     IVLOG(2, "Gradient::Gradient> err: " << err);
-    // LogicalShape* into = LogicalShape(DataType::FLOAT32, {3});m
-    auto fc = std::make_shared<FloatConst>(1.0);  // Make this the same shape
-    // MergeShapes(into, fc->shape);
-    seen_[err.get()] = fc;
+    seen_[err.get()] = std::make_shared<FloatConst>(1.0);
   }
 
   ExprPtr GetDerivative(const ExprPtr& expr) {
@@ -123,9 +120,6 @@ class Jacobian {
     if (!total) {
       total = std::make_shared<FloatConst>(0.0);
     }
-    //  else if (total->shape.dims.size()) {
-    //   total = MakeCall("simple_reduce", {total, expr});
-    // }
     IVLOG(2, "  Gradient::GetDerivative, final result -> " << total);
     seen_.emplace(expr.get(), total);
     return total;
@@ -191,7 +185,6 @@ class Jacobian {
       } else {
         switch (op->combo_op) {
           case CombinationOp::MULTIPLY:
-            // auto in_dims = op->srcs[i]->ref->shape.dims_as_exprs();
             for (size_t j = noidx; j < op->srcs[i]->idxs.size(); j++) {
               oidxs.push_back(op->srcs[i]->idxs[j]);
               odims.push_back(op->srcs[i]->ref->shape.dims_as_exprs()[j]);

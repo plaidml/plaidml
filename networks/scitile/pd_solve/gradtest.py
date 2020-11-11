@@ -141,6 +141,36 @@ class GradTest(unittest.TestCase):
 
         npt.assert_allclose(test_result, true_result)
 
+    def test_6(self):
+        np_x = np.random.rand(10)
+        old_dim = np_x.shape[0]
+
+        dtype = plaidml2.DType.FLOAT32
+        x = edsl.Tensor(edsl.LogicalShape(dtype, np_x.shape))
+        Is = [x]
+        I_dat = [np_x]
+
+        J = np.eye(old_dim)
+
+        y = x
+
+        for _ in range(10):
+            new_dim = np.random.randint(1, 10)
+            new_mat = np.random.rand(new_dim, old_dim)
+            J = np.matmul(new_mat, J)
+            A = edsl.Tensor(edsl.LogicalShape(dtype, new_mat.shape))
+            Is.append(A)
+            I_dat.append(new_mat.copy())
+            if y.shape.ndims == 1:
+                y = matmul_2_1(A, y)
+            else:
+                y = matmul_2_2(A, y)
+            old_dim = new_dim
+
+        test_result = get_jacobian(Is, I_dat, y, x)
+
+        npt.assert_allclose(J, test_result)
+
 
 if __name__ == '__main__':
     unittest.main()
