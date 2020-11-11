@@ -22,8 +22,8 @@ if(NOT InferenceEngineDeveloperPackage_FOUND)
   set(ENABLE_SPEECH_DEMO OFF)
   set(ENABLE_TESTS ON)
   set(ENABLE_VPU ON)
+  set(NGRAPH_ONNX_IMPORT_ENABLE OFF)
   set(TREAT_WARNING_AS_ERROR OFF)
-  set(protobuf_WITH_ZLIB OFF)
 
   add_subdirectory(${openvino_SOURCE_DIR} ${openvino_BINARY_DIR} EXCLUDE_FROM_ALL)
 
