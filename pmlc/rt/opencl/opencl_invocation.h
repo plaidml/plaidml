@@ -43,21 +43,19 @@ public:
   /// Constructs kernel declared with `name` from compiled `program`.
   OpenCLKernel(cl::Program program, std::string name);
 
-  /// Adds event dependency that must be completed before this kernel.
-  void addDependency(OpenCLEvent *event);
   /// Sets kernel argument `idx` to `memory`.
   void setArg(unsigned idx, OpenCLMemory *memory);
   /// Enqueues wrapped kernel on specified command queue `queue` with
   /// `gws` global work size and `lws` local work size.
   /// Returns OpenCL event tracking execution of kernel execution.
-  cl::Event enqueue(cl::CommandQueue queue, cl::NDRange gws, cl::NDRange lws);
+  cl::Event enqueue(cl::CommandQueue queue, cl::NDRange gws, cl::NDRange lws,
+                    const std::vector<cl::Event> &deps);
   /// Returns name of this kernel.
   const std::string &getName() const { return name; }
 
 private:
   cl::Kernel kernel;
   std::string name;
-  std::vector<cl::Event> dependencies;
 };
 
 /// Kind of asynchronous operation executed on OpenCL device.
@@ -112,11 +110,14 @@ public:
                             const std::vector<OpenCLEvent *> &deps);
   /// Creates OpenCL kernel from SPIRV binary.
   OpenCLKernel *createKernelFromIL(char *data, size_t bytes, const char *name);
+  /// Destroys an OpenCL kernel.
+  void destroyKernel(OpenCLKernel *kernel);
   /// Enqueues kernel execution on device with specified global and local work
   /// sizes. Kernel object is destroyed after this function finishes. Returns
   /// event describing status of kernel execution.
   OpenCLEvent *enqueueKernel(OpenCLKernel *kernel, cl::NDRange gws,
-                             cl::NDRange lws);
+                             cl::NDRange lws,
+                             const std::vector<OpenCLEvent *> &deps);
   /// Enqueues barrier operation on device. Barrier serves as synchronization
   /// primitive that ensures all operations enqueued after it finishes will
   /// start executing only after all operations before have finished.

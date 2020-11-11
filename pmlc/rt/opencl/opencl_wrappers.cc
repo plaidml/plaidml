@@ -56,9 +56,9 @@ void *oclCreateKernel(void *invocation, char *binary, uint32_t bytes,
       ->createKernelFromIL(binary, bytes, name);
 }
 
-void oclAddKernelDep(void *kernel, void *event) {
-  static_cast<OpenCLKernel *>(kernel)->addDependency(
-      static_cast<OpenCLEvent *>(event));
+void oclDestroyKernel(void *invocation, void *kernel) {
+  static_cast<OpenCLInvocation *>(invocation)
+      ->destroyKernel(static_cast<OpenCLKernel *>(kernel));
 }
 
 void oclSetKernelArg(void *kernel, size_t idx, void *memory) {
@@ -67,11 +67,19 @@ void oclSetKernelArg(void *kernel, size_t idx, void *memory) {
 }
 
 void *oclScheduleFunc(void *invocation, void *kernel, size_t gws0, size_t gws1,
-                      size_t gws2, size_t lws0, size_t lws1, size_t lws2) {
+                      size_t gws2, size_t lws0, size_t lws1, size_t lws2,
+                      size_t eventCount, ...) {
   cl::NDRange gws(gws0, gws1, gws2);
   cl::NDRange lws(lws0, lws1, lws2);
+  std::vector<OpenCLEvent *> deps;
+  va_list args;
+  va_start(args, eventCount);
+  for (unsigned idx = 0; idx < eventCount; ++idx) {
+    deps.push_back(va_arg(args, OpenCLEvent *));
+  }
+  va_end(args);
   return static_cast<OpenCLInvocation *>(invocation)
-      ->enqueueKernel(static_cast<OpenCLKernel *>(kernel), gws, lws);
+      ->enqueueKernel(static_cast<OpenCLKernel *>(kernel), gws, lws, deps);
 }
 
 void *oclBarrier(void *invocation, uint32_t count, ...) {
@@ -115,10 +123,10 @@ struct Registration {
     registerSymbol("oclWrite", reinterpret_cast<void *>(oclWrite));
     registerSymbol("oclCreateKernel",
                    reinterpret_cast<void *>(oclCreateKernel));
+    registerSymbol("oclDestroyKernel",
+                   reinterpret_cast<void *>(oclDestroyKernel));
     registerSymbol("oclSetKernelArg",
                    reinterpret_cast<void *>(oclSetKernelArg));
-    registerSymbol("oclAddKernelDep",
-                   reinterpret_cast<void *>(oclAddKernelDep));
     registerSymbol("oclScheduleFunc",
                    reinterpret_cast<void *>(oclScheduleFunc));
     registerSymbol("oclBarrier", reinterpret_cast<void *>(oclBarrier));

@@ -35,24 +35,6 @@ struct KernelResource final
 // ============================================================================
 // Operations
 // ============================================================================
-// Verifiers
-static LogicalResult verify(ScheduleFunc op) {
-  static const char *errorMsg =
-      "body must have one operation - 'gpu.launch_func'";
-
-  Block &region = op.body().front();
-  auto opsRange = region.without_terminator();
-  if (opsRange.empty())
-    return op.emitOpError(errorMsg);
-  if (++opsRange.begin() != opsRange.end())
-    return op.emitOpError(errorMsg);
-
-  Operation &onlyOp = *opsRange.begin();
-  if (!isa<gpu::LaunchFuncOp>(onlyOp))
-    return op.emitOpError(errorMsg);
-
-  return success();
-}
 
 // Interface implementations
 ::mlir::Value ScheduleWrite::getSource() { return hostMem(); }

@@ -77,8 +77,8 @@ struct ConvertStandardToLLVMPass
     auto module = getOperation();
     auto *context = module.getContext();
 
-    uint32_t scheduleFuncNum = 0;
-    module.walk([&](comp::ScheduleFunc op) { scheduleFuncNum++; });
+    uint32_t kernelCount = 0;
+    module.walk([&](comp::CreateKernel op) { kernelCount++; });
 
     LowerToLLVMOptions options = {
         /*useBarePtrCallConv=*/false,
@@ -103,7 +103,7 @@ struct ConvertStandardToLLVMPass
     conversion::comp_to_llvm::populateCommonPatterns(context, typeConverter,
                                                      patterns);
     conversion::comp_to_llvm::populateCompToVkPatterns(
-        context, *binaryModulesMap, module, scheduleFuncNum, typeConverter,
+        context, *binaryModulesMap, module, kernelCount, typeConverter,
         patterns);
     LLVMConversionTarget target(*context);
     target.addIllegalDialect<abi::ABIDialect>();

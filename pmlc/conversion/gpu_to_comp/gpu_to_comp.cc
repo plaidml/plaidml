@@ -18,8 +18,9 @@ namespace gpu = mlir::gpu;
 
 namespace {
 
-/// Rewrites gpu.launch_func operation to be contained inside
-/// comp.schedule_func. Creates new execution environment before function,
+/// Rewrites gpu.launch_func operation to a sequence of:
+//  [comp.create_kernel, comp.schedule_compute, comp.destroy_kernel].
+/// Creates a new execution environment before these calls,
 /// then allocates required memory on device. After scheduling function
 /// creates memory reads and wait for completion. Finally deallocates
 /// device memory and destroys execution environment.
@@ -37,12 +38,15 @@ struct RewriteLaunchFunc : public mlir::OpRewritePattern<gpu::LaunchFuncOp> {
   allocateDeviceMemory(mlir::PatternRewriter &rewriter, mlir::Location location,
                        mlir::Value execEnv, const mlir::ValueRange &host,
                        std::vector<mlir::Value> &device) const;
-  mlir::LogicalResult createScheduleFuncOp(mlir::PatternRewriter &rewriter,
-                                           mlir::Location loc,
-                                           mlir::Value execEnv,
-                                           gpu::LaunchFuncOp op,
-                                           const mlir::ValueRange &operands,
-                                           mlir::Value &event) const;
+  mlir::LogicalResult createKernel(mlir::PatternRewriter &rewriter,
+                                   mlir::Location loc, mlir::Value execEnv,
+                                   gpu::LaunchFuncOp op,
+                                   mlir::Value &kernel) const;
+  mlir::LogicalResult scheduleCompute(mlir::PatternRewriter &rewriter,
+                                      mlir::Location loc, mlir::Value execEnv,
+                                      mlir::Value kernel, gpu::LaunchFuncOp op,
+                                      const mlir::ValueRange &operands,
+                                      mlir::Value &event) const;
   mlir::LogicalResult readDeviceMemory(mlir::PatternRewriter &rewriter,
                                        mlir::Location loc, mlir::Value execEnv,
                                        const mlir::ValueRange &hostArgs,
@@ -52,7 +56,9 @@ struct RewriteLaunchFunc : public mlir::OpRewritePattern<gpu::LaunchFuncOp> {
   deallocateDeviceMemory(mlir::PatternRewriter &rewriter, mlir::Location loc,
                          mlir::Value execEnv, const mlir::ValueRange &hostArgs,
                          const mlir::ValueRange &deviceArgs) const;
-
+  mlir::LogicalResult destroyKernel(mlir::PatternRewriter &rewriter,
+                                    mlir::Location loc, mlir::Value execEnv,
+                                    mlir::Value kernel) const;
   comp::ExecEnvType execEnvType;
   comp::EventType eventType;
 };
@@ -110,23 +116,36 @@ RewriteLaunchFunc::matchAndRewrite(gpu::LaunchFuncOp op,
   auto execEnvOp =
       rewriter.create<comp::CreateExecEnv>(loc, execEnvType, device);
   mlir::Value execEnv = execEnvOp.getResult();
+  // Create the kernel.
+  mlir::Value kernel;
+  if (mlir::failed(createKernel(rewriter, loc, execEnv, op, kernel))) {
+    return mlir::failure();
+  }
   // Allocate memory on device for memory operands.
   std::vector<mlir::Value> newOperands;
   if (mlir::failed(allocateDeviceMemory(rewriter, loc, execEnv, op.operands(),
-                                        newOperands)))
+                                        newOperands))) {
     return mlir::failure();
-  mlir::Value funcEvent;
-  if (mlir::failed(createScheduleFuncOp(rewriter, loc, execEnv, op, newOperands,
-                                        funcEvent)))
+  }
+  mlir::Value compEvent;
+  if (mlir::failed(scheduleCompute(rewriter, loc, execEnv, kernel, op,
+                                   newOperands, compEvent))) {
     return mlir::failure();
+  }
   // Read device memory back to host.
   if (mlir::failed(readDeviceMemory(rewriter, loc, execEnv, op.operands(),
-                                    newOperands, funcEvent)))
+                                    newOperands, compEvent))) {
     return mlir::failure();
+  }
   // Deallocate device memory.
   if (mlir::failed(deallocateDeviceMemory(rewriter, loc, execEnv, op.operands(),
-                                          newOperands)))
+                                          newOperands))) {
     return mlir::failure();
+  }
+  // Destroy the kernel
+  if (mlir::failed(destroyKernel(rewriter, loc, execEnv, kernel))) {
+    return mlir::failure();
+  }
   // Destroy execution environment.
   rewriter.create<comp::DestroyExecEnv>(loc, execEnv);
   // Remove original launch operation.
@@ -162,28 +181,38 @@ mlir::LogicalResult RewriteLaunchFunc::allocateDeviceMemory(
   return mlir::success();
 }
 
-mlir::LogicalResult RewriteLaunchFunc::createScheduleFuncOp(
+mlir::LogicalResult RewriteLaunchFunc::createKernel(
     mlir::PatternRewriter &rewriter, mlir::Location loc, mlir::Value execEnv,
-    gpu::LaunchFuncOp op, const mlir::ValueRange &operands,
-    mlir::Value &event) const {
-  // Find kernel that operation launches.
-  mlir::SymbolRefAttr kernelSymbol = op.kernel();
-  auto kernelOp = mlir::SymbolTable::lookupNearestSymbolFrom<gpu::GPUFuncOp>(
-      op.getOperation(), kernelSymbol);
-  if (!kernelOp)
+    gpu::LaunchFuncOp op, mlir::Value &kernel) const {
+  auto kernelFunc = mlir::SymbolTable::lookupNearestSymbolFrom<gpu::GPUFuncOp>(
+      op.getOperation(), op.kernel());
+  if (!kernelFunc) {
     return mlir::failure();
+  }
 
-  auto scheduleFuncOp = rewriter.create<comp::ScheduleFunc>(
-      loc, eventType, execEnv, mlir::ValueRange());
+  auto kernelModule = kernelFunc.getParentOfType<gpu::GPUModuleOp>();
+  auto kernelSymbol = rewriter.getSymbolRefAttr(
+      kernelModule.getName(),
+      {rewriter.getSymbolRefAttr(kernelFunc.getName())});
+
+  auto createKernelOp = rewriter.create<comp::CreateKernel>(
+      loc, rewriter.getType<comp::KernelType>(), execEnv, kernelSymbol);
+  kernel = createKernelOp.getResult();
+  return mlir::success();
+}
+
+mlir::LogicalResult RewriteLaunchFunc::scheduleCompute(
+    mlir::PatternRewriter &rewriter, mlir::Location loc, mlir::Value execEnv,
+    mlir::Value kernel, gpu::LaunchFuncOp op, const mlir::ValueRange &operands,
+    mlir::Value &event) const {
+  auto gridValues = op.getGridSizeOperandValues();
+  auto blockSizeValues = op.getBlockSizeOperandValues();
+
+  auto scheduleFuncOp = rewriter.create<comp::ScheduleCompute>(
+      loc, eventType, execEnv, kernel, gridValues.x, gridValues.y, gridValues.z,
+      blockSizeValues.x, blockSizeValues.y, blockSizeValues.z, operands,
+      mlir::ValueRange{});
   event = scheduleFuncOp.getResult();
-
-  // Add launch_func with new operands inside schedule_func.
-  mlir::PatternRewriter::InsertionGuard insertionGuard(rewriter);
-  rewriter.createBlock(&scheduleFuncOp.body(), scheduleFuncOp.body().end());
-  rewriter.create<gpu::LaunchFuncOp>(loc, kernelOp,
-                                     op.getGridSizeOperandValues(),
-                                     op.getBlockSizeOperandValues(), operands);
-  rewriter.create<comp::ScheduleEnd>(loc);
 
   return mlir::success();
 }
@@ -222,6 +251,14 @@ mlir::LogicalResult RewriteLaunchFunc::deallocateDeviceMemory(
       continue;
     rewriter.create<comp::Dealloc>(loc, execEnv, device);
   }
+  return mlir::success();
+}
+
+mlir::LogicalResult
+RewriteLaunchFunc::destroyKernel(mlir::PatternRewriter &rewriter,
+                                 mlir::Location loc, mlir::Value execEnv,
+                                 mlir::Value kernel) const {
+  rewriter.create<comp::DestroyKernel>(loc, execEnv, kernel);
   return mlir::success();
 }
 
@@ -296,11 +333,6 @@ void ConvertGpuToComp::runOnOperation() {
   mlir::ConversionTarget target(getContext());
   target.addLegalDialect<comp::COMPDialect>();
   target.addLegalDialect<gpu::GPUDialect>();
-  target.addDynamicallyLegalOp<gpu::LaunchFuncOp>(
-      [](gpu::LaunchFuncOp op) -> bool {
-        auto parent = op.getParentOp();
-        return parent && mlir::isa<comp::ScheduleFunc>(parent);
-      });
   target.addDynamicallyLegalOp<gpu::GPUFuncOp>([=](gpu::GPUFuncOp op) -> bool {
     if (!op.isKernel())
       return true;
@@ -319,7 +351,7 @@ void ConvertGpuToComp::runOnOperation() {
            ((op.getNumArguments() > 0) &&
             op.getArgument(0).getType().isa<comp::DeviceType>());
   });
-  target.addIllegalOp<gpu::LaunchOp>();
+  target.addIllegalOp<gpu::LaunchFuncOp, gpu::LaunchOp>();
 
   // Setup rewrite patterns.
   mlir::OwningRewritePatternList patterns;

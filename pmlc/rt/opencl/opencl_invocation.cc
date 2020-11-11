@@ -31,19 +31,16 @@ OpenCLMemory::enqueueWrite(cl::CommandQueue queue, void *src,
 OpenCLKernel::OpenCLKernel(cl::Program program, std::string name)
     : kernel(program, name.c_str()), name(std::move(name)) {}
 
-void OpenCLKernel::addDependency(OpenCLEvent *event) {
-  dependencies.push_back(event->getEvent());
-}
-
 void OpenCLKernel::setArg(unsigned idx, OpenCLMemory *memory) {
   kernel.setArg(idx, memory->getBuffer());
 }
 
 cl::Event OpenCLKernel::enqueue(cl::CommandQueue queue, cl::NDRange gws,
-                                cl::NDRange lws) {
+                                cl::NDRange lws,
+                                const std::vector<cl::Event> &deps) {
   cl::Event result;
-  queue.enqueueNDRangeKernel(kernel, /*offset=*/cl::NDRange(), gws, lws,
-                             &dependencies, &result);
+  queue.enqueueNDRangeKernel(kernel, /*offset=*/cl::NDRange(), gws, lws, &deps,
+                             &result);
   return result;
 }
 
@@ -154,12 +151,19 @@ OpenCLKernel *OpenCLInvocation::createKernelFromIL(char *data, size_t bytes,
   return new OpenCLKernel(program, name);
 }
 
-OpenCLEvent *OpenCLInvocation::enqueueKernel(OpenCLKernel *kernel,
-                                             cl::NDRange gws, cl::NDRange lws) {
-  cl::Event event = kernel->enqueue(queueUser.getOclQueue(), gws, lws);
+void OpenCLInvocation::destroyKernel(OpenCLKernel *kernel) { delete kernel; }
+
+OpenCLEvent *
+OpenCLInvocation::enqueueKernel(OpenCLKernel *kernel, cl::NDRange gws,
+                                cl::NDRange lws,
+                                const std::vector<OpenCLEvent *> &deps) {
+  std::vector<cl::Event> dependencies;
+  std::transform(deps.begin(), deps.end(), std::back_inserter(dependencies),
+                 [](const OpenCLEvent *event) { return event->getEvent(); });
+  cl::Event event =
+      kernel->enqueue(queueUser.getOclQueue(), gws, lws, dependencies);
   OpenCLEvent *result =
       wrapEvent(event, OpenCLActionKind::Kernel, kernel->getName());
-  delete kernel;
   return result;
 }
 

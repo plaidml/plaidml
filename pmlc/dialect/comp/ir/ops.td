@@ -106,62 +106,34 @@ def COMP_DestroyExecEnv : COMP_Op<"destroy_execenv"> {
   }];
 }
 
-def COMP_ScheduleEnd : COMP_Op<"schedule_end", [Terminator]> {
-  let summary = "End of scheduling block.";
+def COMP_CreateKernel : COMP_Op<"create_kernel",
+                                [DeclareOpInterfaceMethods<COMP_ExecEnvOpInterface>]>
+                  , Arguments<(ins Arg<COMP_AnyExecEnv, "", [MemRead<COMP_ExecEnvResource>]>:$execEnv,
+                                   SymbolRefAttr:$kernelFunc)>
+                  , Results<(outs Res<COMP_Kernel, "", [MemAlloc<COMP_KernelResource>]>:$kernel)> {
+  let summary = "Creates an executable kernel.";
 }
 
-def COMP_ScheduleSingleBlock : SingleBlockImplicitTerminator<"ScheduleEnd">;
-
-// def COMP_CreateKernel : COMP_Op<"create_kernel",
-//                                 [DeclareOpInterfaceMethods<COMP_ExecEnvOpInterface>]>,
-//                   , Arguments<(ins Arg<COMP_AnyExecEnv, "", [MemRead<COMP_ExecEnvResource>]>:$execEnv)>
-//                   , Results<(outs Res<COMP_Kernel, "", [MemAlloc<COMP_KernelResource>]>:$kernel)> {
-//   let summary = "Creates an executable kernel.";
-// }
-// 
-// def COMP_DestroyKernel : COMP_Op<"destroy_kernel",
-//                                  [DeclareOpInterfaceMethods<COMP_ExecEnvOpInterface>]>,
-//                   , Arguments<(ins Arg<COMP_AnyExecEnv, "", [MemRead<COMP_ExecEnvResource>]>:$execEnv,
-//                                    Arg<COMP_Kernel, "", [MemFree<COMP_KernelResource>]>:$kernel)> {
-//   let summary = "Destroys an executable kernel.";
-// }
-// 
-// def COMP_ScheduleKernel : COMP_Op<"schedule_kernel",
-//                                   [DeclareOpInterfaceMethods<COMP_ExecEnvOpInterface>,
-//                                    DeclareOpInterfaceMethods<COMP_ScheduleOpInterface>]>
-//                   , Arguments<(ins Arg<COMP_AnyExecEnv, "", [MemRead<COMP_ExecEnvResource>]>:$execEnv,
-//                                    Arg<COMP_Kernel, "", [MemRead<COMP_KernelResource>]>:$kernel)> {
-//   let summary = "Schedules a kernel for execution.";
-// }
-
-def COMP_ScheduleFunc : COMP_Op<"schedule_func",
-                                [RecursiveSideEffects,
-                                 COMP_ScheduleSingleBlock,
-                                 DeclareOpInterfaceMethods<COMP_ExecEnvOpInterface>,
-                                 DeclareOpInterfaceMethods<COMP_ScheduleOpInterface>]>
+def COMP_DestroyKernel : COMP_Op<"destroy_kernel",
+                                 [DeclareOpInterfaceMethods<COMP_ExecEnvOpInterface>]>
                   , Arguments<(ins Arg<COMP_AnyExecEnv, "", [MemRead<COMP_ExecEnvResource>]>:$execEnv,
+                                   Arg<COMP_Kernel, "", [MemFree<COMP_KernelResource>]>:$kernel)> {
+  let summary = "Destroys an executable kernel.";
+}
+
+def COMP_ScheduleCompute : COMP_Op<"schedule_compute",
+                                  [DeclareOpInterfaceMethods<COMP_ExecEnvOpInterface>,
+                                   DeclareOpInterfaceMethods<COMP_ScheduleOpInterface>,
+                                   AttrSizedOperandSegments]>
+                  , Arguments<(ins Arg<COMP_AnyExecEnv, "", [MemRead<COMP_ExecEnvResource>]>:$execEnv,
+                                   Arg<COMP_Kernel, "", [MemRead<COMP_KernelResource>]>:$kernel,
+                                   Index:$gridSizeX, Index:$gridSizeY, Index:$gridSizeZ,
+                                   Index:$blockSizeX, Index:$blockSizeY, Index:$blockSizeZ,
+                                   Arg<Variadic<AnyMemRef>, "", [MemRead<COMP_DeviceMemoryResource>, MemWrite<COMP_DeviceMemoryResource>]>:$buffers,
                                    Variadic<COMP_AnyEvent>:$depEvents)>
                   , Results<(outs COMP_AnyEvent:$outEvent)> {
-  let summary = "Schedules function in region for execution on device.";
-  let description = [{
-    This is a wrapper around gpu.launch_func that schedules function
-    to execute on environment and provides synchronization with
-    event dependencies and output event.
-    The region is expected to have only this single gpu.launch_func operation
-    and implicit terminator - comp.schedule_end.
-    Example:
-    %ev = "comp.schedule_func"(%execEnv, %depEvent) ( {
-      "gpu.launch_func"(...)
-      "comp.schedule_end"
-    })
-    comp.wait %ev
-  }];
-
-  let regions = (region AnyRegion:$body);
-
-  let verifier = [{ return ::pmlc::dialect::comp::verify(*this); }];
+  let summary = "Schedules a kernel for execution.";
 }
-
 
 def COMP_Submit : COMP_Op<"submit",
                           [DeclareOpInterfaceMethods<COMP_ExecEnvOpInterface>]>
