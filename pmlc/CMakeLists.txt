@@ -45,3 +45,5 @@ pml_cc_library(
 )
 
 pml_lit_test(NAME lit)
+
+add_dependencies(pmlc_lit FileCheck count not)

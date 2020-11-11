@@ -12,6 +12,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
+#include "mlir/Transforms/RegionUtils.h"
 
 #include "pmlc/compiler/registry.h"
 #include "pmlc/conversion/abi_to_llvm/passes.h"
@@ -113,70 +114,37 @@ struct OpenMPWorkaroundPass final
     LLVM::LLVMFuncOp funcOp = getOperation();
     OpBuilder builder{&getContext()};
     funcOp.walk([&](omp::ParallelOp parOp) {
-      // The values used to construct the smuggling struct.
-      SmallVector<LLVM::LLVMType, 8> fieldTypes;
-      SmallVector<Value, 8> fieldSrcs;
+      llvm::SetVector<Value> values;
 
-      // A mapping from original values to the OpOperands within the
-      // parallel region that use those values, for value replacement.
-      std::unordered_map<void *, std::list<OpOperand *>> valueMap;
+      visitUsedValuesDefinedAbove({parOp.region()}, [&](OpOperand *opOperand) {
+        auto value = opOperand->get();
 
-      // Find values that cross the loop
-      parOp.walk([&](mlir::Operation *childOp) {
-        if (childOp == parOp.getOperation()) {
+        // If it's not an LLVM type, or if it's an LLVM pointer type, we
+        // don't need or want to smuggle this value in via a struct.
+        auto llvmType = value.getType().dyn_cast<LLVM::LLVMType>();
+        if (!llvmType || llvmType.isPointerTy()) {
           return;
         }
-        for (auto &opOperand : childOp->getOpOperands()) {
-          auto value = opOperand.get();
 
-          // Simple check: if it's not an LLVM type, or if it's an LLVM
-          // pointer type, we don't need or want to smuggle this value in
-          // via a struct.
-          auto llvmType = value.getType().dyn_cast<LLVM::LLVMType>();
-          if (!llvmType || llvmType.isPointerTy()) {
-            continue;
-          }
-
-          Region *region = nullptr;
-          if (auto blockArg = value.dyn_cast<BlockArgument>()) {
-            region = blockArg.getParentRegion();
-          } else {
-            region = value.getDefiningOp()->getParentRegion();
-          }
-
-          // Check the value's source's nested region chain: if we encounter the
-          // parOp's region, then the value is defined within the parOp and
-          // doesn't need to be (can't be) smuggled.
-          bool definedInsideParOp = false;
-          while (region) {
-            if (region == &parOp.region()) {
-              definedInsideParOp = true;
-              break;
-            }
-            region = region->getParentRegion();
-          }
-          if (definedInsideParOp) {
-            continue;
-          }
-
-          // Otherwise, we need to smuggle the value through an alloca'd struct.
-          auto [it, inserted] = valueMap.try_emplace(value.getAsOpaquePointer(),
-                                                     std::list<OpOperand *>{});
-          if (inserted) {
-            fieldTypes.emplace_back(llvmType);
-            fieldSrcs.emplace_back(value);
-          }
-          it->second.emplace_back(&opOperand);
-        }
+        // Otherwise, we need to smuggle the value through an alloca'd
+        // struct.
+        values.insert(value);
       });
 
-      if (!fieldTypes.size()) {
+      if (!values.size()) {
         return; // Nothing to do.
       }
 
       // Build the structure.
       builder.setInsertionPoint(parOp);
-      auto structTy = LLVM::LLVMType::getStructTy(&getContext(), fieldTypes);
+      LLVM::LLVMType structTy;
+      {
+        SmallVector<LLVM::LLVMType, 8> types;
+        for (auto val : values) {
+          types.push_back(val.getType().cast<LLVM::LLVMType>());
+        }
+        structTy = LLVM::LLVMType::getStructTy(&getContext(), types);
+      }
       auto structPtrTy = structTy.getPointerTo();
       auto numElements = builder.create<LLVM::ConstantOp>(
           parOp.getLoc(), LLVM::LLVMType::getInt64Ty(&getContext()),
@@ -185,7 +153,7 @@ struct OpenMPWorkaroundPass final
           parOp.getLoc(), structPtrTy, numElements, 0);
       Value srcStructVal =
           builder.create<LLVM::UndefOp>(parOp.getLoc(), structTy);
-      for (auto srcIdx : llvm::enumerate(fieldSrcs)) {
+      for (auto srcIdx : llvm::enumerate(values)) {
         srcStructVal = builder.create<LLVM::InsertValueOp>(
             parOp.getLoc(), srcStructVal, srcIdx.value(),
             builder.getI64ArrayAttr(srcIdx.index()));
@@ -196,14 +164,12 @@ struct OpenMPWorkaroundPass final
       builder.setInsertionPointToStart(&parOp.region().front());
       auto dstStructVal =
           builder.create<LLVM::LoadOp>(parOp.getLoc(), structPtr);
-      for (auto srcIdx : llvm::enumerate(fieldSrcs)) {
-        auto dstVal = builder.create<LLVM::ExtractValueOp>(
+      for (auto srcIdx : llvm::enumerate(values)) {
+        auto smuggledValue = builder.create<LLVM::ExtractValueOp>(
             parOp.getLoc(), srcIdx.value().getType(), dstStructVal,
             builder.getI64ArrayAttr(srcIdx.index()));
-        for (OpOperand *opOperand :
-             valueMap[srcIdx.value().getAsOpaquePointer()]) {
-          opOperand->set(dstVal);
-        }
+        replaceAllUsesInRegionWith(srcIdx.value(), smuggledValue,
+                                   parOp.region());
       }
     });
   }
@@ -321,8 +287,6 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createLowerToLLVMPass());
   pm.addPass(createTraceLinkingPass());
-  pm.addPass(createCanonicalizerPass());
-  pm.addPass(createCSEPass());
   pm.addPass(createOpenMPWorkaroundPass());
 }
 

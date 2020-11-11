@@ -104,17 +104,15 @@ def SubgroupBroadcastOp : StdX_Op<"subgroup_broadcast", [NoSideEffect, AllTypesM
   let verifier = ?;
 }
 
-def AnyVectorOrScalar : AnyTypeOf<[AnyStdScalar, AnyVector]> {} 
+def AnyVectorOrScalar : AnyTypeOf<[AnyStdScalar, AnyVector]> {}
+def SubgroupBlockReadOutputType : AnyTypeOf<[AnyStdScalar, AnyVector, AnyMemRef]> {}
 
-def SubgroupBlockReadINTELOp : StdX_Op<"subgroup_block_read_intel",
-     [TypesMatchWith<"result type matches element type of 'memref'",
-                     "memref", "result",
-                     "$_self.cast<mlir::MemRefType>().getElementType()">]> {
+def SubgroupBlockReadINTELOp : StdX_Op<"subgroup_block_read_intel", [NoSideEffect]> {
   let summary = "See intel_subgroups extension.";
   let arguments = (ins Arg<AnyMemRef, "the reference to subgroup block read from",
                            [MemRead]>:$memref,
                            Variadic<Index>:$indices);
-  let results = (outs AnyVectorOrScalar:$result);
+  let results = (outs SubgroupBlockReadOutputType:$result);
 
   let builders = [OpBuilder<
     "mlir::OpBuilder &, mlir::OperationState &result, mlir::Value memref,"
@@ -130,13 +128,10 @@ def SubgroupBlockReadINTELOp : StdX_Op<"subgroup_block_read_intel",
     operand_range getIndices() { return {operand_begin() + 1, operand_end()}; }
   }];
 
-  let assemblyFormat = "$memref `[` $indices `]` attr-dict `:` type($memref)";
+  let assemblyFormat = "$memref `[` $indices `]` attr-dict `:` type($memref)`,` type($result)";
 }
 
-def SubgroupBlockWriteINTELOp : StdX_Op<"subgroup_block_write_intel",
-     [TypesMatchWith<"type of 'value' matches element type of 'memref'",
-                     "memref", "value",
-                     "$_self.cast<mlir::MemRefType>().getElementType()">]> {
+def SubgroupBlockWriteINTELOp : StdX_Op<"subgroup_block_write_intel", [NoSideEffect]> {
   let summary = "See intel_subgroups extension.";
 
   let arguments = (ins AnyVectorOrScalar:$value,
@@ -162,7 +157,7 @@ def SubgroupBlockWriteINTELOp : StdX_Op<"subgroup_block_write_intel",
   }];
 
   let assemblyFormat = [{
-    $value `,` $memref `[` $indices `]` attr-dict `:` type($memref)
+    $value `,` $memref `[` $indices `]` attr-dict `:` type($value) `,` type($memref)
   }];
 }
 

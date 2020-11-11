@@ -404,10 +404,9 @@ ConvertAlloc::matchAndRewrite(mlir::Operation *opPtr,
                                               sizes, rewriter);
 
   // Build the call to allocate memory on the device.
-  auto alloc =
-      rewriter.create<LLVM::CallOp>(loc, mlir::TypeRange{getVoidPtrType()},
-                                    rewriter.getSymbolRefAttr(kOclAlloc),
-                                    mlir::ValueRange{operands[0], sizeToAlloc});
+  auto alloc = rewriter.create<LLVM::CallOp>(
+      loc, getVoidPtrType(), rewriter.getSymbolRefAttr(kOclAlloc),
+      mlir::ValueRange{operands[0], sizeToAlloc});
   mlir::Value memRaw = alloc.getResult(0);
   auto targetType = typeConverter.convertType(resultType.getElementType())
                         .dyn_cast_or_null<LLVM::LLVMType>();
