@@ -18,6 +18,18 @@ steps:
       - "bazel-testlogs/**/test.log"
 {{/variants}}
 
+  - label: ':hammer_and_wrench: :linux: :beer:'
+    command: |
+      cmake \
+        -B build-opt \
+        -G Ninja \
+        -D CMAKE_BUILD_TYPE=Release \
+        -D ENABLE_OPENVINO_BRIDGE=ON
+      ninja -C build-opt check-test
+    key: linux_x86_64_cmake
+    agents:
+      PLATFORM: linux_x86_64
+
 
 # test phase
 

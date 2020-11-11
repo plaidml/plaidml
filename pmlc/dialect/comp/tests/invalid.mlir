@@ -63,26 +63,6 @@ func @invalid_alloc(%dev: !comp.device) {
 
 // -----
 
-func @invalid_alloc(%dev: !comp.device) {
-  %env = comp.create_execenv %dev : (!comp.device) -> !comp.execenv<0:0,(11)>
-  %host = "op"() : () -> (memref<1x1xf32>)
-  // expected-error@+1 {{'comp.alloc' op host and device memory shapes must match}}
-  %mem = comp.alloc %env %host : (!comp.execenv<0:0,(11)>, memref<1x1xf32>) -> (memref<2x3xf32, 11>)
-  return
-}
-
-// -----
-
-func @invalid_alloc(%dev: !comp.device) {
-  %env = comp.create_execenv %dev : (!comp.device) -> !comp.execenv<0:0,(11)>
-  %host = "op"() : () -> (memref<2x3xf32>)
-  // expected-error@+1 {{'comp.alloc' op host and device memory element types must match}}
-  %mem = comp.alloc %env %host : (!comp.execenv<0:0,(11)>, memref<2x3xf32>) -> (memref<2x3xf16, 11>)
-  return
-}
-
-// -----
-
 func @invalid_dealloc(%dev: !comp.device) {
   %env = comp.create_execenv %dev : (!comp.device) -> !comp.execenv<0:0,(11)>
   %mem = "op"() : () -> (memref<2x3xf32, 1>)
@@ -100,6 +80,30 @@ func @invalid_write(%dev: !comp.device) {
   // expected-error@+1 {{'comp.schedule_write' op memory space is not supported by execenv}}
   %ev = comp.schedule_write %host to %device on %env
       : (memref<2x3xf32>, memref<2x3xf32, 1>, !comp.execenv<0:0,(11)>) -> (!comp.event<0>)
+  return
+}
+
+// -----
+
+func @invalid_write(%dev: !comp.device) {
+  %env = comp.create_execenv %dev : (!comp.device) -> !comp.execenv<0:0,(11)>
+  %host = "op"() : () -> (memref<1x1xf32>)
+  %device = "op"() : () -> (memref<2x3xf32, 11>)
+  // expected-error@+1 {{'comp.schedule_write' op failed to verify that all of {hostMem, deviceMem} have same shape}}
+  %ev = comp.schedule_write %host to %device on %env
+      : (memref<1x1xf32>, memref<2x3xf32, 11>, !comp.execenv<0:0,(11)>) -> (!comp.event<0>)
+  return
+}
+
+// -----
+
+func @invalid_write(%dev: !comp.device) {
+  %env = comp.create_execenv %dev : (!comp.device) -> !comp.execenv<0:0,(11)>
+  %host = "op"() : () -> (memref<2x3xf32>)
+  %device = "op"() : () -> (memref<2x3xf16, 11>)
+  // expected-error@+1 {{'comp.schedule_write' op failed to verify that all of {hostMem, deviceMem} have same element type}}
+  %ev = comp.schedule_write %host to %device on %env
+      : (memref<2x3xf32>, memref<2x3xf16, 11>, !comp.execenv<0:0,(11)>) -> (!comp.event<0>)
   return
 }
 

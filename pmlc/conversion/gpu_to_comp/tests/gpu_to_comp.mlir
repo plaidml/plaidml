@@ -6,7 +6,9 @@ module attributes {gpu.container_module} {
   //   CHECK-SAME:     %[[DEV:[a-zA-Z0-9]*]]:
   //   CHECK-SAME:     %[[ARGMEM:[a-zA-Z0-9]*]]:
   //        CHECK:   %[[ENV:.*]] = comp.create_execenv %[[DEV]]
-  //      SPACE11:   %[[MEM:.*]] = comp.alloc %[[ENV]] %[[ARGMEM]]
+  //      SPACE11:   %[[MEM:.*]] = comp.alloc %[[ENV]]
+  //      SPACE11:   %[[WEV:.*]] = comp.schedule_write %[[ARGMEM]] to %[[MEM]] on %[[ENV]]
+  //      SPACE11:   comp.wait %[[WEV]]
   //        CHECK:   %[[FEV:.*]] = "comp.schedule_func"(%[[ENV]])
   //   CHECK-NEXT:     gpu.launch_func
   //  SPACE0-SAME:       %[[ARGMEM]]
@@ -45,7 +47,9 @@ module attributes {gpu.container_module} {
   //   CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]*]]:
 
   //        CHECK:   %[[ENV0:.*]] = comp.create_execenv %[[DEV]]
-  //      SPACE11:   %[[MEM02:.*]] = comp.alloc %[[ENV0]] %[[ARG2]]
+  //      SPACE11:   %[[MEM02:.*]] = comp.alloc %[[ENV0]]
+  //      SPACE11:   %[[WEV02:.*]] = comp.schedule_write %[[ARG2]] to %[[MEM02]] on %[[ENV0]]
+  //      SPACE11:   comp.wait %[[WEV02]]
   //        CHECK:   %[[FEV0:.*]] = "comp.schedule_func"(%[[ENV0]])
   //        CHECK:     gpu.launch_func
   //  SPACE0-SAME:       %[[ARG2]]
@@ -57,9 +61,15 @@ module attributes {gpu.container_module} {
   //        CHECK:   comp.destroy_execenv %[[ENV0]]
 
   //        CHECK:   %[[ENV1:.*]] = comp.create_execenv %[[DEV]]
-  //      SPACE11:   %[[MEM10:.*]] = comp.alloc %[[ENV1]] %[[ARG0]]
-  //      SPACE11:   %[[MEM11:.*]] = comp.alloc %[[ENV1]] %[[ARG1]]
-  //      SPACE11:   %[[MEM12:.*]] = comp.alloc %[[ENV1]] %[[ARG2]]
+  //      SPACE11:   %[[MEM10:.*]] = comp.alloc %[[ENV1]]
+  //      SPACE11:   %[[WEV10:.*]] = comp.schedule_write %[[ARG0]] to %[[MEM10]] on %[[ENV1]]
+  //      SPACE11:   comp.wait %[[WEV10]]
+  //      SPACE11:   %[[MEM11:.*]] = comp.alloc %[[ENV1]]
+  //      SPACE11:   %[[WEV11:.*]] = comp.schedule_write %[[ARG1]] to %[[MEM11]] on %[[ENV1]]
+  //      SPACE11:   comp.wait %[[WEV11]]
+  //      SPACE11:   %[[MEM12:.*]] = comp.alloc %[[ENV1]]
+  //      SPACE11:   %[[WEV12:.*]] = comp.schedule_write %[[ARG2]] to %[[MEM12]] on %[[ENV1]]
+  //      SPACE11:   comp.wait %[[WEV12]]
   //        CHECK:   %[[FEV1:.*]] = "comp.schedule_func"(%[[ENV1]])
   //        CHECK:     gpu.launch_func
   //  SPACE0-SAME:       %[[ARG0]], %[[ARG1]], %[[ARG2]]

@@ -132,6 +132,19 @@ function(pml_cc_binary)
           RUNTIME DESTINATION bin)
 endfunction()
 
+function(pml_link_whole_libs TARGET)
+  set(_DEPS "${ARGN}")
+  pml_package_ns(_PACKAGE_NS)
+  # Replace dependencies passed by ::name with ::pml::package::name
+  list(TRANSFORM _DEPS REPLACE "^::" "${_PACKAGE_NS}::")
+
+  # Defer computing transitive dependencies and calling target_link_libraries()
+  # until all libraries have been declared.
+  # Track target and deps, use in pml_complete_binary_link_options() later.
+  set_property(GLOBAL APPEND PROPERTY _PML_CC_BINARY_NAMES "${TARGET}")
+  set_property(TARGET ${TARGET} PROPERTY DIRECT_DEPS ${_DEPS})
+endfunction()
+
 # Sets target_link_libraries() on all registered binaries.
 # This must be called after all libraries have been declared.
 function(pml_complete_binary_link_options)

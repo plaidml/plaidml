@@ -53,3 +53,8 @@ tool_names = [
 ]
 tools = [ToolSubst(s, unresolved='ignore') for s in tool_names]
 llvm_config.add_tool_substitutions(tools, tool_dirs)
+
+# FileCheck -enable-var-scope is enabled by default in MLIR test
+# This option avoids to accidentally reuse variable across -LABEL match,
+# it can be explicitly opted-in by prefixing the variable name with $
+config.environment['FILECHECK_OPTS'] = "-enable-var-scope"

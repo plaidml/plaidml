@@ -39,6 +39,7 @@ endif()
 # -------------------------------------------------------------------------------
 # Project component configuration
 # -------------------------------------------------------------------------------
+option(ENABLE_OPENVINO_BRIDGE "Enable the OpenVINO plugin" ON)
 option(PML_BUILD_TESTS "Builds PML unit tests." ON)
 
 list(APPEND CMAKE_MODULE_PATH
@@ -59,7 +60,6 @@ if(${PML_BUILD_TESTS})
     USES_TERMINAL
   )
 endif()
-
 
 # -------------------------------------------------------------------------------
 # Third party dependencies
