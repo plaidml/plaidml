@@ -3,6 +3,7 @@
 
 #include "mlir/Pass/Pass.h"
 
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "pmlc/dialect/abi/ir/dialect.h"
 #include "pmlc/util/ids.h"
 

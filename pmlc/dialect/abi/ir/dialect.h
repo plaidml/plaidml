@@ -2,12 +2,12 @@
 
 #pragma once
 
-#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/Module.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/Interfaces/LoopLikeInterface.h"
+#include "mlir/Interfaces/SideEffectInterfaces.h"
 
 #include "pmlc/util/loop_with_epilog.h"
 
@@ -19,7 +19,6 @@ using mlir::ModuleOp;
 using mlir::Operation;
 using mlir::Region;
 using mlir::Value;
-using mlir::LLVM::LLVMFuncOp;
 
 namespace OpTrait = mlir::OpTrait;
 
