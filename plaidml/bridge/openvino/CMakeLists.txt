@@ -1,14 +1,7 @@
 set(OUTPUT_ROOT ${CMAKE_BINARY_DIR})
 
-find_package(InferenceEngineDeveloperPackage)
+find_package(InferenceEngineDeveloperPackage QUIET)
 if(NOT InferenceEngineDeveloperPackage_FOUND)
-  CPMAddPackage(
-    NAME openvino
-    GITHUB_REPOSITORY plaidml/openvino
-    GIT_TAG 89d83c2858e346dc2e3c0c1d53376fa5ddb8ea26
-    DOWNLOAD_ONLY ON
-  )
-
   set(CI_BUILD_NUMBER "0")
   set(ENABLE_CLDNN OFF)
   set(ENABLE_CPPLINT OFF)
@@ -25,6 +18,17 @@ if(NOT InferenceEngineDeveloperPackage_FOUND)
   set(NGRAPH_ONNX_IMPORT_ENABLE OFF)
   set(TREAT_WARNING_AS_ERROR OFF)
 
+  FetchContent_Declare(
+    openvino
+    GIT_REPOSITORY https://github.com/plaidml/openvino.git
+    GIT_TAG        507de2630fb341b4732ace986af22cc6f71ca459
+  )
+  if(LOCAL_OPENVINO_DIR)
+    set(openvino_SOURCE_DIR ${LOCAL_OPENVINO_DIR})
+    set(openvino_BINARY_DIR ${CMAKE_BINARY_DIR}/_deps/openvino-build)
+  elseif(NOT openvino_POPULATED)
+    FetchContent_Populate(openvino)
+  endif()
   add_subdirectory(${openvino_SOURCE_DIR} ${openvino_BINARY_DIR} EXCLUDE_FROM_ALL)
 
   set(BIN_FOLDER "bin/intel64")
