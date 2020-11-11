@@ -743,4 +743,49 @@ plaidml_program* plaidml_build(  //
   });
 }
 
+void plaidml_exprs_free(  //
+    plaidml_error* err,   //
+    plaidml_exprs* exprs) {
+  ffi_wrap_void(err, [&] {
+    delete[] exprs->elts;
+    delete exprs;
+  });
+}
+
+plaidml_exprs* plaidml_expr_layer(  //
+    plaidml_error* err,             //
+    const char* op,                 //
+    size_t nattrs,                  //
+    plaidml_attr** raw_attrs,       //
+    size_t ninputs,                 //
+    plaidml_expr** inputs,          //
+    size_t noutputs,                //
+    plaidml_expr** outputs) {
+  return ffi_wrap<plaidml_exprs*>(err, nullptr, [&] {
+    IVLOG(3, "plaidml_expr_layer");
+    llvm::StringMap<ast::VarNodePtr> attrs;
+    for (size_t i = 0; i < nattrs; i++) {
+      plaidml_attr* attr = raw_attrs[i];
+      attrs[attr->key] = attr->value->node;
+    }
+    std::vector<ast::ExprNodePtr> operands;
+    operands.reserve(ninputs);
+    for (size_t i = 0; i < ninputs; i++) {
+      operands.push_back(inputs[i]->node);
+    }
+    std::vector<ast::ExprNodePtr> results;
+    results.reserve(noutputs);
+    for (size_t i = 0; i < noutputs; i++) {
+      results.push_back(outputs[i]->node);
+    }
+    auto node = std::make_shared<ast::ExprNodeLayer>(op, operands, results, attrs);
+    std::vector<ast::ExprNodePtr> outerResults;
+    outerResults.reserve(noutputs);
+    for (size_t i = 0; i < noutputs; i++) {
+      outerResults.push_back(std::make_shared<ast::ExprNodeElement>(node, i));
+    }
+    return ffi_vector<plaidml_exprs, plaidml_expr>(outerResults);
+  });
+}
+
 }  // extern "C"

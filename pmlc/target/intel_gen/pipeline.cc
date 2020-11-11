@@ -43,8 +43,10 @@ using namespace mlir; // NOLINT[build/namespaces]
 
 namespace pmlc::target::intel_gen {
 
-namespace pxa = pmlc::dialect::pxa;
-namespace comp = pmlc::dialect::comp;
+namespace comp = dialect::comp;
+namespace pxa = dialect::pxa;
+namespace stdx = dialect::stdx;
+namespace tile = dialect::tile;
 
 namespace {
 
@@ -101,7 +103,7 @@ struct ParallelLoopToGpuPass
     populateParallelLoopToGPUPatterns(patterns, &getContext());
     ConversionTarget target(getContext());
     target.addLegalDialect<StandardOpsDialect>();
-    target.addLegalDialect<pmlc::dialect::stdx::StdXDialect>();
+    target.addLegalDialect<stdx::StdXDialect>();
     target.addLegalDialect<AffineDialect>();
     target.addLegalDialect<gpu::GPUDialect>();
     target.addLegalDialect<scf::SCFDialect>();
@@ -128,21 +130,22 @@ std::unique_ptr<Pass> createLowerPXAToAffinePass() {
 
 void pipelineBuilder(OpPassManager &pm) {
   // Bound + pad initial tile code
-  pm.addPass(dialect::tile::createComputeBoundsPass());
-  pm.addPass(dialect::tile::createPadRangesPass());
-  pm.addPass(dialect::tile::createPadConstraintsPass());
+  pm.addPass(tile::createInlineLayersPass());
+  pm.addPass(tile::createComputeBoundsPass());
+  pm.addPass(tile::createPadRangesPass());
+  pm.addPass(tile::createPadConstraintsPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
   // Lower to PXA
   pm.addPass(conversion::tile_to_pxa::createLowerTileToPXAPass());
-  pm.addPass(pmlc::dialect::pxa::createAffineNormalizePass());
+  pm.addPass(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
   // Do subgroup or accumulation
-  pm.addPass(pmlc::dialect::pxa::createSubgroupsPass());
-  pm.addPass(pmlc::dialect::pxa::createAffineNormalizePass());
+  pm.addPass(pxa::createSubgroupsPass());
+  pm.addPass(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
@@ -161,8 +164,8 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(createCSEPass());
 
   // Assign GPU blocks + threads to outermost loop
-  pm.addPass(pmlc::dialect::pxa::createGPUThreadPass(/*maxThreads=*/64));
-  pm.addPass(pmlc::dialect::pxa::createAffineNormalizePass());
+  pm.addPass(pxa::createGPUThreadPass(/*maxThreads=*/64));
+  pm.addPass(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
@@ -187,7 +190,7 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(createCSEPass());
 
   // Fix booleans
-  pm.addPass(dialect::stdx::createI1StorageToI32Pass());
+  pm.addPass(stdx::createI1StorageToI32Pass());
 
   // Devectorize
   pm.addPass(createSubgroupBroadcastPass());

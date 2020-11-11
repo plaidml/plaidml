@@ -28,6 +28,7 @@ struct ExprNodeDim;
 struct ExprNodeElement;
 struct ExprNodeInput;
 struct ExprNodeIntrinsic;
+struct ExprNodeLayer;
 struct ExprNodePragma;
 
 struct DimNode;
@@ -212,6 +213,20 @@ struct ExprNodeIntrinsic : NodeBase<ExprNodeIntrinsic, ExprNode> {
   std::vector<ExprNodePtr> operands;
 
   ExprNodeIntrinsic(llvm::StringRef op, llvm::ArrayRef<ExprNodePtr> operands);
+  std::string str() const final;
+};
+
+struct ExprNodeLayer : NodeBase<ExprNodeLayer, ExprNode> {
+  using Base = NodeBase<ExprNodeLayer, ExprNode>;
+
+  std::string op;
+  std::vector<ExprNodePtr> operands;
+  std::vector<ExprNodePtr> results;
+  llvm::StringMap<VarNodePtr> attrs;
+
+  ExprNodeLayer(llvm::StringRef op, llvm::ArrayRef<ExprNodePtr> operands,
+                llvm::ArrayRef<ExprNodePtr> results,
+                const llvm::StringMap<VarNodePtr> &attrs);
   std::string str() const final;
 };
 
