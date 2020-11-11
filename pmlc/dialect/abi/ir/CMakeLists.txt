@@ -6,6 +6,7 @@ pml_cc_library(
     ops.h.inc
   SRCS
     dialect.cc
+    loop_op.cc
   DEPS
     ::ops-gen
   PUBLIC

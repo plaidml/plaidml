@@ -37,12 +37,17 @@ plaidml_cc_library(
     name = "ir",
     srcs = [
         "dialect.cc",
+        "loop_op.cc",
     ],
     hdrs = [
         "dialect.h"
     ],
     deps = [
         ":gen-ops",
+        "@llvm-project//mlir:ControlFlowInterfaces",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:StandardOps",
+        "@llvm-project//mlir:VectorInterfaces",
+        "@llvm-project//mlir:ViewLikeInterface",
     ],
 )
