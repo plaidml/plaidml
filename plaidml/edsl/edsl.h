@@ -30,6 +30,7 @@ namespace details {
 struct Deleter {
   void operator()(plaidml_dim_expr* ptr) { ffi::call_void(plaidml_dim_expr_free, ptr); }
   void operator()(plaidml_expr* ptr) { ffi::call_void(plaidml_expr_free, ptr); }
+  void operator()(plaidml_exprs* ptr) { ffi::call_void(plaidml_exprs_free, ptr); }
   void operator()(plaidml_integers* ptr) { ffi::call_void(plaidml_integers_free, ptr); }
   void operator()(plaidml_poly_expr* ptr) { ffi::call_void(plaidml_poly_expr_free, ptr); }
   void operator()(plaidml_strings* ptr) { ffi::call_void(plaidml_strings_free, ptr); }
@@ -360,6 +361,8 @@ class Tensor {
   std::shared_ptr<plaidml_expr> ptr_;
   TensorLens lens_;
 };
+
+using Tensors = std::vector<Tensor>;
 
 ///
 /// \ingroup edsl_objects
@@ -703,11 +706,11 @@ inline Tensor Placeholder(             //
 
 inline Tensor Zero() { return Tensor(0); }
 
-Tensor intrinsicCall(const std::string& fn, const std::vector<Tensor>& args);
+Tensor intrinsicCall(const std::string& fn, const Tensors& args);
 
 template <typename... Ts>
 Tensor intrinsic(const std::string& fn, Ts... args) {
-  std::vector<Tensor> vec;
+  Tensors vec;
   details::into_vector(&vec, std::forward<Ts>(args)...);
   return intrinsicCall(fn, vec);
 }
@@ -822,7 +825,7 @@ inline Tensor ident(const Tensor& x) { return intrinsic("ident", x); }
 /// \return Tensor
 ///
 inline Tensor index(const std::vector<TensorDim>& dims, size_t axis) {
-  std::vector<Tensor> args = {Tensor{static_cast<int64_t>(axis)}};
+  Tensors args = {Tensor{static_cast<int64_t>(axis)}};
   for (const auto& dim : dims) {
     args.emplace_back(dim);
   }
@@ -851,7 +854,7 @@ inline Tensor pow(const Tensor& x, const Tensor& y) { return intrinsic("pow", x,
 /// \return Tensor
 ///
 inline std::pair<Tensor, Tensor> prng(const Tensor& state, const std::vector<int64_t>& dims) {
-  std::vector<Tensor> args = {state};
+  Tensors args = {state};
   for (int64_t dim : dims) {
     args.emplace_back(TensorDim(dim));
   }
@@ -866,7 +869,7 @@ inline std::pair<Tensor, Tensor> prng(const Tensor& state, const std::vector<int
 /// \return Tensor
 ///
 inline Tensor reshape(const Tensor& x, const std::vector<int64_t>& dims) {
-  std::vector<Tensor> args = {x};
+  Tensors args = {x};
   for (int64_t dim : dims) {
     args.emplace_back(dim);
   }
@@ -880,7 +883,7 @@ inline Tensor reshape(const Tensor& x, const std::vector<int64_t>& dims) {
 /// \return Tensor
 ///
 inline Tensor reshape(const Tensor& x, const std::vector<TensorDim>& dims) {
-  std::vector<Tensor> args = {x};
+  Tensors args = {x};
   for (const TensorDim& dim : dims) {
     args.emplace_back(dim);
   }
@@ -1049,7 +1052,7 @@ PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(^, "bit_xor");
 PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(&&, "logical_and");
 PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(||, "logical_or");
 
-inline Tensor intrinsicCall(const std::string& fn, const std::vector<Tensor>& args) {
+inline Tensor intrinsicCall(const std::string& fn, const Tensors& args) {
   std::vector<plaidml_expr*> ptrs(args.size());
   for (size_t i = 0; i < args.size(); i++) {
     ptrs[i] = args[i].as_ptr();
@@ -1212,8 +1215,7 @@ inline Value make_tuple(const std::vector<Value>& elts) {  //
 
 inline Value None() { return Value(); }
 
-inline Program buildProgram(const std::string& name, const std::vector<Tensor>& inputs,
-                            const std::vector<Tensor>& outputs) {
+inline Program buildProgram(const std::string& name, const Tensors& inputs, const Tensors& outputs) {
   std::vector<plaidml_expr*> input_exprs(inputs.size());
   for (size_t i = 0; i < inputs.size(); i++) {
     input_exprs[i] = inputs[i].as_ptr();
@@ -1253,9 +1255,9 @@ inline std::ostream& operator<<(std::ostream& os, const Value& x) {
   return os;
 }
 
-using PragmaAttrs = std::unordered_map<std::string, Value>;
+using Dictionary = std::unordered_map<std::string, Value>;
 
-inline Tensor pragma(const Tensor& tensor, const std::string& op, const PragmaAttrs& attrs) {
+inline Tensor pragma(const Tensor& tensor, const std::string& op, const Dictionary& attrs) {
   std::vector<plaidml_attr> elts;
   std::vector<plaidml_attr*> ptrs;
   elts.reserve(attrs.size());
@@ -1272,6 +1274,65 @@ inline Tensor pragma(const Tensor& tensor, const std::string& op, const PragmaAt
 /// Adds a tracepoint to the graph
 ///
 inline Tensor trace(const Tensor& x, const std::string& msg) { return pragma(x, "trace", {{"msg", Value(msg)}}); }
+
+using LayerBodySingleFn = std::function<Tensor()>;
+using LayerBodyMultiFn = std::function<Tensors()>;
+
+inline Tensors layer(const std::string& op, const Tensors& operands, const Dictionary& attrs,
+                     const LayerBodyMultiFn& fn) {
+  Tensors innerResults = fn();
+
+  std::vector<plaidml_attr> elts;
+  std::vector<plaidml_attr*> ptrs;
+  elts.reserve(attrs.size());
+  ptrs.reserve(attrs.size());
+  for (const auto& kvp : attrs) {
+    plaidml_attr attr{kvp.first.c_str(), kvp.second.as_ptr()};
+    elts.push_back(attr);
+    ptrs.push_back(&elts.back());
+  }
+
+  std::vector<plaidml_expr*> rawOperands;
+  rawOperands.reserve(operands.size());
+  for (Tensor operand : operands) {
+    rawOperands.push_back(operand.as_ptr());
+  }
+
+  std::vector<plaidml_expr*> rawResults;
+  rawResults.reserve(innerResults.size());
+  for (Tensor result : innerResults) {
+    rawResults.push_back(result.as_ptr());
+  }
+
+  auto outerExprs = details::make_ptr(  //
+      ffi::call<plaidml_exprs*>(        //
+          plaidml_expr_layer,           //
+          op.c_str(),                   //
+          ptrs.size(),                  //
+          ptrs.data(),                  //
+          rawOperands.size(),           //
+          rawOperands.data(),           //
+          rawResults.size(),            //
+          rawResults.data()));
+
+  Tensors outerResults;
+  outerResults.reserve(outerExprs->size);
+  for (size_t i = 0; i < outerExprs->size; i++) {
+    plaidml_expr* expr = outerExprs->elts[i];
+    outerResults.push_back(Tensor{expr});
+  }
+
+  return outerResults;
+}
+
+inline Tensor layer(const std::string& op, const Tensors& operands, const Dictionary& attrs,
+                    const LayerBodySingleFn& fn) {
+  return layer(op, operands, attrs, [&]() { return Tensors{fn()}; })[0];
+}
+
+inline Tensor layer(const std::string& op, const Tensors& operands, const LayerBodySingleFn& fn) {
+  return layer(op, operands, {}, fn);
+}
 
 }  // namespace edsl
 }  // namespace plaidml
