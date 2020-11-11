@@ -65,6 +65,7 @@ plaidml_cc_library(
         "//pmlc/conversion/scf_to_omp",
         "//pmlc/conversion/stdx_to_llvm",
         "//pmlc/conversion/tile_to_pxa",
+        "//pmlc/dialect/abi",
         "//pmlc/dialect/comp",
         "//pmlc/dialect/pxa",
         "//pmlc/dialect/stdx",
