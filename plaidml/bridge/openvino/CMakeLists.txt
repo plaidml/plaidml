@@ -1,77 +1,41 @@
 set(OUTPUT_ROOT ${CMAKE_BINARY_DIR})
 
-function(git_command CWD)
-  string(JOIN " " _COMMAND ${ARGN})
-  message("git ${_COMMAND}")
-  execute_process(
-    COMMAND ${GIT_EXECUTABLE} ${ARGN}
-    RESULT_VARIABLE result
-    WORKING_DIRECTORY "${CWD}"
-    OUTPUT_QUIET
-  )
-  if(result)
-    message(FATAL_ERROR "git command failed: \"${_COMMAND}\"")
-  endif()
-endfunction()
-
 find_package(InferenceEngineDeveloperPackage)
 if(NOT InferenceEngineDeveloperPackage_FOUND)
-  set(OPENVINO_GIT_REMOTE git@github.com:plaidml/openvino.git)
-  set(OPENVINO_GIT_TAG    a2d0a79535e96ba7ae6f552cbda670501d6f2cad)
-  set(OPENVINO_SOURCE_DIR "${CMAKE_BINARY_DIR}/_deps/openvino-src")
-  set(OPENVINO_BINARY_DIR "${CMAKE_BINARY_DIR}/_deps/openvino-build")
-  file(MAKE_DIRECTORY ${OPENVINO_SOURCE_DIR})
-  file(MAKE_DIRECTORY ${OPENVINO_BINARY_DIR})
-
-  set(OPENVINO_CMAKE_OPTIONS
-    -G ${CMAKE_GENERATOR}
-    -D CMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
-    -D CMAKE_C_COMPILER_LAUNCHER=${CMAKE_C_COMPILER_LAUNCHER}
-    -D CMAKE_CXX_COMPILER_LAUNCHER=${CMAKE_CXX_COMPILER_LAUNCHER}
-    -D ENABLE_CLDNN=OFF
-    -D ENABLE_DATA=OFF
-    -D ENABLE_FUNCTIONAL_TESTS=ON
-    -D ENABLE_GAPI_TESTS=OFF
-    -D ENABLE_GNA=OFF
-    -D ENABLE_MKL_DNN=OFF
-    -D ENABLE_MYRIAD=OFF
-    -D ENABLE_PROFILING_ITT=OFF
-    -D ENABLE_SPEECH_DEMO=OFF
-    -D ENABLE_TESTS=ON
-    -D ENABLE_VPU=ON
-    -D OUTPUT_ROOT=${OUTPUT_ROOT}
-    -D TREAT_WARNING_AS_ERROR=OFF
+  CPMAddPackage(
+    NAME openvino
+    GITHUB_REPOSITORY plaidml/openvino
+    GIT_TAG 89d83c2858e346dc2e3c0c1d53376fa5ddb8ea26
+    DOWNLOAD_ONLY ON
   )
 
-  if(NOT IS_DIRECTORY "${OPENVINO_SOURCE_DIR}/.git")
-    git_command(${OPENVINO_SOURCE_DIR} init)
-    git_command(${OPENVINO_SOURCE_DIR} remote add origin ${OPENVINO_GIT_REMOTE})
-  endif()
+  set(CI_BUILD_NUMBER "0")
+  set(ENABLE_CLDNN OFF)
+  set(ENABLE_CPPLINT OFF)
+  set(ENABLE_DATA OFF)
+  set(ENABLE_FUNCTIONAL_TESTS ON)
+  set(ENABLE_GAPI_TESTS OFF)
+  set(ENABLE_GNA OFF)
+  set(ENABLE_MKL_DNN OFF)
+  set(ENABLE_MYRIAD OFF)
+  set(ENABLE_PROFILING_ITT OFF)
+  set(ENABLE_SPEECH_DEMO OFF)
+  set(ENABLE_TESTS ON)
+  set(ENABLE_VPU ON)
+  set(TREAT_WARNING_AS_ERROR OFF)
 
-  git_command(${OPENVINO_SOURCE_DIR} fetch --depth=1 --prune --tags origin ${OPENVINO_GIT_TAG})
-  git_command(${OPENVINO_SOURCE_DIR} checkout --force ${OPENVINO_GIT_TAG})
-  git_command(${OPENVINO_SOURCE_DIR} submodule update --init --depth=1 --recursive --force)
+  add_subdirectory(${openvino_SOURCE_DIR} ${openvino_BINARY_DIR} EXCLUDE_FROM_ALL)
 
-  execute_process(
-    COMMAND ${CMAKE_COMMAND} ${OPENVINO_CMAKE_OPTIONS} ${OPENVINO_SOURCE_DIR}
-    RESULT_VARIABLE result
-    WORKING_DIRECTORY "${OPENVINO_BINARY_DIR}"
-  )
-  if(result)
-    message(FATAL_ERROR "Failed to configure OpenVINO: ${result}")
-  endif()
+  set(BIN_FOLDER bin)
+  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${OUTPUT_ROOT}/${BIN_FOLDER}/${CMAKE_BUILD_TYPE}/lib)
+  set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${OUTPUT_ROOT}/${BIN_FOLDER}/${CMAKE_BUILD_TYPE}/lib)
+  set(CMAKE_COMPILE_PDB_OUTPUT_DIRECTORY ${OUTPUT_ROOT}/${BIN_FOLDER}/${CMAKE_BUILD_TYPE})
+  set(CMAKE_PDB_OUTPUT_DIRECTORY ${OUTPUT_ROOT}/${BIN_FOLDER}/${CMAKE_BUILD_TYPE})
+  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_ROOT}/${BIN_FOLDER}/${CMAKE_BUILD_TYPE})
 
-  execute_process(
-    COMMAND ${CMAKE_COMMAND} --build .
-    RESULT_VARIABLE result
-    WORKING_DIRECTORY "${OPENVINO_BINARY_DIR}"
-  )
-  if(result)
-    message(FATAL_ERROR "Failed to build OpenVINO: ${result}")
-  endif()
-
-  set(InferenceEngineDeveloperPackage_DIR ${OPENVINO_BINARY_DIR})
-  find_package(InferenceEngineDeveloperPackage REQUIRED)
+  set(OpenVINO_MAIN_SOURCE_DIR ${openvino_SOURCE_DIR})
+  set(IE_MAIN_SOURCE_DIR ${OpenVINO_MAIN_SOURCE_DIR}/inference-engine)
+  add_definitions(-DIE_BUILD_POSTFIX=\"${IE_BUILD_POSTFIX}\")
 endif()
 
 file(GLOB_RECURSE _OPS_SRCS CONFIGURE_DEPENDS "ops/*.cpp")
