@@ -20,11 +20,20 @@ steps:
 
   - label: ':hammer_and_wrench: :linux: :beer:'
     command: |
+      echo --- :building_construction: cmake configuration
+      export TEMP=/tmp/$${BUILDKITE_AGENT_NAME}/$${BUILDKITE_PIPELINE_SLUG}
       cmake \
         -B build-opt \
         -G Ninja \
         -D CMAKE_BUILD_TYPE=Release \
-        -D ENABLE_OPENVINO_BRIDGE=ON
+        -D CPM_SOURCE_CACHE=$${TEMP}/cpm \
+        -D ENABLE_OPENVINO_BRIDGE=ON \
+        -D TEMP=$${TEMP}
+
+      echo --- :hammer_and_wrench: ninja
+      ninja -C build-opt
+
+      echo --- :hammer_and_wrench: ninja check-test
       ninja -C build-opt check-test
     key: linux_x86_64_cmake
     agents:

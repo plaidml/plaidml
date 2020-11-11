@@ -11,7 +11,7 @@ function(pml_lit_test)
     _RULE
     ""
     "NAME"
-    "DATA"
+    "DATA;DEPS;LABELS;CHECKS"
     ${ARGN}
   )
 
@@ -30,6 +30,7 @@ function(pml_lit_test)
     USES_TERMINAL
   )
   pml_add_data_dependencies(NAME ${_NAME} DATA ${_RULE_DATA})
+  add_dependencies(${_NAME} ${_RULE_DEPS} FileCheck count not)
 
   string(REPLACE "::" "/" _PACKAGE_PATH ${_PACKAGE_NS})
   set(_TEST_NAME "${_PACKAGE_PATH}/${_RULE_NAME}")
@@ -39,5 +40,13 @@ function(pml_lit_test)
     COMMAND ${_COMMAND}
     WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
   )
+
+  list(APPEND _RULE_LABELS "${_PACKAGE_PATH}")
+  set_property(TEST ${_TEST_NAME} PROPERTY LABELS "${_RULE_LABELS}" "${_RULE_CHECKS}")
+
+  foreach(_CHECK ${_RULE_CHECKS})
+    add_dependencies(check-${_CHECK} ${_NAME} ${_DEPS})
+  endforeach()
+
   set_target_properties(${_NAME} PROPERTIES FOLDER "Tests")
 endfunction()
