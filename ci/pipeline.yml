@@ -28,8 +28,8 @@ steps:
         -D ENABLE_OPENVINO_BRIDGE=ON
       echo --- :hammer_and_wrench: ninja
       ninja -C build-opt
-      echo --- :hammer_and_wrench: ninja check
-      ninja -C build-opt check
+      echo --- :hammer_and_wrench: ninja check-test
+      ninja -C build-opt check-test
     key: linux_x86_64_cmake
     agents:
       PLATFORM: linux_x86_64
