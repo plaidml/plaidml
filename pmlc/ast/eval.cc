@@ -270,6 +270,13 @@ TensorShapes Evaluator::computeShapes(const ExprNode *node) {
           .Case<ExprNodeElement>([&](const auto *node) {
             return TensorShapes{getShape(node->expr, node->ordinal)};
           })
+          .Case<ExprNodeLayer>([&](const auto &node) {
+            TensorShapes ret;
+            for (const ExprNodePtr &result : node->results) {
+              ret.push_back(getShape(result.get()));
+            }
+            return ret;
+          })
           .Case<ExprNodeInput>(
               [&](const auto *node) { return TensorShapes{node->shape}; })
           .Case<ExprNodeIntrinsic>([&](const auto *node) {

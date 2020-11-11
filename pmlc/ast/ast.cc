@@ -169,6 +169,20 @@ std::string ExprNodeIntrinsic::str() const {
 }
 
 //
+// ExprNodeLayer
+//
+
+ExprNodeLayer::ExprNodeLayer(llvm::StringRef op,
+                             llvm::ArrayRef<ExprNodePtr> operands,
+                             llvm::ArrayRef<ExprNodePtr> results,
+                             const llvm::StringMap<VarNodePtr> &attrs)
+    : op(op), operands(operands), results(results), attrs(attrs) {}
+
+std::string ExprNodeLayer::str() const {
+  return llvm::formatv("layer({0})", op);
+}
+
+//
 // ExprNodePragma
 //
 

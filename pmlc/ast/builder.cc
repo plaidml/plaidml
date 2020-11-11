@@ -9,12 +9,14 @@
 #include <vector>
 
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Function.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/Module.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/DebugStringHelper.h"
 #include "mlir/Transforms/Passes.h"
+#include "mlir/Transforms/RegionUtils.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -187,6 +189,11 @@ private:
           }
         })
         .Case<ExprNodeElement>([&](ExprNodeElement *expr) { push(expr->expr); })
+        .Case<ExprNodeLayer>([&](ExprNodeLayer *expr) {
+          for (const ExprNodePtr &node : llvm::reverse(expr->results)) {
+            push(node);
+          }
+        })
         .Case<ExprNodeIntrinsic>([&](ExprNodeIntrinsic *expr) {
           // Push operands from right-to-left so they eventually get processed
           // in left-to-right order.
@@ -479,6 +486,8 @@ struct ProgramBuilder {
               .Case<ExprNodeIntrinsic>([&](ExprNodeIntrinsic *node) {
                 return handleIntrinsic(node);
               })
+              .Case<ExprNodeLayer>(
+                  [&](ExprNodeLayer *node) { return handleLayer(node); })
               .Case<ExprNodePragma>(
                   [&](ExprNodePragma *node) { return handlePragma(node); });
       if (value) {
@@ -591,6 +600,83 @@ struct ProgramBuilder {
               return op->getResult(0);
             });
     return intrinsicBuilder();
+  }
+
+  Value handleLayer(ExprNodeLayer *node) {
+    SmallVector<Value, 8> operands;
+    for (const ExprNodePtr &operand : node->operands) {
+      operands.push_back(builder.lookupNode(operand));
+    }
+    SmallVector<Value, 8> results;
+    for (const ExprNodePtr &result : node->results) {
+      results.push_back(builder.lookupNode(result));
+    }
+    std::vector<NamedAttribute> attrs;
+    for (const auto &kvp : node->attrs) {
+      Attribute value = builder.getAttribute(kvp.getValue());
+      attrs.push_back(builder.getNamedAttr(kvp.getKey(), value));
+    }
+    auto layerOp = builder.create<tile::LayerOp>(
+        loc, node->op, operands, results, builder.getDictionaryAttr(attrs));
+    OpBuilder bodyBuilder(layerOp.body());
+    bodyBuilder.create<tile::LayerReturnOp>(loc, results);
+    buildLayerBody(layerOp);
+    SmallVector<Value, 4> tuple;
+    for (OpResult result : layerOp.getResults()) {
+      tuple.push_back(result);
+    }
+    builder.exprTuples[node] = tuple;
+    return nullptr;
+  }
+
+  void buildLayerBody(tile::LayerOp layerOp) {
+    llvm::SetVector<Value> sinkCandidates;
+    getUsedValuesDefinedAbove(layerOp.body(), sinkCandidates);
+
+    BlockAndValueMapping mapper;
+    llvm::SetVector<Operation *> sunkOperations;
+    for (Value candidate : sinkCandidates) {
+      collectLayerBodyOps(layerOp, candidate, mapper, sunkOperations);
+    }
+
+    for (Operation *op : sunkOperations) {
+      OpBuilder builder(layerOp.body());
+      Operation *clonedOp = builder.clone(*op, mapper);
+      for (auto result : llvm::enumerate(op->getResults())) {
+        auto replacement = clonedOp->getResult(result.index());
+        for (auto &use : llvm::make_early_inc_range(result.value().getUses())) {
+          if (use.getOwner()->getParentOfType<tile::LayerOp>() == layerOp) {
+            use.set(replacement);
+          }
+        }
+      }
+    }
+
+    for (Operation *op : sunkOperations) {
+      op->erase();
+    }
+  }
+
+  void collectLayerBodyOps(tile::LayerOp layerOp, Value candidate,
+                           BlockAndValueMapping &mapper,
+                           llvm::SetVector<Operation *> &into) {
+    Block *body = layerOp.getBody();
+    for (auto item : llvm::zip(layerOp.operands(), body->getArguments())) {
+      Value outer, inner;
+      std::tie(outer, inner) = item;
+      if (candidate == outer) {
+        mapper.map(candidate, inner);
+        return;
+      }
+    }
+    Operation *op = candidate.getDefiningOp();
+    if (!op) {
+      return;
+    }
+    into.insert(op);
+    for (Value operand : op->getOperands()) {
+      collectLayerBodyOps(layerOp, operand, mapper, into);
+    }
   }
 
   Value handlePragma(ExprNodePragma *node) {
