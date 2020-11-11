@@ -26,10 +26,10 @@ steps:
         -G Ninja \
         -D CMAKE_BUILD_TYPE=Release \
         -D ENABLE_OPENVINO_BRIDGE=ON
-      --- :hammer_and_wrench: ninja build
+      echo --- :hammer_and_wrench: ninja
       ninja -C build-opt
-      --- :hammer_and_wrench: ninja test
-      ninja -C build-opt test
+      echo --- :hammer_and_wrench: ninja check
+      ninja -C build-opt check
     key: linux_x86_64_cmake
     agents:
       PLATFORM: linux_x86_64

@@ -3,13 +3,22 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
+set(_TARGET PlaidMLFuncTests)
+set(_LABEL plaidml/bridge/openvino)
+
 addIeTargetTest(
-  NAME PlaidMLFuncTests
+  NAME ${_TARGET}
   ROOT ${CMAKE_CURRENT_SOURCE_DIR}
   DEPENDENCIES plaidmlPlugin
   LINK_LIBRARIES IE::funcSharedTests
   ADD_CPPLINT
-  LABELS OpenVINO
+  LABELS ${_LABEL} test
 )
 
-add_dependencies(check-test PlaidMLFuncTests)
+add_custom_target(check-bridge-openvino
+  COMMAND ${CMAKE_CTEST_COMMAND} -L ${_LABEL}
+  USES_TERMINAL
+)
+
+add_dependencies(check-bridge-openvino ${_TARGET})
+add_dependencies(check-test ${_TARGET})

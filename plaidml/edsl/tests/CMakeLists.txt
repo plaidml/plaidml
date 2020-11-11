@@ -4,9 +4,15 @@ pml_cc_test(
   DEPS
     plaidml::testenv
     pmlc::testing
+  CHECKS
+    smoke
+    test
 )
 
 pml_lit_test(
   NAME lit
   DATA ::cc_test
+  CHECKS
+    smoke
+    test
 )
