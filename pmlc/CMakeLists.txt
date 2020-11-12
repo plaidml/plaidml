@@ -44,6 +44,12 @@ pml_cc_library(
     pmlc::target::x86
 )
 
-pml_lit_test(NAME lit)
-
-add_dependencies(pmlc_lit FileCheck count not)
+pml_lit_test(
+  NAME lit
+  DEPS
+    pmlc-jit
+    pmlc-opt
+  CHECKS
+    smoke
+    test
+)
