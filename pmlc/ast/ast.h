@@ -367,4 +367,10 @@ struct VarNodeTuple : NodeBase<VarNodeTuple, VarNode> {
   std::string str() const final;
 };
 
+struct VarNodeUInt : NodeBase<VarNodeUInt, VarNode> {
+  uint64_t value;
+  explicit VarNodeUInt(uint64_t value) : value(value) {}
+  std::string str() const final { return std::to_string(value); };
+};
+
 } // namespace pmlc::ast

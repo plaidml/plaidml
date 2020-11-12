@@ -110,6 +110,76 @@ void ProgramBuilder::handleOutput(const std::shared_ptr<ngraph::Node>& node) {
   tensorIONameMap[name] = tensorMap.at(std::make_pair(src_node->get_name(), src_output.get_index()));
 }
 
+struct PlaidMLAttributeVisitor : public ngraph::AttributeVisitor {
+  plaidml::edsl::Dictionary attrs;
+
+  void on_adapter(const std::string& name, ngraph::ValueAccessor<void>& adapter) final {
+    THROW_IE_EXCEPTION << "Unsupported 'void' attribute: " << name;
+  }
+
+  void on_adapter(const std::string& name, ngraph::ValueAccessor<std::string>& adapter) final {}
+
+  void on_adapter(const std::string& name, ngraph::ValueAccessor<bool>& adapter) final {
+    attrs[name] = plaidml::edsl::Value(adapter.get());
+  }
+
+  void on_adapter(const std::string& name, ngraph::ValueAccessor<int64_t>& adapter) final {
+    attrs[name] = plaidml::edsl::Value(adapter.get());
+  }
+
+  void on_adapter(const std::string& name, ngraph::ValueAccessor<double>& adapter) final {
+    attrs[name] = plaidml::edsl::Value(adapter.get());
+  }
+
+  void on_adapter(const std::string& name, ngraph::ValueAccessor<std::vector<std::string>>& adapter) final {
+    attrs[name] = plaidml::edsl::make_tuple(adapter.get());
+  }
+
+  void on_adapter(const std::string& name, ngraph::ValueAccessor<std::vector<float>>& adapter) final {
+    attrs[name] = plaidml::edsl::make_tuple(adapter.get());
+  }
+
+  void on_adapter(const std::string& name, ngraph::ValueAccessor<std::vector<double>>& adapter) final {
+    attrs[name] = plaidml::edsl::make_tuple(adapter.get());
+  }
+
+  void on_adapter(const std::string& name, ngraph::ValueAccessor<std::vector<int8_t>>& adapter) final {
+    attrs[name] = plaidml::edsl::make_tuple(adapter.get());
+  }
+
+  void on_adapter(const std::string& name, ngraph::ValueAccessor<std::vector<int16_t>>& adapter) final {
+    attrs[name] = plaidml::edsl::make_tuple(adapter.get());
+  }
+
+  void on_adapter(const std::string& name, ngraph::ValueAccessor<std::vector<int32_t>>& adapter) final {
+    attrs[name] = plaidml::edsl::make_tuple(adapter.get());
+  }
+
+  void on_adapter(const std::string& name, ngraph::ValueAccessor<std::vector<int64_t>>& adapter) final {
+    attrs[name] = plaidml::edsl::make_tuple(adapter.get());
+  }
+
+  void on_adapter(const std::string& name, ngraph::ValueAccessor<std::vector<uint8_t>>& adapter) final {
+    attrs[name] = plaidml::edsl::make_tuple(adapter.get());
+  }
+
+  void on_adapter(const std::string& name, ngraph::ValueAccessor<std::vector<uint16_t>>& adapter) final {
+    attrs[name] = plaidml::edsl::make_tuple(adapter.get());
+  }
+
+  void on_adapter(const std::string& name, ngraph::ValueAccessor<std::vector<uint32_t>>& adapter) final {
+    attrs[name] = plaidml::edsl::make_tuple(adapter.get());
+  }
+
+  void on_adapter(const std::string& name, ngraph::ValueAccessor<std::vector<uint64_t>>& adapter) final {
+    attrs[name] = plaidml::edsl::make_tuple(adapter.get());
+  }
+
+  void on_adapter(const std::string& name, ngraph::ValueAccessor<void*>& adapter) final {
+    THROW_IE_EXCEPTION << "Unsupported 'void*' attribute: " << name;
+  }
+};
+
 void ProgramBuilder::handleOp(const std::shared_ptr<ngraph::Node>& node) {
   const Op op = OpsRegistry::instance()->resolve(node->description());
   if (!op) {
@@ -124,8 +194,9 @@ void ProgramBuilder::handleOp(const std::shared_ptr<ngraph::Node>& node) {
     plaidml::edsl::Tensor tensor = tensorMap.at(std::make_pair(name, index));
     ctx.operands.push_back(tensor);
   }
-  plaidml::edsl::Dictionary attrs;
-  plaidml::edsl::TensorVec tuple = plaidml::edsl::layer(node->description(), attrs, [&]() {
+  PlaidMLAttributeVisitor visitor;
+  node->visit_attributes(visitor);
+  plaidml::edsl::TensorVec tuple = plaidml::edsl::layer("ng." + node->description(), visitor.attrs, [&]() {
     plaidml::edsl::Value value = op(ctx);
     std::vector<plaidml::edsl::Value> tuple = value.as_tuple();
     plaidml::edsl::TensorVec outputs;

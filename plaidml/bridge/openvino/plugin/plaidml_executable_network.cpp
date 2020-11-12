@@ -3,18 +3,18 @@
 //
 
 // NB: IE_SET_METRIC requires this header to be included first
-#include "ie_metric_helpers.hpp"  // NOLINT
+#include "ie_metric_helpers.hpp"
 
 #include "plaidml_executable_network.hpp"
 
-#include <fstream>  // NOLINT
-#include <memory>   // NOLINT
-#include <vector>   // NOLINT
+#include <fstream>
+#include <memory>
+#include <vector>
 
 #include "plaidml_builder.hpp"
 #include "plaidml_infer_request.hpp"
 
-using namespace InferenceEngine;  // NOLINT[build/namespaces]
+using namespace InferenceEngine;
 
 namespace PlaidMLPlugin {
 

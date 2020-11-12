@@ -149,8 +149,16 @@ public:
             [&](VarNodeInt *node) { return getI64IntegerAttr(node->value); })
         .Case<VarNodeString>(
             [&](VarNodeString *node) { return getStringAttr(node->value); })
-        .Default([](VarNode *) -> Attribute {
-          llvm_unreachable("Invalid VarNode");
+        .Case<VarNodeTuple>([&](VarNodeTuple *node) {
+          SmallVector<Attribute, 8> attrs;
+          for (const VarNodePtr &value : node->values) {
+            attrs.push_back(getAttribute(value));
+          }
+          return getArrayAttr(attrs);
+        })
+        .Default([](VarNode *node) -> Attribute {
+          throw std::runtime_error(
+              llvm::formatv("Unsupported VarNode: {0}", node->str()));
         });
   }
 
