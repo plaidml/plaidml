@@ -239,28 +239,98 @@ selectCommonVectorization(MemoryUsageDesc &memoryDesc,
 }
 
 mlir::Optional<ReorderDesc>
-optimizeLayoutForReads(MemoryUsageDesc &memoryDesc) {
+chooseUserProvidedTargetLayout(MemoryUsageDesc &memoryDesc) {
+  IVLOG(3, "In chooseUserProvidedTargetLayout()\n");
+
   mlir::Optional<ReorderDesc> selectedReorder = llvm::None;
-  mlir::ArrayRef<int64_t> commonVector;
-  if (mlir::failed(selectCommonVectorization(memoryDesc, commonVector))) {
-    IVLOG(3, "Inconsistent vectorization between reads and writes");
-    return llvm::None;
-  }
+
   for (MemoryReadDesc &readDesc : memoryDesc.reads) {
-    mlir::Optional<ReorderDesc> reorder =
-        tileAffineMap(readDesc.readMap, memoryDesc.shape, commonVector,
-                      readDesc.dimensionConstraints, readDesc.iterationOrder);
-    if (!reorder.hasValue())
-      return llvm::None;
-    if (!selectedReorder.hasValue()) {
-      selectedReorder = reorder;
-      continue;
+    PxaReadOpInterface readOp = readDesc.readOp;
+    mlir::Value readMem = readOp.getMemRef();
+    IVLOG(3, "readMem: " << mlir::debugString(readMem));
+
+    mlir::MemRefType memrefType = readOp.getMemRefType();
+
+    if (memrefType.getAffineMaps().size() > 0) {
+      mlir::AffineMap layoutMap = memrefType.getAffineMaps().front();
+      IVLOG(3, "layoutMap: " << mlir::debugString(layoutMap));
+
+      mlir::SmallVector<int64_t, 6> expandedShape;
+      mlir::SmallVector<int64_t, 6> expandedVec;
+
+      expandedShape.push_back(1);
+      expandedShape.push_back(4);
+      expandedShape.push_back(56);
+      expandedShape.push_back(56);
+      expandedShape.push_back(16);
+
+      expandedVec.push_back(1);
+      expandedVec.push_back(1);
+      expandedVec.push_back(1);
+      expandedVec.push_back(1);
+      expandedVec.push_back(1);
+
+      selectedReorder = ReorderDesc{layoutMap, expandedShape, expandedVec};
     }
-    if (selectedReorder->reorderMap != reorder->reorderMap) {
-      IVLOG(3, "Inconsistent layout between reads");
-      return llvm::None;
-    }
+
+    // memrefType.setAffineMaps({});
   }
+
+  return selectedReorder;
+}
+
+void printSmallVector(mlir::ArrayRef<int64_t> vec) {
+  IVLOG(3, "Vector: ");
+  for (int64_t i : vec) {
+    IVLOG(3, " " << i);
+  }
+
+  IVLOG(3, "\n");
+}
+
+mlir::Optional<ReorderDesc>
+optimizeLayoutForReads(MemoryUsageDesc &memoryDesc) {
+  mlir::Optional<ReorderDesc> selectedReorder =
+      chooseUserProvidedTargetLayout(memoryDesc);
+
+  if (!selectedReorder.hasValue()) {
+    mlir::ArrayRef<int64_t> commonVector;
+    if (mlir::failed(selectCommonVectorization(memoryDesc, commonVector))) {
+      IVLOG(3, "Inconsistent vectorization between reads and writes");
+      return llvm::None;
+    }
+    for (MemoryReadDesc &readDesc : memoryDesc.reads) {
+      mlir::Optional<ReorderDesc> reorder =
+          tileAffineMap(readDesc.readMap, memoryDesc.shape, commonVector,
+                        readDesc.dimensionConstraints, readDesc.iterationOrder);
+      if (!reorder.hasValue())
+        return llvm::None;
+      if (!selectedReorder.hasValue()) {
+        selectedReorder = reorder;
+
+        IVLOG(3,
+              "reorderMap: " << mlir::debugString(selectedReorder->reorderMap));
+        IVLOG(3, "reorderedShape: ");
+        printSmallVector(selectedReorder->reorderedShape);
+        IVLOG(3, "reorderedVector: ");
+        printSmallVector(selectedReorder->reorderedVector);
+
+        continue;
+      }
+      if (selectedReorder->reorderMap != reorder->reorderMap) {
+        IVLOG(3, "Inconsistent layout between reads");
+        return llvm::None;
+      }
+    }
+  } else {
+    IVLOG(3, "The user specified layout has been used.");
+    IVLOG(3, "reorderMap: " << mlir::debugString(selectedReorder->reorderMap));
+    IVLOG(3, "reorderedShape: ");
+    printSmallVector(selectedReorder->reorderedShape);
+    IVLOG(3, "reorderedVector: ");
+    printSmallVector(selectedReorder->reorderedVector);
+  }
+
   return selectedReorder;
 }
 
@@ -291,6 +361,7 @@ naiveScheduleModel(mlir::ArrayRef<mlir::AffineParallelOp> loopNest) {
 // =============================================================================
 void reorderMemoryReads(const ReorderCreator &creator, ReorderDesc &reorderDesc,
                         MemoryUsageDesc &memoryDesc) {
+  IVLOG(3, "In reorderMemoryReads\n");
   mlir::DenseSet<mlir::Value> memoryToReorder;
   for (MemoryReadDesc &readDesc : memoryDesc.reads) {
     PxaReadOpInterface readOp = readDesc.readOp;
@@ -303,7 +374,10 @@ void reorderMemoryReads(const ReorderCreator &creator, ReorderDesc &reorderDesc,
     // TODO: It should be fused location of all reads.
     mlir::Value reorderedMem =
         creator(originalMem.getLoc(), builder, reorderDesc, originalMem);
+    IVLOG(3, "Calling replaceMemoryLayoutForReading()\n,"
+                 << mlir::debugString(reorderedMem));
     replaceMemoryLayoutForReading(reorderedMem, originalMem, reorderDesc);
+    IVLOG(3, "Returned from replaceMemoryLayoutForReading\n");
   }
 }
 
