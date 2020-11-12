@@ -50,6 +50,17 @@ def matmul_2_2(A, B):
     return C
 
 
+def distance(a, b):
+    I, J = edsl.TensorDims(2)
+    i, j = edsl.TensorIndexes(2)
+    neg = -b
+    a.bind_dims(I)
+    neg.bind_dims(J)
+    C = edsl.TensorOutput(I, J)
+    C[(i, j)] = a[i] + neg[j]
+    return C
+
+
 def get_jacobian(Is, I_dat, O, wrt):
     dy = edsl.jacobian(O, [wrt])[0]
     program = edsl.Program('program', [O, dy])
@@ -142,34 +153,38 @@ class GradTest(unittest.TestCase):
         npt.assert_allclose(test_result, true_result)
 
     def test_6(self):
-        np_x = np.random.rand(10)
-        old_dim = np_x.shape[0]
+        np_x = np.array([1., 2., 3.])
+        np_b = np.array([1., 2., 3.])
+
+        dtype = plaidml2.DType.FLOAT32
+        b = edsl.Tensor(edsl.LogicalShape(dtype, np_b.shape))
+        x = edsl.Tensor(edsl.LogicalShape(dtype, np_x.shape))
+        y = distance(x, b)
+
+        test_result = get_jacobian([x, b], [np_x, np_b], y, x)
+
+        true_result = np.zeros((3, 3, 3))
+        true_result[0, :, 0] = 1
+        true_result[1, :, 1] = 1
+        true_result[2, :, 2] = 1
+
+        npt.assert_allclose(test_result, true_result)
+
+    def test_7(self):
+        np_x = np.array([1., 2., 3.])
 
         dtype = plaidml2.DType.FLOAT32
         x = edsl.Tensor(edsl.LogicalShape(dtype, np_x.shape))
-        Is = [x]
-        I_dat = [np_x]
+        y = distance(x, x)
 
-        J = np.eye(old_dim)
+        test_result = get_jacobian([x], [np_x], y, x)
 
-        y = x
+        true_result = np.zeros((3, 3, 3))
+        true_result[:, :, 0] = [[0, 1, 1], [-1, 0, 0], [-1, 0, 0]]
+        true_result[:, :, 1] = [[0, -1, 0], [1, 0, 1], [0, -1, 0]]
+        true_result[:, :, 2] = [[0, 0, -1], [0, 0, -1], [1, 1, 0]]
 
-        for _ in range(10):
-            new_dim = np.random.randint(1, 10)
-            new_mat = np.random.rand(new_dim, old_dim)
-            J = np.matmul(new_mat, J)
-            A = edsl.Tensor(edsl.LogicalShape(dtype, new_mat.shape))
-            Is.append(A)
-            I_dat.append(new_mat.copy())
-            if y.shape.ndims == 1:
-                y = matmul_2_1(A, y)
-            else:
-                y = matmul_2_2(A, y)
-            old_dim = new_dim
-
-        test_result = get_jacobian(Is, I_dat, y, x)
-
-        npt.assert_allclose(J, test_result)
+        npt.assert_allclose(test_result, true_result)
 
 
 if __name__ == '__main__':

@@ -133,8 +133,11 @@ class Jacobian {
     if (expr->combo_op == CombinationOp::EQ) {
       return std::make_shared<IntConst>(0);
     }
-    if (expr->agg_op == AggregationOp::SUM || expr->agg_op == AggregationOp::ASSIGN) {
+    if (expr->agg_op == AggregationOp::SUM) {
       return DeriveSum(dout, expr, idx);
+    }
+    if (expr->agg_op == AggregationOp::ASSIGN) {
+      return DeriveAssign(dout, expr, idx);
     }
     if (expr->agg_op == AggregationOp::MIN || expr->agg_op == AggregationOp::MAX) {
       return DeriveExtreme(dout, expr, idx);
@@ -209,6 +212,62 @@ class Jacobian {
       }
     }
     auto input = op->srcs[idx];
+    dop->sink_idxs = std::make_shared<IndexMapExpr>(nullptr, oidxs);
+    dop->sink_dims = std::make_shared<SizeMapExpr>(odims);
+    dop->ComputeShape(input->ref->shape.layout);
+    return dop;
+  }
+
+  ExprPtr DeriveAssign(const ExprPtr& dout, const std::shared_ptr<ContractionExpr>& op, size_t idx) {
+    IVLOG(2, "Gradient::DeriveAssign> dout=" << dout << ", op=" << op << ", idx=" << idx);
+    // Compute Jacobian for assignment
+    auto Ji = std::make_shared<ContractionExpr>();
+    Ji->agg_op = AggregationOp::ASSIGN;
+    Ji->combo_op = CombinationOp::NONE;  // May be overridden below based on op->combo_op
+    Ji->constraints = op->constraints;
+
+    auto src = std::make_shared<FloatConst>(1.0);
+    Ji->srcs.push_back(std::make_shared<IndexMapExpr>(src, std::vector<PolyExprPtr>{}));
+
+    std::vector<PolyExprPtr> Jidxs;  // Indexes of new total Jacobian
+    std::vector<DimExprPtr> Jdims;   // Dimensions of new total Jacobian
+
+    for (size_t i = 0; i < op->sink_idxs->idxs.size(); i++) {
+      Jidxs.push_back(op->sink_idxs->idxs[i]);
+      Jdims.push_back(op->shape.dims_as_exprs()[i]);
+    }
+    for (size_t i = 0; i < op->srcs[idx]->idxs.size(); i++) {
+      Jidxs.push_back(op->srcs[idx]->idxs[i]);
+      Jdims.push_back(op->srcs[idx]->ref->shape.dims_as_exprs()[i]);
+    }
+
+    auto input = op->srcs[idx];
+    Ji->sink_idxs = std::make_shared<IndexMapExpr>(nullptr, Jidxs);
+    Ji->sink_dims = std::make_shared<SizeMapExpr>(Jdims);
+    Ji->ComputeShape(input->ref->shape.layout);
+
+    // Connect assignment Jacobian to total Jacobian
+    auto dop = std::make_shared<ContractionExpr>();
+    dop->agg_op = AggregationOp::SUM;
+    dop->combo_op = CombinationOp::NONE;
+    dop->constraints = op->constraints;
+
+    std::vector<PolyExprPtr> oidxs;  // Indexes of new total Jacobian
+    std::vector<DimExprPtr> odims;   // Dimensions of new total Jacobian
+    size_t noidx = IntoTensorShape(dout->shape).sizes().size();
+
+    std::vector<PolyExprPtr> iidxs;
+    for (size_t i = 0; i < noidx; i++) {
+      iidxs.push_back(op->sink_idxs->idxs[i]);
+    }
+    dop->srcs.push_back(std::make_shared<IndexMapExpr>(dout, iidxs));
+    for (size_t i = noidx; i < Jidxs.size(); i++) {
+      oidxs.push_back(Jidxs[i]);
+      odims.push_back(Jdims[i]);
+    }
+    dop->srcs.push_back(std::make_shared<IndexMapExpr>(Ji, Jidxs));
+    dop->combo_op = CombinationOp::MULTIPLY;
+
     dop->sink_idxs = std::make_shared<IndexMapExpr>(nullptr, oidxs);
     dop->sink_dims = std::make_shared<SizeMapExpr>(odims);
     dop->ComputeShape(input->ref->shape.layout);
