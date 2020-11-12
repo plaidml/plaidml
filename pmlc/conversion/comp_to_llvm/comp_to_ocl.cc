@@ -203,6 +203,35 @@ void populateCompToOclPatterns(mlir::MLIRContext *context,
           return llvm::None;
         return llvmInt8Ptr;
       });
+  typeConverter.addConversion(
+      [=](comp::KernelType kernelType) -> mlir::Optional<mlir::Type> {
+        return llvmInt8Ptr;
+      });
+
+  // TODO: Converting index->LLVM integer seems like something that the
+  //       LLVMTypeConverter should be handling automatically.  Currently,
+  //       though, it's materializing indices via a DialectCastOp, which
+  //       explicitly doesn't work on indices.  So we add an explicit
+  //       materialization, and hope this gets fixed in the standard->llvm
+  //       conversion logic (which does have a TODO for it).
+  typeConverter.addTargetMaterialization(
+      [&](mlir::OpBuilder &builder, mlir::Type resultType,
+          mlir::ValueRange inputs,
+          mlir::Location loc) -> mlir::Optional<mlir::Value> {
+        if (inputs.size() != 1) {
+          return llvm::None;
+        }
+        mlir::Value value = inputs[0];
+        if (!value.getType().isIndex()) {
+          return llvm::None;
+        }
+        auto asInt = builder.create<mlir::IndexCastOp>(
+            loc, builder.getIntegerType(typeConverter.getIndexTypeBitwidth()),
+            value);
+        return builder.create<LLVM::DialectCastOp>(loc, resultType, asInt)
+            .getResult();
+      });
+
   // Populate operation conversion patterns.
   patterns.insert<ConvertCreateExecEnv>(kOclCreate, typeConverter, context);
   patterns.insert<ConvertDestroyExecEnv>(kOclDestroy, typeConverter, context);
@@ -451,10 +480,12 @@ mlir::LogicalResult ConvertCreateKernel::matchAndRewrite(
   auto binaryName = op.kernelFunc().getRootReference().str();
   auto kernelName = op.kernelFunc().getLeafReference().str();
 
-  if (modulesMap.count(binaryName) == 0)
+  if (modulesMap.count(binaryName) == 0) {
     return mlir::failure();
-  if (modulesMap.at(binaryName).kernelsNameMap.count(kernelName) == 0)
+  }
+  if (modulesMap.at(binaryName).kernelsNameMap.count(kernelName) == 0) {
     return mlir::failure();
+  }
 
   mlir::Value binaryPtr, binaryBytes;
   getPtrToBinaryModule(rewriter, loc, modulesMap.at(binaryName), binaryPtr,
@@ -499,26 +530,22 @@ mlir::LogicalResult ConvertScheduleCompute::matchAndRewrite(
 
   // OpenCL takes as global work size number of blocks times block size,
   // so multiplications are needed.
-  auto gridSizeX = rewriter.getRemappedValue(op.gridSizeX());
-  auto gridSizeY = rewriter.getRemappedValue(op.gridSizeY());
-  auto gridSizeZ = rewriter.getRemappedValue(op.gridSizeZ());
-  auto blockSizeX = rewriter.getRemappedValue(op.blockSizeX());
-  auto blockSizeY = rewriter.getRemappedValue(op.blockSizeY());
-  auto blockSizeZ = rewriter.getRemappedValue(op.blockSizeZ());
-
-  auto globalX = rewriter.create<LLVM::MulOp>(loc, gridSizeX, blockSizeX);
-  auto globalY = rewriter.create<LLVM::MulOp>(loc, gridSizeY, blockSizeY);
-  auto globalZ = rewriter.create<LLVM::MulOp>(loc, gridSizeZ, blockSizeZ);
+  auto globalX =
+      rewriter.create<mlir::MulIOp>(loc, op.gridSizeX(), op.blockSizeX());
+  auto globalY =
+      rewriter.create<mlir::MulIOp>(loc, op.gridSizeY(), op.blockSizeY());
+  auto globalZ =
+      rewriter.create<mlir::MulIOp>(loc, op.gridSizeZ(), op.blockSizeZ());
 
   mlir::SmallVector<mlir::Value, 16> callArgs{
       rewriter.getRemappedValue(op.execEnv()),
       kernel,
-      globalX,
-      globalY,
-      globalZ,
-      blockSizeX,
-      blockSizeY,
-      blockSizeZ,
+      indexToInt(rewriter, loc, typeConverter, globalX),
+      indexToInt(rewriter, loc, typeConverter, globalY),
+      indexToInt(rewriter, loc, typeConverter, globalZ),
+      indexToInt(rewriter, loc, typeConverter, op.blockSizeX()),
+      indexToInt(rewriter, loc, typeConverter, op.blockSizeY()),
+      indexToInt(rewriter, loc, typeConverter, op.blockSizeZ()),
       createIndexConstant(rewriter, loc, op.depEvents().size())};
   for (auto dep : op.depEvents()) {
     callArgs.emplace_back(rewriter.getRemappedValue(dep));
@@ -527,6 +554,7 @@ mlir::LogicalResult ConvertScheduleCompute::matchAndRewrite(
   rewriter.replaceOpWithNewOp<LLVM::CallOp>(
       op.getOperation(), getVoidPtrType(),
       rewriter.getSymbolRefAttr(kOclScheduleFunc), callArgs);
+
   return mlir::success();
 }
 

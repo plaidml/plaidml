@@ -112,6 +112,9 @@ def COMP_CreateKernel : COMP_Op<"create_kernel",
                                    SymbolRefAttr:$kernelFunc)>
                   , Results<(outs Res<COMP_Kernel, "", [MemAlloc<COMP_KernelResource>]>:$kernel)> {
   let summary = "Creates an executable kernel.";
+  let assemblyFormat = [{
+    `on` $execEnv attr-dict `:` functional-type(operands, results)
+  }];
 }
 
 def COMP_DestroyKernel : COMP_Op<"destroy_kernel",
@@ -119,6 +122,9 @@ def COMP_DestroyKernel : COMP_Op<"destroy_kernel",
                   , Arguments<(ins Arg<COMP_AnyExecEnv, "", [MemRead<COMP_ExecEnvResource>]>:$execEnv,
                                    Arg<COMP_Kernel, "", [MemFree<COMP_KernelResource>]>:$kernel)> {
   let summary = "Destroys an executable kernel.";
+  let assemblyFormat = [{
+    $kernel `on` $execEnv attr-dict `:` functional-type(operands, results)
+  }];
 }
 
 def COMP_ScheduleCompute : COMP_Op<"schedule_compute",
@@ -133,6 +139,14 @@ def COMP_ScheduleCompute : COMP_Op<"schedule_compute",
                                    Variadic<COMP_AnyEvent>:$depEvents)>
                   , Results<(outs COMP_AnyEvent:$outEvent)> {
   let summary = "Schedules a kernel for execution.";
+  let assemblyFormat = [{
+    $kernel `grid` $gridSizeX `,` $gridSizeY `,` $gridSizeZ
+            `block` $blockSizeX `,` $blockSizeY `,` $blockSizeZ
+            `args` $buffers
+            `on` $execEnv
+            (`wait` `for` $depEvents^)?
+            attr-dict `:` functional-type(operands, results)
+  }];
 }
 
 def COMP_Submit : COMP_Op<"submit",

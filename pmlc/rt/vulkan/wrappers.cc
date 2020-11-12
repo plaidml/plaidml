@@ -40,11 +40,22 @@ void vkDeinit(void *vkInvocation) {
   delete static_cast<VulkanInvocation *>(vkInvocation);
 }
 
-void vkCreateLaunchKernelAction(void *vkInvocation, uint8_t *shader,
-                                uint32_t size, const char *entryPoint,
-                                uint32_t x, uint32_t y, uint32_t z) {
+void *vkCreateKernel(void *vkInvocation, uint8_t *shader, uint32_t size,
+                     const char *entryPoint) {
+  return static_cast<VulkanInvocation *>(vkInvocation)
+      ->createKernel(shader, size, entryPoint);
+}
+
+void vkDestroyKernel(void *vkInvocation, void *kernel, const char *entryPoint) {
   static_cast<VulkanInvocation *>(vkInvocation)
-      ->createLaunchKernelAction(shader, size, entryPoint, {x, y, z});
+      ->destroyKernel(static_cast<VulkanKernel *>(kernel));
+}
+
+void vkCreateLaunchKernelAction(void *vkInvocation, void *kernel, uint32_t x,
+                                uint32_t y, uint32_t z) {
+  static_cast<VulkanInvocation *>(vkInvocation)
+      ->createLaunchKernelAction(static_cast<VulkanKernel *>(kernel),
+                                 {x, y, z});
 }
 
 void vkCreateMemoryTransferAction(void *vkInvocation, uint64_t src_index,
@@ -98,6 +109,9 @@ struct Registration {
     // Vulkan Runtime functions
     registerSymbol("vkInit", reinterpret_cast<void *>(vkInit));
     registerSymbol("vkDeinit", reinterpret_cast<void *>(vkDeinit));
+    registerSymbol("vkCreateKernel", reinterpret_cast<void *>(vkCreateKernel));
+    registerSymbol("vkDestroyKernel",
+                   reinterpret_cast<void *>(vkDestroyKernel));
     registerSymbol("vkCreateLaunchKernelAction",
                    reinterpret_cast<void *>(vkCreateLaunchKernelAction));
     registerSymbol("vkCreateMemoryTransferAction",

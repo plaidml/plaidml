@@ -52,7 +52,7 @@ struct KernelResource final
 // ============================================================================
 
 void COMPDialect::initialize() {
-  addTypes<DeviceType, ExecEnvType, EventType>();
+  addTypes<DeviceType, ExecEnvType, EventType, KernelType>();
 #define GET_OP_LIST
   addOperations<
 #include "pmlc/dialect/comp/ir/ops.cc.inc" // NOLINT

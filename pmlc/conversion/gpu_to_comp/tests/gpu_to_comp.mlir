@@ -6,17 +6,18 @@ module attributes {gpu.container_module} {
   //   CHECK-SAME:     %[[DEV:[a-zA-Z0-9]*]]:
   //   CHECK-SAME:     %[[ARGMEM:[a-zA-Z0-9]*]]:
   //        CHECK:   %[[ENV:.*]] = comp.create_execenv %[[DEV]]
+  //        CHECK:   %[[KERNEL:.*]] = comp.create_kernel on %[[ENV]] {kernelFunc = @gpu_module::@zero}
   //      SPACE11:   %[[MEM:.*]] = comp.alloc %[[ENV]]
   //      SPACE11:   %[[WEV:.*]] = comp.schedule_write %[[ARGMEM]] to %[[MEM]] on %[[ENV]]
   //      SPACE11:   comp.wait %[[WEV]]
-  //        CHECK:   %[[FEV:.*]] = "comp.schedule_func"(%[[ENV]])
-  //   CHECK-NEXT:     gpu.launch_func
+  //        CHECK:   %[[FEV:.*]] = comp.schedule_compute %[[KERNEL]]
   //  SPACE0-SAME:       %[[ARGMEM]]
   // SPACE11-SAME:       %[[MEM]]
   //       SPACE0:   comp.wait %[[FEV]]
   //      SPACE11:   %[[REV:.*]] = comp.schedule_read %[[ARGMEM]] from %[[MEM]] on %[[ENV]] wait for %[[FEV]]
   //      SPACE11:   comp.wait %[[REV]]
   //      SPACE11:   comp.dealloc %[[ENV]] %[[MEM]]
+  //        CHECK:   comp.destroy_kernel %[[KERNEL]] on %[[ENV]]
   //        CHECK:   comp.destroy_execenv %[[ENV]]
   func @one_gpu_func(%arg0: memref<8x32xf32>) {
     %c8 = constant 8 : index
@@ -47,20 +48,22 @@ module attributes {gpu.container_module} {
   //   CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]*]]:
 
   //        CHECK:   %[[ENV0:.*]] = comp.create_execenv %[[DEV]]
+  //        CHECK:   %[[KZERO:.*]] = comp.create_kernel on %[[ENV0]] {kernelFunc = @gpu_module::@zero}
   //      SPACE11:   %[[MEM02:.*]] = comp.alloc %[[ENV0]]
-  //      SPACE11:   %[[WEV02:.*]] = comp.schedule_write %[[ARG2]] to %[[MEM02]] on %[[ENV]]
+  //      SPACE11:   %[[WEV02:.*]] = comp.schedule_write %[[ARG2]] to %[[MEM02]] on %[[ENV0]]
   //      SPACE11:   comp.wait %[[WEV02]]
-  //        CHECK:   %[[FEV0:.*]] = "comp.schedule_func"(%[[ENV0]])
-  //        CHECK:     gpu.launch_func
+  //        CHECK:   %[[FEV0:.*]] = comp.schedule_compute %[[KZERO]]
   //  SPACE0-SAME:       %[[ARG2]]
   // SPACE11-SAME:       %[[MEM02]]
   //       SPACE0:   comp.wait %[[FEV0]]
   //      SPACE11:   %[[REV02:.*]] = comp.schedule_read %[[ARG2]] from %[[MEM02]] on %[[ENV0]] wait for %[[FEV0]]
   //      SPACE11:   comp.wait %[[REV02]]
   //      SPACE11:   comp.dealloc %[[ENV0]] %[[MEM02]]
+  //        CHECK:   comp.destroy_kernel %[[KZERO]] on %[[ENV0]]
   //        CHECK:   comp.destroy_execenv %[[ENV0]]
 
   //        CHECK:   %[[ENV1:.*]] = comp.create_execenv %[[DEV]]
+  //        CHECK:   %[[KDOT:.*]] = comp.create_kernel on %[[ENV1]] {kernelFunc = @gpu_module::@dot}
   //      SPACE11:   %[[MEM10:.*]] = comp.alloc %[[ENV1]]
   //      SPACE11:   %[[WEV10:.*]] = comp.schedule_write %[[ARG0]] to %[[MEM10]] on %[[ENV1]]
   //      SPACE11:   comp.wait %[[WEV10]]
@@ -70,8 +73,7 @@ module attributes {gpu.container_module} {
   //      SPACE11:   %[[MEM12:.*]] = comp.alloc %[[ENV1]]
   //      SPACE11:   %[[WEV12:.*]] = comp.schedule_write %[[ARG2]] to %[[MEM12]] on %[[ENV1]]
   //      SPACE11:   comp.wait %[[WEV12]]
-  //        CHECK:   %[[FEV1:.*]] = "comp.schedule_func"(%[[ENV1]])
-  //        CHECK:     gpu.launch_func
+  //        CHECK:   %[[FEV1:.*]] = comp.schedule_compute %[[KDOT]]
   //  SPACE0-SAME:       %[[ARG0]], %[[ARG1]], %[[ARG2]]
   // SPACE11-SAME:       %[[MEM10]], %[[MEM11]], %[[MEM12]]
   //       SPACE0:   comp.wait %[[FEV1]]
@@ -82,6 +84,7 @@ module attributes {gpu.container_module} {
   //      SPACE11:   comp.dealloc %[[ENV1]] %[[MEM10]]
   //      SPACE11:   comp.dealloc %[[ENV1]] %[[MEM11]]
   //      SPACE11:   comp.dealloc %[[ENV1]] %[[MEM12]]
+  //        CHECK:   comp.destroy_kernel %[[KDOT]] on %[[ENV1]]
   //        CHECK:   comp.destroy_execenv %[[ENV1]]
   func @two_gpu_func(%arg0: memref<8x16xf32>, %arg1: memref<16x32xf32>, %arg2: memref<8x32xf32>) {
     %c8 = constant 8 : index
@@ -127,3 +130,4 @@ module attributes {gpu.container_module} {
     }
   }
 }
+

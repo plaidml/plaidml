@@ -22,7 +22,8 @@ module attributes {gpu.container_module} {
   // CHECK-LABEL: func @schedule_func
   //       CHECK:   %[[EV1:.*]] = comp.schedule_write %{{.*}} to %{{.*}} on %{{.*}} :
   //   CHECK-NOT:   comp.wait
-  //       CHECK:   %[[EV2:.*]] = "comp.schedule_func"(%{{.*}}, %[[EV1]])
+  //       CHECK:   %[[EV2:.*]] = comp.schedule_compute
+  //  CHECK-SAME:   %[[EV1]]
   //   CHECK-NOT:   comp.wait
   //       CHECK:   %[[EV3:.*]] = comp.schedule_read %{{.*}} from %{{.*}} on %{{.*}} wait for
   //  CHECK-SAME:     %[[EV2]]
@@ -32,13 +33,12 @@ module attributes {gpu.container_module} {
     %mem = comp.alloc %env : (!comp.execenv<ocl:0,(11)>) -> memref<2x3xf32, 11>
     %ev1 = comp.schedule_write %host to %mem on %env : (memref<2x3xf32>, memref<2x3xf32, 11>, !comp.execenv<ocl:0,(11)>) -> !comp.event<ocl>
     comp.wait %ev1 : !comp.event<ocl>
-    %ev2 = "comp.schedule_func"(%env) ({
-      "gpu.launch_func"(%c1, %c1, %c1, %c1, %c1, %c1, %mem) {kernel = @gpu_module::@kernel} : (index, index, index, index, index, index, memref<2x3xf32, 11>) -> ()
-      "comp.schedule_end"() : () -> ()
-    }) : (!comp.execenv<ocl:0,(11)>) -> !comp.event<ocl>
+    %k = comp.create_kernel on %env {kernelFunc = @gpu_module::@kernel} : (!comp.execenv<ocl:0,(11)>) -> !comp.kernel
+    %ev2 = comp.schedule_compute %k grid %c1, %c1, %c1 block %c1, %c1, %c1 args %mem on %env : (!comp.execenv<ocl:0,(11)>, !comp.kernel, index, index, index, index, index, index, memref<2x3xf32, 11>) -> !comp.event<ocl>
     comp.wait %ev2 : !comp.event<ocl>
     %ev3 = comp.schedule_read %host from %mem on %env : (memref<2x3xf32>, memref<2x3xf32, 11>, !comp.execenv<ocl:0,(11)>) -> !comp.event<ocl>
     comp.wait %ev3 : !comp.event<ocl>
+    comp.destroy_kernel %k on %env : (!comp.execenv<ocl:0,(11)>, !comp.kernel) -> ()
     comp.dealloc %env %mem : (!comp.execenv<ocl:0,(11)>, memref<2x3xf32, 11>) -> ()
     return
   }

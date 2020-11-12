@@ -65,8 +65,8 @@ module attributes {gpu.container_module} {
   //       CHECK:   %[[WEV:.*]] = llvm.call @oclWrite(%{{.*}}, %[[MEM]], %[[ENV]], %[[CST0]])
   //       CHECK:   %[[KRNL:.*]] = llvm.call @oclCreateKernel(%[[ENV]]
   //       CHECK:   llvm.call @oclSetKernelArg(%[[KRNL]], {{.*}}, %[[MEM]])
-  //       CHECK:   llvm.call @oclAddKernelDep(%[[KRNL]], %[[WEV]])
   //       CHECK:   %[[FEV:.*]] = llvm.call @oclScheduleFunc(%[[ENV]], %[[KRNL]]
+  //  CHECK-SAME:   %[[WEV]]
   //       CHECK:   %[[REV:.*]] = llvm.call @oclRead(%{{.*}}, %[[MEM]], %[[ENV]], %[[CST1]], %[[FEV]])
   //       CHECK:   %[[CST1:.*]] = llvm.mlir.constant(1
   //       CHECK:   llvm.call @oclWait(%[[CST1]], %[[REV]])
@@ -79,12 +79,11 @@ module attributes {gpu.container_module} {
     %env = comp.create_execenv %dev : (!comp.device) -> !comp.execenv<ocl:0,(11)>
     %mem0 = comp.alloc %env : (!comp.execenv<ocl:0,(11)>) -> memref<8x32xf32, 11>
     %wev = comp.schedule_write %arg0 to %mem0 on %env : (memref<8x32xf32>, memref<8x32xf32, 11>, !comp.execenv<ocl:0,(11)>) -> !comp.event<ocl>
-    %fev = "comp.schedule_func"(%env, %wev) ( {
-      "gpu.launch_func"(%c8, %c1, %c1, %c32, %c1, %c1, %mem0) {kernel = @gpu_module::@zero} : (index, index, index, index, index, index, memref<8x32xf32, 11>) -> ()
-      "comp.schedule_end"() : () -> ()
-    }) : (!comp.execenv<ocl:0,(11)>, !comp.event<ocl>) -> !comp.event<ocl>
+    %kernel = comp.create_kernel on %env {kernelFunc = @gpu_module::@zero} : (!comp.execenv<ocl:0,(11)>) -> !comp.kernel
+    %fev = comp.schedule_compute %kernel grid %c8, %c1, %c1 block %c32, %c1, %c1 args %mem0 on %env wait for %wev : (!comp.execenv<ocl:0,(11)>, !comp.kernel, index, index, index, index, index, index, memref<8x32xf32, 11>, !comp.event<ocl>) -> !comp.event<ocl>
     %rev = comp.schedule_read %arg0 from %mem0 on %env wait for %fev : (memref<8x32xf32>, memref<8x32xf32, 11>, !comp.execenv<ocl:0,(11)>, !comp.event<ocl>) -> !comp.event<ocl>
     comp.wait %rev : !comp.event<ocl>
+    comp.destroy_kernel %kernel on %env : (!comp.execenv<ocl:0,(11)>, !comp.kernel) -> ()
     comp.dealloc %env %mem0 : (!comp.execenv<ocl:0,(11)>, memref<8x32xf32, 11>) -> ()
     comp.destroy_execenv %env : !comp.execenv<ocl:0,(11)>
     return
@@ -141,8 +140,8 @@ module attributes {gpu.container_module} {
   //       CHECK:   %[[WEV:.*]] = llvm.call @oclWrite(%{{.*}}, %[[MEM]], %[[ENV]], %[[CST0]])
   //       CHECK:   %[[KRNL:.*]] = llvm.call @oclCreateKernel(%[[ENV]]
   //       CHECK:   llvm.call @oclSetKernelArg(%[[KRNL]], {{.*}}, %[[MEM]])
-  //       CHECK:   llvm.call @oclAddKernelDep(%[[KRNL]], %[[WEV]])
   //       CHECK:   %[[FEV:.*]] = llvm.call @oclScheduleFunc(%[[ENV]], %[[KRNL]]
+  //  CHECK-SAME:   %[[WEV]]
   //       CHECK:   %[[REV:.*]] = llvm.call @oclRead(%{{.*}}, %[[MEM]], %[[ENV]], %{{.*}}, %[[FEV]])
   //       CHECK:   %[[CST1:.*]] = llvm.mlir.constant(1
   //       CHECK:   llvm.call @oclWait(%[[CST1]], %[[REV]])
@@ -155,12 +154,11 @@ module attributes {gpu.container_module} {
     %env = comp.create_execenv %dev : (!comp.device) -> !comp.execenv<ocl:0,(11)>
     %mem0 = comp.alloc %env : (!comp.execenv<ocl:0,(11)>) -> memref<8x32xf16, 11>
     %wev = comp.schedule_write %arg0 to %mem0 on %env : (memref<8x32xf16>, memref<8x32xf16, 11>, !comp.execenv<ocl:0,(11)>) -> !comp.event<ocl>
-    %fev = "comp.schedule_func"(%env, %wev) ( {
-      "gpu.launch_func"(%c8, %c1, %c1, %c32, %c1, %c1, %mem0) {kernel = @gpu_module::@zero} : (index, index, index, index, index, index, memref<8x32xf16, 11>) -> ()
-      "comp.schedule_end"() : () -> ()
-    }) : (!comp.execenv<ocl:0,(11)>, !comp.event<ocl>) -> !comp.event<ocl>
+    %kernel = comp.create_kernel on %env {kernelFunc = @gpu_module::@zero} : (!comp.execenv<ocl:0,(11)>) -> !comp.kernel
+    %fev = comp.schedule_compute %kernel grid %c8, %c1, %c1 block %c32, %c1, %c1 args %mem0 on %env wait for %wev : (!comp.execenv<ocl:0,(11)>, !comp.kernel, index, index, index, index, index, index, memref<8x32xf16, 11>, !comp.event<ocl>) -> !comp.event<ocl>
     %rev = comp.schedule_read %arg0 from %mem0 on %env wait for %fev : (memref<8x32xf16>, memref<8x32xf16, 11>, !comp.execenv<ocl:0,(11)>, !comp.event<ocl>) -> !comp.event<ocl>
     comp.wait %rev : !comp.event<ocl>
+    comp.destroy_kernel %kernel on %env : (!comp.execenv<ocl:0,(11)>, !comp.kernel) -> ()
     comp.dealloc %env %mem0 : (!comp.execenv<ocl:0,(11)>, memref<8x32xf16, 11>) -> ()
     comp.destroy_execenv %env : !comp.execenv<ocl:0,(11)>
     return

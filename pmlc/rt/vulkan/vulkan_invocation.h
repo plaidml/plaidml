@@ -33,6 +33,12 @@ struct VulkanDeviceMemoryBuffer {
   size_t bufferSize{0};
 };
 
+/// Struct representing a compiled shader module.
+struct VulkanKernel {
+  VkShaderModule module;
+  const char *entryPoint = nullptr;
+};
+
 /// Struct containing information regarding to a host memory buffer.
 struct VulkanHostMemoryBuffer {
   /// Pointer to a host memory.
@@ -110,8 +116,6 @@ struct LaunchKernelAction : Action {
 
   NumWorkGroups workGroups;
   const char *entryPoint{nullptr};
-  uint8_t *binary{nullptr};
-  uint32_t binarySize{0};
 
   //===--------------------------------------------------------------------===//
   // Vulkan resource data and storage classes.
@@ -137,8 +141,12 @@ public:
   explicit VulkanInvocation(VulkanDevice *device);
   ~VulkanInvocation();
 
-  void createLaunchKernelAction(uint8_t *shader, uint32_t size,
-                                const char *entryPoint,
+  VulkanKernel *createKernel(uint8_t *shader, uint32_t size,
+                             const char *entryPoint);
+
+  void destroyKernel(VulkanKernel *kernel);
+
+  void createLaunchKernelAction(VulkanKernel *kernel,
                                 NumWorkGroups numWorkGroups);
 
   void setLaunchKernelAction(uint32_t subgroupSize);
@@ -168,7 +176,6 @@ private:
 
   void createMemoryBuffers();
   void createQueryPool();
-  void createShaderModule();
   void initDescriptorSetLayoutBindingMap();
   void createDescriptorSetLayout();
   void createPipelineLayout();

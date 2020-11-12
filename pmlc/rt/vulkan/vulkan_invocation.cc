@@ -57,7 +57,6 @@ VulkanInvocation::~VulkanInvocation() {
         vkDestroyDescriptorSetLayout(device->getDevice(), descriptorSetLayout,
                                      nullptr);
       }
-      vkDestroyShaderModule(device->getDevice(), kernel->shaderModule, nullptr);
 
       // For each descriptor set.
       for (auto &deviceMemoryBufferMapPair : kernel->deviceMemoryBufferMap) {
@@ -70,6 +69,30 @@ VulkanInvocation::~VulkanInvocation() {
       }
     }
   }
+}
+
+VulkanKernel *VulkanInvocation::createKernel(uint8_t *shader, uint32_t size,
+                                             const char *entryPoint) {
+  auto kernel = std::make_unique<VulkanKernel>();
+  VkShaderModuleCreateInfo shaderModuleCreateInfo = {};
+  shaderModuleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+  shaderModuleCreateInfo.pNext = nullptr;
+  shaderModuleCreateInfo.flags = 0;
+  // Set size in bytes.
+  shaderModuleCreateInfo.codeSize = size;
+  // Set pointer to the binary shader.
+  shaderModuleCreateInfo.pCode = reinterpret_cast<uint32_t *>(shader);
+  throwOnVulkanError(vkCreateShaderModule(device->getDevice(),
+                                          &shaderModuleCreateInfo, 0,
+                                          &kernel->module),
+                     "vkCreateShaderModule");
+  kernel->entryPoint = entryPoint;
+  return kernel.release();
+}
+
+void VulkanInvocation::destroyKernel(VulkanKernel *kernelPtr) {
+  std::unique_ptr<VulkanKernel> kernel{kernelPtr};
+  vkDestroyShaderModule(device->getDevice(), kernel->module, nullptr);
 }
 
 void VulkanInvocation::createQueryPool() {
@@ -95,15 +118,13 @@ void VulkanInvocation::createQueryPool() {
                      "vkCreateQueryPool");
 }
 
-void VulkanInvocation::createLaunchKernelAction(uint8_t *shader, uint32_t size,
-                                                const char *entryPoint,
+void VulkanInvocation::createLaunchKernelAction(VulkanKernel *kernel,
                                                 NumWorkGroups numWorkGroups) {
   if (!curr) {
     curr = std::make_shared<LaunchKernelAction>();
   }
-  curr->binary = shader;
-  curr->binarySize = size;
-  curr->entryPoint = entryPoint;
+  curr->shaderModule = kernel->module;
+  curr->entryPoint = kernel->entryPoint;
   curr->workGroups = numWorkGroups;
 }
 
@@ -115,7 +136,6 @@ void VulkanInvocation::setLaunchKernelAction(uint32_t subgroupSize) {
   // Create logical device, shader module and memory buffers.
   checkResourceData();
   createMemoryBuffers();
-  createShaderModule();
 
   // Descriptor bindings divided into sets. Each descriptor binding
   // must have a layout binding attached into a descriptor set layout.
@@ -330,9 +350,6 @@ void VulkanInvocation::checkResourceData() {
   if (!curr->resourceData.size()) {
     throw std::runtime_error{"Vulkan device needs at least one resource"};
   }
-  if (!curr->binarySize || !curr->binary) {
-    throw std::runtime_error{"binary shader size must be greater than zero"};
-  }
 }
 
 void VulkanInvocation::createMemoryBuffers() {
@@ -437,21 +454,6 @@ void VulkanInvocation::createMemoryBuffers() {
     // Associate device memory buffers with a descriptor set.
     curr->deviceMemoryBufferMap[descriptorSetIndex] = deviceMemoryBuffers;
   }
-}
-
-void VulkanInvocation::createShaderModule() {
-  VkShaderModuleCreateInfo shaderModuleCreateInfo = {};
-  shaderModuleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-  shaderModuleCreateInfo.pNext = nullptr;
-  shaderModuleCreateInfo.flags = 0;
-  // Set size in bytes.
-  shaderModuleCreateInfo.codeSize = curr->binarySize;
-  // Set pointer to the binary shader.
-  shaderModuleCreateInfo.pCode = reinterpret_cast<uint32_t *>(curr->binary);
-  throwOnVulkanError(vkCreateShaderModule(device->getDevice(),
-                                          &shaderModuleCreateInfo, 0,
-                                          &curr->shaderModule),
-                     "vkCreateShaderModule");
 }
 
 void VulkanInvocation::initDescriptorSetLayoutBindingMap() {

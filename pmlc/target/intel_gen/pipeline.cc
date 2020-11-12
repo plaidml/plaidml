@@ -106,8 +106,7 @@ struct ConvertStandardToLLVMPass
     conversion::comp_to_llvm::populateCommonPatterns(context, typeConverter,
                                                      patterns);
     conversion::comp_to_llvm::populateCompToVkPatterns(
-        context, *binaryModulesMap, module, kernelCount, typeConverter,
-        patterns);
+        context, *binaryModulesMap, kernelCount, typeConverter, patterns);
     LLVMConversionTarget target(*context);
     target.addIllegalDialect<abi::ABIDialect>();
     target.addIllegalDialect<comp::COMPDialect>();
