@@ -62,5 +62,6 @@ pml_cc_library(
     plaidml::plaidml
 )
 
+add_subdirectory(benchmark_app)
 add_subdirectory(plugin)
 add_subdirectory(tests/functional)
