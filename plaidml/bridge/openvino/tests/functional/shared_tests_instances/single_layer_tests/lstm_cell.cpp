@@ -34,4 +34,15 @@ INSTANTIATE_TEST_CASE_P(LSTMCell_default, LSTMCellTest,
                                            ::testing::ValuesIn(netPrecisions),                   //
                                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
                         LSTMCellTest::getTestCaseName);
+
+INSTANTIATE_TEST_CASE_P(smoke, LSTMCellTest,
+                        ::testing::Combine(::testing::Values(shouldDecompose),                         //
+                                           ::testing::Values(3),                                       //
+                                           ::testing::Values(64),                                      //
+                                           ::testing::Values(32),                                      //
+                                           ::testing::ValuesIn(activations),                           //
+                                           ::testing::Values(std::numeric_limits<float>::infinity()),  //
+                                           ::testing::ValuesIn(netPrecisions),                         //
+                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),        //
+                        LSTMCellTest::getTestCaseName);
 }  // namespace

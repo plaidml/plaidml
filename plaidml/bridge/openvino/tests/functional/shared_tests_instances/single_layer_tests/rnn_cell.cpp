@@ -32,4 +32,15 @@ INSTANTIATE_TEST_CASE_P(RNNCell, RNNCellTest,
                                            ::testing::ValuesIn(netPrecisions),                   //
                                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
                         RNNCellTest::getTestCaseName);
+
+INSTANTIATE_TEST_CASE_P(smoke, RNNCellTest,
+                        ::testing::Combine(::testing::Values(shouldDecompose),                   //
+                                           ::testing::Values(3),                                 //
+                                           ::testing::Values(64),                                //
+                                           ::testing::Values(32),                                //
+                                           ::testing::ValuesIn(activations),                     //
+                                           ::testing::ValuesIn(clips),                           //
+                                           ::testing::ValuesIn(netPrecisions),                   //
+                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
+                        RNNCellTest::getTestCaseName);
 }  // namespace

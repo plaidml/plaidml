@@ -25,7 +25,7 @@ batchToSpaceParamsTuple bts_only_test_cases[] = {
                             InferenceEngine::Precision::FP32, CommonTestUtils::DEVICE_PLAIDML),
 };
 
-INSTANTIATE_TEST_CASE_P(Smoke, BatchToSpaceLayerTest, ::testing::ValuesIn(bts_only_test_cases),
+INSTANTIATE_TEST_CASE_P(smoke, BatchToSpaceLayerTest, ::testing::ValuesIn(bts_only_test_cases),
                         BatchToSpaceLayerTest::getTestCaseName);
 
 }  // namespace

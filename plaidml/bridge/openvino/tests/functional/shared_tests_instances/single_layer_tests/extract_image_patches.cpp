@@ -34,4 +34,14 @@ INSTANTIATE_TEST_CASE_P(ExtractImagePatches2D_AutoTestCheck, ExtractImagePatches
                                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),     //
                         ExtractImagePatchesTest::getTestCaseName);
 
+INSTANTIATE_TEST_CASE_P(smoke, ExtractImagePatchesTest,
+                        ::testing::Combine(::testing::Values(std::vector<size_t>({1, 3, 10, 10})),  //
+                                           ::testing::Values(std::vector<size_t>({3, 5})),          //
+                                           ::testing::Values(std::vector<size_t>({5, 5})),          //
+                                           ::testing::Values(std::vector<size_t>({1, 2})),          //
+                                           ::testing::ValuesIn(padTypes),                           //
+                                           ::testing::ValuesIn(netPrecisions),                      //
+                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),     //
+                        ExtractImagePatchesTest::getTestCaseName);
+
 }  // namespace

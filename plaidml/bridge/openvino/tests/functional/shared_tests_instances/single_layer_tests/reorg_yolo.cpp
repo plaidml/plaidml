@@ -22,7 +22,7 @@ const std::vector<std::vector<size_t>> inputShapes = {
     {1, 3, 30, 30}     //
 };
 
-INSTANTIATE_TEST_CASE_P(reorgYoloCheck, reorgYoloLayerTest,
+INSTANTIATE_TEST_CASE_P(smoke, reorgYoloLayerTest,
                         ::testing::Combine(::testing::ValuesIn(inputShapes),                     //
                                            ::testing::ValuesIn(netPrecisions),                   //
                                            ::testing::ValuesIn(std::vector<size_t>({1, 2, 5})),  //

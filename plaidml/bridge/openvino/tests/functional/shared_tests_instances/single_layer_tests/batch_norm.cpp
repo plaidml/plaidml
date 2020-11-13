@@ -28,7 +28,7 @@ const auto batchNormParams = testing::Combine(testing::ValuesIn(epsilon),       
                                               testing::ValuesIn(inputShapes),    //
                                               testing::Values(CommonTestUtils::DEVICE_PLAIDML));
 
-INSTANTIATE_TEST_CASE_P(BatchNorm,                           //
+INSTANTIATE_TEST_CASE_P(smoke,                               //
                         BatchNormLayerTest,                  //
                         batchNormParams,                     //
                         BatchNormLayerTest::getTestCaseName  //

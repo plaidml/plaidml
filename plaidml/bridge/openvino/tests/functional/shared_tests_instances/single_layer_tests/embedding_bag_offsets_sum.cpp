@@ -32,8 +32,22 @@ const auto embBagOffsetSumArgSet = ::testing::Combine(::testing::ValuesIn(embTab
                                                       ::testing::ValuesIn(withWeights),    //
                                                       ::testing::ValuesIn(withDefaultIndex));
 
-INSTANTIATE_TEST_CASE_P(smoke, EmbeddingBagOffsetsSumLayerTest,
+const auto smokeArgSet = ::testing::Combine(::testing::Values(std::vector<size_t>({5, 6})),                          //
+                                            ::testing::Values(std::vector<size_t>({1, 2, 1, 2, 1, 2, 1, 2, 1, 2})),  //
+                                            ::testing::Values(std::vector<size_t>({0, 2})),                          //
+                                            ::testing::Values(4),                                                    //
+                                            ::testing::ValuesIn(withWeights),                                        //
+                                            ::testing::ValuesIn(withDefaultIndex));
+
+INSTANTIATE_TEST_CASE_P(EmbeddingBagOffsetsSum, EmbeddingBagOffsetsSumLayerTest,
                         ::testing::Combine(embBagOffsetSumArgSet,               //
+                                           ::testing::ValuesIn(netPrecisions),  //
+                                           ::testing::ValuesIn(indPrecisions),  //
+                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),
+                        EmbeddingBagOffsetsSumLayerTest::getTestCaseName);
+
+INSTANTIATE_TEST_CASE_P(smoke, EmbeddingBagOffsetsSumLayerTest,
+                        ::testing::Combine(smokeArgSet,                         //
                                            ::testing::ValuesIn(netPrecisions),  //
                                            ::testing::ValuesIn(indPrecisions),  //
                                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),

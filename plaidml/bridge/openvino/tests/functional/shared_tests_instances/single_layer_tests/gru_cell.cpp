@@ -23,13 +23,25 @@ const std::vector<std::vector<std::string>> activations = {{"sigmoid", "tanh"}, 
 const std::vector<float> clips = {std::numeric_limits<float>::infinity(), 1.0f};
 const std::vector<bool> linearBeforeResets = {false, true};
 
-INSTANTIATE_TEST_CASE_P(RNNCell, GRUCellTest,
+INSTANTIATE_TEST_CASE_P(GRU, GRUCellTest,
                         ::testing::Combine(::testing::Values(shouldDecompose),                   //
                                            ::testing::ValuesIn(batches),                         //
                                            ::testing::ValuesIn(hiddenSizes),                     //
                                            ::testing::ValuesIn(inputSizes),                      //
                                            ::testing::ValuesIn(activations),                     //
                                            ::testing::ValuesIn(clips),                           //
+                                           ::testing::ValuesIn(linearBeforeResets),              //
+                                           ::testing::ValuesIn(netPrecisions),                   //
+                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
+                        GRUCellTest::getTestCaseName);
+
+INSTANTIATE_TEST_CASE_P(smoke, GRUCellTest,
+                        ::testing::Combine(::testing::Values(shouldDecompose),                   //
+                                           ::testing::Values(3),                                 //
+                                           ::testing::Values(32),                                //
+                                           ::testing::Values(16),                                //
+                                           ::testing::ValuesIn(activations),                     //
+                                           ::testing::Values(1.0f),                              //
                                            ::testing::ValuesIn(linearBeforeResets),              //
                                            ::testing::ValuesIn(netPrecisions),                   //
                                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //

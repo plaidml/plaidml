@@ -19,7 +19,7 @@ const std::vector<std::vector<size_t>> repeats = {
     {2, 2, 2},
 };
 
-INSTANTIATE_TEST_CASE_P(Tile, TileLayerTest,
+INSTANTIATE_TEST_CASE_P(smoke, TileLayerTest,
                         ::testing::Combine(::testing::ValuesIn(repeats),                         //
                                            ::testing::ValuesIn(netPrecisions),                   //
                                            ::testing::Values(std::vector<size_t>({2, 3, 4})),    //
