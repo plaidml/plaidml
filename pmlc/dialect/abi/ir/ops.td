@@ -37,7 +37,7 @@ def ABI_LoopOp : ABI_Op<"loop", [
   let builders = [OpBuilder<"">];
   let skipDefaultBuilders = 1;
   let assemblyFormat = [{
-    `init` $initRegion `yielding` $networkFieldTypes `to` `body` $bodyRegion `and` `to` `fini` $finiRegion attr-dict
+    `init` $initRegion `yield` $networkFieldTypes `body` $bodyRegion `fini` $finiRegion attr-dict
   }];
   let extraClassDeclaration = [{
     std::vector<mlir::Type> getNetworkFieldTypes();
