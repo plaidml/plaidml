@@ -8,6 +8,7 @@ pml_cc_library(
   DEPS
     MLIRIR
     pmlc::dialect::abi::ir
+    pmlc::util
     ::passes-gen
 )
 
