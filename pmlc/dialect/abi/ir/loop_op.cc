@@ -7,14 +7,17 @@
 
 namespace pmlc::dialect::abi {
 
-mlir::StringRef LoopOp::getNetworkFieldTypesAttrName() {
-  return "networkFieldTypes";
+void LoopOp::build(::mlir::OpBuilder &odsBuilder,
+                   ::mlir::OperationState &odsState) {
+  odsState.addAttribute("networkFieldTypes", odsBuilder.getTypeArrayAttr({}));
+  odsState.addRegion();
+  odsState.addRegion();
+  odsState.addRegion();
 }
 
 std::vector<mlir::Type> LoopOp::getNetworkFieldTypes() {
   std::vector<mlir::Type> result;
-  auto arrayAttr =
-      getAttrOfType<mlir::ArrayAttr>(getNetworkFieldTypesAttrName());
+  auto arrayAttr = networkFieldTypes();
   if (arrayAttr) {
     for (auto attr : arrayAttr) {
       if (auto tyAttr = attr.dyn_cast<mlir::TypeAttr>()) {
@@ -26,8 +29,7 @@ std::vector<mlir::Type> LoopOp::getNetworkFieldTypes() {
 }
 
 unsigned LoopOp::getNumNetworkFields() {
-  auto arrayAttr =
-      getAttrOfType<mlir::ArrayAttr>(getNetworkFieldTypesAttrName());
+  auto arrayAttr = networkFieldTypes();
   if (arrayAttr) {
     return arrayAttr.size();
   }
@@ -40,7 +42,7 @@ void LoopOp::setNetworkFieldTypes(mlir::TypeRange types) {
     attrs.emplace_back(mlir::TypeAttr::get(ty));
   }
   auto arrayAttr = mlir::ArrayAttr::get(attrs, getContext());
-  setAttr(getNetworkFieldTypesAttrName(), arrayAttr);
+  networkFieldTypesAttr(arrayAttr);
 }
 
 mlir::Block *LoopOp::getBodyEntryBlock() { return &bodyRegion().front(); }

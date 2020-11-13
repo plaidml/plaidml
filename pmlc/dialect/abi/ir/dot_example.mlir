@@ -50,10 +50,10 @@ module @dot {
 // After lowering to ABI:
 
 module @dot {
-  "abi.loop"() ( {
+  abi.loop init  {
   ^bb0(%arg0: !llvm.ptr<i8>):  // no predecessors
-    "abi.yield"() : () -> ()
-  },  {
+    abi.yield
+  } yielding [] to body  {
   ^bb0(%arg0: memref<8x16xf32>, %arg1: memref<16x32xf32>, %arg2: memref<8x32xf32>):  // no predecessors
     %cst = constant 0.000000e+00 : f32
     %c0 = constant 0 : index
@@ -95,21 +95,21 @@ module @dot {
     }
     %0 = xsmm.gemm.dispatch.f32 [8, 32, 16], [16, 32, 32]
     xsmm.gemm.invoke.f32 %0, %arg2[%c0, %c0] = %arg0[%c0, %c0], %arg1[%c0, %c0] : (memref<8x16xf32>, memref<16x32xf32>) -> memref<8x32xf32>
-    "abi.terminator"() : () -> ()
-  },  {
-    "abi.terminator"() : () -> ()
-  }) {networkFieldTypes = []} : () -> ()
+    abi.terminator
+  } and to fini  {
+    abi.terminator
+  }
   func @plaidml_rt_thread_num() -> index
 }
 
 // After hoisting and canonicalizing:
 
 module @dot {
-  "abi.loop"() ( {
+  abi.loop init  {
   ^bb0(%arg0: !llvm.ptr<i8>):  // no predecessors
     %0 = xsmm.gemm.dispatch.f32 [8, 32, 16], [16, 32, 32]
-    "abi.yield"(%0) : (i64) -> ()
-  },  {
+    abi.yield %0
+  } yielding [i64] to body  {
   ^bb0(%arg0: i64, %arg1: memref<8x16xf32>, %arg2: memref<16x32xf32>, %arg3: memref<8x32xf32>):  // no predecessors
     %cst = constant 0.000000e+00 : f32
     %c0 = constant 0 : index
@@ -150,11 +150,11 @@ module @dot {
       omp.terminator
     }
     xsmm.gemm.invoke.f32 %arg0, %arg3[%c0, %c0] = %arg1[%c0, %c0], %arg2[%c0, %c0] : (memref<8x16xf32>, memref<16x32xf32>) -> memref<8x32xf32>
-    "abi.terminator"() : () -> ()
-  },  {
+    abi.terminator
+  } and to fini  {
   ^bb0(%arg0: i64):  // no predecessors
-    "abi.terminator"() : () -> ()
-  }) {networkFieldTypes = [i64]} : () -> ()
+    abi.terminator
+  }
   func @plaidml_rt_thread_num() -> index
 }
 

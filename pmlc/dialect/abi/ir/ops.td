@@ -27,9 +27,13 @@ def ABI_LoopOp : ABI_Op<"loop", [
     many runs of the program.
   }];
   let regions = (region AnyRegion:$initRegion, AnyRegion:$bodyRegion, AnyRegion:$finiRegion);
+  let arguments = (ins TypeArrayAttr:$networkFieldTypes);
+  let builders = [OpBuilder<"">];
+  let skipDefaultBuilders = 1;
+  let assemblyFormat = [{
+     `init` $initRegion `yielding` $networkFieldTypes `to` `body` $bodyRegion `and` `to` `fini` $finiRegion attr-dict
+   }];
   let extraClassDeclaration = [{
-    static mlir::StringRef getNetworkFieldTypesAttrName();
-
     std::vector<mlir::Type> getNetworkFieldTypes();
     unsigned getNumNetworkFields();
     void setNetworkFieldTypes(mlir::TypeRange types);
@@ -42,8 +46,11 @@ def ABI_LoopOp : ABI_Op<"loop", [
   }];
 }
 
-def ABI_TerminatorOp : ABI_Op<"terminator", [Terminator, HasParent<"LoopOp">]> {
+def ABI_TerminatorOp : ABI_Op<"terminator", [NoSideEffect, Terminator, HasParent<"LoopOp">]> {
   let summary = "Terminates an abi.loop operation body or fini region";
+  let assemblyFormat = [{
+    attr-dict
+  }];
 }
 
 def ABI_YieldOp : ABI_Op<"yield", [Terminator, HasParent<"LoopOp">]> {
@@ -55,6 +62,9 @@ def ABI_YieldOp : ABI_Op<"yield", [Terminator, HasParent<"LoopOp">]> {
     de-allocate resources previously allocated in the init region.
   }];
   let arguments = (ins Variadic<AnyType>);
+  let assemblyFormat = [{
+    operands attr-dict `:` type(operands)
+  }];
 }
 
 #endif // __PML_ABI_OPS__
