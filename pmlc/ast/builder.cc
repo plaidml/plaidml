@@ -181,7 +181,7 @@ private:
 public:
   explicit AstTraversal(const std::vector<ExprNodePtr> &outputs,
                         const ExprNodeLayer *layer = nullptr) {
-    for (const ExprNodePtr &expr : outputs) {
+    for (const ExprNodePtr &expr : llvm::reverse(outputs)) {
       push(expr);
     }
     while (stack.size()) {

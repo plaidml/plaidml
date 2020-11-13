@@ -206,9 +206,12 @@ void ProgramBuilder::handleOp(const std::shared_ptr<ngraph::Node>& node) {
     }
     return outputs;
   });
+  //   auto value = op(ctx);
+  //   auto tuple = value.as_tuple();
   IE_ASSERT(tuple.size() == node->get_output_size());
   for (unsigned i = 0; i < tuple.size(); i++) {
     plaidml::edsl::Tensor tensor = tuple.at(i);
+    // plaidml::edsl::Tensor tensor = tuple.at(i).as_tensor();
     tensorMap[std::make_pair(node->get_name(), i)] = tensor;
   }
 }
