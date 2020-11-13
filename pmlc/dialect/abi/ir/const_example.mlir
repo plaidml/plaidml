@@ -22,7 +22,7 @@ module @const_add {
   abi.loop init  {
   ^bb0(%arg0: !llvm.ptr<i8>, %arg1: memref<4xi32>, %arg2: memref<4xi32>):  // no predecessors
     abi.yield %arg1, %arg2 : (memref<4xi32>, memref<4xi32>)
-  } yielding [memref<4xi32>, memref<4xi32>] to body  {
+  } yield [memref<4xi32>, memref<4xi32>] body  {
   ^bb0(%arg0: memref<4xi32>, %arg1: memref<4xi32>, %arg2: memref<4xi32>):  // no predecessors
     %c4 = constant 4 : index
     omp.parallel num_threads(%c4 : index) default(shared) {
@@ -34,7 +34,7 @@ module @const_add {
       omp.terminator
     }
     abi.terminator
-  } and to fini  {
+  } fini  {
   ^bb0(%arg0: memref<4xi32>, %arg1: memref<4xi32>):  // no predecessors
     abi.terminator
   }
@@ -47,7 +47,7 @@ module @const_add {
   abi.loop init  {
   ^bb0(%arg0: !llvm.ptr<i8>, %arg1: memref<4xi32>, %arg2: memref<4xi32>):  // no predecessors
     abi.yield %arg1, %arg2 : (memref<4xi32>, memref<4xi32>)
-  } yielding [memref<4xi32>, memref<4xi32>] to body  {
+  } yield [memref<4xi32>, memref<4xi32>] body  {
   ^bb0(%arg0: memref<4xi32>, %arg1: memref<4xi32>, %arg2: memref<4xi32>):  // no predecessors
     %c4 = constant 4 : index
     omp.parallel num_threads(%c4 : index) default(shared) {
@@ -59,7 +59,7 @@ module @const_add {
       omp.terminator
     }
     abi.terminator
-  } and to fini  {
+  } fini  {
   ^bb0(%arg0: memref<4xi32>, %arg1: memref<4xi32>):  // no predecessors
     abi.terminator
   }
