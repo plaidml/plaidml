@@ -7,13 +7,14 @@
 
 #include "plaidml_executable_network.hpp"
 
-#include <memory>  // NOLINT[build/include_order]
-#include <vector>  // NOLINT[build/include_order]
+#include <fstream>
+#include <memory>
+#include <vector>
 
 #include "plaidml_builder.hpp"
 #include "plaidml_infer_request.hpp"
 
-using namespace InferenceEngine;  // NOLINT[build/namespaces]
+using namespace InferenceEngine;
 
 namespace PlaidMLPlugin {
 
@@ -38,6 +39,19 @@ void PlaidMLExecutableNetwork::GetMetric(const std::string& name, Parameter& res
     result = IE_SET_METRIC(OPTIMAL_NUMBER_OF_INFER_REQUESTS, 1);
   } else {
     THROW_IE_EXCEPTION << "Unsupported ExecutableNetwork metric: " << name;
+  }
+}
+
+void PlaidMLExecutableNetwork::ExportImpl(std::ostream& model) {  //
+  model << program_.str() << std::endl;
+}
+
+void PlaidMLExecutableNetwork::Export(const std::string& modelFileName) {
+  std::ofstream modelFile(modelFileName, std::ios::out);
+  if (modelFile.is_open()) {
+    ExportImpl(modelFile);
+  } else {
+    THROW_IE_EXCEPTION << "The " << modelFileName << " file can not be opened for export";
   }
 }
 

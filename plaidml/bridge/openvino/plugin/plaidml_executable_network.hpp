@@ -21,10 +21,15 @@ class PlaidMLExecutableNetwork : public InferenceEngine::ExecutableNetworkThread
   virtual ~PlaidMLExecutableNetwork() = default;
 
   InferenceEngine::InferRequestInternal::Ptr CreateInferRequestImpl(
-      InferenceEngine::InputsDataMap networkInputs, InferenceEngine::OutputsDataMap networkOutputs) override;
+      InferenceEngine::InputsDataMap networkInputs, InferenceEngine::OutputsDataMap networkOutputs) final;
 
   void GetMetric(const std::string& name, InferenceEngine::Parameter& result,
-                 InferenceEngine::ResponseDesc* resp) const override;
+                 InferenceEngine::ResponseDesc* resp) const final;
+
+  void Export(const std::string& modelFileName) final;
+  void Export(std::ostream& networkModel) final { ExportImpl(networkModel); }
+
+  void ExportImpl(std::ostream& model) final;
 
  private:
   plaidml::Program program_;

@@ -1281,13 +1281,14 @@ struct TraceOpConversion : public OpConversionPattern<tile::PragmaOp> {
 
 struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
   void runOnOperation() final {
-    // Inject eltwise.ident ops for each return operand that is a direct block
-    // argument or a constant value.
+    // Inject tile.ident ops for each return operand that is a direct block
+    // argument, a constant value, or a reshape op.
     getOperation().walk([&](ReturnOp op) {
       OpBuilder builder(op);
       for (OpOperand &operand : op.getOperation()->getOpOperands()) {
         Value value = operand.get();
-        if (value.isa<BlockArgument>() || matchPattern(value, m_Constant())) {
+        if (value.isa<BlockArgument>() || matchPattern(value, m_Constant()) ||
+            matchPattern(value, m_Op<tile::ReshapeOp>())) {
           Value copy = builder.create<tile::IdentOp>(op.getLoc(),
                                                      value.getType(), value);
           operand.set(copy);

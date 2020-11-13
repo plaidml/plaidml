@@ -17,7 +17,7 @@ class Engine : public InferenceEngine::InferencePluginInternal {
   Engine();
   virtual ~Engine() = default;
 
-  void GetVersion(const InferenceEngine::Version*& versionInfo) noexcept;  // NOLINT:runtime/references  // TODO
+  void GetVersion(const InferenceEngine::Version*& versionInfo) noexcept;
 
   InferenceEngine::ExecutableNetworkInternal::Ptr LoadExeNetworkImpl(
       const InferenceEngine::ICNNNetwork& network, const std::map<std::string, std::string>& config) override;
