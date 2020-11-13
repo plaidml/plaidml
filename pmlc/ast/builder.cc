@@ -41,6 +41,20 @@ namespace {
 
 static constexpr const char *kEntrypoint = "main";
 
+static StringRef getDiagKindStr(DiagnosticSeverity kind) {
+  switch (kind) {
+  case DiagnosticSeverity::Note:
+    return "note";
+  case DiagnosticSeverity::Warning:
+    return "warning";
+  case DiagnosticSeverity::Error:
+    return "error";
+  case DiagnosticSeverity::Remark:
+    return "remark";
+  }
+  llvm_unreachable("Unknown DiagnosticSeverity");
+}
+
 class OpBuilder : public mlir::OpBuilder {
 public:
   using mlir::OpBuilder::OpBuilder;
@@ -135,8 +149,16 @@ public:
             [&](VarNodeInt *node) { return getI64IntegerAttr(node->value); })
         .Case<VarNodeString>(
             [&](VarNodeString *node) { return getStringAttr(node->value); })
-        .Default([](VarNode *) -> Attribute {
-          llvm_unreachable("Invalid VarNode");
+        .Case<VarNodeTuple>([&](VarNodeTuple *node) {
+          SmallVector<Attribute, 8> attrs;
+          for (const VarNodePtr &value : node->values) {
+            attrs.push_back(getAttribute(value));
+          }
+          return getArrayAttr(attrs);
+        })
+        .Default([](VarNode *node) -> Attribute {
+          throw std::runtime_error(
+              llvm::formatv("Unsupported VarNode: {0}", node->str()));
         });
   }
 
@@ -154,10 +176,12 @@ private:
   std::stack<Entry> stack;
   std::vector<ExprNodePtr> flat;
   std::unordered_set<const ExprNode *> visited;
+  std::unordered_set<ExprNodePtr> exterior;
 
 public:
-  explicit AstTraversal(const ProgramArguments &args) {
-    for (const ExprNodePtr &expr : args.outputs) {
+  explicit AstTraversal(const std::vector<ExprNodePtr> &outputs,
+                        const ExprNodeLayer *layer = nullptr) {
+    for (const ExprNodePtr &expr : llvm::reverse(outputs)) {
       push(expr);
     }
     while (stack.size()) {
@@ -167,13 +191,21 @@ public:
         flat.push_back(entry.expr);
       } else if (!visited.count(entry.expr.get())) {
         visited.emplace(entry.expr.get());
-        push(entry.expr, /*post=*/true);
-        visit(entry.expr.get());
+        if (layer && entry.expr->parent.get() != layer) {
+          exterior.insert(entry.expr);
+        } else {
+          push(entry.expr, /*post=*/true);
+          visit(entry.expr.get());
+        }
       }
     }
   }
 
   const std::vector<ExprNodePtr> &getFlat() const { return flat; }
+
+  const std::unordered_set<ExprNodePtr> &getExterior() const {
+    return exterior;
+  }
 
 private:
   void visit(ExprNode *node) {
@@ -216,7 +248,7 @@ private:
 };
 
 static std::vector<ExprNodePtr> getFlatAst(const ProgramArguments &args) {
-  AstTraversal traversal(args);
+  AstTraversal traversal(args.outputs);
   return traversal.getFlat();
 }
 
@@ -323,11 +355,37 @@ struct ContractionBuilder : PolyVisitor<ContractionBuilder, AffineExpr> {
   }
 
   Value getInit() {
-    if (node->init) {
-      return builder.lookupNode(node->init);
+    if (!node->init) {
+      node->init = createIdentity();
+      node->init->parent = node->parent;
     }
-    return tile::createIdentity(builder, builder.getUnknownLoc(),
-                                resultType.getElementType(), node->aggKind);
+    return builder.lookupNode(node->init);
+  }
+
+  ExprNodePtr createIdentity() {
+    Type elementType = resultType.getElementType();
+    if (elementType.isa<FloatType>()) {
+      auto init = std::make_shared<ast::ExprNodeConstFloat>(
+          tile::getFloatIdentity(node->aggKind));
+      Value value = builder.create<tile::ConstantOp>(builder.getUnknownLoc(),
+                                                     elementType, init->value);
+      builder.addNode(init, value);
+      return init;
+    }
+    if (elementType.isSignedInteger()) {
+      auto init = std::make_shared<ast::ExprNodeConstSigned>(
+          tile::getSignedIntegerIdentity(node->aggKind));
+      Value value = builder.create<tile::ConstantOp>(builder.getUnknownLoc(),
+                                                     elementType, init->value);
+      builder.addNode(init, value);
+      return init;
+    }
+    auto init = std::make_shared<ast::ExprNodeConstUnsigned>(
+        tile::getUnsignedIntegerIdentity(node->aggKind));
+    Value value = builder.create<tile::ConstantOp>(builder.getUnknownLoc(),
+                                                   elementType, init->value);
+    builder.addNode(init, value);
+    return init;
   }
 
   AffineExpr makeExpr(const PolyNodePtr &node) { return visit(node.get()); }
@@ -516,6 +574,15 @@ struct ProgramBuilder {
     IVLOG(3, "\n" << debugString(module));
 
     PassManager pm(context);
+    ScopedDiagnosticHandler diagHandler(pm.getContext(), [&](Diagnostic &diag) {
+      llvm::errs() << getDiagKindStr(diag.getSeverity()) << ": " << diag.str()
+                   << "\n";
+      for (auto &note : diag.getNotes()) {
+        llvm::errs() << "  " << note << "\n";
+      }
+      return success();
+    });
+
     pm.addPass(createCanonicalizerPass());
     pm.addPass(createCSEPass());
     pm.addPass(tile::createMaterializePass());
@@ -604,13 +671,14 @@ struct ProgramBuilder {
   }
 
   Value handleLayer(ExprNodeLayer *node) {
+    AstTraversal traversal(node->results, node);
     SmallVector<Value, 8> operands;
-    for (const ExprNodePtr &operand : node->operands) {
+    for (const ExprNodePtr &operand : traversal.getExterior()) {
       operands.push_back(builder.lookupNode(operand));
     }
-    SmallVector<Value, 8> results;
+    llvm::SetVector<Value> results;
     for (const ExprNodePtr &result : node->results) {
-      results.push_back(builder.lookupNode(result));
+      results.insert(builder.lookupNode(result));
     }
     std::vector<NamedAttribute> attrs;
     for (const auto &kvp : node->attrs) {
@@ -618,66 +686,43 @@ struct ProgramBuilder {
       attrs.push_back(builder.getNamedAttr(kvp.getKey(), value));
     }
     auto layerOp = builder.create<tile::LayerOp>(
-        loc, node->op, operands, results, builder.getDictionaryAttr(attrs));
+        loc, node->op, operands, results.getArrayRef(),
+        builder.getDictionaryAttr(attrs));
+    BlockAndValueMapping mapper;
     OpBuilder bodyBuilder(layerOp.body());
-    bodyBuilder.create<tile::LayerReturnOp>(loc, results);
-    buildLayerBody(layerOp);
+    for (auto tuple : llvm::zip(operands, layerOp.body().getArguments())) {
+      Value outer, inner;
+      std::tie(outer, inner) = tuple;
+      mapper.map(outer, inner);
+    }
+    llvm::SmallVector<Value, 4> innerResults;
+    llvm::SetVector<Operation *> toRemove;
+    for (const ExprNodePtr &node : traversal.getFlat()) {
+      Value value = builder.lookupNode(node);
+      Operation *op = value.getDefiningOp();
+      if (toRemove.contains(op)) {
+        // this has already been visited
+        continue;
+      }
+      assert(op && "Unexpected block argument");
+      Operation *clonedOp = bodyBuilder.clone(*op, mapper);
+      if (results.contains(value)) {
+        for (Value result : clonedOp->getResults()) {
+          innerResults.push_back(result);
+        }
+      }
+      toRemove.insert(op);
+    }
+    bodyBuilder.create<tile::LayerReturnOp>(loc, innerResults);
+    for (Operation *op : toRemove) {
+      op->erase();
+    }
     SmallVector<Value, 4> tuple;
     for (OpResult result : layerOp.getResults()) {
       tuple.push_back(result);
     }
     builder.exprTuples[node] = tuple;
     return nullptr;
-  }
-
-  void buildLayerBody(tile::LayerOp layerOp) {
-    llvm::SetVector<Value> sinkCandidates;
-    getUsedValuesDefinedAbove(layerOp.body(), sinkCandidates);
-
-    BlockAndValueMapping mapper;
-    llvm::SetVector<Operation *> sunkOperations;
-    for (Value candidate : sinkCandidates) {
-      collectLayerBodyOps(layerOp, candidate, mapper, sunkOperations);
-    }
-
-    for (Operation *op : sunkOperations) {
-      OpBuilder builder(layerOp.body());
-      Operation *clonedOp = builder.clone(*op, mapper);
-      for (auto result : llvm::enumerate(op->getResults())) {
-        auto replacement = clonedOp->getResult(result.index());
-        for (auto &use : llvm::make_early_inc_range(result.value().getUses())) {
-          if (use.getOwner()->getParentOfType<tile::LayerOp>() == layerOp) {
-            use.set(replacement);
-          }
-        }
-      }
-    }
-
-    for (Operation *op : sunkOperations) {
-      op->erase();
-    }
-  }
-
-  void collectLayerBodyOps(tile::LayerOp layerOp, Value candidate,
-                           BlockAndValueMapping &mapper,
-                           llvm::SetVector<Operation *> &into) {
-    Block *body = layerOp.getBody();
-    for (auto item : llvm::zip(layerOp.operands(), body->getArguments())) {
-      Value outer, inner;
-      std::tie(outer, inner) = item;
-      if (candidate == outer) {
-        mapper.map(candidate, inner);
-        return;
-      }
-    }
-    Operation *op = candidate.getDefiningOp();
-    if (!op) {
-      return;
-    }
-    into.insert(op);
-    for (Value operand : op->getOperands()) {
-      collectLayerBodyOps(layerOp, operand, mapper, into);
-    }
   }
 
   Value handlePragma(ExprNodePragma *node) {

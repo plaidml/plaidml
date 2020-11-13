@@ -5,7 +5,7 @@
 // NB: IE_SET_METRIC_RETURN requires this header to be included first
 #include "ie_metric_helpers.hpp"
 
-#include <memory>  // NOLINT: build/include_order
+#include <memory>
 
 #include "plaidml_plugin.hpp"
 
@@ -19,7 +19,7 @@
 #include "plaidml/op/op.h"
 #include "plaidml_executable_network.hpp"
 
-using namespace InferenceEngine;  // NOLINT[build/namespaces]
+using namespace InferenceEngine;
 
 namespace PlaidMLPlugin {
 

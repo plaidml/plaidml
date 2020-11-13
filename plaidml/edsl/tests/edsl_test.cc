@@ -1541,7 +1541,7 @@ TEST_F(CppEdsl, Lens) {
 
 TEST_F(CppEdsl, Layer) {
   auto A = Placeholder(DType::FLOAT32, {10, 20});
-  Tensor O = layer("relu", {A}, [&]() {  //
+  Tensor O = layer("relu", [&]() {  //
     return Relu(A);
   });
   auto program = makeProgram("relu", {A}, {O});
