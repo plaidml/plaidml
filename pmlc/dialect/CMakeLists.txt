@@ -1,3 +1,4 @@
+add_subdirectory(abi)
 add_subdirectory(comp)
 add_subdirectory(pxa)
 add_subdirectory(stdx)
