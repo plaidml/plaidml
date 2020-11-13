@@ -33,59 +33,44 @@ def ABI_LoopOp : ABI_Op<"loop", [
   }];
   let regions = (region AnyRegion:$initRegion, AnyRegion:$bodyRegion, AnyRegion:$finiRegion);
   let hasCanonicalizer = 1;
+  let arguments = (ins TypeArrayAttr:$networkFieldTypes);
+  let builders = [OpBuilder<"">];
+  let skipDefaultBuilders = 1;
+  let assemblyFormat = [{
+    `init` $initRegion `yielding` $networkFieldTypes `to` `body` $bodyRegion `and` `to` `fini` $finiRegion attr-dict
+  }];
   let extraClassDeclaration = [{
-    static mlir::StringRef getNetworkFieldTypesAttrName() { return "networkFieldTypes"; }
+    std::vector<mlir::Type> getNetworkFieldTypes();
+    unsigned getNumNetworkFields();
+    void setNetworkFieldTypes(mlir::TypeRange types);
 
-    std::vector<mlir::Type> getNetworkFieldTypes() {
-      std::vector<mlir::Type> result;
-      auto arrayAttr = getAttrOfType<mlir::ArrayAttr>(getNetworkFieldTypesAttrName());
-      if (arrayAttr) {
-        for (auto attr : arrayAttr) {
-          if (auto tyAttr = attr.dyn_cast<mlir::TypeAttr>()) {
-            result.emplace_back(tyAttr.getValue());
-          }
-        }
-      }
-      return result;
-    }
-
-    unsigned getNumNetworkFields() {
-      auto arrayAttr = getAttrOfType<mlir::ArrayAttr>(getNetworkFieldTypesAttrName());
-      if (arrayAttr) {
-        return arrayAttr.size();
-      }
-      return 0;
-    }
-
-    void setNetworkFieldTypes(mlir::TypeRange types) {
-      mlir::SmallVector<mlir::Attribute, 8> attrs;
-      for (auto ty : types) {
-        attrs.emplace_back(mlir::TypeAttr::get(ty));
-      }
-      auto arrayAttr = mlir::ArrayAttr::get(attrs, getContext());
-      setAttr(getNetworkFieldTypesAttrName(), arrayAttr);
-    }
-
-    mlir::Block* getBodyEntryBlock() { return &bodyRegion().front(); }
-    mlir::Block* getFiniEntryBlock() { return &finiRegion().front(); }
+    mlir::Block* getBodyEntryBlock();
+    mlir::Block* getFiniEntryBlock();
     
-    CreateNetworkOp getInitTerminator() {
-      return mlir::cast<CreateNetworkOp>(initRegion().back().getTerminator());
-    }
-
-    DoneOp getFiniTerminator() {
-      return mlir::cast<DoneOp>(finiRegion().back().getTerminator());
-    }
+    YieldOp getInitTerminator();
+    TerminatorOp getFiniTerminator();
   }];
 }
 
-def ABI_DoneOp : ABI_Op<"done", [Terminator, HasParent<"pmlc::dialect::abi::LoopOp">]> {
+def ABI_TerminatorOp : ABI_Op<"terminator", [NoSideEffect, Terminator, HasParent<"LoopOp">]> {
   let summary = "Terminates an abi.loop operation body or fini region";
+  let assemblyFormat = [{
+    attr-dict
+  }];
 }
 
-def ABI_CreateNetworkOp : ABI_Op<"create_network", [Terminator, HasParent<"pmlc::dialect::abi::LoopOp">]> {
+def ABI_YieldOp : ABI_Op<"yield", [NoSideEffect, Terminator, HasParent<"LoopOp">]> {
   let summary = "Terminates an abi.loop operation init region";
+  let description = [{
+    The "abi.yield" operation terminates the init region of an abi.loop.
+    Its arguments are the values that are carried into the body region
+    in order to actually run the network, and into the fini region to
+    de-allocate resources previously allocated in the init region.
+  }];
   let arguments = (ins Variadic<AnyType>);
+  let assemblyFormat = [{
+    operands attr-dict `:` type(operands)
+  }];
 }
 
 #endif // __PML_ABI_OPS__

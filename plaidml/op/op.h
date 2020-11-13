@@ -117,12 +117,14 @@ enum class PadMode {
 struct Integers {
   Integers(const std::vector<int>& elts)  // NOLINT[runtime/explicit]
       : value(edsl::make_tuple(elts)) {}
-  Integers(const std::vector<size_t>& elts)  // NOLINT[runtime/explicit]
-      : value(edsl::make_tuple(elts)) {}
+  Integers(const std::vector<size_t>& elts) {  // NOLINT[runtime/explicit]
+    std::vector<int64_t> casted(elts.begin(), elts.end());
+    value = edsl::make_tuple(casted);
+  }
   Integers(const std::initializer_list<int>& elts)  // NOLINT[runtime/explicit]
-      : value(edsl::make_tuple(std::vector<int>(elts))) {}
+      : Integers(std::vector<int>(elts)) {}
   Integers(const std::initializer_list<size_t>& elts)  // NOLINT[runtime/explicit]
-      : value(edsl::make_tuple(std::vector<size_t>(elts))) {}
+      : Integers(std::vector<size_t>(elts)) {}
 
   edsl::Value value;
 };

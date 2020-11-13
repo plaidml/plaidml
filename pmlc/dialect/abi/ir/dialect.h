@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "mlir/IR/Builders.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/Module.h"
 #include "mlir/IR/OpDefinition.h"

@@ -196,14 +196,16 @@ void plaidml_exprs_free(  //
     plaidml_error* err,   //
     plaidml_exprs* exprs);
 
-plaidml_exprs* plaidml_expr_layer(  //
-    plaidml_error* err,             //
-    const char* op,                 //
-    size_t nattrs,                  //
-    plaidml_attr** attrs,           //
-    size_t ninputs,                 //
-    plaidml_expr** inputs,          //
-    size_t noutputs,                //
+plaidml_expr* plaidml_expr_layer_begin(  //
+    plaidml_error* err,                  //
+    const char* op,                      //
+    size_t nattrs,                       //
+    plaidml_attr** attrs);
+
+plaidml_exprs* plaidml_expr_layer_end(  //
+    plaidml_error* err,                 //
+    plaidml_expr* expr,                 //
+    size_t noutputs,                    //
     plaidml_expr** outputs);
 
 //

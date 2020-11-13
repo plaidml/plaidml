@@ -51,7 +51,7 @@ void LowerToABIPass::runOnOperation() {
     auto returnOp = mlir::dyn_cast<mlir::ReturnOp>(op);
     if (returnOp) {
       builder.setInsertionPoint(returnOp);
-      builder.create<abi::DoneOp>(returnOp.getLoc());
+      builder.create<abi::TerminatorOp>(returnOp.getLoc());
       returnOp.erase();
     }
   }
@@ -111,13 +111,13 @@ void LowerToABIPass::runOnOperation() {
 
   // Terminate the init block using a passthrough of the
   // init block's arguments.
-  builder.create<abi::CreateNetworkOp>(loc, networkArgs);
+  builder.create<abi::YieldOp>(loc, networkArgs);
   loopOp.setNetworkFieldTypes(networkTypes);
 
   // Add the fini region.
   auto *finiEntryBlock = builder.createBlock(&loopOp.finiRegion());
   finiEntryBlock->addArguments(networkTypes);
-  builder.create<abi::DoneOp>(loc);
+  builder.create<abi::TerminatorOp>(loc);
 
   // We no longer need the main function.
   mainFunc.erase();

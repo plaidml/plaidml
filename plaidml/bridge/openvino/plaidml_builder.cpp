@@ -78,22 +78,22 @@ plaidml::Program ProgramBuilder::build() {
 void ProgramBuilder::handleConstant(const std::shared_ptr<ngraph::Node>& node) {
   IE_ASSERT(node->get_output_size() == 1);
   IE_ASSERT(node->description() == "Constant");
-  auto type = to_plaidml(node->get_element_type());
+  plaidml::DType type = to_plaidml(node->get_element_type());
   std::vector<int64_t> dims{node->get_shape().begin(), node->get_shape().end()};
   plaidml::TensorShape shape(type, dims);
   plaidml::Buffer buffer(shape);
   Context ctx{node.get()};
   auto* layer = dynamic_cast<ngraph::opset1::Constant*>(ctx.layer);
   buffer.copy_from(layer->get_data_ptr());
-  auto tensor = plaidml::edsl::Constant(buffer, node->get_friendly_name());
+  plaidml::edsl::Tensor tensor = plaidml::edsl::Constant(buffer, node->get_friendly_name());
   tensorMap[std::make_pair(node->get_name(), 0)] = tensor;
 }
 
 void ProgramBuilder::handleParameter(const std::shared_ptr<ngraph::Node>& node) {
   IE_ASSERT(node->get_output_size() == 1);
   std::vector<int64_t> dims{node->get_shape().begin(), node->get_shape().end()};
-  auto type = to_plaidml(node->get_element_type());
-  auto tensor = plaidml::edsl::Placeholder(type, dims, node->get_friendly_name());
+  plaidml::DType type = to_plaidml(node->get_element_type());
+  plaidml::edsl::Tensor tensor = plaidml::edsl::Placeholder(type, dims, node->get_friendly_name());
   tensorMap[std::make_pair(node->get_name(), 0)] = tensor;
   tensorIONameMap[node->get_friendly_name()] = tensor;
 }
@@ -101,8 +101,8 @@ void ProgramBuilder::handleParameter(const std::shared_ptr<ngraph::Node>& node) 
 void ProgramBuilder::handleOutput(const std::shared_ptr<ngraph::Node>& node) {
   // The OV output name is the name of the node _prior_ to the result
   // When there are multiple outputs, it has .# appended, where # is the output index
-  const auto& src_output = node->input(0).get_source_output();
-  const auto& src_node = src_output.get_node();
+  const ngraph::Output<ngraph::Node>& src_output = node->input(0).get_source_output();
+  const ngraph::Node* src_node = src_output.get_node();
   std::string name = src_node->get_friendly_name();
   if (src_node->get_output_size() > 1) {
     name += "." + std::to_string(src_output.get_index());
@@ -110,25 +110,105 @@ void ProgramBuilder::handleOutput(const std::shared_ptr<ngraph::Node>& node) {
   tensorIONameMap[name] = tensorMap.at(std::make_pair(src_node->get_name(), src_output.get_index()));
 }
 
+struct PlaidMLAttributeVisitor : public ngraph::AttributeVisitor {
+  plaidml::edsl::Dictionary attrs;
+
+  void on_adapter(const std::string& name, ngraph::ValueAccessor<void>& adapter) final {
+    THROW_IE_EXCEPTION << "Unsupported 'void' attribute: " << name;
+  }
+
+  void on_adapter(const std::string& name, ngraph::ValueAccessor<std::string>& adapter) final {}
+
+  void on_adapter(const std::string& name, ngraph::ValueAccessor<bool>& adapter) final {
+    attrs[name] = plaidml::edsl::Value(adapter.get());
+  }
+
+  void on_adapter(const std::string& name, ngraph::ValueAccessor<int64_t>& adapter) final {
+    attrs[name] = plaidml::edsl::Value(adapter.get());
+  }
+
+  void on_adapter(const std::string& name, ngraph::ValueAccessor<double>& adapter) final {
+    attrs[name] = plaidml::edsl::Value(adapter.get());
+  }
+
+  void on_adapter(const std::string& name, ngraph::ValueAccessor<std::vector<std::string>>& adapter) final {
+    attrs[name] = plaidml::edsl::make_tuple(adapter.get());
+  }
+
+  void on_adapter(const std::string& name, ngraph::ValueAccessor<std::vector<float>>& adapter) final {
+    attrs[name] = plaidml::edsl::make_tuple(adapter.get());
+  }
+
+  void on_adapter(const std::string& name, ngraph::ValueAccessor<std::vector<double>>& adapter) final {
+    attrs[name] = plaidml::edsl::make_tuple(adapter.get());
+  }
+
+  void on_adapter(const std::string& name, ngraph::ValueAccessor<std::vector<int8_t>>& adapter) final {
+    attrs[name] = plaidml::edsl::make_tuple(adapter.get());
+  }
+
+  void on_adapter(const std::string& name, ngraph::ValueAccessor<std::vector<int16_t>>& adapter) final {
+    attrs[name] = plaidml::edsl::make_tuple(adapter.get());
+  }
+
+  void on_adapter(const std::string& name, ngraph::ValueAccessor<std::vector<int32_t>>& adapter) final {
+    attrs[name] = plaidml::edsl::make_tuple(adapter.get());
+  }
+
+  void on_adapter(const std::string& name, ngraph::ValueAccessor<std::vector<int64_t>>& adapter) final {
+    attrs[name] = plaidml::edsl::make_tuple(adapter.get());
+  }
+
+  void on_adapter(const std::string& name, ngraph::ValueAccessor<std::vector<uint8_t>>& adapter) final {
+    attrs[name] = plaidml::edsl::make_tuple(adapter.get());
+  }
+
+  void on_adapter(const std::string& name, ngraph::ValueAccessor<std::vector<uint16_t>>& adapter) final {
+    attrs[name] = plaidml::edsl::make_tuple(adapter.get());
+  }
+
+  void on_adapter(const std::string& name, ngraph::ValueAccessor<std::vector<uint32_t>>& adapter) final {
+    attrs[name] = plaidml::edsl::make_tuple(adapter.get());
+  }
+
+  void on_adapter(const std::string& name, ngraph::ValueAccessor<std::vector<uint64_t>>& adapter) final {
+    attrs[name] = plaidml::edsl::make_tuple(adapter.get());
+  }
+
+  void on_adapter(const std::string& name, ngraph::ValueAccessor<void*>& adapter) final {
+    THROW_IE_EXCEPTION << "Unsupported 'void*' attribute: " << name;
+  }
+};
+
 void ProgramBuilder::handleOp(const std::shared_ptr<ngraph::Node>& node) {
-  auto op = OpsRegistry::instance()->resolve(node->description());
+  const Op op = OpsRegistry::instance()->resolve(node->description());
   if (!op) {
     THROW_IE_EXCEPTION << "Unsupported operation: " << node->description();
   }
 
   Context ctx{node.get()};
   for (const auto& input : node->inputs()) {
-    const auto& src_output = input.get_source_output();
-    const auto& name = src_output.get_node()->get_name();
-    const auto& index = src_output.get_index();
-    auto tensor = tensorMap.at(std::make_pair(name, index));
+    const ngraph::Output<ngraph::Node>& src_output = input.get_source_output();
+    const std::string& name = src_output.get_node()->get_name();
+    size_t index = src_output.get_index();
+    plaidml::edsl::Tensor tensor = tensorMap.at(std::make_pair(name, index));
     ctx.operands.push_back(tensor);
   }
-  auto value = op(ctx);
-  auto tuple = value.as_tuple();
+  PlaidMLAttributeVisitor visitor;
+  node->visit_attributes(visitor);
+  plaidml::edsl::TensorVec tuple = plaidml::edsl::layer("ng." + node->description(), visitor.attrs, [&]() {
+    plaidml::edsl::Value value = op(ctx);
+    std::vector<plaidml::edsl::Value> tuple = value.as_tuple();
+    plaidml::edsl::TensorVec outputs;
+    outputs.reserve(tuple.size());
+    for (plaidml::edsl::Value output : tuple) {
+      outputs.push_back(output.as_tensor());
+    }
+    return outputs;
+  });
   IE_ASSERT(tuple.size() == node->get_output_size());
   for (unsigned i = 0; i < tuple.size(); i++) {
-    auto tensor = tuple.at(i).as_tensor();
+    plaidml::edsl::Tensor tensor = tuple.at(i);
     tensorMap[std::make_pair(node->get_name(), i)] = tensor;
   }
 }

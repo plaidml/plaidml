@@ -45,6 +45,10 @@ plaidml_cc_library(
     deps = [
         ":gen-ops",
         "//pmlc/util",
+        "@llvm-project//mlir:ControlFlowInterfaces",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:StandardOps",
+        "@llvm-project//mlir:VectorInterfaces",
+        "@llvm-project//mlir:ViewLikeInterface",
     ],
 )

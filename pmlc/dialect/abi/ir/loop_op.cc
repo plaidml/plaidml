@@ -17,8 +17,7 @@ struct DenormalizeConstantsPattern final
   matchAndRewrite(LoopOp loopOp, mlir::PatternRewriter &rewriter) const final {
     mlir::OpBuilder::InsertionGuard insertionGuard{rewriter};
     auto networkOp = loopOp.getInitTerminator();
-    auto networkFieldTypes = loopOp.getAttrOfType<mlir::ArrayAttr>(
-        abi::LoopOp::getNetworkFieldTypesAttrName());
+    auto networkFieldTypes = loopOp.networkFieldTypes();
     mlir::SmallVector<mlir::Attribute, 8> newNetworkFieldTypes;
     rewriter.startRootUpdate(loopOp);
     rewriter.setInsertionPointToStart(&loopOp.bodyRegion().front());
@@ -42,8 +41,7 @@ struct DenormalizeConstantsPattern final
       }
     }
     if (networkFieldTypes.size() != newNetworkFieldTypes.size()) {
-      loopOp.setAttr(abi::LoopOp::getNetworkFieldTypesAttrName(),
-                     rewriter.getArrayAttr(newNetworkFieldTypes));
+      loopOp.networkFieldTypesAttr(rewriter.getArrayAttr(newNetworkFieldTypes));
       rewriter.finalizeRootUpdate(loopOp);
       return mlir::success();
     }
@@ -91,6 +89,55 @@ struct RemoveUnusedNetworkFieldsPattern final
 };
 
 } // namespace
+
+void LoopOp::build(::mlir::OpBuilder &odsBuilder,
+                   ::mlir::OperationState &odsState) {
+  odsState.addAttribute("networkFieldTypes", odsBuilder.getTypeArrayAttr({}));
+  odsState.addRegion();
+  odsState.addRegion();
+  odsState.addRegion();
+}
+
+std::vector<mlir::Type> LoopOp::getNetworkFieldTypes() {
+  std::vector<mlir::Type> result;
+  auto arrayAttr = networkFieldTypes();
+  if (arrayAttr) {
+    for (auto attr : arrayAttr) {
+      if (auto tyAttr = attr.dyn_cast<mlir::TypeAttr>()) {
+        result.emplace_back(tyAttr.getValue());
+      }
+    }
+  }
+  return result;
+}
+
+unsigned LoopOp::getNumNetworkFields() {
+  auto arrayAttr = networkFieldTypes();
+  if (arrayAttr) {
+    return arrayAttr.size();
+  }
+  return 0;
+}
+
+void LoopOp::setNetworkFieldTypes(mlir::TypeRange types) {
+  mlir::SmallVector<mlir::Attribute, 8> attrs;
+  for (auto ty : types) {
+    attrs.emplace_back(mlir::TypeAttr::get(ty));
+  }
+  auto arrayAttr = mlir::ArrayAttr::get(attrs, getContext());
+  networkFieldTypesAttr(arrayAttr);
+}
+
+mlir::Block *LoopOp::getBodyEntryBlock() { return &bodyRegion().front(); }
+mlir::Block *LoopOp::getFiniEntryBlock() { return &finiRegion().front(); }
+
+YieldOp LoopOp::getInitTerminator() {
+  return mlir::cast<YieldOp>(initRegion().back().getTerminator());
+}
+
+TerminatorOp LoopOp::getFiniTerminator() {
+  return mlir::cast<TerminatorOp>(finiRegion().back().getTerminator());
+}
 
 void LoopOp::getCanonicalizationPatterns(
     mlir::OwningRewritePatternList &patterns, mlir::MLIRContext *ctx) {

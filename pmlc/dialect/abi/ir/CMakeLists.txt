@@ -16,7 +16,7 @@ pml_cc_library(
 pml_tblgen_library(
   NAME ops-gen
   TD_FILE ops.td
-  OPTS -dialect=comp
+  OPTS -dialect=abi
   OUTS
     -gen-op-decls ops.h.inc
     -gen-op-defs ops.cc.inc

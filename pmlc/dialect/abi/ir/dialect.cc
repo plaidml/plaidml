@@ -2,6 +2,8 @@
 
 #include "pmlc/dialect/abi/ir/dialect.h"
 
+#include "mlir/IR/OpImplementation.h"
+
 #define GET_OP_CLASSES
 #include "pmlc/dialect/abi/ir/ops.cc.inc"
 

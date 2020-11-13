@@ -36,22 +36,21 @@ namespace {
 
 constexpr char kEmptyNetworkSingletonName[] = "plaidml_empty_network";
 
-struct CreateNetworkOpLowering final
-    : public mlir::ConvertOpToLLVMPattern<abi::CreateNetworkOp> {
-  using mlir::ConvertOpToLLVMPattern<
-      abi::CreateNetworkOp>::ConvertOpToLLVMPattern;
+struct YieldOpLowering final
+    : public mlir::ConvertOpToLLVMPattern<abi::YieldOp> {
+  using mlir::ConvertOpToLLVMPattern<abi::YieldOp>::ConvertOpToLLVMPattern;
 
   mlir::LogicalResult
   matchAndRewrite(mlir::Operation *op, mlir::ArrayRef<mlir::Value> operands,
                   mlir::ConversionPatternRewriter &rewriter) const final {
-    auto createNetworkOp = mlir::cast<abi::CreateNetworkOp>(op);
+    auto yieldOp = mlir::cast<abi::YieldOp>(op);
 
-    rewriter.startRootUpdate(createNetworkOp);
-    rewriter.setInsertionPoint(createNetworkOp);
+    rewriter.startRootUpdate(yieldOp);
+    rewriter.setInsertionPoint(yieldOp);
 
     mlir::Value networkPtr;
 
-    if (createNetworkOp.getNumOperands() == 0) {
+    if (yieldOp.getNumOperands() == 0) {
       // There's no data being passed from initialization to the body:
       // we don't want to return nullptr (since that's our failure indication),
       // but returning a Network* is a little simpler than managing an output
@@ -75,7 +74,7 @@ struct CreateNetworkOpLowering final
 
     } else {
       auto mallocFunc = importFunc(
-          "malloc", createNetworkOp,
+          "malloc", yieldOp,
           LLVMType::getFunctionTy(getVoidPtrType(),
                                   mlir::ArrayRef<LLVMType>{getIndexType()},
                                   /*isVarArg=*/false),
@@ -87,7 +86,7 @@ struct CreateNetworkOpLowering final
       for (auto operand : operands) {
         auto ty = operand.getType().dyn_cast_or_null<LLVMType>();
         if (!ty) {
-          rewriter.cancelRootUpdate(createNetworkOp);
+          rewriter.cancelRootUpdate(yieldOp);
           return mlir::failure();
         }
         networkFieldTypes.emplace_back(ty);
@@ -131,25 +130,26 @@ struct CreateNetworkOpLowering final
     // Add the new LLVM terminator, replacing the abi.create_network op.
     rewriter.create<LLVM::ReturnOp>(rewriter.getUnknownLoc(),
                                     mlir::ValueRange{networkPtr});
-    rewriter.eraseOp(createNetworkOp);
+    rewriter.eraseOp(yieldOp);
 
-    rewriter.finalizeRootUpdate(createNetworkOp);
+    rewriter.finalizeRootUpdate(yieldOp);
 
     return mlir::success();
   }
 };
 
-struct DoneOpLowering final : public mlir::ConvertOpToLLVMPattern<abi::DoneOp> {
-  using mlir::ConvertOpToLLVMPattern<abi::DoneOp>::ConvertOpToLLVMPattern;
+struct TerminatorOpLowering final
+    : public mlir::ConvertOpToLLVMPattern<abi::TerminatorOp> {
+  using mlir::ConvertOpToLLVMPattern<abi::TerminatorOp>::ConvertOpToLLVMPattern;
 
   mlir::LogicalResult
   matchAndRewrite(mlir::Operation *op, mlir::ArrayRef<mlir::Value> operands,
                   mlir::ConversionPatternRewriter &rewriter) const final {
-    auto doneOp = mlir::cast<abi::DoneOp>(op);
-    rewriter.updateRootInPlace(doneOp, [&] {
-      rewriter.setInsertionPoint(doneOp);
-      rewriter.create<LLVM::ReturnOp>(doneOp.getLoc(), mlir::None);
-      rewriter.eraseOp(doneOp);
+    auto terminatorOp = mlir::cast<abi::TerminatorOp>(op);
+    rewriter.updateRootInPlace(terminatorOp, [&] {
+      rewriter.setInsertionPoint(terminatorOp);
+      rewriter.create<LLVM::ReturnOp>(terminatorOp.getLoc(), mlir::None);
+      rewriter.eraseOp(terminatorOp);
     });
     return mlir::success();
   }
@@ -462,7 +462,7 @@ private:
 void populateABIToLLVMConversionPatterns(
     mlir::LLVMTypeConverter &converter,
     mlir::OwningRewritePatternList &patterns) {
-  patterns.insert<CreateNetworkOpLowering, DoneOpLowering, LoopOpLowering>(
+  patterns.insert<YieldOpLowering, TerminatorOpLowering, LoopOpLowering>(
       converter);
 }
 
