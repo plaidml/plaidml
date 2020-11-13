@@ -4,7 +4,9 @@
 #include <list>
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Support/DebugStringHelper.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
+#include "pmlc/util/logging.h"
 #include "pmlc/util/tags.h"
 #include "llvm/ADT/TypeSwitch.h"
 
@@ -14,9 +16,13 @@ mlir::Value createReorder(mlir::Location loc, mlir::OpBuilder &builder,
                           ReorderDesc &desc, mlir::Value srcMem) {
   // Allocate new memory.
   auto srcMemType = srcMem.getType().cast<mlir::MemRefType>();
-  mlir::MemRefType newMemType =
-      mlir::MemRefType::Builder(srcMemType).setShape(desc.reorderedShape);
+  IVLOG(3, "srcMemType: " << mlir::debugString(srcMemType));
+  mlir::MemRefType newMemType = mlir::MemRefType::Builder(
+      desc.reorderedShape, srcMemType.getElementType());
+
+  IVLOG(3, "newMemType: " << mlir::debugString(newMemType));
   mlir::Value newMem = builder.create<mlir::AllocOp>(loc, newMemType);
+  IVLOG(3, "newMem: " << mlir::debugString(newMem));
   // Create `affine.parallel` that will perform copy with reordering.
   auto parallel = builder.create<mlir::AffineParallelOp>(
       loc, mlir::ArrayRef<mlir::Type>{newMem.getType()},
@@ -310,6 +316,7 @@ void LayoutConverter::convertYieldOp(mlir::AffineYieldOp yieldOp,
 }
 
 mlir::AffineMap LayoutConverter::transformAffineMap(mlir::AffineMap map) {
+  IVLOG(3, "transformAffineMap, map: " << mlir::debugString(map));
   return reorderDesc.reorderMap.compose(map);
 }
 

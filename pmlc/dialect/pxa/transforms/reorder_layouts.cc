@@ -264,6 +264,13 @@ chooseUserProvidedTargetLayout(MemoryUsageDesc &memoryDesc) {
       expandedShape.push_back(56);
       expandedShape.push_back(16);
 
+      /*
+            expandedShape.push_back(1);
+            expandedShape.push_back(56);
+            expandedShape.push_back(56);
+            expandedShape.push_back(64);
+      */
+
       expandedVec.push_back(1);
       expandedVec.push_back(1);
       expandedVec.push_back(1);
@@ -374,6 +381,8 @@ void reorderMemoryReads(const ReorderCreator &creator, ReorderDesc &reorderDesc,
     // TODO: It should be fused location of all reads.
     mlir::Value reorderedMem =
         creator(originalMem.getLoc(), builder, reorderDesc, originalMem);
+
+    IVLOG(3, "reorderedMem: " << mlir::debugString(reorderedMem));
     IVLOG(3, "Calling replaceMemoryLayoutForReading()\n,"
                  << mlir::debugString(reorderedMem));
     replaceMemoryLayoutForReading(reorderedMem, originalMem, reorderDesc);
