@@ -8,5 +8,6 @@ plaidml_cc_library(
     name = "abi",
     deps = [
         "//pmlc/dialect/abi/ir",
+        "//pmlc/dialect/abi/transforms",
     ],
 )

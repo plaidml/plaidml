@@ -26,6 +26,7 @@
 #include "pmlc/dialect/tile/ir/ops.h"
 #include "pmlc/dialect/tile/ir/util.h"
 #include "pmlc/dialect/tile/transforms/passes.h"
+#include "pmlc/util/ids.h"
 #include "pmlc/util/logging.h"
 
 using namespace mlir; // NOLINT
@@ -38,8 +39,6 @@ using pmlc::util::TensorShape;
 namespace tile = pmlc::dialect::tile;
 
 namespace {
-
-static constexpr const char *kEntrypoint = "main";
 
 static StringRef getDiagKindStr(DiagnosticSeverity kind) {
   switch (kind) {
@@ -505,7 +504,7 @@ struct ProgramBuilder {
 
     FunctionType funcType =
         FunctionType::get(inputTypes, program->outputs, context);
-    FuncOp funcOp = FuncOp::create(loc, kEntrypoint, funcType, {});
+    FuncOp funcOp = FuncOp::create(loc, util::kEntrypoint, funcType, {});
     size_t numInputs = inputTypes.size() - program->constants.size();
     for (size_t i = 0; i < program->constants.size(); i++) {
       funcOp.setArgAttr(numInputs + i, "tile.const", builder.getIndexAttr(i));
@@ -569,7 +568,7 @@ struct ProgramBuilder {
     }
     builder.create<ReturnOp>(loc, returnOperands.getArrayRef());
 
-    program->entry = kEntrypoint;
+    program->entry = util::kEntrypoint;
 
     IVLOG(3, "\n" << debugString(module));
 
