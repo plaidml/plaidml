@@ -105,4 +105,46 @@ INSTANTIATE_TEST_CASE_P(Convolution3D_AutoPadValid, BinaryConvolutionLayerTest,
                                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),         //
                         BinaryConvolutionLayerTest::getTestCaseName);
 
+/* ============= Smoke ============= */
+const std::vector<std::vector<size_t>> kernel_smoke = {{3, 5, 3}};
+const std::vector<std::vector<ptrdiff_t>> padding_smoke = {{0, 2, 0}};
+
+const std::vector<std::vector<size_t>> strides_smoke = {{1, 2, 1}};
+const std::vector<std::vector<size_t>> dilations_smoke = {{1, 2, 1}};
+
+const auto convSmokeParams_ExplicitPadding =
+    ::testing::Combine(::testing::ValuesIn(kernel_smoke),                                                           //
+                       ::testing::ValuesIn(strides_smoke),                                                          //
+                       ::testing::ValuesIn(padding_smoke),                                                          //
+                       ::testing::ValuesIn(padding_smoke),                                                          //
+                       ::testing::ValuesIn(dilations_smoke),                                                        //
+                       ::testing::Values(5),                                                                        //
+                       ::testing::Values(ngraph::op::PadType::EXPLICIT),                                            //
+                       ::testing::Values(ngraph::op::v1::BinaryConvolution::BinaryConvolutionMode::XNOR_POPCOUNT),  //
+                       ::testing::Values(0.0));                                                                     //
+const auto convSmokeParams_AutoPadValid =
+    ::testing::Combine(::testing::ValuesIn(kernel_smoke),                                                           //
+                       ::testing::ValuesIn(strides_smoke),                                                          //
+                       ::testing::Values(std::vector<ptrdiff_t>({0, 1, 0})),                                        //
+                       ::testing::Values(std::vector<ptrdiff_t>({0, 1, 0})),                                        //
+                       ::testing::ValuesIn(dilations_smoke),                                                        //
+                       ::testing::Values(5),                                                                        //
+                       ::testing::Values(ngraph::op::PadType::VALID),                                               //
+                       ::testing::Values(ngraph::op::v1::BinaryConvolution::BinaryConvolutionMode::XNOR_POPCOUNT),  //
+                       ::testing::Values(0.0));                                                                     //
+
+INSTANTIATE_TEST_CASE_P(smoke_ExplicitPadding, BinaryConvolutionLayerTest,
+                        ::testing::Combine(convSmokeParams_ExplicitPadding,                             //
+                                           ::testing::ValuesIn(netPrecisions),                          //
+                                           ::testing::Values(std::vector<size_t>({1, 3, 10, 10, 10})),  //
+                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),         //
+                        BinaryConvolutionLayerTest::getTestCaseName);
+
+INSTANTIATE_TEST_CASE_P(smoke_AutoPadValid, BinaryConvolutionLayerTest,
+                        ::testing::Combine(convSmokeParams_AutoPadValid,                                //
+                                           ::testing::ValuesIn(netPrecisions),                          //
+                                           ::testing::Values(std::vector<size_t>({1, 3, 10, 10, 10})),  //
+                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),         //
+                        BinaryConvolutionLayerTest::getTestCaseName);
+
 }  // namespace

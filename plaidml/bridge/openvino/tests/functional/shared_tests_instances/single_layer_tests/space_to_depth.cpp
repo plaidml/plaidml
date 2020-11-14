@@ -24,6 +24,14 @@ const std::vector<SpaceToDepth::SpaceToDepthMode> modes = {
     SpaceToDepth::SpaceToDepthMode::DEPTH_FIRST    //
 };
 
+INSTANTIATE_TEST_CASE_P(smoke, SpaceToDepthLayerTest,
+                        ::testing::Combine(::testing::Values(std::vector<size_t>{2, 1, 6, 12, 6}),  //
+                                           ::testing::ValuesIn(inputPrecisions),                    //
+                                           ::testing::ValuesIn(modes),                              //
+                                           ::testing::ValuesIn(std::vector<size_t>{2, 3}),          //
+                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),     //
+                        SpaceToDepthLayerTest::getTestCaseName);
+
 const std::vector<std::vector<size_t>> inputShapesBS2 = {
     {1, 1, 2, 2},      //
     {1, 1, 4, 4},      //

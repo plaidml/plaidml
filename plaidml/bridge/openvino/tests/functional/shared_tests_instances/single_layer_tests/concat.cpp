@@ -31,4 +31,12 @@ INSTANTIATE_TEST_CASE_P(NoReshape, ConcatLayerTest,
                                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),
                         ConcatLayerTest::getTestCaseName);
 
+INSTANTIATE_TEST_CASE_P(smoke, ConcatLayerTest,
+                        ::testing::Combine(::testing::Values(2),  //
+                                           ::testing::Values(std::vector<std::vector<size_t>>({{4, 8, 4, 2},
+                                                                                               {4, 8, 3, 2}})),  //
+                                           ::testing::ValuesIn(netPrecisions),                                   //
+                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),
+                        ConcatLayerTest::getTestCaseName);
+
 }  // namespace

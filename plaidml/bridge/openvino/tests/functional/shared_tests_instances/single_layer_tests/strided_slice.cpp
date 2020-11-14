@@ -181,7 +181,7 @@ std::vector<StridedSliceParams> ss_only_test_cases = {
                        {}},
 };
 
-INSTANTIATE_TEST_CASE_P(smoke_PlaidML, StridedSliceLayerTest, ::testing::ValuesIn(ss_only_test_cases),
+INSTANTIATE_TEST_CASE_P(smoke, StridedSliceLayerTest, ::testing::ValuesIn(ss_only_test_cases),
                         StridedSliceLayerTest::getTestCaseName);
 
 }  // namespace

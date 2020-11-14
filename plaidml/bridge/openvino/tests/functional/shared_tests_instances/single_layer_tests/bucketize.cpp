@@ -26,7 +26,7 @@ std::vector<InferenceEngine::Precision> outputPrecision = {
 };
 std::vector<bool> withRightBound{true, false};
 
-INSTANTIATE_TEST_CASE_P(BucketizeCheckIndex, BucketizeLayerTest,
+INSTANTIATE_TEST_CASE_P(smoke, BucketizeLayerTest,
                         ::testing::Combine(::testing::ValuesIn(netPrecisions),                          //
                                            ::testing::ValuesIn(inputShapes),                            //
                                            ::testing::ValuesIn(bucketsShapes),                          //
