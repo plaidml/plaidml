@@ -68,7 +68,6 @@ void LowerToABIPass::runOnOperation() {
   // possible initial device argument -- which, if present, is always passed
   // to the initialization block.
   auto *bodyEntryBlock = loopOp.getBodyEntryBlock();
-  mlir::Identifier constAttrId = builder.getIdentifier("tile.const");
   if (bodyEntryBlock->getNumArguments() == 0 ||
       bodyEntryBlock->getArgument(0)
           .getType()
@@ -81,6 +80,7 @@ void LowerToABIPass::runOnOperation() {
         LLVMType::getInt8Ty(&getContext()).getPointerTo());
   }
 
+  mlir::Identifier constAttrId = builder.getIdentifier("tile.const");
   mlir::SmallVector<mlir::Value, 8> networkArgs;
   mlir::SmallVector<mlir::Type, 8> networkTypes;
   for (auto arg : bodyEntryBlock->getArguments()) {
