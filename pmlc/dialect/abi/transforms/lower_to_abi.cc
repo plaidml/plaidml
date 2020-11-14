@@ -46,7 +46,7 @@ void LowerToABIPass::runOnOperation() {
 
   // A function's blocks can end with std.return; since std.return expects its
   // parent to be std.func, we need to replace any cloned top-level std.return
-  // operations with abi.done.
+  // operations with abi.terminator.
   for (auto &op : llvm::make_early_inc_range(loopOp.bodyRegion().getOps())) {
     auto returnOp = mlir::dyn_cast<mlir::ReturnOp>(op);
     if (returnOp) {
@@ -61,14 +61,13 @@ void LowerToABIPass::runOnOperation() {
 
   // Non-constant arguments will vary from invocation to invocation; they are
   // intrinsically parameters of the body entry block.  Constant arguments do
-  // not vary; we pass them to the initializtion block, which can then pass them
-  // on to the body as needed.
+  // not vary; we pass them to the initialization block, which can then pass
+  // them on to the body as needed.
   //
   // At this point, all of the arguments should be memrefs, except for a
   // possible initial device argument -- which, if present, is always passed
   // to the initialization block.
   auto *bodyEntryBlock = loopOp.getBodyEntryBlock();
-  unsigned argIdx = 0;
   mlir::Identifier constAttrId = builder.getIdentifier("tile.const");
   if (bodyEntryBlock->getNumArguments() == 0 ||
       bodyEntryBlock->getArgument(0)
@@ -84,10 +83,10 @@ void LowerToABIPass::runOnOperation() {
 
   mlir::SmallVector<mlir::Value, 8> networkArgs;
   mlir::SmallVector<mlir::Type, 8> networkTypes;
-  while (argIdx < bodyEntryBlock->getNumArguments()) {
-    auto arg = bodyEntryBlock->getArgument(argIdx);
+  for (auto arg : bodyEntryBlock->getArguments()) {
     bool isMemRef =
         arg.getType().isa<mlir::MemRefType, mlir::UnrankedMemRefType>();
+    auto argIdx = arg.getArgNumber();
     if (argIdx && !isMemRef) {
       mainFunc.emitError(
           "Expected only memrefs after an optional device parameter");
@@ -106,7 +105,6 @@ void LowerToABIPass::runOnOperation() {
           initEntryBlock->getArgument(initEntryBlock->getNumArguments() - 1));
       networkTypes.emplace_back(ty);
     }
-    ++argIdx;
   }
 
   // Terminate the init block using a passthrough of the

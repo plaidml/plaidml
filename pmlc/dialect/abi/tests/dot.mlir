@@ -1,4 +1,4 @@
-// RUN: pmlc-opt --lower-to-abi %s | FileCheck %s
+// RUN: pmlc-opt --abi-lower-to-abi %s | FileCheck %s
 
 module @dot {
   func @main(%arg0: memref<8x16xf32>, %arg1: memref<16x32xf32>, %arg2: memref<8x32xf32>) {

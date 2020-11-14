@@ -3,7 +3,7 @@
 
 include "mlir/Pass/PassBase.td"
 
-def LowerToABIPass : Pass<"lower-to-abi", "mlir::ModuleOp"> {
+def LowerToABIPass : Pass<"abi-lower-to-abi", "mlir::ModuleOp"> {
   let summary = "Packages the network as a loop for repeated uses";
   let constructor = "pmlc::dialect::abi::createLowerToABIPass()";
   let options = [

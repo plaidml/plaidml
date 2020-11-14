@@ -1,4 +1,4 @@
-// RUN: pmlc-opt --lower-to-abi %s | FileCheck %s
+// RUN: pmlc-opt --abi-lower-to-abi %s | FileCheck %s
 
 module @const_add {
   func @main(%arg0: memref<4xi32> {tile.const = 0 : index}, %arg1: memref<4xi32> {tile.const = 1 : index}, %arg2: memref<4xi32>) {
