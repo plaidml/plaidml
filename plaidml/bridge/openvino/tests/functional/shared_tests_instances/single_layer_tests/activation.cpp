@@ -43,7 +43,7 @@ const std::map<ActivationTypes, std::vector<std::vector<float>>> activationTypes
     {Ceiling, {{}}},
     {Swish, {{1.0f}}},
     // {Mish,        {{}}},
-    // {HSwish, {{}}}
+    {HSwish, {{}}}
     // {SoftPlus,    {{}}}
 };
 
@@ -76,11 +76,11 @@ const auto basicCases = ::testing::Combine(::testing::ValuesIn(CommonTestUtils::
 //         ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)
 // );
 
-INSTANTIATE_TEST_CASE_P(Activation_Basic, ActivationLayerTest, basicCases, ActivationLayerTest::getTestCaseName);
-// INSTANTIATE_TEST_CASE_P(Activation_Basic_Prelu, ActivationLayerTest, basicPreluCases,
+INSTANTIATE_TEST_CASE_P(smoke, ActivationLayerTest, basicCases, ActivationLayerTest::getTestCaseName);
+// INSTANTIATE_TEST_CASE_P(smoke_Prelu, ActivationLayerTest, basicPreluCases,
 // ActivationLayerTest::getTestCaseName);
 
-// INSTANTIATE_TEST_CASE_P(Activation_Basic, ActivationParamLayerTest, basicPreluCases,
+// INSTANTIATE_TEST_CASE_P(smoke_Prelu_Param, ActivationParamLayerTest, basicPreluCases,
 // ActivationLayerTest::getTestCaseName);
 
 }  // namespace

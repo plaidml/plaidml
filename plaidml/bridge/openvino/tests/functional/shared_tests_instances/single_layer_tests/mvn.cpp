@@ -36,13 +36,20 @@ const std::vector<bool> normalizeVariance = {
 
 const std::vector<double> epsilon = {0.000000001};
 
-const std::vector<std::map<std::string, std::string>> Configs = {{}};
+const auto MvnCases = ::testing::Combine(::testing::ValuesIn(inputShapes),                     //
+                                         ::testing::Values(InferenceEngine::Precision::FP32),  //
+                                         ::testing::ValuesIn(acrossChannels),                  //
+                                         ::testing::ValuesIn(normalizeVariance),               //
+                                         ::testing::ValuesIn(epsilon),                         //
+                                         ::testing::Values(CommonTestUtils::DEVICE_PLAIDML));
 
-const auto MvnCases =
-    ::testing::Combine(::testing::ValuesIn(inputShapes),                                             //
-                       ::testing::Values(InferenceEngine::Precision::FP32),                          //
-                       ::testing::ValuesIn(acrossChannels), ::testing::ValuesIn(normalizeVariance),  //
-                       ::testing::ValuesIn(epsilon),                                                 //
-                       ::testing::Values(CommonTestUtils::DEVICE_PLAIDML));
+const auto SmokeCases = ::testing::Combine(::testing::Values(std::vector<size_t>({3, 7, 16, 6})),  //
+                                           ::testing::Values(InferenceEngine::Precision::FP32),    //
+                                           ::testing::ValuesIn(acrossChannels),                    //
+                                           ::testing::ValuesIn(normalizeVariance),                 //
+                                           ::testing::ValuesIn(epsilon),                           //
+                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML));
 
-INSTANTIATE_TEST_CASE_P(smoke_PlaidML_TestsMVN, MvnLayerTest, MvnCases, MvnLayerTest::getTestCaseName);
+INSTANTIATE_TEST_CASE_P(MVN, MvnLayerTest, MvnCases, MvnLayerTest::getTestCaseName);
+
+INSTANTIATE_TEST_CASE_P(smoke, MvnLayerTest, SmokeCases, MvnLayerTest::getTestCaseName);

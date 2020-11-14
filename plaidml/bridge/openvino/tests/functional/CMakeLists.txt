@@ -15,10 +15,21 @@ addIeTargetTest(
   LABELS ${_LABEL} test
 )
 
+addIeTargetTest(
+  NAME ${_TARGET}Smoke
+  ROOT ${CMAKE_CURRENT_SOURCE_DIR}
+  DEPENDENCIES plaidmlPlugin
+  DEFINES SMOKE_TESTS_ONLY
+  LINK_LIBRARIES IE::funcSharedTests
+  ADD_CPPLINT
+  LABELS ${_LABEL} smoke
+)
+
 add_custom_target(check-bridge-openvino
   COMMAND ${CMAKE_CTEST_COMMAND} -L ${_LABEL}
   USES_TERMINAL
 )
 
 add_dependencies(check-bridge-openvino ${_TARGET})
+add_dependencies(check-smoke ${_TARGET}Smoke)
 add_dependencies(check-test ${_TARGET})

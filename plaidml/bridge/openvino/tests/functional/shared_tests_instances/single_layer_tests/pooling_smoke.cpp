@@ -36,7 +36,7 @@ const auto MaxPoolSmokeParams =
                        ::testing::Values(ngraph::op::PadType::EXPLICIT),       //
                        ::testing::Values(false));  // placeholder value - exclude pad not applicable for max pooling
 
-INSTANTIATE_TEST_CASE_P(MaxPool_Smoke, PoolingLayerTest,
+INSTANTIATE_TEST_CASE_P(smoke_MaxPool, PoolingLayerTest,
                         ::testing::Combine(MaxPoolSmokeParams,                                      //
                                            ::testing::ValuesIn(netPrecisions),                      //
                                            ::testing::Values(std::vector<size_t>({1, 3, 30, 30})),  //
@@ -56,7 +56,7 @@ const auto avgPoolSmokeParams =
                        ::testing::Values(ngraph::op::PadType::EXPLICIT),                         //
                        ::testing::Values(true, false));                                          //
 
-INSTANTIATE_TEST_CASE_P(AvgPool_Smoke, PoolingLayerTest,
+INSTANTIATE_TEST_CASE_P(smoke_AvgPool, PoolingLayerTest,
                         ::testing::Combine(avgPoolSmokeParams,                                      //
                                            ::testing::ValuesIn(netPrecisions),                      //
                                            ::testing::Values(std::vector<size_t>({1, 3, 30, 30})),  //
@@ -76,7 +76,7 @@ const auto allPools_ValidPad_Params = ::testing::Combine(
     ::testing::Values(ngraph::op::PadType::VALID),  //
     ::testing::Values(false));                      // placeholder value - exclude pad not applicable for max pooling
 
-INSTANTIATE_TEST_CASE_P(BothPool_Smoke, PoolingLayerTest,
+INSTANTIATE_TEST_CASE_P(smoke_BothPool, PoolingLayerTest,
                         ::testing::Combine(allPools_ValidPad_Params,                                //
                                            ::testing::ValuesIn(netPrecisions),                      //
                                            ::testing::Values(std::vector<size_t>({1, 3, 30, 30})),  //

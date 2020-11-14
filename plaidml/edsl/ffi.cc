@@ -232,7 +232,7 @@ plaidml_expr* plaidml_expr_constant(  //
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_expr_constant");
     auto node = std::make_shared<ast::ExprNodeConstTensor>(buffer->buffer, name);
-    LayerContext::get()->addNode(node);
+    // Constants cannot be added to layers, so no LayerContext line
     return new plaidml_expr{node};
   });
 }

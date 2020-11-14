@@ -13,7 +13,7 @@ using LayerTestsDefinitions::GrnLayerTest;
 
 namespace {
 
-INSTANTIATE_TEST_CASE_P(GrnCheck1, GrnLayerTest,
+INSTANTIATE_TEST_CASE_P(smoke, GrnLayerTest,
                         ::testing::Combine(::testing::Values(InferenceEngine::Precision::FP32),        //
                                            ::testing::Values(std::vector<std::size_t>({4, 3, 3, 6})),  //
                                            ::testing::Values(0.01),                                    //
