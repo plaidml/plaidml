@@ -48,11 +48,9 @@ module @dot {
 }
 
 // CHECK-LABEL: module @dot {
-//  CHECK-NEXT:   abi.loop init  {
-//  CHECK-NEXT:   ^bb0(%arg0: !llvm.ptr<i8>):  // no predecessors
+//  CHECK-NEXT:   abi.loop init(%arg0: !llvm.ptr<i8>) {
 //  CHECK-NEXT:     abi.yield
-//  CHECK-NEXT:   } body  {
-//  CHECK-NEXT:   ^bb0(%arg0: memref<8x16xf32>, %arg1: memref<16x32xf32>, %arg2: memref<8x32xf32>):  // no predecessors
+//  CHECK-NEXT:   } body(%arg0: memref<8x16xf32>, %arg1: memref<16x32xf32>, %arg2: memref<8x32xf32>) {
 //  CHECK-NEXT:     %[[CFZERO:.*]] = constant 0.000000e+00 : f32
 //  CHECK-NEXT:     %[[C0:.*]] = constant 0 : index
 //  CHECK-NEXT:     %[[C1:.*]] = constant 1 : index
@@ -94,7 +92,7 @@ module @dot {
 //  CHECK-NEXT:     %[[FUNC:.*]] = xsmm.gemm.dispatch.f32 [8, 32, 16], [16, 32, 32]
 //  CHECK-NEXT:     xsmm.gemm.invoke.f32 %[[FUNC]], %arg2[%[[C0]], %[[C0]]] = %arg0[%[[C0]], %[[C0]]], %arg1[%[[C0]], %[[C0]]] : (memref<8x16xf32>, memref<16x32xf32>) -> memref<8x32xf32>
 //  CHECK-NEXT:     abi.terminator
-//  CHECK-NEXT:   } fini  {
+//  CHECK-NEXT:   } fini() {
 //  CHECK-NEXT:     abi.terminator
 //  CHECK-NEXT:   }
 //  CHECK-NEXT:   func @plaidml_rt_thread_num() -> index

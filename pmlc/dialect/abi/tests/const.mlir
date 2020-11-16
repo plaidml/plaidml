@@ -17,11 +17,9 @@ module @const_add {
 }
 
 // CHECK-LABEL: module @const_add {
-//  CHECK-NEXT:   abi.loop init  {
-//  CHECK-NEXT:   ^bb0(%arg0: !llvm.ptr<i8>, %arg1: memref<4xi32>, %arg2: memref<4xi32>):  // no predecessors
+//  CHECK-NEXT:   abi.loop init(%arg0: !llvm.ptr<i8>, %arg1: memref<4xi32>, %arg2: memref<4xi32>) {
 //  CHECK-NEXT:     abi.yield %arg1, %arg2 : memref<4xi32>, memref<4xi32>
-//  CHECK-NEXT:   } body  {
-//  CHECK-NEXT:   ^bb0(%arg0: memref<4xi32>, %arg1: memref<4xi32>, %arg2: memref<4xi32>):  // no predecessors
+//  CHECK-NEXT:   } body(%arg0: memref<4xi32>, %arg1: memref<4xi32>, %arg2: memref<4xi32>) {
 //  CHECK-NEXT:     %[[C4:.*]] = constant 4 : index
 //  CHECK-NEXT:     omp.parallel num_threads(%[[C4]] : index) default(shared) {
 //  CHECK-NEXT:       %[[TID:.*]] = call @plaidml_rt_thread_num() : () -> index
@@ -32,8 +30,7 @@ module @const_add {
 //  CHECK-NEXT:       omp.terminator
 //  CHECK-NEXT:     }
 //  CHECK-NEXT:     abi.terminator
-//  CHECK-NEXT:   } fini  {
-//  CHECK-NEXT:   ^bb0(%arg0: memref<4xi32>, %arg1: memref<4xi32>):  // no predecessors
+//  CHECK-NEXT:   } fini(%arg0: memref<4xi32>, %arg1: memref<4xi32>) { 
 //  CHECK-NEXT:     abi.terminator
 //  CHECK-NEXT:   }
 //  CHECK-NEXT:   func @plaidml_rt_thread_num() -> index

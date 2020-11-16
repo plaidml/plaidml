@@ -37,7 +37,7 @@ plaidml_cc_library(
     name = "ir",
     srcs = [
         "dialect.cc",
-        "loop_op.cc",
+        "ops.cc",
     ],
     hdrs = [
         "dialect.h"

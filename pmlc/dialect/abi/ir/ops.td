@@ -29,9 +29,11 @@ def ABI_LoopOp : ABI_Op<"loop", [
   let regions = (region AnyRegion:$initRegion, AnyRegion:$bodyRegion, AnyRegion:$finiRegion);
   let builders = [OpBuilder<"">];
   let skipDefaultBuilders = 1;
+  /*
   let assemblyFormat = [{
      `init` $initRegion `body` $bodyRegion `fini` $finiRegion attr-dict
    }];
+  */
   let extraClassDeclaration = [{
     mlir::Block* getBodyEntryBlock();
     mlir::Block* getFiniEntryBlock();
@@ -39,6 +41,8 @@ def ABI_LoopOp : ABI_Op<"loop", [
     YieldOp getInitTerminator();
     TerminatorOp getFiniTerminator();
   }];
+  let printer = [{ return printLoopOp(p, *this); }];
+  let parser = [{ return parseLoopOp(parser, result); }];
 }
 
 def ABI_TerminatorOp : ABI_Op<"terminator", [NoSideEffect, Terminator, HasParent<"LoopOp">]> {
