@@ -842,7 +842,7 @@ def floor(x):
     return intrinsic('floor', x)
 
 
-def gather(x, y):
+def gather(x, y, axis=0, mode=0, cubic_coeff=-0.5):
     """Takes an input tensor (``x``) and a set of indices to gather over
     (``y``), and returns an output tensor that gathers the input tensor from the
     indices specified.
@@ -854,7 +854,7 @@ def gather(x, y):
     Returns:
         Tensor: The result of the ``gather`` operation.
     """
-    return intrinsic('gather', x, y)
+    return intrinsic('gather', x, y, axis, mode, cubic_coeff)
 
 
 def ident(x):

@@ -9,3 +9,5 @@ CppEdsl.Erf
 CppEdsl.HigherPrecisionConstants
 CppEdsl.Scatter1D
 CppEdsl.Scatter3D
+CppEdsl.InterpolatedGather1
+CppEdsl.InterpolatedGather2

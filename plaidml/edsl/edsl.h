@@ -14,6 +14,8 @@
 #include "plaidml/core/core.h"
 #include "plaidml/edsl/ffi.h"
 
+#include "pmlc/util/enums.h"
+
 namespace plaidml {
 namespace edsl {
 
@@ -24,6 +26,8 @@ class Tensor;
 class TensorDim;
 class TensorIndex;
 class Value;
+
+using pmlc::util::InterpolationMode;
 
 namespace details {
 
@@ -806,13 +810,37 @@ inline Tensor floor(const Tensor& x) { return intrinsic("floor", x); }
 /// \param y Tensor
 /// \return Tensor
 ///
+class gather {
+ public:
+  explicit gather(const Tensor& x, const Tensor& y) : x_(x), y_(y) {}
 
-inline Tensor gather(const Tensor& x, const Tensor& y, const std::vector<Tensor>& attributes = {}) {
-  std::vector<Tensor> args = {x};
-  args.emplace_back(y);
-  args.insert(args.end(), attributes.begin(), attributes.end());
-  return intrinsicCall("gather", args);
-}
+  gather& axis(int axis) {
+    axis_ = Tensor(axis);
+    return *this;
+  }
+
+  gather& mode(InterpolationMode m) {
+    mode_ = Tensor(static_cast<uint64_t>(m));
+    return *this;
+  }
+
+  gather& cubic_coeff(float cubic_coeff) {
+    cubic_coeff_ = Tensor(cubic_coeff);
+    return *this;
+  }
+
+  Tensor build() const {
+    std::vector<Tensor> args = {x_, y_, axis_, mode_, cubic_coeff_};
+    return intrinsicCall("gather", args);
+  }
+
+ private:
+  Tensor x_;
+  Tensor y_;
+  Tensor axis_ = Tensor(0);
+  Tensor mode_ = Tensor(static_cast<uint64_t>(InterpolationMode::linear));
+  Tensor cubic_coeff_ = Tensor(-0.5);
+};
 
 ///
 /// Returns the identity of `x`.

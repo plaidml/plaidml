@@ -894,7 +894,7 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
     int dim = *(op.axis().getRawData());
     size_t idxDims = indices.getType().cast<MemRefType>().getShape().size();
     auto idxLoadMap = AffineMap::getMultiDimIdentityMap(idxDims, ctx);
-    auto idxLoadOps = loop.getIVs()[dim];
+    auto idxLoadOps = loop.getIVs().slice(dim, idxDims);
 
     // load the value from the indexes array
     Value index =
@@ -904,7 +904,7 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
     // create default source map
     size_t dstDims = size.size();
     std::vector<Value> srcOps;
-    for (size_t i = 0; i < dstDims; ++i) {
+    for (size_t i = idxDims - 1; i < dstDims; ++i) {
       srcOps.push_back(loop.getIVs()[i]);
     }
 
@@ -1040,7 +1040,7 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
                        .getResult();
 
     // calculate interpolation nodes x0, x1, x2, x3
-    auto x1 = rewriter.create<mlir::FPToUIOp>(loc, index, i32Type).getResult();
+    auto x1 = rewriter.create<mlir::FPToSIOp>(loc, index, i32Type).getResult();
     auto x0 = rewriter.create<mlir::SubIOp>(loc, x1, cst1I32).getResult();
     auto x2 = rewriter.create<mlir::AddIOp>(loc, x1, cst1I32).getResult();
     auto x3 = rewriter.create<mlir::AddIOp>(loc, x1, cst2I32).getResult();

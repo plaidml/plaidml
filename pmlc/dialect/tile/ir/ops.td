@@ -91,9 +91,9 @@ def GatherOp : MaterializeOp<"gather"> {
   let arguments = (ins
     RankedTensorOf<[AnyScalar]>:$tensor,
     RankedTensorOf<[AnyScalar]>:$indices,
-    DefaultValuedAttr<IndexAttr,"0">:$axis,
-    DefaultValuedAttr<InterpolationMode,"InterpolationMode::nearest">:$mode,
-    DefaultValuedAttr<F32Attr,"-0.5">:$cubicCoeff
+    DefaultValuedAttr<IndexAttr, "0">:$axis,
+    DefaultValuedAttr<InterpolationMode, "InterpolationMode::nearest">:$mode,
+    DefaultValuedAttr<F32Attr, "-0.5">:$cubicCoeff
   );
   let results = (outs RankedTensorOf<[AnyScalar]>:$result);
   let assemblyFormat = [{

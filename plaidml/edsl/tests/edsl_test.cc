@@ -18,13 +18,11 @@
 #include "plaidml/edsl/edsl.h"
 #include "plaidml/exec/exec.h"
 #include "plaidml/testenv.h"
-#include "pmlc/util/enums.h"
 #include "pmlc/util/env.h"
 #include "pmlc/util/logging.h"
 
 using half_float::half;
 using llvm::StringRef;
-using pmlc::util::InterpolationMode;
 using ::testing::ContainerEq;
 using ::testing::Eq;
 
@@ -1371,6 +1369,66 @@ TEST_F(CppEdsl, Floor) {
   checkExact(program, {input}, {expected});
 }
 
+TEST_F(CppEdsl, Gather) {
+  auto A = Placeholder(DType::FLOAT32, {3, 2});
+  auto B = Placeholder(DType::INT32, {4});
+  auto O = gather(A, B).axis(1).build();
+  auto program = makeProgram("gather", {A, B}, {O});
+
+  std::vector<float> in1 = {
+      -5.0f, -6.0f,  //
+      -7.0f, 4.0f,   //
+      5.0f,  6.0f,   //
+  };
+  std::vector<int> in2 = {0, 1, 1, 0};
+  std::vector<float> out = {
+      -5.0f, -6.0f, -6.0f, -5.0f,  //
+      -7.0f, 4.0f,  4.0f,  -7.0f,  //
+      5.0f,  6.0f,  6.0f,  5.0f,   //
+  };
+  checkExact(program, {in1, in2}, {out});
+}
+
+TEST_F(CppEdsl, InterpolatedGather1) {
+  auto A = Placeholder(DType::FLOAT32, {3, 2});
+  auto B = Placeholder(DType::FLOAT32, {4});
+  auto O = gather(A, B).axis(1).mode(InterpolationMode::linear).build();
+  auto program = makeProgram("interpolated_gather1", {A, B}, {O});
+
+  std::vector<float> in1 = {
+      -5.0f, -6.0f,  //
+      -7.0f, 4.0f,   //
+      5.0f,  6.0f,   //
+  };
+  std::vector<float> in2 = {0, 0.4, 0.7, 1};
+  std::vector<float> out = {
+      -5.0f, -5.4f, -5.7f, -6.0f,  //
+      -7.0f, -2.6f, 0.7f,  4.0f,   //
+      5.0f,  5.4f,  5.7f,  6.0f,   //
+  };
+  checkClose(program, {in1, in2}, {out});
+}
+
+TEST_F(CppEdsl, InterpolatedGather2) {
+  auto A = Placeholder(DType::FLOAT32, {3, 4});
+  auto B = Placeholder(DType::FLOAT32, {1});
+  auto O = gather(A, B).axis(1).mode(InterpolationMode::cubic).cubic_coeff(-0.5).build();
+  auto program = makeProgram("interpolated_gather2", {A, B}, {O});
+
+  std::vector<float> in1 = {
+      1.0f, 2.0f, 3.0f, 4.0f,  //
+      1.0f, 2.0f, 2.0f, 1.0f,  //
+      1.0f, 2.0f, 3.0f, 0.0f,  //
+  };
+  std::vector<float> in2 = {1.5};
+  std::vector<float> out = {
+      2.5f,
+      2.125f,
+      2.75f,
+  };
+  checkClose(program, {in1, in2}, {out});
+}
+
 TEST_F(CppEdsl, Pow) {
   auto A = Placeholder(DType::FLOAT32, {3, 3});
   auto B = Placeholder(DType::FLOAT32, {3, 3});
@@ -1539,75 +1597,6 @@ TEST_F(CppEdsl, Lens) {
   O = Transpose(I, "NM");
   program = makeProgram("transpose_nm", {I}, {O});
   checkExact(program, {input}, {expected});
-}
-
-TEST_F(CppEdsl, Gather) {
-  auto A = Placeholder(DType::FLOAT32, {3, 2});
-  auto B = Placeholder(DType::INT32, {4});
-  auto dim = Tensor(1);
-  std::vector<Tensor> attributes = {dim};
-  auto O = gather(A, B, attributes);
-  auto program = makeProgram("gather", {A, B}, {O});
-
-  std::vector<float> in1 = {
-      -5.0f, -6.0f,  //
-      -7.0f, 4.0f,   //
-      5.0f,  6.0f,   //
-  };
-  std::vector<int> in2 = {0, 1, 1, 0};
-  std::vector<float> out = {
-      -5.0f, -6.0f, -6.0f, -5.0f,  //
-      -7.0f, 4.0f,  4.0f,  -7.0f,  //
-      5.0f,  6.0f,  6.0f,  5.0f,   //
-  };
-  checkExact(program, {in1, in2}, {out});
-}
-
-TEST_F(CppEdsl, InterpolatedGather1) {
-  auto A = Placeholder(DType::FLOAT32, {3, 2});
-  auto B = Placeholder(DType::FLOAT32, {4});
-  auto dim = Tensor(1);
-  auto mode = Tensor(static_cast<uint64_t>(InterpolationMode::linear));
-  std::vector<Tensor> attributes = {dim, mode};
-  auto O = gather(A, B, attributes);
-  auto program = makeProgram("interpolated_gather1", {A, B}, {O});
-
-  std::vector<float> in1 = {
-      -5.0f, -6.0f,  //
-      -7.0f, 4.0f,   //
-      5.0f,  6.0f,   //
-  };
-  std::vector<float> in2 = {0, 0.4, 0.7, 1};
-  std::vector<float> out = {
-      -5.0f, -5.4f, -5.7f, -6.0f,  //
-      -7.0f, -2.6f, 0.7f,  4.0f,   //
-      5.0f,  5.4f,  5.7f,  6.0f,   //
-  };
-  checkClose(program, {in1, in2}, {out});
-}
-
-TEST_F(CppEdsl, InterpolatedGather2) {
-  auto A = Placeholder(DType::FLOAT32, {3, 4});
-  auto B = Placeholder(DType::FLOAT32, {1});
-  auto dim = Tensor(1);
-  auto mode = Tensor(static_cast<uint64_t>(InterpolationMode::cubic));
-  auto coeff = Tensor(-0.5);
-  std::vector<Tensor> attributes = {dim, mode, coeff};
-  auto O = gather(A, B, attributes);
-  auto program = makeProgram("interpolated_gather2", {A, B}, {O});
-
-  std::vector<float> in1 = {
-      1.0f, 2.0f, 3.0f, 4.0f,  //
-      1.0f, 2.0f, 2.0f, 1.0f,  //
-      1.0f, 2.0f, 3.0f, 0.0f,  //
-  };
-  std::vector<float> in2 = {1.5};
-  std::vector<float> out = {
-      2.5f,
-      2.125f,
-      2.75f,
-  };
-  checkClose(program, {in1, in2}, {out});
 }
 
 }  // namespace
