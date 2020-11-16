@@ -1,6 +1,11 @@
 set(OUTPUT_ROOT ${CMAKE_BINARY_DIR})
 
-find_package(InferenceEngineDeveloperPackage QUIET)
+# find_package(InferenceEngineDeveloperPackage) does not support being called
+# multiple times.
+if(NOT InferenceEngineDeveloperPackage_FOUND)
+  find_package(InferenceEngineDeveloperPackage QUIET)
+endif()
+
 if(NOT InferenceEngineDeveloperPackage_FOUND)
   set(CI_BUILD_NUMBER "0")
   set(ENABLE_CLDNN OFF)
@@ -62,6 +67,10 @@ pml_cc_library(
     plaidml::plaidml
 )
 
-add_subdirectory(benchmark_app)
+if(NOT InferenceEngineDeveloperPackage_FOUND)
+  add_subdirectory(benchmark_app)
+endif()
 add_subdirectory(plugin)
-add_subdirectory(tests/functional)
+if(PML_BUILD_TESTS)
+  add_subdirectory(tests/functional)
+endif()
