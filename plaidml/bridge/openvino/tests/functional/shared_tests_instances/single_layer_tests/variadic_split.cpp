@@ -16,6 +16,14 @@ const std::vector<InferenceEngine::Precision> netPrecisions = {
     // InferenceEngine::Precision::FP16
 };
 
+INSTANTIATE_TEST_CASE_P(smoke, VariadicSplitLayerTest,
+                        ::testing::Combine(::testing::Values(std::vector<int32_t>{2, 3, 1, -1}),   //
+                                           ::testing::Values(0, 1, 2, 3),                          //
+                                           ::testing::ValuesIn(netPrecisions),                     //
+                                           ::testing::Values(std::vector<size_t>({7, 8, 11, 7})),  //
+                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),    //
+                        VariadicSplitLayerTest::getTestCaseName);
+
 // Sum of elements numSplits = inputShapes[Axis]
 const std::vector<std::vector<int32_t>> numSplits = {
     {1, 16, 5, 8},  //

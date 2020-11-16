@@ -218,49 +218,63 @@ LogicalResult materializeOperands(OpBuilder &builder, Operation *op) {
   return materializeOperands(builder, op, op->getOpOperands());
 }
 
-Value createIdentity(OpBuilder &builder, Location loc, Type elementType,
-                     util::AggregationKind agg) {
+double getFloatIdentity(util::AggregationKind agg) {
   switch (agg) {
   case util::AggregationKind::assign:
   case util::AggregationKind::add:
-    if (elementType.isa<FloatType>()) {
-      return builder.create<tile::ConstantOp>(loc, elementType, 0.0);
-    } else {
-      return builder.create<tile::ConstantOp>(loc, elementType,
-                                              static_cast<int64_t>(0));
-    }
+    return 0.0;
   case util::AggregationKind::mul:
-    if (elementType.isa<FloatType>()) {
-      return builder.create<tile::ConstantOp>(loc, elementType, 1.0);
-    } else {
-      return builder.create<tile::ConstantOp>(loc, elementType,
-                                              static_cast<int64_t>(1));
-    }
+    return 1.0;
   case util::AggregationKind::min:
-    if (elementType.isa<FloatType>()) {
-      return builder.create<tile::ConstantOp>(
-          loc, elementType, std::numeric_limits<double>::infinity());
-    } else if (elementType.isSignedInteger()) {
-      return builder.create<tile::ConstantOp>(
-          loc, elementType, std::numeric_limits<int64_t>::max());
-    } else {
-      return builder.create<tile::ConstantOp>(
-          loc, elementType,
-          static_cast<int64_t>(std::numeric_limits<uint64_t>::max()));
-    }
+    return std::numeric_limits<double>::infinity();
   case util::AggregationKind::max:
-    if (elementType.isa<FloatType>()) {
-      return builder.create<tile::ConstantOp>(
-          loc, elementType, -std::numeric_limits<double>::infinity());
-    } else if (elementType.isSignedInteger()) {
-      return builder.create<tile::ConstantOp>(
-          loc, elementType, std::numeric_limits<int64_t>::min());
-    } else {
-      return builder.create<tile::ConstantOp>(loc, elementType,
-                                              static_cast<int64_t>(0));
-    }
+    return -std::numeric_limits<double>::infinity();
   }
   llvm_unreachable("Invalid aggregation kind");
+}
+
+int64_t getSignedIntegerIdentity(util::AggregationKind agg) {
+  switch (agg) {
+  case util::AggregationKind::assign:
+  case util::AggregationKind::add:
+    return 0;
+  case util::AggregationKind::mul:
+    return 1;
+  case util::AggregationKind::min:
+    return std::numeric_limits<int64_t>::max();
+  case util::AggregationKind::max:
+    return std::numeric_limits<int64_t>::min();
+  }
+  llvm_unreachable("Invalid aggregation kind");
+}
+
+uint64_t getUnsignedIntegerIdentity(util::AggregationKind agg) {
+  switch (agg) {
+  case util::AggregationKind::assign:
+  case util::AggregationKind::add:
+    return 0;
+  case util::AggregationKind::mul:
+    return 1;
+  case util::AggregationKind::min:
+    return std::numeric_limits<uint64_t>::max();
+  case util::AggregationKind::max:
+    return 0;
+  }
+  llvm_unreachable("Invalid aggregation kind");
+}
+
+Value createIdentity(OpBuilder &builder, Location loc, Type elementType,
+                     util::AggregationKind agg) {
+  if (elementType.isa<FloatType>()) {
+    return builder.create<tile::ConstantOp>(loc, elementType,
+                                            getFloatIdentity(agg));
+  }
+  if (elementType.isSignedInteger()) {
+    return builder.create<tile::ConstantOp>(loc, elementType,
+                                            getSignedIntegerIdentity(agg));
+  }
+  return builder.create<tile::ConstantOp>(loc, elementType,
+                                          getUnsignedIntegerIdentity(agg));
 }
 
 } // namespace pmlc::dialect::tile

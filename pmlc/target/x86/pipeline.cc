@@ -38,6 +38,8 @@ using namespace mlir; // NOLINT[build/namespaces]
 namespace pmlc::target::x86 {
 
 namespace pxa = dialect::pxa;
+namespace stdx = dialect::stdx;
+namespace tile = dialect::tile;
 namespace xsmm = dialect::xsmm;
 
 namespace {
@@ -205,8 +207,9 @@ std::unique_ptr<Pass> createOpenMPWorkaroundPass() {
 }
 
 void pipelineBuilder(OpPassManager &pm) {
-  pm.addPass(pmlc::dialect::tile::createComputeBoundsPass());
-  pm.addPass(pmlc::dialect::tile::createPadConstraintsPass());
+  pm.addPass(tile::createInlineLayersPass());
+  pm.addPass(tile::createComputeBoundsPass());
+  pm.addPass(tile::createPadConstraintsPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
@@ -272,7 +275,7 @@ void pipelineBuilder(OpPassManager &pm) {
 
   pm.addPass(createLowerToCFGPass());
   if (pmlc::util::getEnvVar("PLAIDML_BOUNDS_CHECK") == "1") {
-    pm.addPass(pmlc::dialect::stdx::createBoundsCheckPass());
+    pm.addPass(stdx::createBoundsCheckPass());
   }
 
   pm.addPass(createLowerToLLVMPass());

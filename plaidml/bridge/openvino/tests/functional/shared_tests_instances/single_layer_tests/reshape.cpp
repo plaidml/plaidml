@@ -16,7 +16,7 @@ const std::vector<InferenceEngine::Precision> netPrecisions = {
     // InferenceEngine::Precision::I64
 };
 
-INSTANTIATE_TEST_CASE_P(ReshapeCheck, ReshapeLayerTest,
+INSTANTIATE_TEST_CASE_P(smoke, ReshapeLayerTest,
                         ::testing::Combine(::testing::Values(true),                                     //
                                            ::testing::ValuesIn(netPrecisions),                          //
                                            ::testing::Values(std::vector<size_t>({10, 10, 10, 10})),    //

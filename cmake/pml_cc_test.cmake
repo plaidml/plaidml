@@ -53,7 +53,7 @@ function(pml_cc_test)
     _RULE
     ""
     "NAME"
-    "SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS;LABELS"
+    "SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS;LABELS;CHECKS"
     ${ARGN}
   )
 
@@ -100,7 +100,9 @@ function(pml_cc_test)
   )
 
   list(APPEND _RULE_LABELS "${_PACKAGE_PATH}")
-  set_property(TEST ${_TEST_NAME} PROPERTY LABELS "${_RULE_LABELS}")
+  set_property(TEST ${_TEST_NAME} PROPERTY LABELS "${_RULE_LABELS}" "${_RULE_CHECKS}")
 
-  add_dependencies(check-test ${_NAME})
+  foreach(_CHECK ${_RULE_CHECKS})
+    add_dependencies(check-${_CHECK} ${_NAME})
+  endforeach()
 endfunction()

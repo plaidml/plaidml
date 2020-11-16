@@ -87,9 +87,11 @@ std::string ExprNodeConstFloat::str() const {
 
 ExprNodeConstTensor::ExprNodeConstTensor(const util::BufferPtr &buffer,
                                          llvm::StringRef name)
-    : buffer(buffer) {}
+    : Base(name), buffer(buffer) {}
 
-std::string ExprNodeConstTensor::str() const { return "constant_tensor"; }
+std::string ExprNodeConstTensor::str() const {
+  return llvm::formatv("constant_tensor({0})", name);
+}
 
 std::string Constraint::str() const {
   return llvm::formatv("{0} < {1}", lhs->str(), rhs->str());
@@ -166,6 +168,18 @@ std::string ExprNodeIntrinsic::str() const {
   // }
   ss << ')';
   return ss.str();
+}
+
+//
+// ExprNodeLayer
+//
+
+ExprNodeLayer::ExprNodeLayer(llvm::StringRef op,
+                             const llvm::StringMap<VarNodePtr> &attrs)
+    : op(op), attrs(attrs) {}
+
+std::string ExprNodeLayer::str() const {
+  return llvm::formatv("layer({0})", op);
 }
 
 //

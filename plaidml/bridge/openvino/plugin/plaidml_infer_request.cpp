@@ -4,10 +4,10 @@
 
 #include "plaidml_infer_request.hpp"
 
-#include "ie_layers.h"  // NOLINT[build/include_subdir]
+#include "ie_layers.h"
 
-using namespace plaidml;          // NOLINT[build/namespaces]
-using namespace InferenceEngine;  // NOLINT[build/namespaces]
+using namespace plaidml;
+using namespace InferenceEngine;
 
 static Blob::Ptr make_shared_blob(const TensorDesc& desc) {
   const auto prec = desc.getPrecision();

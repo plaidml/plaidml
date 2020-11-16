@@ -187,6 +187,27 @@ plaidml_expr* plaidml_expr_pragma(  //
     size_t nattrs,                  //
     plaidml_attr** attrs);
 
+typedef struct {
+  size_t size;
+  plaidml_expr** elts;
+} plaidml_exprs;
+
+void plaidml_exprs_free(  //
+    plaidml_error* err,   //
+    plaidml_exprs* exprs);
+
+plaidml_expr* plaidml_expr_layer_begin(  //
+    plaidml_error* err,                  //
+    const char* op,                      //
+    size_t nattrs,                       //
+    plaidml_attr** attrs);
+
+plaidml_exprs* plaidml_expr_layer_end(  //
+    plaidml_error* err,                 //
+    plaidml_expr* expr,                 //
+    size_t noutputs,                    //
+    plaidml_expr** outputs);
+
 //
 // plaidml_contraction
 //

@@ -24,7 +24,9 @@ ngraph::AxisSet cast_constant_axis_mask(size_t operand_idx, ngraph::Node* layer)
   auto bool_mask = ngraph_const->cast_vector<bool>();
   ngraph::AxisSet axis_set{};
   for (size_t i = 0; i < static_cast<size_t>(bool_mask.size()); ++i) {
-    if (bool_mask[i]) axis_set.emplace(i);
+    if (bool_mask[i]) {
+      axis_set.emplace(i);
+    }
   }
   return axis_set;
 }
