@@ -29,11 +29,6 @@ def ABI_LoopOp : ABI_Op<"loop", [
   let regions = (region AnyRegion:$initRegion, AnyRegion:$bodyRegion, AnyRegion:$finiRegion);
   let builders = [OpBuilder<"">];
   let skipDefaultBuilders = 1;
-  /*
-  let assemblyFormat = [{
-     `init` $initRegion `body` $bodyRegion `fini` $finiRegion attr-dict
-   }];
-  */
   let extraClassDeclaration = [{
     mlir::Block* getBodyEntryBlock();
     mlir::Block* getFiniEntryBlock();
