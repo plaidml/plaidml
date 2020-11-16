@@ -51,7 +51,7 @@ module @dot {
 //  CHECK-NEXT:   abi.loop init  {
 //  CHECK-NEXT:   ^bb0(%arg0: !llvm.ptr<i8>):  // no predecessors
 //  CHECK-NEXT:     abi.yield
-//  CHECK-NEXT:   } yield [] body  {
+//  CHECK-NEXT:   } body  {
 //  CHECK-NEXT:   ^bb0(%arg0: memref<8x16xf32>, %arg1: memref<16x32xf32>, %arg2: memref<8x32xf32>):  // no predecessors
 //  CHECK-NEXT:     %[[CFZERO:.*]] = constant 0.000000e+00 : f32
 //  CHECK-NEXT:     %[[C0:.*]] = constant 0 : index

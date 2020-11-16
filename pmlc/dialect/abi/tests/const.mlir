@@ -20,7 +20,7 @@ module @const_add {
 //  CHECK-NEXT:   abi.loop init  {
 //  CHECK-NEXT:   ^bb0(%arg0: !llvm.ptr<i8>, %arg1: memref<4xi32>, %arg2: memref<4xi32>):  // no predecessors
 //  CHECK-NEXT:     abi.yield %arg1, %arg2 : memref<4xi32>, memref<4xi32>
-//  CHECK-NEXT:   } yield [memref<4xi32>, memref<4xi32>] body  {
+//  CHECK-NEXT:   } body  {
 //  CHECK-NEXT:   ^bb0(%arg0: memref<4xi32>, %arg1: memref<4xi32>, %arg2: memref<4xi32>):  // no predecessors
 //  CHECK-NEXT:     %[[C4:.*]] = constant 4 : index
 //  CHECK-NEXT:     omp.parallel num_threads(%[[C4]] : index) default(shared) {

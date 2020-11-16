@@ -110,7 +110,6 @@ void LowerToABIPass::runOnOperation() {
   // Terminate the init block using a passthrough of the
   // init block's arguments.
   builder.create<abi::YieldOp>(loc, networkArgs);
-  loopOp.setNetworkFieldTypes(networkTypes);
 
   // Add the fini region.
   auto *finiEntryBlock = builder.createBlock(&loopOp.finiRegion());
