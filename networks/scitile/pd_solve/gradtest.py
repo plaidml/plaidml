@@ -5,6 +5,7 @@ import sys
 import plaidml2
 import plaidml2.edsl as edsl
 import plaidml2.exec as pld_exec
+import plaidml2.op as op
 
 import unittest
 import numpy.testing as npt
@@ -134,7 +135,7 @@ class GradTest(unittest.TestCase):
         with npt.assert_raises(Exception):
             test_result = get_jacobian([A, B, x], [np_A, np_B, np_x], y, x)
 
-        ## Expected result when rank>=2 wrt input is supported:
+        # Expected result when rank>=2 wrt input is supported:
         # true_result = np.expand_dims(np.squeeze(np.expand_dims(np_B, 0) @ np_A), 1)*np.ones(np_x.shape)
         # npt.assert_allclose(test_result, true_result)
 
@@ -185,6 +186,23 @@ class GradTest(unittest.TestCase):
         true_result[:, :, 2] = [[0, 0, -1], [0, 0, -1], [1, 1, 0]]
 
         npt.assert_allclose(test_result, true_result)
+
+    def test_8(self):
+        np_x = np.array([1., 2., 3.])
+        np_A = np.array([[1., 2., 3.], [4., 5., 6.], [7., 8., 9.]])
+
+        dtype = plaidml2.DType.FLOAT32
+        A = edsl.Tensor(edsl.LogicalShape(dtype, np_A.shape))
+        x = edsl.Tensor(edsl.LogicalShape(dtype, np_x.shape))
+
+        y = matmul_2_2(A, distance(x, x))
+
+        J_test = get_jacobian([A, x], [np_A, np_x], y, x)
+        J_true = np.zeros((3, 3, 3))
+        J_true[:, :, 0] = [[-5, 1, 1], [-11, 4, 4], [-17, 7, 7]]
+        J_true[:, :, 1] = [[2, -4, 2], [5, -10, 5], [8, -16, 8]]
+        J_true[:, :, 2] = [[3, 3, -3], [6, 6, -9], [9, 9, -15]]
+        npt.assert_allclose(J_true, J_test)
 
 
 if __name__ == '__main__':

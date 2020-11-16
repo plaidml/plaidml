@@ -247,30 +247,49 @@ class Jacobian {
     Ji->ComputeShape(input->ref->shape.layout);
 
     // Connect assignment Jacobian to total Jacobian
+    return ChainRule(dout, Ji);
+  }
+
+  ExprPtr ChainRule(const ExprPtr& Jprev, const ExprPtr& Jnew) {
+    // Apply chain rule to calculate new total Jacobian
+    // (Contracts shared dimension of Jprev and Jnew)
     auto dop = std::make_shared<ContractionExpr>();
     dop->agg_op = AggregationOp::SUM;
     dop->combo_op = CombinationOp::NONE;
-    dop->constraints = op->constraints;
 
-    std::vector<PolyExprPtr> oidxs;  // Indexes of new total Jacobian
-    std::vector<DimExprPtr> odims;   // Dimensions of new total Jacobian
-    size_t noidx = IntoTensorShape(dout->shape).sizes().size();
+    std::vector<PolyExprPtr> oidxs;                       // Indexes of new total Jacobian
+    std::vector<DimExprPtr> odims;                        // Dimensions of new total Jacobian
+    size_t Jprank = Jprev->shape.dims_as_exprs().size();  // Rank of old total Jacobian
+    size_t Jnrank = Jnew->shape.dims_as_exprs().size();   // Rank of new (individual) Jacobian
+    std::vector<PolyExprPtr> pidxs;                       // Indices corresponding to Jprev
+    std::vector<PolyExprPtr> nidxs;                       // Indices corresponding to Jnew
 
-    std::vector<PolyExprPtr> iidxs;
-    for (size_t i = 0; i < noidx; i++) {
-      iidxs.push_back(op->sink_idxs->idxs[i]);
+    for (size_t i = 0; i < Jprank; i++) {
+      auto idx = std::make_shared<PolyIndex>(i);
+      pidxs.push_back(idx);
+      if (i < Jprank - 1) {
+        oidxs.push_back(idx);
+        odims.push_back(Jprev->shape.dims_as_exprs()[i]);
+      } else {
+        nidxs.push_back(idx);
+      }
     }
-    dop->srcs.push_back(std::make_shared<IndexMapExpr>(dout, iidxs));
-    for (size_t i = noidx; i < Jidxs.size(); i++) {
-      oidxs.push_back(Jidxs[i]);
-      odims.push_back(Jdims[i]);
+    dop->srcs.push_back(std::make_shared<IndexMapExpr>(Jprev, pidxs));
+
+    size_t offset = -1 * (Jprank == 0);
+
+    for (size_t i = 1 + offset; i < Jnrank; i++) {
+      auto idx = std::make_shared<PolyIndex>(Jprank + i - 1);
+      oidxs.push_back(idx);
+      odims.push_back(Jnew->shape.dims_as_exprs()[i]);
+      nidxs.push_back(idx);
     }
-    dop->srcs.push_back(std::make_shared<IndexMapExpr>(Ji, Jidxs));
+    dop->srcs.push_back(std::make_shared<IndexMapExpr>(Jnew, nidxs));
+
     dop->combo_op = CombinationOp::MULTIPLY;
-
     dop->sink_idxs = std::make_shared<IndexMapExpr>(nullptr, oidxs);
     dop->sink_dims = std::make_shared<SizeMapExpr>(odims);
-    dop->ComputeShape(input->ref->shape.layout);
+    dop->ComputeShape("");
     return dop;
   }
 

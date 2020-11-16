@@ -13,6 +13,7 @@ py_test(
         "//plaidml2:py",
         "//plaidml2/edsl:py",
         "//plaidml2/exec:py",
+        "//plaidml2/op:py",
     ],
 )
 
