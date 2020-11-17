@@ -1389,7 +1389,7 @@ TEST_F(CppEdsl, Gather) {
   checkExact(program, {in1, in2}, {out});
 }
 
-TEST_F(CppEdsl, InterpolatedGather1) {
+TEST_F(CppEdsl, InterpolatedGatherLinear) {
   auto A = Placeholder(DType::FLOAT32, {3, 2});
   auto B = Placeholder(DType::FLOAT32, {4});
   auto O = gather(A, B).axis(1).mode(InterpolationMode::linear).build();
@@ -1409,7 +1409,7 @@ TEST_F(CppEdsl, InterpolatedGather1) {
   checkClose(program, {in1, in2}, {out});
 }
 
-TEST_F(CppEdsl, InterpolatedGather2) {
+TEST_F(CppEdsl, InterpolatedGatherCubic) {
   auto A = Placeholder(DType::FLOAT32, {3, 4});
   auto B = Placeholder(DType::FLOAT32, {1});
   auto O = gather(A, B).axis(1).mode(InterpolationMode::cubic).cubic_coeff(-0.5).build();
@@ -1427,6 +1427,51 @@ TEST_F(CppEdsl, InterpolatedGather2) {
       2.75f,
   };
   checkClose(program, {in1, in2}, {out});
+}
+
+TEST_F(CppEdsl, InterpolatedGatherNearestMultiDIndices) {
+  auto A = Placeholder(DType::FLOAT32, {3, 5, 2});
+  auto B = Placeholder(DType::FLOAT32, {2, 2});
+  auto O = gather(A, B).axis(1).mode(InterpolationMode::nearest).build();
+  auto program = makeProgram("interpolated_gather3", {A, B}, {O});
+
+  std::vector<float> in1 = {
+      1.0f, 2.0f,   //
+      3.0f, 4.0f,   //
+      5.0f, 6.0f,   //
+      7.0f, 8.0f,   //
+      9.0f, 10.0f,  //
+
+      1.1f, 2.1f,   //
+      3.1f, 4.1f,   //
+      5.1f, 6.1f,   //
+      7.1f, 8.1f,   //
+      9.1f, 10.1f,  //
+
+      1.2f, 2.2f,   //
+      3.2f, 4.2f,   //
+      5.2f, 6.2f,   //
+      7.2f, 8.2f,   //
+      9.2f, 10.2f,  //
+  };
+  std::vector<float> in2 = {0.8, 1.3, 2.0, 2.7};
+  std::vector<float> out = {
+      3.0f, 4.0f,  //
+      3.0f, 4.0f,  //
+      5.0f, 6.0f,  //
+      7.0f, 8.0f,  //
+
+      3.1f, 4.1f,  //
+      3.1f, 4.1f,  //
+      5.1f, 6.1f,  //
+      7.1f, 8.1f,  //
+
+      3.2f, 4.2f,  //
+      3.2f, 4.2f,  //
+      5.2f, 6.2f,  //
+      7.2f, 8.2f,  //
+  };
+  checkExact(program, {in1, in2}, {out});
 }
 
 TEST_F(CppEdsl, Pow) {

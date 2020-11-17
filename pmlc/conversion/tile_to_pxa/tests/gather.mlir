@@ -22,7 +22,7 @@ func @gather2(%arg0: tensor<3x2xf32>, %arg1: tensor<4xf32>) -> tensor<3x4xf32> {
 // CHECK-LABEL: func @gather2
 // CHECK: affine.parallel (%[[I:.*]], %[[J:.*]]) = (0, 0) to (3, 4)
 // CHECK: %[[IDX:.*]] = pxa.load {{%.*}}[%[[J]]] : memref<4xf32>
-// CHECK: %[[FLOOR:.*]] = fptoui %[[IDX]] : f32 to i32
+// CHECK: %[[FLOOR:.*]] = fptosi %[[IDX]] : f32 to i32
 // CHECK: %[[CEIL:.*]] = addi %[[FLOOR]], %{{.*}} : i32
 // CHECK: %[[FIDX:.*]] = index_cast %[[FLOOR]] : i32 to index
 // CHECK: %[[CIDX:.*]] = index_cast %[[CEIL]] : i32 to index

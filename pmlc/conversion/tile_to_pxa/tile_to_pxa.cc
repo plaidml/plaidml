@@ -891,10 +891,10 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
     rewriter.setInsertionPointToStart(loop.getBody());
 
     // create an affine map for loading the index, using the leading counters
-    int dim = *(op.axis().getRawData());
+    size_t axis = *(op.axis().getRawData());
     size_t idxDims = indices.getType().cast<MemRefType>().getShape().size();
     auto idxLoadMap = AffineMap::getMultiDimIdentityMap(idxDims, ctx);
-    auto idxLoadOps = loop.getIVs().slice(dim, idxDims);
+    auto idxLoadOps = loop.getIVs().slice(axis, idxDims);
 
     // load the value from the indexes array
     Value index =
@@ -904,7 +904,11 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
     // create default source map
     size_t dstDims = size.size();
     std::vector<Value> srcOps;
-    for (size_t i = idxDims - 1; i < dstDims; ++i) {
+    for (size_t i = 0; i < axis; ++i) {
+      srcOps.push_back(loop.getIVs()[i]);
+    }
+
+    for (size_t i = axis + idxDims - 1; i < dstDims; ++i) {
       srcOps.push_back(loop.getIVs()[i]);
     }
 
@@ -914,16 +918,16 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
       switch (op.mode()) {
       case InterpolationMode::linear:
         interpVal = buildLinearInterpolationOps(loc, rewriter, tensor, index,
-                                                srcOps, dim);
+                                                srcOps, axis);
         break;
       case InterpolationMode::cubic:
         interpVal = buildCubicInterpolationOps(
-            loc, rewriter, tensor, index, srcOps, dim, op.cubicCoeffAttr());
+            loc, rewriter, tensor, index, srcOps, axis, op.cubicCoeffAttr());
         break;
       case InterpolationMode::nearest:
       default:
         interpVal = buildNearestInterpolationOps(loc, rewriter, tensor, index,
-                                                 srcOps, dim);
+                                                 srcOps, axis);
         break;
       }
     } else {
@@ -933,7 +937,7 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
         index = rewriter.create<mlir::IndexCastOp>(loc, index, indexType)
                     .getResult();
       }
-      srcOps.at(dim) = index;
+      srcOps.at(axis) = index;
       interpVal = rewriter.create<mlir::LoadOp>(loc, tensor, srcOps);
     }
 
@@ -955,7 +959,7 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
                                      ConversionPatternRewriter &rewriter,
                                      Value tensor, Value index,
                                      std::vector<Value> &srcOps,
-                                     int dim) const {
+                                     size_t axis) const {
     auto f32Type = rewriter.getF32Type();
     auto i32Type = rewriter.getI32Type();
     auto indexType = rewriter.getIndexType();
@@ -966,14 +970,15 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
     index = rewriter.create<mlir::FPToSIOp>(loc, index, i32Type).getResult();
     index =
         rewriter.create<mlir::IndexCastOp>(loc, index, indexType).getResult();
-    srcOps.at(dim) = index;
+    srcOps.at(axis) = index;
     return rewriter.create<mlir::LoadOp>(loc, tensor, srcOps);
   }
 
   Value buildLinearInterpolationOps(Location loc,
                                     ConversionPatternRewriter &rewriter,
                                     Value tensor, Value index,
-                                    std::vector<Value> &srcOps, int dim) const {
+                                    std::vector<Value> &srcOps,
+                                    size_t axis) const {
     auto f32Type = rewriter.getF32Type();
     auto i32Type = rewriter.getI32Type();
     auto indexType = rewriter.getIndexType();
@@ -993,9 +998,9 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
                     .getResult();
 
     // load sample data g0 and g1 at interpolation nodes
-    srcOps.at(dim) = ceilIndex;
+    srcOps.at(axis) = ceilIndex;
     auto g0 = rewriter.create<mlir::LoadOp>(loc, tensor, srcOps).getResult();
-    srcOps.at(dim) = floorIndex;
+    srcOps.at(axis) = floorIndex;
     auto g1 = rewriter.create<mlir::LoadOp>(loc, tensor, srcOps).getResult();
 
     // calculate coefficients of g0 and g1
@@ -1019,7 +1024,7 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
   Value buildCubicInterpolationOps(Location loc,
                                    ConversionPatternRewriter &rewriter,
                                    Value tensor, Value index,
-                                   std::vector<Value> &srcOps, int dim,
+                                   std::vector<Value> &srcOps, size_t axis,
                                    FloatAttr aAttr) const {
     // Follow the algorithm used in ngraph cubic interpolation (also see, e.g.
     // [article](https://ieeexplore.ieee.org/document/1163711/).
@@ -1050,13 +1055,13 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
     x3 = rewriter.create<mlir::IndexCastOp>(loc, x3, indexType).getResult();
 
     // load sample data g0, g1, g2, g3 at interpolation nodes
-    srcOps.at(dim) = x0;
+    srcOps.at(axis) = x0;
     auto g0 = rewriter.create<mlir::LoadOp>(loc, tensor, srcOps).getResult();
-    srcOps.at(dim) = x1;
+    srcOps.at(axis) = x1;
     auto g1 = rewriter.create<mlir::LoadOp>(loc, tensor, srcOps).getResult();
-    srcOps.at(dim) = x2;
+    srcOps.at(axis) = x2;
     auto g2 = rewriter.create<mlir::LoadOp>(loc, tensor, srcOps).getResult();
-    srcOps.at(dim) = x3;
+    srcOps.at(axis) = x3;
     auto g3 = rewriter.create<mlir::LoadOp>(loc, tensor, srcOps).getResult();
 
     // calculate intermediate terms

@@ -94,7 +94,7 @@ def GatherOp : MaterializeOp<"gather"> {
     RankedTensorOf<[AnyScalar]>:$tensor,
     RankedTensorOf<[AnyScalar]>:$indices,
     DefaultValuedAttr<IndexAttr, "0">:$axis,
-    DefaultValuedAttr<InterpolationMode, "InterpolationMode::nearest">:$mode,
+    DefaultValuedAttr<InterpolationMode, "InterpolationMode::linear">:$mode,
     DefaultValuedAttr<F32Attr, "-0.5">:$cubicCoeff
   );
   let results = (outs RankedTensorOf<[AnyScalar]>:$result);
