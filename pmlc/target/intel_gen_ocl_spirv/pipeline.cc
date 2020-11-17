@@ -50,7 +50,7 @@ namespace tile = dialect::tile;
 struct OclPipelineOptions : public PassPipelineOptions<OclPipelineOptions> {
   Option<bool> useBlockOps{*this, "use-block-ops",
                            llvm::cl::desc("Support for block operations"),
-                           llvm::cl::initializer(false)};
+                           llvm::cl::initializer(true)};
   Option<unsigned> spirvVersion{*this, "spirv-version",
                                 llvm::cl::desc("SPIR-V Version"),
                                 llvm::cl::initializer(150)};

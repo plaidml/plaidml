@@ -27,6 +27,7 @@ namespace stdx = dialect::stdx;
 
 namespace {
 /// Pass to lower to SPIRV that includes GPU, SCF, Std and Stdx dialects
+template <class T>
 struct StdxSubgroupBroadcastOpConversion final
     : public SPIRVOpLowering<stdx::SubgroupBroadcastOp> {
   using SPIRVOpLowering<stdx::SubgroupBroadcastOp>::SPIRVOpLowering;
@@ -36,24 +37,8 @@ struct StdxSubgroupBroadcastOpConversion final
                   ConversionPatternRewriter &rewriter) const final {
     auto stdxType = op.getResult().getType();
     auto spirvType = typeConverter.convertType(stdxType);
-    rewriter.replaceOpWithNewOp<spirv::GroupBroadcastOp>(
-        op, spirvType, spirv::Scope::Subgroup, operands[0], operands[1]);
-
-    return success();
-  }
-};
-
-struct StdxSubgroupNonUniformBroadcastOpConversion final
-    : public SPIRVOpLowering<stdx::SubgroupBroadcastOp> {
-  using SPIRVOpLowering<stdx::SubgroupBroadcastOp>::SPIRVOpLowering;
-
-  LogicalResult
-  matchAndRewrite(stdx::SubgroupBroadcastOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const final {
-    auto stdxType = op.getResult().getType();
-    auto spirvType = typeConverter.convertType(stdxType);
-    rewriter.replaceOpWithNewOp<spirv::GroupNonUniformBroadcastOp>(
-        op, spirvType, spirv::Scope::Subgroup, operands[0], operands[1]);
+    rewriter.replaceOpWithNewOp<T>(op, spirvType, spirv::Scope::Subgroup,
+                                   operands[0], operands[1]);
 
     return success();
   }
@@ -314,12 +299,17 @@ struct GPUToSPIRVCustomPass
     populateSCFToSPIRVPatterns(context, typeConverter, scfContext, patterns);
     populateVectorToSPIRVPatterns(context, typeConverter, patterns);
     populateStandardToSPIRVPatterns(context, typeConverter, patterns);
+
     if (nonUniformBroadcast) {
-      patterns.insert<StdxSubgroupNonUniformBroadcastOpConversion>(
+      IVLOG(3, "GPUToSPIRVCustomPass: Using group non-uniform broadcast op");
+      patterns.insert<
+          StdxSubgroupBroadcastOpConversion<spirv::GroupNonUniformBroadcastOp>>(
           context, typeConverter);
     } else {
-      patterns.insert<StdxSubgroupBroadcastOpConversion>(context,
-                                                         typeConverter);
+      IVLOG(3, "GPUToSPIRVCustomPass: Using group broadcast op");
+      patterns
+          .insert<StdxSubgroupBroadcastOpConversion<spirv::GroupBroadcastOp>>(
+              context, typeConverter);
     }
     populateStdxToSPIRVPatterns(context, typeConverter, patterns);
     patterns.insert<AllocOpPattern>(context, typeConverter);

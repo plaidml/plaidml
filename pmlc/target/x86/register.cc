@@ -21,7 +21,6 @@ static PassPipelineRegistration<> passPipelineReg(kPassPipelineTargetName,
 class Target : public compiler::Target {
 public:
   void buildPipeline(mlir::OpPassManager &pm, llvm::StringRef targetOptions) {
-    assert(targetOptions.empty());
     pipelineBuilder(pm);
   }
 

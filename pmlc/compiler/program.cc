@@ -153,9 +153,11 @@ void Program::compile(StringRef targetNameAndOptions, bool collectPasses,
   auto targetName = targetNameAndOptions.substr(0, begOpts);
   auto targetOptions = targetNameAndOptions.substr(begOpts);
 
+  // if target options are specified
   if (!targetOptions.empty()) {
+    // trim off curly braces
     auto endOpts = targetOptions.find('}');
-    targetOptions = targetOptions.substr(1, endOpts - 2);
+    targetOptions = targetOptions.substr(1, endOpts - 1);
   }
 
   target = resolveTarget(targetName);

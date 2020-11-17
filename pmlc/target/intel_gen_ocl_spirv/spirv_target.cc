@@ -2,6 +2,7 @@
 
 #include "pmlc/target/intel_gen_ocl_spirv/pass_detail.h"
 #include "pmlc/target/intel_gen_ocl_spirv/passes.h"
+#include "pmlc/util/logging.h"
 
 #include "mlir/Dialect/SPIRV/SPIRVOps.h"
 #include "mlir/Dialect/SPIRV/TargetAndABI.h"
@@ -23,6 +24,7 @@ public:
     auto target_env = getOperation().getAttrOfType<spirv::TargetEnvAttr>(
         spirv::getTargetEnvAttrName());
     if (!target_env) {
+      IVLOG(3, "SPIR-V Version = " << spirvVersion);
       auto version = spirv::Version::V_1_5;
       if (spirvVersion == 120) {
         version = spirv::Version::V_1_2;
