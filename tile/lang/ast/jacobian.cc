@@ -166,7 +166,7 @@ class Jacobian {
       return DeriveExtreme(dout, expr, idx);
     }
     if (expr->agg_op == AggregationOp::PROD) {
-      throw std::runtime_error("PROD AggregationOp not supported for Jacobian");
+      throw std::runtime_error("PROD AggregationOp not implemented for Jacobian");
     }
     throw std::runtime_error("Invalid ContractionExpr in DeriveContraction");
   }
@@ -176,7 +176,7 @@ class Jacobian {
 
   ExprPtr DeriveCall(const ExprPtr& dout, const std::shared_ptr<CallExpr>& op, size_t idx) {
     if (op->fn == "reshape") {
-      throw std::runtime_error("Jacobian not supported for reshape");
+      throw std::runtime_error("Jacobian not implemented for reshape");
     }
     auto deriv = DerivRegistry::Instance()->Resolve(op->fn);  // Returns elementwise derivative data
     // Autobroadcasting handles J i/o dims correctly
@@ -221,7 +221,7 @@ class Jacobian {
             Ji->combo_op = CombinationOp::NONE;
             break;
           default:
-            throw std::runtime_error("Combination Op receieved by DeriveSum in Jacobian not supported");
+            throw std::runtime_error("Combination Op receieved by DeriveSum in Jacobian not implemented");
         }
       }
     }
@@ -234,11 +234,11 @@ class Jacobian {
   }
 
   ExprPtr DeriveOverride(const ExprPtr& dout, const std::shared_ptr<GradOverrideExpr>& op, size_t idx) {
-    throw std::runtime_error("DeriveOverride not supported for Jacobian");
+    throw std::runtime_error("DeriveOverride not implemented for Jacobian");
   }
 
   ExprPtr DeriveExtreme(const ExprPtr& dout, const std::shared_ptr<ContractionExpr>& op, size_t idx) {
-    throw std::runtime_error("DeriveExtreme not supported for Jacobian");
+    throw std::runtime_error("DeriveExtreme not implemented for Jacobian");
   }
 
   ExprPtr ChainRule(const ExprPtr& Jprev, const ExprPtr& Ji) {
