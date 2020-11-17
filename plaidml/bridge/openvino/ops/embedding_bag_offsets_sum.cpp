@@ -56,7 +56,7 @@ static OpRegistration reg("EmbeddingBagOffsetsSum", [](const Context& ctx) {
   auto batch = offsets.size();
   offsets.push_back(num_indices);
 
-  auto I_gathered = gather(I, indices);
+  auto I_gathered = gather(I, indices).build();
 
   auto ndims = I_gathered.rank();
   std::vector<edsl::TensorDim> I_dims(ndims);
