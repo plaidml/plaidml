@@ -365,6 +365,10 @@ void populateCustomStdToOCLSpirvPatterns(MLIRContext *context,
       context, typeConverter);
 }
 
+std::unique_ptr<Pass> createGPUToSPIRVCustomPass() {
+  return std::make_unique<GPUToSPIRVCustomPass>();
+}
+
 std::unique_ptr<Pass> createGPUToSPIRVCustomPass(bool nonUniformBroadcast) {
   return std::make_unique<GPUToSPIRVCustomPass>(nonUniformBroadcast);
 }

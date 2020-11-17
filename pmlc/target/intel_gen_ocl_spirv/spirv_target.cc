@@ -53,6 +53,10 @@ public:
 
 } // namespace
 
+std::unique_ptr<mlir::Pass> createAddSpirvTargetPass() {
+  return std::make_unique<IntelGenOclAddSpirvTarget>();
+}
+
 std::unique_ptr<mlir::Pass> createAddSpirvTargetPass(unsigned spirvVersion) {
   return std::make_unique<IntelGenOclAddSpirvTarget>(spirvVersion);
 }
