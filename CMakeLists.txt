@@ -53,7 +53,7 @@ if(CCACHE_PROGRAM)
   set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
 endif()
 
-if(${PML_BUILD_TESTS})
+if(PML_BUILD_TESTS)
   enable_testing()
   add_custom_target(check-smoke
     COMMAND ${CMAKE_CTEST_COMMAND} -L smoke
@@ -71,7 +71,7 @@ endif()
 include(CPM)
 include(boost)
 include(easylogging)
-if(NOT ENABLE_OPENVINO_BRIDGE)
+if(NOT ENABLE_OPENVINO_BRIDGE OR InferenceEngineDeveloperPackage_FOUND)
   include(gflags)
   include(googletest)
 endif()

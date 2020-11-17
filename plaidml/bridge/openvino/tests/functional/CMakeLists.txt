@@ -31,5 +31,8 @@ add_custom_target(check-bridge-openvino
 )
 
 add_dependencies(check-bridge-openvino ${_TARGET})
-add_dependencies(check-smoke ${_TARGET}Smoke)
-add_dependencies(check-test ${_TARGET})
+
+if(PML_BUILD_TESTS)
+  add_dependencies(check-smoke ${_TARGET}Smoke)
+  add_dependencies(check-test ${_TARGET})
+endif()
