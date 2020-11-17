@@ -49,7 +49,7 @@ namespace tile = dialect::tile;
 
 struct OclPipelineOptions : public PassPipelineOptions<OclPipelineOptions> {
   Option<bool> useBlockOps{*this, "use-block-ops",
-                           llvm::cl::desc("Disable use of block ops"),
+                           llvm::cl::desc("Support for block operations"),
                            llvm::cl::initializer(false)};
   Option<unsigned> spirvVersion{*this, "spirv-version",
                                 llvm::cl::desc("SPIR-V Version"),
@@ -144,7 +144,7 @@ void pipelineBuilder(OpPassManager &pm,
 
   // Devectorize
   pm.addPass(pmlc::target::intel_gen::createSubgroupBroadcastPass(
-      /*useBlockOpsr=*/oclPipelineOptions.useBlockOps.getValue()));
+      oclPipelineOptions.useBlockOps.getValue()));
   pm.addPass(createCSEPass());
 
   // Lower mapped scf.parallel's to GPU
@@ -169,7 +169,13 @@ void pipelineBuilder(OpPassManager &pm,
   pm.addPass(createLegalizeStdOpsForSPIRVLoweringPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
-  pm.addPass(conversion::gpu_to_spirv::createGPUToSPIRVCustomPass());
+
+  bool nonUniformBroadcast = false;
+  if (oclPipelineOptions.spirvVersion.getValue() >= 150) {
+    nonUniformBroadcast = true;
+  }
+  pm.addPass(conversion::gpu_to_spirv::createGPUToSPIRVCustomPass(
+      nonUniformBroadcast));
 
   // SPIR-V passes for lowering attributes.
   pm.addPass(createSetSubgroupSizePass());

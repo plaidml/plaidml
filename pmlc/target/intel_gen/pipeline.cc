@@ -214,7 +214,8 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(createLegalizeStdOpsForSPIRVLoweringPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
-  pm.addPass(conversion::gpu_to_spirv::createGPUToSPIRVCustomPass());
+  pm.addPass(conversion::gpu_to_spirv::createGPUToSPIRVCustomPass(
+      /*nonUniformBroadcast=*/false));
 
   // SPIR-V passes for lowering attributes.
   pm.addPass(spirv::createLowerABIAttributesPass());

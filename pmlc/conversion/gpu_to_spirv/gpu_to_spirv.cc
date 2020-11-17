@@ -43,6 +43,22 @@ struct StdxSubgroupBroadcastOpConversion final
   }
 };
 
+struct StdxSubgroupNonUniformBroadcastOpConversion final
+    : public SPIRVOpLowering<stdx::SubgroupBroadcastOp> {
+  using SPIRVOpLowering<stdx::SubgroupBroadcastOp>::SPIRVOpLowering;
+
+  LogicalResult
+  matchAndRewrite(stdx::SubgroupBroadcastOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const final {
+    auto stdxType = op.getResult().getType();
+    auto spirvType = typeConverter.convertType(stdxType);
+    rewriter.replaceOpWithNewOp<spirv::GroupNonUniformBroadcastOp>(
+        op, spirvType, spirv::Scope::Subgroup, operands[0], operands[1]);
+
+    return success();
+  }
+};
+
 struct StdxSubgroupBlockReadINTELOpConversion
     : public SPIRVOpLowering<stdx::SubgroupBlockReadINTELOp> {
   using SPIRVOpLowering<stdx::SubgroupBlockReadINTELOp>::SPIRVOpLowering;
@@ -269,6 +285,10 @@ using GLSLSAbsOpPattern =
 
 struct GPUToSPIRVCustomPass
     : public GPUToSPIRVCustomBase<GPUToSPIRVCustomPass> {
+  GPUToSPIRVCustomPass() = default;
+  explicit GPUToSPIRVCustomPass(bool nonUniformBroadcast) {
+    this->nonUniformBroadcast = nonUniformBroadcast;
+  }
   void runOnOperation() final {
     MLIRContext *context = &getContext();
     ModuleOp module = getOperation();
@@ -294,6 +314,13 @@ struct GPUToSPIRVCustomPass
     populateSCFToSPIRVPatterns(context, typeConverter, scfContext, patterns);
     populateVectorToSPIRVPatterns(context, typeConverter, patterns);
     populateStandardToSPIRVPatterns(context, typeConverter, patterns);
+    if (nonUniformBroadcast) {
+      patterns.insert<StdxSubgroupNonUniformBroadcastOpConversion>(
+          context, typeConverter);
+    } else {
+      patterns.insert<StdxSubgroupBroadcastOpConversion>(context,
+                                                         typeConverter);
+    }
     populateStdxToSPIRVPatterns(context, typeConverter, patterns);
     patterns.insert<AllocOpPattern>(context, typeConverter);
     if (spirv::getMemoryModel(targetAttr) == spirv::MemoryModel::GLSL450)
@@ -315,10 +342,9 @@ struct GPUToSPIRVCustomPass
 void populateStdxToSPIRVPatterns(MLIRContext *context,
                                  SPIRVTypeConverter &typeConverter,
                                  OwningRewritePatternList &patterns) {
-  patterns.insert<
-      StdxSubgroupBroadcastOpConversion, StdxSubgroupBlockReadINTELOpConversion,
-      StdxSubgroupBlockWriteINTELOpConversion, StdxTransferWriteOpConversion>(
-      context, typeConverter);
+  patterns.insert<StdxSubgroupBlockReadINTELOpConversion,
+                  StdxSubgroupBlockWriteINTELOpConversion,
+                  StdxTransferWriteOpConversion>(context, typeConverter);
 }
 
 void populateStdxToSPIRVGLSLPatterns(MLIRContext *context,
@@ -349,8 +375,8 @@ void populateCustomStdToOCLSpirvPatterns(MLIRContext *context,
       context, typeConverter);
 }
 
-std::unique_ptr<Pass> createGPUToSPIRVCustomPass() {
-  return std::make_unique<GPUToSPIRVCustomPass>();
+std::unique_ptr<Pass> createGPUToSPIRVCustomPass(bool nonUniformBroadcast) {
+  return std::make_unique<GPUToSPIRVCustomPass>(nonUniformBroadcast);
 }
 
 } // namespace pmlc::conversion::gpu_to_spirv
