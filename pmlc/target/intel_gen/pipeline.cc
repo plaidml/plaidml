@@ -236,7 +236,10 @@ static PassPipelineRegistration<>
 
 class Target : public compiler::Target {
 public:
-  void buildPipeline(mlir::OpPassManager &pm) { pipelineBuilder(pm); }
+  void buildPipeline(mlir::OpPassManager &pm, llvm::StringRef targetOptions) {
+    assert(targetOptions.empty());
+    pipelineBuilder(pm);
+  }
 
   util::BufferPtr save(compiler::Program &program) {
     throw std::runtime_error(

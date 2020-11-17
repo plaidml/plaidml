@@ -108,9 +108,9 @@ static StringRef getDiagKindStr(DiagnosticSeverity kind) {
   llvm_unreachable("Unknown DiagnosticSeverity");
 }
 
-void Program::compile(StringRef targetName, bool collectPasses,
+void Program::compile(StringRef targetNameAndOptions, bool collectPasses,
                       StringRef dumpDir) {
-  if (targetName.empty()) {
+  if (targetNameAndOptions.empty()) {
     return;
   }
 
@@ -149,8 +149,17 @@ void Program::compile(StringRef targetName, bool collectPasses,
                         /*out=*/llvm::errs());
   }
 
+  auto targetNameSize = targetNameAndOptions.find('{');
+  auto targetName = targetNameAndOptions.substr(0, targetNameSize);
+  auto targetOptions = targetNameAndOptions.substr(targetNameSize);
+
+  // TODO: this is a bit hacky
+  if (!targetOptions.empty()) {
+    targetOptions = targetOptions.substr(1, targetOptions.size() - 2);
+  }
+
   target = resolveTarget(targetName);
-  target->buildPipeline(pm);
+  target->buildPipeline(pm, targetOptions);
   if (failed(pm.run(*module))) {
     throw std::runtime_error("Compilation failure");
   }
