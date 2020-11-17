@@ -84,12 +84,38 @@ class ComputeUses : public AstVisitor<void> {
 class Jacobian {
  public:
   explicit Jacobian(const ExprPtr& err) : uses_(err) {
-    IVLOG(2, "Gradient::Gradient> err: " << err);
-    seen_[err.get()] = std::make_shared<FloatConst>(1.0);
+    IVLOG(2, "Jacobian::Jacobian> err: " << err);
+
+    // Create identity matrix to represent d(err)/d(err)
+    auto dims = err->shape.dims_as_exprs();
+    orank_ = dims.size();
+
+    auto Ji = std::make_shared<ContractionExpr>();
+    Ji->agg_op = AggregationOp::ASSIGN;
+    Ji->combo_op = CombinationOp::NONE;
+
+    auto src = std::make_shared<FloatConst>(1.0);
+    Ji->srcs.push_back(std::make_shared<IndexMapExpr>(src, std::vector<PolyExprPtr>{}));
+
+    std::vector<PolyExprPtr> Jidxs;
+    std::vector<DimExprPtr> Jdims;
+
+    for (size_t io = 0; io < 2; io++) {
+      for (size_t i = 0; i < orank_; i++) {
+        Jidxs.push_back(std::make_shared<PolyIndex>(i));
+        Jdims.push_back(dims[i]);
+      }
+    }
+
+    Ji->sink_idxs = std::make_shared<IndexMapExpr>(nullptr, Jidxs);
+    Ji->sink_dims = std::make_shared<SizeMapExpr>(Jdims);
+    Ji->ComputeShape("");
+
+    seen_[err.get()] = Ji;
   }
 
   ExprPtr GetDerivative(const ExprPtr& expr) {
-    IVLOG(2, "Gradient::GetDerivative> " << expr);
+    IVLOG(2, "Jacobian::GetDerivative> " << expr);
     auto it = seen_.find(expr.get());
     if (it != seen_.end()) {
       IVLOG(2, "  returning: " << it->second);
@@ -133,223 +159,155 @@ class Jacobian {
     if (expr->combo_op == CombinationOp::EQ) {
       return std::make_shared<IntConst>(0);
     }
-    if (expr->agg_op == AggregationOp::SUM) {
+    if (expr->agg_op == AggregationOp::SUM || expr->agg_op == AggregationOp::ASSIGN) {
       return DeriveSum(dout, expr, idx);
-    }
-    if (expr->agg_op == AggregationOp::ASSIGN) {
-      return DeriveAssign(dout, expr, idx);
     }
     if (expr->agg_op == AggregationOp::MIN || expr->agg_op == AggregationOp::MAX) {
       return DeriveExtreme(dout, expr, idx);
     }
     if (expr->agg_op == AggregationOp::PROD) {
-      throw std::runtime_error("PROD AggregationOp does not support differentiation");
+      throw std::runtime_error("PROD AggregationOp not supported for Jacobian");
     }
     throw std::runtime_error("Invalid ContractionExpr in DeriveContraction");
   }
 
+  // Each of these must compute single-layer Jacobian of op, then combine it with prior Jacobian dout to
+  // produce new total Jacobian
+
   ExprPtr DeriveCall(const ExprPtr& dout, const std::shared_ptr<CallExpr>& op, size_t idx) {
-    IVLOG(2, "Gradient::DeriveCall> dout=" << dout << ", op=" << op << ", fn=" << op->fn << ", idx=" << idx);
     if (op->fn == "reshape") {
-      std::vector<ExprPtr> args = {dout};
-      auto in = op->args[0];
-      auto dim_exprs = in->shape.dims_as_exprs();
-      for (size_t i = 0; i < in->shape.dims.size(); ++i) {
-        args.push_back(std::make_shared<DimExprExpr>(dim_exprs[i]));
-      }
-      return MakeCall("reshape", args);
+      throw std::runtime_error("Jacobian not supported for reshape");
     }
-    auto deriv = DerivRegistry::Instance()->Resolve(op->fn);
+    auto deriv = DerivRegistry::Instance()->Resolve(op->fn);  // Returns elementwise derivative data
+    // Autobroadcasting handles J i/o dims correctly
     return deriv.fn(op, dout, op->args, deriv.user_fn, deriv.user_ctx)[idx];
   }
 
   ExprPtr DeriveSum(const ExprPtr& dout, const std::shared_ptr<ContractionExpr>& op, size_t idx) {
-    IVLOG(2, "Gradient::DeriveSum> dout=" << dout << ", op=" << op << ", idx=" << idx);
-    auto dop = std::make_shared<ContractionExpr>();
-    dop->agg_op = AggregationOp::SUM;
-    dop->combo_op = CombinationOp::NONE;  // May be overridden below based on op->combo_op
-    dop->constraints = op->constraints;
-    // Anywhere the forward pass hits the default, the derivative w.r.t. any other tensor is 0;
-    // thus, for the corresponding gradient, the default is everywhere zero i.e. the standard unspecified default
-    if (idx == op->srcs.size()) {
-      throw std::logic_error("A default tensor fell through to the DeriveSum case during Gradient");
-    }
-    std::vector<PolyExprPtr> oidxs;  // Indexes of new total Jacobian
-    std::vector<DimExprPtr> odims;   // Dimensions of new total Jacobian
-    size_t noidx = IntoTensorShape(dout->shape).sizes().size();
-
-    for (size_t i = 0; i < op->srcs.size(); ++i) {
-      if (idx == i) {
-        std::vector<PolyExprPtr> iidxs;
-        for (size_t j = 0; j < noidx; j++) {
-          iidxs.push_back(op->sink_idxs->idxs[j]);
-        }
-        dop->srcs.push_back(std::make_shared<IndexMapExpr>(dout, iidxs));
-      } else {
-        switch (op->combo_op) {
-          case CombinationOp::MULTIPLY:
-            for (size_t j = noidx; j < op->srcs[i]->idxs.size(); j++) {
-              oidxs.push_back(op->srcs[i]->idxs[j]);
-              odims.push_back(op->srcs[i]->ref->shape.dims_as_exprs()[j]);
-            }
-            dop->srcs.push_back(op->srcs[i]);
-            dop->combo_op = CombinationOp::MULTIPLY;
-            break;
-          case CombinationOp::PLUS:
-            // For +, we ignore the other (non-differentiated) input
-            dop->combo_op = CombinationOp::NONE;
-            break;
-          case CombinationOp::COND:
-            throw std::runtime_error("Gradient of sum of conditionals not supported");
-          case CombinationOp::NONE:
-            throw std::runtime_error(
-                "Unexpected multiple inputs found when differentiating contraction with NONE combination op");
-          case CombinationOp::EQ:
-            throw std::runtime_error("Gradient of sum of equalities not supported");
-          default:
-            throw std::runtime_error("Failed to recognize combination op during differentiation");
-        }
-      }
-    }
-    auto input = op->srcs[idx];
-    dop->sink_idxs = std::make_shared<IndexMapExpr>(nullptr, oidxs);
-    dop->sink_dims = std::make_shared<SizeMapExpr>(odims);
-    dop->ComputeShape(input->ref->shape.layout);
-    return dop;
-  }
-
-  ExprPtr DeriveAssign(const ExprPtr& dout, const std::shared_ptr<ContractionExpr>& op, size_t idx) {
-    IVLOG(2, "Gradient::DeriveAssign> dout=" << dout << ", op=" << op << ", idx=" << idx);
-    // Compute Jacobian for assignment
+    // Compute Jacobian for SumContraction Op
     auto Ji = std::make_shared<ContractionExpr>();
     Ji->agg_op = AggregationOp::ASSIGN;
-    Ji->combo_op = CombinationOp::NONE;  // May be overridden below based on op->combo_op
     Ji->constraints = op->constraints;
-
-    auto src = std::make_shared<FloatConst>(1.0);
-    Ji->srcs.push_back(std::make_shared<IndexMapExpr>(src, std::vector<PolyExprPtr>{}));
 
     std::vector<PolyExprPtr> Jidxs;  // Indexes of new total Jacobian
     std::vector<DimExprPtr> Jdims;   // Dimensions of new total Jacobian
 
-    for (size_t i = 0; i < op->sink_idxs->idxs.size(); i++) {
+    // Add dimensions to Ji corresponding to op output dimensions
+    auto odims = op->shape.dims_as_exprs();
+    for (size_t i = 0; i < odims.size(); i++) {
       Jidxs.push_back(op->sink_idxs->idxs[i]);
-      Jdims.push_back(op->shape.dims_as_exprs()[i]);
-    }
-    for (size_t i = 0; i < op->srcs[idx]->idxs.size(); i++) {
-      Jidxs.push_back(op->srcs[idx]->idxs[i]);
-      Jdims.push_back(op->srcs[idx]->ref->shape.dims_as_exprs()[i]);
+      Jdims.push_back(odims[i]);
     }
 
-    auto input = op->srcs[idx];
+    for (size_t j = 0; j < op->srcs.size(); j++) {
+      if (j == idx) {
+        // Add dimensions to Ji corresponding to op w.r.t. input dimensions
+        auto idims = op->srcs[j]->ref->shape.dims_as_exprs();
+        for (size_t i = 0; i < idims.size(); i++) {
+          Jidxs.push_back(op->srcs[j]->idxs[i]);
+          Jdims.push_back(idims[i]);
+        }
+      } else {
+        switch (op->combo_op) {
+          case CombinationOp::MULTIPLY:
+            // Add non-w.r.t. op inputs as inputs to Ji, set combo op for Ji
+            Ji->srcs.push_back(op->srcs[j]);
+            Ji->combo_op = CombinationOp::MULTIPLY;
+            break;
+          case CombinationOp::PLUS:
+            // Jacobian is identity matrix, broadcast through non-wrt dimensions
+            Ji->srcs.push_back(
+                std::make_shared<IndexMapExpr>(std::make_shared<FloatConst>(1.0), std::vector<PolyExprPtr>{}));
+            Ji->combo_op = CombinationOp::NONE;
+            break;
+          default:
+            throw std::runtime_error("Combination Op receieved by DeriveSum in Jacobian not supported");
+        }
+      }
+    }
+
     Ji->sink_idxs = std::make_shared<IndexMapExpr>(nullptr, Jidxs);
     Ji->sink_dims = std::make_shared<SizeMapExpr>(Jdims);
-    Ji->ComputeShape(input->ref->shape.layout);
+    Ji->ComputeShape("");
 
-    // Connect assignment Jacobian to total Jacobian
     return ChainRule(dout, Ji);
   }
 
-  ExprPtr ChainRule(const ExprPtr& Jprev, const ExprPtr& Jnew) {
-    // Apply chain rule to calculate new total Jacobian
-    // (Contracts shared dimension of Jprev and Jnew)
-    auto dop = std::make_shared<ContractionExpr>();
-    dop->agg_op = AggregationOp::SUM;
-    dop->combo_op = CombinationOp::NONE;
-
-    std::vector<PolyExprPtr> oidxs;                       // Indexes of new total Jacobian
-    std::vector<DimExprPtr> odims;                        // Dimensions of new total Jacobian
-    size_t Jprank = Jprev->shape.dims_as_exprs().size();  // Rank of old total Jacobian
-    size_t Jnrank = Jnew->shape.dims_as_exprs().size();   // Rank of new (individual) Jacobian
-    std::vector<PolyExprPtr> pidxs;                       // Indices corresponding to Jprev
-    std::vector<PolyExprPtr> nidxs;                       // Indices corresponding to Jnew
-
-    for (size_t i = 0; i < Jprank; i++) {
-      auto idx = std::make_shared<PolyIndex>(i);
-      pidxs.push_back(idx);
-      if (i < Jprank - 1) {
-        oidxs.push_back(idx);
-        odims.push_back(Jprev->shape.dims_as_exprs()[i]);
-      } else {
-        nidxs.push_back(idx);
-      }
-    }
-    dop->srcs.push_back(std::make_shared<IndexMapExpr>(Jprev, pidxs));
-
-    size_t offset = -1 * (Jprank == 0);
-
-    for (size_t i = 1 + offset; i < Jnrank; i++) {
-      auto idx = std::make_shared<PolyIndex>(Jprank + i - 1);
-      oidxs.push_back(idx);
-      odims.push_back(Jnew->shape.dims_as_exprs()[i]);
-      nidxs.push_back(idx);
-    }
-    dop->srcs.push_back(std::make_shared<IndexMapExpr>(Jnew, nidxs));
-
-    dop->combo_op = CombinationOp::MULTIPLY;
-    dop->sink_idxs = std::make_shared<IndexMapExpr>(nullptr, oidxs);
-    dop->sink_dims = std::make_shared<SizeMapExpr>(odims);
-    dop->ComputeShape("");
-    return dop;
-  }
-
   ExprPtr DeriveOverride(const ExprPtr& dout, const std::shared_ptr<GradOverrideExpr>& op, size_t idx) {
-    // TODO: Ideally we'd cache this call somehow so when the only difference is `idx` we don't recompute
-    return op->fn->fn(op->out, dout, op->ins, op->fn->user_fn, op->fn->user_ctx)[idx];
+    throw std::runtime_error("DeriveOverride not supported for Jacobian");
   }
 
   ExprPtr DeriveExtreme(const ExprPtr& dout, const std::shared_ptr<ContractionExpr>& op, size_t idx) {
-    // Given `O(oidxs) >= I(iidxs);` (or a MIN aggregation too), produce the derivative
-    //  ```dI(iidxs) += (I(iidxs) == O(oidxs)) ? dO(oidxs);```
-    // where the above notation is meant to represent a COND combination op
-    IVLOG(2, "Gradient::DeriveExtreme> dout=" << dout << ", op=" << op << ", idx=" << idx);
-    auto input = op->srcs[0];
-    auto dop = std::make_shared<ContractionExpr>();
-    dop->agg_op = AggregationOp::SUM;
-    dop->combo_op = CombinationOp::COND;
-    dop->constraints = op->constraints;
-    // Anywhere the forward pass hits the default, the derivative w.r.t. any other tensor is 0;
-    // thus, for the corresponding gradient, the default is everywhere zero i.e. the standard unspecified default
-    dop->srcs.push_back(input);
-    dop->srcs.push_back(std::make_shared<IndexMapExpr>(op, op->sink_idxs->idxs));
-    dop->srcs.push_back(std::make_shared<IndexMapExpr>(dout, op->sink_idxs->idxs));
-    dop->sink_idxs = std::make_shared<IndexMapExpr>(nullptr, input->idxs);
-    dop->sink_dims = std::make_shared<SizeMapExpr>(input->ref->shape.dims_as_exprs());
-    dop->ComputeShape(input->ref->shape.layout);
-    return dop;
+    throw std::runtime_error("DeriveExtreme not supported for Jacobian");
+  }
+
+  ExprPtr ChainRule(const ExprPtr& Jprev, const ExprPtr& Ji) {
+    // Combine current Jacobian with total. Output dimensions are
+    // [first {orank_} dimensions of Jprev, last {Ji_rank - orank} dimensions of Ji]
+    auto Jnew = std::make_shared<ContractionExpr>();
+    Jnew->agg_op = AggregationOp::SUM;
+    Jnew->combo_op = CombinationOp::MULTIPLY;
+
+    std::vector<PolyExprPtr> iidxs;  // Indices for op Jacobian
+    std::vector<PolyExprPtr> pidxs;  // Indices for previous total Jacobian
+    std::vector<PolyExprPtr> nidxs;  // Indices for new total Jacobian
+
+    auto idims = Ji->shape.dims_as_exprs();     // Dimensions for op Jacobian
+    auto pdims = Jprev->shape.dims_as_exprs();  // Dimensions for previous total Jacobian
+    std::vector<DimExprPtr> ndims;              // Dimensions for new total Jacobian
+
+    size_t Jirank = idims.size();
+    size_t Jprank = pdims.size();
+
+    // Add dims/idxs corresponding to output dimensions
+    for (size_t i = 0; i < orank_; i++) {
+      auto idx = std::make_shared<PolyIndex>(i);
+      pidxs.push_back(idx);
+      nidxs.push_back(idx);
+      ndims.push_back(pdims[i]);
+    }
+
+    // Add "overlapping" idxs
+    for (size_t i = orank_; i < Jprank; i++) {
+      auto idx = std::make_shared<PolyIndex>(i);
+      pidxs.push_back(idx);
+      iidxs.push_back(idx);
+    }
+
+    // Add dim/idxs corresponding to new input dimensions
+    for (size_t i = Jprank - orank_; i < Jirank; i++) {
+      auto idx = std::make_shared<PolyIndex>(i + orank_);
+      iidxs.push_back(idx);
+      nidxs.push_back(idx);
+      ndims.push_back(idims[i]);
+    }
+
+    // Bind sources
+    Jnew->srcs.push_back(std::make_shared<IndexMapExpr>(Jprev, pidxs));
+    Jnew->srcs.push_back(std::make_shared<IndexMapExpr>(Ji, iidxs));
+
+    // Bind output dims/idxs
+    Jnew->sink_idxs = std::make_shared<IndexMapExpr>(nullptr, nidxs);
+    Jnew->sink_dims = std::make_shared<SizeMapExpr>(ndims);
+    Jnew->ComputeShape("");
+
+    return Jnew;
   }
 
  private:
   ComputeUses uses_;
   std::map<const Expr*, ExprPtr> seen_;
+  size_t orank_;
 };
 
 }  // namespace
 
 std::vector<ExprPtr> ComputeJacobian(const std::vector<ExprPtr>& wrts, const ExprPtr& loss) {
   ExprPtr value = loss;
-  auto ndims = loss->shape.dims.size();
-  if (ndims) {
-    auto cion = std::make_shared<ContractionExpr>();
-    cion->agg_op = AggregationOp::SUM;
-    cion->combo_op = CombinationOp::NONE;
-    std::vector<PolyExprPtr> idxs;
-    for (size_t i = 0; i < ndims; i++) {
-      idxs.push_back(std::make_shared<PolyIndex>(i));
-    }
-    cion->srcs = {std::make_shared<IndexMapExpr>(loss, idxs)};
-    cion->sink_idxs = std::make_shared<IndexMapExpr>(nullptr, std::vector<PolyExprPtr>{});
-    cion->sink_dims = std::make_shared<SizeMapExpr>(std::vector<DimExprPtr>{});
-    cion->ComputeShape("");
-    value = cion;
-  }
   Jacobian grad(value);
   std::vector<ExprPtr> ret(wrts.size());
   for (size_t i = 0; i < wrts.size(); i++) {
     auto wrt = wrts[i];
-    if (wrt->shape.dims_as_exprs().size() > 1) {
-      throw std::runtime_error("Jacobian not supported for wrt input of rank > 1");
-    }
     ret[i] = grad.GetDerivative(wrts[i]);
   }
   return ret;
