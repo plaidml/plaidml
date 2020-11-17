@@ -19,3 +19,6 @@ CppEdsl.Erf
 CppEdsl.SinH
 CppEdsl.Tan
 CppEdsl.ConvI8
+CppEdsl.InterpolatedGatherLinear
+CppEdsl.InterpolatedGatherCubic
+CppEdsl.InterpolatedGatherNearestMultiDIndices
