@@ -10,6 +10,7 @@ class Pass;
 namespace pmlc::target::intel_gen_ocl_spirv {
 
 std::unique_ptr<mlir::Pass> createAddSpirvTargetPass();
+std::unique_ptr<mlir::Pass> createAddSpirvTargetPass(unsigned sprivVersion);
 
 std::unique_ptr<mlir::Pass> createSetSubgroupSizePass();
 

@@ -51,6 +51,9 @@ struct OclPipelineOptions : public PassPipelineOptions<OclPipelineOptions> {
   Option<bool> useBlockOps{*this, "use-block-ops",
                            llvm::cl::desc("Disable use of block ops"),
                            llvm::cl::initializer(false)};
+  Option<unsigned> spirvVersion{*this, "spirv-version",
+                                llvm::cl::desc("SPIR-V Version"),
+                                llvm::cl::initializer(150)};
 };
 
 void pipelineBuilder(OpPassManager &pm,
@@ -150,7 +153,8 @@ void pipelineBuilder(OpPassManager &pm,
   pm.addPass(createCSEPass());
 
   // Do kernel outlining
-  pm.addPass(createAddSpirvTargetPass());
+  pm.addPass(
+      createAddSpirvTargetPass(oclPipelineOptions.spirvVersion.getValue()));
   pm.addPass(conversion::gpu::createGpuKernelOutliningPass());
 
   // Convert GPU to comp.
