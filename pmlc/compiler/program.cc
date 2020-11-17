@@ -149,13 +149,13 @@ void Program::compile(StringRef targetNameAndOptions, bool collectPasses,
                         /*out=*/llvm::errs());
   }
 
-  auto targetNameSize = targetNameAndOptions.find('{');
-  auto targetName = targetNameAndOptions.substr(0, targetNameSize);
-  auto targetOptions = targetNameAndOptions.substr(targetNameSize);
+  auto begOpts = targetNameAndOptions.find('{');
+  auto targetName = targetNameAndOptions.substr(0, begOpts);
+  auto targetOptions = targetNameAndOptions.substr(begOpts);
 
-  // TODO: this is a bit hacky
   if (!targetOptions.empty()) {
-    targetOptions = targetOptions.substr(1, targetOptions.size() - 2);
+    auto endOpts = targetOptions.find('}');
+    targetOptions = targetOptions.substr(1, endOpts - 2);
   }
 
   target = resolveTarget(targetName);
