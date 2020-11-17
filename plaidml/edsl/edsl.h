@@ -807,31 +807,40 @@ inline Tensor exp(const Tensor& x) { return intrinsic("exp", x); }
 inline Tensor floor(const Tensor& x) { return intrinsic("floor", x); }
 
 ///
-/// Takes an input tensor (`x`) and a set of indices to gather over (`y`), and returns an output tensor that gathers the
-/// input tensor from the indices specified.
-/// \param x Tensor
-/// \param y Tensor
-/// \return Tensor
+/// Gather takes an input tensor (`x`) and a set of indices to gather over (`y`), and computes an output tensor that
+/// gathers the input tensor from the indices specified.
 ///
 class gather {
  public:
   explicit gather(const Tensor& x, const Tensor& y) : x_(x), y_(y) {}
 
+  ///
+  /// Set the axis for gather.
+  ///
   gather& axis(int axis) {
     axis_ = Tensor(axis);
     return *this;
   }
 
-  gather& mode(InterpolationMode m) {
-    mode_ = Tensor(static_cast<uint64_t>(m));
+  ///
+  /// Set the interpolation mode for gather.
+  ///
+  gather& mode(InterpolationMode mode) {
+    mode_ = Tensor(static_cast<uint64_t>(mode));
     return *this;
   }
 
+  ///
+  /// Set the coefficient that controls cubic interpolation for gather.
+  ///
   gather& cubic_coeff(float cubic_coeff) {
     cubic_coeff_ = Tensor(cubic_coeff);
     return *this;
   }
 
+  ///
+  /// Construct gather.
+  ///
   Tensor build() const {
     std::vector<Tensor> args = {x_, y_, axis_, mode_, cubic_coeff_};
     return intrinsicCall("gather", args);
@@ -840,6 +849,12 @@ class gather {
  private:
   Tensor x_;
   Tensor y_;
+
+  ///
+  /// axis_ is a dimension index to gather data from
+  /// mode_ specifies type of interpolation
+  /// cubic_coeff_ controls the cubic interpolation
+  ///
   Tensor axis_ = Tensor(0);
   Tensor mode_ = Tensor(static_cast<uint64_t>(InterpolationMode::linear));
   Tensor cubic_coeff_ = Tensor(-0.5);

@@ -963,7 +963,7 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
     auto cstHalfF32 = rewriter.create<mlir::ConstantOp>(
         loc, f32Type, rewriter.getFloatAttr(f32Type, 0.5));
     index = rewriter.create<mlir::AddFOp>(loc, index, cstHalfF32);
-    index = rewriter.create<mlir::FPToUIOp>(loc, index, i32Type).getResult();
+    index = rewriter.create<mlir::FPToSIOp>(loc, index, i32Type).getResult();
     index =
         rewriter.create<mlir::IndexCastOp>(loc, index, indexType).getResult();
     srcOps.at(dim) = index;
@@ -984,7 +984,7 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
                              loc, i32Type, rewriter.getI32IntegerAttr(1))
                          .getResult();
     auto floorIndex =
-        rewriter.create<mlir::FPToUIOp>(loc, index, i32Type).getResult();
+        rewriter.create<mlir::FPToSIOp>(loc, index, i32Type).getResult();
     auto ceilIndex =
         rewriter.create<mlir::AddIOp>(loc, floorIndex, cstOneI32).getResult();
     floorIndex = rewriter.create<mlir::IndexCastOp>(loc, floorIndex, indexType)

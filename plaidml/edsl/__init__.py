@@ -850,6 +850,9 @@ def gather(x, y, axis=0, mode=0, cubic_coeff=-0.5):
     Args:
         x (Tensor): The tensor to peform ``gather`` on.
         y (Tensor): The set of indices to ``gather`` over.
+        axis (int): The dimension index to gather data from.
+        mode (int): The type of interpolation (0: nearest, 1: linear, 2: cubic).
+        cubic_coeff (float): The coefficient that controls the cubic interpolation.
 
     Returns:
         Tensor: The result of the ``gather`` operation.

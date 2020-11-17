@@ -19,5 +19,3 @@ CppEdsl.Erf
 CppEdsl.SinH
 CppEdsl.Tan
 CppEdsl.ConvI8
-CppEdsl.InterpolatedGather1
-CppEdsl.InterpolatedGather2
