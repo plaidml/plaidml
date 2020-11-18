@@ -141,7 +141,8 @@ void reorderMemoryReads(const ReorderCreator &creator, ReorderDesc &reorderDesc,
 /// Note: to obtain affine map from input space to expanded space composition
 ///       A o B can be used (with simplification).
 /// A o B = (d0, d1) -> (d0 + d1, d0, d1, 0)
-ReorderDesc expandAffineMap(mlir::AffineMap map, mlir::ArrayRef<int64_t> vector,
+ReorderDesc expandAffineMap(mlir::AffineMap map, mlir::ArrayRef<int64_t> shape,
+                            mlir::ArrayRef<int64_t> vector,
                             mlir::FlatAffineConstraints &constraints);
 
 /// Create affine permutation map that sorts resulting space dimensions in order

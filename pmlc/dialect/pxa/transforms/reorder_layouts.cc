@@ -238,13 +238,50 @@ selectCommonVectorization(MemoryUsageDesc &memoryDesc,
   return mlir::success();
 }
 
+mlir::LogicalResult
+applyMapOnConstantArray(mlir::AffineMap map, mlir::ArrayRef<int64_t> &input,
+                        mlir::SmallVector<int64_t, 6> &expandedShape) {
+  mlir::SmallVector<mlir::AffineExpr, 6> expansionExprs;
+  // mlir::SmallVector<int64_t, 6> expandedShape;
+  mlir::SmallVector<int64_t, 6> expandedVec;
+  IVLOG(3, "map.getNumResults(): " << map.getNumResults());
+  for (unsigned idx = 0; idx < map.getNumResults(); ++idx) {
+    mlir::AffineExpr dimExpr = mlir::getAffineDimExpr(idx, map.getContext());
+    IVLOG(3, "dimExpr: " << mlir::debugString(dimExpr));
+  }
+
+  mlir::SmallVector<mlir::Attribute, 8> operandConstants;
+  mlir::OpBuilder builder(map.getContext());
+
+  for (auto i : input) {
+    auto attr = builder.getI64IntegerAttr(i);
+    operandConstants.push_back(attr);
+  }
+
+  mlir::SmallVector<mlir::Attribute, 4> foldedResults;
+  if (mlir::failed(map.constantFold(operandConstants, foldedResults))) {
+    return mlir::failure();
+  } else {
+    IVLOG(3, "RESULTS: ");
+    for (unsigned i = 0; i < foldedResults.size(); i++) {
+      int64_t val =
+          foldedResults[i].cast<mlir::IntegerAttr>().getValue().getSExtValue();
+      expandedShape.push_back(val);
+      IVLOG(3, "val: " << val);
+    }
+    return mlir::success();
+  }
+}
+
 mlir::Optional<ReorderDesc>
 chooseUserProvidedTargetLayout(MemoryUsageDesc &memoryDesc) {
   IVLOG(3, "In chooseUserProvidedTargetLayout()\n");
 
   mlir::Optional<ReorderDesc> selectedReorder = llvm::None;
 
-  for (MemoryReadDesc &readDesc : memoryDesc.reads) {
+  if (memoryDesc.reads.size() > 0) {
+    MemoryReadDesc &readDesc = memoryDesc.reads.front();
+
     PxaReadOpInterface readOp = readDesc.readOp;
     mlir::Value readMem = readOp.getMemRef();
     IVLOG(3, "readMem: " << mlir::debugString(readMem));
@@ -255,34 +292,26 @@ chooseUserProvidedTargetLayout(MemoryUsageDesc &memoryDesc) {
       mlir::AffineMap layoutMap = memrefType.getAffineMaps().front();
       IVLOG(3, "layoutMap: " << mlir::debugString(layoutMap));
 
+      mlir::ArrayRef<int64_t> tensorShape = memrefType.getShape();
+      IVLOG(3, "Extant shape: ");
+
+      for (auto i : tensorShape) {
+        IVLOG(3, "i: " << i);
+      }
+
       mlir::SmallVector<int64_t, 6> expandedShape;
       mlir::SmallVector<int64_t, 6> expandedVec;
 
-      expandedShape.push_back(1);
-      expandedShape.push_back(4);
-      expandedShape.push_back(56);
-      expandedShape.push_back(56);
-      expandedShape.push_back(16);
+      if (mlir::succeeded(
+              applyMapOnConstantArray(layoutMap, tensorShape, expandedShape))) {
+        for (size_t i = 0; i < expandedShape.size(); i++) {
+          expandedVec.push_back(1);
+        }
 
-      /*
-            expandedShape.push_back(1);
-            expandedShape.push_back(56);
-            expandedShape.push_back(56);
-            expandedShape.push_back(64);
-      */
-
-      expandedVec.push_back(1);
-      expandedVec.push_back(1);
-      expandedVec.push_back(1);
-      expandedVec.push_back(1);
-      expandedVec.push_back(1);
-
-      selectedReorder = ReorderDesc{layoutMap, expandedShape, expandedVec};
+        selectedReorder = ReorderDesc{layoutMap, expandedShape, expandedVec};
+      }
     }
-
-    // memrefType.setAffineMaps({});
   }
-
   return selectedReorder;
 }
 
@@ -442,6 +471,8 @@ expandAffineExpr(mlir::AffineExpr expr, mlir::AffineExpr dimExpr,
                        constraints, expansionExprs, expandedShape, expandedVec);
       return;
     }
+  } else if (expr.getKind() == mlir::AffineExprKind::FloorDiv) {
+    IVLOG(3, "FLOORDIV: ");
   }
 
   expansionExprs.push_back(dimExpr);
