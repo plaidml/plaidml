@@ -5,6 +5,7 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(opencl_icd_loader)
 
-file(GLOB _GLOB_OPENCL_ICD_LOADER_SRCS LIST_DIRECTORIES false ${opencl_icd_loader_SOURCE_DIR}/loader/*.c)
-add_library(opencl_icd_loader STATIC ${_GLOB_OPENCL_ICD_LOADER_SRCS})
-target_include_directories(opencl_icd_loader PUBLIC ${opencl_headers_SOURCE_DIR})
+file(COPY ${opencl_headers_SOURCE_DIR}/CL DESTINATION ${opencl_icd_loader_SOURCE_DIR}/inc)
+add_library(opencl_icd_loader STATIC ${opencl_icd_loader_SOURCE_DIR})
+target_link_libraries(opencl_icd_loader OpenCL.lib)
+set_target_properties(opencl_icd_loader PROPERTIES LINKER_LANGUAGE CXX)

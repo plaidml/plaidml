@@ -4,3 +4,5 @@ FetchContent_Declare(
   URL_HASH SHA256=4a5fb828e05d8c86f696f8754e90302d6446b950236256bcb4857408357d2b60
 )
 FetchContent_MakeAvailable(volk)
+
+target_include_directories(volk PRIVATE ${vulkan_headers_SOURCE_DIR}/include) 
