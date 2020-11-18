@@ -129,6 +129,11 @@ void pipelineBuilder(OpPassManager &pm,
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
+  // Affine MemRefDataFlowOpt pass
+  pm.addPass(createMemRefDataFlowOptPass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+
   // Pack dims
   pm.addPass(pmlc::target::intel_gen::createAffineIndexPackPass());
   pm.addPass(createCanonicalizerPass());

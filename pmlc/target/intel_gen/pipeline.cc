@@ -179,6 +179,11 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
+  // Affine MemRefDataFlowOpt pass
+  pm.addPass(createMemRefDataFlowOptPass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+
   // Pack dims
   pm.addPass(createAffineIndexPackPass());
   pm.addPass(createCanonicalizerPass());
