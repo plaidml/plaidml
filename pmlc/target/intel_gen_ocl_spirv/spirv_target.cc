@@ -2,6 +2,7 @@
 
 #include "pmlc/target/intel_gen_ocl_spirv/pass_detail.h"
 #include "pmlc/target/intel_gen_ocl_spirv/passes.h"
+#include "pmlc/util/logging.h"
 
 #include "mlir/Dialect/SPIRV/SPIRVOps.h"
 #include "mlir/Dialect/SPIRV/TargetAndABI.h"
@@ -15,12 +16,21 @@ namespace {
 class IntelGenOclAddSpirvTarget
     : public IntelGenOclAddSpirvTargetBase<IntelGenOclAddSpirvTarget> {
 public:
+  IntelGenOclAddSpirvTarget() = default;
+  explicit IntelGenOclAddSpirvTarget(unsigned spirvVersion) {
+    this->spirvVersion = spirvVersion;
+  }
   void runOnOperation() {
     auto target_env = getOperation().getAttrOfType<spirv::TargetEnvAttr>(
         spirv::getTargetEnvAttrName());
     if (!target_env) {
+      IVLOG(3, "SPIR-V Version = " << spirvVersion);
+      auto version = spirv::Version::V_1_5;
+      if (spirvVersion == 120) {
+        version = spirv::Version::V_1_2;
+      }
       auto triple = spirv::VerCapExtAttr::get(
-          spirv::Version::V_1_5,
+          version,
           {spirv::Capability::Kernel, spirv::Capability::Addresses,
            spirv::Capability::Groups, spirv::Capability::SubgroupDispatch,
            spirv::Capability::Int64, spirv::Capability::Int16,
@@ -45,6 +55,10 @@ public:
 
 std::unique_ptr<mlir::Pass> createAddSpirvTargetPass() {
   return std::make_unique<IntelGenOclAddSpirvTarget>();
+}
+
+std::unique_ptr<mlir::Pass> createAddSpirvTargetPass(unsigned spirvVersion) {
+  return std::make_unique<IntelGenOclAddSpirvTarget>(spirvVersion);
 }
 
 } // namespace pmlc::target::intel_gen_ocl_spirv

@@ -403,6 +403,11 @@ struct SubgroupBroadcastPass
         // Make sure that gpuBlock loop is present
         auto gpuBlockOp = op.getParentOfType<scf::ParallelOp>();
         if (gpuBlockOp && hasUnitTag(gpuBlockOp, gpuBlockTag())) {
+          if (useBlockOps.getValue()) {
+            IVLOG(3, "SubgroupBroadcastPass: Block ops enabled")
+          } else {
+            IVLOG(3, "SubgroupBroadcastPass: Block ops disabled")
+          }
           DevectorizeImpl impl(op, subgroupSize, useBlockOps.getValue());
           if (failed(impl.devectorize())) {
             signalPassFailure();

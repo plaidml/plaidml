@@ -214,7 +214,8 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(createLegalizeStdOpsForSPIRVLoweringPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
-  pm.addPass(conversion::gpu_to_spirv::createGPUToSPIRVCustomPass());
+  pm.addPass(conversion::gpu_to_spirv::createGPUToSPIRVCustomPass(
+      /*nonUniformBroadcast=*/true));
 
   // SPIR-V passes for lowering attributes.
   pm.addPass(spirv::createLowerABIAttributesPass());
@@ -236,7 +237,9 @@ static PassPipelineRegistration<>
 
 class Target : public compiler::Target {
 public:
-  void buildPipeline(mlir::OpPassManager &pm) { pipelineBuilder(pm); }
+  void buildPipeline(mlir::OpPassManager &pm, llvm::StringRef targetOptions) {
+    pipelineBuilder(pm);
+  }
 
   util::BufferPtr save(compiler::Program &program) {
     throw std::runtime_error(
