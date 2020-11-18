@@ -10,9 +10,9 @@
 using LayerTestsDefinitions::SelectLayerTest;
 
 const std::vector<InferenceEngine::Precision> inputPrecision = {
-    // InferenceEngine::Precision::I8,    //
-    // InferenceEngine::Precision::I16,   // TODO: Investigate
-    // InferenceEngine::Precision::I64
+    InferenceEngine::Precision::I8,    //
+    InferenceEngine::Precision::I16,   //
+    InferenceEngine::Precision::I64,   //
     InferenceEngine::Precision::I32,   //
     InferenceEngine::Precision::FP32,  //
 };

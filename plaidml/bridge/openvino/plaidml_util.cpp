@@ -31,6 +31,36 @@ ngraph::AxisVector get_axis_vector_from_constant_operand(size_t operand_idx, ngr
   }
 }
 
+plaidml::DType to_plaidml(const InferenceEngine::Precision& ie_type) {
+  switch (ie_type) {
+    case InferenceEngine::Precision::FP16:
+      return plaidml::DType::FLOAT16;
+    case InferenceEngine::Precision::FP32:
+      return plaidml::DType::FLOAT32;
+    case InferenceEngine::Precision::I8:
+      return plaidml::DType::INT8;
+    case InferenceEngine::Precision::I16:
+      return plaidml::DType::INT16;
+    case InferenceEngine::Precision::I32:
+      return plaidml::DType::INT32;
+    case InferenceEngine::Precision::I64:
+      return plaidml::DType::INT64;
+    case InferenceEngine::Precision::U8:
+      return plaidml::DType::UINT8;
+    case InferenceEngine::Precision::U16:
+      return plaidml::DType::UINT16;
+    case InferenceEngine::Precision::U32:
+      return plaidml::DType::UINT8;
+    case InferenceEngine::Precision::U64:
+      return plaidml::DType::UINT16;
+    case InferenceEngine::Precision::BOOL:
+      return plaidml::DType::BOOLEAN;
+    default:
+      // TODO: Verify these are the unsupported types
+      THROW_IE_EXCEPTION << "Unsupported element type";
+  }
+}
+
 plaidml::DType to_plaidml(const ngraph::element::Type& ng_type) {
   switch (ng_type) {
     case ngraph::element::Type_t::f16:

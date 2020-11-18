@@ -34,6 +34,10 @@ class ProgramBuilder {
 
   const InferenceEngine::ICNNNetwork& network;
 
+  // cache network input/output info
+  InferenceEngine::InputsDataMap networkInputs;
+  InferenceEngine::OutputsDataMap networkOutputs;
+
   // Lets us look up the PlaidML tensor by the name of the node that produces it and the index of which output it is
   std::map<std::pair<std::string, size_t>, plaidml::edsl::Tensor> tensorMap;
 
@@ -41,7 +45,10 @@ class ProgramBuilder {
   std::map<std::string, plaidml::edsl::Tensor> tensorIONameMap;
 };
 
-ProgramBuilder::ProgramBuilder(const InferenceEngine::ICNNNetwork& network) : network(network) {}
+ProgramBuilder::ProgramBuilder(const InferenceEngine::ICNNNetwork& network) : network(network) {
+  network.getInputsInfo(networkInputs);
+  network.getOutputsInfo(networkOutputs);
+}
 
 plaidml::Program ProgramBuilder::build() {
   std::shared_ptr<const ngraph::Function> func = network.getFunction();
@@ -58,15 +65,10 @@ plaidml::Program ProgramBuilder::build() {
     }
   }
 
-  InferenceEngine::InputsDataMap networkInputs;
-  network.getInputsInfo(networkInputs);
   std::vector<plaidml::edsl::Tensor> inputs;
   for (const auto& kvp : networkInputs) {
     inputs.push_back(tensorIONameMap.at(kvp.first));
   }
-
-  InferenceEngine::OutputsDataMap networkOutputs;
-  network.getOutputsInfo(networkOutputs);
   std::vector<plaidml::edsl::Tensor> outputs;
   for (const auto& kvp : networkOutputs) {
     outputs.push_back(tensorIONameMap.at(kvp.first));
@@ -91,8 +93,12 @@ void ProgramBuilder::handleConstant(const std::shared_ptr<ngraph::Node>& node) {
 
 void ProgramBuilder::handleParameter(const std::shared_ptr<ngraph::Node>& node) {
   IE_ASSERT(node->get_output_size() == 1);
-  std::vector<int64_t> dims{node->get_shape().begin(), node->get_shape().end()};
-  plaidml::DType type = to_plaidml(node->get_element_type());
+  // TODO: Decide if we want to compare to the nGraph dims & type and issue warnings
+  // std::vector<int64_t> ng_dims{node->get_shape().begin(), node->get_shape().end()};
+  // plaidml::DType ng_type = to_plaidml(node->get_element_type());
+  auto inputDesc = networkInputs[node->get_friendly_name()]->getTensorDesc();
+  std::vector<int64_t> dims{inputDesc.getDims().begin(), inputDesc.getDims().end()};
+  plaidml::DType type = to_plaidml(inputDesc.getPrecision());
   plaidml::edsl::Tensor tensor = plaidml::edsl::Placeholder(type, dims, node->get_friendly_name());
   tensorMap[std::make_pair(node->get_name(), 0)] = tensor;
   tensorIONameMap[node->get_friendly_name()] = tensor;
@@ -107,7 +113,13 @@ void ProgramBuilder::handleOutput(const std::shared_ptr<ngraph::Node>& node) {
   if (src_node->get_output_size() > 1) {
     name += "." + std::to_string(src_output.get_index());
   }
-  tensorIONameMap[name] = tensorMap.at(std::make_pair(src_node->get_name(), src_output.get_index()));
+  const auto requested_prec = to_plaidml(networkOutputs[name]->getTensorDesc().getPrecision());
+  const plaidml::edsl::Tensor& tensor = tensorMap.at(std::make_pair(src_node->get_name(), src_output.get_index()));
+  if (requested_prec == tensor.dtype()) {
+    tensorIONameMap[name] = tensor;
+  } else {
+    tensorIONameMap[name] = plaidml::edsl::cast(tensor, requested_prec);
+  }
 }
 
 struct PlaidMLAttributeVisitor : public ngraph::AttributeVisitor {
