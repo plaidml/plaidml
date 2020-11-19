@@ -815,6 +815,7 @@ std::shared_ptr<Program> buildProgram(llvm::StringRef name,
                                       const ProgramArguments &args) {
   enableGlobalDialectRegistry(true);
   registerDialect<dialect::tile::TileDialect>();
+  registerDialect<dialect::layer::LayerDialect>();
   registerDialect<StandardOpsDialect>();
   if (name.empty()) {
     name = "module";

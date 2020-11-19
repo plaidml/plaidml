@@ -8,5 +8,6 @@ plaidml_cc_library(
     name = "layer",
     deps = [
         "//pmlc/dialect/layer/ir",
+        "//pmlc/dialect/layer/transforms",
     ],
 )

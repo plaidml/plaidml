@@ -81,9 +81,14 @@ ParseResult parseLayerOp(OpAsmParser &parser, OperationState &result) {
   return success();
 }
 
+void LayerDialect::initialize() {
+  addOperations<
+#define GET_OP_LIST
+#include "pmlc/dialect/layer/ir/ops.cc.inc"
+      >();
+}
+
 } // namespace pmlc::dialect::layer
 
 #define GET_OP_CLASSES
-#include "pmlc/dialect/layer/ir/ops.cc.inc"
-
-//#include "pmlc/dialect/layer/ir/interfaces.cc.inc"
+#include "pmlc/dialect/layer/ir/ops.cc.inc" // NOLINT

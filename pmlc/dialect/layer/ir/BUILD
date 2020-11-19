@@ -10,6 +10,7 @@ filegroup(
     srcs = [
         "@llvm-project//mlir:AffineOpsTdFiles",
         "@llvm-project//mlir:OpBaseTdFiles",
+        "ops.td",
     ],
 )
 
