@@ -18,7 +18,6 @@ filegroup(
         "//pmlc/conversion/stdx_to_llvm/tests:all",
         "//pmlc/conversion/tile_to_pxa/tests:all",
         "//pmlc/dialect/comp/tests:all",
-        "//pmlc/dialect/layer/tests:all",
         "//pmlc/dialect/oplib/tests:all",
         "//pmlc/dialect/pxa/tests:all",
         "//pmlc/dialect/stdx/tests:all",
