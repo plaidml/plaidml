@@ -5,6 +5,7 @@
 #include "mlir/Support/DebugStringHelper.h"
 #include "mlir/Transforms/InliningUtils.h"
 
+#include "pmlc/dialect/layer/ir/ops.h"
 #include "pmlc/dialect/tile/ir/ops.h"
 #include "pmlc/dialect/tile/transforms/pass_detail.h"
 #include "pmlc/util/logging.h"
@@ -25,7 +26,7 @@ struct InlinerImpl : InlinerInterface {
 
   void handleTerminator(Operation *op,
                         ArrayRef<Value> valuesToReplace) const final {
-    auto returnOp = cast<LayerReturnOp>(op);
+    auto returnOp = cast<layer::LayerReturnOp>(op);
     // Replace the values directly with the return operands.
     assert(returnOp.getNumOperands() == valuesToReplace.size());
     for (auto item : llvm::zip(valuesToReplace, returnOp.getOperands())) {
@@ -40,7 +41,7 @@ struct InlineLayersPass : public InlineLayersBase<InlineLayersPass> {
   void runOnFunction() final {
     auto func = getFunction();
     InlinerImpl inliner(&getContext());
-    func.walk([&](LayerOp op) {
+    func.walk([&](layer::LayerOp op) {
       if (failed(inlineRegion(inliner, &op.body(), op, op.operands(),
                               op.results(), op.getLoc(),
                               /*shouldCloneInlinedRegion=*/true))) {

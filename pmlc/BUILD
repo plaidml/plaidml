@@ -67,6 +67,7 @@ plaidml_cc_library(
         "//pmlc/conversion/tile_to_pxa",
         "//pmlc/dialect/abi",
         "//pmlc/dialect/comp",
+        "//pmlc/dialect/layer",
         "//pmlc/dialect/pxa",
         "//pmlc/dialect/stdx",
         "//pmlc/dialect/tile",

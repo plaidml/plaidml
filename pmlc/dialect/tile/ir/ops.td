@@ -106,44 +106,6 @@ def IndexOp : SpecialOp<"index"> {
   let assemblyFormat = "$axis attr-dict `:` type($result)";
 }
 
-def LayerOp : SpecialOp<"layer", [NoSideEffect, IsolatedFromAbove]> {
-  let summary = "layer operation";
-  let arguments = (ins
-    Variadic<EltwiseAny>:$operands,
-    StrAttr:$op,
-    DictionaryAttr:$attrs);
-  let results = (outs Variadic<EltwiseAny>:$results);
-  let regions = (region SizedRegion<1>:$body);
-
-  let skipDefaultBuilders = 1;
-  let builders = [OpBuilder<
-    "mlir::OpBuilder &builder, "
-    "mlir::OperationState& result, "
-    "mlir::StringRef op, "
-    "mlir::ArrayRef<mlir::Value> operands, "
-    "mlir::ArrayRef<mlir::Value> innerResults, "
-    "mlir::DictionaryAttr attrs"
-  >];
-
-  let extraClassDeclaration = [{
-    mlir::Block *getBody();
-  }];
-
-  let printer = [{ print$cppClass(p, *this); }];
-  let parser = [{ return parse$cppClass(parser, result); }];
-}
-
-def LayerReturnOp : SpecialOp<"layer.return", [
-  NoSideEffect,
-  ReturnLike,
-  Terminator,
-  HasParent<"LayerOp">
-]> {
-  let summary = "Return results from a layer";
-  let arguments = (ins Variadic<EltwiseAny>:$operands);
-  let assemblyFormat = "attr-dict ($operands^ `:` type($operands))?";
-}
-
 def PrngOp : SpecialOp<"prng"> {
   let summary = "pseudorandom number generator";
   let arguments = (ins RankedTensorOf<[UI32]>:$state);
