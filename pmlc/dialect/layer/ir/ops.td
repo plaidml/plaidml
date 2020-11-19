@@ -12,13 +12,13 @@ def LayerDialect : Dialect {
   let cppNamespace = "pmlc::dialect::layer";
 }
 
-class Layer_Op<string mnemonic, list<OpTrait> traits = []>
+class LayerOp<string mnemonic, list<OpTrait> traits = []>
     : Op<LayerDialect, mnemonic, traits> {
 }
 
 
-def LayerOp : Layer_Op<"layer", [NoSideEffect, IsolatedFromAbove]> {
-  let summary = "layer operation";
+def BoxOp : LayerOp<"box", [NoSideEffect, IsolatedFromAbove]> {
+  let summary = "layer container operation";
   let arguments = (ins
     Variadic<AnyType>:$operands,
     StrAttr:$op,
@@ -44,11 +44,11 @@ def LayerOp : Layer_Op<"layer", [NoSideEffect, IsolatedFromAbove]> {
   let parser = [{ return parse$cppClass(parser, result); }];
 }
 
-def LayerReturnOp : Layer_Op<"layer.return", [
+def LayerReturnOp : LayerOp<"layer.return", [
   NoSideEffect,
   ReturnLike,
   Terminator,
-  HasParent<"LayerOp">
+  HasParent<"BoxOp">
 ]> {
   let summary = "Return results from a layer";
   let arguments = (ins Variadic<AnyType>:$operands);

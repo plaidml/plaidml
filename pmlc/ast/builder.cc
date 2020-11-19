@@ -687,7 +687,7 @@ struct ProgramBuilder {
       Attribute value = builder.getAttribute(kvp.getValue());
       attrs.push_back(builder.getNamedAttr(kvp.getKey(), value));
     }
-    auto layerOp = builder.create<layer::LayerOp>(
+    auto layerOp = builder.create<layer::BoxOp>(
         loc, node->op, operands, results.getArrayRef(),
         builder.getDictionaryAttr(attrs));
     BlockAndValueMapping mapper;

@@ -40,7 +40,7 @@ struct InlineLayersPass : public InlineLayersBase<InlineLayersPass> {
   void runOnFunction() final {
     auto func = getFunction();
     InlinerImpl inliner(&getContext());
-    func.walk([&](LayerOp op) {
+    func.walk([&](BoxOp op) {
       if (failed(inlineRegion(inliner, &op.body(), op, op.operands(),
                               op.results(), op.getLoc(),
                               /*shouldCloneInlinedRegion=*/true))) {

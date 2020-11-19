@@ -15,11 +15,11 @@ namespace pmlc::dialect::layer {
 
 using llvm::SmallVector;
 
-Block *LayerOp::getBody() { return &body().front(); }
+Block *BoxOp::getBody() { return &body().front(); }
 
-void LayerOp::build(OpBuilder &builder, OperationState &result, StringRef op,
-                    ArrayRef<Value> operands, ArrayRef<Value> innerResults,
-                    DictionaryAttr attrs) {
+void BoxOp::build(OpBuilder &builder, OperationState &result, StringRef op,
+                  ArrayRef<Value> operands, ArrayRef<Value> innerResults,
+                  DictionaryAttr attrs) {
   for (Value value : innerResults) {
     result.types.push_back(value.getType());
   }
@@ -36,7 +36,7 @@ void LayerOp::build(OpBuilder &builder, OperationState &result, StringRef op,
   bodyRegion->push_back(body);
 }
 
-void printLayerOp(OpAsmPrinter &p, LayerOp op) {
+void printBoxOp(OpAsmPrinter &p, BoxOp op) {
   p << op.getOperationName() << " \"" << op.op() << "\" ("
     << op.getBody()->getArguments() << ") = (";
   p.printOperands(op.operands());
@@ -53,7 +53,7 @@ void printLayerOp(OpAsmPrinter &p, LayerOp op) {
   p.printOptionalAttrDict(op.getAttrs(), elidedAttrs);
 }
 
-ParseResult parseLayerOp(OpAsmParser &parser, OperationState &result) {
+ParseResult parseBoxOp(OpAsmParser &parser, OperationState &result) {
   StringAttr opName;
   FunctionType funcType;
   SmallVector<OpAsmParser::OperandType, 4> inner;
