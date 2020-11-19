@@ -25,7 +25,7 @@ struct InlinerImpl : InlinerInterface {
 
   void handleTerminator(Operation *op,
                         ArrayRef<Value> valuesToReplace) const final {
-    auto returnOp = cast<LayerReturnOp>(op);
+    auto returnOp = cast<ReturnOp>(op);
     // Replace the values directly with the return operands.
     assert(returnOp.getNumOperands() == valuesToReplace.size());
     for (auto item : llvm::zip(valuesToReplace, returnOp.getOperands())) {

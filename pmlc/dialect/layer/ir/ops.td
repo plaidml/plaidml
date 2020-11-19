@@ -44,7 +44,7 @@ def BoxOp : LayerOp<"box", [NoSideEffect, IsolatedFromAbove]> {
   let parser = [{ return parse$cppClass(parser, result); }];
 }
 
-def LayerReturnOp : LayerOp<"layer.return", [
+def ReturnOp : LayerOp<"return", [
   NoSideEffect,
   ReturnLike,
   Terminator,

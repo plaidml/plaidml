@@ -715,7 +715,7 @@ struct ProgramBuilder {
       }
       toRemove.insert(op);
     }
-    bodyBuilder.create<layer::LayerReturnOp>(loc, innerResults);
+    bodyBuilder.create<layer::ReturnOp>(loc, innerResults);
     for (Operation *op : toRemove) {
       op->erase();
     }
