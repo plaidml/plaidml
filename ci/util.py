@@ -72,7 +72,7 @@ class CondaEnv(object):
             env['JAVA_HOME'] = str(self.path)
         else:
             env['CONDA_EXE'] = str(self.path / 'Scripts' / 'conda.exe')
-            # env['JAVA_HOME'] = str(self.path / 'Library')
+            env['JAVA_HOME'] = str(self.path / 'Library')
         return env
 
     def create(self, spec):
