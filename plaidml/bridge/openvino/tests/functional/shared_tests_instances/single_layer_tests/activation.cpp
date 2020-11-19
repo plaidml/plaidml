@@ -12,8 +12,8 @@ using namespace ngraph::helpers;  // NOLINT[build/namespaces]
 namespace {
 
 const std::vector<InferenceEngine::Precision> netPrecisions = {
-    InferenceEngine::Precision::FP32,
-    // InferenceEngine::Precision::FP16
+    InferenceEngine::Precision::FP32,  //
+    InferenceEngine::Precision::FP16,  //
 };
 
 const std::map<ActivationTypes, std::vector<std::vector<float>>> activationTypes = {

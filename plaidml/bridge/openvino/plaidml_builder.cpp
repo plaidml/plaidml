@@ -95,12 +95,18 @@ void ProgramBuilder::handleParameter(const std::shared_ptr<ngraph::Node>& node) 
   IE_ASSERT(node->get_output_size() == 1);
   // TODO: Decide if we want to compare to the nGraph dims & type and issue warnings
   // std::vector<int64_t> ng_dims{node->get_shape().begin(), node->get_shape().end()};
-  // plaidml::DType ng_type = to_plaidml(node->get_element_type());
   auto inputDesc = networkInputs[node->get_friendly_name()]->getTensorDesc();
   std::vector<int64_t> dims{inputDesc.getDims().begin(), inputDesc.getDims().end()};
   plaidml::DType type = to_plaidml(inputDesc.getPrecision());
+  plaidml::DType ng_type = to_plaidml(node->get_element_type());
   plaidml::edsl::Tensor tensor = plaidml::edsl::Placeholder(type, dims, node->get_friendly_name());
-  tensorMap[std::make_pair(node->get_name(), 0)] = tensor;
+  plaidml::edsl::Tensor cast_tensor;
+  if (ng_type != type) {
+    cast_tensor = plaidml::edsl::cast(tensor, ng_type);
+  } else {
+    cast_tensor = tensor;
+  }
+  tensorMap[std::make_pair(node->get_name(), 0)] = cast_tensor;
   tensorIONameMap[node->get_friendly_name()] = tensor;
 }
 

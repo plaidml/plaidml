@@ -21,7 +21,7 @@ std::vector<std::vector<std::vector<size_t>>> inShapes = {
 
 std::vector<InferenceEngine::Precision> netPrecisions = {
     InferenceEngine::Precision::FP32,
-    // InferenceEngine::Precision::FP16  // TODO: Not yet supported
+    InferenceEngine::Precision::FP16,
 };
 
 INSTANTIATE_TEST_CASE_P(NoReshape, ConcatLayerTest,

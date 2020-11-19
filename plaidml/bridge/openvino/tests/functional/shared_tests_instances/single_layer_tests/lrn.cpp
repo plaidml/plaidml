@@ -16,7 +16,7 @@ namespace {
 
 const std::vector<InferenceEngine::Precision> netPrecisions = {
     InferenceEngine::Precision::FP32,
-    // InferenceEngine::Precision::FP16,
+    InferenceEngine::Precision::FP16,
 };
 
 const double alpha = 9.9e-05;

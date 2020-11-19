@@ -13,7 +13,7 @@ namespace {
 
 const std::vector<InferenceEngine::Precision> netPrecisions = {
     InferenceEngine::Precision::FP32,
-    // InferenceEngine::Precision::FP16  // TODO: Not yet working
+    InferenceEngine::Precision::FP16,
 };
 
 /* ============= 2D Convolution ============= */
