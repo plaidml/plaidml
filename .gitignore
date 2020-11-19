@@ -116,3 +116,6 @@ ENV/
 
 # Source code tagging tools
 tags
+
+# CMake stuff
+build*/
