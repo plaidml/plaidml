@@ -45,6 +45,10 @@ materializeOperands(mlir::OpBuilder &builder, mlir::Operation *op,
 mlir::LogicalResult materializeOperands(mlir::OpBuilder &builder,
                                         mlir::Operation *op);
 
+double getFloatIdentity(util::AggregationKind agg);
+int64_t getSignedIntegerIdentity(util::AggregationKind agg);
+uint64_t getUnsignedIntegerIdentity(util::AggregationKind agg);
+
 mlir::Value createIdentity(mlir::OpBuilder &builder, mlir::Location loc,
                            mlir::Type elementType, util::AggregationKind agg);
 

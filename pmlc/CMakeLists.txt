@@ -30,6 +30,7 @@ pml_cc_library(
     pmlc::conversion::scf_to_omp
     pmlc::conversion::stdx_to_llvm
     pmlc::conversion::tile_to_pxa
+    pmlc::dialect::abi::ir
     pmlc::dialect::comp::ir
     pmlc::dialect::comp::transforms
     pmlc::dialect::pxa::ir
@@ -44,4 +45,12 @@ pml_cc_library(
     pmlc::target::x86
 )
 
-pml_lit_test(NAME lit)
+pml_lit_test(
+  NAME lit
+  DEPS
+    pmlc-jit
+    pmlc-opt
+  CHECKS
+    smoke
+    test
+)

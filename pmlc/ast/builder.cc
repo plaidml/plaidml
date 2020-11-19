@@ -9,12 +9,14 @@
 #include <vector>
 
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Function.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/Module.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/DebugStringHelper.h"
 #include "mlir/Transforms/Passes.h"
+#include "mlir/Transforms/RegionUtils.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -38,6 +40,20 @@ namespace tile = pmlc::dialect::tile;
 namespace {
 
 static constexpr const char *kEntrypoint = "main";
+
+static StringRef getDiagKindStr(DiagnosticSeverity kind) {
+  switch (kind) {
+  case DiagnosticSeverity::Note:
+    return "note";
+  case DiagnosticSeverity::Warning:
+    return "warning";
+  case DiagnosticSeverity::Error:
+    return "error";
+  case DiagnosticSeverity::Remark:
+    return "remark";
+  }
+  llvm_unreachable("Unknown DiagnosticSeverity");
+}
 
 class OpBuilder : public mlir::OpBuilder {
 public:
@@ -133,8 +149,16 @@ public:
             [&](VarNodeInt *node) { return getI64IntegerAttr(node->value); })
         .Case<VarNodeString>(
             [&](VarNodeString *node) { return getStringAttr(node->value); })
-        .Default([](VarNode *) -> Attribute {
-          llvm_unreachable("Invalid VarNode");
+        .Case<VarNodeTuple>([&](VarNodeTuple *node) {
+          SmallVector<Attribute, 8> attrs;
+          for (const VarNodePtr &value : node->values) {
+            attrs.push_back(getAttribute(value));
+          }
+          return getArrayAttr(attrs);
+        })
+        .Default([](VarNode *node) -> Attribute {
+          throw std::runtime_error(
+              llvm::formatv("Unsupported VarNode: {0}", node->str()));
         });
   }
 
@@ -152,10 +176,12 @@ private:
   std::stack<Entry> stack;
   std::vector<ExprNodePtr> flat;
   std::unordered_set<const ExprNode *> visited;
+  std::unordered_set<ExprNodePtr> exterior;
 
 public:
-  explicit AstTraversal(const ProgramArguments &args) {
-    for (const ExprNodePtr &expr : args.outputs) {
+  explicit AstTraversal(const std::vector<ExprNodePtr> &outputs,
+                        const ExprNodeLayer *layer = nullptr) {
+    for (const ExprNodePtr &expr : llvm::reverse(outputs)) {
       push(expr);
     }
     while (stack.size()) {
@@ -165,13 +191,21 @@ public:
         flat.push_back(entry.expr);
       } else if (!visited.count(entry.expr.get())) {
         visited.emplace(entry.expr.get());
-        push(entry.expr, /*post=*/true);
-        visit(entry.expr.get());
+        if (layer && entry.expr->parent.get() != layer) {
+          exterior.insert(entry.expr);
+        } else {
+          push(entry.expr, /*post=*/true);
+          visit(entry.expr.get());
+        }
       }
     }
   }
 
   const std::vector<ExprNodePtr> &getFlat() const { return flat; }
+
+  const std::unordered_set<ExprNodePtr> &getExterior() const {
+    return exterior;
+  }
 
 private:
   void visit(ExprNode *node) {
@@ -188,6 +222,11 @@ private:
           }
         })
         .Case<ExprNodeElement>([&](ExprNodeElement *expr) { push(expr->expr); })
+        .Case<ExprNodeLayer>([&](ExprNodeLayer *expr) {
+          for (const ExprNodePtr &node : llvm::reverse(expr->results)) {
+            push(node);
+          }
+        })
         .Case<ExprNodeIntrinsic>([&](ExprNodeIntrinsic *expr) {
           // Push operands from right-to-left so they eventually get processed
           // in left-to-right order.
@@ -209,7 +248,7 @@ private:
 };
 
 static std::vector<ExprNodePtr> getFlatAst(const ProgramArguments &args) {
-  AstTraversal traversal(args);
+  AstTraversal traversal(args.outputs);
   return traversal.getFlat();
 }
 
@@ -316,11 +355,37 @@ struct ContractionBuilder : PolyVisitor<ContractionBuilder, AffineExpr> {
   }
 
   Value getInit() {
-    if (node->init) {
-      return builder.lookupNode(node->init);
+    if (!node->init) {
+      node->init = createIdentity();
+      node->init->parent = node->parent;
     }
-    return tile::createIdentity(builder, builder.getUnknownLoc(),
-                                resultType.getElementType(), node->aggKind);
+    return builder.lookupNode(node->init);
+  }
+
+  ExprNodePtr createIdentity() {
+    Type elementType = resultType.getElementType();
+    if (elementType.isa<FloatType>()) {
+      auto init = std::make_shared<ast::ExprNodeConstFloat>(
+          tile::getFloatIdentity(node->aggKind));
+      Value value = builder.create<tile::ConstantOp>(builder.getUnknownLoc(),
+                                                     elementType, init->value);
+      builder.addNode(init, value);
+      return init;
+    }
+    if (elementType.isSignedInteger()) {
+      auto init = std::make_shared<ast::ExprNodeConstSigned>(
+          tile::getSignedIntegerIdentity(node->aggKind));
+      Value value = builder.create<tile::ConstantOp>(builder.getUnknownLoc(),
+                                                     elementType, init->value);
+      builder.addNode(init, value);
+      return init;
+    }
+    auto init = std::make_shared<ast::ExprNodeConstUnsigned>(
+        tile::getUnsignedIntegerIdentity(node->aggKind));
+    Value value = builder.create<tile::ConstantOp>(builder.getUnknownLoc(),
+                                                   elementType, init->value);
+    builder.addNode(init, value);
+    return init;
   }
 
   AffineExpr makeExpr(const PolyNodePtr &node) { return visit(node.get()); }
@@ -480,6 +545,8 @@ struct ProgramBuilder {
               .Case<ExprNodeIntrinsic>([&](ExprNodeIntrinsic *node) {
                 return handleIntrinsic(node);
               })
+              .Case<ExprNodeLayer>(
+                  [&](ExprNodeLayer *node) { return handleLayer(node); })
               .Case<ExprNodePragma>(
                   [&](ExprNodePragma *node) { return handlePragma(node); });
       if (value) {
@@ -507,6 +574,15 @@ struct ProgramBuilder {
     IVLOG(3, "\n" << debugString(module));
 
     PassManager pm(context);
+    ScopedDiagnosticHandler diagHandler(pm.getContext(), [&](Diagnostic &diag) {
+      llvm::errs() << getDiagKindStr(diag.getSeverity()) << ": " << diag.str()
+                   << "\n";
+      for (auto &note : diag.getNotes()) {
+        llvm::errs() << "  " << note << "\n";
+      }
+      return success();
+    });
+
     pm.addPass(createCanonicalizerPass());
     pm.addPass(createCSEPass());
     pm.addPass(tile::createMaterializePass());
@@ -592,6 +668,61 @@ struct ProgramBuilder {
               return op->getResult(0);
             });
     return intrinsicBuilder();
+  }
+
+  Value handleLayer(ExprNodeLayer *node) {
+    AstTraversal traversal(node->results, node);
+    SmallVector<Value, 8> operands;
+    for (const ExprNodePtr &operand : traversal.getExterior()) {
+      operands.push_back(builder.lookupNode(operand));
+    }
+    llvm::SetVector<Value> results;
+    for (const ExprNodePtr &result : node->results) {
+      results.insert(builder.lookupNode(result));
+    }
+    std::vector<NamedAttribute> attrs;
+    for (const auto &kvp : node->attrs) {
+      Attribute value = builder.getAttribute(kvp.getValue());
+      attrs.push_back(builder.getNamedAttr(kvp.getKey(), value));
+    }
+    auto layerOp = builder.create<tile::LayerOp>(
+        loc, node->op, operands, results.getArrayRef(),
+        builder.getDictionaryAttr(attrs));
+    BlockAndValueMapping mapper;
+    OpBuilder bodyBuilder(layerOp.body());
+    for (auto tuple : llvm::zip(operands, layerOp.body().getArguments())) {
+      Value outer, inner;
+      std::tie(outer, inner) = tuple;
+      mapper.map(outer, inner);
+    }
+    llvm::SmallVector<Value, 4> innerResults;
+    llvm::SetVector<Operation *> toRemove;
+    for (const ExprNodePtr &node : traversal.getFlat()) {
+      Value value = builder.lookupNode(node);
+      Operation *op = value.getDefiningOp();
+      if (toRemove.contains(op)) {
+        // this has already been visited
+        continue;
+      }
+      assert(op && "Unexpected block argument");
+      Operation *clonedOp = bodyBuilder.clone(*op, mapper);
+      if (results.contains(value)) {
+        for (Value result : clonedOp->getResults()) {
+          innerResults.push_back(result);
+        }
+      }
+      toRemove.insert(op);
+    }
+    bodyBuilder.create<tile::LayerReturnOp>(loc, innerResults);
+    for (Operation *op : toRemove) {
+      op->erase();
+    }
+    SmallVector<Value, 4> tuple;
+    for (OpResult result : layerOp.getResults()) {
+      tuple.push_back(result);
+    }
+    builder.exprTuples[node] = tuple;
+    return nullptr;
   }
 
   Value handlePragma(ExprNodePragma *node) {

@@ -3,6 +3,8 @@
 include "pmlc/dialect/tile/ir/base.td"
 include "pmlc/dialect/tile/ir/eltwise.td"
 
+include "mlir/Interfaces/ControlFlowInterfaces.td"
+
 // TODO: this should be defined upstream
 def IntegerSetAttr : Attr<
     CPred<"$_self.isa<IntegerSetAttr>()">, "IntegerSet attribute"> {
@@ -17,7 +19,7 @@ def ContractionOp : TileOp<"contract", [
 ]> {
   let arguments = (ins
     EltwiseAny:$init,
-    Variadic<AnyType>:$operands,
+    Variadic<EltwiseAny>:$operands,
     AggregationKind:$agg,
     CombinationKind:$combo,
     AffineMapAttr:$sink,
@@ -102,6 +104,44 @@ def IndexOp : SpecialOp<"index"> {
   let arguments = (ins IndexAttr:$axis);
   let results = (outs EltwiseIndex:$result);
   let assemblyFormat = "$axis attr-dict `:` type($result)";
+}
+
+def LayerOp : SpecialOp<"layer", [NoSideEffect, IsolatedFromAbove]> {
+  let summary = "layer operation";
+  let arguments = (ins
+    Variadic<EltwiseAny>:$operands,
+    StrAttr:$op,
+    DictionaryAttr:$attrs);
+  let results = (outs Variadic<EltwiseAny>:$results);
+  let regions = (region SizedRegion<1>:$body);
+
+  let skipDefaultBuilders = 1;
+  let builders = [OpBuilder<
+    "mlir::OpBuilder &builder, "
+    "mlir::OperationState& result, "
+    "mlir::StringRef op, "
+    "mlir::ArrayRef<mlir::Value> operands, "
+    "mlir::ArrayRef<mlir::Value> innerResults, "
+    "mlir::DictionaryAttr attrs"
+  >];
+
+  let extraClassDeclaration = [{
+    mlir::Block *getBody();
+  }];
+
+  let printer = [{ print$cppClass(p, *this); }];
+  let parser = [{ return parse$cppClass(parser, result); }];
+}
+
+def LayerReturnOp : SpecialOp<"layer.return", [
+  NoSideEffect,
+  ReturnLike,
+  Terminator,
+  HasParent<"LayerOp">
+]> {
+  let summary = "Return results from a layer";
+  let arguments = (ins Variadic<EltwiseAny>:$operands);
+  let assemblyFormat = "attr-dict ($operands^ `:` type($operands))?";
 }
 
 def PrngOp : SpecialOp<"prng"> {

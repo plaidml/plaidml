@@ -25,6 +25,7 @@
     tile.cc
     tile_accumulate.cc
     vectorize.cc
+    vectorize_mem.cc
   DEPS
     LLVMSupport
     MLIRIR

@@ -1539,5 +1539,24 @@ TEST_F(CppEdsl, Lens) {
   checkExact(program, {input}, {expected});
 }
 
+TEST_F(CppEdsl, Layer) {
+  auto A = Placeholder(DType::FLOAT32, {10, 20});
+  Tensor O = layer("relu", [&]() {  //
+    return Relu(A);
+  });
+  auto program = makeProgram("relu", {A}, {O});
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.Layer
+  // CHECK: module @relu
+  // CHECK: %[[X0:.*]] = tile.layer "relu" (%[[arg1:.*]]) = (%{{.*}}) : (tensor<10x20xf32>) -> tensor<10x20xf32>
+  // CHECK:   %[[cst:.*]] = tile.constant(0.000000e+00 : f64) : tensor<f32>
+  // CHECK:   %[[X1:.*]] = tile.cmp_lt %[[arg1]], %[[cst]] : (tensor<10x20xf32>, tensor<f32>) -> tensor<10x20xi1>
+  // CHECK:   %[[X2:.*]] = tile.select %[[X1]], %[[cst]], %[[arg1]] : (tensor<10x20xi1>, tensor<f32>, tensor<10x20xf32>) -> tensor<10x20xf32>
+  // CHECK:   tile.layer.return %[[X2]] : tensor<10x20xf32>
+  // CHECK: return %[[X0]] : tensor<10x20xf32>
+  // clang-format on
+  runProgram(program);
+}
+
 }  // namespace
 }  // namespace plaidml::edsl

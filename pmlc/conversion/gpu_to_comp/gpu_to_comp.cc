@@ -148,8 +148,12 @@ mlir::LogicalResult RewriteLaunchFunc::allocateDeviceMemory(
             mlir::MemRefType::Builder(memRefType)
                 .setMemorySpace(execEnvType.getDefaultMemorySpace());
         auto allocOp =
-            rewriter.create<comp::Alloc>(loc, newMemRefType, execEnv, hostArg);
+            rewriter.create<comp::Alloc>(loc, newMemRefType, execEnv);
         newArg = allocOp.getResult();
+        comp::EventType eventType = execEnvType.getEventType();
+        mlir::Value event = rewriter.create<comp::ScheduleWrite>(
+            loc, eventType, hostArg, newArg, execEnv, mlir::ValueRange{});
+        rewriter.create<comp::Wait>(loc, event);
       }
     }
 

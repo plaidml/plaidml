@@ -13,6 +13,7 @@
 #include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/IR/Dialect.h"
 
+#include "pmlc/dialect/abi/ir/dialect.h"
 #include "pmlc/dialect/comp/ir/dialect.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/dialect/stdx/ir/ops.h"
@@ -32,6 +33,7 @@ void registerAllDialects(DialectRegistry &registry) {
                   spirv::SPIRVDialect,              //
                   StandardOpsDialect,               //
                   vector::VectorDialect,            //
+                  pmlc::dialect::abi::ABIDialect,   //
                   pmlc::dialect::comp::COMPDialect, //
                   pmlc::dialect::pxa::PXADialect,   //
                   pmlc::dialect::stdx::StdXDialect, //

@@ -28,6 +28,7 @@ struct ExprNodeDim;
 struct ExprNodeElement;
 struct ExprNodeInput;
 struct ExprNodeIntrinsic;
+struct ExprNodeLayer;
 struct ExprNodePragma;
 
 struct DimNode;
@@ -93,6 +94,7 @@ struct NodeBase : BaseT, std::enable_shared_from_this<ConcreteT> {
 
 struct ExprNode {
   std::string name;
+  ExprNodePtr parent;
 
   explicit ExprNode(llvm::StringRef name = "");
   virtual ~ExprNode() = default;
@@ -212,6 +214,17 @@ struct ExprNodeIntrinsic : NodeBase<ExprNodeIntrinsic, ExprNode> {
   std::vector<ExprNodePtr> operands;
 
   ExprNodeIntrinsic(llvm::StringRef op, llvm::ArrayRef<ExprNodePtr> operands);
+  std::string str() const final;
+};
+
+struct ExprNodeLayer : NodeBase<ExprNodeLayer, ExprNode> {
+  using Base = NodeBase<ExprNodeLayer, ExprNode>;
+
+  std::string op;
+  std::vector<ExprNodePtr> results;
+  llvm::StringMap<VarNodePtr> attrs;
+
+  ExprNodeLayer(llvm::StringRef op, const llvm::StringMap<VarNodePtr> &attrs);
   std::string str() const final;
 };
 

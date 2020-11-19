@@ -1,15 +1,19 @@
 // RUN: pmlc-opt -convert-linalg-to-loops -x86-convert-pxa-to-affine -lower-affine \
-// RUN:     -canonicalize -convert-scf-to-std -x86-convert-std-to-llvm %s | \
+// RUN:     -canonicalize -convert-scf-to-std -x86-convert-std-to-llvm \
+// RUN:     -x86-openmp-workaround %s | \
 // RUN:   pmlc-jit -e baseline | FileCheck %s
 // RUN: pmlc-opt -convert-linalg-to-loops -x86-convert-pxa-to-affine -lower-affine \
-// RUN:     -canonicalize -convert-scf-to-std -x86-convert-std-to-llvm %s | \
+// RUN:     -canonicalize -convert-scf-to-std -x86-convert-std-to-llvm \
+// RUN:     -x86-openmp-workaround %s | \
 // RUN:   pmlc-jit -e tiled | FileCheck %s
 // RUN: pmlc-opt -convert-linalg-to-loops -x86-convert-pxa-to-affine -lower-affine \
-// RUN:     -canonicalize -convert-scf-to-std -x86-convert-std-to-llvm %s | \
+// RUN:     -canonicalize -convert-scf-to-std -x86-convert-std-to-llvm \
+// RUN:     -x86-openmp-workaround %s | \
 // RUN:   pmlc-jit -e xsmm | FileCheck %s
 // RUN: pmlc-opt -convert-linalg-to-loops --pass-pipeline='x86-affine-stencil-xsmm{batched=true}' \
 // RUN:     -x86-convert-pxa-to-affine -lower-affine \
-// RUN:     -canonicalize -convert-scf-to-std -x86-convert-std-to-llvm %s | \
+// RUN:     -canonicalize -convert-scf-to-std -x86-convert-std-to-llvm \
+// RUN:     -x86-openmp-workaround %s | \
 // RUN:   pmlc-jit -e baseline | FileCheck %s
 
 !I_memref = type memref<1x6x5x7xf32>
