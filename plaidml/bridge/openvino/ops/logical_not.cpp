@@ -17,8 +17,8 @@ namespace PlaidMLPlugin {
 static OpRegistration reg("logicalnot", [](const Context& ctx) {
   IE_ASSERT(ctx.operands.size() == 1);
   auto I = ctx.operands.at(0);
-  auto T = edsl::Tensor(true);
-  auto F = edsl::Tensor(false);
+  auto T = edsl::cast(edsl::Tensor(true), DType::BOOLEAN);
+  auto F = edsl::cast(edsl::Tensor(false), DType::BOOLEAN);
 
   return edsl::make_tuple(edsl::select(I, F, T));
 });
