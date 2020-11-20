@@ -19,6 +19,7 @@
 #include "pmlc/conversion/scf_to_omp/passes.h"
 #include "pmlc/conversion/stdx_to_llvm/passes.h"
 #include "pmlc/conversion/tile_to_pxa/passes.h"
+#include "pmlc/dialect/layer/transforms/passes.h"
 #include "pmlc/dialect/pxa/transforms/passes.h"
 #include "pmlc/dialect/stdx/transforms/passes.h"
 #include "pmlc/dialect/tile/transforms/passes.h"
@@ -37,6 +38,7 @@ using namespace mlir; // NOLINT[build/namespaces]
 
 namespace pmlc::target::x86 {
 
+namespace layer = dialect::layer;
 namespace pxa = dialect::pxa;
 namespace stdx = dialect::stdx;
 namespace tile = dialect::tile;
@@ -207,7 +209,7 @@ std::unique_ptr<Pass> createOpenMPWorkaroundPass() {
 }
 
 void pipelineBuilder(OpPassManager &pm) {
-  pm.addPass(tile::createInlineLayersPass());
+  pm.addPass(layer::createInlineLayersPass());
   pm.addPass(tile::createComputeBoundsPass());
   pm.addPass(tile::createPadConstraintsPass());
   pm.addPass(createCanonicalizerPass());

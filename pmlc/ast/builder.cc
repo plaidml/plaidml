@@ -23,6 +23,7 @@
 
 #include "pmlc/ast/ast.h"
 #include "pmlc/ast/eval.h"
+#include "pmlc/dialect/layer/ir/ops.h"
 #include "pmlc/dialect/tile/ir/ops.h"
 #include "pmlc/dialect/tile/ir/util.h"
 #include "pmlc/dialect/tile/transforms/passes.h"
@@ -35,6 +36,7 @@ namespace pmlc::ast {
 using compiler::Program;
 using pmlc::util::DataType;
 using pmlc::util::TensorShape;
+namespace layer = pmlc::dialect::layer;
 namespace tile = pmlc::dialect::tile;
 
 namespace {
@@ -685,7 +687,7 @@ struct ProgramBuilder {
       Attribute value = builder.getAttribute(kvp.getValue());
       attrs.push_back(builder.getNamedAttr(kvp.getKey(), value));
     }
-    auto layerOp = builder.create<tile::LayerOp>(
+    auto layerOp = builder.create<layer::BoxOp>(
         loc, node->op, operands, results.getArrayRef(),
         builder.getDictionaryAttr(attrs));
     BlockAndValueMapping mapper;
@@ -713,7 +715,7 @@ struct ProgramBuilder {
       }
       toRemove.insert(op);
     }
-    bodyBuilder.create<tile::LayerReturnOp>(loc, innerResults);
+    bodyBuilder.create<layer::ReturnOp>(loc, innerResults);
     for (Operation *op : toRemove) {
       op->erase();
     }
@@ -813,6 +815,7 @@ std::shared_ptr<Program> buildProgram(llvm::StringRef name,
                                       const ProgramArguments &args) {
   enableGlobalDialectRegistry(true);
   registerDialect<dialect::tile::TileDialect>();
+  registerDialect<dialect::layer::LayerDialect>();
   registerDialect<StandardOpsDialect>();
   if (name.empty()) {
     name = "module";

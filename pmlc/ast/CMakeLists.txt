@@ -10,6 +10,8 @@ pml_cc_library(
     eval.cc
   DEPS
     pmlc::compiler
+    pmlc::dialect::layer::ir
+    pmlc::dialect::layer::transforms
     pmlc::dialect::tile::ir
     pmlc::dialect::tile::transforms
     pmlc::util

@@ -33,6 +33,8 @@ pml_cc_library(
     pmlc::dialect::abi::ir
     pmlc::dialect::comp::ir
     pmlc::dialect::comp::transforms
+    pmlc::dialect::layer::ir
+    pmlc::dialect::layer::transforms
     pmlc::dialect::pxa::ir
     pmlc::dialect::pxa::transforms
     pmlc::dialect::stdx::ir
