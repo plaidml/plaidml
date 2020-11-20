@@ -65,6 +65,7 @@ build:windows --define=compiler=msvc
 build:windows --build_tag_filters=-docs,-latex,-linux,-macos,-pytorch,-skip_windows
 build:windows --action_env=NUMBER_OF_PROCESSORS
 build:windows --action_env=PLAIDML_SETTINGS
+build:windows --action_env=KMP_DUPLICATE_LIB_OK=TRUE
 test:windows --enable_runfiles
 test:windows --test_tag_filters=-docs,-latex,-linux,-macos,-pytorch,-skip_windows
 test:windows --test_env=NUMBER_OF_PROCESSORS
