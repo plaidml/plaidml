@@ -43,8 +43,8 @@ const std::map<ActivationTypes, std::vector<std::vector<float>>> activationTypes
     {Ceiling, {{}}},
     {Swish, {{1.0f}}},
     {Mish, {{}}},
-    {HSwish, {{}}}
-    // {SoftPlus,    {{}}}
+    {HSwish, {{}}},
+    {SoftPlus, {{}}}
 };
 
 // TODO
