@@ -1,6 +1,7 @@
 channels:
   - conda-forge
 dependencies:
+  - nomkl
   - clang-tools
   - conda=4.6
   - numpy=1.16
@@ -9,7 +10,6 @@ dependencies:
   - pre_commit=1.17.0
   - python=3.7.0
   - pyyaml
-  - nomkl
   - pip:
     - cpplint==1.4.4
     - nbstripout
