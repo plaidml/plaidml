@@ -18,6 +18,7 @@ pml_cc_library(
     pmlc::conversion::scf_to_omp
     pmlc::conversion::stdx_to_llvm
     pmlc::conversion::tile_to_pxa
+    pmlc::dialect::layer::transforms
     pmlc::dialect::pxa::analysis
     pmlc::dialect::pxa::transforms
     pmlc::dialect::stdx::transforms

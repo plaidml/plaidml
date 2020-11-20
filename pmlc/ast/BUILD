@@ -10,6 +10,7 @@ plaidml_cc_library(
     hdrs = glob(["*.h"]),
     deps = [
         "//pmlc/compiler",
+        "//pmlc/dialect/layer",
         "//pmlc/dialect/tile",
         "//pmlc/util",
         "@llvm-project//mlir:Support",

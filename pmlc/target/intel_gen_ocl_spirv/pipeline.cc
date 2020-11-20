@@ -31,6 +31,7 @@
 #include "pmlc/conversion/tile_to_pxa/passes.h"
 #include "pmlc/dialect/comp/ir/types.h"
 #include "pmlc/dialect/comp/transforms/passes.h"
+#include "pmlc/dialect/layer/transforms/passes.h"
 #include "pmlc/dialect/pxa/transforms/passes.h"
 #include "pmlc/dialect/stdx/ir/ops.h"
 #include "pmlc/dialect/stdx/transforms/passes.h"
@@ -43,6 +44,7 @@ using namespace mlir; // NOLINT[build/namespaces]
 namespace pmlc::target::intel_gen_ocl_spirv {
 
 namespace comp = dialect::comp;
+namespace layer = dialect::layer;
 namespace pxa = dialect::pxa;
 namespace stdx = dialect::stdx;
 namespace tile = dialect::tile;
@@ -59,7 +61,7 @@ struct OclPipelineOptions : public PassPipelineOptions<OclPipelineOptions> {
 void pipelineBuilder(OpPassManager &pm,
                      const OclPipelineOptions &oclPipelineOptions) {
   // Bound + pad initial tile code
-  pm.addPass(tile::createInlineLayersPass());
+  pm.addPass(layer::createInlineLayersPass());
   pm.addPass(tile::createComputeBoundsPass());
   pm.addPass(tile::createPadRangesPass());
   pm.addPass(tile::createPadConstraintsPass());

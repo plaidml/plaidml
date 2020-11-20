@@ -16,21 +16,15 @@ gentbl(
 plaidml_cc_library(
     name = "transforms",
     srcs = [
-        "contraction.cc",
-        "materialize.cc",
-        "pad_constraints.cc",
-        "pad_ranges.cc",
-        "padding.cc",
+        "inline_layers.cc",
         "pass_detail.h",
     ],
     hdrs = [
-        "contraction.h",
-        "padding.h",
         "passes.h",
     ],
     deps = [
         ":gen-pass",
-        "//pmlc/dialect/tile/ir",
+        "//pmlc/dialect/layer/ir",
         "//pmlc/util",
         "//pmlc/util/bilp",
         "//pmlc/util/math",

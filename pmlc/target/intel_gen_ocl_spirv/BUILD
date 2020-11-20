@@ -35,6 +35,7 @@ plaidml_cc_library(
         "//pmlc/conversion/stdx_to_llvm",
         "//pmlc/conversion/tile_to_pxa",
         "//pmlc/dialect/comp/transforms",
+        "//pmlc/dialect/layer/transforms",
         "//pmlc/dialect/pxa/transforms",
         "//pmlc/dialect/stdx/transforms",
         "//pmlc/dialect/tile/transforms",
