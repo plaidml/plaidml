@@ -10,5 +10,4 @@ dependencies:
       - keras-applications==1.0.8
       - six
       - tensorflow==1.15
-      - m2w64-toolchai
       - theano==1.0.4

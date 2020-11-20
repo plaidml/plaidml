@@ -1,7 +1,6 @@
 channels:
   - conda-forge
 dependencies:
-  - mkl-service
   - conda=4.6
   - numpy=1.16
   - pip=19
