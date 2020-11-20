@@ -90,7 +90,6 @@ VARIANTS:
     env:
       PLAIDML_DEVICE: llvm_cpu.0
       PLAIDML_TARGET: llvm_cpu
-      KMP_DUPLICATE_LIB_OK: TRUE
 
 SUITES:
   smoke:

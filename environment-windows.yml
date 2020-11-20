@@ -1,7 +1,6 @@
 channels:
   - conda-forge
 dependencies:
-  - nomkl
   - clang-tools
   - conda=4.6
   - numpy=1.16
