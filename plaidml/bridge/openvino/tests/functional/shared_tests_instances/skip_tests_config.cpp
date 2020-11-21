@@ -9,6 +9,17 @@
 
 std::vector<std::string> disabledTestPatterns() {
   return {
+      ".*Acos.*FP16.*",               // TODO
+      ".*Asin.*FP16.*",               // TODO
+      ".*Atan.*FP16.*",               // TODO
+      ".*Ceiling.*FP16.*",            // TODO
+      ".*Cosh.*FP16.*",               // TODO
+      ".*Erf.*FP16.*",                // TODO
+      ".*Floor.*FP16.*",              // TODO
+      ".*Lrn.*FP16.*",                // TODO
+      ".*Sinh.*FP16.*",               // TODO
+      ".*Tan.*FP16.*",                // TODO
+      ".*Convert.*targetPRC=FP16.*",  // TODO
 #ifdef SMOKE_TESTS_ONLY
       "^(?!smoke).*",
 #endif  // SMOKE_TESTS_ONLY
