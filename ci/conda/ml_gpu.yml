@@ -23,4 +23,4 @@ dependencies:
       - sklearn
       - tensorflow==1.15; platform_system == 'Darwin'
       - tensorflow-gpu==1.15; platform_system != 'Darwin'
-      - theano
+      - theano==1.0.4
