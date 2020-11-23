@@ -46,8 +46,8 @@ const std::vector<ngraph::op::v4::Interpolate::NearestMode> nearestModes = {
     ngraph::op::v4::Interpolate::NearestMode::floor,
     ngraph::op::v4::Interpolate::NearestMode::round_prefer_ceil,
     ngraph::op::v4::Interpolate::NearestMode::ceil,
-    ngraph::op::v4::Interpolate::NearestMode::simple,  // needs to set correct scales in InterpolateLayerTest::SetUp()
-                                                       // if it is downsample.
+    // If it is downsample and using simple mode, scales in InterpolateLayerTest::SetUp() has to be set correctly.
+    ngraph::op::v4::Interpolate::NearestMode::simple,
 };
 
 const std::vector<ngraph::op::v4::Interpolate::NearestMode> defaultNearestMode = {

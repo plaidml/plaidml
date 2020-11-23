@@ -90,5 +90,4 @@ def NearestMode : I64EnumAttr<
   let convertFromStorage = "static_cast<" # returnType # ">($_self.getValue().getZExtValue())";
 }
 
-
 #endif // __PML_UTIL_ENUMS__
