@@ -41,6 +41,7 @@
 #include "pmlc/rt/symbol_registry.h"
 #include "pmlc/util/env.h"
 #include "pmlc/util/logging.h"
+#include "pmlc/util/util.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
 
@@ -85,47 +86,9 @@ static std::string makeCWrapperFunctionName(StringRef name) {
 // invocation interface.
 static std::string packFunctionArguments(llvm::Module *module,
                                          StringRef entry) {
-  auto &ctx = module->getContext();
-  llvm::IRBuilder<> builder(ctx);
   auto funcName = makeCWrapperFunctionName(entry);
-  auto *func = module->getFunction(funcName);
-  if (!func) {
-    throw std::runtime_error("Could not find function: " + funcName);
-  }
-
-  // Given a function `foo(<...>)`, define the interface function
-  // `mlir_foo(i8**)`.
-  auto newType = llvm::FunctionType::get(builder.getVoidTy(),
-                                         builder.getInt8PtrTy()->getPointerTo(),
-                                         /*isVarArg=*/false);
   auto newName = makePackedFunctionName(entry);
-  auto funcCst = module->getOrInsertFunction(newName, newType);
-  llvm::Function *interfaceFunc = cast<llvm::Function>(funcCst.getCallee());
-
-  // Extract the arguments from the type-erased argument list and cast them to
-  // the proper types.
-  auto bb = llvm::BasicBlock::Create(ctx);
-  bb->insertInto(interfaceFunc);
-  builder.SetInsertPoint(bb);
-  llvm::Value *argList = interfaceFunc->arg_begin();
-  SmallVector<llvm::Value *, 8> args;
-  args.reserve(llvm::size(func->args()));
-  for (auto &indexedArg : llvm::enumerate(func->args())) {
-    llvm::Value *argIndex = llvm::Constant::getIntegerValue(
-        builder.getInt64Ty(), APInt(64, indexedArg.index()));
-    llvm::Value *argPtrPtr = builder.CreateGEP(argList, argIndex);
-    llvm::Value *argPtr = builder.CreateLoad(argPtrPtr);
-    llvm::Value *arg =
-        builder.CreateBitCast(argPtr, indexedArg.value().getType());
-    args.push_back(arg);
-  }
-
-  // Call the implementation function with the extracted arguments.
-  builder.CreateCall(func, args);
-
-  // The interface function returns void.
-  builder.CreateRetVoid();
-
+  util::wrapFunctionAndPackArguments(module, funcName, newName);
   return newName;
 }
 

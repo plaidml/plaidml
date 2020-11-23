@@ -29,6 +29,7 @@ plaidml_cc_library(
     deps = [
         ":enums-gen",
         "@easylogging",
+        "@llvm-project//llvm:Core",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:IR",
