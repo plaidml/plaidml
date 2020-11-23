@@ -23,7 +23,7 @@ static OpRegistration reg("EmbeddingBagPackedSum", [](const Context& ctx) {
   auto indices = ctx.operands.at(1);
   IE_ASSERT(indices.rank() == 2);
 
-  Tensor per_sample_weights;
+  edsl::Tensor per_sample_weights;
   bool with_weights = false;
 
   if (ctx.operands.size() == 3) {
@@ -32,7 +32,7 @@ static OpRegistration reg("EmbeddingBagPackedSum", [](const Context& ctx) {
     with_weights = true;
   }
 
-  auto I_gathered = gather(I, indices).build();
+  Tensor I_gathered = edsl::gather(I, indices);
   if (with_weights) {
     std::vector<int64_t> unsqueeze_axes;
     for (int64_t i = per_sample_weights.rank(); i < I_gathered.rank(); i++) {

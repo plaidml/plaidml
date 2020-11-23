@@ -386,6 +386,19 @@ LogicalResult verifyContractionOp(ContractionOp op) {
   return success();
 }
 
+void GatherOp::build(OpBuilder &builder, OperationState &result,
+                     Type resultType, ValueRange operands, IntegerAttr axis,
+                     IntegerAttr interpolationMode, IntegerAttr nearestMode,
+                     FloatAttr cubeCoeff) {
+  assert(operands.size() == 2u && "mismatched number of parameters");
+  result.addOperands(operands);
+  result.addAttribute("axis", axis);
+  result.addAttribute("interpolationMode", interpolationMode);
+  result.addAttribute("nearestMode", nearestMode);
+  result.addAttribute("cubeCoeff", cubeCoeff);
+  result.addTypes(resultType);
+}
+
 } // namespace pmlc::dialect::tile
 
 #define GET_OP_CLASSES

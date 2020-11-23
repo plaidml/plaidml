@@ -1372,7 +1372,7 @@ TEST_F(CppEdsl, Floor) {
 TEST_F(CppEdsl, Gather) {
   auto A = Placeholder(DType::FLOAT32, {3, 2});
   auto B = Placeholder(DType::INT32, {4});
-  auto O = gather(A, B).axis(1).build();
+  auto O = gather(A, B).axis(1);
   auto program = makeProgram("gather", {A, B}, {O});
 
   std::vector<float> in1 = {
@@ -1389,51 +1389,49 @@ TEST_F(CppEdsl, Gather) {
   checkExact(program, {in1, in2}, {out});
 }
 
-TEST_F(CppEdsl, InterpolatedGatherLinear) {
-  auto A = Placeholder(DType::FLOAT32, {3, 2});
-  auto B = Placeholder(DType::FLOAT32, {4});
-  auto O = gather(A, B).axis(1).mode(InterpolationMode::linear).build();
-  auto program = makeProgram("interpolated_gather1", {A, B}, {O});
+TEST_F(CppEdsl, InterpolatedGatherNearest) {
+  auto A = Placeholder(DType::FLOAT32, {1, 6});
+  auto B = Placeholder(DType::FLOAT32, {9});
+  auto O =
+      gather(A, B).axis(1).interpolationMode(InterpolationMode::NEAREST).nearestMode(NearestMode::ROUND_PREFER_CEIL);
+  auto program = makeProgram("interpolated_gather_nearest", {A, B}, {O});
 
-  std::vector<float> in1 = {
-      -5.0f, -6.0f,  //
-      -7.0f, 4.0f,   //
-      5.0f,  6.0f,   //
-  };
-  std::vector<float> in2 = {0, 0.4, 0.7, 1};
-  std::vector<float> out = {
-      -5.0f, -5.4f, -5.7f, -6.0f,  //
-      -7.0f, -2.6f, 0.7f,  4.0f,   //
-      5.0f,  5.4f,  5.7f,  6.0f,   //
-  };
-  checkClose(program, {in1, in2}, {out});
+  std::vector<float> in1 = {0.3f, 1.0f, 8.0f, 5.0f, 5.0f, 2.0f};
+  std::vector<float> in2 = {-0.25f, 0.5f, 0.75f, 1.5f, 2.0f, 5.0f, 5.1f, 5.5f, 5.6f};
+  std::vector<float> out = {0.3f, 1.0f, 1.0f, 8.0f, 8.0f, 2.0f, 2.0f, 2.0f, 2.0f};
+  checkExact(program, {in1, in2}, {out});
+}
+
+TEST_F(CppEdsl, InterpolatedGatherLinear) {
+  auto A = Placeholder(DType::FLOAT32, {1, 6});
+  auto B = Placeholder(DType::FLOAT32, {12});
+  auto O = gather(A, B).axis(1).interpolationMode(InterpolationMode::LINEAR);
+  auto program = makeProgram("interpolated_gather_linear", {A, B}, {O});
+
+  std::vector<float> in1 = {0.0f, 1.0f, 8.0f, 5.0f, 5.0f, 2.0f};
+  std::vector<float> in2 = {-0.25f, 0.25f, 0.75f, 1.25f, 1.75f, 2.25f, 2.75f, 3.25f, 3.75f, 4.25f, 4.75f, 5.25f};
+  std::vector<float> out = {0.0f, 0.25f, 0.75f, 2.75f, 6.25f, 7.25f, 5.75f, 5.0f, 5.0f, 4.25f, 2.75f, 2.0f};
+  checkExact(program, {in1, in2}, {out});
 }
 
 TEST_F(CppEdsl, InterpolatedGatherCubic) {
-  auto A = Placeholder(DType::FLOAT32, {3, 4});
-  auto B = Placeholder(DType::FLOAT32, {1});
-  auto O = gather(A, B).axis(1).mode(InterpolationMode::cubic).cubic_coeff(-0.5).build();
-  auto program = makeProgram("interpolated_gather2", {A, B}, {O});
+  auto A = Placeholder(DType::FLOAT32, {1, 6});
+  auto B = Placeholder(DType::FLOAT32, {12});
+  auto O = gather(A, B).axis(1).interpolationMode(InterpolationMode::CUBIC).cubeCoeff(-0.5);
+  auto program = makeProgram("interpolated_gather_cubic", {A, B}, {O});
 
-  std::vector<float> in1 = {
-      1.0f, 2.0f, 3.0f, 4.0f,  //
-      1.0f, 2.0f, 2.0f, 1.0f,  //
-      1.0f, 2.0f, 3.0f, 0.0f,  //
-  };
-  std::vector<float> in2 = {1.5};
-  std::vector<float> out = {
-      2.5f,
-      2.125f,
-      2.75f,
-  };
+  std::vector<float> in1 = {0.0f, 1.0f, 8.0f, 5.0f, 5.0f, 2.0f};
+  std::vector<float> in2 = {-0.25f, 0.25f, 0.75f, 1.25f, 1.75f, 2.25f, 2.75f, 3.25f, 3.75f, 4.25f, 4.75f, 5.25f};
+  std::vector<float> out = {-0.0703125f, 0.0390625f, 0.304688f, 2.5625f,  6.8125f,  7.88281f,
+                            5.77344f,    4.85938f,   5.14062f,  4.39062f, 2.60938f, 1.78906f};
   checkClose(program, {in1, in2}, {out});
 }
 
-TEST_F(CppEdsl, InterpolatedGatherNearestMultiDIndices) {
+TEST_F(CppEdsl, InterpolatedGatherMultiDIndices) {
   auto A = Placeholder(DType::FLOAT32, {3, 5, 2});
   auto B = Placeholder(DType::FLOAT32, {2, 2});
-  auto O = gather(A, B).axis(1).mode(InterpolationMode::nearest).build();
-  auto program = makeProgram("interpolated_gather3", {A, B}, {O});
+  auto O = gather(A, B).axis(1).interpolationMode(InterpolationMode::NEAREST);
+  auto program = makeProgram("interpolated_gather_multiD_indices", {A, B}, {O});
 
   std::vector<float> in1 = {
       1.0f, 2.0f,   //

@@ -56,7 +56,7 @@ static OpRegistration reg("EmbeddingBagOffsetsSum", [](const Context& ctx) {
   auto batch = offsets.size();
   offsets.push_back(num_indices);
 
-  auto I_gathered = gather(I, indices).build();
+  edsl::Tensor I_gathered = edsl::gather(I, indices);
 
   auto ndims = I_gathered.rank();
   std::vector<edsl::TensorDim> I_dims(ndims);
@@ -69,7 +69,7 @@ static OpRegistration reg("EmbeddingBagOffsetsSum", [](const Context& ctx) {
   O_dims[0] = edsl::TensorDim(1);
   for (size_t i = 0; i < num_indices; ++i) {
     O_idxs[0] = I_idxs[0] - i;
-    auto slice = edsl::Contraction(O_dims, O_idxs).sum(I_gathered(I_idxs)).build();
+    edsl::Tensor slice = edsl::Contraction(O_dims, O_idxs).sum(I_gathered(I_idxs));
     if (with_weights == true) {
       edsl::Tensor weight = op::slice(per_sample_weights).add_dim(i, i + 1);
       slice = slice * weight;

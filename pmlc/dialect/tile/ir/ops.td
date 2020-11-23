@@ -94,13 +94,24 @@ def GatherOp : MaterializeOp<"gather"> {
     RankedTensorOf<[AnyScalar]>:$tensor,
     RankedTensorOf<[AnyScalar]>:$indices,
     DefaultValuedAttr<IndexAttr, "0">:$axis,
-    DefaultValuedAttr<InterpolationMode, "InterpolationMode::linear">:$mode,
-    DefaultValuedAttr<F32Attr, "-0.5">:$cubicCoeff
+    DefaultValuedAttr<InterpolationMode, "InterpolationMode::linear">:$interpolationMode,
+    DefaultValuedAttr<NearestMode, "NearestMode::round_prefer_floor">:$nearestMode,
+    DefaultValuedAttr<F32Attr, "-0.75">:$cubeCoeff
   );
   let results = (outs RankedTensorOf<[AnyScalar]>:$result);
   let assemblyFormat = [{
     $tensor $indices attr-dict `:` functional-type(operands, $result)
   }];
+  let builders = [OpBuilder<
+    "mlir::OpBuilder &builder, "
+    "mlir::OperationState& result, "
+    "mlir::Type resultType, "
+    "mlir::ValueRange operands, "
+    "mlir::IntegerAttr axis, "
+    "mlir::IntegerAttr interpolationMode, "
+    "mlir::IntegerAttr nearestMode, "
+    "mlir::FloatAttr cubeCoeff"
+  >];
 }
 
 def IndexOp : SpecialOp<"index"> {

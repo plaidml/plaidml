@@ -75,4 +75,20 @@ def InterpolationMode : I64EnumAttr<
   let convertFromStorage = "static_cast<" # returnType # ">($_self.getValue().getZExtValue())";
 }
 
+def NearestMode : I64EnumAttr<
+    "NearestMode",
+    "Specifies round mode when InterpolationMode == nearest ",
+    [
+     I64EnumAttrCase<"round_prefer_floor", 0>,
+     I64EnumAttrCase<"round_prefer_ceil", 1>,
+     I64EnumAttrCase<"floor", 2>,
+     I64EnumAttrCase<"ceil", 3>,
+     I64EnumAttrCase<"simple", 4>,
+    ]> {
+  let cppNamespace = "pmlc::util";
+  let returnType = "NearestMode";
+  let convertFromStorage = "static_cast<" # returnType # ">($_self.getValue().getZExtValue())";
+}
+
+
 #endif // __PML_UTIL_ENUMS__

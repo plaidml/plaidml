@@ -30,6 +30,14 @@ static llvm::Optional<int64_t> getIntegerValue(Evaluator *evaluator,
   return llvm::None;
 }
 
+static llvm::Optional<double> getFloatValue(Evaluator *evaluator,
+                                            const ExprNodePtr &operand) {
+  if (auto node = std::dynamic_pointer_cast<ExprNodeConstFloat>(operand)) {
+    return node->value;
+  }
+  return llvm::None;
+}
+
 struct BooleanOp : Intrinsic {
   TensorShapes getShapes(Evaluator *evaluator, ArrayRef<ExprNodePtr> operands,
                          ArrayRef<TensorShape> shapes) const final {
@@ -60,27 +68,49 @@ struct GatherOp : Intrinsic {
   TensorShapes getShapes(Evaluator *evaluator, ArrayRef<ExprNodePtr> operands,
                          ArrayRef<TensorShape> shapes) const final {
     auto operands_size = operands.size();
-    if (operands_size != 5) {
-      throw std::runtime_error("'gather' requires 5 arguments.");
+    if (operands_size != 6) {
+      throw std::runtime_error("'gather' requires six arguments.");
     }
     auto tensor = shapes[0];
     auto idxs = shapes[1];
-    if (!tensor.getRank()) {
+    int64_t rank = tensor.getRank();
+    if (!rank) {
       throw std::runtime_error(
           "'gather' requires first operand to have at least one dimension.");
     }
+    auto axis = getIntegerValue(evaluator, operands[2]);
+    if ((!axis) || (axis.getValue() >= rank) || (axis.getValue() < 0)) {
+      throw std::runtime_error(
+          "'gather' primitive expects the 'axis' argument "
+          "to be a positive integer that is less than the tensor rank.");
+    }
+    auto interpolationMode = getIntegerValue(evaluator, operands[3]);
+    if (!interpolationMode) {
+      throw std::runtime_error(
+          "'gather' primitive expects the 'interpolationMode' argument "
+          "to be a constant integer");
+    }
+    auto nearestMode = getIntegerValue(evaluator, operands[4]);
+    if (!nearestMode) {
+      throw std::runtime_error(
+          "'gather' primitive expects the 'nearestMode' argument "
+          "to be a constant integer");
+    }
+    auto cubeCoeff = getFloatValue(evaluator, operands[5]);
+    if (!cubeCoeff) {
+      throw std::runtime_error(
+          "'gather' primitive expects the 'cubeCoeff' argument "
+          "to be a constant float");
+    }
 
     TensorShape shape{tensor.elementType};
-
-    size_t axis = getIntegerValue(evaluator, operands[2]).getValue();
-    for (size_t i = 0; i < axis; i++) {
+    for (auto i = 0; i < axis.getValue(); i++) {
       shape.sizes.push_back(tensor.sizes[i]);
     }
     shape.sizes.insert(shape.sizes.end(), idxs.sizes.begin(), idxs.sizes.end());
-    for (size_t i = axis + 1; i < tensor.getRank(); i++) {
+    for (auto i = axis.getValue() + 1; i < rank; i++) {
       shape.sizes.push_back(tensor.sizes[i]);
     }
-
     return {shape};
   }
 };

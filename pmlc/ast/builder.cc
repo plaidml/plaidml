@@ -742,32 +742,34 @@ struct ProgramBuilder {
   Value makeGatherOp(ExprNodeIntrinsic *node, ArrayRef<Value> operands) {
     TensorShape shape = evaluator.getShape(node);
     RankedTensorType resultType = builder.getRankedTensorType(shape);
-    auto op = builder.create<tile::GatherOp>(
-        loc, resultType, ValueRange{operands[0], operands[1]},
-        ArrayRef<NamedAttribute>{});
-
-    FloatAttr cubicCoeff;
-    if (!m_Constant(&cubicCoeff).match(operands[4].getDefiningOp())) {
-      throw std::runtime_error(
-          "'cubicCoeff' primitive expects argument 5 to be a constant float");
-    }
-    auto cubicCoeffFloat = static_cast<float>(cubicCoeff.getValueAsDouble());
-    op.setAttr("cubicCoeff", builder.getF32FloatAttr(cubicCoeffFloat));
-
-    IntegerAttr mode;
-    if (!m_Constant(&mode).match(operands[3].getDefiningOp())) {
-      throw std::runtime_error(
-          "'mode' primitive expects argument 4 to be a constant integer");
-    }
-    op.setAttr("mode", mode);
-
     IntegerAttr axis;
-    if (!m_Constant(&axis).match(operands[2].getDefiningOp())) {
-      throw std::runtime_error(
-          "'axis' primitive expects argument 3 to be a constant integer");
+    IntegerAttr interpolationMode;
+    IntegerAttr nearestMode;
+    FloatAttr cubeCoeff;
+    if (!matchPattern(operands[2], m_Constant(&axis))) {
+      throw std::runtime_error("'gather' primitive expects the 'axis' argument "
+                               "to be a constant integer");
     }
-    op.setAttr("axis", builder.getIndexAttr(axis.getInt()));
-
+    if (!matchPattern(operands[3], m_Constant(&interpolationMode))) {
+      throw std::runtime_error(
+          "'gather' primitive expects the 'interpolationMode' argument "
+          "to be a constant integer");
+    }
+    if (!matchPattern(operands[4], m_Constant(&nearestMode))) {
+      throw std::runtime_error(
+          "'gather' primitive expects the 'nearestMode' argument "
+          "to be a constant integer");
+    }
+    if (!matchPattern(operands[5], m_Constant(&cubeCoeff))) {
+      throw std::runtime_error(
+          "'gather' primitive expects the 'cubeCoeff' argument "
+          "to be a constant float");
+    }
+    auto cubeCoeffFloat = static_cast<float>(cubeCoeff.getValueAsDouble());
+    auto op = builder.create<tile::GatherOp>(
+        loc, resultType, operands.take_front(2),
+        builder.getIndexAttr(axis.getInt()), interpolationMode, nearestMode,
+        builder.getF32FloatAttr(cubeCoeffFloat));
     return op.result();
   }
 

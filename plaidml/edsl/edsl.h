@@ -14,8 +14,6 @@
 #include "plaidml/core/core.h"
 #include "plaidml/edsl/ffi.h"
 
-#include "pmlc/util/enums.h"
-
 namespace plaidml {
 namespace edsl {
 
@@ -26,8 +24,6 @@ class Tensor;
 class TensorDim;
 class TensorIndex;
 class Value;
-
-using pmlc::util::InterpolationMode;
 
 namespace details {
 
@@ -806,6 +802,22 @@ inline Tensor exp(const Tensor& x) { return intrinsic("exp", x); }
 ///
 inline Tensor floor(const Tensor& x) { return intrinsic("floor", x); }
 
+enum class InterpolationMode : uint64_t {
+  NEAREST,
+  LINEAR,
+  CUBIC,
+  _LAST,
+};
+
+enum class NearestMode : uint64_t {
+  ROUND_PREFER_FLOOR,
+  ROUND_PREFER_CEIL,
+  FLOOR,
+  CEIL,
+  SIMPLE,
+  _LAST,
+};
+
 ///
 /// Gather takes an input tensor (`x`) and a set of indices to gather over (`y`), and computes an output tensor that
 /// gathers the input tensor from the indices specified.
@@ -825,16 +837,24 @@ class gather {
   ///
   /// Set the interpolation mode for gather.
   ///
-  gather& mode(InterpolationMode mode) {
-    mode_ = Tensor(static_cast<uint64_t>(mode));
+  gather& interpolationMode(InterpolationMode mode) {
+    interpolation_mode_ = Tensor(static_cast<uint64_t>(mode));
+    return *this;
+  }
+
+  ///
+  /// Set the nearest mode for gather.
+  ///
+  gather& nearestMode(NearestMode mode) {
+    nearest_mode_ = Tensor(static_cast<uint64_t>(mode));
     return *this;
   }
 
   ///
   /// Set the coefficient that controls cubic interpolation for gather.
   ///
-  gather& cubic_coeff(float cubic_coeff) {
-    cubic_coeff_ = Tensor(cubic_coeff);
+  gather& cubeCoeff(float cube_coeff) {
+    cube_coeff_ = Tensor(cube_coeff);
     return *this;
   }
 
@@ -842,9 +862,11 @@ class gather {
   /// Construct gather.
   ///
   Tensor build() const {
-    std::vector<Tensor> args = {x_, y_, axis_, mode_, cubic_coeff_};
+    std::vector<Tensor> args = {x_, y_, axis_, interpolation_mode_, nearest_mode_, cube_coeff_};
     return intrinsicCall("gather", args);
   }
+
+  operator Tensor() { return build(); }
 
  private:
   Tensor x_;
@@ -853,11 +875,12 @@ class gather {
   ///
   /// axis_ is a dimension index to gather data from
   /// mode_ specifies type of interpolation
-  /// cubic_coeff_ controls the cubic interpolation
+  /// cube_coeff_ controls the cubic interpolation
   ///
   Tensor axis_ = Tensor(0);
-  Tensor mode_ = Tensor(static_cast<uint64_t>(InterpolationMode::linear));
-  Tensor cubic_coeff_ = Tensor(-0.5);
+  Tensor interpolation_mode_ = Tensor(static_cast<uint64_t>(InterpolationMode::LINEAR));
+  Tensor nearest_mode_ = Tensor(static_cast<uint64_t>(NearestMode::ROUND_PREFER_FLOOR));
+  Tensor cube_coeff_ = Tensor(-0.75);
 };
 
 ///
