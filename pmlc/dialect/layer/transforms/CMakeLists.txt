@@ -1,18 +1,13 @@
 pml_cc_library(
   NAME transforms
   HDRS
-    contraction.h
     passes.h
   SRCS
-    contraction.cc
-    materialize.cc
-    pad_constraints.cc
-    pad_ranges.cc
-    padding.cc
+    inline_layers.cc
   DEPS
     LLVMSupport
     MLIRIR
-    pmlc::dialect::tile::ir
+    pmlc::dialect::layer::ir
     pmlc::util
     pmlc::util::bilp
     pmlc::util::math

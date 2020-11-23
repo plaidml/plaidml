@@ -18,6 +18,7 @@
 #include "mlir/Dialect/StandardOps/Transforms/Passes.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Pass/PassOptions.h"
 #include "mlir/Transforms/Passes.h"
 
 #include "pmlc/compiler/registry.h"
@@ -30,6 +31,7 @@
 #include "pmlc/conversion/tile_to_pxa/passes.h"
 #include "pmlc/dialect/comp/ir/types.h"
 #include "pmlc/dialect/comp/transforms/passes.h"
+#include "pmlc/dialect/layer/transforms/passes.h"
 #include "pmlc/dialect/pxa/transforms/passes.h"
 #include "pmlc/dialect/stdx/ir/ops.h"
 #include "pmlc/dialect/stdx/transforms/passes.h"
@@ -42,13 +44,24 @@ using namespace mlir; // NOLINT[build/namespaces]
 namespace pmlc::target::intel_gen_ocl_spirv {
 
 namespace comp = dialect::comp;
+namespace layer = dialect::layer;
 namespace pxa = dialect::pxa;
 namespace stdx = dialect::stdx;
 namespace tile = dialect::tile;
 
-void pipelineBuilder(OpPassManager &pm) {
+struct OclPipelineOptions : public PassPipelineOptions<OclPipelineOptions> {
+  Option<bool> useBlockOps{*this, "use-block-ops",
+                           llvm::cl::desc("Support for block operations"),
+                           llvm::cl::initializer(true)};
+  Option<unsigned> spirvVersion{*this, "spirv-version",
+                                llvm::cl::desc("SPIR-V Version"),
+                                llvm::cl::initializer(150)};
+};
+
+void pipelineBuilder(OpPassManager &pm,
+                     const OclPipelineOptions &oclPipelineOptions) {
   // Bound + pad initial tile code
-  pm.addPass(tile::createInlineLayersPass());
+  pm.addPass(layer::createInlineLayersPass());
   pm.addPass(tile::createComputeBoundsPass());
   pm.addPass(tile::createPadRangesPass());
   pm.addPass(tile::createPadConstraintsPass());
@@ -133,7 +146,7 @@ void pipelineBuilder(OpPassManager &pm) {
 
   // Devectorize
   pm.addPass(pmlc::target::intel_gen::createSubgroupBroadcastPass(
-      /*useBlockOpsr=*/true));
+      oclPipelineOptions.useBlockOps.getValue()));
   pm.addPass(createCSEPass());
 
   // Lower mapped scf.parallel's to GPU
@@ -142,7 +155,8 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(createCSEPass());
 
   // Do kernel outlining
-  pm.addPass(createAddSpirvTargetPass());
+  pm.addPass(
+      createAddSpirvTargetPass(oclPipelineOptions.spirvVersion.getValue()));
   pm.addPass(conversion::gpu::createGpuKernelOutliningPass());
 
   // Convert GPU to comp.
@@ -157,7 +171,13 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(createLegalizeStdOpsForSPIRVLoweringPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
-  pm.addPass(conversion::gpu_to_spirv::createGPUToSPIRVCustomPass());
+
+  bool nonUniformBroadcast = false;
+  if (oclPipelineOptions.spirvVersion.getValue() >= 150) {
+    nonUniformBroadcast = true;
+  }
+  pm.addPass(conversion::gpu_to_spirv::createGPUToSPIRVCustomPass(
+      nonUniformBroadcast));
 
   // SPIR-V passes for lowering attributes.
   pm.addPass(createSetSubgroupSizePass());
@@ -176,13 +196,17 @@ static constexpr const char *kTargetName = "intel_gen_ocl_spirv";
 static constexpr const char *kPassPipelineTargetName =
     "target-intel_gen_ocl_spirv";
 
-static PassPipelineRegistration<>
+static PassPipelineRegistration<OclPipelineOptions>
     passPipelineReg(kPassPipelineTargetName,
                     "Target pipeline for Intel GEN iGPUs", pipelineBuilder);
 
 class Target : public compiler::Target {
 public:
-  void buildPipeline(mlir::OpPassManager &pm) { pipelineBuilder(pm); }
+  void buildPipeline(mlir::OpPassManager &pm, llvm::StringRef targetOptions) {
+    auto oclPipelineOptions =
+        OclPipelineOptions::createFromString(targetOptions);
+    pipelineBuilder(pm, *oclPipelineOptions);
+  }
 
   util::BufferPtr save(compiler::Program &program) {
     throw std::runtime_error(

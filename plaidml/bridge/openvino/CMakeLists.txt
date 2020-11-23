@@ -64,7 +64,9 @@ pml_cc_library(
   DEPS
     IE::inference_engine
     IE::ngraph
-    plaidml::plaidml
+    plaidml::core
+    plaidml::edsl
+    plaidml::op
 )
 
 if(NOT InferenceEngineDeveloperPackage_FOUND)

@@ -8,11 +8,6 @@ def ComputeBounds : FunctionPass<"tile-compute-bounds"> {
   let constructor = "pmlc::dialect::tile::createComputeBoundsPass()";
 }
 
-def InlineLayers : FunctionPass<"tile-inline-layers"> {
-  let summary = "Inline layers";
-  let constructor = "pmlc::dialect::tile::createInlineLayersPass()";
-}
-
 def Materialize : FunctionPass<"tile-materialize"> {
   let summary = "Materialize arbitrary-precision values based on type promotion rules";
   let constructor = "pmlc::dialect::tile::createMaterializePass()";

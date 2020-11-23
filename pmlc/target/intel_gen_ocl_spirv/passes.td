@@ -8,6 +8,10 @@ def IntelGenOclAddSpirvTarget : Pass<"intel-gen-ocl-add-spirv-target", "mlir::Mo
   let summary = "Add spirv target environment attributes";
   let constructor = "pmlc::target::intel_gen_ocl_spirv::createAddSpirvTargetPass()";
   let dependentDialects = ["mlir::spirv::SPIRVDialect"];
+  let options = [
+    Option<"spirvVersion", "spirv-version", "unsigned", /*default=*/"150",
+           "SPIR-V Version">,
+  ];
 }
 
 def IntelGenOclSetSubgroupSize : Pass<"intel-gen-ocl-set-subgroup-size", "mlir::spirv::ModuleOp"> {

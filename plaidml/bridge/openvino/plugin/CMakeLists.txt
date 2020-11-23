@@ -21,6 +21,9 @@ target_link_libraries(${TARGET_NAME}
 
 pml_link_whole_libs(${TARGET_NAME}
   plaidml::bridge::openvino
+  plaidml::exec
+  pmlc::rt::llvm
+  pmlc::target::x86
 )
 
 ie_register_plugins(
