@@ -78,11 +78,10 @@ struct GatherOp : Intrinsic {
     }
     auto tensor = shapes[0];
     auto idxs = shapes[1];
-    if (isDataTypeFloat(idxs.elementType)) {
-      if (!isDataTypeFloat(tensor.elementType)) {
-        throw std::runtime_error("'gather' interpolation modes require tensor "
-                                 "elements to be floats.");
-      }
+    if (isDataTypeFloat(idxs.elementType) &&
+        !isDataTypeFloat(tensor.elementType)) {
+      throw std::runtime_error("'gather' interpolation modes require tensor "
+                               "elements to be floats.");
     }
     int64_t rank = tensor.getRank();
     if (!rank) {

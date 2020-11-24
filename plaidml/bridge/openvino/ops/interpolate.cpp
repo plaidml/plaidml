@@ -33,13 +33,10 @@ edsl::InterpolationMode get_plaidml_interpolation_mode(ngraph::op::v4::Interpola
   switch (mode) {
     case ngraph::op::v4::Interpolate::InterpolateMode::nearest:
       return edsl::InterpolationMode::NEAREST;
-      break;
     case ngraph::op::v4::Interpolate::InterpolateMode::linear:
       return edsl::InterpolationMode::LINEAR;
-      break;
     case ngraph::op::v4::Interpolate::InterpolateMode::cubic:
       return edsl::InterpolationMode::CUBIC;
-      break;
     default:
       THROW_IE_EXCEPTION << "Unsupported Interpolate InterpolateMode";
       break;
@@ -50,23 +47,14 @@ edsl::NearestMode get_plaidml_nearest_mode(ngraph::op::v4::Interpolate::NearestM
   switch (nearest_mode) {
     case ngraph::op::v4::Interpolate::NearestMode::round_prefer_floor:
       return edsl::NearestMode::ROUND_PREFER_FLOOR;
-      break;
     case ngraph::op::v4::Interpolate::NearestMode::round_prefer_ceil:
       return edsl::NearestMode::ROUND_PREFER_CEIL;
-      break;
     case ngraph::op::v4::Interpolate::NearestMode::floor:
       return edsl::NearestMode::FLOOR;
-      break;
     case ngraph::op::v4::Interpolate::NearestMode::ceil:
       return edsl::NearestMode::CEIL;
-      break;
     case ngraph::op::v4::Interpolate::NearestMode::simple:
-      if (is_downsample) {
-        return edsl::NearestMode::CEIL;
-      } else {
-        return edsl::NearestMode::SIMPLE;
-      }
-      break;
+      return is_downsample ? edsl::NearestMode::CEIL : edsl::NearestMode::SIMPLE;
     default:
       THROW_IE_EXCEPTION << "Unsupported Interpolate NearestMode";
       break;
