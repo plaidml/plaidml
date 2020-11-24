@@ -1,22 +1,13 @@
-// RUN: pmlc-opt -convert-linalg-to-loops -x86-convert-pxa-to-affine -lower-affine \
-// RUN:     -canonicalize -convert-scf-to-std -x86-convert-std-to-llvm %s | \
-// RUN:   pmlc-jit -e baseline 
-
-// RUN: pmlc-opt -convert-linalg-to-loops -x86-affine-stencil-xsmm -x86-convert-pxa-to-affine -lower-affine \
-// RUN:     -canonicalize -convert-scf-to-std -x86-convert-std-to-llvm %s | \
-// RUN:   pmlc-jit -e baseline 
-
 
 // Command lines:
-// bazel-bin/pmlc/opt -convert-linalg-to-loops -x86-convert-pxa-to-affine -lower-affine  -canonicalize -convert-scf-to-std -x86-convert-std-to-llvm pmlc/target/x86/tests/conv_NCHW_3X3.mlir | bazel-bin/pmlc/jit -e baseline
+// bazel-bin/pmlc/opt -convert-linalg-to-loops -x86-convert-pxa-to-affine -lower-affine  -canonicalize -convert-scf-to-std -x86-convert-std-to-llvm pmlc/target/x86/tests/stub_conv_NCHW_3X3.mlir 
 
-// bazel-bin/pmlc/opt -convert-linalg-to-loops -x86-affine-stencil-xsmm -x86-convert-pxa-to-affine -lower-affine  -canonicalize -convert-scf-to-std -x86-convert-std-to-llvm pmlc/target/x86/tests/conv_NCHW_3X3.mlir | bazel-bin/pmlc/jit -e baseline
+// bazel-bin/pmlc/opt -convert-linalg-to-loops -x86-affine-stencil-xsmm -x86-convert-pxa-to-affine -lower-affine  -canonicalize -convert-scf-to-std -x86-convert-std-to-llvm pmlc/target/x86/tests/stub_conv_NCHW_3X3.mlir
 
 
-!I_memref = type memref<1x64x56x56xf32> // NCHW -> NCHWc64
-!K_memref = type memref<64x64x3x3xf32>  // nofm-nifm-kh-kw -> nofm/c1-nifm/c2-kh-kw-c1-c2
-!O_memref = type memref<1x64x56x56xf32> // N-nofm-H-W -> N-nofm/c-H-W-c
-
+!I_memref = type memref<1x64x56x56xf32> 
+!K_memref = type memref<64x64x3x3xf32>  
+!O_memref = type memref<1x64x56x56xf32> 
 
 func @conv2(%I: !I_memref, %K: !K_memref, %O: !O_memref) {
   %c1 = constant 1 : index
