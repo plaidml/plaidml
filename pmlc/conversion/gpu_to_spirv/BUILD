@@ -35,5 +35,6 @@ plaidml_cc_library(
         "@llvm-project//mlir:GPUToSPIRVTransforms",
         "@llvm-project//mlir:GPUTransforms",
         "@llvm-project//mlir:SPIRVDialect",
+        "@llvm-project//mlir:VectorOps",
     ],
 )

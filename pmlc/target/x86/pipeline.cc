@@ -12,12 +12,14 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
+#include "mlir/Transforms/RegionUtils.h"
 
 #include "pmlc/compiler/registry.h"
 #include "pmlc/conversion/pxa_to_affine/passes.h"
 #include "pmlc/conversion/scf_to_omp/passes.h"
 #include "pmlc/conversion/stdx_to_llvm/passes.h"
 #include "pmlc/conversion/tile_to_pxa/passes.h"
+#include "pmlc/dialect/layer/transforms/passes.h"
 #include "pmlc/dialect/pxa/transforms/passes.h"
 #include "pmlc/dialect/stdx/transforms/passes.h"
 #include "pmlc/dialect/tile/transforms/passes.h"
@@ -36,7 +38,10 @@ using namespace mlir; // NOLINT[build/namespaces]
 
 namespace pmlc::target::x86 {
 
+namespace layer = dialect::layer;
 namespace pxa = dialect::pxa;
+namespace stdx = dialect::stdx;
+namespace tile = dialect::tile;
 namespace xsmm = dialect::xsmm;
 
 namespace {
@@ -63,26 +68,6 @@ struct LowerPXAToAffinePass
   }
 };
 
-struct ExtractLoweringPattern
-    : public OpConversionPattern<LLVM::ExtractValueOp> {
-  using OpConversionPattern<LLVM::ExtractValueOp>::OpConversionPattern;
-
-  LogicalResult
-  matchAndRewrite(LLVM::ExtractValueOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const final {
-    Value src = operands[0];
-    while (auto insertOp = mlir::dyn_cast_or_null<LLVM::InsertValueOp>(
-               src.getDefiningOp())) {
-      if (op.position() == insertOp.position()) {
-        rewriter.replaceOp(op, insertOp.value());
-        return success();
-      }
-      src = insertOp.container();
-    }
-    return failure();
-  }
-};
-
 struct ConvertStandardToLLVMPass
     : public ConvertStandardToLLVMBase<ConvertStandardToLLVMPass> {
   void runOnOperation() override {
@@ -104,7 +89,6 @@ struct ConvertStandardToLLVMPass
     conversion::stdx_to_llvm::populateStdXToLLVMConversionPatterns(
         typeConverter, patterns);
     populateOpenMPToLLVMConversionPatterns(context, typeConverter, patterns);
-    patterns.insert<ExtractLoweringPattern>(context);
 
     LLVMConversionTarget target(*context);
     target.addDynamicallyLegalOp<omp::ParallelOp>([&](omp::ParallelOp op) {
@@ -112,14 +96,79 @@ struct ConvertStandardToLLVMPass
     });
     target.addLegalOp<omp::TerminatorOp, omp::TaskyieldOp, omp::FlushOp,
                       omp::BarrierOp, omp::TaskwaitOp>();
-    target.addDynamicallyLegalOp<LLVM::ExtractValueOp>(
-        [](LLVM::ExtractValueOp op) {
-          return !mlir::dyn_cast_or_null<LLVM::InsertValueOp>(
-              op.container().getDefiningOp());
-        });
     if (failed(applyPartialConversion(module, target, patterns))) {
       signalPassFailure();
     }
+  }
+};
+
+// OpenMP has issues passing values through to OpenMP blocks.  As a workaround,
+// we have a simple pass to smuggle values that cross the boundary via an
+// alloca()'d struct.
+struct OpenMPWorkaroundPass final
+    : public OpenMPWorkaroundBase<OpenMPWorkaroundPass> {
+  void runOnOperation() final {
+    LLVM::LLVMFuncOp funcOp = getOperation();
+    OpBuilder builder{&getContext()};
+    funcOp.walk([&](omp::ParallelOp parOp) {
+      llvm::SetVector<Value> values;
+
+      visitUsedValuesDefinedAbove({parOp.region()}, [&](OpOperand *opOperand) {
+        auto value = opOperand->get();
+
+        // If it's not an LLVM type, or if it's an LLVM pointer type, we
+        // don't need or want to smuggle this value in via a struct.
+        auto llvmType = value.getType().dyn_cast<LLVM::LLVMType>();
+        if (!llvmType || llvmType.isPointerTy()) {
+          return;
+        }
+
+        // Otherwise, we need to smuggle the value through an alloca'd
+        // struct.
+        values.insert(value);
+      });
+
+      if (!values.size()) {
+        return; // Nothing to do.
+      }
+
+      // Build the structure.
+      builder.setInsertionPoint(parOp);
+      LLVM::LLVMType structTy;
+      {
+        SmallVector<LLVM::LLVMType, 8> types;
+        for (auto val : values) {
+          types.push_back(val.getType().cast<LLVM::LLVMType>());
+        }
+        structTy = LLVM::LLVMType::getStructTy(&getContext(), types);
+      }
+      auto structPtrTy = structTy.getPointerTo();
+      auto numElements = builder.create<LLVM::ConstantOp>(
+          parOp.getLoc(), LLVM::LLVMType::getInt64Ty(&getContext()),
+          builder.getIndexAttr(1));
+      auto structPtr = builder.create<LLVM::AllocaOp>(
+          parOp.getLoc(), structPtrTy, numElements, 0);
+      Value srcStructVal =
+          builder.create<LLVM::UndefOp>(parOp.getLoc(), structTy);
+      for (auto srcIdx : llvm::enumerate(values)) {
+        srcStructVal = builder.create<LLVM::InsertValueOp>(
+            parOp.getLoc(), srcStructVal, srcIdx.value(),
+            builder.getI64ArrayAttr(srcIdx.index()));
+      }
+      builder.create<LLVM::StoreOp>(parOp.getLoc(), srcStructVal, structPtr);
+
+      // Unpack the structure, rewriting the affected values.
+      builder.setInsertionPointToStart(&parOp.region().front());
+      auto dstStructVal =
+          builder.create<LLVM::LoadOp>(parOp.getLoc(), structPtr);
+      for (auto srcIdx : llvm::enumerate(values)) {
+        auto smuggledValue = builder.create<LLVM::ExtractValueOp>(
+            parOp.getLoc(), srcIdx.value().getType(), dstStructVal,
+            builder.getI64ArrayAttr(srcIdx.index()));
+        replaceAllUsesInRegionWith(srcIdx.value(), smuggledValue,
+                                   parOp.region());
+      }
+    });
   }
 };
 
@@ -155,9 +204,14 @@ std::unique_ptr<Pass> createLowerToLLVMPass() {
   return std::make_unique<ConvertStandardToLLVMPass>();
 }
 
+std::unique_ptr<Pass> createOpenMPWorkaroundPass() {
+  return std::make_unique<OpenMPWorkaroundPass>();
+}
+
 void pipelineBuilder(OpPassManager &pm) {
-  pm.addPass(pmlc::dialect::tile::createComputeBoundsPass());
-  pm.addPass(pmlc::dialect::tile::createPadConstraintsPass());
+  pm.addPass(layer::createInlineLayersPass());
+  pm.addPass(tile::createComputeBoundsPass());
+  pm.addPass(tile::createPadConstraintsPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
@@ -190,12 +244,8 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
 
-  // Currently these MemRefDataFlowOptPass is disabled because it will turn
-  // 0-dim tensors into actual floats, which do not correctly pass through
-  // OpenMP due to calling convention issues.  TODO: Fix OpenMP upstream and
-  // re-enable.
-  // pm.addPass(pxa::createMemRefDataFlowOptPass());
-  // pm.addPass(createCanonicalizerPass());
+  pm.addPass(pxa::createMemRefDataFlowOptPass());
+  pm.addPass(createCanonicalizerPass());
 
   pm.addPass(pxa::createLocalizePass());
   pm.addPass(pxa::createResizeTmpsPass());
@@ -227,11 +277,12 @@ void pipelineBuilder(OpPassManager &pm) {
 
   pm.addPass(createLowerToCFGPass());
   if (pmlc::util::getEnvVar("PLAIDML_BOUNDS_CHECK") == "1") {
-    pm.addPass(pmlc::dialect::stdx::createBoundsCheckPass());
+    pm.addPass(stdx::createBoundsCheckPass());
   }
 
   pm.addPass(createLowerToLLVMPass());
   pm.addPass(createTraceLinkingPass());
+  pm.addPass(createOpenMPWorkaroundPass());
 }
 
 } // namespace pmlc::target::x86

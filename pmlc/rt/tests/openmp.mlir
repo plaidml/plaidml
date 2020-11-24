@@ -1,4 +1,5 @@
-// RUN: pmlc-opt -x86-convert-std-to-llvm -x86-trace-linking %s | pmlc-jit | FileCheck %s
+// RUN: pmlc-opt -x86-convert-std-to-llvm -x86-trace-linking \
+// RUN:     -x86-openmp-workaround %s | pmlc-jit | FileCheck %s
 
 func @print_memref_f32(memref<*xf32>)
 func @plaidml_rt_thread_num() -> index

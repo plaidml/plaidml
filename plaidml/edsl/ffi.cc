@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <stack>
 #include <string>
 #include <vector>
 
@@ -89,6 +90,26 @@ ast::AffineOp getAffineOp(plaidml_int_op op) {
   }
   throw std::runtime_error("Unknown polynomial op");
 }
+
+struct LayerContext {
+  static LayerContext* get() {
+    thread_local LayerContext context;
+    return &context;
+  }
+
+  void addNode(const ast::ExprNodePtr& node) {
+    if (stack.empty()) {
+      return;
+    }
+    node->parent = stack.top();
+  }
+
+  void push(const std::shared_ptr<ast::ExprNodeLayer>& layer) { stack.push(layer); }
+
+  void pop() { stack.pop(); }
+
+  std::stack<std::shared_ptr<ast::ExprNodeLayer>> stack;
+};
 
 }  // namespace
 
@@ -186,7 +207,9 @@ plaidml_expr* plaidml_expr_dim(  //
     plaidml_dim_expr* expr) {
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_expr_dim");
-    return new plaidml_expr{std::make_shared<ast::ExprNodeDim>(expr->node)};
+    auto node = std::make_shared<ast::ExprNodeDim>(expr->node);
+    LayerContext::get()->addNode(node);
+    return new plaidml_expr{node};
   });
 }
 
@@ -196,7 +219,9 @@ plaidml_expr* plaidml_expr_input(  //
     const char* name) {
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_expr_input: " << shape->shape.str());
-    return new plaidml_expr{std::make_shared<ast::ExprNodeInput>(shape->shape, name)};
+    auto node = std::make_shared<ast::ExprNodeInput>(shape->shape, name);
+    LayerContext::get()->addNode(node);
+    return new plaidml_expr{node};
   });
 }
 
@@ -206,7 +231,9 @@ plaidml_expr* plaidml_expr_constant(  //
     const char* name) {
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_expr_constant");
-    return new plaidml_expr{std::make_shared<ast::ExprNodeConstTensor>(buffer->buffer, name)};
+    auto node = std::make_shared<ast::ExprNodeConstTensor>(buffer->buffer, name);
+    // Constants cannot be added to layers, so no LayerContext line
+    return new plaidml_expr{node};
   });
 }
 
@@ -237,7 +264,9 @@ plaidml_expr* plaidml_expr_uint(  //
     uint64_t value) {
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_expr_uint> " << value);
-    return new plaidml_expr{std::make_shared<ast::ExprNodeConstUnsigned>(value)};
+    auto node = std::make_shared<ast::ExprNodeConstUnsigned>(value);
+    LayerContext::get()->addNode(node);
+    return new plaidml_expr{node};
   });
 }
 
@@ -246,7 +275,9 @@ plaidml_expr* plaidml_expr_int(  //
     int64_t value) {
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_expr_int> " << value);
-    return new plaidml_expr{std::make_shared<ast::ExprNodeConstSigned>(value)};
+    auto node = std::make_shared<ast::ExprNodeConstSigned>(value);
+    LayerContext::get()->addNode(node);
+    return new plaidml_expr{node};
   });
 }
 
@@ -255,7 +286,9 @@ plaidml_expr* plaidml_expr_float(  //
     double value) {
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_expr_float");
-    return new plaidml_expr{std::make_shared<ast::ExprNodeConstFloat>(value)};
+    auto node = std::make_shared<ast::ExprNodeConstFloat>(value);
+    LayerContext::get()->addNode(node);
+    return new plaidml_expr{node};
   });
 }
 
@@ -265,7 +298,9 @@ plaidml_expr* plaidml_expr_cast(  //
     plaidml_datatype dtype) {
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_expr_cast");
-    return new plaidml_expr{std::make_shared<ast::ExprNodeCast>(convertFromDataType(dtype), expr->node)};
+    auto node = std::make_shared<ast::ExprNodeCast>(convertFromDataType(dtype), expr->node);
+    LayerContext::get()->addNode(node);
+    return new plaidml_expr{node};
   });
 }
 
@@ -275,7 +310,9 @@ plaidml_expr* plaidml_expr_element(  //
     size_t ordinal) {
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_expr_element");
-    return new plaidml_expr{std::make_shared<ast::ExprNodeElement>(expr->node, ordinal)};
+    auto node = std::make_shared<ast::ExprNodeElement>(expr->node, ordinal);
+    LayerContext::get()->addNode(node);
+    return new plaidml_expr{node};
   });
 }
 
@@ -292,7 +329,9 @@ plaidml_expr* plaidml_expr_pragma(  //
       plaidml_attr* attr = raw_attrs[i];
       attrs[attr->key] = attr->value->node;
     }
-    return new plaidml_expr{std::make_shared<ast::ExprNodePragma>(expr->node, op, attrs)};
+    auto node = std::make_shared<ast::ExprNodePragma>(expr->node, op, attrs);
+    LayerContext::get()->addNode(node);
+    return new plaidml_expr{node};
   });
 }
 
@@ -310,6 +349,7 @@ plaidml_expr* plaidml_expr_intrinsic(  //
     auto node = std::make_shared<ast::ExprNodeIntrinsic>(fn, operands);
     ast::Evaluator evaluator;
     evaluator.verify(node);
+    LayerContext::get()->addNode(node);
     return new plaidml_expr{node};
   });
 }
@@ -335,6 +375,7 @@ plaidml_expr* plaidml_expr_contraction(  //
     if (init) {
       node->init = init->node;
     }
+    LayerContext::get()->addNode(node);
     return new plaidml_expr{node};
   });
 }
@@ -740,6 +781,56 @@ plaidml_program* plaidml_build(  //
       args.outputs.push_back(outputs[i]->node);
     }
     return new plaidml_program{ast::buildProgram(name, args)};
+  });
+}
+
+void plaidml_exprs_free(  //
+    plaidml_error* err,   //
+    plaidml_exprs* exprs) {
+  ffi_wrap_void(err, [&] {
+    delete[] exprs->elts;
+    delete exprs;
+  });
+}
+
+plaidml_expr* plaidml_expr_layer_begin(  //
+    plaidml_error* err,                  //
+    const char* op,                      //
+    size_t nattrs,                       //
+    plaidml_attr** raw_attrs) {
+  return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
+    IVLOG(3, "plaidml_expr_layer_begin");
+    llvm::StringMap<ast::VarNodePtr> attrs;
+    for (size_t i = 0; i < nattrs; i++) {
+      plaidml_attr* attr = raw_attrs[i];
+      attrs[attr->key] = attr->value->node;
+    }
+    auto node = std::make_shared<ast::ExprNodeLayer>(op, attrs);
+    LayerContext::get()->push(node);
+    return new plaidml_expr{node};
+  });
+}
+
+plaidml_exprs* plaidml_expr_layer_end(  //
+    plaidml_error* err,                 //
+    plaidml_expr* expr,                 //
+    size_t noutputs,                    //
+    plaidml_expr** outputs) {
+  return ffi_wrap<plaidml_exprs*>(err, nullptr, [&] {
+    IVLOG(3, "plaidml_expr_layer");
+    auto node = std::dynamic_pointer_cast<ast::ExprNodeLayer>(expr->node);
+    if (!node) {
+      throw std::bad_cast();
+    }
+    std::vector<ast::ExprNodePtr> outerResults;
+    outerResults.reserve(noutputs);
+    node->results.clear();
+    node->results.reserve(noutputs);
+    for (size_t i = 0; i < noutputs; i++) {
+      node->results.push_back(outputs[i]->node);
+      outerResults.push_back(std::make_shared<ast::ExprNodeElement>(node, i));
+    }
+    return ffi_vector<plaidml_exprs, plaidml_expr>(outerResults);
   });
 }
 

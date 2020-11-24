@@ -19,6 +19,7 @@ pml_cc_library(
     pmlc::conversion::stdx_to_llvm
     pmlc::conversion::tile_to_pxa
     pmlc::dialect::comp::transforms
+    pmlc::dialect::layer::transforms
     pmlc::dialect::pxa::transforms
     pmlc::dialect::stdx::transforms
     pmlc::dialect::tile::transforms
@@ -35,6 +36,5 @@ pml_cc_library(
 pml_tblgen_library(
   NAME passes-gen
   TD_FILE passes.td
-  OUTS
-    -gen-pass-decls passes.h.inc
+  OUTS -gen-pass-decls passes.h.inc
 )

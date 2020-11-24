@@ -39,6 +39,7 @@ endif()
 # -------------------------------------------------------------------------------
 # Project component configuration
 # -------------------------------------------------------------------------------
+option(ENABLE_OPENVINO_BRIDGE "Enable the OpenVINO plugin" ON)
 option(PML_BUILD_TESTS "Builds PML unit tests." ON)
 
 list(APPEND CMAKE_MODULE_PATH
@@ -52,14 +53,17 @@ if(CCACHE_PROGRAM)
   set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
 endif()
 
-if(${PML_BUILD_TESTS})
+if(PML_BUILD_TESTS)
   enable_testing()
+  add_custom_target(check-smoke
+    COMMAND ${CMAKE_CTEST_COMMAND} -L smoke
+    USES_TERMINAL
+  )
   add_custom_target(check-test
-    COMMAND ${CMAKE_CTEST_COMMAND}
+    COMMAND ${CMAKE_CTEST_COMMAND} -L test
     USES_TERMINAL
   )
 endif()
-
 
 # -------------------------------------------------------------------------------
 # Third party dependencies
@@ -67,8 +71,10 @@ endif()
 include(CPM)
 include(boost)
 include(easylogging)
-include(gflags)
-include(googletest)
+if(NOT ENABLE_OPENVINO_BRIDGE OR InferenceEngineDeveloperPackage_FOUND)
+  include(gflags)
+  include(googletest)
+endif()
 include(half)
 include(llvm-project)
 include(xsmm)
@@ -90,9 +96,10 @@ get_directory_property(HAS_PARENT PARENT_DIRECTORY)
 if(HAS_PARENT)
   set(IS_SUBPROJECT TRUE)
 else()
-  add_custom_target(check DEPENDS
-    check-test
-    check-clang-format
+  add_custom_target(check
+    DEPENDS
+      check-test
+      check-clang-format
   )
 endif()
 
@@ -108,11 +115,3 @@ configure_lit_site_cfg(
   MAIN_CONFIG
   ${CMAKE_CURRENT_SOURCE_DIR}/lit.cfg.py
 )
-
-if(PML_BUILD_TESTS AND NOT IS_SUBPROJECT)
-  add_dependencies(check-test
-    FileCheck count not
-    pmlc-jit
-    pmlc-opt
-  )
-endif()

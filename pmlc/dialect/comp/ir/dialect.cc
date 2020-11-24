@@ -33,22 +33,6 @@ static LogicalResult verify(ScheduleFunc op) {
   return success();
 }
 
-static LogicalResult verify(Alloc op) {
-  Type deviceMemType = op.deviceMem().getType();
-
-  if (op.hostMem()) {
-    auto hostMemType = op.hostMem().getType();
-    if (deviceMemType.cast<::mlir::ShapedType>().getShape() !=
-        hostMemType.cast<::mlir::ShapedType>().getShape())
-      return op.emitOpError("host and device memory shapes must match");
-    if (getElementTypeOrSelf(deviceMemType) !=
-        getElementTypeOrSelf(hostMemType))
-      return op.emitOpError("host and device memory element types must match");
-  }
-
-  return success();
-}
-
 // Interface implementations
 ::mlir::Value ScheduleWrite::getSource() { return hostMem(); }
 ::mlir::Value ScheduleWrite::getDestination() { return deviceMem(); }

@@ -1,10 +1,10 @@
+add_subdirectory(bridge)
 add_subdirectory(core)
 add_subdirectory(edsl)
 add_subdirectory(exec)
 add_subdirectory(op)
 
-list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR})
-include(symbols)
+include(symbols.cmake)
 
 pml_cc_library(
   NAME plaidml

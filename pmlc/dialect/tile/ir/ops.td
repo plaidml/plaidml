@@ -3,6 +3,8 @@
 include "pmlc/dialect/tile/ir/base.td"
 include "pmlc/dialect/tile/ir/eltwise.td"
 
+include "mlir/Interfaces/ControlFlowInterfaces.td"
+
 // TODO: this should be defined upstream
 def IntegerSetAttr : Attr<
     CPred<"$_self.isa<IntegerSetAttr>()">, "IntegerSet attribute"> {
@@ -17,7 +19,7 @@ def ContractionOp : TileOp<"contract", [
 ]> {
   let arguments = (ins
     EltwiseAny:$init,
-    Variadic<AnyType>:$operands,
+    Variadic<EltwiseAny>:$operands,
     AggregationKind:$agg,
     CombinationKind:$combo,
     AffineMapAttr:$sink,
