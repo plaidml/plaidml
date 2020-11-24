@@ -917,6 +917,10 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
     Value interpVal;
     if (idx.getType().isa<FloatType>()) {
       switch (op.interpolationMode()) {
+      case InterpolationMode::nearest:
+        interpVal = buildNearestInterpolationOps(
+            loc, rewriter, tensor, idx, srcOps, axis, op.nearestMode());
+        break;
       case InterpolationMode::linear:
         interpVal = buildLinearInterpolationOps(loc, rewriter, tensor, idx,
                                                 srcOps, axis);
@@ -926,11 +930,8 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
             buildCubicInterpolationOps(loc, rewriter, tensor, idx, srcOps, axis,
                                        op.cubeCoeffAttr().getValueAsDouble());
         break;
-      case InterpolationMode::nearest:
       default:
-        interpVal = buildNearestInterpolationOps(
-            loc, rewriter, tensor, idx, srcOps, axis, op.nearestMode());
-        break;
+        llvm_unreachable("Unsupported InterpolationMode");
       }
     } else {
       if (!idx.getType().isa<IndexType>()) {
@@ -988,7 +989,6 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
     default:
       llvm_unreachable("Unsupported NearestMode");
     }
-
     idx = checkIntOutOfBounds(loc, rewriter, idx, bounds[0], bounds[1]);
     idx = rewriter.create<mlir::IndexCastOp>(loc, idx, idxType).getResult();
     srcOps.at(axis) = idx;
@@ -1046,7 +1046,6 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
 
     auto idxType = rewriter.getIndexType();
     auto i32Type = rewriter.getI32Type();
-
     auto elementType = tensor.getType().cast<MemRefType>().getElementType();
     auto bounds = GetIndexBounds(loc, rewriter, tensor, axis, i32Type);
 
