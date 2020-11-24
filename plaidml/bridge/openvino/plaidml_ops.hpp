@@ -46,16 +46,16 @@ class OpsRegistry {
  private:
   std::unordered_map<std::string, Op> registry;
 
-  // TODO: Would perhaps be nicer to revert to caseless_unordered_map from plugin_api/caseless.hpp if we can get it
-  // building
   std::string normalizedName(std::string name) {
     std::transform(name.begin(), name.end(), name.begin(), [](unsigned char ch) { return std::tolower(ch); });
     return name;
   }
 };
 
-struct OpRegistration {
-  OpRegistration(const std::string& name, Op op) { OpsRegistry::instance()->registerOp(name, op); }
-};
+inline void registerOp(const std::string& name, Op op) {  //
+  OpsRegistry::instance()->registerOp(name, op);
+}
+
+void registerOps();
 
 }  // namespace PlaidMLPlugin

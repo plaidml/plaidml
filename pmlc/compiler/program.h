@@ -62,4 +62,6 @@ struct Program {
   util::BufferPtr save();
 };
 
+void registerTargets();
+
 } // namespace pmlc::compiler

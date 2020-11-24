@@ -36,29 +36,28 @@ half_float::half f2h(float n) {
   return half_float::half_cast<half_float::half>(n);
 }
 
-namespace {
-struct Registration {
-  Registration() {
-    using pmlc::rt::registerSymbol;
+namespace pmlc::rt {
 
-    // compiler_rt functions
-    // TODO: replace with @llvm-project//compiler-rt/lib/builtins
-    registerSymbol("__gnu_h2f_ieee", reinterpret_cast<void *>(h2f));
-    registerSymbol("__gnu_f2h_ieee", reinterpret_cast<void *>(f2h));
-    registerSymbol("___extendhfsf2", reinterpret_cast<void *>(h2f));
-    registerSymbol("___truncsfhf2", reinterpret_cast<void *>(f2h));
+void registerBuiltins() {
+  using pmlc::rt::registerSymbol;
 
-    // cstdlib functions
-    registerSymbol("free", reinterpret_cast<void *>(free));
-    registerSymbol("malloc", reinterpret_cast<void *>(malloc));
+  // compiler_rt functions
+  // TODO: replace with @llvm-project//compiler-rt/lib/builtins
+  registerSymbol("__gnu_h2f_ieee", reinterpret_cast<void *>(h2f));
+  registerSymbol("__gnu_f2h_ieee", reinterpret_cast<void *>(f2h));
+  registerSymbol("___extendhfsf2", reinterpret_cast<void *>(h2f));
+  registerSymbol("___truncsfhf2", reinterpret_cast<void *>(f2h));
 
-    // RunnerUtils functions
-    registerSymbol("_mlir_ciface_print_memref_f32",
-                   reinterpret_cast<void *>(_mlir_ciface_print_memref_f32));
+  // cstdlib functions
+  registerSymbol("free", reinterpret_cast<void *>(free));
+  registerSymbol("malloc", reinterpret_cast<void *>(malloc));
 
-    registerSymbol("plaidml_rt_trace",
-                   reinterpret_cast<void *>(plaidml_rt_trace));
-  }
-};
-static Registration reg;
-} // namespace
+  // RunnerUtils functions
+  registerSymbol("_mlir_ciface_print_memref_f32",
+                 reinterpret_cast<void *>(_mlir_ciface_print_memref_f32));
+
+  registerSymbol("plaidml_rt_trace",
+                 reinterpret_cast<void *>(plaidml_rt_trace));
+}
+
+} // namespace pmlc::rt

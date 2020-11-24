@@ -18,13 +18,13 @@ pml_cc_library(
     LINK_DEPENDS ${WINDOWS_DEF}
     OUTPUT_NAME plaidml
     SOVERSION 1
-  DEPS
+  PRIVATE_DEPS
     plaidml::core::obj
     plaidml::edsl::obj
     plaidml::exec::obj
     plaidml::op::obj
-    pmlc::rt::llvm
-    pmlc::target::x86
+    pmlc::rt::all_runtimes
+    pmlc::target::all_obj
 )
 
 pml_cc_library(
@@ -32,7 +32,12 @@ pml_cc_library(
   HDRS testenv.h
   SRCS testenv.cc
   DEPS
-    ::plaidml
+    plaidml::core
+    plaidml::edsl
+    plaidml::exec
+    plaidml::op
+    pmlc::rt::all_runtimes
+    pmlc::target::all
     gflags
     gmock
     gtest

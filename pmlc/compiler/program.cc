@@ -2,6 +2,7 @@
 
 #include "pmlc/compiler/program.h"
 
+#include <mutex>
 #include <utility>
 
 #include "llvm/Support/FileSystem.h"
@@ -110,6 +111,9 @@ static StringRef getDiagKindStr(DiagnosticSeverity kind) {
 
 void Program::compile(StringRef targetNameAndOptions, bool collectPasses,
                       StringRef dumpDir) {
+  static std::once_flag once;
+  std::call_once(once, []() { registerTargets(); });
+
   if (targetNameAndOptions.empty()) {
     return;
   }

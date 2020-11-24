@@ -27,7 +27,18 @@ pml_cc_library(
   DEPS
     plaidml::core::obj
     plaidml::edsl::obj
-    plaidml::op::lib::obj
+    plaidml::op::lib
     pmlc::util
     LLVMSupport
+)
+
+pml_cc_test(
+  NAME op_test
+  SRCS op_test.cc
+  DEPS
+    plaidml::testenv
+    pmlc::testing
+  CHECKS
+    smoke
+    test
 )

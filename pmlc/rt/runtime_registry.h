@@ -110,4 +110,6 @@ void registerRuntime(mlir::StringRef id, std::shared_ptr<Runtime> runtime);
 // executables.
 void initRuntimes();
 
+void registerRuntimes();
+
 } // namespace pmlc::rt
