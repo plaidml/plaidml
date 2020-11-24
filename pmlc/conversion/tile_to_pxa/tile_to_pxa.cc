@@ -1007,7 +1007,7 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
     auto cst1F =
         rewriter
             .create<mlir::ConstantOp>(loc, elementType,
-                                      rewriter.getFloatAttr(elementType, 1))
+                                      rewriter.getFloatAttr(elementType, 1.0))
             .getResult();
 
     // Calculate interpolation nodes: floor and ceil
@@ -1046,7 +1046,6 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
 
     auto idxType = rewriter.getIndexType();
     auto i32Type = rewriter.getI32Type();
-    // auto f64Type = rewriter.getF64Type();
 
     auto elementType = tensor.getType().cast<MemRefType>().getElementType();
     auto bounds = GetIndexBounds(loc, rewriter, tensor, axis, i32Type);
