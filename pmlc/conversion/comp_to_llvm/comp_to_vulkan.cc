@@ -261,7 +261,7 @@ void addVkFunctionDeclarations(mlir::ModuleOp &module) {
   std::vector<std::pair<const char *, mlir::Type>> bindType{
       {kBindBufferFloat16, builder.getF16Type()},
       {kBindBufferFloat32, builder.getF32Type()},
-      {kBindBufferFloat64, builder.getF32Type()},
+      {kBindBufferFloat64, builder.getF64Type()},
       {kBindBufferInteger8, builder.getIntegerType(8)},
       {kBindBufferInteger16, builder.getIntegerType(16)},
       {kBindBufferInteger32, builder.getI32Type()},

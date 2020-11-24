@@ -22,4 +22,6 @@ CppEdsl.ConvI8
 CppEdsl.InterpolatedGatherNearest
 CppEdsl.InterpolatedGatherLinear
 CppEdsl.InterpolatedGatherCubic
+CppEdsl.InterpolatedGatherCubicDouble
+CppEdsl.InterpolatedGatherCubicHalf
 CppEdsl.InterpolatedGatherMultiDIndices

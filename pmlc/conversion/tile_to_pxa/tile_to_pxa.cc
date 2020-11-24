@@ -922,8 +922,9 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
                                                 srcOps, axis);
         break;
       case InterpolationMode::cubic:
-        interpVal = buildCubicInterpolationOps(
-            loc, rewriter, tensor, idx, srcOps, axis, op.cubeCoeffAttr());
+        interpVal =
+            buildCubicInterpolationOps(loc, rewriter, tensor, idx, srcOps, axis,
+                                       op.cubeCoeffAttr().getValueAsDouble());
         break;
       case InterpolationMode::nearest:
       default:
@@ -959,38 +960,27 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
                                      Value tensor, Value idx,
                                      std::vector<Value> &srcOps, size_t axis,
                                      NearestMode nearestMode) const {
-    auto i32Type = rewriter.getI32Type();
     auto idxType = rewriter.getIndexType();
-
-    // Create index upper bound constant
-    int32_t axisLen = tensor.getType().cast<MemRefType>().getShape()[axis];
-    auto idxMax = rewriter
-                      .create<mlir::ConstantOp>(
-                          loc, i32Type, rewriter.getI32IntegerAttr(axisLen - 1))
-                      .getResult();
-    auto cst0I32 = rewriter
-                       .create<mlir::ConstantOp>(loc, i32Type,
-                                                 rewriter.getI32IntegerAttr(0))
-                       .getResult();
-
+    auto i32Type = rewriter.getI32Type();
+    auto bounds = GetIndexBounds(loc, rewriter, tensor, axis, i32Type);
     switch (nearestMode) {
     case NearestMode::round_prefer_floor: {
       auto cmp = isHalfWayFloat(loc, rewriter, idx);
-      auto floor = floorFPToSI(loc, rewriter, idx);
-      auto round = roundFPToSI(loc, rewriter, idx);
+      auto floor = floorFPToSI(loc, rewriter, idx, i32Type);
+      auto round = roundFPToSI(loc, rewriter, idx, i32Type);
       idx = rewriter.create<mlir::SelectOp>(loc, cmp, floor, round).result();
     } break;
     case NearestMode::round_prefer_ceil: {
       auto cmp = isHalfWayFloat(loc, rewriter, idx);
-      auto ceil = ceilFPToSI(loc, rewriter, idx);
-      auto round = roundFPToSI(loc, rewriter, idx);
+      auto ceil = ceilFPToSI(loc, rewriter, idx, i32Type);
+      auto round = roundFPToSI(loc, rewriter, idx, i32Type);
       idx = rewriter.create<mlir::SelectOp>(loc, cmp, ceil, round).result();
     } break;
     case NearestMode::floor:
-      idx = floorFPToSI(loc, rewriter, idx);
+      idx = floorFPToSI(loc, rewriter, idx, i32Type);
       break;
     case NearestMode::ceil:
-      idx = ceilFPToSI(loc, rewriter, idx);
+      idx = ceilFPToSI(loc, rewriter, idx, i32Type);
       break;
     case NearestMode::simple:
       idx = rewriter.create<mlir::FPToSIOp>(loc, idx, i32Type).getResult();
@@ -999,7 +989,7 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
       llvm_unreachable("Unsupported NearestMode");
     }
 
-    idx = CheckIntOutOfBounds(loc, rewriter, idx, cst0I32, idxMax);
+    idx = checkIntOutOfBounds(loc, rewriter, idx, bounds[0], bounds[1]);
     idx = rewriter.create<mlir::IndexCastOp>(loc, idx, idxType).getResult();
     srcOps.at(axis) = idx;
     return rewriter.create<mlir::LoadOp>(loc, tensor, srcOps);
@@ -1010,32 +1000,21 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
                                     Value tensor, Value idx,
                                     std::vector<Value> &srcOps,
                                     size_t axis) const {
-    auto f32Type = rewriter.getF32Type();
-    auto i32Type = rewriter.getI32Type();
     auto idxType = rewriter.getIndexType();
-
-    // Create constants
-    auto cst0I32 = rewriter
-                       .create<mlir::ConstantOp>(loc, i32Type,
-                                                 rewriter.getI32IntegerAttr(0))
-                       .getResult();
-    auto cst1F32 = rewriter
-                       .create<mlir::ConstantOp>(loc, f32Type,
-                                                 rewriter.getF32FloatAttr(1.0))
-                       .getResult();
-
-    // Create index upper bound constant
-    int32_t axisLen = tensor.getType().cast<MemRefType>().getShape()[axis];
-    auto idxMax = rewriter
-                      .create<mlir::ConstantOp>(
-                          loc, i32Type, rewriter.getI32IntegerAttr(axisLen - 1))
-                      .getResult();
+    auto i32Type = rewriter.getI32Type();
+    auto elementType = tensor.getType().cast<MemRefType>().getElementType();
+    auto bounds = GetIndexBounds(loc, rewriter, tensor, axis, i32Type);
+    auto cst1F =
+        rewriter
+            .create<mlir::ConstantOp>(loc, elementType,
+                                      rewriter.getFloatAttr(elementType, 1))
+            .getResult();
 
     // Calculate interpolation nodes: floor and ceil
-    auto floor = floorFPToSI(loc, rewriter, idx);
-    auto ceil = ceilFPToSI(loc, rewriter, idx);
-    floor = CheckIntOutOfBounds(loc, rewriter, floor, cst0I32, idxMax);
-    ceil = CheckIntOutOfBounds(loc, rewriter, ceil, cst0I32, idxMax);
+    auto floor = floorFPToSI(loc, rewriter, idx, i32Type);
+    auto ceil = ceilFPToSI(loc, rewriter, idx, i32Type);
+    floor = checkIntOutOfBounds(loc, rewriter, floor, bounds[0], bounds[1]);
+    ceil = checkIntOutOfBounds(loc, rewriter, ceil, bounds[0], bounds[1]);
     floor = rewriter.create<mlir::IndexCastOp>(loc, floor, idxType).getResult();
     ceil = rewriter.create<mlir::IndexCastOp>(loc, ceil, idxType).getResult();
 
@@ -1046,10 +1025,10 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
     auto g1 = rewriter.create<mlir::LoadOp>(loc, tensor, srcOps).getResult();
 
     // Calculate coefficients of g0 and g1
-    auto floorF32 =
-        rewriter.create<mlir::FloorFOp>(loc, f32Type, idx).getResult();
-    auto c0 = rewriter.create<mlir::SubFOp>(loc, idx, floorF32).getResult();
-    auto c1 = rewriter.create<mlir::SubFOp>(loc, cst1F32, c0).getResult();
+    auto floorF =
+        rewriter.create<mlir::FloorFOp>(loc, elementType, idx).getResult();
+    auto c0 = rewriter.create<mlir::SubFOp>(loc, idx, floorF).getResult();
+    auto c1 = rewriter.create<mlir::SubFOp>(loc, cst1F, c0).getResult();
 
     // Return interpolation result (result = c0*g0 + c1*g1)
     auto p0 = rewriter.create<mlir::MulFOp>(loc, c0, g0).getResult();
@@ -1061,56 +1040,57 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
                                    ConversionPatternRewriter &rewriter,
                                    Value tensor, Value idx,
                                    std::vector<Value> &srcOps, size_t axis,
-                                   FloatAttr cubicCoeffAttr) const {
+                                   double cubicCoeff) const {
     // Follow the algorithm used in ngraph cubic interpolation (also see, e.g.
     // [article](https://ieeexplore.ieee.org/document/1163711/).
 
     auto idxType = rewriter.getIndexType();
     auto i32Type = rewriter.getI32Type();
-    auto f32Type = rewriter.getF32Type();
+    // auto f64Type = rewriter.getF64Type();
 
-    // Create constant a (cube_coeff)
-    auto a = rewriter.create<mlir::ConstantOp>(loc, f32Type, cubicCoeffAttr)
+    auto elementType = tensor.getType().cast<MemRefType>().getElementType();
+    auto bounds = GetIndexBounds(loc, rewriter, tensor, axis, i32Type);
+
+    // Create constant a (cubeCoeff)
+    auto a = rewriter
+                 .create<mlir::ConstantOp>(
+                     loc, rewriter.getF64Type(),
+                     FloatAttr::get(rewriter.getF64Type(), cubicCoeff))
                  .getResult();
+    if (!elementType.isa<mlir::Float64Type>()) {
+      a = rewriter.create<mlir::FPTruncOp>(loc, elementType, a);
+    }
 
     // Create integer constants
-    SmallVector<Value, 4> cstI32;
+    SmallVector<Value, 4> cstI;
     for (auto i = 0; i <= 2; i++) {
       auto cstOp = rewriter.create<mlir::ConstantOp>(
-          loc, i32Type, rewriter.getI32IntegerAttr(static_cast<int32_t>(i)));
-      cstI32.push_back(cstOp.getResult());
+          loc, i32Type, rewriter.getIntegerAttr(i32Type, i));
+      cstI.push_back(cstOp.getResult());
     }
 
     // Create float constants
-    SmallVector<Value, 4> cstF32;
+    SmallVector<Value, 4> cstF;
     for (auto i = 0; i <= 3; i++) {
       auto cstOp = rewriter.create<mlir::ConstantOp>(
-          loc, f32Type, rewriter.getF32FloatAttr(static_cast<float>(i)));
-      cstF32.push_back(cstOp.getResult());
+          loc, elementType, rewriter.getFloatAttr(elementType, i));
+      cstF.push_back(cstOp.getResult());
     }
 
-    // Create index upper bound constant
-    int32_t axisLen = tensor.getType().cast<MemRefType>().getShape()[axis];
-    auto idxMax = rewriter
-                      .create<mlir::ConstantOp>(
-                          loc, i32Type, rewriter.getI32IntegerAttr(axisLen - 1))
-                      .getResult();
-
     // Calculate interpolation nodes x
-    auto floorI32 = floorFPToSI(loc, rewriter, idx);
-    auto ceilI32 = ceilFPToSI(loc, rewriter, idx);
+    auto floorI = floorFPToSI(loc, rewriter, idx, i32Type);
+    auto ceilI = ceilFPToSI(loc, rewriter, idx, i32Type);
     SmallVector<Value, 4> x;
     x.push_back(
-        rewriter.create<mlir::SubIOp>(loc, floorI32, cstI32[1]).getResult());
-    x.push_back(floorI32);
-    x.push_back(ceilI32);
-    x.push_back(
-        rewriter.create<mlir::AddIOp>(loc, ceilI32, cstI32[1]).getResult());
+        rewriter.create<mlir::SubIOp>(loc, floorI, cstI[1]).getResult());
+    x.push_back(floorI);
+    x.push_back(ceilI);
+    x.push_back(rewriter.create<mlir::AddIOp>(loc, ceilI, cstI[1]).getResult());
 
     // Load sample data g at interpolation nodes
     SmallVector<Value, 4> g;
     for (size_t i = 0; i < x.size(); i++) {
-      x[i] = CheckIntOutOfBounds(loc, rewriter, x[i], cstI32[0], idxMax);
+      x[i] = checkIntOutOfBounds(loc, rewriter, x[i], bounds[0], bounds[1]);
       x[i] = rewriter.create<mlir::IndexCastOp>(loc, x[i], idxType).getResult();
       srcOps.at(axis) = x[i];
       auto loadOp = rewriter.create<mlir::LoadOp>(loc, tensor, srcOps);
@@ -1119,30 +1099,29 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
 
     // Calculate intermediate terms
     SmallVector<Value, 4> p;
-    auto floorF32 =
-        rewriter.create<mlir::FloorFOp>(loc, f32Type, idx).getResult();
-    auto s = rewriter.create<mlir::SubFOp>(loc, idx, floorF32).getResult();
+    auto floorF =
+        rewriter.create<mlir::FloorFOp>(loc, idx.getType(), idx).getResult();
+    auto s = rewriter.create<mlir::SubFOp>(loc, idx, floorF).getResult();
     auto s2 = rewriter.create<mlir::MulFOp>(loc, s, s).getResult();
     auto s3 = rewriter.create<mlir::MulFOp>(loc, s2, s).getResult();
     auto s_a = rewriter.create<mlir::MulFOp>(loc, a, s).getResult();
     auto s2_a = rewriter.create<mlir::MulFOp>(loc, a, s2).getResult();
     auto s3_a = rewriter.create<mlir::MulFOp>(loc, a, s3).getResult();
-    auto s3_a2 = rewriter.create<mlir::AddFOp>(loc, a, cstF32[2]).getResult();
+    auto s3_a2 = rewriter.create<mlir::AddFOp>(loc, a, cstF[2]).getResult();
     s3_a2 = rewriter.create<mlir::MulFOp>(loc, s3_a2, s3).getResult();
-    auto s2_a3 = rewriter.create<mlir::AddFOp>(loc, a, cstF32[3]).getResult();
+    auto s2_a3 = rewriter.create<mlir::AddFOp>(loc, a, cstF[3]).getResult();
     s2_a3 = rewriter.create<mlir::MulFOp>(loc, s2_a3, s2).getResult();
     auto s2_2a3 = rewriter.create<mlir::AddFOp>(loc, a, a).getResult();
-    s2_2a3 = rewriter.create<mlir::AddFOp>(loc, s2_2a3, cstF32[3]).getResult();
+    s2_2a3 = rewriter.create<mlir::AddFOp>(loc, s2_2a3, cstF[3]).getResult();
     s2_2a3 = rewriter.create<mlir::MulFOp>(loc, s2_2a3, s2).getResult();
 
     // Calculate 4 terms at interpolation nodes
-    p.push_back(
-        rewriter.create<mlir::MulFOp>(loc, s2_a, cstF32[2]).getResult());
+    p.push_back(rewriter.create<mlir::MulFOp>(loc, s2_a, cstF[2]).getResult());
     p[0] = rewriter.create<mlir::SubFOp>(loc, s3_a, p[0]).getResult();
     p[0] = rewriter.create<mlir::AddFOp>(loc, p[0], s_a).getResult();
 
     p.push_back(rewriter.create<mlir::SubFOp>(loc, s3_a2, s2_a3).getResult());
-    p[1] = rewriter.create<mlir::AddFOp>(loc, p[1], cstF32[1]).getResult();
+    p[1] = rewriter.create<mlir::AddFOp>(loc, p[1], cstF[1]).getResult();
 
     p.push_back(rewriter.create<mlir::SubFOp>(loc, s2_2a3, s3_a2).getResult());
     p[2] = rewriter.create<mlir::SubFOp>(loc, p[2], s_a).getResult();
@@ -1159,7 +1138,23 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
     return rewriter.create<mlir::AddFOp>(loc, r, p[3]).getResult();
   }
 
-  Value CheckIntOutOfBounds(Location loc, ConversionPatternRewriter &rewriter,
+  SmallVector<Value, 2> GetIndexBounds(Location loc,
+                                       ConversionPatternRewriter &rewriter,
+                                       Value tensor, size_t axis,
+                                       IntegerType integerType) const {
+    // Return lower and upper bounds of a tensor at an axis
+    SmallVector<Value, 2> bounds;
+    auto axisLen = tensor.getType().cast<MemRefType>().getShape()[axis];
+    auto lower = rewriter.create<mlir::ConstantOp>(
+        loc, integerType, rewriter.getIntegerAttr(integerType, 0));
+    auto upper = rewriter.create<mlir::ConstantOp>(
+        loc, integerType, rewriter.getIntegerAttr(integerType, axisLen - 1));
+    bounds.push_back(lower.getResult());
+    bounds.push_back(upper.getResult());
+    return bounds;
+  }
+
+  Value checkIntOutOfBounds(Location loc, ConversionPatternRewriter &rewriter,
                             Value value, Value lowerBound,
                             Value upperBound) const {
     // Check if a mlir::IntegerType value is out of bounds. If it is, set it to
@@ -1177,41 +1172,42 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
 
   Value isHalfWayFloat(Location loc, ConversionPatternRewriter &rewriter,
                        Value value) const {
-    auto f32Type = rewriter.getF32Type();
+    // Check if the fractional part of a float value is 0.5
+    auto floatType = value.getType();
     auto half = rewriter.create<mlir::ConstantOp>(
-        loc, f32Type, rewriter.getFloatAttr(f32Type, 0.5));
+        loc, floatType, rewriter.getFloatAttr(floatType, 0.5));
     auto floor =
-        rewriter.create<mlir::FloorFOp>(loc, f32Type, value).getResult();
+        rewriter.create<mlir::FloorFOp>(loc, floatType, value).getResult();
     auto floorPlusHalf = rewriter.create<mlir::AddFOp>(loc, floor, half);
-    return rewriter.create<mlir::CmpFOp>(loc, CmpFPredicate::OEQ, value,
-                                         floorPlusHalf);
+    return rewriter
+        .create<mlir::CmpFOp>(loc, CmpFPredicate::OEQ, value, floorPlusHalf)
+        .getResult();
   }
 
   Value ceilFPToSI(Location loc, ConversionPatternRewriter &rewriter,
-                   Value value) const {
-    auto i32Type = rewriter.getI32Type();
-    auto f32Type = rewriter.getF32Type();
-    auto ceilF32 =
-        rewriter.create<mlir::CeilFOp>(loc, f32Type, value).getResult();
-    return rewriter.create<mlir::FPToSIOp>(loc, i32Type, ceilF32).getResult();
+                   Value value, IntegerType integerType) const {
+    auto ceilFloat =
+        rewriter.create<mlir::CeilFOp>(loc, value.getType(), value).getResult();
+    return rewriter.create<mlir::FPToSIOp>(loc, integerType, ceilFloat)
+        .getResult();
   }
 
   Value floorFPToSI(Location loc, ConversionPatternRewriter &rewriter,
-                    Value value) const {
-    auto i32Type = rewriter.getI32Type();
-    auto f32Type = rewriter.getF32Type();
-    auto floorF32 =
-        rewriter.create<mlir::FloorFOp>(loc, f32Type, value).getResult();
-    return rewriter.create<mlir::FPToSIOp>(loc, i32Type, floorF32).getResult();
+                    Value value, IntegerType integerType) const {
+    auto floorFloat =
+        rewriter.create<mlir::FloorFOp>(loc, value.getType(), value)
+            .getResult();
+    return rewriter.create<mlir::FPToSIOp>(loc, integerType, floorFloat)
+        .getResult();
   }
 
   Value roundFPToSI(Location loc, ConversionPatternRewriter &rewriter,
-                    Value value) const {
-    auto f32Type = rewriter.getF32Type();
+                    Value value, IntegerType integerType) const {
+    auto floatType = value.getType();
     auto half = rewriter.create<mlir::ConstantOp>(
-        loc, f32Type, rewriter.getFloatAttr(f32Type, 0.5));
+        loc, floatType, rewriter.getFloatAttr(floatType, 0.5));
     auto valuePlusHalf = rewriter.create<mlir::AddFOp>(loc, value, half);
-    return floorFPToSI(loc, rewriter, valuePlusHalf);
+    return floorFPToSI(loc, rewriter, valuePlusHalf, integerType);
   }
 };
 

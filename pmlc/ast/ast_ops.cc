@@ -38,6 +38,11 @@ static llvm::Optional<double> getFloatValue(Evaluator *evaluator,
   return llvm::None;
 }
 
+static bool isDataTypeFloat(DataType type) {
+  return type == DataType::bf16 || type == DataType::f16 ||
+         type == DataType::f32 || type == DataType::f64;
+}
+
 struct BooleanOp : Intrinsic {
   TensorShapes getShapes(Evaluator *evaluator, ArrayRef<ExprNodePtr> operands,
                          ArrayRef<TensorShape> shapes) const final {
@@ -73,13 +78,19 @@ struct GatherOp : Intrinsic {
     }
     auto tensor = shapes[0];
     auto idxs = shapes[1];
+    if (isDataTypeFloat(idxs.elementType)) {
+      if (!isDataTypeFloat(tensor.elementType)) {
+        throw std::runtime_error("'gather' interpolation modes require tensor "
+                                 "elements to be floats.");
+      }
+    }
     int64_t rank = tensor.getRank();
     if (!rank) {
       throw std::runtime_error(
           "'gather' requires first operand to have at least one dimension.");
     }
     auto axis = getIntegerValue(evaluator, operands[2]);
-    if ((!axis) || (axis.getValue() >= rank) || (axis.getValue() < 0)) {
+    if (!axis || axis.getValue() >= rank || axis.getValue() < 0) {
       throw std::runtime_error(
           "'gather' primitive expects the 'axis' argument "
           "to be a positive integer that is less than the tensor rank.");

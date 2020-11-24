@@ -767,11 +767,10 @@ struct ProgramBuilder {
           "'gather' primitive expects the 'cubeCoeff' argument "
           "to be a constant float");
     }
-    auto cubeCoeffFloat = static_cast<float>(cubeCoeff.getValueAsDouble());
     auto op = builder.create<tile::GatherOp>(
         loc, resultType, operands.take_front(2),
         builder.getIndexAttr(axis.getInt()), interpolationMode, nearestMode,
-        builder.getF32FloatAttr(cubeCoeffFloat));
+        cubeCoeff);
     return op.result();
   }
 

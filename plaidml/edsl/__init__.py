@@ -842,7 +842,26 @@ def floor(x):
     return intrinsic('floor', x)
 
 
-def gather(x, y, axis=0, interpolation_mode=1, nearest_mode=0, cube_coeff=-0.75):
+class InterpolationMode(enum.Enum):
+    NEAREST = 0
+    LINEAR = 1
+    CUBIC = 2
+
+
+class NearestMode(enum.Enum):
+    ROUND_PREFER_FLOOR = 0
+    ROUND_PREFER_CEIL = 1
+    FLOOR = 2
+    CEIL = 3
+    SIMPLE = 4
+
+
+def gather(x,
+           y,
+           axis=0,
+           interpolation_mode=InterpolationMode.LINEAR,
+           nearest_mode=NearestMode.ROUND_PREFER_FLOOR,
+           cube_coeff=-0.75):
     """Takes an input tensor (``x``) and a set of indices to gather over
     (``y``), and returns an output tensor that gathers the input tensor from the
     indices specified.
@@ -851,22 +870,15 @@ def gather(x, y, axis=0, interpolation_mode=1, nearest_mode=0, cube_coeff=-0.75)
         x (Tensor): The tensor to peform ``gather`` on.
         y (Tensor): The set of indices to ``gather`` over.
         axis (int): The dimension index to gather data from.
-        interpolation_mode (int): The type of interpolation 
-            0: NEAREST
-            1: LINEAR
-            2: CUBIC
-        nearest_mode (int): The type of nearest interpolation 
-            0: ROUND_PREFER_FLOOR
-            1: ROUND_PREFER_CEIL
-            2: FLOOR,
-            3: CEIL,
-            4: SIMPLE
+        interpolation_mode (Enum): The type of interpolation 
+        nearest_mode (Enum): The type of nearest interpolation 
         cube_coeff (float): The coefficient that controls the cubic interpolation.
 
     Returns:
         Tensor: The result of the ``gather`` operation.
     """
-    return intrinsic('gather', x, y, axis, interpolation_mode, nearest_mode, cube_coeff)
+    return intrinsic('gather', x, y, axis, interpolation_mode.value, nearest_mode.value,
+                     cube_coeff)
 
 
 def ident(x):

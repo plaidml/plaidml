@@ -806,7 +806,6 @@ enum class InterpolationMode : uint64_t {
   NEAREST,
   LINEAR,
   CUBIC,
-  _LAST,
 };
 
 enum class NearestMode : uint64_t {
@@ -815,7 +814,6 @@ enum class NearestMode : uint64_t {
   FLOOR,
   CEIL,
   SIMPLE,
-  _LAST,
 };
 
 ///
