@@ -127,8 +127,9 @@ void wrapFunctionAndPackArguments(llvm::Module *module,
         builder.getInt64Ty(), APInt(64, indexedArg.index()));
     llvm::Value *argPtrPtr = builder.CreateGEP(argList, argIndex);
     llvm::Value *argPtr = builder.CreateLoad(argPtrPtr);
-    llvm::Value *arg =
-        builder.CreateBitCast(argPtr, indexedArg.value().getType());
+    auto dstType = indexedArg.value().getType();
+    llvm::Value *arg = dstType->isIntegerTy() ?
+        builder.CreatePtrToInt(argPtr, dstType) : builder.CreateBitCast(argPtr, dstType);
     args.push_back(arg);
   }
 
