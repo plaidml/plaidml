@@ -74,6 +74,7 @@ local exports = [
   'plaidml_expr_contraction_set_no_reduce',
   'plaidml_expr_contraction_set_use_default',
   'plaidml_expr_gradient',
+  'plaidml_expr_jacobian',
   'plaidml_deriv_register',
   'plaidml_program_free',
   'plaidml_program_evaluate',

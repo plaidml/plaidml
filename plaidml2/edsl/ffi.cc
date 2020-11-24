@@ -16,6 +16,7 @@
 #ifdef PLAIDML_AST
 #include "tile/lang/ast/ast.h"
 #include "tile/lang/ast/gradient.h"
+#include "tile/lang/ast/jacobian.h"
 #endif
 
 #ifdef PLAIDML_MLIR
@@ -904,6 +905,34 @@ void plaidml_expr_gradient(  //
     for (size_t i = 0; i < nwrts; i++) {
       derivs[i] = new plaidml_expr{deriv_values[i]};
     }
+#endif
+  });
+}
+
+void plaidml_expr_jacobian(  //
+    plaidml_error* err,      //
+    size_t nwrts,            //
+    plaidml_expr** wrts,     //
+    plaidml_expr* loss,      //
+    plaidml_expr** derivs) {
+  // Given a forward pass tensor operation that takes `nwrt` inputs given in
+  // `wrt` and produces the output `loss`, produce the derivatives for each
+  // tensor in `wrt` and store these `nwrt` derivatives in `derivs` in the
+  // corresponding order as they were received in `wrt`.
+  ffi_wrap_void(err, [&] {
+    IVLOG(3, "plaidml_expr_jacobian");
+#ifdef PLAIDML_AST
+    std::vector<ExprPtr> wrt_exprs(nwrts);
+    for (size_t i = 0; i < nwrts; i++) {
+      wrt_exprs[i] = wrts[i]->expr;
+    }
+    auto deriv_exprs = ComputeJacobian(wrt_exprs, loss->expr);
+    for (size_t i = 0; i < nwrts; i++) {
+      derivs[i] = new plaidml_expr{deriv_exprs[i]};
+    }
+#endif
+#ifdef PLAIDML_MLIR
+    throw std::runtime_error("Jacobian Op not implemented for MLIR");
 #endif
   });
 }

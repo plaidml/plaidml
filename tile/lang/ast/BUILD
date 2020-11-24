@@ -15,12 +15,14 @@ plaidml_cc_library(
         "fold.cc",
         "fold.h",
         "gradient.cc",
+        "jacobian.cc",
         "traversal.cc",
         "traversal.h",
     ],
     hdrs = [
         "ast.h",
         "gradient.h",
+        "jacobian.h",
     ],
     visibility = ["//visibility:public"],
     deps = [

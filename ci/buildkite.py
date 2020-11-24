@@ -217,12 +217,9 @@ def make_all_wheels(workdir):
 
 def download_test_artifacts(pattern):
     util.buildkite_download(pattern, '.')
-    util.buildkite_download(pattern.replace('/', '\\'), '.')
     for path in glob.glob(pattern):
         src = pathlib.Path(path)
-        tgt = pathlib.Path(path.replace('\\', '/'))
-        tgt.parent.mkdir(parents=True, exist_ok=True)
-        src.rename(tgt)
+        src.parent.mkdir(parents=True, exist_ok=True)
 
 
 def cmd_report(args, remainder):

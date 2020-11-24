@@ -730,6 +730,19 @@ def index(x, axis):
     return call('index', x, axis)
 
 
+def jacobian(loss, variables):
+    wrts = [x.as_ptr() for x in variables]
+    raw_grads = ffi.new('plaidml_expr*[]', len(wrts))
+    ffi_call(
+        lib.plaidml_expr_jacobian,
+        len(wrts),
+        wrts,
+        loss.as_ptr(),
+        raw_grads,
+    )
+    return [Tensor(expr=x) for x in raw_grads]
+
+
 def log(x):
     return call('log', x)
 
