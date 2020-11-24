@@ -815,9 +815,8 @@ struct ProgramBuilder {
 
 std::shared_ptr<Program> buildProgram(llvm::StringRef name,
                                       const ProgramArguments &args) {
-  static std::once_flag isInitialized;
-  std::call_once(isInitialized, []() {
-    registerOps();
+  static std::once_flag once;
+  std::call_once(once, []() {
     enableGlobalDialectRegistry(true);
     registerDialect<dialect::tile::TileDialect>();
     registerDialect<dialect::layer::LayerDialect>();

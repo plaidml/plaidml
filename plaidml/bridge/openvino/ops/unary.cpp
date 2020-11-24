@@ -28,12 +28,6 @@ static void registerUnaryOpCall(const std::string& name, T op) {
 }
 
 void registerUnaryOps() {
-  //   registerOp("sigmoid", [](const Context& ctx) {
-  //     IE_ASSERT(ctx.operands.size() == 1);
-  //     edsl::Tensor I = ctx.operands.at(0);
-  //     std::cout << "I: " << I.str() << std::endl;
-  //     return edsl::make_tuple(op::sigmoid(I));
-  //   });
   registerUnaryOpCall("abs", op::abs);
   registerUnaryOp("acos", "acos");
   registerUnaryOp("asin", "asin");
