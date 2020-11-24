@@ -1431,7 +1431,7 @@ TEST_F(CppEdsl, InterpolatedGatherCubicDouble) {
   auto A = Placeholder(DType::FLOAT64, {1, 6});
   auto B = Placeholder(DType::FLOAT64, {12});
   auto O = gather(A, B).axis(1).interpolationMode(InterpolationMode::CUBIC).cubeCoeff(-0.5);
-  auto program = makeProgram("interpolated_gather_cubic", {A, B}, {O});
+  auto program = makeProgram("interpolated_gather_cubic_double", {A, B}, {O});
 
   std::vector<double> in1 = {0.0, 1.0, 8.0, 5.0, 5.0, 2.0};
   std::vector<double> in2 = {-0.25, 0.25, 0.75, 1.25, 1.75, 2.25, 2.75, 3.25, 3.75, 4.25, 4.75, 5.25};
@@ -1444,7 +1444,7 @@ TEST_F(CppEdsl, InterpolatedGatherCubicHalf) {
   auto A = Placeholder(DType::FLOAT16, {1, 6});
   auto B = Placeholder(DType::FLOAT16, {12});
   auto O = gather(A, B).axis(1).interpolationMode(InterpolationMode::CUBIC).cubeCoeff(-0.5);
-  auto program = makeProgram("interpolated_gather_cubic", {A, B}, {O});
+  auto program = makeProgram("interpolated_gather_cubic_half", {A, B}, {O});
 
   std::vector<float> in1 = {0.0f, 1.0f, 8.0f, 5.0f, 5.0f, 2.0f};
   std::vector<float> in2 = {-0.25f, 0.25f, 0.75f, 1.25f, 1.75f, 2.25f, 2.75f, 3.25f, 3.75f, 4.25f, 4.75f, 5.25f};

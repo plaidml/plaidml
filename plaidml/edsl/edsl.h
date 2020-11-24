@@ -872,7 +872,8 @@ class gather {
 
   ///
   /// axis_ is a dimension index to gather data from
-  /// mode_ specifies type of interpolation
+  /// interpolation_mode_ specifies type of interpolation
+  /// nearest_mode_ specifies type of  nearest interpolation
   /// cube_coeff_ controls the cubic interpolation
   ///
   Tensor axis_ = Tensor(0);
