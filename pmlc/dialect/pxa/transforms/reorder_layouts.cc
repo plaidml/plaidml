@@ -238,17 +238,45 @@ selectCommonVectorization(MemoryUsageDesc &memoryDesc,
   return mlir::success();
 }
 
+void fixResultsIfModulosInAffineMap(
+    mlir::AffineMap &map, mlir::SmallVector<int64_t, 6> &expandedShape) {
+  // Deal with modulos
+  mlir::SmallVector<int64_t, 6> expandedShapeCopy(expandedShape);
+  expandedShape.clear();
+
+  IVLOG(3, "map.getNumResults(): " << map.getNumResults());
+  for (unsigned idx = 0; idx < map.getNumResults(); ++idx) {
+    int64_t res = expandedShapeCopy[idx];
+
+    mlir::AffineExpr expr = map.getResult(idx);
+    IVLOG(3, "dimExpr: " << mlir::debugString(expr));
+
+    if (expr.getKind() == mlir::AffineExprKind::Mod) {
+      auto addExpr = expr.cast<mlir::AffineBinaryOpExpr>();
+      mlir::AffineExpr lhsExpr = addExpr.getLHS();
+      mlir::AffineExpr rhsExpr = addExpr.getRHS();
+
+      IVLOG(3, "Modulo Op, LHS: " << mlir::debugString(lhsExpr));
+      IVLOG(3, "Modulo Op, RHS: " << mlir::debugString(rhsExpr));
+
+      if (rhsExpr.getKind() == mlir::AffineExprKind::Constant) {
+        auto constantExpr = rhsExpr.cast<mlir::AffineConstantExpr>();
+        res = constantExpr.getValue();
+        IVLOG(3, "The modulo constantValue: " << res);
+      }
+    }
+
+    expandedShape.push_back(res);
+  }
+}
+
 mlir::LogicalResult
 applyMapOnConstantArray(mlir::AffineMap map, mlir::ArrayRef<int64_t> &input,
                         mlir::SmallVector<int64_t, 6> &expandedShape) {
   mlir::SmallVector<mlir::AffineExpr, 6> expansionExprs;
   // mlir::SmallVector<int64_t, 6> expandedShape;
   mlir::SmallVector<int64_t, 6> expandedVec;
-  IVLOG(3, "map.getNumResults(): " << map.getNumResults());
-  for (unsigned idx = 0; idx < map.getNumResults(); ++idx) {
-    mlir::AffineExpr dimExpr = mlir::getAffineDimExpr(idx, map.getContext());
-    IVLOG(3, "dimExpr: " << mlir::debugString(dimExpr));
-  }
+  IVLOG(3, "applyMapOnConstantArray map: " << mlir::debugString(map));
 
   mlir::SmallVector<mlir::Attribute, 8> operandConstants;
   mlir::OpBuilder builder(map.getContext());
@@ -262,13 +290,18 @@ applyMapOnConstantArray(mlir::AffineMap map, mlir::ArrayRef<int64_t> &input,
   if (mlir::failed(map.constantFold(operandConstants, foldedResults))) {
     return mlir::failure();
   } else {
-    IVLOG(3, "RESULTS: ");
     for (unsigned i = 0; i < foldedResults.size(); i++) {
       int64_t val =
           foldedResults[i].cast<mlir::IntegerAttr>().getValue().getSExtValue();
       expandedShape.push_back(val);
-      IVLOG(3, "val: " << val);
     }
+
+    fixResultsIfModulosInAffineMap(map, expandedShape);
+    IVLOG(3, "RESULTS: ");
+    for (unsigned i = 0; i < expandedShape.size(); i++) {
+      IVLOG(3, "val: " << expandedShape[i]);
+    }
+
     return mlir::success();
   }
 }
@@ -336,6 +369,7 @@ optimizeLayoutForReads(MemoryUsageDesc &memoryDesc) {
       return llvm::None;
     }
     for (MemoryReadDesc &readDesc : memoryDesc.reads) {
+      IVLOG(3, "readDesc.readMap: " << mlir::debugString(readDesc.readMap));
       mlir::Optional<ReorderDesc> reorder =
           tileAffineMap(readDesc.readMap, memoryDesc.shape, commonVector,
                         readDesc.dimensionConstraints, readDesc.iterationOrder);
@@ -483,6 +517,7 @@ expandAffineExpr(mlir::AffineExpr expr, mlir::AffineExpr dimExpr,
 ReorderDesc expandAffineMap(mlir::AffineMap map, mlir::ArrayRef<int64_t> shape,
                             mlir::ArrayRef<int64_t> vector,
                             mlir::FlatAffineConstraints &constraints) {
+  IVLOG(3, "Input map: " << mlir::debugString(map));
   mlir::SmallVector<mlir::AffineExpr, 6> expansionExprs;
   mlir::SmallVector<int64_t, 6> expandedShape;
   mlir::SmallVector<int64_t, 6> expandedVec;
@@ -493,6 +528,8 @@ ReorderDesc expandAffineMap(mlir::AffineMap map, mlir::ArrayRef<int64_t> shape,
   }
   auto reorderMap = mlir::AffineMap::get(map.getNumResults(), 0, expansionExprs,
                                          map.getContext());
+
+  IVLOG(3, "Output map: " << mlir::debugString(reorderMap));
   return ReorderDesc{reorderMap, expandedShape, expandedVec};
 }
 
@@ -578,6 +615,7 @@ tileAffineMap(mlir::AffineMap map, mlir::ArrayRef<int64_t> shape,
   mlir::AffineMap expanded = expand.reorderMap.compose(map);
   mlir::AffineMap expandedSimple =
       simplifyMapWithConstraints(expanded, constraints);
+  IVLOG(3, "expandedSimple: " << mlir::debugString(expandedSimple));
   mlir::ArrayRef<int64_t> expandedShape = expand.reorderedShape;
   mlir::ArrayRef<int64_t> expandedVector = expand.reorderedVector;
   ReorderDesc sort =
