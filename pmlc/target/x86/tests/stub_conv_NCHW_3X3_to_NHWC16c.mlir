@@ -4,8 +4,10 @@
 
 //PLAIDML_VERBOSE=3 bazel-bin/pmlc/opt -convert-linalg-to-loops -pxa-reorder-layouts="allow-reorder=true" -x86-affine-stencil-xsmm -x86-convert-pxa-to-affine -lower-affine  -canonicalize -convert-scf-to-std -x86-convert-std-to-llvm pmlc/target/x86/tests/stub_conv_NCHW_3X3_to_NHWC16c.mlir
 
-#NCHW_to_NHWC16c = affine_map<(N,C,H,W) -> (N,C floordiv 16, H,W,C mod 16)> 
-#KCRS_to_KCRSck = affine_map<(K,C,R,S) -> (K floordiv 16,C floordiv 16,C mod 16, K mod 16)> 
+#NCHW_to_NHWC16c = affine_map<(N,C,H,W) -> 
+            (N,C floordiv 16, H,W,C mod 16)> 
+#KCRS_to_KCRSck = affine_map<(K,C,R,S) -> 
+            (K floordiv 16,C floordiv 16,C mod 16, K mod 16)> 
 
 !I_memref = type memref<1x64x56x56xf32, #NCHW_to_NHWC16c> 
 !K_memref = type memref<64x64x3x3xf32, #KCRS_to_KCRSck>  
