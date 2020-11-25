@@ -5,6 +5,7 @@ pml_cc_library(
   HDRS
     device_id.h
     executable.h
+    register.h
     runtime.h
     runtime_registry.h
     symbol_registry.h
@@ -18,6 +19,7 @@ pml_cc_library(
     jit_executable.cc
     jit_executable.h
     prng.cc
+    register.cc
     runtime_registry.cc
     symbol_registry.cc
     xsmm.cc
@@ -42,4 +44,12 @@ set_property(SOURCE xsmm.cc
   PROPERTY COMPILE_DEFINITIONS
     __BLAS=0
     LIBXSMM_DEFAULT_CONFIG
+)
+
+pml_cc_library(
+  NAME all_runtimes
+  SRCS all_runtimes.cc
+  DEPS
+    ::rt
+    pmlc::rt::llvm
 )

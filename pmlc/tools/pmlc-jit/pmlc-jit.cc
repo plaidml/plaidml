@@ -94,6 +94,7 @@ int main(int argc, char **argv) {
   llvm::InitializeNativeTarget();
   llvm::InitializeNativeTargetAsmPrinter();
   mlir::initializeLLVMPasses();
+  pmlc::rt::registerRuntimes();
   pmlc::rt::initRuntimes();
 
   std::set_terminate([]() {

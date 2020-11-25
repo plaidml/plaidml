@@ -11,6 +11,7 @@
 
 #include "plaidml/core/internal.h"
 #include "plaidml/core/settings.h"
+#include "pmlc/ast/ast_ops.h"
 #include "pmlc/util/env.h"
 #include "pmlc/util/logging.h"
 #include "pmlc/util/util.h"
@@ -53,6 +54,8 @@ void plaidml_init(plaidml_error* err) {
       }
       IVLOG(1, "plaidml_init");
       Settings::Instance()->load();
+      pmlc::ast::registerOps();
+      pmlc::compiler::registerTargets();
     });
   });
 }

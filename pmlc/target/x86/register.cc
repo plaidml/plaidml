@@ -31,8 +31,8 @@ public:
   }
 };
 
-static compiler::TargetRegistration targetReg(kTargetName, []() {
-  return std::make_shared<Target>();
-});
+void registerTarget() {
+  pmlc::compiler::registerTarget(kTargetName, std::make_shared<Target>());
+}
 
 } // namespace pmlc::target::x86

@@ -14,6 +14,7 @@ plaidml_cc_library(
         "jit_executable.cc",
         "jit_executable.h",
         "prng.cc",
+        "register.cc",
         "runtime_registry.cc",
         "symbol_registry.cc",
         "xsmm.cc",
@@ -21,6 +22,7 @@ plaidml_cc_library(
     hdrs = [
         "device_id.h",
         "executable.h",
+        "register.h",
         "runtime.h",
         "runtime_registry.h",
         "symbol_registry.h",
@@ -47,6 +49,18 @@ plaidml_cc_library(
     alwayslink = 1,
 )
 
+plaidml_cc_library(
+    name = "all_runtimes",
+    srcs = ["all_runtimes.cc"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":rt",
+        "//pmlc/rt/llvm",
+        "//pmlc/rt/vulkan",
+    ],
+    alwayslink = 1,
+)
+
 plaidml_cc_test(
     name = "device_id_test",
     size = "small",
@@ -55,6 +69,8 @@ plaidml_cc_test(
         "internal.h",
     ],
     deps = [
+        ":all_runtimes",
         ":rt",
+        "//pmlc/target:all_targets",
     ],
 )

@@ -2,6 +2,7 @@ pml_cc_library(
   NAME x86
   HDRS
     passes.h
+    pipeline.h
   SRCS
     heatmap.cc
     heatmap_impl.cc
