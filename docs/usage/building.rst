@@ -20,7 +20,7 @@ executable. Example:
 .. code-block::
     
     wget https://github.com/bazelbuild/bazelisk/releases/download/v0.0.8/bazelisk-darwin-amd64
-    mv bazelisk-darwin-amd64 /usr/local/bin
+    mv bazelisk-darwin-amd64 /usr/local/bin/bazelisk
     chmod +x /usr/local/bin/bazelisk
 
 https://github.com/bazelbuild/bazelisk/releases
