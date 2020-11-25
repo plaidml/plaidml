@@ -12,15 +12,3 @@ pml_cc_library(
     pmlc::util
     LLVMSupport
 )
-
-pml_cc_library(
-  NAME obj
-  TYPE OBJECT
-  HDRS ${_HDRS}
-  SRCS ${_SRCS}
-  DEPS
-    plaidml::core::obj
-    plaidml::edsl::obj
-    pmlc::util
-    LLVMSupport
-)

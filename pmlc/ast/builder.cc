@@ -3,6 +3,7 @@
 #include "pmlc/ast/builder.h"
 
 #include <limits>
+#include <mutex>
 #include <stack>
 #include <string>
 #include <unordered_set>
@@ -22,6 +23,7 @@
 #include "llvm/Support/FormatVariadic.h"
 
 #include "pmlc/ast/ast.h"
+#include "pmlc/ast/ast_ops.h"
 #include "pmlc/ast/eval.h"
 #include "pmlc/dialect/layer/ir/ops.h"
 #include "pmlc/dialect/tile/ir/ops.h"
@@ -813,10 +815,13 @@ struct ProgramBuilder {
 
 std::shared_ptr<Program> buildProgram(llvm::StringRef name,
                                       const ProgramArguments &args) {
-  enableGlobalDialectRegistry(true);
-  registerDialect<dialect::tile::TileDialect>();
-  registerDialect<dialect::layer::LayerDialect>();
-  registerDialect<StandardOpsDialect>();
+  static std::once_flag once;
+  std::call_once(once, []() {
+    enableGlobalDialectRegistry(true);
+    registerDialect<dialect::tile::TileDialect>();
+    registerDialect<dialect::layer::LayerDialect>();
+    registerDialect<StandardOpsDialect>();
+  });
   if (name.empty()) {
     name = "module";
   }

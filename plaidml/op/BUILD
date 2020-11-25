@@ -71,6 +71,10 @@ plaidml_cc_test(
     name = "op_test",
     size = "medium",
     srcs = ["op_test.cc"],
+    copts = select({
+        "@bazel_tools//src/conditions:darwin_x86_64": ["-Wno-deprecated-declarations"],
+        "//conditions:default": [],
+    }),
     linkstatic = True,
     deps = [
         ":op",

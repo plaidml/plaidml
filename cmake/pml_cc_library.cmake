@@ -61,7 +61,7 @@ function(pml_cc_library)
     _RULE
     "PUBLIC;ALWAYSLINK;TESTONLY;WHOLEARCHIVE"
     "NAME;TYPE"
-    "HDRS;TEXTUAL_HDRS;SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS;INCLUDES;PROPS"
+    "HDRS;TEXTUAL_HDRS;SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS;INCLUDES;PROPS;PRIVATE_DEPS"
     ${ARGN}
   )
 
@@ -72,6 +72,7 @@ function(pml_cc_library)
   pml_package_ns(_PACKAGE_NS)
   # Replace dependencies passed by ::name with ::pml::package::name
   list(TRANSFORM _RULE_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
+  list(TRANSFORM _RULE_PRIVATE_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
   list(TRANSFORM _RULE_DATA REPLACE "^::" "${_PACKAGE_NS}::")
 
   # Prefix the library with the package name, so we get: pml_package_name.
@@ -128,7 +129,10 @@ function(pml_cc_library)
     if(_RULE_WHOLEARCHIVE)
       pml_whole_archive_link(${_NAME} ${_RULE_DEPS})
     else()
-      target_link_libraries(${_NAME} PUBLIC ${_RULE_DEPS})
+      target_link_libraries(${_NAME}
+        PUBLIC ${_RULE_DEPS}
+        PRIVATE ${_RULE_PRIVATE_DEPS}
+      )
     endif()
     target_link_libraries(${_NAME}
       PRIVATE

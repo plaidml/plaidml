@@ -62,10 +62,13 @@ set(API_SYMBOLS
   plaidml_expr_input
   plaidml_expr_int
   plaidml_expr_intrinsic
+  plaidml_expr_layer_begin
+  plaidml_expr_layer_end
   plaidml_expr_pragma
   plaidml_expr_ptr
   plaidml_expr_repr
   plaidml_expr_uint
+  plaidml_exprs_free
   plaidml_poly_expr_dim
   plaidml_poly_expr_free
   plaidml_poly_expr_index

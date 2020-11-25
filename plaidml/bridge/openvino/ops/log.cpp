@@ -14,10 +14,12 @@ using namespace InferenceEngine;  // NOLINT[build/namespaces]
 
 namespace PlaidMLPlugin {
 
-static OpRegistration reg("log", [](const Context& ctx) {
-  IE_ASSERT(ctx.operands.size() == 1);
-  auto I = ctx.operands.at(0);
-  return edsl::make_tuple(log(I));
-});
+void registerLog() {
+  registerOp("log", [](const Context& ctx) {
+    IE_ASSERT(ctx.operands.size() == 1);
+    auto I = ctx.operands.at(0);
+    return edsl::make_tuple(log(I));
+  });
+}
 
 }  // namespace PlaidMLPlugin

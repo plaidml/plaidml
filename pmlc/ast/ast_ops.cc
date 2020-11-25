@@ -177,29 +177,25 @@ struct ShapeOp : Intrinsic {
   }
 };
 
-struct Registration {
-  Registration() {
-    auto registry = IntrinsicRegistry::Instance();
-    registry->add("cmp_eq", std::make_unique<BooleanOp>());
-    registry->add("cmp_ge", std::make_unique<BooleanOp>());
-    registry->add("cmp_gt", std::make_unique<BooleanOp>());
-    registry->add("cmp_le", std::make_unique<BooleanOp>());
-    registry->add("cmp_lt", std::make_unique<BooleanOp>());
-    registry->add("cmp_ne", std::make_unique<BooleanOp>());
-    registry->add("gather", std::make_unique<GatherOp>());
-    registry->add("index", std::make_unique<IndexOp>());
-    registry->add("logical_and", std::make_unique<BooleanOp>());
-    registry->add("logical_not", std::make_unique<BooleanOp>());
-    registry->add("logical_or", std::make_unique<BooleanOp>());
-    registry->add("logical_xor", std::make_unique<BooleanOp>());
-    registry->add("prng", std::make_unique<PrngOp>());
-    registry->add("reshape", std::make_unique<ReshapeOp>());
-    registry->add("scatter", std::make_unique<ScatterOp>());
-    registry->add("select", std::make_unique<SelectOp>());
-    registry->add("shape", std::make_unique<ShapeOp>());
-  }
-};
-
-static Registration registration;
+void registerOps() {
+  auto registry = IntrinsicRegistry::Instance();
+  registry->add("cmp_eq", std::make_unique<BooleanOp>());
+  registry->add("cmp_ge", std::make_unique<BooleanOp>());
+  registry->add("cmp_gt", std::make_unique<BooleanOp>());
+  registry->add("cmp_le", std::make_unique<BooleanOp>());
+  registry->add("cmp_lt", std::make_unique<BooleanOp>());
+  registry->add("cmp_ne", std::make_unique<BooleanOp>());
+  registry->add("gather", std::make_unique<GatherOp>());
+  registry->add("index", std::make_unique<IndexOp>());
+  registry->add("logical_and", std::make_unique<BooleanOp>());
+  registry->add("logical_not", std::make_unique<BooleanOp>());
+  registry->add("logical_or", std::make_unique<BooleanOp>());
+  registry->add("logical_xor", std::make_unique<BooleanOp>());
+  registry->add("prng", std::make_unique<PrngOp>());
+  registry->add("reshape", std::make_unique<ReshapeOp>());
+  registry->add("scatter", std::make_unique<ScatterOp>());
+  registry->add("select", std::make_unique<SelectOp>());
+  registry->add("shape", std::make_unique<ShapeOp>());
+}
 
 } // namespace pmlc::ast

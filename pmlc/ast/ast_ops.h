@@ -47,4 +47,6 @@ private:
   llvm::StringMap<std::unique_ptr<Intrinsic>> registry_;
 };
 
+void registerOps();
+
 } // namespace pmlc::ast

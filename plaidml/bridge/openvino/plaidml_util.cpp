@@ -31,8 +31,38 @@ ngraph::AxisVector get_axis_vector_from_constant_operand(size_t operand_idx, ngr
   }
 }
 
-plaidml::DType to_plaidml(const ngraph::element::Type& ng_type) {
-  switch (ng_type) {
+plaidml::DType to_plaidml(const InferenceEngine::Precision& precision) {
+  switch (precision) {
+    case InferenceEngine::Precision::FP16:
+      return plaidml::DType::FLOAT16;
+    case InferenceEngine::Precision::FP32:
+      return plaidml::DType::FLOAT32;
+    case InferenceEngine::Precision::I8:
+      return plaidml::DType::INT8;
+    case InferenceEngine::Precision::I16:
+      return plaidml::DType::INT16;
+    case InferenceEngine::Precision::I32:
+      return plaidml::DType::INT32;
+    case InferenceEngine::Precision::I64:
+      return plaidml::DType::INT64;
+    case InferenceEngine::Precision::U8:
+      return plaidml::DType::UINT8;
+    case InferenceEngine::Precision::U16:
+      return plaidml::DType::UINT16;
+    case InferenceEngine::Precision::U32:
+      return plaidml::DType::UINT8;
+    case InferenceEngine::Precision::U64:
+      return plaidml::DType::UINT16;
+    case InferenceEngine::Precision::BOOL:
+      return plaidml::DType::BOOLEAN;
+    default:
+      // TODO: Verify these are the unsupported types
+      THROW_IE_EXCEPTION << "Unsupported element type";
+  }
+}
+
+plaidml::DType to_plaidml(const ngraph::element::Type& type) {
+  switch (type) {
     case ngraph::element::Type_t::f16:
       return plaidml::DType::FLOAT16;
     case ngraph::element::Type_t::f32:
@@ -67,8 +97,8 @@ plaidml::DType to_plaidml(const ngraph::element::Type& ng_type) {
   }
 }
 
-plaidml::op::AutoPadMode to_plaidml(const ngraph::op::PadType& ng_type) {
-  switch (ng_type) {
+plaidml::op::AutoPadMode to_plaidml(const ngraph::op::PadType& type) {
+  switch (type) {
     case ngraph::op::PadType::EXPLICIT:
       return plaidml::op::AutoPadMode::EXPLICIT;
     case ngraph::op::PadType::SAME_LOWER:
@@ -82,8 +112,8 @@ plaidml::op::AutoPadMode to_plaidml(const ngraph::op::PadType& ng_type) {
   }
 }
 
-plaidml::op::PadMode to_plaidml(const ngraph::op::PadMode& ng_type) {
-  switch (ng_type) {
+plaidml::op::PadMode to_plaidml(const ngraph::op::PadMode& type) {
+  switch (type) {
     case ngraph::op::PadMode::CONSTANT:
       return plaidml::op::PadMode::CONSTANT;
     case ngraph::op::PadMode::EDGE:
