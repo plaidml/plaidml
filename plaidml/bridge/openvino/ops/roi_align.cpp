@@ -39,7 +39,7 @@ edsl::Tensor make_tensor(DType dtype, const std::vector<int64_t>& dims, const st
 namespace PlaidMLPlugin {
 
 // TODO: change register method as plaidml-v1
-static OpRegistration reg("ROLIAlign", [](const Context& ctx) {
+static OpRegistration reg("ROIAlign", [](const Context& ctx) {
   IE_ASSERT(ctx.operands.size() == 3);
   auto X = ctx.operands.at(0);
   auto* layer = ngraph::as_type<ngraph::opset3::ROIAlign>(ctx.layer);
@@ -101,11 +101,12 @@ static OpRegistration reg("ROLIAlign", [](const Context& ctx) {
     }
     auto ind_tensor_w = make_tensor(DType::INT32, {sampling_w}, indices_w, "indices_w");
 
-    auto batch_X = op::slice(X)
+    auto slice_X = op::slice(X)
                        .add_dim(batch_indices[i])
                        .add_dim(0, input_size[1])
                        .add_dim(0, input_size[2])
                        .add_dim(0, input_size[3]);
+    auto batch_X = op::unsqueeze(slice_X, {0});
 
     auto gather_w = edsl::gather(batch_X, ind_tensor_w).axis(3).interpolationMode(edsl::InterpolationMode::LINEAR);
     auto gather_h = edsl::gather(gather_w, ind_tensor_h).axis(2).interpolationMode(edsl::InterpolationMode::LINEAR);

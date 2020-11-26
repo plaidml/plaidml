@@ -15,18 +15,14 @@ std::vector<InferenceEngine::Precision> netPrecisions = {
     InferenceEngine::Precision::FP32,
 };
 
-std::vector<InferenceEngine::Precision> indPrecisions = {
-    InferenceEngine::Precision::I32,
-};
-
-const std::vector<InferenceEngine::SizeVector> inputShapes = {{7, 256, 200, 200}};
-const std::vector<std::vector<std::vector<int64_t>>> rois = {{{2, 2, 4, 4}, {10, 11, 11, 12}}};
-const std::vector<std::vector<int64_t>> batchIndices = {{2, 5}};
+const std::vector<std::vector<size_t>> inputShapes = {{7, 256, 200, 200}};
+const std::vector<std::vector<std::vector<float>>> rois = {{{0.1, 0.2, 0.44, 34}, {0.33, 0.41, 0.11, 32}}};
+const std::vector<std::vector<size_t>> batchIndices = {{2, 5}};
 const std::vector<size_t> numROIs = {2};
 const std::vector<size_t> pooledHs = {6};
 const std::vector<size_t> pooledWs = {6};
 const std::vector<size_t> samplingRatios = {2, 0};
-const std::vector<float> spatialScale = {16.0};
+const std::vector<float> spatialScale = {20.0};
 const std::vector<std::string> modes = {"avg", "max"};
 
 const auto roiAlignArgSet = ::testing::Combine(::testing::ValuesIn(inputShapes),     //
