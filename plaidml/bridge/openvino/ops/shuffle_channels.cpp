@@ -19,8 +19,9 @@ void registerShuffleChannels() {
     auto I = ctx.operands.at(0);
     auto group = layer->get_group();
     auto axis = layer->get_axis();
+    IE_ASSERT(I.rank() == 4);
     if (axis < 0) {
-      axis = axis + 4;
+      axis = axis + I.rank();
     }
 
     std::vector<edsl::TensorDim> original_dims(I.rank());
