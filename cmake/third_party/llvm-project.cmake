@@ -1,7 +1,7 @@
 FetchContent_Declare(
   llvm-project
-  URL      https://github.com/plaidml/llvm-project/archive/b3f1f66eddd9ed4e3caf6043344b17f5b0920bb0.tar.gz
-  URL_HASH SHA256=217fb2d6b249e886d6954612ff65dbf834a418e1f1c835c47445722afb5a54be
+  URL      https://github.com/plaidml/llvm-project/archive/182eb478559f27191b7373616f30a608065aaaa3.tar.gz
+  URL_HASH SHA256=606ce4fae35c72b951f31402741403d568287933712db5ae4e735e51b00bab46
 )
 
 set(LLVM_APPEND_VC_REV OFF CACHE BOOL "" FORCE)
