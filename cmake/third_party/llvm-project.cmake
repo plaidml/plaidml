@@ -1,9 +1,3 @@
-FetchContent_Declare(
-  llvm-project
-  URL      https://github.com/plaidml/llvm-project/archive/b3f1f66eddd9ed4e3caf6043344b17f5b0920bb0.tar.gz
-  URL_HASH SHA256=217fb2d6b249e886d6954612ff65dbf834a418e1f1c835c47445722afb5a54be
-)
-
 set(LLVM_APPEND_VC_REV OFF CACHE BOOL "" FORCE)
 set(LLVM_ENABLE_IDE OFF CACHE BOOL "" FORCE)
 set(LLVM_ENABLE_ASSERTIONS OFF CACHE BOOL "" FORCE)
@@ -19,14 +13,26 @@ set(OPENMP_ENABLE_LIBOMPTARGET OFF CACHE BOOL "" FORCE)
 set(OPENMP_ENABLE_OMPT_TOOLS OFF CACHE BOOL "" FORCE)
 set(OPENMP_STANDALONE_BUILD ON CACHE BOOL "" FORCE)
 
-FetchContent_GetProperties(llvm-project)
-if(NOT llvm-project_POPULATED)
-  FetchContent_Populate(llvm-project)
-  set(LLVM_SOURCE_DIR ${llvm-project_SOURCE_DIR})
-  set(LLVM_BINARY_DIR ${llvm-project_BINARY_DIR})
-  add_subdirectory(${LLVM_SOURCE_DIR}/llvm ${LLVM_BINARY_DIR} EXCLUDE_FROM_ALL)
-endif()
+message("LOCAL_LLVM_DIR: ${LOCAL_LLVM_DIR}")
 
+if(LOCAL_LLVM_DIR)
+  set(LLVM_SOURCE_DIR ${LOCAL_LLVM_DIR})
+  set(LLVM_BINARY_DIR ${CMAKE_BINARY_DIR}/_deps/llvm-project-build)
+  add_subdirectory(${LLVM_SOURCE_DIR}/llvm ${LLVM_BINARY_DIR} EXCLUDE_FROM_ALL)
+else()
+  FetchContent_Declare(
+    llvm-project
+    URL      https://github.com/plaidml/llvm-project/archive/b3f1f66eddd9ed4e3caf6043344b17f5b0920bb0.tar.gz
+    URL_HASH SHA256=217fb2d6b249e886d6954612ff65dbf834a418e1f1c835c47445722afb5a54be
+  )
+  FetchContent_GetProperties(llvm-project)
+  if(NOT llvm-project_POPULATED)
+    FetchContent_Populate(llvm-project)
+    set(LLVM_SOURCE_DIR ${llvm-project_SOURCE_DIR})
+    set(LLVM_BINARY_DIR ${llvm-project_BINARY_DIR})
+    add_subdirectory(${LLVM_SOURCE_DIR}/llvm ${LLVM_BINARY_DIR} EXCLUDE_FROM_ALL)
+  endif()
+endif()
 
 list(APPEND LLVM_INCLUDE_DIRS
   ${LLVM_SOURCE_DIR}/llvm/include
