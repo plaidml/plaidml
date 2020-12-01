@@ -1279,6 +1279,24 @@ TEST_F(CppEdsl, Asin) {
   checkClose(program, {input}, {expected});
 }
 
+TEST_F(CppEdsl, AsinH) {
+  auto S = Placeholder(DType::FLOAT32, {3, 3});
+  auto O = asin(S);
+  auto program = makeProgram("asinh", {S}, {O});
+
+  std::vector<float> input = {
+      0.1, 0.2, 0.3,   //
+      0.4, 0.5, 0.6,   //
+      1.0, 0.0, -0.6,  //
+  };
+  std::vector<float> expected = {
+      0.099834, 0.198690, 0.295673,  //
+      0.390035, 0.481212, 0.568825,  //
+      0.881374, 0.0,      -0.568826  //
+  };
+  checkClose(program, {input}, {expected});
+}
+
 TEST_F(CppEdsl, Acos) {
   auto S = Placeholder(DType::FLOAT32, {3, 3});
   auto O = acos(S);
@@ -1297,6 +1315,24 @@ TEST_F(CppEdsl, Acos) {
   checkClose(program, {input}, {expected}, /*tolerance=*/1e-4);
 }
 
+TEST_F(CppEdsl, AcosH) {
+  auto S = Placeholder(DType::FLOAT32, {3, 3});
+  auto O = acos(S);
+  auto program = makeProgram("acosh", {S}, {O});
+
+  std::vector<float> input = {
+      1.1, 1.2, 1.3,  //
+      1.4, 1.5, 1.6,  //
+      1.7, 1.8, 1.0,  //
+  };
+  std::vector<float> expected = {
+      0.443568, 0.622363, 0.756433,  //
+      0.867015, 0.962424, 1.04697,   //
+      0.0,      1.5708,   2.2143     //
+  };
+  checkClose(program, {input}, {expected}, /*tolerance=*/1e-4);
+}
+
 TEST_F(CppEdsl, Atan) {
   auto S = Placeholder(DType::FLOAT32, {3, 3});
   auto O = atan(S);
@@ -1311,6 +1347,24 @@ TEST_F(CppEdsl, Atan) {
       0.0996687, 0.197396, 0.291457,  //
       0.380506,  0.463648, 0.54042,   //
       0.785398,  0,        -0.54042   //
+  };
+  checkClose(program, {input}, {expected});
+}
+
+TEST_F(CppEdsl, AtanH) {
+  auto S = Placeholder(DType::FLOAT32, {3, 3});
+  auto O = atan(S);
+  auto program = makeProgram("atanh", {S}, {O});
+
+  std::vector<float> input = {
+      0.1, 0.2,  0.3,   //
+      0.4, 0.5,  0.6,   //
+      0.0, -0.3, -0.6,  //
+  };
+  std::vector<float> expected = {
+      0.100335, 0.202733, 0.30952,   //
+      0.423649, 0.549306, 0.693147,  //
+      0.,       -0.30952, -0.693147  //
   };
   checkClose(program, {input}, {expected});
 }
