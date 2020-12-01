@@ -7,7 +7,10 @@ package(default_visibility = ["//visibility:public"])
 
 filegroup(
     name = "td_files",
-    srcs = ["enums.td"],
+    srcs = [
+        "enums.td",
+        "loop_with_epilog.td",
+    ],
 )
 
 gentbl(
@@ -21,6 +24,19 @@ gentbl(
     td_srcs = ["@llvm-project//mlir:OpBaseTdFiles"],
 )
 
+
+gentbl(
+    name = "loop_with_epilog-gen",
+    tbl_outs = [
+        ("-gen-op-interface-decls", "loop_with_epilog.h.inc"),
+        ("-gen-op-interface-defs", "loop_with_epilog.cc.inc"),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "loop_with_epilog.td",
+    td_srcs = ["@llvm-project//mlir:OpBaseTdFiles"],
+)
+
+
 plaidml_cc_library(
     name = "util",
     srcs = glob(["*.cc"]),
@@ -28,6 +44,7 @@ plaidml_cc_library(
     copts = COPTS,
     deps = [
         ":enums-gen",
+        ":loop_with_epilog-gen",
         "@easylogging",
         "@llvm-project//llvm:Core",
         "@llvm-project//llvm:Support",
