@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <cstdarg>
 #include <mutex>
 #include <numeric>
 
@@ -29,20 +30,6 @@
 using pmlc::rt::Device;
 
 namespace pmlc::rt::vulkan {
-namespace {
-
-template <typename T>
-void bindBuffer(void *vkInvocation, DescriptorSetIndex setIndex,
-                BindingIndex bindIndex, uint32_t bufferByteSize,
-                ::UnrankedMemRefType<T> *unrankedMemRef) {
-  DynamicMemRefType<T> memRef(*unrankedMemRef);
-  T *ptr = memRef.data + memRef.offset;
-  VulkanHostMemoryBuffer memBuffer{ptr, bufferByteSize};
-  static_cast<VulkanInvocation *>(vkInvocation)
-      ->setResourceData(setIndex, bindIndex, memBuffer);
-}
-
-} // namespace
 
 extern "C" {
 
@@ -56,17 +43,18 @@ void vkDeinit(void *vkInvocation) {
 
 void vkCreateLaunchKernelAction(void *vkInvocation, uint8_t *shader,
                                 uint32_t size, const char *entryPoint,
-                                uint32_t x, uint32_t y, uint32_t z) {
-  static_cast<VulkanInvocation *>(vkInvocation)
-      ->createLaunchKernelAction(shader, size, entryPoint, {x, y, z});
-}
+                                uint32_t x, uint32_t y, uint32_t z,
+                                uint32_t count, ...) {
+  std::vector<void *> deviceBuffers;
+  va_list args;
+  va_start(args, count);
+  for (unsigned i = 0; i < count; ++i)
+    deviceBuffers.push_back(va_arg(args, void *));
+  va_end(args);
 
-void vkCreateMemoryTransferAction(void *vkInvocation, uint64_t src_index,
-                                  uint64_t src_binding, uint64_t dst_index,
-                                  uint64_t dst_binding) {
   static_cast<VulkanInvocation *>(vkInvocation)
-      ->createMemoryTransferAction(src_index, src_binding, dst_index,
-                                   dst_binding);
+      ->createLaunchKernelAction(shader, size, entryPoint, {x, y, z},
+                                 deviceBuffers);
 }
 
 void vkSetLaunchKernelAction(void *vkInvocation, uint32_t subgroupSize) {
@@ -88,27 +76,30 @@ void vkWait(uint32_t count, ...) {
   // vkCmdSetEvent + vkCmdWaitEvents
 }
 
-#define BIND_BUFFER_IMPL(_name_, _type_)                                       \
-  void _mlir_ciface_bindBuffer##_name_(                                        \
-      void *vkInvocation, DescriptorSetIndex setIndex, BindingIndex bindIndex, \
-      uint32_t bufferByteSize, ::UnrankedMemRefType<_type_> *unrankedMemRef) { \
-    bindBuffer(vkInvocation, setIndex, bindIndex, bufferByteSize,              \
-               unrankedMemRef);                                                \
-  }
+void *vkAlloc(void *vkInvocation, uint32_t bytes, void *hostPtr) {
+  vulkanBuffer *newBuffer = new vulkanBuffer();
+  VulkanHostMemoryBuffer memBuffer{hostPtr, bytes};
+  newBuffer->HostBuffer = memBuffer;
+  newBuffer->spirvClass = mlir::spirv::StorageClass::StorageBuffer;
+  DescriptorSetIndex setIndex = 0;
+  return static_cast<VulkanInvocation *>(vkInvocation)
+      ->createMemoryBuffer(setIndex, newBuffer);
+}
 
-BIND_BUFFER_IMPL(Float16, half_float::half);
-BIND_BUFFER_IMPL(Float32, float);
-BIND_BUFFER_IMPL(Float64, double);
-BIND_BUFFER_IMPL(Integer8, int8_t);
-BIND_BUFFER_IMPL(Integer16, int16_t);
-BIND_BUFFER_IMPL(Integer32, int32_t);
-BIND_BUFFER_IMPL(Integer64, int64_t);
+void vkDealloc(void *invocation, void *memory) {
+  static_cast<VulkanInvocation *>(invocation)->deallocDeviceBuffer(memory);
+}
 
-void _mlir_ciface_fillResourceFloat32(
-    ::UnrankedMemRefType<float> *unrankedMemRef, int32_t size, float value) {
-  DynamicMemRefType<float> memRef(*unrankedMemRef);
-  float *ptr = memRef.data + memRef.offset;
-  std::fill_n(ptr, size, value);
+void *vkRead(void *dst, void *src, void *invocation, uint32_t count, ...) {
+  static_cast<VulkanInvocation *>(invocation)->copyDeviceBufferToHost(dst, src);
+  // TODO: return Vulkan Event
+  return nullptr;
+}
+
+void *vkWrite(void *src, void *dst, void *invocation, uint32_t count, ...) {
+  static_cast<VulkanInvocation *>(invocation)->copyHostBufferToDevice(src, dst);
+  // TODO: return Vulkan Event
+  return nullptr;
 }
 
 } // extern "C"
@@ -123,29 +114,15 @@ struct Registration {
     registerSymbol("vkDeinit", reinterpret_cast<void *>(vkDeinit));
     registerSymbol("vkCreateLaunchKernelAction",
                    reinterpret_cast<void *>(vkCreateLaunchKernelAction));
-    registerSymbol("vkCreateMemoryTransferAction",
-                   reinterpret_cast<void *>(vkCreateMemoryTransferAction));
     registerSymbol("vkSetLaunchKernelAction",
                    reinterpret_cast<void *>(vkSetLaunchKernelAction));
     registerSymbol("vkRun", reinterpret_cast<void *>(vkRun));
     registerSymbol("vkWait", reinterpret_cast<void *>(vkWait));
+    registerSymbol("vkAlloc", reinterpret_cast<void *>(vkAlloc));
+    registerSymbol("vkDealloc", reinterpret_cast<void *>(vkDealloc));
+    registerSymbol("vkRead", reinterpret_cast<void *>(vkRead));
+    registerSymbol("vkWrite", reinterpret_cast<void *>(vkWrite));
     registerSymbol("vkScheduleFunc", reinterpret_cast<void *>(vkScheduleFunc));
-    registerSymbol("_mlir_ciface_bindBufferFloat16",
-                   reinterpret_cast<void *>(_mlir_ciface_bindBufferFloat16));
-    registerSymbol("_mlir_ciface_bindBufferFloat32",
-                   reinterpret_cast<void *>(_mlir_ciface_bindBufferFloat32));
-    registerSymbol("_mlir_ciface_bindBufferFloat64",
-                   reinterpret_cast<void *>(_mlir_ciface_bindBufferFloat64));
-    registerSymbol("_mlir_ciface_bindBufferInteger8",
-                   reinterpret_cast<void *>(_mlir_ciface_bindBufferInteger8));
-    registerSymbol("_mlir_ciface_bindBufferInteger16",
-                   reinterpret_cast<void *>(_mlir_ciface_bindBufferInteger16));
-    registerSymbol("_mlir_ciface_bindBufferInteger32",
-                   reinterpret_cast<void *>(_mlir_ciface_bindBufferInteger32));
-    registerSymbol("_mlir_ciface_bindBufferInteger64",
-                   reinterpret_cast<void *>(_mlir_ciface_bindBufferInteger64));
-    registerSymbol("_mlir_ciface_fillResourceFloat32",
-                   reinterpret_cast<void *>(_mlir_ciface_fillResourceFloat32));
   }
 };
 static Registration reg;
