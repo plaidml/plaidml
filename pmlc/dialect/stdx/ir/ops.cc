@@ -47,6 +47,47 @@ verifySubgroupBlockWriteINTELOp(SubgroupBlockWriteINTELOp op) {
   return success();
 }
 
+static LogicalResult verifyPackOp(PackOp op) {
+  auto tupleType = op.getTupleType();
+  if (op.getNumOperands() != tupleType.size()) {
+    return failure();
+  }
+  for (unsigned i = 0; i < tupleType.size(); i++) {
+    if (op.getOperand(i).getType() != tupleType.getType(i)) {
+      return failure();
+    }
+  }
+  return success();
+}
+
+static LogicalResult verifyUnpackOp(UnpackOp op) {
+  auto tupleType = op.getTupleType();
+  if (op.getNumResults() != tupleType.size()) {
+    return failure();
+  }
+  for (unsigned i = 0; i < tupleType.size(); i++) {
+    if (op.getResult(i).getType() != tupleType.getType(i)) {
+      return failure();
+    }
+  }
+  return success();
+}
+
+static ParseResult parseTupleTypeAsm(OpAsmParser &parser, Type &tuple,
+                                     SmallVectorImpl<Type> &expanded) {
+  auto ret = parser.parseTypeList(expanded);
+  if (ret) {
+    return failure();
+  }
+  tuple = TupleType::get(expanded, parser.getBuilder().getContext());
+  return ret;
+}
+
+static void printTupleTypeAsm(OpAsmPrinter &printer, Type tuple,
+                              TypeRange expanded) {
+  printer << expanded;
+}
+
 void StdXDialect::initialize() {
   addOperations<
 #define GET_OP_LIST

@@ -161,4 +161,32 @@ def SubgroupBlockWriteINTELOp : StdX_Op<"subgroup_block_write_intel", [NoSideEff
   }];
 }
 
+def PackOp : StdX_Op<"pack", [NoSideEffect]> {
+  let summary = "Pack multiple values into a tuple";
+  let arguments = (ins Variadic<AnyType>:$in);
+  let results = (outs AnyTuple:$out);
+  let assemblyFormat = [{ $in `:` custom<TupleTypeAsm>(type($out), type($in)) attr-dict }];
+  let builders = [OpBuilder<
+    "mlir::OpBuilder &, mlir::OperationState &, mlir::ArrayRef<mlir::Value>">];
+  let extraClassDeclaration = [{
+    mlir::TupleType getTupleType() {
+      return out().getType().cast<mlir::TupleType>();
+    }
+  }];
+}
+
+def UnpackOp : StdX_Op<"unpack", [NoSideEffect]> {
+  let summary = "Pack multiple values into a tuple";
+  let arguments = (ins AnyTuple:$in);
+  let results = (outs Variadic<AnyType>:$out);
+  let assemblyFormat = [{ $in `:` custom<TupleTypeAsm>(type($in), type($out)) attr-dict }];
+  let builders = [OpBuilder<
+    "mlir::OpBuilder &, mlir::OperationState &, mlir::Value">];
+  let extraClassDeclaration = [{
+    mlir::TupleType getTupleType() {
+      return in().getType().cast<mlir::TupleType>();
+    }
+  }];
+}
+
 #endif // __PML_STDX_OPS__
