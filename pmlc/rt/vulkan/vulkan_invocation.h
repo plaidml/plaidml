@@ -41,6 +41,14 @@ struct VulkanHostMemoryBuffer {
   uint32_t size{0};
 };
 
+/// Struct containing information regarding to an allocated buffer memory.
+struct vulkanBuffer {
+  VulkanDeviceMemoryBuffer devBuffer;
+  VulkanHostMemoryBuffer HostBuffer;
+  mlir::spirv::StorageClass spirvClass;
+  DescriptorSetIndex setIndex;
+};
+
 /// Struct containing the number of local workgroups to dispatch for each
 /// dimension.
 struct NumWorkGroups {
@@ -137,25 +145,19 @@ public:
   explicit VulkanInvocation(VulkanDevice *device);
   ~VulkanInvocation();
 
+  vulkanBuffer *createMemoryBuffer(DescriptorSetIndex setIndex,
+                                   vulkanBuffer *newbufer);
   void createLaunchKernelAction(uint8_t *shader, uint32_t size,
                                 const char *entryPoint,
-                                NumWorkGroups numWorkGroups);
+                                NumWorkGroups numWorkGroups,
+                                std::vector<void *> deviceBuffers);
 
   void setLaunchKernelAction(uint32_t subgroupSize);
-
   void addLaunchActionToSchedule();
-
-  void createMemoryTransferAction(uint64_t src_index, uint64_t src_binding,
-                                  uint64_t dst_index, uint64_t dst_binding);
-
-  void createMemoryTransferAction(VkBuffer src, VkBuffer dst, size_t size);
-
   void run();
-
-  /// Sets needed data for Vulkan device.
-  void setResourceData(const DescriptorSetIndex desIndex,
-                       const BindingIndex bindIndex,
-                       const VulkanHostMemoryBuffer &hostMemBuffer);
+  void copyHostBufferToDevice(void *srcPtr, void *deviceBuffer);
+  void copyDeviceBufferToHost(void *hostPtr, void *deviceBuffer);
+  void deallocDeviceBuffer(void *buffer);
 
 private:
   void mapStorageClassToDescriptorType(mlir::spirv::StorageClass storageClass,
@@ -163,32 +165,30 @@ private:
 
   void mapStorageClassToBufferUsageFlag(mlir::spirv::StorageClass storageClass,
                                         VkBufferUsageFlagBits &bufferUsage);
-
-  void checkResourceData();
-
-  void createMemoryBuffers();
-  void createQueryPool();
-  void createShaderModule();
-  void initDescriptorSetLayoutBindingMap();
-  void createDescriptorSetLayout();
-  void createPipelineLayout();
+  void allocateDescriptorSets();
   void createComputePipeline(uint32_t subgroupSize);
   void createDescriptorPool();
-  void allocateDescriptorSets();
-  void setWriteDescriptors();
+  void createDescriptorSetLayout();
+  void createPipelineLayout();
+  void createQueryPool();
   void createSchedule();
+  void createShaderModule();
+  void freeSchedule();
+  void freeCommandBuffers();
   void getQueryPoolResults();
+  void initDescriptorSetLayoutBindingMap();
+  void setWriteDescriptors();
   void submitCommandBuffersToQueue();
-  void updateHostMemoryBuffers();
 
   std::vector<ActionPtr> schedule;
   std::shared_ptr<LaunchKernelAction> curr;
+  std::vector<vulkanBuffer *> deviceBufferPool;
   std::shared_ptr<VulkanDevice> device;
   VkCommandPool commandPool;
   llvm::SmallVector<VkCommandBuffer, 1> commandBuffers;
   VkQueryPool timestampQueryPool;
   const uint32_t timestampQueryPoolSize{8192};
-  uint32_t timestampQueryCount{2};
+  uint32_t timestampQueryCount{0};
   uint32_t memoryTransferCount{0};
 };
 
