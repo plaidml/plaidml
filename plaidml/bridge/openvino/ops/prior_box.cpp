@@ -15,7 +15,31 @@ using ngraph::opset4::PriorBox;
 
 namespace PlaidMLPlugin {
 
-struct LocalConfigs {
+class PriorBoxImpl {
+ public:
+  PriorBoxImpl(const Context& context, const ngraph::op::PriorBoxAttrs& attributes);
+
+  // Fixed size path uses fixed_size, density, fixed_ratio | aspect_ratio
+  void processFixedSizePath();
+
+  // Min size path uses min_size, max_size, aspect_ratio, scale_all_sizes
+  void processMinSizePath();
+
+  // Append variance after former result
+  void processVariance();
+
+  edsl::Tensor& getOutput() { return C_out; }
+
+ private:
+  // Preprocess data with some attributes
+  void prepareConfig();
+
+  // Produce a tensor which data are interlaced with W and H
+  // Use this to produce box center for different path
+  void produceCenterBase();
+
+  const Context& ctx;
+  const ngraph::op::PriorBoxAttrs& attrs;
   int H;
   int W;
   int IH;
@@ -30,14 +54,18 @@ struct LocalConfigs {
   std::vector<float> aspect_ratios_scale_size;
   std::vector<float> variance;
   std::vector<float> min_size;
+  edsl::Tensor C_mix;
+  edsl::Tensor C_out;
 };
 
+PriorBoxImpl::PriorBoxImpl(const Context& context, const ngraph::op::PriorBoxAttrs& attributes)
+    : ctx(context), attrs(attributes) {
+  prepareConfig();
+  produceCenterBase();
+}
+
 // Preprocess data with some attributes
-void prepareConfig(LocalConfigs& conf, const ngraph::op::PriorBoxAttrs& attrs, const Context& ctx) {
-  int& H = conf.H;
-  int& W = conf.W;
-  int& IH = conf.IH;
-  int& IW = conf.IW;
+void PriorBoxImpl::prepareConfig() {
   auto* input_shape_ngraph_op = ngraph::as_type<ngraph::op::Constant>(ctx.layer->get_input_node_ptr(0));
   std::vector<int> input_shape = input_shape_ngraph_op->get_vector<int>();
   H = input_shape[0];
@@ -47,9 +75,8 @@ void prepareConfig(LocalConfigs& conf, const ngraph::op::PriorBoxAttrs& attrs, c
   IH = image_shape[0];
   IW = image_shape[1];
 
-  conf.num_of_prior = ngraph::op::PriorBox::number_of_priors(attrs);
+  num_of_prior = ngraph::op::PriorBox::number_of_priors(attrs);
 
-  std::vector<float>& aspect_ratios = conf.aspect_ratios;
   aspect_ratios.push_back(1.0f);
   for (const auto& aspect_ratio : attrs.aspect_ratio) {
     bool exist = false;
@@ -66,17 +93,13 @@ void prepareConfig(LocalConfigs& conf, const ngraph::op::PriorBoxAttrs& attrs, c
     if (std::fabs(ar - 1.0f) < 1e-6) {
       continue;
     }
-    conf.aspect_ratios_scale_size.push_back(std::sqrt(ar));
+    aspect_ratios_scale_size.push_back(std::sqrt(ar));
   }
 
-  conf.variance = attrs.variance;
-  if (conf.variance.empty()) conf.variance.push_back(0.1f);
+  variance = attrs.variance;
+  if (variance.empty()) variance.push_back(0.1f);
 
-  float& step = conf.step;
-  float& step_x = conf.step_x;
-  float& step_y = conf.step_y;
   step = attrs.step;
-  std::vector<float>& min_size = conf.min_size;
   min_size = attrs.min_size;
   if (!attrs.scale_all_sizes) {
     // mxnet-like PriorBox
@@ -89,31 +112,25 @@ void prepareConfig(LocalConfigs& conf, const ngraph::op::PriorBoxAttrs& attrs, c
   step_x = (step == 0) ? static_cast<float>(IW) / W : step;
   step_y = (step == 0) ? static_cast<float>(IH) / H : step;
 
-  conf.min_element_size = min_size.size();
-  conf.offset = attrs.offset;
+  min_element_size = min_size.size();
+  offset = attrs.offset;
 }
 
-// Produce a tensor which data are interlaced with W and H
-// Use this to produce box center for different path
-void produceCenterBase(edsl::Tensor& C_mix, LocalConfigs& conf) {
-  auto CW = edsl::cast(edsl::index({edsl::TensorDim(conf.H), edsl::TensorDim(conf.W), edsl::TensorDim(1)}, 1),
-                       DType::FLOAT32);
-  auto CH = edsl::cast(edsl::index({edsl::TensorDim(conf.H), edsl::TensorDim(conf.W), edsl::TensorDim(1)}, 0),
-                       DType::FLOAT32);
+void PriorBoxImpl::produceCenterBase() {
+  auto CW = edsl::cast(edsl::index({edsl::TensorDim(H), edsl::TensorDim(W), edsl::TensorDim(1)}, 1), DType::FLOAT32);
+  auto CH = edsl::cast(edsl::index({edsl::TensorDim(H), edsl::TensorDim(W), edsl::TensorDim(1)}, 0), DType::FLOAT32);
   edsl::Tensor CW_normalized, CH_normalized;
-  if (conf.step == 0) {
-    CW_normalized = (CW + 0.5f) * conf.step_x / conf.IW;
-    CH_normalized = (CH + 0.5f) * conf.step_y / conf.IH;
+  if (step == 0) {
+    CW_normalized = (CW + 0.5f) * step_x / IW;
+    CH_normalized = (CH + 0.5f) * step_y / IH;
   } else {
-    CW_normalized = (CW + conf.offset) * conf.step / conf.IW;
-    CH_normalized = (CH + conf.offset) * conf.step / conf.IH;
+    CW_normalized = (CW + offset) * step / IW;
+    CH_normalized = (CH + offset) * step / IH;
   }
   C_mix = op::concatenate({CW_normalized, CH_normalized}, -1);
 }
 
-// Fixed size path uses fixed_size, density, fixed_ratio | aspect_ratio
-void processFixedSizePath(edsl::Tensor& C_out, edsl::Tensor& C_mix, LocalConfigs& conf,
-                          const ngraph::op::PriorBoxAttrs& attrs) {
+void PriorBoxImpl::processFixedSizePath() {
   int fixed_size_count = attrs.fixed_size.size();
   int fixed_ratio_count = attrs.fixed_ratio.size();
   bool first_out = true;
@@ -129,11 +146,11 @@ void processFixedSizePath(edsl::Tensor& C_out, edsl::Tensor& C_mix, LocalConfigs
 
     // Create a density which last dimenstion is 2 (for center data which are WH)
     edsl::TensorDim e(density_s), one(1);
-    auto Density_mix = edsl::reshape(
-        op::concatenate({(edsl::cast(edsl::index({e, e, one}, 1), DType::FLOAT32) * shift + var) / conf.IW,
-                         (edsl::cast(edsl::index({e, e, one}, 0), DType::FLOAT32) * shift + var) / conf.IH},
-                        -1),
-        {density_s * density_s, 2});
+    auto Density_mix =
+        edsl::reshape(op::concatenate({(edsl::cast(edsl::index({e, e, one}, 1), DType::FLOAT32) * shift + var) / IW,
+                                       (edsl::cast(edsl::index({e, e, one}, 0), DType::FLOAT32) * shift + var) / IH},
+                                      -1),
+                      {density_s * density_s, 2});
 
     if (fixed_ratio_count) {
       std::vector<float> fixed_ratio_ar;
@@ -147,11 +164,11 @@ void processFixedSizePath(edsl::Tensor& C_out, edsl::Tensor& C_mix, LocalConfigs
 
       // Expand center for output
       edsl::Tensor Center_temp =
-          op::broadcast(C_mix, {conf.H, conf.W, fixed_ratio_count, density_s * density_s, 2}, {0, 1, 4}) + Density_mix;
+          op::broadcast(C_mix, {H, W, fixed_ratio_count, density_s * density_s, 2}, {0, 1, 4}) + Density_mix;
 
       // Box
-      auto Box_width_fixed_ratio_ar = fixed_size_s * 0.5f * Fixed_ratio / conf.IW;
-      auto Box_height_fixed_ratio_ar = fixed_size_s * 0.5f / Fixed_ratio / conf.IH;
+      auto Box_width_fixed_ratio_ar = fixed_size_s * 0.5f * Fixed_ratio / IW;
+      auto Box_height_fixed_ratio_ar = fixed_size_s * 0.5f / Fixed_ratio / IH;
       auto Box_fixed_ratio_ar_first = op::concatenate({-Box_width_fixed_ratio_ar, -Box_height_fixed_ratio_ar}, -1);
       auto Box_fixed_ratio_ar_second = op::concatenate({Box_width_fixed_ratio_ar, Box_height_fixed_ratio_ar}, -1);
 
@@ -160,17 +177,17 @@ void processFixedSizePath(edsl::Tensor& C_out, edsl::Tensor& C_mix, LocalConfigs
       edsl::TensorIndex i, j, k, l, m;
       auto C_dst = edsl::reshape(
           op::concatenate({op::clip(edsl::Contraction()
-                                        .outShape(conf.H, conf.W, fixed_ratio_count, density_s * density_s, 2)
+                                        .outShape(H, W, fixed_ratio_count, density_s * density_s, 2)
                                         .outAccess(i, j, k, l, m)
                                         .assign(Center_temp(i, j, k, l, m) + Box_fixed_ratio_ar_first(k, m)),
                                     edsl::Tensor(0.0f), edsl::Tensor()),
                            op::clip(edsl::Contraction()
-                                        .outShape(conf.H, conf.W, fixed_ratio_count, density_s * density_s, 2)
+                                        .outShape(H, W, fixed_ratio_count, density_s * density_s, 2)
                                         .outAccess(i, j, k, l, m)
                                         .assign(Center_temp(i, j, k, l, m) + Box_fixed_ratio_ar_second(k, m)),
                                     edsl::Tensor(), edsl::Tensor(1.0f))},
                           -1),
-          {conf.H, conf.W, fixed_ratio_count * density_s * density_s * 4});
+          {H, W, fixed_ratio_count * density_s * density_s * 4});
 
       if (first_out) {
         C_out = C_dst;
@@ -185,12 +202,12 @@ void processFixedSizePath(edsl::Tensor& C_out, edsl::Tensor& C_mix, LocalConfigs
         box_width = box_height = attrs.fixed_size[s] * 0.5f;
 
         // Center
-        auto Center_temp = op::broadcast(C_mix, {conf.H, conf.W, density_s * density_s, 2}, {0, 1, 3}) + Density_mix;
+        auto Center_temp = op::broadcast(C_mix, {H, W, density_s * density_s, 2}, {0, 1, 3}) + Density_mix;
 
         // Box
         std::vector<float> box_db;
-        box_db.push_back(-box_width / conf.IW);
-        box_db.push_back(-box_height / conf.IH);
+        box_db.push_back(-box_width / IW);
+        box_db.push_back(-box_height / IH);
         TensorShape shape_db(DType::FLOAT32, {2});
         Buffer buffer_db(shape_db);
         buffer_db.copy_from(box_db.data());
@@ -200,7 +217,7 @@ void processFixedSizePath(edsl::Tensor& C_out, edsl::Tensor& C_mix, LocalConfigs
         auto C_dst = edsl::reshape(op::concatenate({op::clip(Center_temp + Box_db, edsl::Tensor(0.0f), edsl::Tensor()),
                                                     op::clip(Center_temp - Box_db, edsl::Tensor(), edsl::Tensor(1.0f))},
                                                    -1),
-                                   {conf.H, conf.W, density_s * density_s * 4});
+                                   {H, W, density_s * density_s * 4});
         if (first_out) {
           C_out = C_dst;
           first_out = false;
@@ -210,18 +227,17 @@ void processFixedSizePath(edsl::Tensor& C_out, edsl::Tensor& C_mix, LocalConfigs
       }
 
       // Aspect_ratio
-      int ar_sz_count = conf.aspect_ratios_scale_size.size();
+      int ar_sz_count = aspect_ratios_scale_size.size();
       if (ar_sz_count > 0) {
         TensorShape shape_ar_sz(DType::FLOAT32, {ar_sz_count, 1});
         Buffer buffer_ar_sz(shape_ar_sz);
-        buffer_ar_sz.copy_from(conf.aspect_ratios_scale_size.data());
+        buffer_ar_sz.copy_from(aspect_ratios_scale_size.data());
         auto Aspect_ratio_sz = edsl::Constant(buffer_ar_sz, "aspect_ratio_scale_size");
-        auto Box_width_ar_sz = fixed_size_s * 0.5f * Aspect_ratio_sz / conf.IW;
-        auto Box_height_ar_sz = fixed_size_s * 0.5f / Aspect_ratio_sz / conf.IH;
+        auto Box_width_ar_sz = fixed_size_s * 0.5f * Aspect_ratio_sz / IW;
+        auto Box_height_ar_sz = fixed_size_s * 0.5f / Aspect_ratio_sz / IH;
 
         // Center
-        auto Center_temp =
-            op::broadcast(C_mix, {conf.H, conf.W, ar_sz_count, density_s * density_s, 2}, {0, 1, 4}) + Density_mix;
+        auto Center_temp = op::broadcast(C_mix, {H, W, ar_sz_count, density_s * density_s, 2}, {0, 1, 4}) + Density_mix;
 
         // Box
         auto Box_ar_sz_first = op::concatenate({-Box_width_ar_sz, -Box_height_ar_sz}, -1);
@@ -232,17 +248,17 @@ void processFixedSizePath(edsl::Tensor& C_out, edsl::Tensor& C_mix, LocalConfigs
         edsl::TensorIndex i, j, k, l, m;
         auto C_dst =
             edsl::reshape(op::concatenate({op::clip(edsl::Contraction()
-                                                        .outShape(conf.H, conf.W, ar_sz_count, density_s * density_s, 2)
+                                                        .outShape(H, W, ar_sz_count, density_s * density_s, 2)
                                                         .outAccess(i, j, k, l, m)
                                                         .assign(Center_temp(i, j, k, l, m) + Box_ar_sz_first(k, m)),
                                                     edsl::Tensor(0.0f), edsl::Tensor()),
                                            op::clip(edsl::Contraction()
-                                                        .outShape(conf.H, conf.W, ar_sz_count, density_s * density_s, 2)
+                                                        .outShape(H, W, ar_sz_count, density_s * density_s, 2)
                                                         .outAccess(i, j, k, l, m)
                                                         .assign(Center_temp(i, j, k, l, m) + Box_ar_sz_second(k, m)),
                                                     edsl::Tensor(), edsl::Tensor(1.0f))},
                                           -1),
-                          {conf.H, conf.W, ar_sz_count * density_s * density_s * 4});
+                          {H, W, ar_sz_count * density_s * density_s * 4});
 
         if (first_out) {
           C_out = C_dst;
@@ -255,26 +271,24 @@ void processFixedSizePath(edsl::Tensor& C_out, edsl::Tensor& C_mix, LocalConfigs
   }
 }
 
-// Min size path uses min_size, max_size, aspect_ratio, scale_all_sizes
-void processMinSizePath(edsl::Tensor& C_out, edsl::Tensor& C_mix, LocalConfigs& conf,
-                        const ngraph::op::PriorBoxAttrs& attrs) {
+void PriorBoxImpl::processMinSizePath() {
   // Center
   auto C_mix_box = op::concatenate({C_mix, C_mix}, -1);
-  auto C = op::repeat(op::unsqueeze(C_mix_box, {-2})).count(conf.min_element_size).axis(-2);
+  auto C = op::repeat(op::unsqueeze(C_mix_box, {-2})).count(min_element_size).axis(-2);
 
   // Min_size
   std::vector<float> box_min;
-  for (auto i : conf.min_size) {
+  for (auto i : min_size) {
     float box_width = i * 0.5;
     float box_height = i * 0.5;
-    float first = -box_width / conf.IW;
-    float second = -box_height / conf.IH;
+    float first = -box_width / IW;
+    float second = -box_height / IH;
     box_min.push_back(first);
     box_min.push_back(second);
     box_min.push_back(-first);
     box_min.push_back(-second);
   }
-  TensorShape shape(DType::FLOAT32, {conf.min_element_size, 4});
+  TensorShape shape(DType::FLOAT32, {min_element_size, 4});
   Buffer buffer_min(shape);
   buffer_min.copy_from(box_min.data());
   auto Box_min = edsl::Constant(buffer_min, "box_min");
@@ -285,14 +299,14 @@ void processMinSizePath(edsl::Tensor& C_out, edsl::Tensor& C_mix, LocalConfigs& 
   // Max_size
   edsl::Tensor C_max_size;
   int max_element_size = attrs.max_size.size();
-  int result_size = max_element_size < conf.min_element_size ? max_element_size : conf.min_element_size;
+  int result_size = max_element_size < min_element_size ? max_element_size : min_element_size;
   if (attrs.scale_all_sizes && max_element_size > 0) {
     std::vector<float> box_max;
     for (size_t i = 0; i < result_size; i++) {
-      float box_width = std::sqrt(conf.min_size[i] * attrs.max_size[i]) * 0.5f;
+      float box_width = std::sqrt(min_size[i] * attrs.max_size[i]) * 0.5f;
       float box_height = box_width;
-      float first = -box_width / conf.IW;
-      float second = -box_height / conf.IH;
+      float first = -box_width / IW;
+      float second = -box_height / IH;
       box_max.push_back(first);
       box_max.push_back(second);
       box_max.push_back(-first);
@@ -306,41 +320,37 @@ void processMinSizePath(edsl::Tensor& C_out, edsl::Tensor& C_mix, LocalConfigs& 
     C_max_size = op::repeat(op::unsqueeze(C_mix_box, {-2})).count(result_size).axis(-2) + B_max;
 
     // In this case, process index which min_size and max_size both have
-    if (conf.min_element_size <= max_element_size) {
+    if (min_element_size <= max_element_size) {
       C_out = op::concatenate({C_min_size, C_max_size}, -1);
     } else {
       C_out = op::concatenate(
           {edsl::reshape(
-               op::concatenate(
-                   {op::slice(C_min_size).add_dim(0, conf.H).add_dim(0, conf.W).add_dim(0, result_size).add_dim(0, 4),
-                    C_max_size},
-                   -1),
-               {conf.H, conf.W, result_size * 8}),
-           edsl::reshape(op::slice(C_min_size)
-                             .add_dim(0, conf.H)
-                             .add_dim(0, conf.W)
-                             .add_dim(result_size, conf.min_element_size)
-                             .add_dim(0, 4),
-                         {conf.H, conf.W, (conf.min_element_size - result_size) * 4})},
+               op::concatenate({op::slice(C_min_size).add_dim(0, H).add_dim(0, W).add_dim(0, result_size).add_dim(0, 4),
+                                C_max_size},
+                               -1),
+               {H, W, result_size * 8}),
+           edsl::reshape(
+               op::slice(C_min_size).add_dim(0, H).add_dim(0, W).add_dim(result_size, min_element_size).add_dim(0, 4),
+               {H, W, (min_element_size - result_size) * 4})},
           -1);
     }
   }
 
   // Aspect_ratio
-  if (conf.aspect_ratios_scale_size.size() > 0) {
+  if (aspect_ratios_scale_size.size() > 0) {
     std::vector<float> min_size_ar;
     if (attrs.scale_all_sizes) {
-      min_size_ar = conf.min_size;
+      min_size_ar = min_size;
     } else {
-      min_size_ar.push_back(conf.min_size[0]);
+      min_size_ar.push_back(min_size[0]);
     }
     std::vector<float> box_ar;
     for (auto ms : min_size_ar) {
-      for (auto ar : conf.aspect_ratios_scale_size) {
+      for (auto ar : aspect_ratios_scale_size) {
         float box_width = ms * 0.5f * ar;
         float box_height = ms * 0.5f / ar;
-        float first = -box_width / conf.IW;
-        float second = -box_height / conf.IH;
+        float first = -box_width / IW;
+        float second = -box_height / IH;
         box_ar.push_back(first);
         box_ar.push_back(second);
         box_ar.push_back(-first);
@@ -348,7 +358,7 @@ void processMinSizePath(edsl::Tensor& C_out, edsl::Tensor& C_mix, LocalConfigs& 
       }
     }
     int msa_size = min_size_ar.size();
-    int ar_size = conf.aspect_ratios_scale_size.size();
+    int ar_size = aspect_ratios_scale_size.size();
     TensorShape shape(DType::FLOAT32, {msa_size * ar_size, 4});
     Buffer buffer_ar(shape);
     buffer_ar.copy_from(box_ar.data());
@@ -356,57 +366,56 @@ void processMinSizePath(edsl::Tensor& C_out, edsl::Tensor& C_mix, LocalConfigs& 
 
     auto C_ar = op::repeat(op::unsqueeze(C_mix_box, {-2})).count(msa_size * ar_size).axis(-2) + B_ar;
     if (attrs.scale_all_sizes) {
-      auto C_ar_reshape = edsl::reshape(C_ar, {conf.H, conf.W, conf.min_element_size, 4 * ar_size});
-      if (conf.min_element_size <= max_element_size) {
+      auto C_ar_reshape = edsl::reshape(C_ar, {H, W, min_element_size, 4 * ar_size});
+      if (min_element_size <= max_element_size) {
         C_out = op::concatenate({C_min_size, C_max_size, C_ar_reshape}, -1);
       } else {
         // The first part will work with min_size, max_size, aspect_ratio
         // Then the left parts will work without max_size
         C_out = op::concatenate(
-            {edsl::reshape(
-                 op::concatenate(
-                     {op::slice(C_min_size).add_dim(0, conf.H).add_dim(0, conf.W).add_dim(0, result_size).add_dim(0, 4),
-                      C_max_size,
-                      op::slice(C_ar_reshape)
-                          .add_dim(0, conf.H)
-                          .add_dim(0, conf.W)
-                          .add_dim(0, result_size)
-                          .add_dim(0, 4 * ar_size)},
-                     -1),
-                 {conf.H, conf.W, result_size * (8 + 4 * ar_size)}),
+            {edsl::reshape(op::concatenate(
+                               {op::slice(C_min_size).add_dim(0, H).add_dim(0, W).add_dim(0, result_size).add_dim(0, 4),
+                                C_max_size,
+                                op::slice(C_ar_reshape)
+                                    .add_dim(0, H)
+                                    .add_dim(0, W)
+                                    .add_dim(0, result_size)
+                                    .add_dim(0, 4 * ar_size)},
+                               -1),
+                           {H, W, result_size * (8 + 4 * ar_size)}),
              edsl::reshape(op::concatenate({op::slice(C_min_size)
-                                                .add_dim(0, conf.H)
-                                                .add_dim(0, conf.W)
-                                                .add_dim(result_size, conf.min_element_size)
+                                                .add_dim(0, H)
+                                                .add_dim(0, W)
+                                                .add_dim(result_size, min_element_size)
                                                 .add_dim(0, 4),
                                             op::slice(C_ar_reshape)
-                                                .add_dim(0, conf.H)
-                                                .add_dim(0, conf.W)
-                                                .add_dim(result_size, conf.min_element_size)
+                                                .add_dim(0, H)
+                                                .add_dim(0, W)
+                                                .add_dim(result_size, min_element_size)
                                                 .add_dim(0, 4 * ar_size)},
                                            -1),
-                           {conf.H, conf.W, (conf.min_element_size - result_size) * (4 + 4 * ar_size)})},
+                           {H, W, (min_element_size - result_size) * (4 + 4 * ar_size)})},
             -1);
       }
     } else {
-      C_out = op::concatenate({C_min_size, edsl::reshape(C_ar, {conf.H, conf.W, ar_size, 4})}, -2);
+      C_out = op::concatenate({C_min_size, edsl::reshape(C_ar, {H, W, ar_size, 4})}, -2);
     }
   }
 }
 
-void processVariance(edsl::Tensor& C_out, LocalConfigs& conf, const ngraph::op::PriorBoxAttrs& attrs) {
-  int channel_size = conf.W * conf.H * conf.num_of_prior * 4;
+void PriorBoxImpl::processVariance() {
+  int channel_size = W * H * num_of_prior * 4;
   auto C_out_reshape = edsl::reshape(C_out, {1, channel_size});
   if (attrs.clip) C_out_reshape = op::clip(C_out_reshape, edsl::Tensor(0.0f), edsl::Tensor(1.0f));
 
   edsl::Tensor Varian;
-  if (conf.variance.size() == 1) {
-    auto Val = edsl::cast(edsl::Tensor(conf.variance[0]), DType::FLOAT32);
+  if (variance.size() == 1) {
+    auto Val = edsl::cast(edsl::Tensor(variance[0]), DType::FLOAT32);
     Varian = op::broadcast(Val, {1, channel_size}, {});
   } else {
     TensorShape shape_va(DType::FLOAT32, {1, 4});
     Buffer buffer_va(shape_va);
-    buffer_va.copy_from(conf.variance.data());
+    buffer_va.copy_from(variance.data());
     auto V = edsl::Constant(buffer_va, "variance");
     Varian = edsl::reshape(op::repeat(V).count(channel_size / 4).axis(0), {1, channel_size});
   }
@@ -420,20 +429,15 @@ void registerPriorBox() {
     IE_ASSERT(ctx.operands.size() == 2);
     const ngraph::op::PriorBoxAttrs& attrs = layer->get_attrs();
     IE_ASSERT(attrs.variance.size() == 1 || attrs.variance.size() == 4 || attrs.variance.empty());
-    LocalConfigs conf;
-    prepareConfig(conf, attrs, ctx);
-    edsl::Tensor C_mix;
-    produceCenterBase(C_mix, conf);
-    edsl::Tensor C_out;
+    PriorBoxImpl pbi(ctx, attrs);
     int fixed_size_count = attrs.fixed_size.size();
     if (fixed_size_count) {
-      processFixedSizePath(C_out, C_mix, conf, attrs);
+      pbi.processFixedSizePath();
     } else {
-      processMinSizePath(C_out, C_mix, conf, attrs);
+      pbi.processMinSizePath();
     }
-    // Append variance after former result
-    processVariance(C_out, conf, attrs);
-    return edsl::make_tuple(C_out);
+    pbi.processVariance();
+    return edsl::make_tuple(pbi.getOutput());
   });
 }
 
