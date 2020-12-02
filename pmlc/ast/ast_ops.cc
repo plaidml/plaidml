@@ -255,6 +255,7 @@ struct ShapeOp : Intrinsic {
 
 void registerOps() {
   auto registry = IntrinsicRegistry::Instance();
+  registry->add("argsort", std::make_unique<ArgSortOp>());
   registry->add("cmp_eq", std::make_unique<BooleanOp>());
   registry->add("cmp_ge", std::make_unique<BooleanOp>());
   registry->add("cmp_gt", std::make_unique<BooleanOp>());
