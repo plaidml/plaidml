@@ -4,5 +4,6 @@ dependencies:
   - pip=19
   - python=3.6
   - pip:
+      - h5py < 3.0.0
       - tensorflow==1.15; platform_system == 'Darwin'
       - tensorflow-gpu==1.15; platform_system != 'Darwin'
