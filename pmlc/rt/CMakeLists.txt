@@ -54,4 +54,6 @@ pml_cc_library(
   DEPS
     ::rt
     pmlc::rt::llvm
+    pmlc::rt::vulkan
+    pmlc::rt::opencl
 )

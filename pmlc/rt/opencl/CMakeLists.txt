@@ -18,5 +18,5 @@ pml_cc_library(
 	mlir_runner_utils
     opencl_headers
     opencl_hpp_headers
-    opencl_icd_loader
+    OpenCL
 )
