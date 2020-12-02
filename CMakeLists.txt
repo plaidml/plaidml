@@ -78,6 +78,11 @@ endif()
 include(half)
 include(llvm-project)
 include(xsmm)
+include(vulkan_headers)
+include(volk)
+include(opencl_headers)
+include(opencl_hpp_headers)
+include(opencl_icd_loader)
 
 # -------------------------------------------------------------------------------
 # cmake modules
