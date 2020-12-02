@@ -7,3 +7,4 @@ FetchContent_MakeAvailable(vulkan_headers)
 
 add_library(vulkan_headers INTERFACE)
 target_include_directories(vulkan_headers INTERFACE ${vulkan_headers_SOURCE_DIR})
+target_include_directories(vulkan_headers INTERFACE ${vulkan_headers_SOURCE_DIR}/include)
