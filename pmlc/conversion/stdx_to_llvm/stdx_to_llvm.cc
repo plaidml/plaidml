@@ -73,6 +73,21 @@ struct ATanLowering : public LibMCallLowering<stdx::ATanOp> {
   std::string getFuncName() const override { return "atanf"; }
 };
 
+struct ACosHLowering : public LibMCallLowering<stdx::ACosHOp> {
+  using LibMCallLowering<stdx::ACosHOp>::LibMCallLowering;
+  std::string getFuncName() const override { return "acoshf"; }
+};
+
+struct ASinHLowering : public LibMCallLowering<stdx::ASinHOp> {
+  using LibMCallLowering<stdx::ASinHOp>::LibMCallLowering;
+  std::string getFuncName() const override { return "asinhf"; }
+};
+
+struct ATanHLowering : public LibMCallLowering<stdx::ATanHOp> {
+  using LibMCallLowering<stdx::ATanHOp>::LibMCallLowering;
+  std::string getFuncName() const override { return "atanhf"; }
+};
+
 struct CosHLowering : public LibMCallLowering<stdx::CosHOp> {
   using LibMCallLowering<stdx::CosHOp>::LibMCallLowering;
   std::string getFuncName() const override { return "coshf"; }
@@ -304,6 +319,9 @@ void populateStdXToLLVMConversionPatterns(LLVMTypeConverter &converter,
   patterns.insert<ACosLowering,    //
                   ASinLowering,    //
                   ATanLowering,    //
+                  ACosHLowering,   //
+                  ASinHLowering,   //
+                  ATanHLowering,   //
                   CosHLowering,    //
                   ErfLowering,     //
                   FloorLowering,   //
