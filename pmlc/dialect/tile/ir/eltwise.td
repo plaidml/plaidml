@@ -120,10 +120,13 @@ class EW_UnaryLogicOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
 
 def EW_AbsOp : EW_UnaryOp<"abs">;
 def EW_ACosOp : EW_UnaryFloatOp<"acos">;
+def EW_ACosHOp : EW_UnaryFloatOp<"acosh">;
 def EW_AddOp : EW_BinaryOp<"add", [Commutative, NoSideEffect]>, HasFolder;
 def EW_ASinOp : EW_UnaryFloatOp<"asin">;
+def EW_ASinHOp : EW_UnaryFloatOp<"asinh">;
 def EW_AssignOp : EW_UnaryOp<"assign">;
 def EW_ATanOp : EW_UnaryFloatOp<"atan">;
+def EW_ATanHOp : EW_UnaryFloatOp<"atanh">;
 def EW_CeilOp : EW_UnaryOp<"ceil">;
 def EW_CmpEqOp : EW_CompareOp<"cmp_eq", [Commutative, NoSideEffect]>;
 def EW_CmpGeOp : EW_CompareOp<"cmp_ge">;
