@@ -17,5 +17,6 @@ pml_cc_library(
     MLIRSPIRV
     mlir_runner_utils
     half
+    vulkan_headers
     volk
 )
