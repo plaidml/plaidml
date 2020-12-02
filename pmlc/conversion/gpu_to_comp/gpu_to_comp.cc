@@ -18,6 +18,12 @@ namespace gpu = mlir::gpu;
 
 namespace {
 
+struct valueComparator {
+  bool operator()(const mlir::Value a, const mlir::Value b) const {
+    return a.getAsOpaquePointer() < b.getAsOpaquePointer();
+  }
+};
+
 /// Rewrites gpu.launch_func operation to be contained inside
 /// comp.schedule_func. Creates new execution environment before function,
 /// then allocates required memory on device. After scheduling function
@@ -33,25 +39,27 @@ struct RewriteLaunchFunc : public mlir::OpRewritePattern<gpu::LaunchFuncOp> {
   matchAndRewrite(gpu::LaunchFuncOp op,
                   mlir::PatternRewriter &rewriter) const override;
 
+  mlir::LogicalResult allocateDeviceMemory(
+      mlir::PatternRewriter &rewriter, mlir::Location loc, mlir::Value execEnv,
+      std::vector<gpu::LaunchFuncOp> &ops,
+      std::vector<std::vector<mlir::Value>> &newOperands,
+      std::map<mlir::Value, mlir::Value, valueComparator> &bufferPool) const;
   mlir::LogicalResult
-  allocateDeviceMemory(mlir::PatternRewriter &rewriter, mlir::Location location,
-                       mlir::Value execEnv, const mlir::ValueRange &host,
-                       std::vector<mlir::Value> &device) const;
-  mlir::LogicalResult createScheduleFuncOp(mlir::PatternRewriter &rewriter,
-                                           mlir::Location loc,
-                                           mlir::Value execEnv,
-                                           gpu::LaunchFuncOp op,
-                                           const mlir::ValueRange &operands,
-                                           mlir::Value &event) const;
-  mlir::LogicalResult readDeviceMemory(mlir::PatternRewriter &rewriter,
-                                       mlir::Location loc, mlir::Value execEnv,
-                                       const mlir::ValueRange &hostArgs,
-                                       const mlir::ValueRange &deviceArgs,
-                                       mlir::Value dependency) const;
-  mlir::LogicalResult
-  deallocateDeviceMemory(mlir::PatternRewriter &rewriter, mlir::Location loc,
-                         mlir::Value execEnv, const mlir::ValueRange &hostArgs,
-                         const mlir::ValueRange &deviceArgs) const;
+  createScheduleFuncOps(mlir::PatternRewriter &rewriter, mlir::Location loc,
+                        mlir::Value execEnv,
+                        std::vector<gpu::LaunchFuncOp> &ops,
+                        std::vector<std::vector<mlir::Value>> &newOperands,
+                        std::vector<mlir::Value> &events) const;
+  mlir::LogicalResult readDeviceMemory(
+      mlir::PatternRewriter &rewriter, mlir::Location loc, mlir::Value execEnv,
+      std::vector<mlir::Value> &funcEvents,
+      std::vector<std::vector<mlir::Value>> &newOperands,
+      std::map<mlir::Value, mlir::Value, valueComparator> &bufferPool) const;
+  mlir::LogicalResult deallocateDeviceMemory(
+      mlir::PatternRewriter &rewriter, mlir::Location loc, mlir::Value execEnv,
+      std::map<mlir::Value, mlir::Value, valueComparator> &bufferPool) const;
+  template <typename T>
+  mlir::LogicalResult getConsecutiveOps(T op, std::vector<T> &ops) const;
 
   comp::ExecEnvType execEnvType;
   comp::EventType eventType;
@@ -106,120 +114,178 @@ RewriteLaunchFunc::matchAndRewrite(gpu::LaunchFuncOp op,
     return mlir::failure();
   }
   mlir::Value device = func.getArgument(0);
+
+  std::vector<gpu::LaunchFuncOp> launchOps;
+  if (mlir::failed(getConsecutiveOps<gpu::LaunchFuncOp>(op, launchOps)))
+    return mlir::failure();
+
   // Create execution environment.
   auto execEnvOp =
       rewriter.create<comp::CreateExecEnv>(loc, execEnvType, device);
   mlir::Value execEnv = execEnvOp.getResult();
+  std::map<mlir::Value, mlir::Value, valueComparator> bufferPool;
+  std::vector<std::vector<mlir::Value>> newOperands(launchOps.size());
   // Allocate memory on device for memory operands.
-  std::vector<mlir::Value> newOperands;
-  if (mlir::failed(allocateDeviceMemory(rewriter, loc, execEnv, op.operands(),
-                                        newOperands)))
+  if (mlir::failed(allocateDeviceMemory(rewriter, loc, execEnv, launchOps,
+                                        newOperands, bufferPool)))
     return mlir::failure();
-  mlir::Value funcEvent;
-  if (mlir::failed(createScheduleFuncOp(rewriter, loc, execEnv, op, newOperands,
-                                        funcEvent)))
+  std::vector<mlir::Value> funcEvents;
+  if (mlir::failed(createScheduleFuncOps(rewriter, loc, execEnv, launchOps,
+                                         newOperands, funcEvents)))
     return mlir::failure();
   // Read device memory back to host.
-  if (mlir::failed(readDeviceMemory(rewriter, loc, execEnv, op.operands(),
-                                    newOperands, funcEvent)))
+  if (mlir::failed(readDeviceMemory(rewriter, loc, execEnv, funcEvents,
+                                    newOperands, bufferPool)))
     return mlir::failure();
   // Deallocate device memory.
-  if (mlir::failed(deallocateDeviceMemory(rewriter, loc, execEnv, op.operands(),
-                                          newOperands)))
+  if (mlir::failed(deallocateDeviceMemory(rewriter, loc, execEnv, bufferPool)))
     return mlir::failure();
   // Destroy execution environment.
   rewriter.create<comp::DestroyExecEnv>(loc, execEnv);
-  // Remove original launch operation.
-  rewriter.eraseOp(op.getOperation());
-
+  // Remove original launch operations.
+  for (auto launchOp : launchOps) {
+    rewriter.eraseOp(launchOp.getOperation());
+  }
+  return mlir::success();
+}
+template <typename T>
+mlir::LogicalResult
+RewriteLaunchFunc::getConsecutiveOps(T op, std::vector<T> &ops) const {
+  // Collect consecutive ops of type T starting from a given op in current block
+  auto &opList = op.getOperation()->getBlock()->getOperations();
+  for (size_t i = 0; i < opList.size(); i++) {
+    auto currOp = std::next(opList.begin(), i);
+    if (mlir::isa<T>(currOp) && op == mlir::cast<T>(*currOp)) {
+      for (size_t j = i; j < opList.size(); j++) {
+        auto nextOp = std::next(opList.begin(), j);
+        if (!mlir::isa<T>(nextOp)) {
+          break;
+        }
+        ops.push_back(mlir::cast<T>(*nextOp));
+      }
+      break;
+    }
+  }
   return mlir::success();
 }
 
 mlir::LogicalResult RewriteLaunchFunc::allocateDeviceMemory(
     mlir::PatternRewriter &rewriter, mlir::Location loc, mlir::Value execEnv,
-    const mlir::ValueRange &host, std::vector<mlir::Value> &device) const {
-  device.reserve(host.size());
-  for (mlir::Value hostArg : host) {
-    mlir::Value newArg = hostArg;
+    std::vector<gpu::LaunchFuncOp> &ops,
+    std::vector<std::vector<mlir::Value>> &newOperands,
+    std::map<mlir::Value, mlir::Value, valueComparator> &bufferPool) const {
+  for (size_t i = 0; i < ops.size(); i++) {
+    for (mlir::Value hostArg : ops[i].operands()) {
+      if (bufferPool.count(hostArg) == 0) {
+        if (auto memRefType = hostArg.getType().dyn_cast<mlir::MemRefType>()) {
+          if (execEnvType.supportsMemorySpace(memRefType.getMemorySpace())) {
+            break;
+          }
+          mlir::MemRefType newMemRefType =
+              mlir::MemRefType::Builder(memRefType)
+                  .setMemorySpace(execEnvType.getDefaultMemorySpace());
+          auto allocOp =
+              rewriter.create<comp::Alloc>(loc, newMemRefType, execEnv);
+          auto deviceBuffer = allocOp.getResult();
 
-    if (auto memRefType = hostArg.getType().dyn_cast<mlir::MemRefType>()) {
-      if (!execEnvType.supportsMemorySpace(memRefType.getMemorySpace())) {
-        mlir::MemRefType newMemRefType =
-            mlir::MemRefType::Builder(memRefType)
-                .setMemorySpace(execEnvType.getDefaultMemorySpace());
-        auto allocOp =
-            rewriter.create<comp::Alloc>(loc, newMemRefType, execEnv);
-        newArg = allocOp.getResult();
-        comp::EventType eventType = execEnvType.getEventType();
-        mlir::Value event = rewriter.create<comp::ScheduleWrite>(
-            loc, eventType, hostArg, newArg, execEnv, mlir::ValueRange{});
-        rewriter.create<comp::Wait>(loc, event);
+          comp::EventType eventType = execEnvType.getEventType();
+          mlir::Value event = rewriter.create<comp::ScheduleWrite>(
+              loc, eventType, hostArg, deviceBuffer, execEnv,
+              mlir::ValueRange{});
+          rewriter.create<comp::Wait>(loc, event);
+          bufferPool.insert({hostArg, deviceBuffer});
+        }
       }
+      newOperands[i].push_back(bufferPool[hostArg]);
     }
-
-    device.push_back(newArg);
   }
   return mlir::success();
 }
 
-mlir::LogicalResult RewriteLaunchFunc::createScheduleFuncOp(
+mlir::LogicalResult RewriteLaunchFunc::createScheduleFuncOps(
     mlir::PatternRewriter &rewriter, mlir::Location loc, mlir::Value execEnv,
-    gpu::LaunchFuncOp op, const mlir::ValueRange &operands,
-    mlir::Value &event) const {
-  // Find kernel that operation launches.
-  mlir::SymbolRefAttr kernelSymbol = op.kernel();
-  auto kernelOp = mlir::SymbolTable::lookupNearestSymbolFrom<gpu::GPUFuncOp>(
-      op.getOperation(), kernelSymbol);
-  if (!kernelOp)
-    return mlir::failure();
+    std::vector<gpu::LaunchFuncOp> &ops,
+    std::vector<std::vector<mlir::Value>> &newOperands,
+    std::vector<mlir::Value> &events) const {
+  for (size_t i = 0; i < ops.size(); i++) {
+    auto op = ops[i];
+    // Find kernel that operation launches.
+    mlir::SymbolRefAttr kernelSymbol = op.kernel();
+    auto kernelOp = mlir::SymbolTable::lookupNearestSymbolFrom<gpu::GPUFuncOp>(
+        op.getOperation(), kernelSymbol);
+    if (!kernelOp)
+      return mlir::failure();
 
-  auto scheduleFuncOp = rewriter.create<comp::ScheduleFunc>(
-      loc, eventType, execEnv, mlir::ValueRange());
-  event = scheduleFuncOp.getResult();
+    std::vector<mlir::Value> deps;
+    for (size_t ie = 0; ie < events.size(); ie++) {
+      for (auto newOperand : newOperands[i]) {
+        if (std::find(newOperands[ie].begin(), newOperands[ie].end(),
+                      newOperand) != newOperands[ie].end()) {
+          deps.push_back(events[ie]);
+          break;
+        }
+      }
+    }
+    if (deps.size() > 0) {
+      rewriter.create<comp::Wait>(loc, deps);
+    }
 
-  // Add launch_func with new operands inside schedule_func.
-  mlir::PatternRewriter::InsertionGuard insertionGuard(rewriter);
-  rewriter.createBlock(&scheduleFuncOp.body(), scheduleFuncOp.body().end());
-  rewriter.create<gpu::LaunchFuncOp>(loc, kernelOp,
-                                     op.getGridSizeOperandValues(),
-                                     op.getBlockSizeOperandValues(), operands);
-  rewriter.create<comp::ScheduleEnd>(loc);
+    auto scheduleFuncOp = rewriter.create<comp::ScheduleFunc>(
+        loc, eventType, execEnv, mlir::ValueRange());
+    events.push_back(scheduleFuncOp.getResult());
 
+    // Add launch_func with new operands inside schedule_func.
+    mlir::PatternRewriter::InsertionGuard insertionGuard(rewriter);
+    rewriter.createBlock(&scheduleFuncOp.body(), scheduleFuncOp.body().end());
+
+    if (newOperands[i].size() == 0) {
+      rewriter.create<gpu::LaunchFuncOp>(
+          loc, kernelOp, op.getGridSizeOperandValues(),
+          op.getBlockSizeOperandValues(), op.operands());
+    } else {
+      rewriter.create<gpu::LaunchFuncOp>(
+          loc, kernelOp, op.getGridSizeOperandValues(),
+          op.getBlockSizeOperandValues(), newOperands[i]);
+    }
+    rewriter.create<comp::ScheduleEnd>(loc);
+  }
   return mlir::success();
 }
 
 mlir::LogicalResult RewriteLaunchFunc::readDeviceMemory(
     mlir::PatternRewriter &rewriter, mlir::Location loc, mlir::Value execEnv,
-    const mlir::ValueRange &hostArgs, const mlir::ValueRange &deviceArgs,
-    mlir::Value dependency) const {
+    std::vector<mlir::Value> &funcEvents,
+    std::vector<std::vector<mlir::Value>> &newOperands,
+    std::map<mlir::Value, mlir::Value, valueComparator> &bufferPool) const {
   std::vector<mlir::Value> readEvents;
-  for (size_t argIdx = 0; argIdx < hostArgs.size(); ++argIdx) {
-    mlir::Value host = hostArgs[argIdx];
-    mlir::Value device = deviceArgs[argIdx];
-    if (host == device)
-      continue;
-    auto readOp = rewriter.create<comp::ScheduleRead>(
-        loc, eventType, host, device, execEnv, dependency);
+  for (auto pair : bufferPool) {
+    mlir::Value host = pair.first;
+    mlir::Value device = pair.second;
+    std::vector<mlir::Value> deps;
+    for (size_t i = 0; i < newOperands.size(); i++) {
+      if (std::find(newOperands[i].begin(), newOperands[i].end(), device) !=
+          newOperands[i].end()) {
+        deps.push_back(funcEvents[i]);
+      }
+    }
+    auto readOp = rewriter.create<comp::ScheduleRead>(loc, eventType, host,
+                                                      device, execEnv, deps);
     readEvents.push_back(readOp.getResult());
   }
   // Wait for all read operations to finish or dependency if no reads.
   if (!readEvents.empty())
     rewriter.create<comp::Wait>(loc, readEvents);
   else
-    rewriter.create<comp::Wait>(loc, dependency);
+    rewriter.create<comp::Wait>(loc, funcEvents);
 
   return mlir::success();
 }
 
 mlir::LogicalResult RewriteLaunchFunc::deallocateDeviceMemory(
     mlir::PatternRewriter &rewriter, mlir::Location loc, mlir::Value execEnv,
-    const mlir::ValueRange &hostArgs,
-    const mlir::ValueRange &deviceArgs) const {
-  for (size_t argIdx = 0; argIdx < hostArgs.size(); ++argIdx) {
-    mlir::Value host = hostArgs[argIdx];
-    mlir::Value device = deviceArgs[argIdx];
-    if (host == device)
-      continue;
+    std::map<mlir::Value, mlir::Value, valueComparator> &bufferPool) const {
+  for (auto pair : bufferPool) {
+    mlir::Value device = pair.second;
     rewriter.create<comp::Dealloc>(loc, execEnv, device);
   }
   return mlir::success();

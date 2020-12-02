@@ -1,6 +1,6 @@
 // Copyright 2020, Intel Corporation
-#ifndef __PMLC_GPU_KERNEL_OUTLINING_PASS__
-#define __PMLC_GPU_KERNEL_OUTLINING_PASS__
+#ifndef __PMLC_GPU_TRANSFORMS__
+#define __PMLC_GPU_TRANSFORMS__
 
 include "mlir/Pass/PassBase.td"
 
@@ -13,4 +13,14 @@ def GpuKernelOutliningPass : Pass<"pmlc-kernel_outlining", "mlir::ModuleOp"> {
   ];
 }
 
-#endif // __PMLC_GPU_KERNEL_OUTLINING_PASS__
+def GatherGpuLaunchFuncsPass : Pass<"pmlc-gather_gpu_launch_funcs", "mlir::ModuleOp"> {
+  let summary = "Gather gpu.launch_func separated by std.alloc";
+  let constructor = "pmlc::conversion::gpu::createGatherGpuLaunchFuncsPass()";
+  let dependentDialects = [
+    "mlir::gpu::GPUDialect",
+    "mlir::spirv::SPIRVDialect"
+  ];
+}
+
+
+#endif // __PMLC_GPU_TRANSFORMS__

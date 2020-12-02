@@ -158,14 +158,16 @@ void pipelineBuilder(OpPassManager &pm,
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
-  // Do kernel outlining
+  // GPU transforms
   pm.addPass(
       createAddSpirvTargetPass(oclPipelineOptions.spirvVersion.getValue()));
   pm.addPass(conversion::gpu::createGpuKernelOutliningPass());
+  pm.addPass(conversion::gpu::createGatherGpuLaunchFuncsPass());
 
   // Convert GPU to comp.
   pm.addPass(pmlc::conversion::gpu_to_comp::createConvertGpuToCompPass(
       comp::ExecEnvRuntime::OpenCL, /*memorySpace=*/11));
+  pm.addPass(comp::createMinimizeBufferTransfersPass());
   pm.addPass(comp::createExecEnvCoalescingPass());
   pm.addPass(comp::createMinimizeAllocationsPass());
   pm.addPass(comp::createRemoveRedundantRWPass());
