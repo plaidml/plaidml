@@ -686,7 +686,7 @@ struct ProgramBuilder {
     }
     llvm::SmallVector<Type, 4> resultTypes;
     for (const Value &val : results) {
-      resultTypes.insert(val.getType());
+      resultTypes.push_back(val.getType());
     }
     std::vector<NamedAttribute> attrs;
     for (const auto &kvp : node->attrs) {
@@ -694,8 +694,7 @@ struct ProgramBuilder {
       attrs.push_back(builder.getNamedAttr(kvp.getKey(), value));
     }
     auto layerOp = builder.create<layer::BoxOp>(
-        loc, node->op, operands, resultTypes.getArrayRef(),
-        builder.getDictionaryAttr(attrs));
+        loc, node->op, operands, resultTypes, builder.getDictionaryAttr(attrs));
     BlockAndValueMapping mapper;
     OpBuilder bodyBuilder(layerOp.body());
     for (auto tuple : llvm::zip(operands, layerOp.body().getArguments())) {
