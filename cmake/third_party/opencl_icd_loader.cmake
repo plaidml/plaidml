@@ -4,3 +4,5 @@ FetchContent_Declare(
   URL_HASH SHA256=e4c27a5adcef4dbc0fee98864af203dc78dfc967ca7287c9bad9add030e7516e
 )
 FetchContent_MakeAvailable(opencl_icd_loader)
+
+file(COPY ${opencl_headers_SOURCE_DIR}/CL DESTINATION ${opencl_icd_loader_SOURCE_DIR}/inc)
