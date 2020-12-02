@@ -42,36 +42,29 @@ module attributes {gpu.container_module} {
 module attributes {gpu.container_module} {
   //  CHECK-LABEL: func @two_gpu_func
   //   CHECK-SAME:     %[[DEV:[a-zA-Z0-9]*]]:
-  //   CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]*]]:
-  //   CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]*]]:
-  //   CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]*]]:
 
   //        CHECK:   %[[ENV0:.*]] = comp.create_execenv %[[DEV]]
-  //      SPACE11:   %[[MEM02:.*]] = comp.alloc %[[ENV0]]
-  //      SPACE11:   %[[WEV02:.*]] = comp.schedule_write %[[ARG2]] to %[[MEM02]] on %[[ENV0]]
-  //      SPACE11:   comp.wait %[[WEV02]]
-  //      SPACE11:   %[[MEM00:.*]] = comp.alloc %[[ENV0]]
-  //      SPACE11:   %[[WEV00:.*]] = comp.schedule_write %[[ARG0]] to %[[MEM00]] on %[[ENV0]]
-  //      SPACE11:   comp.wait %[[WEV00]]
-  //      SPACE11:   %[[MEM01:.*]] = comp.alloc %[[ENV0]]
-  //      SPACE11:   %[[WEV01:.*]] = comp.schedule_write %[[ARG1]] to %[[MEM01]] on %[[ENV0]]
-  //      SPACE11:   comp.wait %[[WEV01]]
-  //        CHECK:   %[[FEV0:.*]] = "comp.schedule_func"(%[[ENV0]])
+  //      SPACE11:   comp.alloc %[[ENV0]]
+  //      SPACE11:   comp.schedule_write 
+  //      SPACE11:   comp.wait
+  //      SPACE11:   comp.alloc %[[ENV0]]
+  //      SPACE11:   comp.schedule_write
+  //      SPACE11:   comp.wait
+  //      SPACE11:   comp.alloc %[[ENV0]]
+  //      SPACE11:   comp.schedule_write
+  //      SPACE11:   comp.wait
+  //        CHECK:   "comp.schedule_func"(%[[ENV0]])
   //        CHECK:     gpu.launch_func
-  //  SPACE0-SAME:       %[[ARG2]]
-  // SPACE11-SAME:       %[[MEM02]]
-  //      SPACE11:   comp.wait %[[FEV0]]
-  //        CHECK:   %[[FEV1:.*]] = "comp.schedule_func"(%[[ENV0]])
+  //      SPACE11:   comp.wait
+  //        CHECK:   "comp.schedule_func"(%[[ENV0]])
   //        CHECK:     gpu.launch_func
-  //  SPACE0-SAME:       %[[ARG0]], %[[ARG1]], %[[ARG2]]
-  // SPACE11-SAME:       %[[MEM00]], %[[MEM01]], %[[MEM02]]
-  //      SPACE11:   %[[REV00:.*]] = comp.schedule_read %{{.*}} from %{{.*}} on %[[ENV0]] wait for %[[FEV0]], %[[FEV1]]
-  //      SPACE11:   %[[REV01:.*]] = comp.schedule_read %{{.*}} from %{{.*}} on %[[ENV0]] wait for %[[FEV1]]
-  //      SPACE11:   %[[REV02:.*]] = comp.schedule_read %{{.*}} from %{{.*}} on %[[ENV0]] wait for %[[FEV1]]
-  //      SPACE11:   comp.wait %[[REV00]], %[[REV01]], %[[REV02]]
-  //      SPACE11:   comp.dealloc %[[ENV0]] %{{.*}}
-  //      SPACE11:   comp.dealloc %[[ENV0]] %{{.*}}
-  //      SPACE11:   comp.dealloc %[[ENV0]] %{{.*}}
+  //      SPACE11:   comp.schedule_read
+  //      SPACE11:   comp.schedule_read
+  //      SPACE11:   comp.schedule_read
+  //      SPACE11:   comp.wait
+  //      SPACE11:   comp.dealloc %[[ENV0]]
+  //      SPACE11:   comp.dealloc %[[ENV0]]
+  //      SPACE11:   comp.dealloc %[[ENV0]]
   //        CHECK:   comp.destroy_execenv %[[ENV0]]
 
 
