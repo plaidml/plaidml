@@ -1281,7 +1281,7 @@ TEST_F(CppEdsl, Asin) {
 
 TEST_F(CppEdsl, AsinH) {
   auto S = Placeholder(DType::FLOAT32, {3, 3});
-  auto O = asin(S);
+  auto O = asinh(S);
   auto program = makeProgram("asinh", {S}, {O});
 
   std::vector<float> input = {
@@ -1317,7 +1317,7 @@ TEST_F(CppEdsl, Acos) {
 
 TEST_F(CppEdsl, AcosH) {
   auto S = Placeholder(DType::FLOAT32, {3, 3});
-  auto O = acos(S);
+  auto O = acosh(S);
   auto program = makeProgram("acosh", {S}, {O});
 
   std::vector<float> input = {
@@ -1328,7 +1328,7 @@ TEST_F(CppEdsl, AcosH) {
   std::vector<float> expected = {
       0.443568, 0.622363, 0.756433,  //
       0.867015, 0.962424, 1.04697,   //
-      0.0,      1.5708,   2.2143     //
+      1.12323,  1.19291,  0.0        //
   };
   checkClose(program, {input}, {expected}, /*tolerance=*/1e-4);
 }
@@ -1353,7 +1353,7 @@ TEST_F(CppEdsl, Atan) {
 
 TEST_F(CppEdsl, AtanH) {
   auto S = Placeholder(DType::FLOAT32, {3, 3});
-  auto O = atan(S);
+  auto O = atanh(S);
   auto program = makeProgram("atanh", {S}, {O});
 
   std::vector<float> input = {
