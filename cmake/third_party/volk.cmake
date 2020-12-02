@@ -5,4 +5,4 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(volk)
 
-target_include_directories(volk PRIVATE ${vulkan_headers_SOURCE_DIR}/include) 
+target_include_directories(volk PRIVATE ${vulkan_headers_SOURCE_DIR}/include)
