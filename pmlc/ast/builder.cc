@@ -685,7 +685,7 @@ struct ProgramBuilder {
       results.insert(builder.lookupNode(result));
     }
     llvm::SmallVector<Type, 4> resultTypes;
-    for (const Value &val : results) {
+    for (Value val : results) {
       resultTypes.push_back(val.getType());
     }
     std::vector<NamedAttribute> attrs;
