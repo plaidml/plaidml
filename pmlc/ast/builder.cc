@@ -681,8 +681,11 @@ struct ProgramBuilder {
       operands.push_back(builder.lookupNode(operand));
     }
     llvm::SetVector<Value> results;
+    llvm::SetVector<Type> resultTypes;
     for (const ExprNodePtr &result : node->results) {
-      results.insert(builder.lookupNode(result));
+      Value val = builder.lookupNode(result);
+      results.insert(val);
+      resultTypes.insert(val.getType());
     }
     std::vector<NamedAttribute> attrs;
     for (const auto &kvp : node->attrs) {
@@ -690,7 +693,7 @@ struct ProgramBuilder {
       attrs.push_back(builder.getNamedAttr(kvp.getKey(), value));
     }
     auto layerOp = builder.create<layer::BoxOp>(
-        loc, node->op, operands, results.getArrayRef(),
+        loc, node->op, operands, resultTypes.getArrayRef(),
         builder.getDictionaryAttr(attrs));
     BlockAndValueMapping mapper;
     OpBuilder bodyBuilder(layerOp.body());
