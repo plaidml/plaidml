@@ -14,8 +14,8 @@ pml_cc_library(
     pmlc::compiler
     pmlc::rt
     MLIRPass
-	MLIRSPIRV
-	mlir_runner_utils
+    MLIRSPIRV
+    mlir_runner_utils
     opencl_headers
     opencl_hpp_headers
     OpenCL

@@ -27,31 +27,9 @@ if (NOT WIN32)
       pmlc::target::all_obj
   )
 else()
-# For Windows build both static and shared lib
   pml_cc_library(
     NAME plaidml
     TYPE STATIC
-    LINKOPTS
-    PROPS
-      OUTPUT_NAME plaidml
-      SOVERSION 1
-    DEPS
-      plaidml::core::obj
-      plaidml::edsl::obj
-      plaidml::exec::obj
-      plaidml::op::obj
-      pmlc::rt::all_runtimes
-      pmlc::target::all_obj
-  )
-
-  pml_cc_library(
-    NAME plaidml_dll
-    TYPE SHARED
-    LINKOPTS
-    LINK_DEPENDS ${WINDOWS_DEF}
-    PROPS
-      OUTPUT_NAME plaidml
-      SOVERSION 1
     DEPS
       plaidml::core::obj
       plaidml::edsl::obj
