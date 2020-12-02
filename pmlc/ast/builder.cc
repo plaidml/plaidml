@@ -681,10 +681,11 @@ struct ProgramBuilder {
       operands.push_back(builder.lookupNode(operand));
     }
     llvm::SetVector<Value> results;
-    llvm::SetVector<Type> resultTypes;
     for (const ExprNodePtr &result : node->results) {
-      Value val = builder.lookupNode(result);
-      results.insert(val);
+      results.insert(builder.lookupNode(result));
+    }
+    llvm::SmallVector<Type, 4> resultTypes;
+    for (const Value &val : results) {
       resultTypes.insert(val.getType());
     }
     std::vector<NamedAttribute> attrs;
