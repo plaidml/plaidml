@@ -684,14 +684,17 @@ struct ProgramBuilder {
     for (const ExprNodePtr &result : node->results) {
       results.insert(builder.lookupNode(result));
     }
+    llvm::SmallVector<Type, 4> resultTypes;
+    for (Value val : results) {
+      resultTypes.push_back(val.getType());
+    }
     std::vector<NamedAttribute> attrs;
     for (const auto &kvp : node->attrs) {
       Attribute value = builder.getAttribute(kvp.getValue());
       attrs.push_back(builder.getNamedAttr(kvp.getKey(), value));
     }
     auto layerOp = builder.create<layer::BoxOp>(
-        loc, node->op, operands, results.getArrayRef(),
-        builder.getDictionaryAttr(attrs));
+        loc, node->op, operands, resultTypes, builder.getDictionaryAttr(attrs));
     BlockAndValueMapping mapper;
     OpBuilder bodyBuilder(layerOp.body());
     for (auto tuple : llvm::zip(operands, layerOp.body().getArguments())) {
