@@ -42,18 +42,18 @@ class PriorBoxImpl {
   const ngraph::op::PriorBoxAttrs& attrs;
   int H;
   int W;
-  int IH;
-  int IW;
+  edsl::Tensor IH;
+  edsl::Tensor IW;
   int num_of_prior;
   int min_element_size;
-  float step;
-  float step_x;
-  float step_y;
+  edsl::Tensor step;
+  edsl::Tensor step_x;
+  edsl::Tensor step_y;
   float offset;
   std::vector<float> aspect_ratios;
   std::vector<float> aspect_ratios_scale_size;
   std::vector<float> variance;
-  std::vector<float> min_size;
+  edsl::Tensor min_size;
   edsl::Tensor C_mix;
   edsl::Tensor C_out;
 };
@@ -70,10 +70,9 @@ void PriorBoxImpl::prepareConfig() {
   std::vector<int> input_shape = input_shape_ngraph_op->get_vector<int>();
   H = input_shape[0];
   W = input_shape[1];
-  auto* image_shape_ngraph_op = ngraph::as_type<ngraph::op::Constant>(ctx.layer->get_input_node_ptr(1));
-  std::vector<int> image_shape = image_shape_ngraph_op->get_vector<int>();
-  IH = image_shape[0];
-  IW = image_shape[1];
+  auto IHIW = ctx.operands.at(1);
+  IH = edsl::cast(op::slice(IHIW).add_dims({0}), DType::FLOAT32);
+  IW = edsl::cast(op::slice(IHIW).add_dims({1}), DType::FLOAT32);
 
   num_of_prior = ngraph::op::PriorBox::number_of_priors(attrs);
 
@@ -99,20 +98,25 @@ void PriorBoxImpl::prepareConfig() {
   variance = attrs.variance;
   if (variance.empty()) variance.push_back(0.1f);
 
-  step = attrs.step;
-  min_size = attrs.min_size;
+  step = edsl::cast(edsl::Tensor(attrs.step), DType::FLOAT32);
+  min_element_size = attrs.min_size.size();
+  TensorShape shape_ms(DType::FLOAT32, {min_element_size, 1});
+  Buffer buffer_ms(shape_ms);
+  buffer_ms.copy_from(attrs.min_size.data());
+  min_size = edsl::Constant(buffer_ms, "min_size");
   if (!attrs.scale_all_sizes) {
     // mxnet-like PriorBox
-    if (step == -1)
+    if (attrs.step == -1)
       step = 1.f * IH / H;
     else
-      step *= IH;
-    for (auto& size : min_size) size *= IH;
+      step = step * IH;
+    min_size = min_size * IH;
   }
-  step_x = (step == 0) ? static_cast<float>(IW) / W : step;
-  step_y = (step == 0) ? static_cast<float>(IH) / H : step;
+  edsl::Tensor a = IW / W;
+  edsl::Tensor b = step;
+  step_x = edsl::select(step == 0, IW / W, step);
+  step_y = edsl::select(step == 0, IH / H, step);
 
-  min_element_size = min_size.size();
   offset = attrs.offset;
 }
 
@@ -120,13 +124,8 @@ void PriorBoxImpl::produceCenterBase() {
   auto CW = edsl::cast(edsl::index({edsl::TensorDim(H), edsl::TensorDim(W), edsl::TensorDim(1)}, 1), DType::FLOAT32);
   auto CH = edsl::cast(edsl::index({edsl::TensorDim(H), edsl::TensorDim(W), edsl::TensorDim(1)}, 0), DType::FLOAT32);
   edsl::Tensor CW_normalized, CH_normalized;
-  if (step == 0) {
-    CW_normalized = (CW + 0.5f) * step_x / IW;
-    CH_normalized = (CH + 0.5f) * step_y / IH;
-  } else {
-    CW_normalized = (CW + offset) * step / IW;
-    CH_normalized = (CH + offset) * step / IH;
-  }
+  CW_normalized = edsl::select(step == 0, (CW + 0.5f) * step_x / IW, (CW + offset) * step / IW);
+  CH_normalized = edsl::select(step == 0, (CH + 0.5f) * step_y / IH, (CH + offset) * step / IH);
   C_mix = op::concatenate({CW_normalized, CH_normalized}, -1);
 }
 
@@ -205,13 +204,9 @@ void PriorBoxImpl::processFixedSizePath() {
         auto Center_temp = op::broadcast(C_mix, {H, W, density_s * density_s, 2}, {0, 1, 3}) + Density_mix;
 
         // Box
-        std::vector<float> box_db;
-        box_db.push_back(-box_width / IW);
-        box_db.push_back(-box_height / IH);
-        TensorShape shape_db(DType::FLOAT32, {2});
-        Buffer buffer_db(shape_db);
-        buffer_db.copy_from(box_db.data());
-        auto Box_db = edsl::Constant(buffer_db, "box_db");
+        auto Box_db_first = edsl::reshape(-box_width / IW, {1, 1});
+        auto Box_db_second = edsl::reshape(-box_height / IH, {1, 1});
+        auto Box_db = op::concatenate({Box_db_first, Box_db_second}, -1);
 
         // Combine two tensor with element size 2 (WH) to a tensor with element size 4 (WHWH)
         auto C_dst = edsl::reshape(op::concatenate({op::clip(Center_temp + Box_db, edsl::Tensor(0.0f), edsl::Tensor()),
@@ -277,21 +272,9 @@ void PriorBoxImpl::processMinSizePath() {
   auto C = op::repeat(op::unsqueeze(C_mix_box, {-2})).count(min_element_size).axis(-2);
 
   // Min_size
-  std::vector<float> box_min;
-  for (auto i : min_size) {
-    float box_width = i * 0.5;
-    float box_height = i * 0.5;
-    float first = -box_width / IW;
-    float second = -box_height / IH;
-    box_min.push_back(first);
-    box_min.push_back(second);
-    box_min.push_back(-first);
-    box_min.push_back(-second);
-  }
-  TensorShape shape(DType::FLOAT32, {min_element_size, 4});
-  Buffer buffer_min(shape);
-  buffer_min.copy_from(box_min.data());
-  auto Box_min = edsl::Constant(buffer_min, "box_min");
+  auto first = -min_size * 0.5 / IW;
+  auto second = -min_size * 0.5 / IH;
+  auto Box_min = op::concatenate({first, second, -first, -second}, -1);
 
   auto C_min_size = C + Box_min;
   C_out = C_min_size;
@@ -301,21 +284,15 @@ void PriorBoxImpl::processMinSizePath() {
   int max_element_size = attrs.max_size.size();
   int result_size = max_element_size < min_element_size ? max_element_size : min_element_size;
   if (attrs.scale_all_sizes && max_element_size > 0) {
-    std::vector<float> box_max;
-    for (size_t i = 0; i < result_size; i++) {
-      float box_width = std::sqrt(min_size[i] * attrs.max_size[i]) * 0.5f;
-      float box_height = box_width;
-      float first = -box_width / IW;
-      float second = -box_height / IH;
-      box_max.push_back(first);
-      box_max.push_back(second);
-      box_max.push_back(-first);
-      box_max.push_back(-second);
-    }
-    TensorShape shape_max(DType::FLOAT32, {result_size, 4});
+    std::vector<float> max_size_new(attrs.max_size.begin(), attrs.max_size.begin() + result_size);
+    TensorShape shape_max(DType::FLOAT32, {result_size, 1});
     Buffer buffer_max(shape_max);
-    buffer_max.copy_from(box_max.data());
-    auto B_max = edsl::Constant(buffer_max, "box_max");
+    buffer_max.copy_from(max_size_new.data());
+    auto max_size = edsl::Constant(buffer_max, "buffer_max");
+    auto e = -edsl::sqrt(op::slice(min_size).add_dim(0, result_size).add_dim(0, 1) * max_size) * 0.5f;
+    auto e_first = e / IW;
+    auto e_second = e / IH;
+    auto B_max = op::concatenate({e_first, e_second, -e_first, -e_second}, -1);
 
     C_max_size = op::repeat(op::unsqueeze(C_mix_box, {-2})).count(result_size).axis(-2) + B_max;
 
@@ -338,31 +315,20 @@ void PriorBoxImpl::processMinSizePath() {
 
   // Aspect_ratio
   if (aspect_ratios_scale_size.size() > 0) {
-    std::vector<float> min_size_ar;
-    if (attrs.scale_all_sizes) {
-      min_size_ar = min_size;
-    } else {
-      min_size_ar.push_back(min_size[0]);
-    }
-    std::vector<float> box_ar;
-    for (auto ms : min_size_ar) {
-      for (auto ar : aspect_ratios_scale_size) {
-        float box_width = ms * 0.5f * ar;
-        float box_height = ms * 0.5f / ar;
-        float first = -box_width / IW;
-        float second = -box_height / IH;
-        box_ar.push_back(first);
-        box_ar.push_back(second);
-        box_ar.push_back(-first);
-        box_ar.push_back(-second);
-      }
-    }
-    int msa_size = min_size_ar.size();
     int ar_size = aspect_ratios_scale_size.size();
-    TensorShape shape(DType::FLOAT32, {msa_size * ar_size, 4});
-    Buffer buffer_ar(shape);
-    buffer_ar.copy_from(box_ar.data());
-    auto B_ar = edsl::Constant(buffer_ar, "box_ar");
+    TensorShape shape_arss(DType::FLOAT32, {ar_size});
+    Buffer buffer_arss(shape_arss);
+    buffer_arss.copy_from(aspect_ratios_scale_size.data());
+    auto Arss = edsl::Constant(buffer_arss, "aspect_ratios_scale_size");
+
+    edsl::Tensor min_size_ar = attrs.scale_all_sizes ? min_size : op::slice(min_size).add_dims({0, 0});
+    int msa_size = attrs.scale_all_sizes ? min_element_size : 1;
+    auto min_size_ar_ex = edsl::reshape(op::repeat(edsl::reshape(min_size_ar, {msa_size, 1})).count(ar_size).axis(-1),
+                                        {msa_size, ar_size});
+    auto B_ar_first = edsl::reshape(-min_size_ar_ex * 0.5f * Arss / IW, {msa_size, ar_size, 1});
+    auto B_ar_second = edsl::reshape(-min_size_ar_ex * 0.5f / Arss / IH, {msa_size, ar_size, 1});
+    auto B_ar = edsl::reshape(op::concatenate({B_ar_first, B_ar_second, -B_ar_first, -B_ar_second}, -1),
+                              {msa_size * ar_size, 4});
 
     auto C_ar = op::repeat(op::unsqueeze(C_mix_box, {-2})).count(msa_size * ar_size).axis(-2) + B_ar;
     if (attrs.scale_all_sizes) {
