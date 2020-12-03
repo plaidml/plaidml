@@ -96,8 +96,7 @@ DiagnosticCounter::Result DiagnosticCounter::next() {
   return Result::Match;
 }
 
-void wrapFunctionAndPackArguments(llvm::Module *module,
-                                  StringRef funcName,
+void wrapFunctionAndPackArguments(llvm::Module *module, StringRef funcName,
                                   StringRef newName) {
   auto &ctx = module->getContext();
   llvm::IRBuilder<> builder(ctx);
@@ -106,9 +105,9 @@ void wrapFunctionAndPackArguments(llvm::Module *module,
     throw std::runtime_error("Could not find function: " + funcName.str());
   }
 
-  // Given a function `foo(<...>)`, define the interface function
-  // `mlir_foo(i8**)`.
-  auto newType = llvm::FunctionType::get(builder.getVoidTy(),
+  // Given a function `foo(<...>) -> T`, define the interface function
+  // `mlir_foo(i8**) -> T`.
+  auto newType = llvm::FunctionType::get(func->getReturnType(),
                                          builder.getInt8PtrTy()->getPointerTo(),
                                          /*isVarArg=*/false);
   auto funcCst = module->getOrInsertFunction(newName, newType);
@@ -128,16 +127,19 @@ void wrapFunctionAndPackArguments(llvm::Module *module,
     llvm::Value *argPtrPtr = builder.CreateGEP(argList, argIndex);
     llvm::Value *argPtr = builder.CreateLoad(argPtrPtr);
     auto dstType = indexedArg.value().getType();
-    llvm::Value *arg = dstType->isIntegerTy() ?
-        builder.CreatePtrToInt(argPtr, dstType) : builder.CreateBitCast(argPtr, dstType);
+    llvm::Value *arg = dstType->isIntegerTy()
+                           ? builder.CreatePtrToInt(argPtr, dstType)
+                           : builder.CreateBitCast(argPtr, dstType);
     args.push_back(arg);
   }
 
-  // Call the implementation function with the extracted arguments.
-  builder.CreateCall(func, args);
-
-  // The interface function returns void.
-  builder.CreateRetVoid();
+  // Call the implementation function with the extracted arguments + return
+  llvm::Value *val = builder.CreateCall(func, args);
+  if (func->getReturnType()->isVoidTy()) {
+    builder.CreateRetVoid();
+  } else {
+    builder.CreateRet(val);
+  }
 }
 
 } // namespace pmlc::util

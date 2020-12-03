@@ -44,6 +44,7 @@ struct TypeConverter : public mlir::TypeConverter {
     addConversion([](FloatType type) { return type; });
     addConversion([](IntegerType type) { return tile::toSignlessType(type); });
     addConversion([](MemRefType type) { return type; });
+    addConversion([](stdx::ArgpackType type) { return type; });
     addConversion([this](RankedTensorType type) {
       auto elementType = type.getElementType();
       auto newType = convertType(elementType);
@@ -1456,15 +1457,16 @@ struct FuncOpConversion : public OpConversionPattern<FuncOp> {
 
     // Convert the function signature
     TypeConverter typeConverter;
-    mlir::TypeConverter::SignatureConversion result(type.getNumInputs() +
-                                                    type.getNumResults());
+    mlir::TypeConverter::SignatureConversion result(type.getNumInputs());
     for (unsigned i = 0; i < type.getNumInputs(); ++i) {
       result.addInputs(i, {typeConverter.convertType(type.getInput(i))});
     }
     SmallVector<Type, 8> resultTypes;
     for (Type resultType : type.getResults()) {
       Type newResultType = typeConverter.convertType(resultType);
-      result.addInputs({newResultType});
+      if (!newResultType.isa<stdx::ArgpackType>()) {
+        result.addInputs({newResultType});
+      }
       resultTypes.push_back(newResultType);
     }
 
@@ -1556,6 +1558,37 @@ struct TraceOpConversion : public OpConversionPattern<tile::PragmaOp> {
   }
 };
 
+struct PackOpConversion : public OpConversionPattern<stdx::PackOp> {
+  using OpConversionPattern<stdx::PackOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(stdx::PackOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const final {
+    auto argpackType = stdx::ArgpackType::get(op.getContext());
+    rewriter.replaceOpWithNewOp<stdx::PackOp>(op, TypeRange(argpackType),
+                                              operands);
+    return success();
+  }
+};
+
+struct UnpackOpConversion : public OpConversionPattern<stdx::UnpackOp> {
+  using OpConversionPattern<stdx::UnpackOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(stdx::UnpackOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const final {
+    SmallVector<Type, 8> newResultTypes;
+    TypeConverter typeConverter;
+    if (failed(
+            typeConverter.convertTypes(op.getResultTypes(), newResultTypes))) {
+      return failure();
+    }
+    rewriter.replaceOpWithNewOp<stdx::UnpackOp>(op, newResultTypes,
+                                                operands[0]);
+    return success();
+  }
+};
+
 struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
   void runOnOperation() final {
     // Inject tile.ident ops for each return operand that is a direct block
@@ -1585,6 +1618,12 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         [&](FuncOp op) { return converter.isSignatureLegal(op.getType()); });
     target.addDynamicallyLegalOp<ReturnOp>(
         [&](ReturnOp op) { return converter.isLegal(op); });
+    target.addDynamicallyLegalOp<stdx::PackOp>([&](stdx::PackOp op) {
+      return converter.isLegal(op.getOperandTypes());
+    });
+    target.addDynamicallyLegalOp<stdx::UnpackOp>([&](stdx::UnpackOp op) {
+      return converter.isLegal(op.getResultTypes());
+    });
 
     // Setup rewrite patterns
     using CmpIntLtOp =
@@ -1609,6 +1648,8 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         ScatterOpConversion,  //
         ShapeOpConversion,    //
         TraceOpConversion,    //
+        PackOpConversion,     //
+        UnpackOpConversion,   //
         ContractionOpConversion<CombinationKind::none, FirstOperand>,
         ContractionOpConversion<CombinationKind::add, StdOp<mlir::AddFOp>,
                                 ResultIs<EltwiseFloat>>,

@@ -10,6 +10,7 @@
 #include "pmlc/conversion/pxa_to_affine/pass_detail.h"
 #include "pmlc/conversion/pxa_to_affine/passes.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
+#include "pmlc/dialect/stdx/ir/ops.h"
 #include "pmlc/util/logging.h"
 #include "pmlc/util/tags.h"
 #include "pmlc/util/util.h"
@@ -19,6 +20,7 @@ using namespace mlir; // NOLINT
 namespace pmlc::conversion::pxa_to_affine {
 
 namespace pxa = dialect::pxa;
+namespace stdx = dialect::stdx;
 
 namespace {
 
@@ -245,11 +247,17 @@ struct FuncOpConversion : public OpConversionPattern<FuncOp> {
     for (unsigned i = 0; i < type.getNumInputs(); ++i) {
       result.addInputs(i, {type.getInput(i)});
     }
+    SmallVector<Type, 1> resultTypes;
+    for (unsigned i = 0; i < type.getNumResults(); ++i) {
+      if (type.getResult(i).isa<stdx::ArgpackType>()) {
+        resultTypes.push_back(type.getResult(i));
+      }
+    }
 
     // Create a new function with an updated signature.
     auto newOp = rewriter.cloneWithoutRegions(op);
     rewriter.inlineRegionBefore(op.getBody(), newOp.getBody(), newOp.end());
-    newOp.setType(FunctionType::get(result.getConvertedTypes(), llvm::None,
+    newOp.setType(FunctionType::get(result.getConvertedTypes(), resultTypes,
                                     op.getContext()));
 
     // Tell the rewriter to convert the region signature.
@@ -268,7 +276,13 @@ struct ReturnOpConversion : public OpConversionPattern<ReturnOp> {
   matchAndRewrite(ReturnOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
     IVLOG(2, "ReturnOpConversion::matchAndRewrite>");
-    rewriter.replaceOpWithNewOp<ReturnOp>(op);
+    SmallVector<Value, 1> results;
+    for (auto val : operands) {
+      if (val.getType().isa<stdx::ArgpackType>()) {
+        results.push_back(val);
+      }
+    }
+    rewriter.replaceOpWithNewOp<ReturnOp>(op, results);
     return success();
   }
 };

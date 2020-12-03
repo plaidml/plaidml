@@ -356,6 +356,21 @@ TEST_F(CppEdsl, ConstAdd) {
   checkExact(program, {}, {expected});
 }
 
+TEST_F(CppEdsl, MixedAdd) {
+  std::vector<int32_t> a = {4, 3, 2, 1};
+  std::vector<int32_t> b = {1, 2, 3, 4};
+  auto I = Placeholder(DType::UINT32, {4});
+  auto A = Constant(makeBuffer(DType::INT32, {4}, a), "A");
+  auto B = Constant(makeBuffer(DType::INT32, {4}, b), "B");
+  auto AB = A + B;
+  auto O = AB + I;
+  auto program = makeProgram("mixed_add", {I}, {O});
+
+  std::vector<int32_t> A_input = {1, 2, 2, 1};
+  std::vector<int32_t> expected = {6, 7, 7, 6};
+  checkExact(program, {A_input}, {expected});
+}
+
 TEST_F(CppEdsl, ConstCast) {
   auto O = cast(Tensor{3}, DType::FLOAT32);
   auto program = makeProgram("const_cast", {}, {O});

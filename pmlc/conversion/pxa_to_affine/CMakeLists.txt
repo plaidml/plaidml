@@ -7,6 +7,7 @@ pml_cc_library(
   DEPS
     ::passes-gen
     pmlc::dialect::tile::ir
+    pmlc::dialect::stdx::ir
     pmlc::util
 )
 
