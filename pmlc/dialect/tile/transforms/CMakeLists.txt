@@ -13,8 +13,8 @@ pml_cc_library(
   DEPS
     LLVMSupport
     MLIRIR
+    pmlc::dialect::stdx::ir
     pmlc::dialect::tile::ir
-    pmlc::dialect::pxa::ir
     pmlc::util
     pmlc::util::bilp
     pmlc::util::math
