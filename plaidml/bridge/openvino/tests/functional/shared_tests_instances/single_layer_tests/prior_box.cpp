@@ -15,7 +15,6 @@ const std::vector<InferenceEngine::Precision> netPrecisions = {
     // InferenceEngine::Precision::FP16,
 };
 
-// The count of tests will be too large for CI, close most checks here
 const std::vector<std::vector<float>> minSizes = {{256.0f}, {256.0f, 128.0f}};
 const std::vector<std::vector<float>> maxSizes = {{315.0f}};
 const std::vector<std::vector<float>> aspectRatios = {{1.0f}, {2.0f, 3.0f}};
@@ -32,10 +31,16 @@ const std::vector<bool> scaleAllSizes = {false, true};
 const std::vector<bool> useFixedSizes = {false, true};
 const std::vector<bool> useFixedRatios = {false, true};
 // Combine supports up to 10 arguments
-const auto layerSpecificParamsForFullTest = ::testing::Combine(
+const auto layerSpecificParamsForMinSizeTest = ::testing::Combine(
     ::testing::ValuesIn(minSizes), ::testing::ValuesIn(maxSizes), ::testing::ValuesIn(aspectRatios),
     ::testing::ValuesIn(density), ::testing::ValuesIn(fixedRatios), ::testing::ValuesIn(fixedSizes),
-    ::testing::ValuesIn(clip), ::testing::ValuesIn(flip), ::testing::ValuesIn(steps), ::testing::ValuesIn(offsets));
+    ::testing::Values(false), ::testing::Values(false), ::testing::ValuesIn(steps), ::testing::ValuesIn(offsets));
+
+const auto layerSpecificParamsForFixedSizeTest =
+    ::testing::Combine(::testing::Values(std::vector<float>({256.0f})), ::testing::Values(std::vector<float>({315.0f})),
+                       ::testing::ValuesIn(aspectRatios), ::testing::ValuesIn(density),
+                       ::testing::ValuesIn(fixedRatios), ::testing::ValuesIn(fixedSizes), ::testing::Values(false),
+                       ::testing::Values(false), ::testing::ValuesIn(steps), ::testing::ValuesIn(offsets));
 
 const auto layerSpecificParamsForSmoke = ::testing::Combine(
     ::testing::Values(std::vector<float>({256.0f})), ::testing::Values(std::vector<float>({315.0f})),
@@ -46,11 +51,22 @@ const auto layerSpecificParamsForSmoke = ::testing::Combine(
 std::vector<std::vector<size_t>> layerShapes{{2, 3}};
 std::vector<std::vector<size_t>> imageShapes{{2}};
 
-INSTANTIATE_TEST_CASE_P(PriorBoxLayerFullCheck, PriorBoxLayerTest,
-                        ::testing::Combine(layerSpecificParamsForFullTest, ::testing::ValuesIn(variances),
-                                           ::testing::ValuesIn(scaleAllSizes), ::testing::ValuesIn(useFixedSizes),
-                                           ::testing::ValuesIn(useFixedRatios), ::testing::ValuesIn(netPrecisions),
+INSTANTIATE_TEST_CASE_P(PriorBoxLayerMinSizeCheck, PriorBoxLayerTest,
+                        ::testing::Combine(layerSpecificParamsForMinSizeTest,
+                                           ::testing::Values(std::vector<float>({0.1f})),
+                                           ::testing::ValuesIn(scaleAllSizes), ::testing::Values(false),
+                                           ::testing::Values(false), ::testing::ValuesIn(netPrecisions),
                                            ::testing::ValuesIn(layerShapes), ::testing::ValuesIn(imageShapes),
+                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML),
+                                           ::testing::Values(std::map<std::string, std::string>({}))),
+                        PriorBoxLayerTest::getTestCaseName);
+
+INSTANTIATE_TEST_CASE_P(PriorBoxLayerFixedSizeCheck, PriorBoxLayerTest,
+                        ::testing::Combine(layerSpecificParamsForMinSizeTest,
+                                           ::testing::Values(std::vector<float>({0.1f})), ::testing::Values(false),
+                                           ::testing::Values(true), ::testing::Values(true),
+                                           ::testing::ValuesIn(netPrecisions), ::testing::ValuesIn(layerShapes),
+                                           ::testing::ValuesIn(imageShapes),
                                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML),
                                            ::testing::Values(std::map<std::string, std::string>({}))),
                         PriorBoxLayerTest::getTestCaseName);
