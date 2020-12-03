@@ -42,7 +42,7 @@ const auto layerSpecificParamsForFixedSizeTest =
                        ::testing::ValuesIn(fixedRatios), ::testing::ValuesIn(fixedSizes), ::testing::Values(false),
                        ::testing::Values(false), ::testing::ValuesIn(steps), ::testing::ValuesIn(offsets));
 
-const auto layerSpecificParamsForSmoke = ::testing::Combine(
+const auto layerSpecificParamsForSmokeTest = ::testing::Combine(
     ::testing::Values(std::vector<float>({256.0f})), ::testing::Values(std::vector<float>({315.0f})),
     ::testing::Values(std::vector<float>({2.0f, 3.0f})), ::testing::Values(std::vector<float>({2.0f, 4.0f})),
     ::testing::Values(std::vector<float>({2.0f, 4.0f})), ::testing::Values(std::vector<float>({2.0f, 4.0f})),
@@ -62,7 +62,7 @@ INSTANTIATE_TEST_CASE_P(PriorBoxLayerMinSizeCheck, PriorBoxLayerTest,
                         PriorBoxLayerTest::getTestCaseName);
 
 INSTANTIATE_TEST_CASE_P(PriorBoxLayerFixedSizeCheck, PriorBoxLayerTest,
-                        ::testing::Combine(layerSpecificParamsForMinSizeTest,
+                        ::testing::Combine(layerSpecificParamsForFixedSizeTest,
                                            ::testing::Values(std::vector<float>({0.1f})), ::testing::Values(false),
                                            ::testing::Values(true), ::testing::Values(true),
                                            ::testing::ValuesIn(netPrecisions), ::testing::ValuesIn(layerShapes),
@@ -72,7 +72,7 @@ INSTANTIATE_TEST_CASE_P(PriorBoxLayerFixedSizeCheck, PriorBoxLayerTest,
                         PriorBoxLayerTest::getTestCaseName);
 
 INSTANTIATE_TEST_CASE_P(smoke, PriorBoxLayerTest,
-                        ::testing::Combine(layerSpecificParamsForSmoke, ::testing::ValuesIn(variances),
+                        ::testing::Combine(layerSpecificParamsForSmokeTest, ::testing::ValuesIn(variances),
                                            ::testing::ValuesIn(scaleAllSizes), ::testing::ValuesIn(useFixedSizes),
                                            ::testing::ValuesIn(useFixedRatios), ::testing::ValuesIn(netPrecisions),
                                            ::testing::ValuesIn(layerShapes), ::testing::ValuesIn(imageShapes),
