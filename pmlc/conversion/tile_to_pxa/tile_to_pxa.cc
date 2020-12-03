@@ -13,6 +13,7 @@
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "pmlc/conversion/tile_to_pxa/pass_detail.h"
+#include "pmlc/dialect/layer/ir/ops.h"
 #include "pmlc/dialect/pxa/analysis/strides.h"
 #include "pmlc/dialect/pxa/analysis/uses.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
@@ -27,6 +28,7 @@
 namespace pmlc::conversion::tile_to_pxa {
 
 namespace tile = dialect::tile;
+namespace layer = dialect::layer;
 namespace pxa = dialect::pxa;
 namespace stdx = dialect::stdx;
 
@@ -886,7 +888,22 @@ struct ArgSortOpConversion : public OpConversionPattern<tile::ArgSortOp> {
 
     // Allocate an output tensor to contain the sorted argument indices.
     auto resultType = MemRefType::get(shape, i32Type);
-    auto result = rewriter.create<AllocOp>(loc, resultType).getResult();
+    Value result = rewriter.create<AllocOp>(loc, resultType).getResult();
+
+    llvm::SmallVector<Type, 4> resultTypes;
+    resultTypes.push_back(resultType);
+    llvm::SmallVector<NamedAttribute, 4> attrs;
+    llvm::SmallVector<Value, 2> layerInputs{result, tensor};
+    auto layerOp =
+        rewriter.create<layer::BoxOp>(loc, "argsort", layerInputs, resultTypes,
+                                      rewriter.getDictionaryAttr(attrs));
+    rewriter.setInsertionPointToStart(&layerOp.body().front());
+
+    // Inside the box, the output tensor comes from the first argument,
+    // and the input data tensor comes from the next. Outputs must come
+    // first in the layer.box operands list.
+    result = layerOp.body().getArguments()[0];
+    tensor = layerOp.body().getArguments()[1];
 
     // Create an affine loop nest over all the dimensions, including the one
     // we are sorting on. We will use a single iteration for the sort axis,
@@ -1080,7 +1097,10 @@ struct ArgSortOpConversion : public OpConversionPattern<tile::ArgSortOp> {
     // }
 
     rewriter.create<AffineYieldOp>(loc, ArrayRef<Value>{result});
-    rewriter.replaceOp(op, outerLoop.getResult(0));
+    rewriter.setInsertionPointToEnd(&layerOp.body().back());
+    auto loopResult = outerLoop.getResult(0);
+    rewriter.create<layer::ReturnOp>(loc, ArrayRef<Value>{loopResult});
+    rewriter.replaceOp(op, layerOp.getResult(0));
     return success();
   }
 };
@@ -1945,6 +1965,7 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
     TypeConverter converter;
     target.addLegalDialect<mlir::AffineDialect>();
     target.addLegalDialect<mlir::StandardOpsDialect>();
+    target.addLegalDialect<dialect::layer::LayerDialect>();
     target.addLegalDialect<dialect::pxa::PXADialect>();
     target.addLegalDialect<dialect::stdx::StdXDialect>();
     target.addLegalOp<scf::ForOp, scf::YieldOp, scf::IfOp>();
