@@ -25,14 +25,14 @@ void GatherGpuLaunchFuncsPass::gatherAllocOpsBetweenConsecutiveLaunchOps(
     mlir::Block &block, std::vector<std::vector<mlir::AllocOp>> &allocOpVectors,
     std::vector<gpu::LaunchFuncOp> &firstLaunchOpVector) {
   for (auto itOp = block.begin(); itOp != block.end(); itOp++) {
-    if (auto launchOp = dyn_cast<gpu::LaunchFuncOp>(*itOp)) {
+    if (mlir::isa<gpu::LaunchFuncOp>(itOp)) {
       std::vector<mlir::AllocOp> allocOpVector;
       for (auto itOpFast = std::next(itOp, 1); itOpFast != block.end();
            itOpFast++) {
-        if (auto allocOp = dyn_cast<mlir::AllocOp>(*itOpFast)) {
-          allocOpVector.push_back(allocOp);
-        } else if (!dyn_cast<gpu::LaunchFuncOp>(*itOpFast)) {
-          firstLaunchOpVector.push_back(launchOp);
+        if (mlir::isa<mlir::AllocOp>(itOpFast)) {
+          allocOpVector.push_back(mlir::cast<mlir::AllocOp>(*itOpFast));
+        } else if (!mlir::isa<gpu::LaunchFuncOp>(*itOpFast)) {
+          firstLaunchOpVector.push_back(mlir::cast<gpu::LaunchFuncOp>(*itOp));
           allocOpVectors.push_back(allocOpVector);
           itOp = itOpFast;
           break;
