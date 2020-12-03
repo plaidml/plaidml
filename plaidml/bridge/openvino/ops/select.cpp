@@ -15,13 +15,15 @@ using namespace InferenceEngine;  // NOLINT[build/namespaces]
 
 namespace PlaidMLPlugin {
 
-static OpRegistration reg("select", [](const Context& ctx) {
-  IE_ASSERT(ctx.operands.size() == 3);
-  auto A = ctx.operands.at(0);
-  auto B = ctx.operands.at(1);
-  auto C = ctx.operands.at(2);
-  DType target_type = to_plaidml(ctx.layer->get_default_output().get_element_type());
-  return edsl::make_tuple(select(A, cast(B, target_type), cast(C, target_type)));
-});
+void registerSelect() {
+  registerOp("select", [](const Context& ctx) {
+    IE_ASSERT(ctx.operands.size() == 3);
+    auto A = ctx.operands.at(0);
+    auto B = ctx.operands.at(1);
+    auto C = ctx.operands.at(2);
+    DType target_type = to_plaidml(ctx.layer->get_element_type());
+    return edsl::make_tuple(select(A, cast(B, target_type), cast(C, target_type)));
+  });
+}
 
 }  // namespace PlaidMLPlugin
