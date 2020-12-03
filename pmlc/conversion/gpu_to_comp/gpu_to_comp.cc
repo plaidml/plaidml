@@ -113,13 +113,11 @@ RewriteLaunchFunc::matchAndRewrite(gpu::LaunchFuncOp op,
         "Expected containing function to supply an execution device");
     return mlir::failure();
   }
-
   // Create execution environment.
   mlir::Value device = func.getArgument(0);
   auto execEnvOp =
       rewriter.create<comp::CreateExecEnv>(loc, execEnvType, device);
   mlir::Value execEnv = execEnvOp.getResult();
-
   // Collect consecutive gpu.launch_func Ops starting from current op.
   std::vector<gpu::LaunchFuncOp> launchOps;
   if (mlir::failed(getConsecutiveOps<gpu::LaunchFuncOp>(op, launchOps)))
@@ -143,32 +141,29 @@ RewriteLaunchFunc::matchAndRewrite(gpu::LaunchFuncOp op,
   // Deallocate device memory.
   if (mlir::failed(deallocateDeviceMemory(rewriter, loc, execEnv, bufferPool)))
     return mlir::failure();
-
   // Destroy execution environment.
   rewriter.create<comp::DestroyExecEnv>(loc, execEnv);
-
   // Remove original launch operations.
   for (auto launchOp : launchOps) {
     rewriter.eraseOp(launchOp.getOperation());
   }
   return mlir::success();
 }
+
 template <typename T>
 mlir::LogicalResult
 RewriteLaunchFunc::getConsecutiveOps(T op, std::vector<T> &ops) const {
   // Collect consecutive ops of type T starting from a given op.
-  auto &opList = op.getOperation()->getBlock()->getOperations();
-  for (size_t i = 0; i < opList.size(); i++) {
-    auto currOp = std::next(opList.begin(), i);
-    if (mlir::isa<T>(currOp) && op == mlir::cast<T>(*currOp)) {
-      for (size_t j = i; j < opList.size(); j++) {
-        auto nextOp = std::next(opList.begin(), j);
-        if (!mlir::isa<T>(nextOp)) {
-          break;
+  auto block = op.getOperation()->getBlock();
+  for (auto itOp = block->begin(); itOp != block->end(); itOp++) {
+    if (op == mlir::cast<T>(*itOp)) {
+      for (auto itOpFast = itOp; itOpFast != block->end(); itOpFast++) {
+        T currOp = llvm::dyn_cast<T>(*itOpFast);
+        if (!currOp) {
+          return mlir::success();
         }
-        ops.push_back(mlir::cast<T>(*nextOp));
+        ops.push_back(currOp);
       }
-      break;
     }
   }
   return mlir::success();

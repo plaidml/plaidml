@@ -24,20 +24,17 @@ private:
 void GatherGpuLaunchFuncsPass::gatherAllocOpsBetweenConsecutiveLaunchOps(
     mlir::Block &block, std::vector<std::vector<mlir::AllocOp>> &allocOpVectors,
     std::vector<gpu::LaunchFuncOp> &firstLaunchOpVector) {
-  auto &opList = block.getOperations();
-  for (size_t i = 0; i < opList.size(); i++) {
-    auto currOp = std::next(opList.begin(), i);
-    if (mlir::isa<gpu::LaunchFuncOp>(currOp)) {
-      auto launchOp = mlir::cast<gpu::LaunchFuncOp>(*currOp);
+  for (auto itOp = block.begin(); itOp != block.end(); itOp++) {
+    if (auto launchOp = dyn_cast<gpu::LaunchFuncOp>(*itOp)) {
       std::vector<mlir::AllocOp> allocOpVector;
-      for (size_t j = i + 1; j < opList.size(); j++) {
-        auto nextOp = std::next(opList.begin(), j);
-        if (mlir::isa<mlir::AllocOp>(nextOp)) {
-          allocOpVector.push_back(mlir::cast<mlir::AllocOp>(*nextOp));
-        } else if (!mlir::isa<gpu::LaunchFuncOp>(nextOp)) {
+      for (auto itOpFast = std::next(itOp, 1); itOpFast != block.end();
+           itOpFast++) {
+        if (auto allocOp = dyn_cast<mlir::AllocOp>(*itOpFast)) {
+          allocOpVector.push_back(allocOp);
+        } else if (!dyn_cast<gpu::LaunchFuncOp>(*itOpFast)) {
           firstLaunchOpVector.push_back(launchOp);
           allocOpVectors.push_back(allocOpVector);
-          i = j;
+          itOp = itOpFast;
           break;
         }
       }
