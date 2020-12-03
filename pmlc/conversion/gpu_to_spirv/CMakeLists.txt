@@ -11,6 +11,7 @@ pml_cc_library(
     MLIRGPUToSPIRVTransforms
     MLIRGPU
     MLIRSPIRV
+    MLIRVectorToSPIRV
 )
 
 pml_tblgen_library(

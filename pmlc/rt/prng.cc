@@ -38,13 +38,12 @@ _mlir_ciface_plaidml_rt_prng(UnrankedMemRefType<uint32_t> *state,
   newStatePtr[2] = s2;
 }
 
-namespace {
-struct Registration {
-  Registration() {
-    using pmlc::rt::registerSymbol;
-    registerSymbol("_mlir_ciface_plaidml_rt_prng",
-                   reinterpret_cast<void *>(_mlir_ciface_plaidml_rt_prng));
-  }
-};
-static Registration reg;
-} // namespace
+namespace pmlc::rt {
+
+void registerPrng() {
+  using pmlc::rt::registerSymbol;
+  registerSymbol("_mlir_ciface_plaidml_rt_prng",
+                 reinterpret_cast<void *>(_mlir_ciface_plaidml_rt_prng));
+}
+
+} // namespace pmlc::rt

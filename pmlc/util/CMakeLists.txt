@@ -27,6 +27,7 @@ pml_cc_library(
     util.cc
   DEPS
     easyloggingpp
+    LLVMCore
     MLIRIR
     MLIRStandard
     ::enums-gen

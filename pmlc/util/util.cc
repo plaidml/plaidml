@@ -4,6 +4,7 @@
 
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Function.h"
+#include "llvm/IR/IRBuilder.h"
 #include "llvm/Support/Process.h"
 
 using namespace mlir; // NOLINT
@@ -93,6 +94,50 @@ DiagnosticCounter::Result DiagnosticCounter::next() {
     return Result::Break;
   }
   return Result::Match;
+}
+
+void wrapFunctionAndPackArguments(llvm::Module *module,
+                                  StringRef funcName,
+                                  StringRef newName) {
+  auto &ctx = module->getContext();
+  llvm::IRBuilder<> builder(ctx);
+  auto *func = module->getFunction(funcName);
+  if (!func) {
+    throw std::runtime_error("Could not find function: " + funcName.str());
+  }
+
+  // Given a function `foo(<...>)`, define the interface function
+  // `mlir_foo(i8**)`.
+  auto newType = llvm::FunctionType::get(builder.getVoidTy(),
+                                         builder.getInt8PtrTy()->getPointerTo(),
+                                         /*isVarArg=*/false);
+  auto funcCst = module->getOrInsertFunction(newName, newType);
+  llvm::Function *interfaceFunc = cast<llvm::Function>(funcCst.getCallee());
+
+  // Extract the arguments from the type-erased argument list and cast them to
+  // the proper types.
+  auto bb = llvm::BasicBlock::Create(ctx);
+  bb->insertInto(interfaceFunc);
+  builder.SetInsertPoint(bb);
+  llvm::Value *argList = interfaceFunc->arg_begin();
+  SmallVector<llvm::Value *, 8> args;
+  args.reserve(llvm::size(func->args()));
+  for (auto &indexedArg : llvm::enumerate(func->args())) {
+    llvm::Value *argIndex = llvm::Constant::getIntegerValue(
+        builder.getInt64Ty(), APInt(64, indexedArg.index()));
+    llvm::Value *argPtrPtr = builder.CreateGEP(argList, argIndex);
+    llvm::Value *argPtr = builder.CreateLoad(argPtrPtr);
+    auto dstType = indexedArg.value().getType();
+    llvm::Value *arg = dstType->isIntegerTy() ?
+        builder.CreatePtrToInt(argPtr, dstType) : builder.CreateBitCast(argPtr, dstType);
+    args.push_back(arg);
+  }
+
+  // Call the implementation function with the extracted arguments.
+  builder.CreateCall(func, args);
+
+  // The interface function returns void.
+  builder.CreateRetVoid();
 }
 
 } // namespace pmlc::util

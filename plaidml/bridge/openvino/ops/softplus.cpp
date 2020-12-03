@@ -14,11 +14,12 @@ using namespace InferenceEngine;  // NOLINT[build/namespaces]
 
 namespace PlaidMLPlugin {
 
-static OpRegistration reg("softplus", [](const Context& ctx) {
-  IE_ASSERT(ctx.operands.size() == 1);
-  auto I = ctx.operands.at(0);
-
-  return edsl::make_tuple(edsl::log(edsl::exp(I)+1.0));
-});
+void registerSoftplus() {
+  registerOp("softplus", [](const Context& ctx) {
+    IE_ASSERT(ctx.operands.size() == 1);
+    auto I = ctx.operands.at(0);
+    return edsl::make_tuple(edsl::log(edsl::exp(I) + 1.0));
+  });
+}
 
 }  // namespace PlaidMLPlugin

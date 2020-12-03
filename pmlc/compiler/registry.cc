@@ -24,43 +24,35 @@ public:
     return &registry;
   }
 
-  void registerTarget(StringRef name, TargetFactory factory) {
-    if (factories.count(name)) {
+  void registerTarget(StringRef name, TargetPtr target) {
+    if (targets.count(name)) {
       throw std::runtime_error(
           formatv("Target is already registered: {0}", name));
     }
-    factories[name] = factory;
+    targets[name] = target;
   }
 
   TargetPtr resolve(StringRef name) {
     auto itTarget = targets.find(name);
     if (itTarget == targets.end()) {
-      auto itFactory = factories.find(name);
-      if (itFactory == factories.end()) {
-        throw std::runtime_error(formatv("Could not find target: {0}", name));
-      }
-      TargetFactory factory = itFactory->second;
-      TargetPtr target = factory();
-      std::tie(itTarget, std::ignore) =
-          targets.insert(std::make_pair(name, target));
+      throw std::runtime_error(formatv("Could not find target: {0}", name));
     }
     return itTarget->second;
   }
 
   std::vector<StringRef> list() {
-    auto keys = factories.keys();
+    auto keys = targets.keys();
     return std::vector<StringRef>(keys.begin(), keys.end());
   }
 
 private:
-  StringMap<TargetFactory> factories;
   StringMap<TargetPtr> targets;
 };
 
 } // namespace
 
-void registerTarget(StringRef name, TargetFactory factory) {
-  TargetRegistry::instance()->registerTarget(name, factory);
+void registerTarget(StringRef name, TargetPtr target) {
+  TargetRegistry::instance()->registerTarget(name, target);
 }
 
 TargetPtr resolveTarget(StringRef name) {

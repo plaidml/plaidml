@@ -25,27 +25,8 @@ plaidml_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":api",
-        ":runtimes",
-        ":targets",
-    ],
-)
-
-plaidml_cc_library(
-    name = "targets",
-    visibility = ["//visibility:public"],
-    deps = [
-        "//pmlc/target/intel_gen",
-        "//pmlc/target/intel_gen_ocl_spirv",
-        "//pmlc/target/x86",
-    ],
-)
-
-plaidml_cc_library(
-    name = "runtimes",
-    visibility = ["//visibility:public"],
-    deps = [
-        "//pmlc/rt/llvm",
-        "//pmlc/rt/vulkan",
+        "//pmlc/rt:all_runtimes",
+        "//pmlc/target:all_targets",
     ],
 )
 

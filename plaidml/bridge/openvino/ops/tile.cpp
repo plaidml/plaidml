@@ -15,13 +15,15 @@ using namespace InferenceEngine;  // NOLINT[build/namespaces]
 
 namespace PlaidMLPlugin {
 
-static OpRegistration reg("tile", [](const Context& ctx) {
-  IE_ASSERT(ctx.operands.size() == 2);
-  auto I = ctx.operands.at(0);
-  auto reps = get_shape_from_constant_operand(1, ctx.layer);
-  std::vector<int> reps_ints;
-  reps_ints.assign(reps.begin(), reps.end());
-  return edsl::make_tuple(op::tile(I, reps_ints));
-});
+void registerTile() {
+  registerOp("tile", [](const Context& ctx) {
+    IE_ASSERT(ctx.operands.size() == 2);
+    auto I = ctx.operands.at(0);
+    auto reps = get_shape_from_constant_operand(1, ctx.layer);
+    std::vector<int> reps_ints;
+    reps_ints.assign(reps.begin(), reps.end());
+    return edsl::make_tuple(op::tile(I, reps_ints));
+  });
+}
 
 }  // namespace PlaidMLPlugin
