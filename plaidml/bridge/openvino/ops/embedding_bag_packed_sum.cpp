@@ -33,7 +33,7 @@ void registerEmbeddingBagPackedSum() {
       with_weights = true;
     }
 
-    auto I_gathered = gather(I, indices);
+    edsl::Tensor I_gathered = gather(I, indices);
     if (with_weights) {
       std::vector<int64_t> unsqueeze_axes;
       for (int64_t i = per_sample_weights.rank(); i < I_gathered.rank(); i++) {
