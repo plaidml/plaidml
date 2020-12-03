@@ -1,4 +1,8 @@
 // Copyright 2020 Intel Corporation
+#include "pmlc/target/x86/pipeline.h"
+
+#include <algorithm>
+#include <memory>
 
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/OpenMPToLLVM/ConvertOpenMPToLLVM.h"
@@ -214,6 +218,7 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(tile::createPadConstraintsPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
+  pm.addPass(tile::createSplitMainPass());
 
   pm.addPass(pmlc::conversion::tile_to_pxa::createLowerTileToPXAPass());
   pm.addPass(createCanonicalizerPass());

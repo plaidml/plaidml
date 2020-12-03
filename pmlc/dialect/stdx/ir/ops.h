@@ -13,6 +13,12 @@
 
 namespace pmlc::dialect::stdx {
 
+class ArgpackType
+    : public mlir::Type::TypeBase<ArgpackType, mlir::Type, mlir::TypeStorage> {
+public:
+  using Base::Base;
+};
+
 using mlir::Value;
 
 } // namespace pmlc::dialect::stdx
