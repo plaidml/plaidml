@@ -5,6 +5,7 @@
 #pragma once
 
 #include <algorithm>
+#include <cctype>
 #include <functional>
 #include <string>
 #include <unordered_map>
