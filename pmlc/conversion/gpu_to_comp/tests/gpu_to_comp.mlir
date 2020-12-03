@@ -67,9 +67,6 @@ module attributes {gpu.container_module} {
   //      SPACE11:   comp.dealloc %[[ENV0]]
   //        CHECK:   comp.destroy_execenv %[[ENV0]]
 
-
-
-
   func @two_gpu_func(%arg0: memref<8x16xf32>, %arg1: memref<16x32xf32>, %arg2: memref<8x32xf32>) {
     %c8 = constant 8 : index
     %c32 = constant 32 : index
