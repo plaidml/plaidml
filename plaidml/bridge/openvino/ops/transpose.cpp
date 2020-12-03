@@ -15,14 +15,16 @@ using namespace InferenceEngine;  // NOLINT[build/namespaces]
 
 namespace PlaidMLPlugin {
 
-static OpRegistration reg("transpose", [](const Context& ctx) {
-  IE_ASSERT(ctx.operands.size() == 2);
-  auto I = ctx.operands.at(0);
-  std::vector<size_t> axes = get_axis_vector_from_constant_operand(1, ctx.layer);
-  if (axes.empty()) {
-    return edsl::make_tuple(op::transpose(I));
-  }
-  return edsl::make_tuple(op::transpose(I, edsl::make_tuple(axes)));
-});
+void registerTranspose() {
+  registerOp("transpose", [](const Context& ctx) {
+    IE_ASSERT(ctx.operands.size() == 2);
+    auto I = ctx.operands.at(0);
+    std::vector<size_t> axes = get_axis_vector_from_constant_operand(1, ctx.layer);
+    if (axes.empty()) {
+      return edsl::make_tuple(op::transpose(I));
+    }
+    return edsl::make_tuple(op::transpose(I, edsl::make_tuple(axes)));
+  });
+}
 
 }  // namespace PlaidMLPlugin

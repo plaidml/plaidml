@@ -63,26 +63,24 @@ extern "C" int64_t plaidml_rt_xsmm_brgemm_dispatch_f32(int32_t lda, int32_t ldb,
   return reinterpret_cast<int64_t>(sgemm);
 }
 
-namespace {
-struct Registration {
-  Registration() {
-    libxsmm_init();
+namespace pmlc::rt {
 
-    using pmlc::rt::registerSymbol;
+void registerXsmm() {
+  libxsmm_init();
 
-    registerSymbol("plaidml_rt_xsmm_gemm_invoke_f32",
-                   reinterpret_cast<void *>(plaidml_rt_xsmm_gemm_invoke_f32));
+  using pmlc::rt::registerSymbol;
 
-    registerSymbol("plaidml_rt_xsmm_gemm_dispatch_f32",
-                   reinterpret_cast<void *>(plaidml_rt_xsmm_gemm_dispatch_f32));
+  registerSymbol("plaidml_rt_xsmm_gemm_invoke_f32",
+                 reinterpret_cast<void *>(plaidml_rt_xsmm_gemm_invoke_f32));
 
-    registerSymbol("plaidml_rt_xsmm_brgemm_invoke_f32",
-                   reinterpret_cast<void *>(plaidml_rt_xsmm_brgemm_invoke_f32));
+  registerSymbol("plaidml_rt_xsmm_gemm_dispatch_f32",
+                 reinterpret_cast<void *>(plaidml_rt_xsmm_gemm_dispatch_f32));
 
-    registerSymbol(
-        "plaidml_rt_xsmm_brgemm_dispatch_f32",
-        reinterpret_cast<void *>(plaidml_rt_xsmm_brgemm_dispatch_f32));
-  }
-};
-static Registration reg;
-} // namespace
+  registerSymbol("plaidml_rt_xsmm_brgemm_invoke_f32",
+                 reinterpret_cast<void *>(plaidml_rt_xsmm_brgemm_invoke_f32));
+
+  registerSymbol("plaidml_rt_xsmm_brgemm_dispatch_f32",
+                 reinterpret_cast<void *>(plaidml_rt_xsmm_brgemm_dispatch_f32));
+}
+
+} // namespace pmlc::rt

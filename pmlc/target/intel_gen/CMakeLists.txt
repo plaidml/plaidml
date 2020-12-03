@@ -2,6 +2,7 @@ pml_cc_library(
   NAME intel_gen
   HDRS
     passes.h
+    pipeline.h
   SRCS
     affine_index_pack.cc
     lower_affine.cc
@@ -26,10 +27,13 @@ pml_cc_library(
     MLIRAffineToStandard
     MLIRAffineTransforms
     MLIRGPU
+    MLIRSPIRVTransforms
     MLIRGPUToSPIRVTransforms
+    MLIRVectorToSPIRV
     MLIRGPUToVulkanTransforms
     MLIRLLVMIRTransforms
     MLIRSCFToGPU
+    MLIRSPIRVTransforms
     MLIRStandardOpsTransforms
 )
 

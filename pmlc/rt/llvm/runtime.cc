@@ -3,6 +3,7 @@
 #include <stdexcept>
 
 #include "pmlc/rt/llvm/device.h"
+#include "pmlc/rt/llvm/register.h"
 #include "pmlc/rt/runtime_registry.h"
 
 namespace pmlc::rt::llvm {
@@ -22,7 +23,15 @@ private:
   std::shared_ptr<Device> dev = std::make_shared<Device>();
 };
 
-RuntimeRegistration<Runtime> reg{"llvm_cpu"};
-
 } // namespace
+
+extern void registerBuiltins();
+extern void registerOpenMP();
+
+void registerRuntime() {
+  registerBuiltins();
+  registerOpenMP();
+  registerRuntime("llvm_cpu", std::make_shared<Runtime>());
+}
+
 } // namespace pmlc::rt::llvm

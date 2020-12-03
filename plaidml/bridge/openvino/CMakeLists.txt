@@ -53,20 +53,18 @@ file(GLOB_RECURSE _OPS_SRCS CONFIGURE_DEPENDS "ops/*.cpp")
 pml_cc_library(
   NAME openvino
   HDRS
-    plaidml_ops.hpp
     plaidml_builder.hpp
+    plaidml_ops.hpp
     plaidml_util.hpp
   SRCS
     plaidml_builder.cpp
+    plaidml_ops.cpp
     plaidml_util.cpp
     ${_OPS_SRCS}
   INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}
   DEPS
     IE::inference_engine
     IE::ngraph
-    plaidml::core
-    plaidml::edsl
-    plaidml::op
 )
 
 if(NOT InferenceEngineDeveloperPackage_FOUND)

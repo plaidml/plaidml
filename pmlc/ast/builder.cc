@@ -3,6 +3,7 @@
 #include "pmlc/ast/builder.h"
 
 #include <limits>
+#include <mutex>
 #include <stack>
 #include <string>
 #include <unordered_set>
@@ -22,6 +23,7 @@
 #include "llvm/Support/FormatVariadic.h"
 
 #include "pmlc/ast/ast.h"
+#include "pmlc/ast/ast_ops.h"
 #include "pmlc/ast/eval.h"
 #include "pmlc/dialect/layer/ir/ops.h"
 #include "pmlc/dialect/tile/ir/ops.h"
@@ -682,14 +684,17 @@ struct ProgramBuilder {
     for (const ExprNodePtr &result : node->results) {
       results.insert(builder.lookupNode(result));
     }
+    llvm::SmallVector<Type, 4> resultTypes;
+    for (Value val : results) {
+      resultTypes.push_back(val.getType());
+    }
     std::vector<NamedAttribute> attrs;
     for (const auto &kvp : node->attrs) {
       Attribute value = builder.getAttribute(kvp.getValue());
       attrs.push_back(builder.getNamedAttr(kvp.getKey(), value));
     }
     auto layerOp = builder.create<layer::BoxOp>(
-        loc, node->op, operands, results.getArrayRef(),
-        builder.getDictionaryAttr(attrs));
+        loc, node->op, operands, resultTypes, builder.getDictionaryAttr(attrs));
     BlockAndValueMapping mapper;
     OpBuilder bodyBuilder(layerOp.body());
     for (auto tuple : llvm::zip(operands, layerOp.body().getArguments())) {
@@ -813,10 +818,13 @@ struct ProgramBuilder {
 
 std::shared_ptr<Program> buildProgram(llvm::StringRef name,
                                       const ProgramArguments &args) {
-  enableGlobalDialectRegistry(true);
-  registerDialect<dialect::tile::TileDialect>();
-  registerDialect<dialect::layer::LayerDialect>();
-  registerDialect<StandardOpsDialect>();
+  static std::once_flag once;
+  std::call_once(once, []() {
+    enableGlobalDialectRegistry(true);
+    registerDialect<dialect::tile::TileDialect>();
+    registerDialect<dialect::layer::LayerDialect>();
+    registerDialect<StandardOpsDialect>();
+  });
   if (name.empty()) {
     name = "module";
   }

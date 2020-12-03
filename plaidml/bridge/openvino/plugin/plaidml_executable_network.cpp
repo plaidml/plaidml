@@ -7,9 +7,9 @@
 
 #include "plaidml_executable_network.hpp"
 
-#include <fstream>
-#include <memory>
-#include <vector>
+#include <fstream>  // NOLINT[build/include_order]
+#include <memory>   // NOLINT[build/include_order]
+#include <vector>   // NOLINT[build/include_order]
 
 #include "plaidml_builder.hpp"
 #include "plaidml_infer_request.hpp"
@@ -17,6 +17,17 @@
 using namespace InferenceEngine;
 
 namespace PlaidMLPlugin {
+
+static plaidml::Program buildProgram(const ICNNNetwork& network) {
+  InputsDataMap inputsInfo;
+  network.getInputsInfo(inputsInfo);
+
+  OutputsDataMap outputsInfo;
+  network.getOutputsInfo(outputsInfo);
+
+  std::shared_ptr<const ngraph::Function> func = network.getFunction();
+  return buildProgram(func, network.getName(), inputsInfo, outputsInfo);
+}
 
 InferRequestInternal::Ptr PlaidMLExecutableNetwork::CreateInferRequestImpl(InputsDataMap networkInputs,
                                                                            OutputsDataMap networkOutputs) {

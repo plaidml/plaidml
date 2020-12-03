@@ -63,47 +63,49 @@ edsl::Tensor create_kernel_tensor(const int64_t& filter_row, const int64_t& filt
 
 namespace PlaidMLPlugin {
 
-static OpRegistration reg("ExtractImagePatches", [](const Context& ctx) {
-  auto* layer = ngraph::as_type<ngraph::opset3::ExtractImagePatches>(ctx.layer);
-  IE_ASSERT(ctx.operands.size() == 1);
+void registerExtractImagePatches() {
+  registerOp("ExtractImagePatches", [](const Context& ctx) {
+    auto* layer = ngraph::as_type<ngraph::opset3::ExtractImagePatches>(ctx.layer);
+    IE_ASSERT(ctx.operands.size() == 1);
 
-  auto input_tensor = ctx.operands.at(0);
-  auto filter_row = layer->get_sizes()[0];
-  auto filter_col = layer->get_sizes()[1];
+    auto input_tensor = ctx.operands.at(0);
+    auto filter_row = layer->get_sizes()[0];
+    auto filter_col = layer->get_sizes()[1];
 
-  edsl::Tensor kernel_tensor;
-  switch (input_tensor.dtype()) {
-    case DType::FLOAT32:
-      kernel_tensor = create_kernel_tensor<float>(filter_row, filter_col, input_tensor);
-      break;
-    case DType::INT32:
-      kernel_tensor = create_kernel_tensor<int>(filter_row, filter_col, input_tensor);
-      break;
-  }
+    edsl::Tensor kernel_tensor;
+    switch (input_tensor.dtype()) {
+      case DType::FLOAT32:
+        kernel_tensor = create_kernel_tensor<float>(filter_row, filter_col, input_tensor);
+        break;
+      case DType::INT32:
+        kernel_tensor = create_kernel_tensor<int>(filter_row, filter_col, input_tensor);
+        break;
+    }
 
-  std::vector<size_t> strides;
-  for (auto stride : layer->get_strides()) {
-    strides.push_back(stride);
-  }
+    std::vector<size_t> strides;
+    for (auto stride : layer->get_strides()) {
+      strides.push_back(stride);
+    }
 
-  std::vector<size_t> dilations;
-  for (auto dilation : layer->get_rates()) {
-    dilations.push_back(dilation);
-  }
+    std::vector<size_t> dilations;
+    for (auto dilation : layer->get_rates()) {
+      dilations.push_back(dilation);
+    }
 
-  auto autopad_mode = to_plaidml(layer->get_auto_pad());
-  if (autopad_mode == plaidml::op::AutoPadMode::EXPLICIT) {
-    THROW_IE_EXCEPTION << "only valid or auto_pad(same_upper or same_lower) "
-                          "PadType is accepted";
-  }
+    auto autopad_mode = to_plaidml(layer->get_auto_pad());
+    if (autopad_mode == plaidml::op::AutoPadMode::EXPLICIT) {
+      THROW_IE_EXCEPTION << "only valid or auto_pad(same_upper or same_lower) "
+                            "PadType is accepted";
+    }
 
-  auto result = op::convolution(input_tensor, kernel_tensor)
-                    .strides(strides)
-                    .dilations(dilations)
-                    .autopad_mode(autopad_mode)
-                    .input_layout(plaidml::op::TensorLayout::NCX)
-                    .filter_layout(plaidml::op::TensorLayout::KCX);
-  return edsl::make_tuple(result);
-});
+    auto result = op::convolution(input_tensor, kernel_tensor)
+                      .strides(strides)
+                      .dilations(dilations)
+                      .autopad_mode(autopad_mode)
+                      .input_layout(plaidml::op::TensorLayout::NCX)
+                      .filter_layout(plaidml::op::TensorLayout::KCX);
+    return edsl::make_tuple(result);
+  });
+}
 
 }  // namespace PlaidMLPlugin

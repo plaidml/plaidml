@@ -19,6 +19,8 @@ namespace pmlc::conversion::stdx_to_llvm {
 
 namespace stdx = dialect::stdx;
 namespace edsc = mlir::edsc;
+using LLVMType = LLVM::LLVMType;
+using LLVMStructType = LLVM::LLVMStructType;
 
 namespace {
 
@@ -179,6 +181,101 @@ struct ReshapeLowering : public ConvertOpToLLVMPattern<stdx::ReshapeOp> {
   }
 };
 
+static LLVM::LLVMFuncOp importFunc(OpBuilder &builder, mlir::StringRef name,
+                                   LLVMType funcTy) {
+  // Find the enclosing module
+  auto moduleOp =
+      builder.getBlock()->getParentOp()->getParentOfType<mlir::ModuleOp>();
+  // Check if the function is defined
+  auto func = moduleOp.lookupSymbol<LLVM::LLVMFuncOp>(name);
+  if (!func) {
+    // If not, make a declaration
+    mlir::OpBuilder::InsertionGuard insertionGuard{builder};
+    builder.setInsertionPointToStart(moduleOp.getBody());
+    func =
+        builder.create<LLVM::LLVMFuncOp>(builder.getUnknownLoc(), name, funcTy);
+  }
+  return func;
+}
+
+static LLVMStructType getStructType(TypeConverter &converter, TypeRange types) {
+  mlir::SmallVector<LLVMType, 8> fieldTypes;
+  assert(types.size() > 0);
+  for (auto type : types) {
+    fieldTypes.push_back(converter.convertType(type).cast<LLVMType>());
+  }
+  return LLVMType::getStructTy(types[0].getContext(), fieldTypes)
+      .cast<LLVMStructType>();
+}
+
+struct PackLowering : public ConvertOpToLLVMPattern<stdx::PackOp> {
+  using ConvertOpToLLVMPattern<stdx::PackOp>::ConvertOpToLLVMPattern;
+
+  LogicalResult
+  matchAndRewrite(Operation *baseOp, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto op = cast<stdx::PackOp>(baseOp);
+    Location loc = op.getLoc();
+    // Get the relevant types
+    auto structType = getStructType(typeConverter, op.getOperandTypes());
+    auto i8PtrType = LLVMType::getInt8Ty(rewriter.getContext()).getPointerTo();
+    // Get the size of the struct type and malloc
+    auto sizeofStruct = getSizeInBytes(loc, structType, rewriter);
+    auto mallocFunc =
+        importFunc(rewriter, "malloc",
+                   LLVMType::getFunctionTy(
+                       i8PtrType, mlir::ArrayRef<LLVMType>{getIndexType()},
+                       /*isVarArg=*/false));
+    auto rawPtr = rewriter
+                      .create<LLVM::CallOp>(loc, mallocFunc,
+                                            mlir::ValueRange{sizeofStruct})
+                      .getResult(0);
+    auto structPtr = rewriter.create<LLVM::BitcastOp>(
+        loc, structType.getPointerTo(), rawPtr);
+    // Make a value like struct holding all the fields
+    mlir::Value structVal =
+        rewriter.create<LLVM::UndefOp>(op.getLoc(), structType);
+    for (auto valIdx : llvm::enumerate(operands)) {
+      structVal = rewriter.create<LLVM::InsertValueOp>(
+          loc, structType, structVal, valIdx.value(),
+          rewriter.getI64ArrayAttr(valIdx.index()));
+    }
+    // Store the result
+    rewriter.create<LLVM::StoreOp>(loc, structVal, structPtr);
+    // Return the raw pointer
+    rewriter.replaceOp(op, {rawPtr});
+    return success();
+  }
+};
+
+struct UnpackLowering : public ConvertOpToLLVMPattern<stdx::UnpackOp> {
+  using ConvertOpToLLVMPattern<stdx::UnpackOp>::ConvertOpToLLVMPattern;
+
+  LogicalResult
+  matchAndRewrite(Operation *baseOp, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto op = cast<stdx::UnpackOp>(baseOp);
+    Location loc = op.getLoc();
+    // Get the LLVM structure type
+    auto structType = getStructType(typeConverter, op.getResultTypes());
+    // Bitcast the input operand
+    auto structPtr = rewriter.create<LLVM::BitcastOp>(
+        loc, structType.getPointerTo(), operands[0]);
+    // Load it
+    auto structVal = rewriter.create<LLVM::LoadOp>(loc, structPtr);
+    // Extract all the values
+    SmallVector<Value, 8> outVals;
+    for (unsigned i = 0; i < op.getNumResults(); i++) {
+      outVals.push_back(rewriter.create<LLVM::ExtractValueOp>(
+          loc, structType.getBody()[i], structVal,
+          rewriter.getI64ArrayAttr(i)));
+    }
+    // Return extracted values
+    rewriter.replaceOp(op, outVals);
+    return success();
+  }
+};
+
 /// A pass converting MLIR operations into the LLVM IR dialect.
 struct LowerToLLVMPass : public LowerToLLVMBase<LowerToLLVMPass> {
   // Run the dialect converter on the module.
@@ -192,8 +289,8 @@ struct LowerToLLVMPass : public LowerToLLVMBase<LowerToLLVMPass> {
     populateStdToLLVMConversionPatterns(typeConverter, patterns);
     populateStdXToLLVMConversionPatterns(typeConverter, patterns);
 
-    ConversionTarget target(*context);
-    target.addLegalDialect<LLVM::LLVMDialect>();
+    LLVMConversionTarget target(*context);
+    target.addIllegalDialect<stdx::StdXDialect>();
     if (failed(applyPartialConversion(module, target, patterns))) {
       signalPassFailure();
     }
@@ -210,11 +307,19 @@ void populateStdXToLLVMConversionPatterns(LLVMTypeConverter &converter,
                   CosHLowering,    //
                   ErfLowering,     //
                   FloorLowering,   //
+                  PackLowering,    //
                   PowLowering,     //
                   ReshapeLowering, //
                   RoundLowering,   //
                   SinHLowering,    //
-                  TanLowering>(converter);
+                  TanLowering,     //
+                  UnpackLowering   //
+                  >(converter);
+  converter.addConversion([](TupleType type) -> Optional<Type> {
+    // Tuples look like i8 pointers.  I'd like this to be void*, but MLIR
+    // disallows void* in it's validation for some bizare reason
+    return LLVMType::getInt8Ty(type.getContext()).getPointerTo();
+  });
 }
 
 std::unique_ptr<mlir::Pass> createLowerToLLVMPass() {

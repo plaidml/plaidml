@@ -23,6 +23,7 @@ dependencies:
       - dm-sonnet<2.0.0
       - drawSvg
       - graphviz
+      - h5py < 3.0.0
       - humanize
       - keras==2.2.4
       - keras-applications==1.0.8
