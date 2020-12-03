@@ -63,24 +63,24 @@ struct ACosLowering : public LibMCallLowering<stdx::ACosOp> {
   std::string getFuncName() const override { return "acosf"; }
 };
 
-struct ASinLowering : public LibMCallLowering<stdx::ASinOp> {
-  using LibMCallLowering<stdx::ASinOp>::LibMCallLowering;
-  std::string getFuncName() const override { return "asinf"; }
-};
-
-struct ATanLowering : public LibMCallLowering<stdx::ATanOp> {
-  using LibMCallLowering<stdx::ATanOp>::LibMCallLowering;
-  std::string getFuncName() const override { return "atanf"; }
-};
-
 struct ACosHLowering : public LibMCallLowering<stdx::ACosHOp> {
   using LibMCallLowering<stdx::ACosHOp>::LibMCallLowering;
   std::string getFuncName() const override { return "acoshf"; }
 };
 
+struct ASinLowering : public LibMCallLowering<stdx::ASinOp> {
+  using LibMCallLowering<stdx::ASinOp>::LibMCallLowering;
+  std::string getFuncName() const override { return "asinf"; }
+};
+
 struct ASinHLowering : public LibMCallLowering<stdx::ASinHOp> {
   using LibMCallLowering<stdx::ASinHOp>::LibMCallLowering;
   std::string getFuncName() const override { return "asinhf"; }
+};
+
+struct ATanLowering : public LibMCallLowering<stdx::ATanOp> {
+  using LibMCallLowering<stdx::ATanOp>::LibMCallLowering;
+  std::string getFuncName() const override { return "atanf"; }
 };
 
 struct ATanHLowering : public LibMCallLowering<stdx::ATanHOp> {
@@ -317,10 +317,10 @@ struct LowerToLLVMPass : public LowerToLLVMBase<LowerToLLVMPass> {
 void populateStdXToLLVMConversionPatterns(LLVMTypeConverter &converter,
                                           OwningRewritePatternList &patterns) {
   patterns.insert<ACosLowering,    //
-                  ASinLowering,    //
-                  ATanLowering,    //
                   ACosHLowering,   //
+                  ASinLowering,    //
                   ASinHLowering,   //
+                  ATanLowering,    //
                   ATanHLowering,   //
                   CosHLowering,    //
                   ErfLowering,     //
