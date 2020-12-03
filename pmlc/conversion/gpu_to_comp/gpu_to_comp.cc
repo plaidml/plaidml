@@ -113,16 +113,18 @@ RewriteLaunchFunc::matchAndRewrite(gpu::LaunchFuncOp op,
         "Expected containing function to supply an execution device");
     return mlir::failure();
   }
-  mlir::Value device = func.getArgument(0);
 
+  // Create execution environment.
+  mlir::Value device = func.getArgument(0);
+  auto execEnvOp =
+      rewriter.create<comp::CreateExecEnv>(loc, execEnvType, device);
+  mlir::Value execEnv = execEnvOp.getResult();
+
+  // Collect consecutive gpu.launch_func Ops starting from current op.
   std::vector<gpu::LaunchFuncOp> launchOps;
   if (mlir::failed(getConsecutiveOps<gpu::LaunchFuncOp>(op, launchOps)))
     return mlir::failure();
 
-  // Create execution environment.
-  auto execEnvOp =
-      rewriter.create<comp::CreateExecEnv>(loc, execEnvType, device);
-  mlir::Value execEnv = execEnvOp.getResult();
   std::map<mlir::Value, mlir::Value, valueComparator> bufferPool;
   std::vector<std::vector<mlir::Value>> newOperands(launchOps.size());
   // Allocate memory on device for memory operands.
@@ -130,6 +132,7 @@ RewriteLaunchFunc::matchAndRewrite(gpu::LaunchFuncOp op,
                                         newOperands, bufferPool)))
     return mlir::failure();
   std::vector<mlir::Value> funcEvents;
+  // Create schedule functions within the same execution environment.
   if (mlir::failed(createScheduleFuncOps(rewriter, loc, execEnv, launchOps,
                                          newOperands, funcEvents)))
     return mlir::failure();
@@ -140,8 +143,10 @@ RewriteLaunchFunc::matchAndRewrite(gpu::LaunchFuncOp op,
   // Deallocate device memory.
   if (mlir::failed(deallocateDeviceMemory(rewriter, loc, execEnv, bufferPool)))
     return mlir::failure();
+
   // Destroy execution environment.
   rewriter.create<comp::DestroyExecEnv>(loc, execEnv);
+
   // Remove original launch operations.
   for (auto launchOp : launchOps) {
     rewriter.eraseOp(launchOp.getOperation());
@@ -151,7 +156,7 @@ RewriteLaunchFunc::matchAndRewrite(gpu::LaunchFuncOp op,
 template <typename T>
 mlir::LogicalResult
 RewriteLaunchFunc::getConsecutiveOps(T op, std::vector<T> &ops) const {
-  // Collect consecutive ops of type T starting from a given op in current block
+  // Collect consecutive ops of type T starting from a given op.
   auto &opList = op.getOperation()->getBlock()->getOperations();
   for (size_t i = 0; i < opList.size(); i++) {
     auto currOp = std::next(opList.begin(), i);
@@ -187,7 +192,6 @@ mlir::LogicalResult RewriteLaunchFunc::allocateDeviceMemory(
           auto allocOp =
               rewriter.create<comp::Alloc>(loc, newMemRefType, execEnv);
           auto deviceBuffer = allocOp.getResult();
-
           comp::EventType eventType = execEnvType.getEventType();
           mlir::Value event = rewriter.create<comp::ScheduleWrite>(
               loc, eventType, hostArg, deviceBuffer, execEnv,
@@ -215,7 +219,6 @@ mlir::LogicalResult RewriteLaunchFunc::createScheduleFuncOps(
         op.getOperation(), kernelSymbol);
     if (!kernelOp)
       return mlir::failure();
-
     std::vector<mlir::Value> deps;
     for (size_t ie = 0; ie < events.size(); ie++) {
       for (auto newOperand : newOperands[i]) {
@@ -229,15 +232,12 @@ mlir::LogicalResult RewriteLaunchFunc::createScheduleFuncOps(
     if (deps.size() > 0) {
       rewriter.create<comp::Wait>(loc, deps);
     }
-
     auto scheduleFuncOp = rewriter.create<comp::ScheduleFunc>(
         loc, eventType, execEnv, mlir::ValueRange());
     events.push_back(scheduleFuncOp.getResult());
-
     // Add launch_func with new operands inside schedule_func.
     mlir::PatternRewriter::InsertionGuard insertionGuard(rewriter);
     rewriter.createBlock(&scheduleFuncOp.body(), scheduleFuncOp.body().end());
-
     if (newOperands[i].size() == 0) {
       rewriter.create<gpu::LaunchFuncOp>(
           loc, kernelOp, op.getGridSizeOperandValues(),

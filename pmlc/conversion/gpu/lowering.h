@@ -13,6 +13,7 @@ namespace pmlc::conversion::gpu {
 // Set spv.target_env and spv.entry_point_abi
 std::unique_ptr<mlir::Pass> createGpuKernelOutliningPass();
 
+// Gather gpu.launch_func Ops separated by std.alloc
 std::unique_ptr<mlir::Pass> createGatherGpuLaunchFuncsPass();
 
 /// Generate the code for registering conversion passes.

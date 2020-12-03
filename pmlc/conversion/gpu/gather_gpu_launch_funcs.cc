@@ -57,7 +57,6 @@ void GatherGpuLaunchFuncsPass::runOnOperation() {
       std::vector<gpu::LaunchFuncOp> firstLaunchOpVector;
       gatherAllocOpsBetweenConsecutiveLaunchOps(block, allocOpVectors,
                                                 firstLaunchOpVector);
-
       for (size_t i = 0; i < firstLaunchOpVector.size(); i++) {
         for (size_t j = 0; j < allocOpVectors[i].size(); j++) {
           allocOpVectors[i][j].getOperation()->moveBefore(
