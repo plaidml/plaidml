@@ -9,10 +9,12 @@ pml_cc_library(
     pad_constraints.cc
     pad_ranges.cc
     padding.cc
+    split_main.cc
   DEPS
     LLVMSupport
     MLIRIR
     pmlc::dialect::tile::ir
+    pmlc::dialect::pxa::ir
     pmlc::util
     pmlc::util::bilp
     pmlc::util::math
