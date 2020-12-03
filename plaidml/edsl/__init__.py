@@ -869,9 +869,9 @@ def gather(x,
     Args:
         x (Tensor): The tensor to peform ``gather`` on.
         y (Tensor): The set of indices to ``gather`` over.
-        axis (int): The dimension index to gather data from.
-        interpolation_mode (Enum): The type of interpolation 
-        nearest_mode (Enum): The type of nearest interpolation 
+        axis (int): The dimension index to ``gather`` data from.
+        interpolation_mode (Enum): The type of interpolation.
+        nearest_mode (Enum): The type of nearest interpolation.
         cube_coeff (float): The coefficient that controls the cubic interpolation.
 
     Returns:

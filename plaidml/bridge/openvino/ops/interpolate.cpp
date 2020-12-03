@@ -93,37 +93,40 @@ edsl::Tensor get_output_coordinate_transformed_indices(
   return IX;
 }
 
-static OpRegistration reg("interpolate", [](const Context& ctx) {
-  auto* layer = ngraph::as_type<ngraph::opset4::Interpolate>(ctx.layer);
-  auto result_shape = cast_constant_operand<int64_t>(1, layer);
-  auto scales = cast_constant_operand<float>(2, layer);
-  auto mode = layer->get_attrs().mode;
-  auto nearest_mode = layer->get_attrs().nearest_mode;
-  auto cube_coeff = layer->get_attrs().cube_coeff;
-  auto coordinate_transformation_mode = layer->get_attrs().coordinate_transformation_mode;
+void registerInterpolate() {
+  registerOp("Interpolate", [](const Context& ctx) {
+    auto* layer = ngraph::as_type<ngraph::opset4::Interpolate>(ctx.layer);
+    auto result_shape = cast_constant_operand<int64_t>(1, layer);
+    auto scales = cast_constant_operand<float>(2, layer);
+    auto mode = layer->get_attrs().mode;
+    auto nearest_mode = layer->get_attrs().nearest_mode;
+    auto cube_coeff = layer->get_attrs().cube_coeff;
+    auto coordinate_transformation_mode = layer->get_attrs().coordinate_transformation_mode;
 
-  bool is_downsample = false;
-  for (auto scale : scales) {
-    is_downsample = is_downsample || (scale < 1.0);
-  }
+    bool is_downsample = false;
+    for (auto scale : scales) {
+      is_downsample = is_downsample || (scale < 1.0);
+    }
 
-  auto I = ctx.operands.at(0);
-  auto pads_begin = layer->get_attrs().pads_begin;
-  auto pads_end = layer->get_attrs().pads_end;
-  I = op::explicit_padding(I, {pads_begin.begin(), pads_begin.end()}, {pads_end.begin(), pads_end.end()})
-          .padval(edsl::Constant(0.0));
+    auto I = ctx.operands.at(0);
+    auto pads_begin = layer->get_attrs().pads_begin;
+    auto pads_end = layer->get_attrs().pads_end;
+    I = op::explicit_padding(I, {pads_begin.begin(), pads_begin.end()}, {pads_end.begin(), pads_end.end()})
+            .padval(edsl::Constant(0.0));
 
-  std::vector<edsl::TensorDim> I_dims(I.rank());
-  I.bind_dims(I_dims);
+    std::vector<edsl::TensorDim> I_dims(I.rank());
+    I.bind_dims(I_dims);
 
-  for (int i = 0; i < result_shape.size(); i++) {
-    auto IX = get_output_coordinate_transformed_indices(I_dims[i], result_shape[i], coordinate_transformation_mode);
-    I = edsl::gather(I, IX)
-            .axis(i)
-            .interpolationMode(get_plaidml_interpolation_mode(mode))
-            .nearestMode(get_plaidml_nearest_mode(nearest_mode, is_downsample))
-            .cubeCoeff(cube_coeff);
-  }
-  return edsl::make_tuple(I);
-});
+    for (int i = 0; i < result_shape.size(); i++) {
+      auto IX = get_output_coordinate_transformed_indices(I_dims[i], result_shape[i], coordinate_transformation_mode);
+      I = edsl::gather(I, IX)
+              .axis(i)
+              .interpolationMode(get_plaidml_interpolation_mode(mode))
+              .nearestMode(get_plaidml_nearest_mode(nearest_mode, is_downsample))
+              .cubeCoeff(cube_coeff);
+    }
+    return edsl::make_tuple(I);
+  });
+}
+
 }  // namespace PlaidMLPlugin
