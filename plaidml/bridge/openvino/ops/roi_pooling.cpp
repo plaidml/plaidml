@@ -25,7 +25,7 @@ std::vector<T> cast_constant_operand(size_t operand_idx, ngraph::Node* layer) {
   }
 }
 
-std::tuple<edsl::Tensor, int, int> crop_resized(edsl::Tensor& I, std::vector<float>& coord, std::string method,
+std::tuple<edsl::Tensor, int, int> crop_resized(edsl::Tensor I, std::vector<float>& coord, std::string method,
                                                 int64_t pooled_h, int64_t pooled_w) {
   auto x_1 = coord[0];
   auto y_1 = coord[1];
@@ -68,8 +68,8 @@ void registerROIPooling() {
     auto I_shape = I.compute_shape().sizes();
 
     auto pooled_shape = layer->get_output_size();
-    auto pooled_height = static_cast<int64_t >(pooled_shape[0]);
-    auto pooled_width = static_cast<int64_t >(pooled_shape[1]);
+    auto pooled_height = static_cast<int64_t>(pooled_shape[0]);
+    auto pooled_width = static_cast<int64_t>(pooled_shape[1]);
     auto spatial_ratio = layer->get_spatial_scale();
     auto method = layer->get_method();
 
@@ -87,13 +87,8 @@ void registerROIPooling() {
       for (int i = 1; i < coord.size(); i++) {
         coord[i] *= spatial_ratio;
       }
-
-      auto slice_I = op::unsqueeze(op::slice(I)                  //
-                                       .add_dim(batch_id)        //
-                                       .add_dim(0, I_shape[1])   //
-                                       .add_dim(0, I_shape[2])   //
-                                       .add_dim(0, I_shape[3]),  //
-                                   {0});
+      auto batch_indices = edsl::index({edsl::TensorDim(1)}, 0) + batch_id;
+      auto slice_I = edsl::gather(I, batch_indices).axis(0);
 
       edsl::Tensor ROI_tensor;
       int kernel_height;
