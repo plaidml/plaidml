@@ -25,23 +25,6 @@ std::vector<T> cast_constant_operand(size_t operand_idx, ngraph::Node* layer) {
   }
 }
 
-template <typename T>
-Buffer makeBuffer(DType dtype, const std::vector<int64_t>& dims, const std::vector<T>& data) {
-  TensorShape shape(dtype, dims);
-  Buffer buffer(shape);
-  buffer.copy_from(data.data());
-  return buffer;
-}
-
-template <typename T>
-edsl::Tensor indices_generator(T start_point, int64_t len, int stride, DType dtype, std::string name) {
-  std::vector<T> indices(len);
-  for (int64_t i = 0; i < len; i++) {
-    indices[i] = static_cast<T>(start_point + stride * i);
-  }
-  return edsl::Constant(makeBuffer(dtype, {len}, indices), name);
-}
-
 std::tuple<edsl::Tensor, int, int> crop_resized(edsl::Tensor& I, std::vector<float>& coord, std::string method,
                                                 int64_t pooled_h, int64_t pooled_w) {
   auto x_1 = coord[0];
@@ -58,12 +41,12 @@ std::tuple<edsl::Tensor, int, int> crop_resized(edsl::Tensor& I, std::vector<flo
   edsl::Tensor w_tensor, h_tensor;
   edsl::InterpolationMode interpolation_mode;
   if (method != "bilinear") {
-    h_tensor = indices_generator(static_cast<int>(x_1), pooled_h, kernel_h, DType::INT32, "indices_h");
-    w_tensor = indices_generator(static_cast<int>(y_1), pooled_w, kernel_w, DType::INT32, "indices_w");
+    h_tensor = edsl::index({edsl::TensorDim(pooled_h)}, 0) * kernel_h + static_cast<int>(x_1);
+    w_tensor = edsl::index({edsl::TensorDim(pooled_w)}, 0) * kernel_w + static_cast<int>(y_1);
     interpolation_mode = edsl::InterpolationMode::NEAREST;
   } else {
-    h_tensor = indices_generator(x_1, pooled_h, kernel_h, DType::FLOAT32, "indices_h");
-    w_tensor = indices_generator(y_1, pooled_h, kernel_w, DType::FLOAT32, "indices_w");
+    h_tensor = edsl::cast(edsl::index({edsl::TensorDim(pooled_h)}, 0), DType::FLOAT32) * kernel_h + x_1;
+    w_tensor = edsl::cast(edsl::index({edsl::TensorDim(pooled_w)}, 0), DType::FLOAT32) * kernel_w + y_1;
     interpolation_mode = edsl::InterpolationMode::LINEAR;
   }
 
