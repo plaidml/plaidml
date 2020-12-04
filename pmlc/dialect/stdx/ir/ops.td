@@ -52,12 +52,24 @@ def ACosOp : StdX_UnaryFuncOp<"acos"> {
   let summary = "arccosine";
 }
 
+def ACosHOp : StdX_UnaryFuncOp<"acosh"> {
+  let summary = "hyperbolic arccosine";
+}
+
 def ASinOp : StdX_UnaryFuncOp<"asin"> {
   let summary = "arcsine";
 }
 
+def ASinHOp : StdX_UnaryFuncOp<"asinh"> {
+  let summary = "hyperbolic arcsine";
+}
+
 def ATanOp : StdX_UnaryFuncOp<"atan"> {
   let summary = "arctangent";
+}
+
+def ATanHOp : StdX_UnaryFuncOp<"atanh"> {
+  let summary = "hyperbolic arctangent";
 }
 
 def CosHOp : StdX_UnaryFuncOp<"cosh"> {
