@@ -17,6 +17,7 @@ plaidml_cc_library(
         "vulkan_state.h",
         "wrappers.cc",
     ],
+    hdrs = ["register.h"],
     local_defines = ["VULKAN_RT_BUILD"],
     deps = [
         "//pmlc/compiler",

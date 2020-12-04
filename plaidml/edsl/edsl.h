@@ -737,6 +737,13 @@ inline Tensor abs(const Tensor& x) { return intrinsic("abs", x); }
 inline Tensor acos(const Tensor& x) { return intrinsic("acos", x); }
 
 ///
+/// Computes the elementwise inverse hyperbolic cosine of `x`.
+/// \param x Tensor
+/// \return Tensor
+///
+inline Tensor acosh(const Tensor& x) { return intrinsic("acosh", x); }
+
+///
 /// Computes the elementwise arcsine of `x`.
 /// \param x Tensor
 /// \return Tensor
@@ -744,11 +751,25 @@ inline Tensor acos(const Tensor& x) { return intrinsic("acos", x); }
 inline Tensor asin(const Tensor& x) { return intrinsic("asin", x); }
 
 ///
+/// Computes the elementwise inverse hyperbolic sine of `x`.
+/// \param x Tensor
+/// \return Tensor
+///
+inline Tensor asinh(const Tensor& x) { return intrinsic("asinh", x); }
+
+///
 /// Computes the elementwise arctangent of `x`.
 /// \param x Tensor
 /// \return Tensor
 ///
 inline Tensor atan(const Tensor& x) { return intrinsic("atan", x); }
+
+///
+/// Computes the elementwise inverse hyperbolic tangent of `x`.
+/// \param x Tensor
+/// \return Tensor
+///
+inline Tensor atanh(const Tensor& x) { return intrinsic("atanh", x); }
 
 ///
 /// Casts the element type of a tensor `x` to the type specified by `dtype`.
