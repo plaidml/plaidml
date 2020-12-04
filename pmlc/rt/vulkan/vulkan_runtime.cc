@@ -25,22 +25,28 @@ namespace pmlc::rt::vulkan {
 class VulkanRuntime final : public pmlc::rt::Runtime {
 public:
   VulkanRuntime() {
-    auto state = std::make_shared<VulkanState>();
+    try {
+      auto state = std::make_shared<VulkanState>();
 
-    uint32_t physicalDeviceCount = 0;
-    throwOnVulkanError(vkEnumeratePhysicalDevices(
-                           state->instance, &physicalDeviceCount, nullptr),
-                       "vkEnumeratePhysicalDevices");
+      uint32_t physicalDeviceCount = 0;
+      throwOnVulkanError(vkEnumeratePhysicalDevices(
+                             state->instance, &physicalDeviceCount, nullptr),
+                         "vkEnumeratePhysicalDevices");
 
-    llvm::SmallVector<VkPhysicalDevice, 1> physicalDevices(physicalDeviceCount);
-    throwOnVulkanError(vkEnumeratePhysicalDevices(state->instance,
-                                                  &physicalDeviceCount,
-                                                  physicalDevices.data()),
-                       "vkEnumeratePhysicalDevices");
+      llvm::SmallVector<VkPhysicalDevice, 1> physicalDevices(
+          physicalDeviceCount);
+      throwOnVulkanError(vkEnumeratePhysicalDevices(state->instance,
+                                                    &physicalDeviceCount,
+                                                    physicalDevices.data()),
+                         "vkEnumeratePhysicalDevices");
 
-    for (const auto &physicalDevice : physicalDevices) {
-      devices.emplace_back(
-          std::make_shared<VulkanDevice>(physicalDevice, state));
+      for (const auto &physicalDevice : physicalDevices) {
+        devices.emplace_back(
+            std::make_shared<VulkanDevice>(physicalDevice, state));
+      }
+    } catch (const VkResult &e) {
+      if (e != VK_ERROR_INITIALIZATION_FAILED)
+        throw;
     }
   }
 
