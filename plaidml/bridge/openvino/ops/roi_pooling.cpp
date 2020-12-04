@@ -65,7 +65,6 @@ void registerROIPooling() {
     auto* layer = ngraph::as_type<ngraph::opset4::ROIPooling>(ctx.layer);
     IE_ASSERT(ctx.operands.size() == 2);
     auto I = ctx.operands.at(0);
-    auto I_shape = I.compute_shape().sizes();
 
     auto pooled_shape = layer->get_output_size();
     auto pooled_height = static_cast<int64_t>(pooled_shape[0]);
