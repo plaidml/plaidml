@@ -113,41 +113,37 @@ void _mlir_ciface_fillResourceFloat32(
 
 } // extern "C"
 
-namespace {
-struct Registration {
-  Registration() {
-    using pmlc::rt::registerSymbol;
+void registerSymbols() {
+  using pmlc::rt::registerSymbol;
 
-    // Vulkan Runtime functions
-    registerSymbol("vkInit", reinterpret_cast<void *>(vkInit));
-    registerSymbol("vkDeinit", reinterpret_cast<void *>(vkDeinit));
-    registerSymbol("vkCreateLaunchKernelAction",
-                   reinterpret_cast<void *>(vkCreateLaunchKernelAction));
-    registerSymbol("vkCreateMemoryTransferAction",
-                   reinterpret_cast<void *>(vkCreateMemoryTransferAction));
-    registerSymbol("vkSetLaunchKernelAction",
-                   reinterpret_cast<void *>(vkSetLaunchKernelAction));
-    registerSymbol("vkRun", reinterpret_cast<void *>(vkRun));
-    registerSymbol("vkWait", reinterpret_cast<void *>(vkWait));
-    registerSymbol("vkScheduleFunc", reinterpret_cast<void *>(vkScheduleFunc));
-    registerSymbol("_mlir_ciface_bindBufferFloat16",
-                   reinterpret_cast<void *>(_mlir_ciface_bindBufferFloat16));
-    registerSymbol("_mlir_ciface_bindBufferFloat32",
-                   reinterpret_cast<void *>(_mlir_ciface_bindBufferFloat32));
-    registerSymbol("_mlir_ciface_bindBufferFloat64",
-                   reinterpret_cast<void *>(_mlir_ciface_bindBufferFloat64));
-    registerSymbol("_mlir_ciface_bindBufferInteger8",
-                   reinterpret_cast<void *>(_mlir_ciface_bindBufferInteger8));
-    registerSymbol("_mlir_ciface_bindBufferInteger16",
-                   reinterpret_cast<void *>(_mlir_ciface_bindBufferInteger16));
-    registerSymbol("_mlir_ciface_bindBufferInteger32",
-                   reinterpret_cast<void *>(_mlir_ciface_bindBufferInteger32));
-    registerSymbol("_mlir_ciface_bindBufferInteger64",
-                   reinterpret_cast<void *>(_mlir_ciface_bindBufferInteger64));
-    registerSymbol("_mlir_ciface_fillResourceFloat32",
-                   reinterpret_cast<void *>(_mlir_ciface_fillResourceFloat32));
-  }
-};
-static Registration reg;
-} // namespace
+  // Vulkan Runtime functions
+  registerSymbol("vkInit", reinterpret_cast<void *>(vkInit));
+  registerSymbol("vkDeinit", reinterpret_cast<void *>(vkDeinit));
+  registerSymbol("vkCreateLaunchKernelAction",
+                 reinterpret_cast<void *>(vkCreateLaunchKernelAction));
+  registerSymbol("vkCreateMemoryTransferAction",
+                 reinterpret_cast<void *>(vkCreateMemoryTransferAction));
+  registerSymbol("vkSetLaunchKernelAction",
+                 reinterpret_cast<void *>(vkSetLaunchKernelAction));
+  registerSymbol("vkRun", reinterpret_cast<void *>(vkRun));
+  registerSymbol("vkWait", reinterpret_cast<void *>(vkWait));
+  registerSymbol("vkScheduleFunc", reinterpret_cast<void *>(vkScheduleFunc));
+  registerSymbol("_mlir_ciface_bindBufferFloat16",
+                 reinterpret_cast<void *>(_mlir_ciface_bindBufferFloat16));
+  registerSymbol("_mlir_ciface_bindBufferFloat32",
+                 reinterpret_cast<void *>(_mlir_ciface_bindBufferFloat32));
+  registerSymbol("_mlir_ciface_bindBufferFloat64",
+                 reinterpret_cast<void *>(_mlir_ciface_bindBufferFloat64));
+  registerSymbol("_mlir_ciface_bindBufferInteger8",
+                 reinterpret_cast<void *>(_mlir_ciface_bindBufferInteger8));
+  registerSymbol("_mlir_ciface_bindBufferInteger16",
+                 reinterpret_cast<void *>(_mlir_ciface_bindBufferInteger16));
+  registerSymbol("_mlir_ciface_bindBufferInteger32",
+                 reinterpret_cast<void *>(_mlir_ciface_bindBufferInteger32));
+  registerSymbol("_mlir_ciface_bindBufferInteger64",
+                 reinterpret_cast<void *>(_mlir_ciface_bindBufferInteger64));
+  registerSymbol("_mlir_ciface_fillResourceFloat32",
+                 reinterpret_cast<void *>(_mlir_ciface_fillResourceFloat32));
+}
+
 } // namespace pmlc::rt::vulkan
