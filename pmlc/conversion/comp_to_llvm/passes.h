@@ -77,6 +77,24 @@ void addVkFunctionDeclarations(mlir::ModuleOp &module);
 /// than OpenCL will cause this pass to report failure.
 std::unique_ptr<mlir::Pass> createConvertCompToVulkanPass();
 
+// ============================================================================
+// Level Zero
+// ============================================================================
+/// Populates `patterns` and `typeConverter` with conversion patterns that
+/// perform lowering for LevelZero runtime.
+void populateCompToLevelZeroPatterns(mlir::MLIRContext *context,
+                                     const BinaryModulesMap &modulesMap,
+                                     mlir::TypeConverter &typeConverter,
+                                     mlir::OwningRewritePatternList &patterns);
+
+/// Adds declarations of functions specific to LevelZero runtime.
+void addLevelZeroFunctionDeclarations(mlir::ModuleOp &module);
+
+/// Returns pass that will perform lowering for LevelZero runtime.
+/// To provide stronger guarantees any comp operation with runtime different
+/// than LevelZero will cause this pass to report failure.
+std::unique_ptr<mlir::Pass> createConvertCompToLevelZeroPass();
+
 /// Generate the code for registering conversion passes.
 #define GEN_PASS_REGISTRATION
 #include "pmlc/conversion/comp_to_llvm/passes.h.inc"

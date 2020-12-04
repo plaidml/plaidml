@@ -83,6 +83,8 @@ include(volk)
 include(opencl_headers)
 include(opencl_hpp_headers)
 include(opencl_icd_loader)
+#include(FindLevelZero)
+find_package(LevelZero)
 
 # -------------------------------------------------------------------------------
 # cmake modules

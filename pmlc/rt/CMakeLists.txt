@@ -1,6 +1,7 @@
 add_subdirectory(llvm)
 add_subdirectory(vulkan)
 add_subdirectory(opencl)
+add_subdirectory(level_zero)
 
 pml_cc_library(
   NAME rt
@@ -56,4 +57,5 @@ pml_cc_library(
     pmlc::rt::llvm
     pmlc::rt::vulkan
     pmlc::rt::opencl
+    pmlc::rt::level_zero
 )

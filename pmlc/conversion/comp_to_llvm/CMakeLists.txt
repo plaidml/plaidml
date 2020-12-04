@@ -4,6 +4,7 @@ pml_cc_library(
     passes.h
   SRCS
     common.cc
+    comp_to_level_zero.cc
     comp_to_ocl.cc
     comp_to_vulkan.cc
     utils.cc

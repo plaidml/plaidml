@@ -10,6 +10,7 @@ plaidml_cc_library(
         "//pmlc/compiler",
         "//pmlc/target/intel_gen",
         "//pmlc/target/intel_gen_ocl_spirv",
+        "//pmlc/target/intel_level_zero",
         "//pmlc/target/x86",
     ],
     alwayslink = 1,
