@@ -33,6 +33,8 @@ using namespace mlir; // NOLINT
 
 using util::AggregationKind;
 using util::CombinationKind;
+using util::InterpolationMode;
+using util::NearestMode;
 
 namespace {
 
@@ -42,6 +44,7 @@ struct TypeConverter : public mlir::TypeConverter {
     addConversion([](FloatType type) { return type; });
     addConversion([](IntegerType type) { return tile::toSignlessType(type); });
     addConversion([](MemRefType type) { return type; });
+    addConversion([](stdx::ArgpackType type) { return type; });
     addConversion([this](RankedTensorType type) {
       auto elementType = type.getElementType();
       auto newType = convertType(elementType);
@@ -868,11 +871,11 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
     auto loc = op.getLoc();
     auto ctx = rewriter.getContext();
 
-    // input values
+    // Input values
     auto tensor = adaptor.tensor();
-    // index values for the last dimension
+    // Index values for the last dimension
     // this is a one-dimensional array of integers
-    auto indexes = adaptor.dims();
+    auto indices = adaptor.indices();
 
     TypeConverter typeConverter;
     auto resultType = typeConverter.convertType(op.result().getType());
@@ -881,7 +884,7 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
     // Make an allocation for the output
     auto resultMemRef = rewriter.create<AllocOp>(loc, memrefType).getResult();
 
-    // we need an array of int64_t representing the results tensor's dims
+    // We need an array of int64_t representing the results tensor's dims
     ArrayRef<int64_t> size = memrefType.getShape();
 
     auto loop = rewriter.create<AffineParallelOp>(
@@ -889,46 +892,321 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
         ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign}, size);
     rewriter.setInsertionPointToStart(loop.getBody());
 
-    // create an affine map for loading the index, using the leading counters
-    size_t idxDims = indexes.getType().cast<MemRefType>().getShape().size();
+    // Create an affine map for loading the index, using the leading counters
+    size_t axis = *(op.axis().getRawData());
+    size_t idxDims = indices.getType().cast<MemRefType>().getShape().size();
     auto idxLoadMap = AffineMap::getMultiDimIdentityMap(idxDims, ctx);
-    auto idxLoadOps = loop.getIVs().take_front(idxDims);
+    auto idxLoadOps = loop.getIVs().slice(axis, idxDims);
 
-    // load the value from the indexes array
-    Value indexVal =
-        rewriter.create<pxa::PxaLoadOp>(loc, indexes, idxLoadMap, idxLoadOps)
+    // Load the value from the indices array
+    Value idx =
+        rewriter.create<pxa::PxaLoadOp>(loc, indices, idxLoadMap, idxLoadOps)
             .getResult();
 
-    if (!indexVal.getType().isa<IndexType>()) {
-      // cast from whatever integer type it has to index type
-      auto indexType = rewriter.getIndexType();
-      indexVal = rewriter.create<mlir::IndexCastOp>(loc, indexVal, indexType)
-                     .getResult();
-    }
-
-    // mix the indexVal in with the loop indexes to create source map
+    // Create default source map
     size_t dstDims = size.size();
-    SmallVector<Value, 4> srcOps;
-    srcOps.push_back(indexVal);
-    for (size_t i = idxDims; i < dstDims; ++i) {
+    std::vector<Value> srcOps;
+    for (size_t i = 0; i < axis; ++i) {
       srcOps.push_back(loop.getIVs()[i]);
     }
 
-    // load the specified value from the source tensor
-    auto loaded = rewriter.create<mlir::LoadOp>(loc, tensor, srcOps);
+    for (size_t i = axis + idxDims - 1; i < dstDims; ++i) {
+      srcOps.push_back(loop.getIVs()[i]);
+    }
 
-    // create a destination map using all of the dimensions
+    // Create std ops for 1D interpolation
+    Value interpVal;
+    if (idx.getType().isa<FloatType>()) {
+      switch (op.interpolationMode()) {
+      case InterpolationMode::nearest:
+        interpVal = buildNearestInterpolationOps(
+            loc, rewriter, tensor, idx, srcOps, axis, op.nearestMode());
+        break;
+      case InterpolationMode::linear:
+        interpVal = buildLinearInterpolationOps(loc, rewriter, tensor, idx,
+                                                srcOps, axis);
+        break;
+      case InterpolationMode::cubic:
+        interpVal =
+            buildCubicInterpolationOps(loc, rewriter, tensor, idx, srcOps, axis,
+                                       op.cubeCoeffAttr().getValueAsDouble());
+        break;
+      default:
+        llvm_unreachable("Unsupported InterpolationMode");
+      }
+    } else {
+      if (!idx.getType().isa<IndexType>()) {
+        auto indexType = rewriter.getIndexType();
+        // Cast from whatever integer type it has to index type
+        idx =
+            rewriter.create<mlir::IndexCastOp>(loc, idx, indexType).getResult();
+      }
+      srcOps.at(axis) = idx;
+      interpVal = rewriter.create<mlir::LoadOp>(loc, tensor, srcOps);
+    }
+
+    // Create a destination map using all of the dimensions
     auto dstStoreMap = AffineMap::getMultiDimIdentityMap(dstDims, ctx);
 
-    // create a destination map from the whole loop
+    // Create a destination map from the whole loop
     auto stored = rewriter.create<pxa::PxaReduceOp>(loc, AtomicRMWKind::assign,
-                                                    loaded, resultMemRef,
+                                                    interpVal, resultMemRef,
                                                     dstStoreMap, loop.getIVs());
     rewriter.create<AffineYieldOp>(loc, ArrayRef<Value>{stored.getResult()});
-
     rewriter.replaceOp(op, loop.getResult(0));
-
     return success();
+  }
+
+  Value buildNearestInterpolationOps(Location loc,
+                                     ConversionPatternRewriter &rewriter,
+                                     Value tensor, Value idx,
+                                     std::vector<Value> &srcOps, size_t axis,
+                                     NearestMode nearestMode) const {
+    auto idxType = rewriter.getIndexType();
+    auto i32Type = rewriter.getI32Type();
+    auto bounds = GetIndexBounds(loc, rewriter, tensor, axis, i32Type);
+    switch (nearestMode) {
+    case NearestMode::round_prefer_floor: {
+      auto cmp = isHalfWayFloat(loc, rewriter, idx);
+      auto floor = floorFPToSI(loc, rewriter, idx, i32Type);
+      auto round = roundFPToSI(loc, rewriter, idx, i32Type);
+      idx = rewriter.create<mlir::SelectOp>(loc, cmp, floor, round).result();
+    } break;
+    case NearestMode::round_prefer_ceil: {
+      auto cmp = isHalfWayFloat(loc, rewriter, idx);
+      auto ceil = ceilFPToSI(loc, rewriter, idx, i32Type);
+      auto round = roundFPToSI(loc, rewriter, idx, i32Type);
+      idx = rewriter.create<mlir::SelectOp>(loc, cmp, ceil, round).result();
+    } break;
+    case NearestMode::floor:
+      idx = floorFPToSI(loc, rewriter, idx, i32Type);
+      break;
+    case NearestMode::ceil:
+      idx = ceilFPToSI(loc, rewriter, idx, i32Type);
+      break;
+    case NearestMode::simple:
+      idx = rewriter.create<mlir::FPToSIOp>(loc, idx, i32Type).getResult();
+      break;
+    default:
+      llvm_unreachable("Unsupported NearestMode");
+    }
+    idx = checkIntOutOfBounds(loc, rewriter, idx, bounds[0], bounds[1]);
+    idx = rewriter.create<mlir::IndexCastOp>(loc, idx, idxType).getResult();
+    srcOps.at(axis) = idx;
+    return rewriter.create<mlir::LoadOp>(loc, tensor, srcOps);
+  }
+
+  Value buildLinearInterpolationOps(Location loc,
+                                    ConversionPatternRewriter &rewriter,
+                                    Value tensor, Value idx,
+                                    std::vector<Value> &srcOps,
+                                    size_t axis) const {
+    auto idxType = rewriter.getIndexType();
+    auto i32Type = rewriter.getI32Type();
+    auto elementType = tensor.getType().cast<MemRefType>().getElementType();
+    auto bounds = GetIndexBounds(loc, rewriter, tensor, axis, i32Type);
+    auto cst1F =
+        rewriter
+            .create<mlir::ConstantOp>(loc, elementType,
+                                      rewriter.getFloatAttr(elementType, 1.0))
+            .getResult();
+
+    // Calculate interpolation nodes: floor and ceil
+    auto floor = floorFPToSI(loc, rewriter, idx, i32Type);
+    auto ceil = ceilFPToSI(loc, rewriter, idx, i32Type);
+    floor = checkIntOutOfBounds(loc, rewriter, floor, bounds[0], bounds[1]);
+    ceil = checkIntOutOfBounds(loc, rewriter, ceil, bounds[0], bounds[1]);
+    floor = rewriter.create<mlir::IndexCastOp>(loc, floor, idxType).getResult();
+    ceil = rewriter.create<mlir::IndexCastOp>(loc, ceil, idxType).getResult();
+
+    // Load sample data g0 and g1 at interpolation nodes
+    srcOps.at(axis) = ceil;
+    auto g0 = rewriter.create<mlir::LoadOp>(loc, tensor, srcOps).getResult();
+    srcOps.at(axis) = floor;
+    auto g1 = rewriter.create<mlir::LoadOp>(loc, tensor, srcOps).getResult();
+
+    // Calculate coefficients of g0 and g1
+    auto floorF =
+        rewriter.create<mlir::FloorFOp>(loc, elementType, idx).getResult();
+    auto c0 = rewriter.create<mlir::SubFOp>(loc, idx, floorF).getResult();
+    auto c1 = rewriter.create<mlir::SubFOp>(loc, cst1F, c0).getResult();
+
+    // Return interpolation result (result = c0*g0 + c1*g1)
+    auto p0 = rewriter.create<mlir::MulFOp>(loc, c0, g0).getResult();
+    auto p1 = rewriter.create<mlir::MulFOp>(loc, c1, g1).getResult();
+    return rewriter.create<mlir::AddFOp>(loc, p0, p1).getResult();
+  }
+
+  Value buildCubicInterpolationOps(Location loc,
+                                   ConversionPatternRewriter &rewriter,
+                                   Value tensor, Value idx,
+                                   std::vector<Value> &srcOps, size_t axis,
+                                   double cubicCoeff) const {
+    // Follow the algorithm used in ngraph cubic interpolation (also see, e.g.
+    // [article](https://ieeexplore.ieee.org/document/1163711/).
+
+    auto idxType = rewriter.getIndexType();
+    auto i32Type = rewriter.getI32Type();
+    auto elementType = tensor.getType().cast<MemRefType>().getElementType();
+    auto bounds = GetIndexBounds(loc, rewriter, tensor, axis, i32Type);
+
+    // Create constant a (cubeCoeff)
+    auto a = rewriter
+                 .create<mlir::ConstantOp>(
+                     loc, rewriter.getF64Type(),
+                     FloatAttr::get(rewriter.getF64Type(), cubicCoeff))
+                 .getResult();
+    if (!elementType.isa<mlir::Float64Type>()) {
+      a = rewriter.create<mlir::FPTruncOp>(loc, elementType, a);
+    }
+
+    // Create integer constants
+    SmallVector<Value, 4> cstI;
+    for (auto i = 0; i <= 2; i++) {
+      auto cstOp = rewriter.create<mlir::ConstantOp>(
+          loc, i32Type, rewriter.getIntegerAttr(i32Type, i));
+      cstI.push_back(cstOp.getResult());
+    }
+
+    // Create float constants
+    SmallVector<Value, 4> cstF;
+    for (auto i = 0; i <= 3; i++) {
+      auto cstOp = rewriter.create<mlir::ConstantOp>(
+          loc, elementType, rewriter.getFloatAttr(elementType, i));
+      cstF.push_back(cstOp.getResult());
+    }
+
+    // Calculate interpolation nodes x
+    auto floorI = floorFPToSI(loc, rewriter, idx, i32Type);
+    auto ceilI = ceilFPToSI(loc, rewriter, idx, i32Type);
+    SmallVector<Value, 4> x;
+    x.push_back(
+        rewriter.create<mlir::SubIOp>(loc, floorI, cstI[1]).getResult());
+    x.push_back(floorI);
+    x.push_back(ceilI);
+    x.push_back(rewriter.create<mlir::AddIOp>(loc, ceilI, cstI[1]).getResult());
+
+    // Load sample data g at interpolation nodes
+    SmallVector<Value, 4> g;
+    for (size_t i = 0; i < x.size(); i++) {
+      x[i] = checkIntOutOfBounds(loc, rewriter, x[i], bounds[0], bounds[1]);
+      x[i] = rewriter.create<mlir::IndexCastOp>(loc, x[i], idxType).getResult();
+      srcOps.at(axis) = x[i];
+      auto loadOp = rewriter.create<mlir::LoadOp>(loc, tensor, srcOps);
+      g.push_back(loadOp.getResult());
+    }
+
+    // Calculate intermediate terms
+    SmallVector<Value, 4> p;
+    auto floorF =
+        rewriter.create<mlir::FloorFOp>(loc, idx.getType(), idx).getResult();
+    auto s = rewriter.create<mlir::SubFOp>(loc, idx, floorF).getResult();
+    auto s2 = rewriter.create<mlir::MulFOp>(loc, s, s).getResult();
+    auto s3 = rewriter.create<mlir::MulFOp>(loc, s2, s).getResult();
+    auto s_a = rewriter.create<mlir::MulFOp>(loc, a, s).getResult();
+    auto s2_a = rewriter.create<mlir::MulFOp>(loc, a, s2).getResult();
+    auto s3_a = rewriter.create<mlir::MulFOp>(loc, a, s3).getResult();
+    auto s3_a2 = rewriter.create<mlir::AddFOp>(loc, a, cstF[2]).getResult();
+    s3_a2 = rewriter.create<mlir::MulFOp>(loc, s3_a2, s3).getResult();
+    auto s2_a3 = rewriter.create<mlir::AddFOp>(loc, a, cstF[3]).getResult();
+    s2_a3 = rewriter.create<mlir::MulFOp>(loc, s2_a3, s2).getResult();
+    auto s2_2a3 = rewriter.create<mlir::AddFOp>(loc, a, a).getResult();
+    s2_2a3 = rewriter.create<mlir::AddFOp>(loc, s2_2a3, cstF[3]).getResult();
+    s2_2a3 = rewriter.create<mlir::MulFOp>(loc, s2_2a3, s2).getResult();
+
+    // Calculate 4 terms at interpolation nodes
+    p.push_back(rewriter.create<mlir::MulFOp>(loc, s2_a, cstF[2]).getResult());
+    p[0] = rewriter.create<mlir::SubFOp>(loc, s3_a, p[0]).getResult();
+    p[0] = rewriter.create<mlir::AddFOp>(loc, p[0], s_a).getResult();
+
+    p.push_back(rewriter.create<mlir::SubFOp>(loc, s3_a2, s2_a3).getResult());
+    p[1] = rewriter.create<mlir::AddFOp>(loc, p[1], cstF[1]).getResult();
+
+    p.push_back(rewriter.create<mlir::SubFOp>(loc, s2_2a3, s3_a2).getResult());
+    p[2] = rewriter.create<mlir::SubFOp>(loc, p[2], s_a).getResult();
+
+    p.push_back(rewriter.create<mlir::SubFOp>(loc, s2_a, s3_a).getResult());
+
+    for (size_t i = 0; i < p.size(); i++) {
+      p[i] = rewriter.create<mlir::MulFOp>(loc, p[i], g[i]).getResult();
+    }
+
+    // Return interpolation result (result = p0 + p1 + p2 + p3)
+    auto r = rewriter.create<mlir::AddFOp>(loc, p[0], p[1]).getResult();
+    r = rewriter.create<mlir::AddFOp>(loc, r, p[2]).getResult();
+    return rewriter.create<mlir::AddFOp>(loc, r, p[3]).getResult();
+  }
+
+  SmallVector<Value, 2> GetIndexBounds(Location loc,
+                                       ConversionPatternRewriter &rewriter,
+                                       Value tensor, size_t axis,
+                                       IntegerType integerType) const {
+    // Return lower and upper bounds of a tensor at an axis
+    SmallVector<Value, 2> bounds;
+    auto axisLen = tensor.getType().cast<MemRefType>().getShape()[axis];
+    auto lower = rewriter.create<mlir::ConstantOp>(
+        loc, integerType, rewriter.getIntegerAttr(integerType, 0));
+    auto upper = rewriter.create<mlir::ConstantOp>(
+        loc, integerType, rewriter.getIntegerAttr(integerType, axisLen - 1));
+    bounds.push_back(lower.getResult());
+    bounds.push_back(upper.getResult());
+    return bounds;
+  }
+
+  Value checkIntOutOfBounds(Location loc, ConversionPatternRewriter &rewriter,
+                            Value value, Value lowerBound,
+                            Value upperBound) const {
+    // Check if a mlir::IntegerType value is out of bounds. If it is, set it to
+    // lower/upper bound.
+    auto cmpLower = rewriter.create<mlir::CmpIOp>(loc, CmpIPredicate::slt,
+                                                  value, lowerBound);
+    auto cmpUpper = rewriter.create<mlir::CmpIOp>(loc, CmpIPredicate::slt,
+                                                  value, upperBound);
+    value = rewriter.create<mlir::SelectOp>(loc, cmpLower, lowerBound, value)
+                .result();
+    value = rewriter.create<mlir::SelectOp>(loc, cmpUpper, value, upperBound)
+                .result();
+    return value;
+  }
+
+  Value isHalfWayFloat(Location loc, ConversionPatternRewriter &rewriter,
+                       Value value) const {
+    // Check if the fractional part of a float value is 0.5
+    auto floatType = value.getType();
+    auto half = rewriter.create<mlir::ConstantOp>(
+        loc, floatType, rewriter.getFloatAttr(floatType, 0.5));
+    auto floor =
+        rewriter.create<mlir::FloorFOp>(loc, floatType, value).getResult();
+    auto floorPlusHalf = rewriter.create<mlir::AddFOp>(loc, floor, half);
+    return rewriter
+        .create<mlir::CmpFOp>(loc, CmpFPredicate::OEQ, value, floorPlusHalf)
+        .getResult();
+  }
+
+  Value ceilFPToSI(Location loc, ConversionPatternRewriter &rewriter,
+                   Value value, IntegerType integerType) const {
+    auto ceilFloat =
+        rewriter.create<mlir::CeilFOp>(loc, value.getType(), value).getResult();
+    return rewriter.create<mlir::FPToSIOp>(loc, integerType, ceilFloat)
+        .getResult();
+  }
+
+  Value floorFPToSI(Location loc, ConversionPatternRewriter &rewriter,
+                    Value value, IntegerType integerType) const {
+    auto floorFloat =
+        rewriter.create<mlir::FloorFOp>(loc, value.getType(), value)
+            .getResult();
+    return rewriter.create<mlir::FPToSIOp>(loc, integerType, floorFloat)
+        .getResult();
+  }
+
+  Value roundFPToSI(Location loc, ConversionPatternRewriter &rewriter,
+                    Value value, IntegerType integerType) const {
+    auto floatType = value.getType();
+    auto half = rewriter.create<mlir::ConstantOp>(
+        loc, floatType, rewriter.getFloatAttr(floatType, 0.5));
+    auto valuePlusHalf = rewriter.create<mlir::AddFOp>(loc, value, half);
+    return floorFPToSI(loc, rewriter, valuePlusHalf, integerType);
   }
 };
 
@@ -1179,15 +1457,16 @@ struct FuncOpConversion : public OpConversionPattern<FuncOp> {
 
     // Convert the function signature
     TypeConverter typeConverter;
-    mlir::TypeConverter::SignatureConversion result(type.getNumInputs() +
-                                                    type.getNumResults());
+    mlir::TypeConverter::SignatureConversion result(type.getNumInputs());
     for (unsigned i = 0; i < type.getNumInputs(); ++i) {
       result.addInputs(i, {typeConverter.convertType(type.getInput(i))});
     }
     SmallVector<Type, 8> resultTypes;
     for (Type resultType : type.getResults()) {
       Type newResultType = typeConverter.convertType(resultType);
-      result.addInputs({newResultType});
+      if (!newResultType.isa<stdx::ArgpackType>()) {
+        result.addInputs({newResultType});
+      }
       resultTypes.push_back(newResultType);
     }
 
@@ -1279,6 +1558,37 @@ struct TraceOpConversion : public OpConversionPattern<tile::PragmaOp> {
   }
 };
 
+struct PackOpConversion : public OpConversionPattern<stdx::PackOp> {
+  using OpConversionPattern<stdx::PackOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(stdx::PackOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const final {
+    auto argpackType = stdx::ArgpackType::get(op.getContext());
+    rewriter.replaceOpWithNewOp<stdx::PackOp>(op, TypeRange(argpackType),
+                                              operands);
+    return success();
+  }
+};
+
+struct UnpackOpConversion : public OpConversionPattern<stdx::UnpackOp> {
+  using OpConversionPattern<stdx::UnpackOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(stdx::UnpackOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const final {
+    SmallVector<Type, 8> newResultTypes;
+    TypeConverter typeConverter;
+    if (failed(
+            typeConverter.convertTypes(op.getResultTypes(), newResultTypes))) {
+      return failure();
+    }
+    rewriter.replaceOpWithNewOp<stdx::UnpackOp>(op, newResultTypes,
+                                                operands[0]);
+    return success();
+  }
+};
+
 struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
   void runOnOperation() final {
     // Inject tile.ident ops for each return operand that is a direct block
@@ -1308,6 +1618,12 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         [&](FuncOp op) { return converter.isSignatureLegal(op.getType()); });
     target.addDynamicallyLegalOp<ReturnOp>(
         [&](ReturnOp op) { return converter.isLegal(op); });
+    target.addDynamicallyLegalOp<stdx::PackOp>([&](stdx::PackOp op) {
+      return converter.isLegal(op.getOperandTypes());
+    });
+    target.addDynamicallyLegalOp<stdx::UnpackOp>([&](stdx::UnpackOp op) {
+      return converter.isLegal(op.getResultTypes());
+    });
 
     // Setup rewrite patterns
     using CmpIntLtOp =
@@ -1332,6 +1648,8 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         ScatterOpConversion,  //
         ShapeOpConversion,    //
         TraceOpConversion,    //
+        PackOpConversion,     //
+        UnpackOpConversion,   //
         ContractionOpConversion<CombinationKind::none, FirstOperand>,
         ContractionOpConversion<CombinationKind::add, StdOp<mlir::AddFOp>,
                                 ResultIs<EltwiseFloat>>,

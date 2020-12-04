@@ -57,7 +57,7 @@ void registerEmbeddingBagOffsetsSum() {
     auto batch = offsets.size();
     offsets.push_back(num_indices);
 
-    auto I_gathered = gather(I, indices);
+    edsl::Tensor I_gathered = edsl::gather(I, indices);
 
     auto ndims = I_gathered.rank();
     std::vector<edsl::TensorDim> I_dims(ndims);

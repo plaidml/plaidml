@@ -823,14 +823,85 @@ inline Tensor exp(const Tensor& x) { return intrinsic("exp", x); }
 ///
 inline Tensor floor(const Tensor& x) { return intrinsic("floor", x); }
 
+enum class InterpolationMode : uint64_t {
+  NEAREST,
+  LINEAR,
+  CUBIC,
+};
+
+enum class NearestMode : uint64_t {
+  ROUND_PREFER_FLOOR,
+  ROUND_PREFER_CEIL,
+  FLOOR,
+  CEIL,
+  SIMPLE,
+};
+
 ///
-/// Takes an input tensor (`x`) and a set of indices to gather over (`y`), and returns an output tensor that gathers the
-/// input tensor from the indices specified.
-/// \param x Tensor
-/// \param y Tensor
-/// \return Tensor
+/// Gather takes an input tensor (`x`) and a set of indices to gather over (`y`), and computes an output tensor that
+/// gathers the input tensor from the indices specified.
 ///
-inline Tensor gather(const Tensor& x, const Tensor& y) { return intrinsic("gather", x, y); }
+class gather {
+ public:
+  explicit gather(const Tensor& x, const Tensor& y) : x_(x), y_(y) {}
+
+  ///
+  /// Set the axis for gather.
+  ///
+  gather& axis(int axis) {
+    axis_ = Tensor(axis);
+    return *this;
+  }
+
+  ///
+  /// Set the interpolation mode for gather.
+  ///
+  gather& interpolationMode(InterpolationMode mode) {
+    interpolation_mode_ = Tensor(static_cast<uint64_t>(mode));
+    return *this;
+  }
+
+  ///
+  /// Set the nearest mode for gather.
+  ///
+  gather& nearestMode(NearestMode mode) {
+    nearest_mode_ = Tensor(static_cast<uint64_t>(mode));
+    return *this;
+  }
+
+  ///
+  /// Set the coefficient that controls cubic interpolation for gather.
+  ///
+  gather& cubeCoeff(float cube_coeff) {
+    cube_coeff_ = Tensor(cube_coeff);
+    return *this;
+  }
+
+  ///
+  /// Construct gather.
+  ///
+  Tensor build() const {
+    std::vector<Tensor> args = {x_, y_, axis_, interpolation_mode_, nearest_mode_, cube_coeff_};
+    return intrinsicCall("gather", args);
+  }
+
+  operator Tensor() { return build(); }
+
+ private:
+  Tensor x_;
+  Tensor y_;
+
+  ///
+  /// axis_ is a dimension index to gather data from
+  /// interpolation_mode_ specifies type of interpolation
+  /// nearest_mode_ specifies type of  nearest interpolation
+  /// cube_coeff_ controls the cubic interpolation
+  ///
+  Tensor axis_ = Tensor(0);
+  Tensor interpolation_mode_ = Tensor(static_cast<uint64_t>(InterpolationMode::LINEAR));
+  Tensor nearest_mode_ = Tensor(static_cast<uint64_t>(NearestMode::ROUND_PREFER_FLOOR));
+  Tensor cube_coeff_ = Tensor(-0.75);
+};
 
 ///
 /// Returns the identity of `x`.

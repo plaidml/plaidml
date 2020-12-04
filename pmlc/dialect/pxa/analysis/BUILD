@@ -19,6 +19,7 @@ plaidml_cc_library(
         "uses.h",
     ],
     deps = [
+        "//pmlc/dialect/layer/ir",
         "//pmlc/dialect/pxa/ir",
         "//pmlc/dialect/stdx/ir",
         "//pmlc/util/bilp",

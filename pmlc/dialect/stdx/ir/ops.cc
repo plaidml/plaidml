@@ -2,6 +2,7 @@
 
 #include "pmlc/dialect/stdx/ir/ops.h"
 
+#include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpImplementation.h"
 
 using namespace mlir; // NOLINT
@@ -47,48 +48,28 @@ verifySubgroupBlockWriteINTELOp(SubgroupBlockWriteINTELOp op) {
   return success();
 }
 
-static LogicalResult verifyPackOp(PackOp op) {
-  auto tupleType = op.getTupleType();
-  if (op.getNumOperands() != tupleType.size()) {
-    return failure();
+Type StdXDialect::parseType(DialectAsmParser &parser) const {
+  StringRef keyword;
+  if (parser.parseKeyword(&keyword)) {
+    return Type();
   }
-  for (unsigned i = 0; i < tupleType.size(); i++) {
-    if (op.getOperand(i).getType() != tupleType.getType(i)) {
-      return failure();
-    }
+  if (keyword == "argpack") {
+    return ArgpackType::get(getContext());
   }
-  return success();
+  parser.emitError(parser.getNameLoc(), "unknown type: ") << keyword;
+  return Type();
 }
 
-static LogicalResult verifyUnpackOp(UnpackOp op) {
-  auto tupleType = op.getTupleType();
-  if (op.getNumResults() != tupleType.size()) {
-    return failure();
+void StdXDialect::printType(Type type, DialectAsmPrinter &os) const {
+  if (type.isa<ArgpackType>()) {
+    os << "argpack";
+    return;
   }
-  for (unsigned i = 0; i < tupleType.size(); i++) {
-    if (op.getResult(i).getType() != tupleType.getType(i)) {
-      return failure();
-    }
-  }
-  return success();
-}
-
-static ParseResult parseTupleTypeAsm(OpAsmParser &parser, Type &tuple,
-                                     SmallVectorImpl<Type> &expanded) {
-  auto ret = parser.parseTypeList(expanded);
-  if (ret) {
-    return failure();
-  }
-  tuple = TupleType::get(expanded, parser.getBuilder().getContext());
-  return ret;
-}
-
-static void printTupleTypeAsm(OpAsmPrinter &printer, Type tuple,
-                              TypeRange expanded) {
-  printer << expanded;
+  llvm_unreachable("unexpected stdx type kind");
 }
 
 void StdXDialect::initialize() {
+  addTypes<ArgpackType>();
   addOperations<
 #define GET_OP_LIST
 #include "pmlc/dialect/stdx/ir/ops.cc.inc" // NOLINT

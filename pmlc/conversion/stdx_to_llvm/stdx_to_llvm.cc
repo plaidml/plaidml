@@ -231,9 +231,14 @@ struct PackLowering : public ConvertOpToLLVMPattern<stdx::PackOp> {
                   ConversionPatternRewriter &rewriter) const override {
     auto op = cast<stdx::PackOp>(baseOp);
     Location loc = op.getLoc();
+    auto i8PtrType = LLVMType::getInt8Ty(rewriter.getContext()).getPointerTo();
+    if (op.getNumOperands() == 0) {
+      auto nullPtr = rewriter.create<LLVM::NullOp>(loc, i8PtrType);
+      rewriter.replaceOp(op, {nullPtr});
+      return success();
+    }
     // Get the relevant types
     auto structType = getStructType(typeConverter, op.getOperandTypes());
-    auto i8PtrType = LLVMType::getInt8Ty(rewriter.getContext()).getPointerTo();
     // Get the size of the struct type and malloc
     auto sizeofStruct = getSizeInBytes(loc, structType, rewriter);
     auto mallocFunc =
@@ -270,6 +275,10 @@ struct UnpackLowering : public ConvertOpToLLVMPattern<stdx::UnpackOp> {
   matchAndRewrite(Operation *baseOp, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
     auto op = cast<stdx::UnpackOp>(baseOp);
+    if (op.getNumResults() == 0) {
+      rewriter.replaceOp(op, {});
+      return success();
+    }
     Location loc = op.getLoc();
     // Get the LLVM structure type
     auto structType = getStructType(typeConverter, op.getResultTypes());
@@ -333,8 +342,8 @@ void populateStdXToLLVMConversionPatterns(LLVMTypeConverter &converter,
                   TanLowering,     //
                   UnpackLowering   //
                   >(converter);
-  converter.addConversion([](TupleType type) -> Optional<Type> {
-    // Tuples look like i8 pointers.  I'd like this to be void*, but MLIR
+  converter.addConversion([](stdx::ArgpackType type) -> Optional<Type> {
+    // Argpack types look like i8 pointers.  I'd like this to be void*, but MLIR
     // disallows void* in it's validation for some bizare reason
     return LLVMType::getInt8Ty(type.getContext()).getPointerTo();
   });
