@@ -1,5 +1,7 @@
 add_subdirectory(utils)
 
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/utils/include)
+
 pml_cc_library(
   NAME level_zero
   SRCS
@@ -18,6 +20,6 @@ pml_cc_library(
     MLIRPass
     MLIRSPIRV
     mlir_runner_utils
-    lz_wrapper
+    pmlc::rt::level_zero::utils::lz_wrapper
     LevelZero::LevelZero
 )

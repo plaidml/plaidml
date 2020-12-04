@@ -1,5 +1,6 @@
 add_subdirectory(intel_gen)
 add_subdirectory(intel_gen_ocl_spirv)
+add_subdirectory(intel_level_zero)
 add_subdirectory(x86)
 
 pml_cc_library(

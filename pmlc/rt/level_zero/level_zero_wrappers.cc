@@ -71,8 +71,9 @@ void levelZeroSetKernelArg(void *kernel, uint32_t idx, void *memory) {
 void *levelZeroScheduleFunc(void *invocation, void *kernel, uint64_t gws0,
                             uint64_t gws1, uint64_t gws2, uint64_t lws0,
                             uint64_t lws1, uint64_t lws2) {
-  ze_group_count_t gws(gws0, gws1, gws2);
-  ze_group_count_t lws(lws0, lws1, lws2);
+  //ze_group_count_t gws(gws0, gws1, gws2);
+  ze_group_count_t gws = {gws0 * lws0, gws1 * lws1, gws2 * lws2};
+  ze_group_count_t lws = {lws0, lws1, lws2};
   return static_cast<LevelZeroInvocation *>(invocation)
       ->enqueueKernel(static_cast<LevelZeroKernel *>(kernel), gws, lws);
 }

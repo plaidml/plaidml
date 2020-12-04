@@ -193,7 +193,7 @@ void pipelineBuilder(OpPassManager &pm,
   // pm.addPass(pmlc::conversion::comp_to_llvm::createConvertCompToOclPass());
 
   // Comp to LLVM - L0 function calls.
-  pm.addPass(pmlc::conversion::comp_to_llvm::createConvertCompToL0Pass());
+  pm.addPass(pmlc::conversion::comp_to_llvm::createConvertCompToLevelZeroPass());
 
   // Convert to LLVM code.
   pm.addPass(pmlc::target::intel_gen::createConvertStandardToLLVM());

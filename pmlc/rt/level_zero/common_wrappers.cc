@@ -5,7 +5,7 @@
 #include "pmlc/util/logging.h"
 
 namespace pmlc::rt::level_zero {
-namespace {
+/*namespace {
 template <typename T>
 void *castMemrefToPtr(::UnrankedMemRefType<T> *unrankedMemRef) {
   DynamicMemRefType<T> memRef(*unrankedMemRef);
@@ -48,5 +48,5 @@ struct Registration {
   }
 };
 static Registration reg;
-} // namespace
+} // namespace*/
 } // namespace pmlc::rt::level_zero

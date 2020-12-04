@@ -8,7 +8,7 @@ namespace pmlc::rt::level_zero {
 
 LevelZeroQueue::LevelZeroQueue(const ze_context_handle_t &context,
                                const ze_device_handle_t &device,
-                               ze_device_properties_t properties)
+                               ze_command_queue_group_properties_t properties)
     : properties(properties) {
   // seems no need to use proiority
   queue = lzt::create_command_queue(context, device, 0,
@@ -51,8 +51,8 @@ LevelZeroQueueUser LevelZeroQueueGuard::use() {
 }
 
 LevelZeroDevice::LevelZeroDevice(ze_device_handle_t device)
-    : context(device), device(device) {
-  IVLOG(1, "Instantiating LevelZero device: " << lzt::get_device_properties(device).name;
+    : context(lzt::get_default_context()), device(device) {
+  IVLOG(1, "Instantiating LevelZero device: " << lzt::get_device_properties(device).name);
 }
 
 std::unique_ptr<Executable> LevelZeroDevice::compile(
@@ -66,7 +66,7 @@ LevelZeroDevice::getQueue(ze_command_queue_group_properties_t properties) {
   // Lock modification of queues vector.
   std::lock_guard<std::mutex> lock(queuesMutex);
   for (std::unique_ptr<LevelZeroQueueGuard> &guard : queues) {
-    if (guard->getLevelZeroProperties() != properties || guard->isUsed())
+    if (/*!(guard->getLevelZeroProperties() & properties) ||*/ guard->isUsed())
       continue;
     LevelZeroQueueUser user = guard->use();
     if (user)

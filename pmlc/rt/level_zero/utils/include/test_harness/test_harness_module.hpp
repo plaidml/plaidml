@@ -27,6 +27,13 @@ ze_module_handle_t create_module(ze_context_handle_t context,
                                  const ze_module_format_t format,
                                  const char *build_flags,
                                  ze_module_build_log_handle_t *p_build_log);
+ze_module_handle_t create_module(ze_context_handle_t context,
+                                 ze_device_handle_t device,
+                                 uint8_t *data,
+                                 size_t bytes,
+                                 const ze_module_format_t format,
+                                 const char *build_flags,
+                                 ze_module_build_log_handle_t *p_build_log);
 void destroy_module(ze_module_handle_t module);
 size_t get_build_log_size(const ze_module_build_log_handle_t build_log);
 std::string get_build_log_string(const ze_module_build_log_handle_t build_log);

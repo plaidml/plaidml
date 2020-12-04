@@ -62,6 +62,37 @@ ze_module_handle_t create_module(ze_context_handle_t context,
   return module;
 }
 
+ze_module_handle_t create_module(ze_context_handle_t context,
+                                 ze_device_handle_t device,
+                                 uint8_t *data,
+                                 size_t bytes,
+                                 const ze_module_format_t format,
+                                 const char *build_flags,
+                                 ze_module_build_log_handle_t *p_build_log) {
+
+  ze_module_desc_t module_description = {};
+  module_description.stype = ZE_STRUCTURE_TYPE_MODULE_DESC;
+  ze_module_handle_t module;
+  ze_module_constants_t module_constants = {};
+  const std::vector<uint8_t> binary_file(data, data + bytes);
+
+  EXPECT_TRUE((format == ZE_MODULE_FORMAT_IL_SPIRV) ||
+              (format == ZE_MODULE_FORMAT_NATIVE));
+
+  module_description.pNext = nullptr;
+  module_description.format = format;
+  module_description.inputSize = static_cast<uint32_t>(binary_file.size());
+  module_description.pInputModule = binary_file.data();
+  module_description.pBuildFlags = build_flags;
+  module_description.pConstants = &module_constants;
+
+  EXPECT_EQ(ZE_RESULT_SUCCESS,
+            zeModuleCreate(context, device, &module_description, &module,
+                           p_build_log));
+
+  return module;
+}
+
 size_t get_build_log_size(const ze_module_build_log_handle_t build_log) {
   size_t build_log_size = 0;
   EXPECT_EQ(ZE_RESULT_SUCCESS,

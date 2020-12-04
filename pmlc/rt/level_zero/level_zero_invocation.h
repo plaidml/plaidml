@@ -23,12 +23,12 @@ public:
   /// on specified command queue.
   ze_event_handle_t
   enqueueRead(ze_command_list_handle_t list, void *dst,
-              const std::vector<ze_event_handle_t> &dependencies);
+              std::vector<ze_event_handle_t> &dependencies);
   /// Enqueues write operation from `src` pointer into this buffer
   /// on specified command queue.
   ze_event_handle_t
   enqueueWrite(ze_command_list_handle_t list, void *src,
-               const std::vector<ze_event_handle_t> &dependencies);
+               std::vector<ze_event_handle_t> &dependencies);
 
 private:
   void *buffer;
@@ -45,13 +45,13 @@ public:
   LevelZeroKernel(ze_module_handle_t module, std::string name);
 
   /// Adds event dependency that must be completed before this kernel.
-  void addDependency(ze_event_handle_t event);
+  void addDependency(LevelZeroEvent* event);
   /// Sets kernel argument `idx` to `memory`.
   void setArg(unsigned idx, LevelZeroMemory *memory);
   /// Enqueues wrapped kernel on specified command queue `queue` with
   /// `gws` global work size and `lws` local work size.
   /// Returns OpenCL event tracking execution of kernel execution.
-  ze_event_handel_t enqueue(ze_command_list_handle_t list, ze_group_count_t gws,
+  ze_event_handle_t enqueue(ze_command_list_handle_t list, ze_group_count_t gws,
                             ze_group_count_t lws);
   /// Returns name of this kernel.
   const std::string &getName() const { return name; }
@@ -80,7 +80,7 @@ public:
   const std::string &getName() const { return name; }
 
   /// Blocks execution untill all `events` have finished executing.
-  static void wait(const std::vector<ze_event_handle_t> &events);
+  static void wait(const std::vector<LevelZeroEvent* > &events);
 
 private:
   ze_event_handle_t event;
