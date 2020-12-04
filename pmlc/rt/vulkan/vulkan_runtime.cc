@@ -44,9 +44,7 @@ public:
         devices.emplace_back(
             std::make_shared<VulkanDevice>(physicalDevice, state));
       }
-    } catch (const VkResult &e) {
-      if (e != VK_ERROR_INITIALIZATION_FAILED)
-        throw;
+    } catch (...) {
     }
   }
 
