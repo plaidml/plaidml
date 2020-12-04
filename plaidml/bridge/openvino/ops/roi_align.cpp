@@ -92,7 +92,7 @@ static OpRegistration reg("ROIAlign", [](const Context& ctx) {
 
     std::vector<int32_t> indices_h(sampling_h);
     for (int ih = 0; ih < sampling_h; ih++) {
-      indices_h.push_back(x_1 + interval_h * ih);
+      indices_h[ih] = x_1 + interval_h * ih;
     }
     auto ind_tensor_h = make_tensor(DType::INT32, {sampling_h}, indices_h, "indices_h");
     std::vector<int64_t> indices_w(sampling_w);
