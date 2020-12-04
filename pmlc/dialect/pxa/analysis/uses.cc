@@ -5,6 +5,7 @@
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "llvm/ADT/TypeSwitch.h"
 
+#include "pmlc/dialect/layer/ir/ops.h"
 #include "pmlc/dialect/stdx/ir/ops.h"
 #include "pmlc/util/logging.h"
 
@@ -21,6 +22,9 @@ Value getPrevIndirectDef(OpResult def) {
       .Case<AffineIfOp>([&](auto op) {
         auto yield = cast<AffineYieldOp>(op.getThenBlock()->getTerminator());
         return yield.getOperand(def.getResultNumber());
+      })
+      .Case<layer::BoxOp>([&](auto op) {
+        return op.getOperand(def.getResultNumber()); //
       })
       .Case<PrngOp>([&](auto op) {
         if (op.getResult(def.getResultNumber()) == op.result_tensor()) {
@@ -42,6 +46,9 @@ Value getNextIndirectUse(mlir::OpOperand &use) {
   return TypeSwitch<Operation *, Value>(use.getOwner())
       .Case<AffineYieldOp>([&](auto op) {
         return op.getParentOp()->getResult(use.getOperandNumber());
+      })
+      .Case<layer::BoxOp>([&](auto op) {
+        return op.getResult(use.getOperandNumber()); //
       })
       .Case<PxaReduceOp>([&](auto op) { return op.result(); })
       .Case<PxaVectorReduceOp>([&](auto op) { return op.result(); })
