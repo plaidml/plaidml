@@ -34,9 +34,13 @@ extern void registerSymbols();
 extern void registerMemrefCasts();
 
 void registerRuntime() {
-  registerSymbols();
-  registerMemrefCasts();
-  registerRuntime("opencl", std::make_shared<OpenCLRuntime>());
+  try {
+    registerRuntime("opencl", std::make_shared<OpenCLRuntime>());
+    registerSymbols();
+    registerMemrefCasts();
+  } catch (std::exception &ex) {
+    IVLOG(2, "Failed to register 'opencl' runtime: " << ex.what());
+  }
 }
 
 } // namespace pmlc::rt::opencl

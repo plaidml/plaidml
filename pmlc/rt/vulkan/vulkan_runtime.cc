@@ -25,26 +25,22 @@ namespace pmlc::rt::vulkan {
 class VulkanRuntime final : public pmlc::rt::Runtime {
 public:
   VulkanRuntime() {
-    try {
-      auto state = std::make_shared<VulkanState>();
+    auto state = std::make_shared<VulkanState>();
 
-      uint32_t physicalDeviceCount = 0;
-      throwOnVulkanError(vkEnumeratePhysicalDevices(
-                             state->instance, &physicalDeviceCount, nullptr),
-                         "vkEnumeratePhysicalDevices");
+    uint32_t physicalDeviceCount = 0;
+    throwOnVulkanError(vkEnumeratePhysicalDevices(
+                           state->instance, &physicalDeviceCount, nullptr),
+                       "vkEnumeratePhysicalDevices");
 
-      llvm::SmallVector<VkPhysicalDevice, 1> physicalDevices(
-          physicalDeviceCount);
-      throwOnVulkanError(vkEnumeratePhysicalDevices(state->instance,
-                                                    &physicalDeviceCount,
-                                                    physicalDevices.data()),
-                         "vkEnumeratePhysicalDevices");
+    llvm::SmallVector<VkPhysicalDevice, 1> physicalDevices(physicalDeviceCount);
+    throwOnVulkanError(vkEnumeratePhysicalDevices(state->instance,
+                                                  &physicalDeviceCount,
+                                                  physicalDevices.data()),
+                       "vkEnumeratePhysicalDevices");
 
-      for (const auto &physicalDevice : physicalDevices) {
-        devices.emplace_back(
-            std::make_shared<VulkanDevice>(physicalDevice, state));
-      }
-    } catch (...) {
+    for (const auto &physicalDevice : physicalDevices) {
+      devices.emplace_back(
+          std::make_shared<VulkanDevice>(physicalDevice, state));
     }
   }
 
@@ -62,8 +58,12 @@ private:
 extern void registerSymbols();
 
 void registerRuntime() {
-  registerSymbols();
-  registerRuntime("vulkan", std::make_shared<VulkanRuntime>());
+  try {
+    registerRuntime("vulkan", std::make_shared<VulkanRuntime>());
+    registerSymbols();
+  } catch (std::exception &ex) {
+    IVLOG(2, "Failed to register 'vulkan' runtime: " << ex.what());
+  }
 }
 
 } // namespace pmlc::rt::vulkan
