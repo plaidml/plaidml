@@ -1,5 +1,6 @@
 pml_cc_library(
   NAME llvm
+  HDRS register.h
   SRCS
     builtin.cc
     device.cc

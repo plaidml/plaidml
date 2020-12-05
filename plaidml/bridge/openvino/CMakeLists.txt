@@ -26,7 +26,7 @@ if(NOT InferenceEngineDeveloperPackage_FOUND)
   FetchContent_Declare(
     openvino
     GIT_REPOSITORY https://github.com/plaidml/openvino.git
-    GIT_TAG        02c1b88ca69553ab90ad15b18328e6e3169ae205
+    GIT_TAG        04750e225e633fd07ae28b2bf28c3e8202ad7c2b
   )
   if(LOCAL_OPENVINO_DIR)
     set(openvino_SOURCE_DIR ${LOCAL_OPENVINO_DIR})
@@ -53,20 +53,18 @@ file(GLOB_RECURSE _OPS_SRCS CONFIGURE_DEPENDS "ops/*.cpp")
 pml_cc_library(
   NAME openvino
   HDRS
-    plaidml_ops.hpp
     plaidml_builder.hpp
+    plaidml_ops.hpp
     plaidml_util.hpp
   SRCS
     plaidml_builder.cpp
+    plaidml_ops.cpp
     plaidml_util.cpp
     ${_OPS_SRCS}
   INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}
   DEPS
     IE::inference_engine
     IE::ngraph
-    plaidml::core
-    plaidml::edsl
-    plaidml::op
 )
 
 if(NOT InferenceEngineDeveloperPackage_FOUND)

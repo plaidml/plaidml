@@ -3,6 +3,7 @@
 #include "pmlc/ast/builder.h"
 
 #include <limits>
+#include <mutex>
 #include <stack>
 #include <string>
 #include <unordered_set>
@@ -22,6 +23,7 @@
 #include "llvm/Support/FormatVariadic.h"
 
 #include "pmlc/ast/ast.h"
+#include "pmlc/ast/ast_ops.h"
 #include "pmlc/ast/eval.h"
 #include "pmlc/dialect/layer/ir/ops.h"
 #include "pmlc/dialect/tile/ir/ops.h"
@@ -661,6 +663,7 @@ struct ProgramBuilder {
             .Case("prng", [&]() { return makePrngOp(node, operands); })
             .Case("reshape", [&]() { return makeReshapeOp(node, operands); })
             .Case("scatter", [&]() { return makeScatterOp(node, operands); })
+            .Case("gather", [&]() { return makeGatherOp(node, operands); })
             .Default([&]() {
               const AbstractOperation *abstractOp = lookupOperation(node->op);
               OperationState state(loc, abstractOp->name);
@@ -682,14 +685,17 @@ struct ProgramBuilder {
     for (const ExprNodePtr &result : node->results) {
       results.insert(builder.lookupNode(result));
     }
+    llvm::SmallVector<Type, 4> resultTypes;
+    for (Value val : results) {
+      resultTypes.push_back(val.getType());
+    }
     std::vector<NamedAttribute> attrs;
     for (const auto &kvp : node->attrs) {
       Attribute value = builder.getAttribute(kvp.getValue());
       attrs.push_back(builder.getNamedAttr(kvp.getKey(), value));
     }
     auto layerOp = builder.create<layer::BoxOp>(
-        loc, node->op, operands, results.getArrayRef(),
-        builder.getDictionaryAttr(attrs));
+        loc, node->op, operands, resultTypes, builder.getDictionaryAttr(attrs));
     BlockAndValueMapping mapper;
     OpBuilder bodyBuilder(layerOp.body());
     for (auto tuple : llvm::zip(operands, layerOp.body().getArguments())) {
@@ -738,6 +744,39 @@ struct ProgramBuilder {
         .create<tile::PragmaOp>(loc, tensor, node->op,
                                 builder.getDictionaryAttr(attrs))
         .result();
+  }
+
+  Value makeGatherOp(ExprNodeIntrinsic *node, ArrayRef<Value> operands) {
+    TensorShape shape = evaluator.getShape(node);
+    RankedTensorType resultType = builder.getRankedTensorType(shape);
+    IntegerAttr axis;
+    IntegerAttr interpolationMode;
+    IntegerAttr nearestMode;
+    FloatAttr cubeCoeff;
+    if (!matchPattern(operands[2], m_Constant(&axis))) {
+      throw std::runtime_error("'gather' primitive expects the 'axis' argument "
+                               "to be a constant integer");
+    }
+    if (!matchPattern(operands[3], m_Constant(&interpolationMode))) {
+      throw std::runtime_error(
+          "'gather' primitive expects the 'interpolationMode' argument "
+          "to be a constant integer");
+    }
+    if (!matchPattern(operands[4], m_Constant(&nearestMode))) {
+      throw std::runtime_error(
+          "'gather' primitive expects the 'nearestMode' argument "
+          "to be a constant integer");
+    }
+    if (!matchPattern(operands[5], m_Constant(&cubeCoeff))) {
+      throw std::runtime_error(
+          "'gather' primitive expects the 'cubeCoeff' argument "
+          "to be a constant float");
+    }
+    auto op = builder.create<tile::GatherOp>(
+        loc, resultType, operands.take_front(2),
+        builder.getIndexAttr(axis.getInt()), interpolationMode, nearestMode,
+        cubeCoeff);
+    return op.result();
   }
 
   Value makeReshapeOp(ExprNodeIntrinsic *node, ArrayRef<Value> operands) {
@@ -813,10 +852,13 @@ struct ProgramBuilder {
 
 std::shared_ptr<Program> buildProgram(llvm::StringRef name,
                                       const ProgramArguments &args) {
-  enableGlobalDialectRegistry(true);
-  registerDialect<dialect::tile::TileDialect>();
-  registerDialect<dialect::layer::LayerDialect>();
-  registerDialect<StandardOpsDialect>();
+  static std::once_flag once;
+  std::call_once(once, []() {
+    enableGlobalDialectRegistry(true);
+    registerDialect<dialect::tile::TileDialect>();
+    registerDialect<dialect::layer::LayerDialect>();
+    registerDialect<StandardOpsDialect>();
+  });
   if (name.empty()) {
     name = "module";
   }

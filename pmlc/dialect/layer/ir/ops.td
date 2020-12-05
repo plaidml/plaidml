@@ -17,7 +17,7 @@ class LayerOp<string mnemonic, list<OpTrait> traits = []>
 }
 
 
-def BoxOp : LayerOp<"box", [NoSideEffect, IsolatedFromAbove]> {
+def BoxOp : LayerOp<"box", [IsolatedFromAbove]> {
   let summary = "layer container operation";
   let arguments = (ins
     Variadic<AnyType>:$operands,
@@ -32,7 +32,7 @@ def BoxOp : LayerOp<"box", [NoSideEffect, IsolatedFromAbove]> {
     "mlir::OperationState& result, "
     "mlir::StringRef op, "
     "mlir::ArrayRef<mlir::Value> operands, "
-    "mlir::ArrayRef<mlir::Value> innerResults, "
+    "mlir::ArrayRef<mlir::Type> resultTypes, "
     "mlir::DictionaryAttr attrs"
   >];
 

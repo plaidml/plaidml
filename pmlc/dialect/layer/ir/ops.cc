@@ -18,10 +18,10 @@ using llvm::SmallVector;
 Block *BoxOp::getBody() { return &body().front(); }
 
 void BoxOp::build(OpBuilder &builder, OperationState &result, StringRef op,
-                  ArrayRef<Value> operands, ArrayRef<Value> innerResults,
+                  ArrayRef<Value> operands, ArrayRef<Type> resultTypes,
                   DictionaryAttr attrs) {
-  for (Value value : innerResults) {
-    result.types.push_back(value.getType());
+  for (Type type : resultTypes) {
+    result.types.push_back(type);
   }
   result.addOperands(operands);
   result.addAttribute("op", builder.getStringAttr(op));

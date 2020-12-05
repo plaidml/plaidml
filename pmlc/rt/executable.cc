@@ -3,7 +3,6 @@
 #include "pmlc/rt/executable.h"
 
 #include "pmlc/rt/device_id.h"
-#include "pmlc/util/buffer.h"
 
 using pmlc::compiler::Program;
 

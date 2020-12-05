@@ -42,9 +42,8 @@ pml_cc_library(
     pmlc::dialect::tile::ir
     pmlc::dialect::tile::transforms
     pmlc::dialect::xsmm::ir
-    pmlc::target::intel_gen
-    pmlc::target::intel_gen_ocl_spirv
-    pmlc::target::x86
+    pmlc::rt::all_runtimes
+    pmlc::target::all
 )
 
 pml_lit_test(
