@@ -663,6 +663,7 @@ struct ProgramBuilder {
             .Case("prng", [&]() { return makePrngOp(node, operands); })
             .Case("reshape", [&]() { return makeReshapeOp(node, operands); })
             .Case("scatter", [&]() { return makeScatterOp(node, operands); })
+            .Case("gather", [&]() { return makeGatherOp(node, operands); })
             .Default([&]() {
               const AbstractOperation *abstractOp = lookupOperation(node->op);
               OperationState state(loc, abstractOp->name);
@@ -743,6 +744,39 @@ struct ProgramBuilder {
         .create<tile::PragmaOp>(loc, tensor, node->op,
                                 builder.getDictionaryAttr(attrs))
         .result();
+  }
+
+  Value makeGatherOp(ExprNodeIntrinsic *node, ArrayRef<Value> operands) {
+    TensorShape shape = evaluator.getShape(node);
+    RankedTensorType resultType = builder.getRankedTensorType(shape);
+    IntegerAttr axis;
+    IntegerAttr interpolationMode;
+    IntegerAttr nearestMode;
+    FloatAttr cubeCoeff;
+    if (!matchPattern(operands[2], m_Constant(&axis))) {
+      throw std::runtime_error("'gather' primitive expects the 'axis' argument "
+                               "to be a constant integer");
+    }
+    if (!matchPattern(operands[3], m_Constant(&interpolationMode))) {
+      throw std::runtime_error(
+          "'gather' primitive expects the 'interpolationMode' argument "
+          "to be a constant integer");
+    }
+    if (!matchPattern(operands[4], m_Constant(&nearestMode))) {
+      throw std::runtime_error(
+          "'gather' primitive expects the 'nearestMode' argument "
+          "to be a constant integer");
+    }
+    if (!matchPattern(operands[5], m_Constant(&cubeCoeff))) {
+      throw std::runtime_error(
+          "'gather' primitive expects the 'cubeCoeff' argument "
+          "to be a constant float");
+    }
+    auto op = builder.create<tile::GatherOp>(
+        loc, resultType, operands.take_front(2),
+        builder.getIndexAttr(axis.getInt()), interpolationMode, nearestMode,
+        cubeCoeff);
+    return op.result();
   }
 
   Value makeReshapeOp(ExprNodeIntrinsic *node, ArrayRef<Value> operands) {

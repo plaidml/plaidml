@@ -14,6 +14,7 @@
 #include <stdexcept>
 
 #include "pmlc/rt/runtime_registry.h"
+#include "pmlc/rt/vulkan/register.h"
 #include "pmlc/rt/vulkan/vulkan_device.h"
 #include "pmlc/rt/vulkan/vulkan_error.h"
 #include "pmlc/rt/vulkan/vulkan_state.h"
@@ -54,6 +55,15 @@ private:
   std::vector<std::shared_ptr<VulkanDevice>> devices;
 };
 
-pmlc::rt::RuntimeRegistration<VulkanRuntime> reg{"vulkan"};
+extern void registerSymbols();
+
+void registerRuntime() {
+  try {
+    registerRuntime("vulkan", std::make_shared<VulkanRuntime>());
+    registerSymbols();
+  } catch (std::exception &ex) {
+    IVLOG(2, "Failed to register 'vulkan' runtime: " << ex.what());
+  }
+}
 
 } // namespace pmlc::rt::vulkan

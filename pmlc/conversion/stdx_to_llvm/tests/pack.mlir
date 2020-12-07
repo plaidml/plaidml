@@ -2,7 +2,7 @@
 // RUN: pmlc-opt -x86-convert-std-to-llvm %s | pmlc-jit -e jitEntry | FileCheck %s --check-prefix=JIT
 
 // CHECK-LABEL: @packLowering
-func @packLowering(%A: memref<20x10xf32>, %i: index, %f: f32) -> (tuple<memref<20x10xf32>, index, f32>) {
+func @packLowering(%A: memref<20x10xf32>, %i: index, %f: f32) -> (!stdx.argpack) {
   %0 = stdx.pack %A, %i, %f : memref<20x10xf32>, index, f32
   // llvm.call @malloc
   // llvm.bitcast 
@@ -11,11 +11,11 @@ func @packLowering(%A: memref<20x10xf32>, %i: index, %f: f32) -> (tuple<memref<2
   // llvm.insertvalue
   // llvm.insertvalue
   // llvm.store
-  return %0 : tuple<memref<20x10xf32>, index, f32>
+  return %0 : !stdx.argpack
 }
 
 // CHECK-LABEL: @unpackLowering
-func @unpackLowering(%P: tuple<memref<20x10xf32>, index, f32>) -> (memref<20x10xf32>, index, f32) {
+func @unpackLowering(%P: !stdx.argpack) -> (memref<20x10xf32>, index, f32) {
   %A, %i, %f = stdx.unpack %P : memref<20x10xf32>, index, f32
   // llvm.bitcast
   // llvm.load
