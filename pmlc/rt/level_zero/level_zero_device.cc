@@ -17,6 +17,11 @@ LevelZeroQueue::LevelZeroQueue(const ze_context_handle_t &context,
   list = lzt::create_command_list(context, device, 0, 0);
 }
 
+LevelZeroQueue::~LevelZeroQueue() {
+    lzt::destroy_command_list(list);
+    lzt::destroy_command_queue(queue);
+}
+
 LevelZeroQueueUser::LevelZeroQueueUser()
     : LevelZeroQueueUser(nullptr, nullptr) {}
 
@@ -53,6 +58,13 @@ LevelZeroQueueUser LevelZeroQueueGuard::use() {
 LevelZeroDevice::LevelZeroDevice(ze_device_handle_t device)
     : context(lzt::get_default_context()), device(device) {
   IVLOG(1, "Instantiating LevelZero device: " << lzt::get_device_properties(device).name);
+  queues.clear();
+}
+
+LevelZeroDevice::~LevelZeroDevice() {
+    // TODO maybe other place
+    // Once multiple devices, shall change
+    lzt::destroy_context(context);
 }
 
 std::unique_ptr<Executable> LevelZeroDevice::compile(
@@ -66,8 +78,9 @@ LevelZeroDevice::getQueue(ze_command_queue_group_properties_t properties) {
   // Lock modification of queues vector.
   std::lock_guard<std::mutex> lock(queuesMutex);
   for (std::unique_ptr<LevelZeroQueueGuard> &guard : queues) {
-    if (/*!(guard->getLevelZeroProperties() & properties) ||*/ guard->isUsed())
+    if (/*!(guard->getLevelZeroProperties() & properties) ||*/ guard->isUsed()) {
       continue;
+    }
     LevelZeroQueueUser user = guard->use();
     if (user)
       return user;

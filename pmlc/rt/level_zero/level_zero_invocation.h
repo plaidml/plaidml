@@ -8,12 +8,14 @@
 #include "pmlc/rt/level_zero/level_zero_device.h"
 
 namespace pmlc::rt::level_zero {
+class LevelZeroInvocation;
 class LevelZeroEvent;
 
 /// Class encapsulating level zero memory buffer allocated on device.
 class LevelZeroMemory {
 public:
   LevelZeroMemory(void *buffer, size_t bytes) : buffer(buffer), bytes(bytes) {}
+  ~LevelZeroMemory() {lzt::free_memory(buffer);}
 
   /// Returns OpenCL buffer.
   void *getBuffer() { return buffer; }
@@ -21,14 +23,14 @@ public:
   size_t size() { return bytes; }
   /// Enqueues read operation from this buffer into `dst` pointer
   /// on specified command queue.
-  ze_event_handle_t
+  void
   enqueueRead(ze_command_list_handle_t list, void *dst,
-              std::vector<ze_event_handle_t> &dependencies);
+              std::vector<ze_event_handle_t> &dependencies, ze_event_handle_t &resultE);
   /// Enqueues write operation from `src` pointer into this buffer
   /// on specified command queue.
-  ze_event_handle_t
+  void
   enqueueWrite(ze_command_list_handle_t list, void *src,
-               std::vector<ze_event_handle_t> &dependencies);
+               std::vector<ze_event_handle_t> &dependencies, ze_event_handle_t &resultE);
 
 private:
   void *buffer;
@@ -43,6 +45,7 @@ class LevelZeroKernel {
 public:
   /// Constructs kernel declared with `name` from compiled `program`.
   LevelZeroKernel(ze_module_handle_t module, std::string name);
+  ~LevelZeroKernel();
 
   /// Adds event dependency that must be completed before this kernel.
   void addDependency(LevelZeroEvent* event);
@@ -51,12 +54,13 @@ public:
   /// Enqueues wrapped kernel on specified command queue `queue` with
   /// `gws` global work size and `lws` local work size.
   /// Returns OpenCL event tracking execution of kernel execution.
-  ze_event_handle_t enqueue(ze_command_list_handle_t list, ze_group_count_t gws,
-                            ze_group_count_t lws);
+  void enqueue(ze_command_list_handle_t list, ze_group_count_t gws,
+                            ze_group_count_t lws, ze_event_handle_t &resultE);
   /// Returns name of this kernel.
   const std::string &getName() const { return name; }
 
 private:
+  ze_module_handle_t module;
   ze_kernel_handle_t kernel;
   std::string name;
   std::vector<ze_event_handle_t> dependencies;
@@ -138,6 +142,7 @@ private:
   std::shared_ptr<LevelZeroDevice> device;
   LevelZeroQueueUser queueUser;
   std::vector<std::unique_ptr<LevelZeroEvent>> events;
+  level_zero_tests::zeEventPool eventPool;
 
   LevelZeroEvent *wrapEvent(ze_event_handle_t event, LevelZeroActionKind kind,
                             std::string name);

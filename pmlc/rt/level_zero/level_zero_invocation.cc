@@ -10,33 +10,45 @@
 
 namespace pmlc::rt::level_zero {
 
-ze_event_handle_t LevelZeroMemory::enqueueRead(
+void LevelZeroMemory::enqueueRead(
     ze_command_list_handle_t list, void *dst,
-    std::vector<ze_event_handle_t> &dependencies) {
-  ze_event_handle_t result;
+    std::vector<ze_event_handle_t> &dependencies, ze_event_handle_t &resultE) {
+  //ze_event_handle_t result;
   // queue.enqueueReadBuffer(buffer, /*blocking=*/false, /*offset=*/0, bytes,
   // dst,
   //                        &dependencies, &result);
-  lzt::append_memory_copy(list, dst, buffer, bytes, result, dependencies.size(),
+  lzt::append_memory_copy(list, dst, buffer, bytes, resultE, dependencies.size(),
                           dependencies.data());
-  return result;
+  //return result;
 }
 
-ze_event_handle_t LevelZeroMemory::enqueueWrite(
+void LevelZeroMemory::enqueueWrite(
     ze_command_list_handle_t list, void *src,
-    std::vector<ze_event_handle_t> &dependencies) {
-  ze_event_handle_t result;
+    std::vector<ze_event_handle_t> &dependencies, ze_event_handle_t &resultE) {
+  //ze_event_handle_t result;
   // queue.enqueueWriteBuffer(buffer, /*blocking=*/false, /*offset=*/0, bytes,
   // src,
   //                         &dependencies, &result);
-  lzt::append_memory_copy(list, buffer, src, bytes, result, dependencies.size(),
+  lzt::append_memory_copy(list, buffer, src, bytes, resultE, dependencies.size(),
                           dependencies.data());
-  return result;
+  //return result;
 }
 
 LevelZeroKernel::LevelZeroKernel(ze_module_handle_t module, std::string name)
-    : name(std::move(name)) {
+    : module(module), name(std::move(name)) {
+  //module = lzt::create_module(device->getLevelZeroContext(),
+  //                                               device->getLevelZeroDevice(),
+  //                                               buf,
+  //                                               bytes,
+  //                                               ZE_MODULE_FORMAT_IL_SPIRV,
+  //                                               "",
+  //                                               nullptr);
   kernel = lzt::create_function(module, name);
+}
+
+LevelZeroKernel::~LevelZeroKernel() {
+    lzt::destroy_function(kernel);
+    lzt::destroy_module(module);
 }
 
 void LevelZeroKernel::addDependency(LevelZeroEvent* event) {
@@ -49,15 +61,15 @@ void LevelZeroKernel::setArg(unsigned idx, LevelZeroMemory *memory) {
   lzt::set_argument_value(kernel, idx, sizeof(buf), &buf);
 }
 
-ze_event_handle_t LevelZeroKernel::enqueue(ze_command_list_handle_t list,
+void LevelZeroKernel::enqueue(ze_command_list_handle_t list,
                                            ze_group_count_t gws,
-                                           ze_group_count_t lws) {
-  ze_event_handle_t result;
+                                           ze_group_count_t lws, ze_event_handle_t &resultE) {
+  //ze_event_handle_t result;
   // queue.enqueueNDRangeKernel(kernel, /*offset=*/cl::NDRange(), gws, lws,
   //                           &dependencies, &result);
-  lzt::append_launch_function(list, kernel, &gws, result, dependencies.size(),
+  lzt::append_launch_function(list, kernel, &gws, resultE, dependencies.size(),
                               dependencies.data());
-  return result;
+  //return result;
 }
 
 LevelZeroEvent::LevelZeroEvent(ze_event_handle_t event,
@@ -86,6 +98,9 @@ LevelZeroInvocation::~LevelZeroInvocation() {
   // Need to explicitly wait for all operations to avoid unfinished events
   // when gathering profiling information.
   finish();
+  for (std::unique_ptr<LevelZeroEvent> &event : events) {
+      eventPool.destroy_event(event->getEvent());
+  }
 #if 0
   // Gather profiling information.
   using std::chrono::nanoseconds;
@@ -143,6 +158,7 @@ LevelZeroInvocation::~LevelZeroInvocation() {
 LevelZeroMemory *LevelZeroInvocation::allocateMemory(size_t bytes) {
   // cl::Buffer buffer(device->getOclContext(), CL_MEM_READ_WRITE, bytes,
   // nullptr);
+  // TODO host memory
   void *buffer = lzt::allocate_shared_memory(bytes);
   return new LevelZeroMemory(buffer, bytes);
 }
@@ -157,8 +173,9 @@ LevelZeroInvocation::enqueueRead(LevelZeroMemory *src, void *dst,
   std::vector<ze_event_handle_t> dependencies;
   std::transform(deps.begin(), deps.end(), std::back_inserter(dependencies),
                  [](const LevelZeroEvent *event) { return event->getEvent(); });
-  ze_event_handle_t event =
-      src->enqueueRead(queueUser.getLevelZeroList(), dst, dependencies);
+  ze_event_handle_t event;
+  eventPool.create_event(event);
+  src->enqueueRead(queueUser.getLevelZeroList(), dst, dependencies, event);
   return wrapEvent(event, LevelZeroActionKind::Read, "read");
 }
 
@@ -168,8 +185,9 @@ LevelZeroInvocation::enqueueWrite(LevelZeroMemory *dst, void *src,
   std::vector<ze_event_handle_t> dependencies;
   std::transform(deps.begin(), deps.end(), std::back_inserter(dependencies),
                  [](const LevelZeroEvent *event) { return event->getEvent(); });
-  ze_event_handle_t event =
-      dst->enqueueWrite(queueUser.getLevelZeroList(), src, dependencies);
+  ze_event_handle_t event;
+  eventPool.create_event(event);
+      dst->enqueueWrite(queueUser.getLevelZeroList(), src, dependencies, event);
   return wrapEvent(event, LevelZeroActionKind::Write, "write");
 }
 
@@ -193,8 +211,9 @@ LevelZeroKernel *LevelZeroInvocation::createKernelFromIL(char *data,
 LevelZeroEvent *LevelZeroInvocation::enqueueKernel(LevelZeroKernel *kernel,
                                                    ze_group_count_t gws,
                                                    ze_group_count_t lws) {
-  ze_event_handle_t event =
-      kernel->enqueue(queueUser.getLevelZeroList(), gws, lws);
+  ze_event_handle_t event;
+  eventPool.create_event(event);
+  kernel->enqueue(queueUser.getLevelZeroList(), gws, lws, event);
   LevelZeroEvent *result =
       wrapEvent(event, LevelZeroActionKind::Kernel, kernel->getName());
   delete kernel;
@@ -204,6 +223,7 @@ LevelZeroEvent *LevelZeroInvocation::enqueueKernel(LevelZeroKernel *kernel,
 LevelZeroEvent *
 LevelZeroInvocation::enqueueBarrier(const std::vector<LevelZeroEvent *> &deps) {
   ze_event_handle_t result;
+  eventPool.create_event(result);
   std::vector<ze_event_handle_t> dependencies;
   std::transform(deps.begin(), deps.end(), std::back_inserter(dependencies),
                  [](const LevelZeroEvent *event) { return event->getEvent(); });

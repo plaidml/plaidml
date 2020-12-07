@@ -16,6 +16,7 @@ public:
   LevelZeroQueue(const ze_context_handle_t &context,
                  const ze_device_handle_t &device,
                  ze_command_queue_group_properties_t properties);
+  ~LevelZeroQueue();
 
   /// Returns wrapped level_zero queue.
   ze_command_queue_handle_t getLevelZeroQueue() { return queue; }
@@ -109,6 +110,7 @@ class LevelZeroDevice final
       public std::enable_shared_from_this<LevelZeroDevice> {
 public:
   explicit LevelZeroDevice(ze_device_handle_t device);
+  ~LevelZeroDevice();
 
   std::unique_ptr<Executable>
   compile(const std::shared_ptr<pmlc::compiler::Program> &program) final;
