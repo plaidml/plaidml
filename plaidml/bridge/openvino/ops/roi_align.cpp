@@ -53,8 +53,6 @@ void registerROIAlign() {
     auto mode = layer->get_mode();
     auto num_rois = static_cast<int32_t>(batch_indices.size());
 
-    auto input_size = X.compute_shape().sizes();
-
     op::PoolMode pool_mode;
     switch (mode) {
       case ngraph::op::v3::ROIAlign::PoolingMode::AVG:
@@ -74,43 +72,32 @@ void registerROIAlign() {
       auto y_1 = spatial_scale * boxes[4 * i + 1];
       auto x_2 = spatial_scale * boxes[4 * i + 2];
       auto y_2 = spatial_scale * boxes[4 * i + 3];
-      auto roi_width = std::max(spatial_scale * (x_2 - x_1), 1.0f);
-      auto roi_height = std::max(spatial_scale * (y_2 - y_1), 1.0f);
+      auto roi_width = std::max((x_2 - x_1), 1.0f);
+      auto roi_height = std::max((y_2 - y_1), 1.0f);
 
-      int pool_size_h, pool_size_w;
+      int pool_kernel_h, pool_kernel_w;
       if (sampling_ratio == 0) {
-        pool_size_h = std::ceil(roi_height / pooled_h);
-        pool_size_w = std::ceil(roi_width / pooled_w);
+        pool_kernel_h = std::ceil(roi_height / pooled_h);
+        pool_kernel_w = std::ceil(roi_width / pooled_w);
       } else {
-        pool_size_h = pool_size_w = sampling_ratio;
+        pool_kernel_h = sampling_ratio;
+        pool_kernel_w = sampling_ratio;
       }
-      auto sampling_h = pool_size_h * pooled_h;
-      auto sampling_w = pool_size_w * pooled_w;
+      //      auto sampling_h = pool_kernel_h * pooled_h;
+      //      auto sampling_w = pool_kernel_w * pooled_w;
 
-      auto interval_h = roi_width / (sampling_h + 1.0);
-      auto interval_w = roi_width / (sampling_w + 1.0);
+      auto resize_h = pool_kernel_h * pooled_w;
+      auto resize_w = pool_kernel_w * pooled_h;
+      auto interval_h = roi_height / resize_h;
+      auto interval_w = roi_width / resize_w;
+      auto indices_h = edsl::index({edsl::TensorDim(resize_h)}, 0) * interval_h + x_1 + interval_h / 2;
+      auto indices_w = edsl::index({edsl::TensorDim(resize_w)}, 0) * interval_w + y_1 + interval_w / 2;
 
-      std::vector<int32_t> indices_h(sampling_h);
-      for (int ih = 0; ih < sampling_h; ih++) {
-        indices_h[ih] = x_1 + interval_h * ih;
-      }
-      auto ind_tensor_h = make_tensor(DType::INT32, {sampling_h}, indices_h, "indices_h");
-      std::vector<int64_t> indices_w(sampling_w);
-      for (int iw = 0; iw < sampling_w; iw++) {
-        indices_w.push_back(x_1 + interval_w * iw);
-      }
-      auto ind_tensor_w = make_tensor(DType::INT32, {sampling_w}, indices_w, "indices_w");
-
-      auto slice_X = op::slice(X)
-                         .add_dim(batch_indices[i])
-                         .add_dim(0, input_size[1])
-                         .add_dim(0, input_size[2])
-                         .add_dim(0, input_size[3]);
-      auto batch_X = op::unsqueeze(slice_X, {0});
-
-      auto gather_w = edsl::gather(batch_X, ind_tensor_w).axis(3).interpolationMode(edsl::InterpolationMode::LINEAR);
-      auto gather_h = edsl::gather(gather_w, ind_tensor_h).axis(2).interpolationMode(edsl::InterpolationMode::LINEAR);
-      auto pooled_T = op::pool(gather_h, pool_mode, {pool_size_h, pool_size_w}, {pool_size_h, pool_size_w},
+      auto batch_X =
+          edsl::gather(X, edsl::Tensor(batch_indices[i])).axis(0).interpolationMode(edsl::InterpolationMode::NEAREST);
+      auto gather_w = edsl::gather(batch_X, indices_w).axis(3).interpolationMode(edsl::InterpolationMode::LINEAR);
+      auto gather_h = edsl::gather(gather_w, indices_h).axis(2).interpolationMode(edsl::InterpolationMode::LINEAR);
+      auto pooled_T = op::pool(gather_h, pool_mode, {pool_kernel_h, pool_kernel_w}, {pool_kernel_h, pool_kernel_w},
                                op::AutoPadMode::VALID, {}, op::TensorLayout::NCX, true, true);
       pooled_rois.push_back(pooled_T);
     }
