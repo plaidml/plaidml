@@ -58,6 +58,7 @@ plaidml_cc_library(
         "//pmlc/rt/llvm",
         "//pmlc/rt/vulkan",
         "//pmlc/rt/opencl",
+        "//pmlc/rt/level_zero",
     ],
     alwayslink = 1,
 )

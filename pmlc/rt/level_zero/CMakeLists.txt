@@ -4,6 +4,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/utils/include)
 
 pml_cc_library(
   NAME level_zero
+  HDRS register.h
   SRCS
     common_wrappers.cc
     level_zero_device.cc

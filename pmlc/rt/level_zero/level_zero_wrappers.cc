@@ -105,9 +105,7 @@ void levelZeroWait(uint32_t count, ...) {
 
 } // extern "C"
 
-namespace {
-struct Registration {
-  Registration() {
+void registerSymbols() {
     using pmlc::rt::registerSymbol;
 
     // LevelZero Runtime functions
@@ -133,8 +131,6 @@ struct Registration {
     registerSymbol("levelZeroSubmit",
                    reinterpret_cast<void *>(levelZeroSubmit));
     registerSymbol("levelZeroWait", reinterpret_cast<void *>(levelZeroWait));
-  }
-};
-static Registration reg;
-} // namespace
+}
+
 } // namespace pmlc::rt::level_zero

@@ -1,3 +1,6 @@
+include(gflags)
+include(googletest)
+
 pml_cc_library(
   NAME testing
   SRCS gtest_main.cc

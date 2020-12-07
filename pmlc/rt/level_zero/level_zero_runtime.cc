@@ -1,6 +1,7 @@
 // Copyright 2020 Intel Corporation
 #include <vector>
 
+#include "pmlc/rt/level_zero/register.h"
 #include "pmlc/rt/runtime.h"
 #include "pmlc/rt/runtime_registry.h"
 #include "pmlc/util/logging.h"
@@ -29,6 +30,15 @@ private:
   std::vector<std::shared_ptr<LevelZeroDevice>> devices;
 };
 
-pmlc::rt::RuntimeRegistration<LevelZeroRuntime> reg{"level_zero"};
+extern void registerSymbols();
+
+void registerRuntime() {
+  try {
+    registerRuntime("level_zero", std::make_shared<LevelZeroRuntime>());
+    registerSymbols();
+  } catch (std::exception &ex) {
+    IVLOG(2, "Failed to register 'level_zero' runtime: " << ex.what());
+  }
+}
 
 } // namespace pmlc::rt::level_zero
