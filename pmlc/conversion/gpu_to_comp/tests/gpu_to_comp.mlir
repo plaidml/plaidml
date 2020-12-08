@@ -6,17 +6,15 @@ module attributes {gpu.container_module} {
   //   CHECK-SAME:     %[[DEV:[a-zA-Z0-9]*]]:
   //   CHECK-SAME:     %[[ARGMEM:[a-zA-Z0-9]*]]:
   //        CHECK:   %[[ENV:.*]] = comp.create_execenv %[[DEV]]
-  //      SPACE11:   %[[MEM:.*]] = comp.alloc %[[ENV]]
-  //      SPACE11:   %[[WEV:.*]] = comp.schedule_write %[[ARGMEM]] to %[[MEM]] on %[[ENV]]
-  //      SPACE11:   comp.wait %[[WEV]]
+  //        CHECK:   %[[MEM:.*]] = comp.alloc %[[ENV]]
+  //        CHECK:   %[[WEV:.*]] = comp.schedule_write %[[ARGMEM]] to %[[MEM]] on %[[ENV]]
+  //        CHECK:   comp.wait %[[WEV]]
   //        CHECK:   %[[FEV:.*]] = "comp.schedule_func"(%[[ENV]])
   //   CHECK-NEXT:     gpu.launch_func
-  //  SPACE0-SAME:       %[[ARGMEM]]
-  // SPACE11-SAME:       %[[MEM]]
-  //       SPACE0:   comp.wait %[[FEV]]
-  //      SPACE11:   %[[REV:.*]] = comp.schedule_read %[[ARGMEM]] from %[[MEM]] on %[[ENV]] wait for %[[FEV]]
-  //      SPACE11:   comp.wait %[[REV]]
-  //      SPACE11:   comp.dealloc %[[ENV]] %[[MEM]]
+  //   CHECK-SAME:       %[[MEM]]
+  //        CHECK:   %[[REV:.*]] = comp.schedule_read %[[ARGMEM]] from %[[MEM]] on %[[ENV]] wait for %[[FEV]]
+  //        CHECK:   comp.wait %[[REV]]
+  //        CHECK:   comp.dealloc %[[ENV]] %[[MEM]]
   //        CHECK:   comp.destroy_execenv %[[ENV]]
   func @one_gpu_func(%arg0: memref<8x32xf32>) {
     %c8 = constant 8 : index
@@ -42,31 +40,34 @@ module attributes {gpu.container_module} {
 module attributes {gpu.container_module} {
   //  CHECK-LABEL: func @two_gpu_func
   //   CHECK-SAME:     %[[DEV:[a-zA-Z0-9]*]]:
+  //   CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]*]]:
+  //   CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]*]]:
+  //   CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]*]]:
 
   //        CHECK:   %[[ENV0:.*]] = comp.create_execenv %[[DEV]]
-  //      SPACE11:   comp.alloc %[[ENV0]]
-  //      SPACE11:   comp.schedule_write 
-  //      SPACE11:   comp.wait
-  //      SPACE11:   comp.alloc %[[ENV0]]
-  //      SPACE11:   comp.schedule_write
-  //      SPACE11:   comp.wait
-  //      SPACE11:   comp.alloc %[[ENV0]]
-  //      SPACE11:   comp.schedule_write
-  //      SPACE11:   comp.wait
-  //        CHECK:   "comp.schedule_func"(%[[ENV0]])
+  //        CHECK:   %[[MEM00:.*]] = comp.alloc %[[ENV0]]
+  //        CHECK:   %[[WEV00:.*]] = comp.schedule_write %{{.*}} to %{{.*}} on %[[ENV0]]
+  //        CHECK:   comp.wait %[[WEV00]]
+  //        CHECK:   %{{.*}} = comp.alloc %[[ENV0]]
+  //        CHECK:   %[[WEV01:.*]] = comp.schedule_write %{{.*}} to %{{.*}} on %[[ENV0]]
+  //        CHECK:   comp.wait %[[WEV01]]
+  //        CHECK:   %{{.*}} = comp.alloc %[[ENV0]]
+  //        CHECK:   %[[WEV02:.*]] = comp.schedule_write %{{.*}} to %{{.*}} on %[[ENV0]]
+  //        CHECK:   comp.wait %[[WEV02]]
+  //        CHECK:   %{{.*}} = "comp.schedule_func"(%[[ENV0]])
   //        CHECK:     gpu.launch_func
-  //      SPACE11:   comp.wait
-  //        CHECK:   "comp.schedule_func"(%[[ENV0]])
+  //   CHECK-SAME:       %[[MEM00]]
+  //        CHECK:   %{{.*}} = "comp.schedule_func"(%[[ENV0]])
   //        CHECK:     gpu.launch_func
-  //      SPACE11:   comp.schedule_read
-  //      SPACE11:   comp.schedule_read
-  //      SPACE11:   comp.schedule_read
-  //      SPACE11:   comp.wait
-  //      SPACE11:   comp.dealloc %[[ENV0]]
-  //      SPACE11:   comp.dealloc %[[ENV0]]
-  //      SPACE11:   comp.dealloc %[[ENV0]]
+  //   CHECK-SAME:       %{{.*}}, %{{.*}}, %{{.*}}
+  //        CHECK:   %{{.*}} = comp.schedule_read %{{.*}} from %{{.*}} on %[[ENV0]] wait for %{{.*}}
+  //        CHECK:   %{{.*}} = comp.schedule_read %{{.*}} from %{{.*}} on %[[ENV0]] wait for %{{.*}}
+  //        CHECK:   %{{.*}} = comp.schedule_read %{{.*}} from %{{.*}} on %[[ENV0]] wait for %{{.*}}
+  //        CHECK:   comp.wait %{{.*}}, %{{.*}}, %{{.*}}
+  //        CHECK:   comp.dealloc %[[ENV0]] %{{.*}}
+  //        CHECK:   comp.dealloc %[[ENV0]] %{{.*}}
+  //        CHECK:   comp.dealloc %[[ENV0]] %{{.*}}
   //        CHECK:   comp.destroy_execenv %[[ENV0]]
-
   func @two_gpu_func(%arg0: memref<8x16xf32>, %arg1: memref<16x32xf32>, %arg2: memref<8x32xf32>) {
     %c8 = constant 8 : index
     %c32 = constant 32 : index
@@ -111,3 +112,4 @@ module attributes {gpu.container_module} {
     }
   }
 }
+
