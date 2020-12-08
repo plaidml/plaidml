@@ -1752,9 +1752,7 @@ TEST_F(CppEdsl, Lens) {
 
 TEST_F(CppEdsl, Layer) {
   auto A = Placeholder(DType::FLOAT32, {10, 20});
-  Tensor O = layer("relu", [&]() {  //
-    return Relu(A);
-  });
+  Tensor O = layer("relu", {A}, [&]() { return Relu(A); });
   auto program = makeProgram("relu", {A}, {O});
   // clang-format off
   // CHECK-LABEL: CppEdsl.Layer
@@ -1765,6 +1763,71 @@ TEST_F(CppEdsl, Layer) {
   // CHECK:   %[[X2:.*]] = tile.select %[[X1]], %[[cst]], %[[arg1]] : (tensor<10x20xi1>, tensor<f32>, tensor<10x20xf32>) -> tensor<10x20xf32>
   // CHECK:   layer.return %[[X2]] : tensor<10x20xf32>
   // CHECK: return %[[X0]] : tensor<10x20xf32>
+  // clang-format on
+  runProgram(program);
+}
+
+TEST_F(CppEdsl, LayerOperandOrder) {
+  auto A = Placeholder(DType::FLOAT32, {10, 20});
+  auto B = Placeholder(DType::FLOAT32, {10, 20});
+  Tensor O = layer("sum", {A, B}, [&]() { return A + B; });
+  auto program = makeProgram("LayerOperandOrder", {A, B}, {O});
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.LayerOperandOrder
+  // CHECK: module @LayerOperandOrder
+  // CHECK: func @main(%[[ARG0:.*]]: tensor<10x20xf32>, %[[ARG1:.*]]: tensor<10x20xf32>) -> tensor<10x20xf32>
+  // CHECK:   %[[X0:.*]] = layer.box "sum" (%[[ARG2:.*]], %[[ARG3:.*]]) = (%[[ARG0]], %[[ARG1]]) : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
+  // CHECK:     %[[X1:.*]] = tile.add %[[ARG2]], %[[ARG3]] : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
+  // CHECK:     layer.return %[[X1]] : tensor<10x20xf32>
+  // CHECK:   return %[[X0]] : tensor<10x20xf32>
+  // clang-format on
+  runProgram(program);
+}
+
+TEST_F(CppEdsl, LayerMissingOperand) {
+  auto A = Placeholder(DType::FLOAT32, {10, 20});
+  auto B = Placeholder(DType::FLOAT32, {10, 20});
+  Tensor O = layer("sum", {A}, [&]() { return A + B; });
+  EXPECT_ANY_THROW({ makeProgram("LayerMissingOperand", {A, B}, {O}); });
+}
+
+TEST_F(CppEdsl, LayerEmbeddedConst) {
+  auto A = Placeholder(DType::FLOAT32, {10, 20});
+  Tensor O = layer("sum", {A}, [&]() {  //
+    std::vector<int> bData = {1, 2, 3, 4};
+    auto B = Constant(makeBuffer(DType::FLOAT32, {10, 20}, bData), "B");
+    return A + B;
+  });
+  auto program = makeProgram("LayerEmbeddedConst", {A}, {O});
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.LayerEmbeddedConst
+  // CHECK: module @LayerEmbeddedConst
+  // CHECK: func @main(%[[ARG0:.*]]: tensor<10x20xf32>, %[[ARG1:.*]]: tensor<10x20xf32> {tile.const = 0 : index}) -> tensor<10x20xf32>
+  // CHECK:   %[[X0:.*]] = layer.box "sum" (%[[ARG2:.*]], %[[ARG3:.*]]) = (%[[ARG0]], %[[ARG1]]) : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
+  // CHECK:     %[[X1:.*]] = tile.add %[[ARG2]], %[[ARG3]] : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
+  // CHECK:     layer.return %[[X1]] : tensor<10x20xf32>
+  // CHECK:   return %[[X0]] : tensor<10x20xf32>
+  // clang-format on
+  runProgram(program);
+}
+
+TEST_F(CppEdsl, LayerUnusedOperand) {
+  auto A = Placeholder(DType::FLOAT32, {10, 20});
+  std::vector<int> data = {1, 2, 3, 4};
+  auto B = Constant(makeBuffer(DType::FLOAT32, {10, 20}, data), "B");
+  Tensor O = layer("sum", {A, B}, [&]() {
+    auto C = Constant(makeBuffer(DType::FLOAT32, {10, 20}, data), "C");
+    return A + C;
+  });
+  auto program = makeProgram("LayerUnusedOperand", {A}, {O});
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.LayerUnusedOperand
+  // CHECK: module @LayerUnusedOperand
+  // CHECK: func @main(%[[ARG0:.*]]: tensor<10x20xf32>, %[[ARG1:.*]]: tensor<10x20xf32> {tile.const = 0 : index}, %[[ARG2:.*]]: tensor<10x20xf32> {tile.const = 1 : index}) -> tensor<10x20xf32>
+  // CHECK:   %[[X0:.*]] = layer.box "sum" (%[[ARG3:.*]], %[[ARG4:.*]], %[[ARG5:.*]]) = (%[[ARG0]], %[[ARG1]], %[[ARG2]]) : (tensor<10x20xf32>, tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
+  // CHECK:     %[[X1:.*]] = tile.add %[[ARG3]], %[[ARG5]] : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
+  // CHECK:     layer.return %[[X1]] : tensor<10x20xf32>
+  // CHECK:   return %[[X0]] : tensor<10x20xf32>
   // clang-format on
   runProgram(program);
 }
