@@ -199,6 +199,8 @@ void plaidml_exprs_free(  //
 plaidml_expr* plaidml_expr_layer_begin(  //
     plaidml_error* err,                  //
     const char* op,                      //
+    size_t ninputs,                      //
+    plaidml_expr** inputs,               //
     size_t nattrs,                       //
     plaidml_attr** attrs);
 

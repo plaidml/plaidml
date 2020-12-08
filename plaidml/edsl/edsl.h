@@ -1380,7 +1380,8 @@ inline Tensor trace(const Tensor& x, const std::string& msg) { return pragma(x, 
 using LayerBodySingleFn = std::function<Tensor()>;
 using LayerBodyMultiFn = std::function<TensorVec()>;
 
-inline TensorVec layer(const std::string& op, const Dictionary& attrs, const LayerBodyMultiFn& fn) {
+inline TensorVec layer(const std::string& op, const TensorVec& operands, const Dictionary& attrs,
+                       const LayerBodyMultiFn& fn) {
   std::vector<plaidml_attr> elts;
   std::vector<plaidml_attr*> ptrs;
   elts.reserve(attrs.size());
@@ -1391,10 +1392,18 @@ inline TensorVec layer(const std::string& op, const Dictionary& attrs, const Lay
     ptrs.push_back(&elts.back());
   }
 
+  std::vector<plaidml_expr*> rawOperands;
+  rawOperands.reserve(operands.size());
+  for (Tensor operand : operands) {
+    rawOperands.push_back(operand.as_ptr());
+  }
+
   auto expr = details::make_ptr(     //
       ffi::call<plaidml_expr*>(      //
           plaidml_expr_layer_begin,  //
           op.c_str(),                //
+          rawOperands.size(),        //
+          rawOperands.data(),        //
           ptrs.size(),               //
           ptrs.data()));
 
@@ -1423,11 +1432,14 @@ inline TensorVec layer(const std::string& op, const Dictionary& attrs, const Lay
   return outerResults;
 }
 
-inline Tensor layer(const std::string& op, const Dictionary& attrs, const LayerBodySingleFn& fn) {
-  return layer(op, attrs, [&]() { return TensorVec{fn()}; })[0];
+inline Tensor layer(const std::string& op, const TensorVec& operands, const Dictionary& attrs,
+                    const LayerBodySingleFn& fn) {
+  return layer(op, operands, attrs, [&]() { return TensorVec{fn()}; })[0];
 }
 
-inline Tensor layer(const std::string& op, const LayerBodySingleFn& fn) { return layer(op, {}, fn); }
+inline Tensor layer(const std::string& op, const TensorVec& operands, const LayerBodySingleFn& fn) {
+  return layer(op, operands, {}, fn);
+}
 
 }  // namespace edsl
 }  // namespace plaidml

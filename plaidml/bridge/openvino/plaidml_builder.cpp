@@ -221,16 +221,17 @@ void ProgramBuilder::handleOp(const std::shared_ptr<ngraph::Node>& node) {
   }
   PlaidMLAttributeVisitor visitor;
   node->visit_attributes(visitor);
-  plaidml::edsl::TensorVec tuple = plaidml::edsl::layer("ng." + node->description(), visitor.attrs, [&]() {
-    plaidml::edsl::Value value = op(ctx);
-    std::vector<plaidml::edsl::Value> tuple = value.as_tuple();
-    plaidml::edsl::TensorVec outputs;
-    outputs.reserve(tuple.size());
-    for (plaidml::edsl::Value output : tuple) {
-      outputs.push_back(output.as_tensor());
-    }
-    return outputs;
-  });
+  plaidml::edsl::TensorVec tuple =
+      plaidml::edsl::layer("ng." + node->description(), ctx.operands, visitor.attrs, [&]() {
+        plaidml::edsl::Value value = op(ctx);
+        std::vector<plaidml::edsl::Value> tuple = value.as_tuple();
+        plaidml::edsl::TensorVec outputs;
+        outputs.reserve(tuple.size());
+        for (plaidml::edsl::Value output : tuple) {
+          outputs.push_back(output.as_tensor());
+        }
+        return outputs;
+      });
   IE_ASSERT(tuple.size() == node->get_output_size());
   for (unsigned i = 0; i < tuple.size(); i++) {
     plaidml::edsl::Tensor tensor = tuple.at(i);

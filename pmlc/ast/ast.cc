@@ -175,8 +175,9 @@ std::string ExprNodeIntrinsic::str() const {
 //
 
 ExprNodeLayer::ExprNodeLayer(llvm::StringRef op,
+                             llvm::ArrayRef<ExprNodePtr> operands,
                              const llvm::StringMap<VarNodePtr> &attrs)
-    : op(op), attrs(attrs) {}
+    : op(op), operands(operands), attrs(attrs) {}
 
 std::string ExprNodeLayer::str() const {
   return llvm::formatv("layer({0})", op);
