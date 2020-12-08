@@ -25,6 +25,7 @@ pml_cc_library(
     pmlc::dialect::stdx::transforms
     pmlc::dialect::tile::transforms
     pmlc::dialect::xsmm::ir
+    pmlc::transforms
     MLIRAffineToStandard
     MLIRAffineTransforms
     MLIRLLVMIRTransforms
