@@ -45,6 +45,12 @@ def MinimizeAllocations : FunctionPass<"comp-minimize-allocations"> {
   let constructor = "pmlc::dialect::comp::createMinimizeAllocationsPass()";
 }
 
+def MinimizeBufferTransfers : FunctionPass<"comp-minimize-buffer-transfers"> {
+  let summary = "Minimize number of memory transfers between host and device";
+  let constructor = "pmlc::dialect::comp::createMinimizeBufferTransfersPass()";
+}
+
+
 def RecalculateEventDeps : FunctionPass<"comp-recalc-event-deps"> {
   let summary = "Recalculate event dependencies based on data dependencies";
   let constructor = "pmlc::dialect::comp::createRecalculateEventDepsPass()";

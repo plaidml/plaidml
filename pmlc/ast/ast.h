@@ -221,10 +221,12 @@ struct ExprNodeLayer : NodeBase<ExprNodeLayer, ExprNode> {
   using Base = NodeBase<ExprNodeLayer, ExprNode>;
 
   std::string op;
+  std::vector<ExprNodePtr> operands;
   std::vector<ExprNodePtr> results;
   llvm::StringMap<VarNodePtr> attrs;
 
-  ExprNodeLayer(llvm::StringRef op, const llvm::StringMap<VarNodePtr> &attrs);
+  ExprNodeLayer(llvm::StringRef op, llvm::ArrayRef<ExprNodePtr> operands,
+                const llvm::StringMap<VarNodePtr> &attrs);
   std::string str() const final;
 };
 
