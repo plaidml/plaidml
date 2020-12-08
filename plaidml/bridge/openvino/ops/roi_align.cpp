@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
+#include <algorithm>
+#include <cmath>
+
 #include "ngraph/opsets/opset3.hpp"
 #include "plaidml/op/op.h"
 #include "plaidml_ops.hpp"
 #include "plaidml_util.hpp"
-
-#include <algorithm>
-#include <cmath>
 
 using namespace plaidml;          // NOLINT[build/namespaces]
 using namespace InferenceEngine;  // NOLINT[build/namespaces]
@@ -25,14 +25,6 @@ std::vector<T> cast_constant_operand(size_t operand_idx, ngraph::Node* layer) {
         << "Dynamic slicing not currently supported by PlaidML plugin; all of indices, offsets and default index"
            "must be Constants.";
   }
-}
-template <typename T>
-edsl::Tensor make_tensor(DType dtype, const std::vector<int64_t>& dims, const std::vector<T>& data,
-                         const std::string& name) {
-  TensorShape shape(dtype, dims);
-  Buffer buffer(shape);
-  buffer.copy_from(data.data());
-  return edsl::Constant(buffer, name);
 }
 }  // namespace
 
@@ -83,15 +75,13 @@ void registerROIAlign() {
         pool_kernel_h = sampling_ratio;
         pool_kernel_w = sampling_ratio;
       }
-      //      auto sampling_h = pool_kernel_h * pooled_h;
-      //      auto sampling_w = pool_kernel_w * pooled_w;
 
-      auto resize_h = pool_kernel_h * pooled_w;
-      auto resize_w = pool_kernel_w * pooled_h;
-      auto interval_h = roi_height / resize_h;
-      auto interval_w = roi_width / resize_w;
-      auto indices_h = edsl::index({edsl::TensorDim(resize_h)}, 0) * interval_h + x_1 + interval_h / 2;
-      auto indices_w = edsl::index({edsl::TensorDim(resize_w)}, 0) * interval_w + y_1 + interval_w / 2;
+      auto total_sampling_h = pool_kernel_h * pooled_w;
+      auto total_sampling_w = pool_kernel_w * pooled_h;
+      auto interval_h = roi_height / total_sampling_h;
+      auto interval_w = roi_width / total_sampling_w;
+      auto indices_h = edsl::index({edsl::TensorDim(total_sampling_h)}, 0) * interval_h + x_1 + interval_h / 2;
+      auto indices_w = edsl::index({edsl::TensorDim(total_sampling_w)}, 0) * interval_w + y_1 + interval_w / 2;
 
       auto batch_X =
           edsl::gather(X, edsl::Tensor(batch_indices[i])).axis(0).interpolationMode(edsl::InterpolationMode::NEAREST);
