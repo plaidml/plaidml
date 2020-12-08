@@ -3,7 +3,6 @@
 //
 
 #include <algorithm>
-#include <cmath>
 
 #include "ngraph/opsets/opset3.hpp"
 #include "plaidml/op/op.h"
@@ -38,9 +37,11 @@ void registerROIAlign() {
     auto boxes = cast_constant_operand<int32_t>(1, layer);
     auto batch_indices = cast_constant_operand<int32_t>(2, layer);
 
+    auto sampling_ratio = layer->get_sampling_ratio();
+    IE_ASSERT(sampling_ratio == 0);
+
     auto pooled_h = layer->get_pooled_h();
     auto pooled_w = layer->get_pooled_w();
-    auto sampling_ratio = layer->get_sampling_ratio();
     auto spatial_scale = layer->get_spatial_scale();
     auto mode = layer->get_mode();
     auto num_rois = static_cast<int32_t>(batch_indices.size());
@@ -67,17 +68,8 @@ void registerROIAlign() {
       auto roi_width = std::max((x_2 - x_1), 1.0f);
       auto roi_height = std::max((y_2 - y_1), 1.0f);
 
-      int pool_kernel_h, pool_kernel_w;
-      if (sampling_ratio == 0) {
-        pool_kernel_h = std::ceil(roi_height / pooled_h);
-        pool_kernel_w = std::ceil(roi_width / pooled_w);
-      } else {
-        pool_kernel_h = sampling_ratio;
-        pool_kernel_w = sampling_ratio;
-      }
-
-      auto total_sampling_h = pool_kernel_h * pooled_w;
-      auto total_sampling_w = pool_kernel_w * pooled_h;
+      auto total_sampling_h = 2 * pooled_w;
+      auto total_sampling_w = 2 * pooled_h;
       auto interval_h = roi_height / total_sampling_h;
       auto interval_w = roi_width / total_sampling_w;
       auto indices_h = edsl::index({edsl::TensorDim(total_sampling_h)}, 0) * interval_h + x_1 + interval_h / 2;
@@ -87,8 +79,8 @@ void registerROIAlign() {
           edsl::gather(X, edsl::Tensor(batch_indices[i])).axis(0).interpolationMode(edsl::InterpolationMode::NEAREST);
       auto gather_w = edsl::gather(batch_X, indices_w).axis(3).interpolationMode(edsl::InterpolationMode::LINEAR);
       auto gather_h = edsl::gather(gather_w, indices_h).axis(2).interpolationMode(edsl::InterpolationMode::LINEAR);
-      auto pooled_T = op::pool(gather_h, pool_mode, {pool_kernel_h, pool_kernel_w}, {pool_kernel_h, pool_kernel_w},
-                               op::AutoPadMode::VALID, {}, op::TensorLayout::NCX, true, true);
+      auto pooled_T =
+          op::pool(gather_h, pool_mode, {2, 2}, {2, 2}, op::AutoPadMode::VALID, {}, op::TensorLayout::NCX, true, true);
       pooled_rois.push_back(pooled_T);
     }
 
