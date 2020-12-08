@@ -3,6 +3,7 @@
 //
 
 #include "plaidml_ops.hpp"
+#include "plaidml_util.hpp"
 
 #include "ngraph/opsets/opset.hpp"
 #include "ngraph/opsets/opset1.hpp"
@@ -20,7 +21,8 @@ void registerSelect() {
     auto A = ctx.operands.at(0);
     auto B = ctx.operands.at(1);
     auto C = ctx.operands.at(2);
-    return edsl::make_tuple(select(A, B, C));
+    DType target_type = to_plaidml(ctx.layer->get_element_type());
+    return edsl::make_tuple(select(A, cast(B, target_type), cast(C, target_type)));
   });
 }
 
