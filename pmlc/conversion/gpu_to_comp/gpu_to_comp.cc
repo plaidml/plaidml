@@ -156,11 +156,12 @@ RewriteLaunchFunc::getConsecutiveOps(T op, std::vector<T> &ops) const {
   // Collect consecutive ops of type T starting from a given op.
   auto operation = op.getOperation();
   while (operation != nullptr) {
-    if (!mlir::isa<T>(operation)) {
+    if (auto opT = mlir::dyn_cast<T>(operation)) {
+      ops.push_back(opT);
+      operation = operation->getNextNode();
+    } else {
       return mlir::success();
     }
-    ops.push_back(mlir::cast<T>(operation));
-    operation = operation->getNextNode();
   }
   return mlir::success();
 }

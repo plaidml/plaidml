@@ -116,8 +116,8 @@ void MinimizeBufferTransfersPass::runOnFunction() {
     if ((copyMode & BufferCopyMode::HostToDevice) == BufferCopyMode::NoCopy) {
       auto users = op.getResult().getUsers();
       for (auto user : users) {
-        if (mlir::isa<comp::Wait>(user)) {
-          removeWaitOpEvent(mlir::cast<comp::Wait>(*user), op.getResult());
+        if (auto waitOp = mlir::dyn_cast<comp::Wait>(user)) {
+          removeWaitOpEvent(waitOp, op.getResult());
         }
       }
       op.replaceAllUsesWith(op.deviceMem());
@@ -130,8 +130,8 @@ void MinimizeBufferTransfersPass::runOnFunction() {
     if ((copyMode & BufferCopyMode::DeviceToHost) == BufferCopyMode::NoCopy) {
       auto users = op.getResult().getUsers();
       for (auto user : users) {
-        if (mlir::isa<comp::Wait>(user)) {
-          removeWaitOpEvent(mlir::cast<comp::Wait>(*user), op.getResult());
+        if (auto waitOp = mlir::dyn_cast<comp::Wait>(user)) {
+          removeWaitOpEvent(waitOp, op.getResult());
         }
       }
       op.erase();
