@@ -40,9 +40,6 @@ module attributes {gpu.container_module} {
 module attributes {gpu.container_module} {
   //  CHECK-LABEL: func @two_gpu_func
   //   CHECK-SAME:     %[[DEV:[a-zA-Z0-9]*]]:
-  //   CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]*]]:
-  //   CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]*]]:
-  //   CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]*]]:
 
   //        CHECK:   %[[ENV0:.*]] = comp.create_execenv %[[DEV]]
   //        CHECK:   %[[MEM00:.*]] = comp.alloc %[[ENV0]]
@@ -68,6 +65,7 @@ module attributes {gpu.container_module} {
   //        CHECK:   comp.dealloc %[[ENV0]] %{{.*}}
   //        CHECK:   comp.dealloc %[[ENV0]] %{{.*}}
   //        CHECK:   comp.destroy_execenv %[[ENV0]]
+
   func @two_gpu_func(%arg0: memref<8x16xf32>, %arg1: memref<16x32xf32>, %arg2: memref<8x32xf32>) {
     %c8 = constant 8 : index
     %c32 = constant 32 : index
