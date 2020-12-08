@@ -24,3 +24,16 @@ pml_cc_library(
     pmlc::rt::level_zero::utils::lz_wrapper
     LevelZero::LevelZero
 )
+
+pml_cc_binary(
+    NAME level_zero_probe
+    SRCS
+      level_zero_probe.cc
+      level_zero_utils.h
+      level_zero_utils.cc
+    COPTS
+      -g
+    DEPS
+      pmlc::rt::level_zero::utils::lz_wrapper
+      pmlc::rt
+)

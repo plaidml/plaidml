@@ -97,10 +97,14 @@ LevelZeroInvocation::LevelZeroInvocation(LevelZeroDevice *device)
 LevelZeroInvocation::~LevelZeroInvocation() {
   // Need to explicitly wait for all operations to avoid unfinished events
   // when gathering profiling information.
-  finish();
-  for (std::unique_ptr<LevelZeroEvent> &event : events) {
-      eventPool.destroy_event(event->getEvent());
+  //finish();
+  for(size_t i = 0; i < kernels.size(); i++) {
+      delete kernels[i];
   }
+  //for (std::unique_ptr<LevelZeroEvent> &event : events) {
+  //    eventPool.destroy_event(event->getEvent());
+  //}
+  //device->clearQueues();
 #if 0
   // Gather profiling information.
   using std::chrono::nanoseconds;
@@ -159,7 +163,7 @@ LevelZeroMemory *LevelZeroInvocation::allocateMemory(size_t bytes) {
   // cl::Buffer buffer(device->getOclContext(), CL_MEM_READ_WRITE, bytes,
   // nullptr);
   // TODO host memory
-  void *buffer = lzt::allocate_shared_memory(bytes);
+  void *buffer = lzt::allocate_shared_memory(bytes, 1, 0, 0, device->getLevelZeroDevice(), device->getLevelZeroContext());
   return new LevelZeroMemory(buffer, bytes);
 }
 
@@ -205,7 +209,9 @@ LevelZeroKernel *LevelZeroInvocation::createKernelFromIL(char *data,
                                                  ZE_MODULE_FORMAT_IL_SPIRV,
                                                  "",
                                                  nullptr);
-  return new LevelZeroKernel(module, name);
+  LevelZeroKernel *kernel = new LevelZeroKernel(module, name);
+  kernels.push_back(kernel);
+  return kernel;
 }
 
 LevelZeroEvent *LevelZeroInvocation::enqueueKernel(LevelZeroKernel *kernel,
@@ -216,7 +222,7 @@ LevelZeroEvent *LevelZeroInvocation::enqueueKernel(LevelZeroKernel *kernel,
   kernel->enqueue(queueUser.getLevelZeroList(), gws, lws, event);
   LevelZeroEvent *result =
       wrapEvent(event, LevelZeroActionKind::Kernel, kernel->getName());
-  delete kernel;
+  //delete kernel;
   return result;
 }
 
@@ -243,7 +249,8 @@ void LevelZeroInvocation::flush() {
 }
 
 void LevelZeroInvocation::finish() {
-  lzt::synchronize(queueUser.getLevelZeroQueue(), UINT64_MAX);
+  // xin can not wait twice
+  //lzt::synchronize(queueUser.getLevelZeroQueue(), UINT64_MAX);
 }
 
 LevelZeroEvent *LevelZeroInvocation::wrapEvent(ze_event_handle_t event,

@@ -92,4 +92,11 @@ LevelZeroDevice::getQueue(ze_command_queue_group_properties_t properties) {
   return queues.back()->use();
 }
 
+void LevelZeroDevice::clearQueues() {
+    for (std::unique_ptr<LevelZeroQueueGuard> &guard : queues) {
+        guard.reset();
+    }
+    queues.clear();
+}
+
 } // namespace pmlc::rt::level_zero

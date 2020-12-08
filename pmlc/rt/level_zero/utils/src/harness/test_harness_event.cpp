@@ -36,8 +36,8 @@ ze_event_pool_handle_t create_event_pool(ze_event_pool_desc_t desc) {
 ze_event_pool_handle_t create_event_pool(ze_context_handle_t context,
                                          ze_event_pool_desc_t desc) {
   ze_event_pool_handle_t event_pool;
-  ze_driver_handle_t driver = lzt::get_default_driver();
-  ze_device_handle_t device = zeDevice::get_instance()->get_device();
+  //ze_driver_handle_t driver = lzt::get_default_driver();
+  //ze_device_handle_t device = zeDevice::get_instance()->get_device();
 
   EXPECT_EQ(ZE_RESULT_SUCCESS,
             zeEventPoolCreate(context, &desc, 0, nullptr, &event_pool));

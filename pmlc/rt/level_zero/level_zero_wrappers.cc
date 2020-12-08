@@ -94,13 +94,14 @@ void levelZeroSubmit(void *invocation) {
 }
 
 void levelZeroWait(uint32_t count, ...) {
-  std::vector<LevelZeroEvent *> events;
+  //TODO move to kernellaunch
+  /*std::vector<LevelZeroEvent *> events;
   va_list args;
   va_start(args, count);
   for (unsigned i = 0; i < count; ++i)
     events.push_back(va_arg(args, LevelZeroEvent *));
   va_end(args);
-  LevelZeroEvent::wait(events);
+  LevelZeroEvent::wait(events);*/
 }
 
 } // extern "C"

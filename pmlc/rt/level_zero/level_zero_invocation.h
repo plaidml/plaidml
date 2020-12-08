@@ -142,6 +142,7 @@ private:
   std::shared_ptr<LevelZeroDevice> device;
   LevelZeroQueueUser queueUser;
   std::vector<std::unique_ptr<LevelZeroEvent>> events;
+  std::vector<LevelZeroKernel *> kernels;
   level_zero_tests::zeEventPool eventPool;
 
   LevelZeroEvent *wrapEvent(ze_event_handle_t event, LevelZeroActionKind kind,

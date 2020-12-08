@@ -122,6 +122,7 @@ public:
   /// Returns LevelZero queue with specified properties for execution
   /// on this device. Returned user is always non-empty.
   LevelZeroQueueUser getQueue(ze_command_queue_group_properties_t properties);
+  void clearQueues();
 
 private:
   ze_context_handle_t context;

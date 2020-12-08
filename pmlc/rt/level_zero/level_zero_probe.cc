@@ -6,6 +6,7 @@
 #include "pmlc/rt/level_zero/level_zero_utils.h"
 
 int main(int argc, char **argv) {
+  zeInit(0);
   std::vector<ze_driver_handle_t> drivers;
   try {
     drivers = lzt::get_all_driver_handles();
@@ -21,6 +22,7 @@ int main(int argc, char **argv) {
   }
 
   std::cout << "Available level zero devices: " << std::endl;
+  std::cout << supportedDevices.size() << std::endl;
   for (ze_device_handle_t &device : supportedDevices) {
     std::cout << "  " << lzt::get_device_properties(device).name << std::endl;
   }

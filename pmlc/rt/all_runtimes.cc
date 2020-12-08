@@ -6,6 +6,7 @@
 #include "pmlc/rt/register.h"
 #include "pmlc/rt/runtime_registry.h"
 #include "pmlc/rt/vulkan/register.h"
+#include "pmlc/util/logging.h"
 
 namespace pmlc::rt {
 

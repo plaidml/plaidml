@@ -34,6 +34,7 @@ static constexpr const char *kLevelZeroScheduleFunc = "levelZeroScheduleFunc";
 static constexpr const char *kLevelZeroBarrier = "levelZeroBarrier";
 static constexpr const char *kLevelZeroSubmit = "levelZeroSubmit";
 static constexpr const char *kLevelZeroWait = "levelZeroWait";
+static uint32_t scheduleFuncNum = 0;
 
 namespace {
 
@@ -41,10 +42,13 @@ class ConvertCompToLevelZero
     : public ConvertCompToLevelZeroBase<ConvertCompToLevelZero> {
 public:
   void runOnOperation();
+  // TODO comp shall provide comp.submit for lower
 };
 
 void ConvertCompToLevelZero::runOnOperation() {
   mlir::ModuleOp module = getOperation();
+  scheduleFuncNum = 0;
+  module.walk([&](comp::ScheduleFunc op) { scheduleFuncNum++; });
   // Serialize SPIRV kernels.
   BinaryModulesMap modulesMap;
   if (mlir::failed(serializeSpirvKernels(module, modulesMap)))
@@ -462,6 +466,13 @@ mlir::LogicalResult ConvertScheduleFunc::matchAndRewrite(
   rewriter.replaceOpWithNewOp<mlir::CallOp>(
       op.getOperation(), mlir::ArrayRef<mlir::Type>{llvmEventType},
       rewriter.getSymbolRefAttr(kLevelZeroScheduleFunc), scheduleArgs);
+
+  if(--scheduleFuncNum == 0) {
+    rewriter.create<LLVM::CallOp>(loc, mlir::ArrayRef<mlir::Type>{},
+                                  rewriter.getSymbolRefAttr(kLevelZeroSubmit),
+                                  mlir::ArrayRef<mlir::Value>{operands[0]});
+  }
+
   return mlir::success();
 }
 
