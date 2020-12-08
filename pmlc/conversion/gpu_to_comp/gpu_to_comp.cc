@@ -154,16 +154,13 @@ template <typename T>
 mlir::LogicalResult
 RewriteLaunchFunc::getConsecutiveOps(T op, std::vector<T> &ops) const {
   // Collect consecutive ops of type T starting from a given op.
-  auto block = op.getOperation()->getBlock();
-  for (auto itOp = block->begin(); itOp != block->end(); itOp++) {
-    if (mlir::isa<T>(itOp) && op == mlir::cast<T>(*itOp)) {
-      for (auto itOpFast = itOp; itOpFast != block->end(); itOpFast++) {
-        if (!mlir::isa<T>(itOpFast)) {
-          return mlir::success();
-        }
-        ops.push_back(mlir::cast<T>(*itOpFast));
-      }
+  auto operation = op.getOperation();
+  while (operation != nullptr) {
+    if (!mlir::isa<T>(operation)) {
+      return mlir::success();
     }
+    ops.push_back(mlir::cast<T>(operation));
+    operation = operation->getNextNode();
   }
   return mlir::success();
 }
