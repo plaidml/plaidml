@@ -23,8 +23,8 @@ private:
   mlir::Operation *
   gatherAllocOpsStartingFromOp(mlir::Operation *op,
                                std::vector<mlir::Operation *> &ops);
-  void gatherAllocOpsBetweenConsecutiveLaunchOps(
-      mlir::Block &block, std::vector<std::shared_ptr<Move>> &moves);
+  std::vector<std::shared_ptr<Move>>
+  gatherAllocOpsBetweenConsecutiveLaunchOps(mlir::Block &block);
 };
 
 mlir::Operation *GatherGpuLaunchFuncsPass::gatherAllocOpsStartingFromOp(
@@ -41,8 +41,10 @@ mlir::Operation *GatherGpuLaunchFuncsPass::gatherAllocOpsStartingFromOp(
   return op;
 }
 
-void GatherGpuLaunchFuncsPass::gatherAllocOpsBetweenConsecutiveLaunchOps(
-    mlir::Block &block, std::vector<std::shared_ptr<Move>> &moves) {
+std::vector<std::shared_ptr<Move>>
+GatherGpuLaunchFuncsPass::gatherAllocOpsBetweenConsecutiveLaunchOps(
+    mlir::Block &block) {
+  std::vector<std::shared_ptr<Move>> moves;
   mlir::Operation *op = &(*block.begin());
   while (op != nullptr) {
     if (mlir::isa<gpu::LaunchFuncOp>(op)) {
@@ -55,6 +57,7 @@ void GatherGpuLaunchFuncsPass::gatherAllocOpsBetweenConsecutiveLaunchOps(
       op = op->getNextNode();
     }
   }
+  return moves;
 }
 
 void GatherGpuLaunchFuncsPass::runOnOperation() {
@@ -65,8 +68,8 @@ void GatherGpuLaunchFuncsPass::runOnOperation() {
     }
     auto &blocks = funcOp.getBlocks();
     for (auto &block : blocks) {
-      std::vector<std::shared_ptr<Move>> moves;
-      gatherAllocOpsBetweenConsecutiveLaunchOps(block, moves);
+
+      auto moves = gatherAllocOpsBetweenConsecutiveLaunchOps(block);
       for (auto move : moves) {
         for (auto &op : move->ops) {
           op->moveBefore(move->insertionOp);
