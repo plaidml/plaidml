@@ -848,7 +848,10 @@ class gather {
   ///
   /// Set the axis for gather.
   ///
-  gather& axis(int axis) {
+  gather& axis(int64_t axis) {
+    if (axis < 0) {
+      axis += x_.rank();
+    }
     axis_ = Tensor(axis);
     return *this;
   }
