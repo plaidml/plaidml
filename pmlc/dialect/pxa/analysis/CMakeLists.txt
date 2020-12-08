@@ -13,5 +13,6 @@ pml_cc_library(
     uses.h
   DEPS
     pmlc::util::bilp
+    pmlc::dialect::layer::ir
     pmlc::dialect::pxa::ir
 )

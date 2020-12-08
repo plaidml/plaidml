@@ -1,5 +1,6 @@
 pml_cc_library(
   NAME opencl
+  HDRS register.h
   SRCS
     common_wrappers.cc
     opencl_device.cc

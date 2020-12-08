@@ -29,8 +29,11 @@ static void registerUnaryOpCall(const std::string& name, T op) {
 void registerUnaryOps() {
   registerUnaryOpCall("abs", op::abs);
   registerUnaryOp("acos", "acos");
+  registerUnaryOp("acosh", "acosh");
   registerUnaryOp("asin", "asin");
+  registerUnaryOp("asinh", "asinh");
   registerUnaryOp("atan", "atan");
+  registerUnaryOp("atanh", "atanh");
   registerUnaryOp("ceiling", "ceil");
   registerUnaryOp("cos", "cos");
   registerUnaryOp("cosh", "cosh");

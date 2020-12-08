@@ -17,7 +17,7 @@ class LayerOp<string mnemonic, list<OpTrait> traits = []>
 }
 
 
-def BoxOp : LayerOp<"box", [NoSideEffect, IsolatedFromAbove]> {
+def BoxOp : LayerOp<"box", [IsolatedFromAbove]> {
   let summary = "layer container operation";
   let arguments = (ins
     Variadic<AnyType>:$operands,

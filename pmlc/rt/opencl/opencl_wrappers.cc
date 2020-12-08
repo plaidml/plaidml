@@ -102,31 +102,24 @@ void oclWait(uint32_t count, ...) {
 
 } // extern "C"
 
-namespace {
-struct Registration {
-  Registration() {
-    using pmlc::rt::registerSymbol;
+void registerSymbols() {
+  using pmlc::rt::registerSymbol;
 
-    // OpenCL Runtime functions
-    registerSymbol("oclCreate", reinterpret_cast<void *>(oclCreate));
-    registerSymbol("oclDestroy", reinterpret_cast<void *>(oclDestroy));
-    registerSymbol("oclAlloc", reinterpret_cast<void *>(oclAlloc));
-    registerSymbol("oclDealloc", reinterpret_cast<void *>(oclDealloc));
-    registerSymbol("oclRead", reinterpret_cast<void *>(oclRead));
-    registerSymbol("oclWrite", reinterpret_cast<void *>(oclWrite));
-    registerSymbol("oclCreateKernel",
-                   reinterpret_cast<void *>(oclCreateKernel));
-    registerSymbol("oclSetKernelArg",
-                   reinterpret_cast<void *>(oclSetKernelArg));
-    registerSymbol("oclAddKernelDep",
-                   reinterpret_cast<void *>(oclAddKernelDep));
-    registerSymbol("_mlir_ciface_oclScheduleFunc",
-                   reinterpret_cast<void *>(oclScheduleFunc));
-    registerSymbol("oclBarrier", reinterpret_cast<void *>(oclBarrier));
-    registerSymbol("oclSubmit", reinterpret_cast<void *>(oclSubmit));
-    registerSymbol("oclWait", reinterpret_cast<void *>(oclWait));
-  }
-};
-static Registration reg;
-} // namespace
+  // OpenCL Runtime functions
+  registerSymbol("oclCreate", reinterpret_cast<void *>(oclCreate));
+  registerSymbol("oclDestroy", reinterpret_cast<void *>(oclDestroy));
+  registerSymbol("oclAlloc", reinterpret_cast<void *>(oclAlloc));
+  registerSymbol("oclDealloc", reinterpret_cast<void *>(oclDealloc));
+  registerSymbol("oclRead", reinterpret_cast<void *>(oclRead));
+  registerSymbol("oclWrite", reinterpret_cast<void *>(oclWrite));
+  registerSymbol("oclCreateKernel", reinterpret_cast<void *>(oclCreateKernel));
+  registerSymbol("oclSetKernelArg", reinterpret_cast<void *>(oclSetKernelArg));
+  registerSymbol("oclAddKernelDep", reinterpret_cast<void *>(oclAddKernelDep));
+  registerSymbol("_mlir_ciface_oclScheduleFunc",
+                 reinterpret_cast<void *>(oclScheduleFunc));
+  registerSymbol("oclBarrier", reinterpret_cast<void *>(oclBarrier));
+  registerSymbol("oclSubmit", reinterpret_cast<void *>(oclSubmit));
+  registerSymbol("oclWait", reinterpret_cast<void *>(oclWait));
+}
+
 } // namespace pmlc::rt::opencl

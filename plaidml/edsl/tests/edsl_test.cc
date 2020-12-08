@@ -356,6 +356,21 @@ TEST_F(CppEdsl, ConstAdd) {
   checkExact(program, {}, {expected});
 }
 
+TEST_F(CppEdsl, MixedAdd) {
+  std::vector<int32_t> a = {4, 3, 2, 1};
+  std::vector<int32_t> b = {1, 2, 3, 4};
+  auto I = Placeholder(DType::UINT32, {4});
+  auto A = Constant(makeBuffer(DType::INT32, {4}, a), "A");
+  auto B = Constant(makeBuffer(DType::INT32, {4}, b), "B");
+  auto AB = A + B;
+  auto O = AB + I;
+  auto program = makeProgram("mixed_add", {I}, {O});
+
+  std::vector<int32_t> A_input = {1, 2, 2, 1};
+  std::vector<int32_t> expected = {6, 7, 7, 6};
+  checkExact(program, {A_input}, {expected});
+}
+
 TEST_F(CppEdsl, ConstCast) {
   auto O = cast(Tensor{3}, DType::FLOAT32);
   auto program = makeProgram("const_cast", {}, {O});
@@ -1279,6 +1294,24 @@ TEST_F(CppEdsl, Asin) {
   checkClose(program, {input}, {expected});
 }
 
+TEST_F(CppEdsl, AsinH) {
+  auto S = Placeholder(DType::FLOAT32, {3, 3});
+  auto O = asinh(S);
+  auto program = makeProgram("asinh", {S}, {O});
+
+  std::vector<float> input = {
+      0.1, 0.2, 0.3,   //
+      0.4, 0.5, 0.6,   //
+      1.0, 0.0, -0.6,  //
+  };
+  std::vector<float> expected = {
+      0.099834, 0.198690, 0.295673,  //
+      0.390035, 0.481212, 0.568825,  //
+      0.881374, 0.0,      -0.568826  //
+  };
+  checkClose(program, {input}, {expected});
+}
+
 TEST_F(CppEdsl, Acos) {
   auto S = Placeholder(DType::FLOAT32, {3, 3});
   auto O = acos(S);
@@ -1297,6 +1330,24 @@ TEST_F(CppEdsl, Acos) {
   checkClose(program, {input}, {expected}, /*tolerance=*/1e-4);
 }
 
+TEST_F(CppEdsl, AcosH) {
+  auto S = Placeholder(DType::FLOAT32, {3, 3});
+  auto O = acosh(S);
+  auto program = makeProgram("acosh", {S}, {O});
+
+  std::vector<float> input = {
+      1.1, 1.2, 1.3,  //
+      1.4, 1.5, 1.6,  //
+      1.7, 1.8, 1.0,  //
+  };
+  std::vector<float> expected = {
+      0.443568, 0.622363, 0.756433,  //
+      0.867015, 0.962424, 1.04697,   //
+      1.12323,  1.19291,  0.0        //
+  };
+  checkClose(program, {input}, {expected}, /*tolerance=*/1e-4);
+}
+
 TEST_F(CppEdsl, Atan) {
   auto S = Placeholder(DType::FLOAT32, {3, 3});
   auto O = atan(S);
@@ -1311,6 +1362,24 @@ TEST_F(CppEdsl, Atan) {
       0.0996687, 0.197396, 0.291457,  //
       0.380506,  0.463648, 0.54042,   //
       0.785398,  0,        -0.54042   //
+  };
+  checkClose(program, {input}, {expected});
+}
+
+TEST_F(CppEdsl, AtanH) {
+  auto S = Placeholder(DType::FLOAT32, {3, 3});
+  auto O = atanh(S);
+  auto program = makeProgram("atanh", {S}, {O});
+
+  std::vector<float> input = {
+      0.1, 0.2,  0.3,   //
+      0.4, 0.5,  0.6,   //
+      0.0, -0.3, -0.6,  //
+  };
+  std::vector<float> expected = {
+      0.100335, 0.202733, 0.30952,   //
+      0.423649, 0.549306, 0.693147,  //
+      0.,       -0.30952, -0.693147  //
   };
   checkClose(program, {input}, {expected});
 }
@@ -1367,6 +1436,148 @@ TEST_F(CppEdsl, Floor) {
       1,  0,  -7  //
   };
   checkExact(program, {input}, {expected});
+}
+
+TEST_F(CppEdsl, Gather) {
+  auto A = Placeholder(DType::FLOAT32, {3, 2});
+  auto B = Placeholder(DType::INT32, {4});
+  auto O = gather(A, B).axis(1);
+  auto program = makeProgram("gather", {A, B}, {O});
+
+  std::vector<float> in1 = {
+      -5.0f, -6.0f,  //
+      -7.0f, 4.0f,   //
+      5.0f,  6.0f,   //
+  };
+  std::vector<int> in2 = {0, 1, 1, 0};
+  std::vector<float> out = {
+      -5.0f, -6.0f, -6.0f, -5.0f,  //
+      -7.0f, 4.0f,  4.0f,  -7.0f,  //
+      5.0f,  6.0f,  6.0f,  5.0f,   //
+  };
+  checkExact(program, {in1, in2}, {out});
+}
+
+TEST_F(CppEdsl, InterpolatedGatherNearest) {
+  auto A = Placeholder(DType::FLOAT32, {1, 6});
+  auto B = Placeholder(DType::FLOAT32, {9});
+  auto O =
+      gather(A, B).axis(1).interpolationMode(InterpolationMode::NEAREST).nearestMode(NearestMode::ROUND_PREFER_CEIL);
+  auto program = makeProgram("interpolated_gather_nearest", {A, B}, {O});
+
+  std::vector<float> in1 = {0.3f, 1.0f, 8.0f, 5.0f, 5.0f, 2.0f};
+  std::vector<float> in2 = {-0.25f, 0.5f, 0.75f, 1.5f, 2.0f, 5.0f, 5.1f, 5.5f, 5.6f};
+  std::vector<float> out = {0.3f, 1.0f, 1.0f, 8.0f, 8.0f, 2.0f, 2.0f, 2.0f, 2.0f};
+  checkExact(program, {in1, in2}, {out});
+}
+
+TEST_F(CppEdsl, InterpolatedGatherLinear) {
+  auto A = Placeholder(DType::FLOAT32, {1, 6});
+  auto B = Placeholder(DType::FLOAT32, {12});
+  auto O = gather(A, B).axis(-1).interpolationMode(InterpolationMode::LINEAR);
+  auto program = makeProgram("interpolated_gather_linear", {A, B}, {O});
+
+  std::vector<float> in1 = {0.0f, 1.0f, 8.0f, 5.0f, 5.0f, 2.0f};
+  std::vector<float> in2 = {-0.25f, 0.25f, 0.75f, 1.25f, 1.75f, 2.25f, 2.75f, 3.25f, 3.75f, 4.25f, 4.75f, 5.25f};
+  std::vector<float> out = {0.0f, 0.25f, 0.75f, 2.75f, 6.25f, 7.25f, 5.75f, 5.0f, 5.0f, 4.25f, 2.75f, 2.0f};
+  checkExact(program, {in1, in2}, {out});
+}
+
+TEST_F(CppEdsl, InterpolatedGatherCubic) {
+  auto A = Placeholder(DType::FLOAT32, {1, 6});
+  auto B = Placeholder(DType::FLOAT32, {12});
+  auto O = gather(A, B).axis(1).interpolationMode(InterpolationMode::CUBIC).cubeCoeff(-0.5);
+  auto program = makeProgram("interpolated_gather_cubic", {A, B}, {O});
+
+  std::vector<float> in1 = {0.0f, 1.0f, 8.0f, 5.0f, 5.0f, 2.0f};
+  std::vector<float> in2 = {-0.25f, 0.25f, 0.75f, 1.25f, 1.75f, 2.25f, 2.75f, 3.25f, 3.75f, 4.25f, 4.75f, 5.25f};
+  std::vector<float> out = {-0.0703125f, 0.0390625f, 0.304688f, 2.5625f,  6.8125f,  7.88281f,
+                            5.77344f,    4.85938f,   5.14062f,  4.39062f, 2.60938f, 1.78906f};
+  checkClose(program, {in1, in2}, {out});
+}
+
+TEST_F(CppEdsl, InterpolatedGatherCubicDouble) {
+  auto A = Placeholder(DType::FLOAT64, {1, 6});
+  auto B = Placeholder(DType::FLOAT64, {12});
+  auto O = gather(A, B).axis(1).interpolationMode(InterpolationMode::CUBIC).cubeCoeff(-0.5);
+  auto program = makeProgram("interpolated_gather_cubic_double", {A, B}, {O});
+
+  std::vector<double> in1 = {0.0, 1.0, 8.0, 5.0, 5.0, 2.0};
+  std::vector<double> in2 = {-0.25, 0.25, 0.75, 1.25, 1.75, 2.25, 2.75, 3.25, 3.75, 4.25, 4.75, 5.25};
+  std::vector<double> out = {-0.0703125, 0.0390625, 0.304688, 2.5625,  6.8125,  7.88281,
+                             5.77344,    4.85938,   5.14062,  4.39062, 2.60938, 1.78906};
+  checkClose(program, {in1, in2}, {out});
+}
+
+TEST_F(CppEdsl, InterpolatedGatherCubicHalf) {
+  auto A = Placeholder(DType::FLOAT16, {1, 6});
+  auto B = Placeholder(DType::FLOAT16, {12});
+  auto O = gather(A, B).axis(1).interpolationMode(InterpolationMode::CUBIC).cubeCoeff(-0.5);
+  auto program = makeProgram("interpolated_gather_cubic_half", {A, B}, {O});
+
+  std::vector<float> in1 = {0.0f, 1.0f, 8.0f, 5.0f, 5.0f, 2.0f};
+  std::vector<float> in2 = {-0.25f, 0.25f, 0.75f, 1.25f, 1.75f, 2.25f, 2.75f, 3.25f, 3.75f, 4.25f, 4.75f, 5.25f};
+  std::vector<float> out = {-0.0703125f, 0.0390625f, 0.304688f, 2.5625f,  6.8125f,  7.88281f,
+                            5.77344f,    4.85938f,   5.14062f,  4.39062f, 2.60938f, 1.78906f};
+
+  std::vector<half> in1_half(in1.size());
+  for (size_t i = 0; i < in1.size(); i++) {
+    in1_half[i] = in1[i];
+  }
+  std::vector<half> in2_half(in2.size());
+  for (size_t i = 0; i < in2.size(); i++) {
+    in2_half[i] = in2[i];
+  }
+  std::vector<half> out_half(out.size());
+  for (size_t i = 0; i < out.size(); i++) {
+    out_half[i] = out[i];
+  }
+  checkClose(program, {in1_half, in2_half}, {out_half}, /*tolerance=*/1e-2);
+}
+
+TEST_F(CppEdsl, InterpolatedGatherMultiDIndices) {
+  auto A = Placeholder(DType::FLOAT32, {3, 5, 2});
+  auto B = Placeholder(DType::FLOAT32, {2, 2});
+  auto O = gather(A, B).axis(1).interpolationMode(InterpolationMode::NEAREST);
+  auto program = makeProgram("interpolated_gather_multiD_indices", {A, B}, {O});
+
+  std::vector<float> in1 = {
+      1.0f, 2.0f,   //
+      3.0f, 4.0f,   //
+      5.0f, 6.0f,   //
+      7.0f, 8.0f,   //
+      9.0f, 10.0f,  //
+
+      1.1f, 2.1f,   //
+      3.1f, 4.1f,   //
+      5.1f, 6.1f,   //
+      7.1f, 8.1f,   //
+      9.1f, 10.1f,  //
+
+      1.2f, 2.2f,   //
+      3.2f, 4.2f,   //
+      5.2f, 6.2f,   //
+      7.2f, 8.2f,   //
+      9.2f, 10.2f,  //
+  };
+  std::vector<float> in2 = {0.8, 1.3, 2.0, 2.7};
+  std::vector<float> out = {
+      3.0f, 4.0f,  //
+      3.0f, 4.0f,  //
+      5.0f, 6.0f,  //
+      7.0f, 8.0f,  //
+
+      3.1f, 4.1f,  //
+      3.1f, 4.1f,  //
+      5.1f, 6.1f,  //
+      7.1f, 8.1f,  //
+
+      3.2f, 4.2f,  //
+      3.2f, 4.2f,  //
+      5.2f, 6.2f,  //
+      7.2f, 8.2f,  //
+  };
+  checkExact(program, {in1, in2}, {out});
 }
 
 TEST_F(CppEdsl, Pow) {
@@ -1541,9 +1752,7 @@ TEST_F(CppEdsl, Lens) {
 
 TEST_F(CppEdsl, Layer) {
   auto A = Placeholder(DType::FLOAT32, {10, 20});
-  Tensor O = layer("relu", [&]() {  //
-    return Relu(A);
-  });
+  Tensor O = layer("relu", {A}, [&]() { return Relu(A); });
   auto program = makeProgram("relu", {A}, {O});
   // clang-format off
   // CHECK-LABEL: CppEdsl.Layer
@@ -1554,6 +1763,71 @@ TEST_F(CppEdsl, Layer) {
   // CHECK:   %[[X2:.*]] = tile.select %[[X1]], %[[cst]], %[[arg1]] : (tensor<10x20xi1>, tensor<f32>, tensor<10x20xf32>) -> tensor<10x20xf32>
   // CHECK:   layer.return %[[X2]] : tensor<10x20xf32>
   // CHECK: return %[[X0]] : tensor<10x20xf32>
+  // clang-format on
+  runProgram(program);
+}
+
+TEST_F(CppEdsl, LayerOperandOrder) {
+  auto A = Placeholder(DType::FLOAT32, {10, 20});
+  auto B = Placeholder(DType::FLOAT32, {10, 20});
+  Tensor O = layer("sum", {A, B}, [&]() { return A + B; });
+  auto program = makeProgram("LayerOperandOrder", {A, B}, {O});
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.LayerOperandOrder
+  // CHECK: module @LayerOperandOrder
+  // CHECK: func @main(%[[ARG0:.*]]: tensor<10x20xf32>, %[[ARG1:.*]]: tensor<10x20xf32>) -> tensor<10x20xf32>
+  // CHECK:   %[[X0:.*]] = layer.box "sum" (%[[ARG2:.*]], %[[ARG3:.*]]) = (%[[ARG0]], %[[ARG1]]) : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
+  // CHECK:     %[[X1:.*]] = tile.add %[[ARG2]], %[[ARG3]] : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
+  // CHECK:     layer.return %[[X1]] : tensor<10x20xf32>
+  // CHECK:   return %[[X0]] : tensor<10x20xf32>
+  // clang-format on
+  runProgram(program);
+}
+
+TEST_F(CppEdsl, LayerMissingOperand) {
+  auto A = Placeholder(DType::FLOAT32, {10, 20});
+  auto B = Placeholder(DType::FLOAT32, {10, 20});
+  Tensor O = layer("sum", {A}, [&]() { return A + B; });
+  EXPECT_ANY_THROW({ makeProgram("LayerMissingOperand", {A, B}, {O}); });
+}
+
+TEST_F(CppEdsl, LayerEmbeddedConst) {
+  auto A = Placeholder(DType::FLOAT32, {10, 20});
+  Tensor O = layer("sum", {A}, [&]() {  //
+    std::vector<int> bData = {1, 2, 3, 4};
+    auto B = Constant(makeBuffer(DType::FLOAT32, {10, 20}, bData), "B");
+    return A + B;
+  });
+  auto program = makeProgram("LayerEmbeddedConst", {A}, {O});
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.LayerEmbeddedConst
+  // CHECK: module @LayerEmbeddedConst
+  // CHECK: func @main(%[[ARG0:.*]]: tensor<10x20xf32>, %[[ARG1:.*]]: tensor<10x20xf32> {tile.const = 0 : index}) -> tensor<10x20xf32>
+  // CHECK:   %[[X0:.*]] = layer.box "sum" (%[[ARG2:.*]], %[[ARG3:.*]]) = (%[[ARG0]], %[[ARG1]]) : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
+  // CHECK:     %[[X1:.*]] = tile.add %[[ARG2]], %[[ARG3]] : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
+  // CHECK:     layer.return %[[X1]] : tensor<10x20xf32>
+  // CHECK:   return %[[X0]] : tensor<10x20xf32>
+  // clang-format on
+  runProgram(program);
+}
+
+TEST_F(CppEdsl, LayerUnusedOperand) {
+  auto A = Placeholder(DType::FLOAT32, {10, 20});
+  std::vector<int> data = {1, 2, 3, 4};
+  auto B = Constant(makeBuffer(DType::FLOAT32, {10, 20}, data), "B");
+  Tensor O = layer("sum", {A, B}, [&]() {
+    auto C = Constant(makeBuffer(DType::FLOAT32, {10, 20}, data), "C");
+    return A + C;
+  });
+  auto program = makeProgram("LayerUnusedOperand", {A}, {O});
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.LayerUnusedOperand
+  // CHECK: module @LayerUnusedOperand
+  // CHECK: func @main(%[[ARG0:.*]]: tensor<10x20xf32>, %[[ARG1:.*]]: tensor<10x20xf32> {tile.const = 0 : index}, %[[ARG2:.*]]: tensor<10x20xf32> {tile.const = 1 : index}) -> tensor<10x20xf32>
+  // CHECK:   %[[X0:.*]] = layer.box "sum" (%[[ARG3:.*]], %[[ARG4:.*]], %[[ARG5:.*]]) = (%[[ARG0]], %[[ARG1]], %[[ARG2]]) : (tensor<10x20xf32>, tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
+  // CHECK:     %[[X1:.*]] = tile.add %[[ARG3]], %[[ARG5]] : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
+  // CHECK:     layer.return %[[X1]] : tensor<10x20xf32>
+  // CHECK:   return %[[X0]] : tensor<10x20xf32>
   // clang-format on
   runProgram(program);
 }

@@ -63,14 +63,29 @@ struct ACosLowering : public LibMCallLowering<stdx::ACosOp> {
   std::string getFuncName() const override { return "acosf"; }
 };
 
+struct ACosHLowering : public LibMCallLowering<stdx::ACosHOp> {
+  using LibMCallLowering<stdx::ACosHOp>::LibMCallLowering;
+  std::string getFuncName() const override { return "acoshf"; }
+};
+
 struct ASinLowering : public LibMCallLowering<stdx::ASinOp> {
   using LibMCallLowering<stdx::ASinOp>::LibMCallLowering;
   std::string getFuncName() const override { return "asinf"; }
 };
 
+struct ASinHLowering : public LibMCallLowering<stdx::ASinHOp> {
+  using LibMCallLowering<stdx::ASinHOp>::LibMCallLowering;
+  std::string getFuncName() const override { return "asinhf"; }
+};
+
 struct ATanLowering : public LibMCallLowering<stdx::ATanOp> {
   using LibMCallLowering<stdx::ATanOp>::LibMCallLowering;
   std::string getFuncName() const override { return "atanf"; }
+};
+
+struct ATanHLowering : public LibMCallLowering<stdx::ATanHOp> {
+  using LibMCallLowering<stdx::ATanHOp>::LibMCallLowering;
+  std::string getFuncName() const override { return "atanhf"; }
 };
 
 struct CosHLowering : public LibMCallLowering<stdx::CosHOp> {
@@ -216,9 +231,14 @@ struct PackLowering : public ConvertOpToLLVMPattern<stdx::PackOp> {
                   ConversionPatternRewriter &rewriter) const override {
     auto op = cast<stdx::PackOp>(baseOp);
     Location loc = op.getLoc();
+    auto i8PtrType = LLVMType::getInt8Ty(rewriter.getContext()).getPointerTo();
+    if (op.getNumOperands() == 0) {
+      auto nullPtr = rewriter.create<LLVM::NullOp>(loc, i8PtrType);
+      rewriter.replaceOp(op, {nullPtr});
+      return success();
+    }
     // Get the relevant types
     auto structType = getStructType(typeConverter, op.getOperandTypes());
-    auto i8PtrType = LLVMType::getInt8Ty(rewriter.getContext()).getPointerTo();
     // Get the size of the struct type and malloc
     auto sizeofStruct = getSizeInBytes(loc, structType, rewriter);
     auto mallocFunc =
@@ -255,6 +275,10 @@ struct UnpackLowering : public ConvertOpToLLVMPattern<stdx::UnpackOp> {
   matchAndRewrite(Operation *baseOp, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
     auto op = cast<stdx::UnpackOp>(baseOp);
+    if (op.getNumResults() == 0) {
+      rewriter.replaceOp(op, {});
+      return success();
+    }
     Location loc = op.getLoc();
     // Get the LLVM structure type
     auto structType = getStructType(typeConverter, op.getResultTypes());
@@ -302,8 +326,11 @@ struct LowerToLLVMPass : public LowerToLLVMBase<LowerToLLVMPass> {
 void populateStdXToLLVMConversionPatterns(LLVMTypeConverter &converter,
                                           OwningRewritePatternList &patterns) {
   patterns.insert<ACosLowering,    //
+                  ACosHLowering,   //
                   ASinLowering,    //
+                  ASinHLowering,   //
                   ATanLowering,    //
+                  ATanHLowering,   //
                   CosHLowering,    //
                   ErfLowering,     //
                   FloorLowering,   //
@@ -315,8 +342,8 @@ void populateStdXToLLVMConversionPatterns(LLVMTypeConverter &converter,
                   TanLowering,     //
                   UnpackLowering   //
                   >(converter);
-  converter.addConversion([](TupleType type) -> Optional<Type> {
-    // Tuples look like i8 pointers.  I'd like this to be void*, but MLIR
+  converter.addConversion([](stdx::ArgpackType type) -> Optional<Type> {
+    // Argpack types look like i8 pointers.  I'd like this to be void*, but MLIR
     // disallows void* in it's validation for some bizare reason
     return LLVMType::getInt8Ty(type.getContext()).getPointerTo();
   });

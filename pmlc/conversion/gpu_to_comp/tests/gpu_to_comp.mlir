@@ -42,47 +42,31 @@ module attributes {gpu.container_module} {
 module attributes {gpu.container_module} {
   //  CHECK-LABEL: func @two_gpu_func
   //   CHECK-SAME:     %[[DEV:[a-zA-Z0-9]*]]:
-  //   CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]*]]:
-  //   CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]*]]:
-  //   CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]*]]:
 
   //        CHECK:   %[[ENV0:.*]] = comp.create_execenv %[[DEV]]
-  //      SPACE11:   %[[MEM02:.*]] = comp.alloc %[[ENV0]]
-  //      SPACE11:   %[[WEV02:.*]] = comp.schedule_write %[[ARG2]] to %[[MEM02]] on %[[ENV0]]
-  //      SPACE11:   comp.wait %[[WEV02]]
-  //        CHECK:   %[[FEV0:.*]] = "comp.schedule_func"(%[[ENV0]])
+  //      SPACE11:   comp.alloc %[[ENV0]]
+  //      SPACE11:   comp.schedule_write 
+  //      SPACE11:   comp.wait
+  //      SPACE11:   comp.alloc %[[ENV0]]
+  //      SPACE11:   comp.schedule_write
+  //      SPACE11:   comp.wait
+  //      SPACE11:   comp.alloc %[[ENV0]]
+  //      SPACE11:   comp.schedule_write
+  //      SPACE11:   comp.wait
+  //        CHECK:   "comp.schedule_func"(%[[ENV0]])
   //        CHECK:     gpu.launch_func
-  //  SPACE0-SAME:       %[[ARG2]]
-  // SPACE11-SAME:       %[[MEM02]]
-  //       SPACE0:   comp.wait %[[FEV0]]
-  //      SPACE11:   %[[REV02:.*]] = comp.schedule_read %[[ARG2]] from %[[MEM02]] on %[[ENV0]] wait for %[[FEV0]]
-  //      SPACE11:   comp.wait %[[REV02]]
-  //      SPACE11:   comp.dealloc %[[ENV0]] %[[MEM02]]
+  //      SPACE11:   comp.wait
+  //        CHECK:   "comp.schedule_func"(%[[ENV0]])
+  //        CHECK:     gpu.launch_func
+  //      SPACE11:   comp.schedule_read
+  //      SPACE11:   comp.schedule_read
+  //      SPACE11:   comp.schedule_read
+  //      SPACE11:   comp.wait
+  //      SPACE11:   comp.dealloc %[[ENV0]]
+  //      SPACE11:   comp.dealloc %[[ENV0]]
+  //      SPACE11:   comp.dealloc %[[ENV0]]
   //        CHECK:   comp.destroy_execenv %[[ENV0]]
 
-  //        CHECK:   %[[ENV1:.*]] = comp.create_execenv %[[DEV]]
-  //      SPACE11:   %[[MEM10:.*]] = comp.alloc %[[ENV1]]
-  //      SPACE11:   %[[WEV10:.*]] = comp.schedule_write %[[ARG0]] to %[[MEM10]] on %[[ENV1]]
-  //      SPACE11:   comp.wait %[[WEV10]]
-  //      SPACE11:   %[[MEM11:.*]] = comp.alloc %[[ENV1]]
-  //      SPACE11:   %[[WEV11:.*]] = comp.schedule_write %[[ARG1]] to %[[MEM11]] on %[[ENV1]]
-  //      SPACE11:   comp.wait %[[WEV11]]
-  //      SPACE11:   %[[MEM12:.*]] = comp.alloc %[[ENV1]]
-  //      SPACE11:   %[[WEV12:.*]] = comp.schedule_write %[[ARG2]] to %[[MEM12]] on %[[ENV1]]
-  //      SPACE11:   comp.wait %[[WEV12]]
-  //        CHECK:   %[[FEV1:.*]] = "comp.schedule_func"(%[[ENV1]])
-  //        CHECK:     gpu.launch_func
-  //  SPACE0-SAME:       %[[ARG0]], %[[ARG1]], %[[ARG2]]
-  // SPACE11-SAME:       %[[MEM10]], %[[MEM11]], %[[MEM12]]
-  //       SPACE0:   comp.wait %[[FEV1]]
-  //      SPACE11:   %[[REV10:.*]] = comp.schedule_read %[[ARG0]] from %[[MEM10]] on %[[ENV1]] wait for %[[FEV1]]
-  //      SPACE11:   %[[REV11:.*]] = comp.schedule_read %[[ARG1]] from %[[MEM11]] on %[[ENV1]] wait for %[[FEV1]]
-  //      SPACE11:   %[[REV12:.*]] = comp.schedule_read %[[ARG2]] from %[[MEM12]] on %[[ENV1]] wait for %[[FEV1]]
-  //      SPACE11:   comp.wait %[[REV10]], %[[REV11]], %[[REV12]]
-  //      SPACE11:   comp.dealloc %[[ENV1]] %[[MEM10]]
-  //      SPACE11:   comp.dealloc %[[ENV1]] %[[MEM11]]
-  //      SPACE11:   comp.dealloc %[[ENV1]] %[[MEM12]]
-  //        CHECK:   comp.destroy_execenv %[[ENV1]]
   func @two_gpu_func(%arg0: memref<8x16xf32>, %arg1: memref<16x32xf32>, %arg2: memref<8x32xf32>) {
     %c8 = constant 8 : index
     %c32 = constant 32 : index

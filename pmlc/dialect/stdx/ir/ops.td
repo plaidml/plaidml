@@ -12,11 +12,13 @@ include "mlir/Interfaces/ViewLikeInterface.td"
 
 include "mlir/Dialect/StandardOps/IR/StandardOpsBase.td"
 
-
 def StdX_Dialect : Dialect {
   let name = "stdx";
   let cppNamespace = "pmlc::dialect::stdx";
 }
+
+def Argpack : DialectType<StdX_Dialect, CPred<"$_self.isa<ArgpackType>()">, "Argpack type">,
+        BuildableType<"$_builder.getType<ArgpackType>()">;
 
 class StdX_Op<string mnemonic, list<OpTrait> traits = []> :
     Op<StdX_Dialect, mnemonic, traits> {
@@ -50,12 +52,24 @@ def ACosOp : StdX_UnaryFuncOp<"acos"> {
   let summary = "arccosine";
 }
 
+def ACosHOp : StdX_UnaryFuncOp<"acosh"> {
+  let summary = "hyperbolic arccosine";
+}
+
 def ASinOp : StdX_UnaryFuncOp<"asin"> {
   let summary = "arcsine";
 }
 
+def ASinHOp : StdX_UnaryFuncOp<"asinh"> {
+  let summary = "hyperbolic arcsine";
+}
+
 def ATanOp : StdX_UnaryFuncOp<"atan"> {
   let summary = "arctangent";
+}
+
+def ATanHOp : StdX_UnaryFuncOp<"atanh"> {
+  let summary = "hyperbolic arctangent";
 }
 
 def CosHOp : StdX_UnaryFuncOp<"cosh"> {
@@ -161,32 +175,18 @@ def SubgroupBlockWriteINTELOp : StdX_Op<"subgroup_block_write_intel", [NoSideEff
   }];
 }
 
-def PackOp : StdX_Op<"pack", [NoSideEffect]> {
+def PackOp : Op<StdX_Dialect, "pack"> {
   let summary = "Pack multiple values into a tuple";
   let arguments = (ins Variadic<AnyType>:$in);
-  let results = (outs AnyTuple:$out);
-  let assemblyFormat = [{ $in `:` custom<TupleTypeAsm>(type($out), type($in)) attr-dict }];
-  let builders = [OpBuilder<
-    "mlir::OpBuilder &, mlir::OperationState &, mlir::ArrayRef<mlir::Value>">];
-  let extraClassDeclaration = [{
-    mlir::TupleType getTupleType() {
-      return out().getType().cast<mlir::TupleType>();
-    }
-  }];
+  let results = (outs Argpack:$out);
+  let assemblyFormat = [{ $in `:` type($in) attr-dict }];
 }
 
-def UnpackOp : StdX_Op<"unpack", [NoSideEffect]> {
+def UnpackOp : Op<StdX_Dialect, "unpack"> {
   let summary = "Pack multiple values into a tuple";
-  let arguments = (ins AnyTuple:$in);
+  let arguments = (ins Argpack:$in);
   let results = (outs Variadic<AnyType>:$out);
-  let assemblyFormat = [{ $in `:` custom<TupleTypeAsm>(type($in), type($out)) attr-dict }];
-  let builders = [OpBuilder<
-    "mlir::OpBuilder &, mlir::OperationState &, mlir::Value">];
-  let extraClassDeclaration = [{
-    mlir::TupleType getTupleType() {
-      return in().getType().cast<mlir::TupleType>();
-    }
-  }];
+  let assemblyFormat = [{ $in `:` type($out) attr-dict }];
 }
 
 #endif // __PML_STDX_OPS__
