@@ -1474,7 +1474,7 @@ TEST_F(CppEdsl, InterpolatedGatherNearest) {
 TEST_F(CppEdsl, InterpolatedGatherLinear) {
   auto A = Placeholder(DType::FLOAT32, {1, 6});
   auto B = Placeholder(DType::FLOAT32, {12});
-  auto O = gather(A, B).axis(1).interpolationMode(InterpolationMode::LINEAR);
+  auto O = gather(A, B).axis(-1).interpolationMode(InterpolationMode::LINEAR);
   auto program = makeProgram("interpolated_gather_linear", {A, B}, {O});
 
   std::vector<float> in1 = {0.0f, 1.0f, 8.0f, 5.0f, 5.0f, 2.0f};
