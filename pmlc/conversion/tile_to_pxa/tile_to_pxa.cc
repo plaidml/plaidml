@@ -516,14 +516,12 @@ static Value
 buildBroadcastLoad(OpBuilder &builder, Location loc, Value operand,
                    unsigned outRank,
                    Optional<tile::PaddingInfo> maybePadding = llvm::None) {
-  auto body = builder.getBlock();
-  auto defOp = operand.getDefiningOp();
-  Attribute attr;
   // Handle scalar values
-  if (defOp && m_Constant(&attr).match(defOp)) {
+  if (!operand.getType().isa<MemRefType>()) {
     return operand;
   }
   // handle broadcasts
+  auto body = builder.getBlock();
   auto operandType = operand.getType().cast<MemRefType>();
   assert(operandType.getRank() <= outRank && "result rank < operand rank");
   auto shape = operandType.getShape();
@@ -813,9 +811,7 @@ struct ContractionOpConversion
     auto srcs = op.srcs().getValue();
     for (size_t i = 0; i < srcs.size(); i++) {
       auto operand = cionOperands[i];
-      auto defOp = operand.getDefiningOp();
-      Attribute attr;
-      if (defOp && m_Constant(&attr).match(defOp)) {
+      if (!operand.getType().isa<MemRefType>()) {
         scalars.push_back(operand);
       } else {
         auto map = srcs[i].cast<AffineMapAttr>().getValue();
@@ -1565,8 +1561,25 @@ struct PackOpConversion : public OpConversionPattern<stdx::PackOp> {
   matchAndRewrite(stdx::PackOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
     auto argpackType = stdx::ArgpackType::get(op.getContext());
+    // Some 0-dim tensors convert to 0-dim memrefs, and some convert to actual
+    // scalars.  To make the type mapping exact, we always convert 0-dim memrefs
+    // to scalars via doing a load before packing.
+    SmallVector<Value, 8> scalarizedOperands;
+    for (auto val : operands) {
+      // Handle cases requring load
+      if (auto memrefType = val.getType().dyn_cast<MemRefType>()) {
+        if (memrefType.getRank() == 0) {
+          auto loadOp =
+              rewriter.create<pxa::PxaLoadOp>(op.getLoc(), val, ValueRange({}));
+          scalarizedOperands.push_back(loadOp.getResult());
+          continue;
+        }
+      }
+      // Default case is a no-op
+      scalarizedOperands.push_back(val);
+    }
     rewriter.replaceOpWithNewOp<stdx::PackOp>(op, TypeRange(argpackType),
-                                              operands);
+                                              scalarizedOperands);
     return success();
   }
 };
@@ -1579,9 +1592,16 @@ struct UnpackOpConversion : public OpConversionPattern<stdx::UnpackOp> {
                   ConversionPatternRewriter &rewriter) const final {
     SmallVector<Type, 8> newResultTypes;
     TypeConverter typeConverter;
-    if (failed(
-            typeConverter.convertTypes(op.getResultTypes(), newResultTypes))) {
-      return failure();
+    for (auto type : op.getResultTypes()) {
+      if (auto tensorType = type.dyn_cast<TensorType>()) {
+        if (tensorType.getRank() == 0) {
+          auto newType = typeConverter.convertType(tensorType.getElementType());
+          newResultTypes.push_back(newType);
+          continue;
+        }
+      }
+      auto newType = typeConverter.convertType(type);
+      newResultTypes.push_back(newType);
     }
     rewriter.replaceOpWithNewOp<stdx::UnpackOp>(op, newResultTypes,
                                                 operands[0]);
@@ -1591,14 +1611,18 @@ struct UnpackOpConversion : public OpConversionPattern<stdx::UnpackOp> {
 
 struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
   void runOnOperation() final {
-    // Inject tile.ident ops for each return operand that is a direct block
+    // Inject tile.ident ops for each return operand that needs it.
     // argument, a constant value, or a reshape op.
     getOperation().walk([&](ReturnOp op) {
       OpBuilder builder(op);
       for (OpOperand &operand : op.getOperation()->getOpOperands()) {
         Value value = operand.get();
-        if (value.isa<BlockArgument>() || matchPattern(value, m_Constant()) ||
-            matchPattern(value, m_Op<tile::ReshapeOp>())) {
+        bool needsIdent =                                  //
+            value.isa<BlockArgument>() ||                  // Block arguemnt
+            matchPattern(value, m_Constant()) ||           // Constant op
+            matchPattern(value, m_Op<stdx::UnpackOp>()) || // Direct from unpack
+            matchPattern(value, m_Op<tile::ReshapeOp>());  // Reshape op
+        if (needsIdent) {
           Value copy = builder.create<tile::IdentOp>(op.getLoc(),
                                                      value.getType(), value);
           operand.set(copy);
@@ -1697,11 +1721,11 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         EltwiseOpConversion<tile::ATanOp, StdOp<stdx::ATanOp>,
                             OperandsAre<EltwiseFloat>>,
         EltwiseOpConversion<tile::ACosHOp, StdOp<stdx::ACosHOp>,
-            OperandsAre<EltwiseFloat>>,
+                            OperandsAre<EltwiseFloat>>,
         EltwiseOpConversion<tile::ASinHOp, StdOp<stdx::ASinHOp>,
-            OperandsAre<EltwiseFloat>>,
+                            OperandsAre<EltwiseFloat>>,
         EltwiseOpConversion<tile::ATanHOp, StdOp<stdx::ATanHOp>,
-            OperandsAre<EltwiseFloat>>,
+                            OperandsAre<EltwiseFloat>>,
         EltwiseOpConversion<tile::CeilOp, StdOp<mlir::CeilFOp>,
                             ResultIs<EltwiseFloat>>,
         EltwiseOpConversion<tile::FloorOp, StdOp<stdx::FloorOp>,
