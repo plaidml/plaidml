@@ -23,7 +23,14 @@ void *levelZeroAlloc(void *invocation, size_t bytes) {
   return static_cast<LevelZeroInvocation *>(invocation)->allocateMemory(bytes);
 }
 
+void levelZeroSubmit(void* invocation);
 void levelZeroDealloc(void *invocation, void *memory) {
+  //TODO xin workaround to let submit run
+  static bool first = true;
+  if(first) {
+      levelZeroSubmit(invocation);
+      first = false;
+  }
   static_cast<LevelZeroInvocation *>(invocation)
       ->deallocateMemory(static_cast<LevelZeroMemory *>(memory));
 }
@@ -72,8 +79,8 @@ void *levelZeroScheduleFunc(void *invocation, void *kernel, uint64_t gws0,
                             uint64_t gws1, uint64_t gws2, uint64_t lws0,
                             uint64_t lws1, uint64_t lws2) {
   //ze_group_count_t gws(gws0, gws1, gws2);
-  ze_group_count_t gws = {gws0 * lws0, gws1 * lws1, gws2 * lws2};
-  ze_group_count_t lws = {lws0, lws1, lws2};
+  ze_group_count_t gws = {(uint32_t)(gws0 * lws0), (uint32_t)(gws1 * lws1), (uint32_t)(gws2 * lws2)};
+  ze_group_count_t lws = {(uint32_t)lws0, (uint32_t)lws1, (uint32_t)lws2};
   return static_cast<LevelZeroInvocation *>(invocation)
       ->enqueueKernel(static_cast<LevelZeroKernel *>(kernel), gws, lws);
 }
@@ -95,13 +102,14 @@ void levelZeroSubmit(void *invocation) {
 
 void levelZeroWait(uint32_t count, ...) {
   //TODO move to kernellaunch
-  /*std::vector<LevelZeroEvent *> events;
+  std::vector<LevelZeroEvent *> events;
   va_list args;
   va_start(args, count);
   for (unsigned i = 0; i < count; ++i)
     events.push_back(va_arg(args, LevelZeroEvent *));
   va_end(args);
-  LevelZeroEvent::wait(events);*/
+
+  LevelZeroEvent::wait(events);
 }
 
 } // extern "C"

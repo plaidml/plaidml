@@ -79,12 +79,13 @@ private:
 /// represented as LevelZeroQueueUser.
 class LevelZeroQueueGuard {
 public:
-  explicit LevelZeroQueueGuard(LevelZeroQueue queue, bool init = false)
+  explicit LevelZeroQueueGuard(LevelZeroQueue *queue, bool init = false)
       : used(init), queue(queue) {}
+  ~LevelZeroQueueGuard() {delete queue;}
 
   /// Returns properties of contained queue.
   ze_command_queue_group_properties_t getLevelZeroProperties() {
-    return queue.getLevelZeroProperties();
+    return queue->getLevelZeroProperties();
   }
   /// Checks if this queue is currently in use. Does not guarantee that
   /// subsequent calls to use() will return non-empty user in
@@ -97,7 +98,7 @@ public:
 
 private:
   std::atomic<bool> used;
-  LevelZeroQueue queue;
+  LevelZeroQueue *queue;
   // Fiendship definition to release guard when upon user destruction.
   friend class LevelZeroQueueUser;
 };

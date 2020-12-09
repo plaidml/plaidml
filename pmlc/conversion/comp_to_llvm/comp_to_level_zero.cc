@@ -467,11 +467,11 @@ mlir::LogicalResult ConvertScheduleFunc::matchAndRewrite(
       op.getOperation(), mlir::ArrayRef<mlir::Type>{llvmEventType},
       rewriter.getSymbolRefAttr(kLevelZeroScheduleFunc), scheduleArgs);
 
-  if(--scheduleFuncNum == 0) {
-    rewriter.create<LLVM::CallOp>(loc, mlir::ArrayRef<mlir::Type>{},
-                                  rewriter.getSymbolRefAttr(kLevelZeroSubmit),
-                                  mlir::ArrayRef<mlir::Value>{operands[0]});
-  }
+  //if(--scheduleFuncNum == 0) {
+  //  rewriter.create<LLVM::CallOp>(loc, mlir::ArrayRef<mlir::Type>{},
+  //                                rewriter.getSymbolRefAttr(kLevelZeroSubmit),
+  //                                mlir::ArrayRef<mlir::Value>{operands[0]});
+  //}
 
   return mlir::success();
 }

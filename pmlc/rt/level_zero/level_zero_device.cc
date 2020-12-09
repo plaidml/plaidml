@@ -52,7 +52,7 @@ LevelZeroQueueUser LevelZeroQueueGuard::use() {
   // Currently in use - return null user.
   if (expected)
     return LevelZeroQueueUser();
-  return LevelZeroQueueUser(this, &queue);
+  return LevelZeroQueueUser(this, queue);
 }
 
 LevelZeroDevice::LevelZeroDevice(ze_device_handle_t device)
@@ -64,7 +64,7 @@ LevelZeroDevice::LevelZeroDevice(ze_device_handle_t device)
 LevelZeroDevice::~LevelZeroDevice() {
     // TODO maybe other place
     // Once multiple devices, shall change
-    lzt::destroy_context(context);
+    //lzt::destroy_context(context);
 }
 
 std::unique_ptr<Executable> LevelZeroDevice::compile(
@@ -87,7 +87,7 @@ LevelZeroDevice::getQueue(ze_command_queue_group_properties_t properties) {
   }
   // Because queues is locked and not visible to other threads yet it
   // is safe to assume that new guard will return non-empty OpenCLQueueUser.
-  LevelZeroQueue newQueue(context, device, properties);
+  LevelZeroQueue *newQueue = new LevelZeroQueue(context, device, properties);
   queues.emplace_back(std::make_unique<LevelZeroQueueGuard>(newQueue));
   return queues.back()->use();
 }

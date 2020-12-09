@@ -9,11 +9,21 @@
 #ifndef level_zero_tests_ZE_TEST_HARNESS_HPP
 #define level_zero_tests_ZE_TEST_HARNESS_HPP
 
+#include <sstream>
+#include <stdexcept>
 #include <assert.h>
-#define EXPECT_EQ(x, y) assert((x) == (y))
-#define EXPECT_NE(x, y) assert((x) != (y))
-#define EXPECT_GT(x, y) assert((x) > (y))
-#define EXPECT_TRUE(x) assert((x))
+
+#define MYASSERT(x) {\
+    if(!(x)) {\
+        std::ostringstream oss;\
+        oss << "Failed in " << __func__ << " at " << __LINE__;\
+        throw std::runtime_error(oss.str());\
+    }\
+}
+#define EXPECT_EQ(x, y) MYASSERT((x) == (y))
+#define EXPECT_NE(x, y) MYASSERT((x) != (y))
+#define EXPECT_GT(x, y) MYASSERT((x) > (y))
+#define EXPECT_TRUE(x) MYASSERT((x))
 
 #define ASSERT_EQ(x, y) EXPECT_EQ(x, y)
 
