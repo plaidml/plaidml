@@ -141,6 +141,19 @@ StrideInfo &StrideInfo::operator*=(int64_t factor) {
   return *this;
 }
 
+// Divide the offset and all strides by a constant.
+StrideInfo &StrideInfo::operator/=(int64_t factor) {
+  offset /= factor;
+  if (factor == 0) {
+    strides.clear();
+  } else {
+    for (auto &kvp : strides) {
+      kvp.second /= factor;
+    }
+  }
+  return *this;
+}
+
 // StrideInfo addition operation.
 StrideInfo &StrideInfo::operator+=(const StrideInfo &rhs) {
   offset += rhs.offset;
@@ -396,8 +409,11 @@ Optional<StrideInfo> computeStrideInfo(AffineExpr expr, ValueRange args) {
         return None;
 
       // Divide by the divisor and return
-      // TODO: Replace the multiplication operator with division operator
-      *lhs *= (1 / rhs.getValue());
+      IVLOG(4, "StrideInfo BEFORE division: " << debugString(*lhs));
+      IVLOG(4, "StrideInfo offset BEFORE division: " << lhs->offset);
+      *lhs /= rhs.getValue();
+      IVLOG(4, "StrideInfo AFTER division: " << debugString(*lhs));
+      IVLOG(4, "StrideInfo offset AFTER division: " << lhs->offset);
       return lhs;
     }
 
