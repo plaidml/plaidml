@@ -1560,7 +1560,6 @@ struct PackOpConversion : public OpConversionPattern<stdx::PackOp> {
   LogicalResult
   matchAndRewrite(stdx::PackOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
-    IVLOG(3, "Doing Pack rewrite");
     auto argpackType = stdx::ArgpackType::get(op.getContext());
     // Some 0-dim tensors convert to 0-dim memrefs, and some convert to actual
     // scalars.  To make the type mapping exact, we always convert 0-dim memrefs
@@ -1573,19 +1572,15 @@ struct PackOpConversion : public OpConversionPattern<stdx::PackOp> {
           auto loadOp =
               rewriter.create<pxa::PxaLoadOp>(op.getLoc(), val, ValueRange({}));
           scalarizedOperands.push_back(loadOp.getResult());
-          Type foo = loadOp.getResult().getType();
-          IVLOG(3, "Packing scalarized type " << debugString(foo));
           continue;
         }
       }
       // Default case is a no-op
       Type foo = val.getType();
-      IVLOG(3, "Packing type " << debugString(foo));
       scalarizedOperands.push_back(val);
     }
     rewriter.replaceOpWithNewOp<stdx::PackOp>(op, TypeRange(argpackType),
                                               scalarizedOperands);
-    IVLOG(3, "Done Pack rewrite");
     return success();
   }
 };
@@ -1596,25 +1591,21 @@ struct UnpackOpConversion : public OpConversionPattern<stdx::UnpackOp> {
   LogicalResult
   matchAndRewrite(stdx::UnpackOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
-    IVLOG(3, "Doing Unpack rewrite");
     SmallVector<Type, 8> newResultTypes;
     TypeConverter typeConverter;
     for (auto type : op.getResultTypes()) {
       if (auto tensorType = type.dyn_cast<TensorType>()) {
         if (tensorType.getRank() == 0) {
           auto newType = typeConverter.convertType(tensorType.getElementType());
-          IVLOG(3, "Unpacking scalarized type " << debugString(newType));
           newResultTypes.push_back(newType);
           continue;
         }
       }
       auto newType = typeConverter.convertType(type);
-      IVLOG(3, "Unpacking type " << debugString(newType));
       newResultTypes.push_back(newType);
     }
     rewriter.replaceOpWithNewOp<stdx::UnpackOp>(op, newResultTypes,
                                                 operands[0]);
-    IVLOG(3, "Done Unpack rewrite");
     return success();
   }
 };

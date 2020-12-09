@@ -100,14 +100,14 @@ void HoistingState::doHoisting() {
   for (auto &innerOp :
        make_early_inc_range(mainFunc.begin()->without_terminator())) {
     // If an operation has a side effect, bail
-    IVLOG(1, "Trying op " << debugString(innerOp));
+    IVLOG(3, "Trying op " << debugString(innerOp));
     auto innerEffect = dyn_cast<MemoryEffectOpInterface>(innerOp);
     if (!innerEffect)
       continue;
     if (!innerEffect.hasNoEffect())
       continue;
     // Check if all operands (if any) are in init
-    IVLOG(1, "Checking operands " << debugString(innerOp));
+    IVLOG(3, "Checking operands " << debugString(innerOp));
     bool allOperandsInInit = true;
     for (auto operand : innerOp.getOperands()) {
       if (!maybeCrossFunc.count(operand)) {
@@ -118,7 +118,7 @@ void HoistingState::doHoisting() {
     if (!allOperandsInInit) {
       continue;
     }
-    IVLOG(1, "Hoisting " << debugString(innerOp));
+    IVLOG(3, "Hoisting " << debugString(innerOp));
     // Yes?  Hoist to init, add results as possible cross function results
     innerOp.moveBefore(initPack);
     for (auto result : innerOp.getResults()) {

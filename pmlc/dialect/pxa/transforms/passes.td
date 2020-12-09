@@ -19,7 +19,7 @@ def AutoTileExample : FunctionPass<"pxa-autotile-example"> {
 }
 
 def DeallocPlacement : Pass<"pxa-dealloc-placement", "mlir::ModuleOp"> {
-  let summary = "Adds deallocs for memref allocss";
+  let summary = "Adds deallocs for memref allocs";
   let constructor = "pmlc::dialect::pxa::createDeallocPlacementPass()";
 }
 
