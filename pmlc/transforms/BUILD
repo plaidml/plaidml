@@ -32,6 +32,7 @@ plaidml_cc_library(
     deps = [
         ":gen-pass",
         "//pmlc/util",
+        "//pmlc/dialect/stdx/ir",
         "@llvm-project//mlir:Pass",
     ],
 )
