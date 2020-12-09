@@ -66,7 +66,7 @@ std::unique_ptr<mlir::Pass> createConvertCompToOclPass();
 
 void populateCompToVkPatterns(mlir::MLIRContext *context,
                               const BinaryModulesMap &modulesMap,
-                              mlir::ModuleOp moduleOp, uint32_t numKernel,
+                              mlir::ModuleOp moduleOp,
                               mlir::TypeConverter &typeConverter,
                               mlir::OwningRewritePatternList &patterns);
 
