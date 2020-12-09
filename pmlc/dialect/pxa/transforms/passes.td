@@ -18,9 +18,9 @@ def AutoTileExample : FunctionPass<"pxa-autotile-example"> {
   let constructor = "pmlc::dialect::pxa::createAutoTileExamplePass()";
 }
 
-def BufferPlacement : FunctionPass<"pxa-buffer-placement"> {
-  let summary = "Optimizes placement of alloc and dealloc operations";
-  let constructor = "pmlc::dialect::pxa::createBufferPlacementPass()";
+def DeallocPlacement : Pass<"pxa-dealloc-placement", "mlir::ModuleOp"> {
+  let summary = "Adds deallocs for memref allocs";
+  let constructor = "pmlc::dialect::pxa::createDeallocPlacementPass()";
 }
 
 def Cache : FunctionPass<"pxa-cache"> {
