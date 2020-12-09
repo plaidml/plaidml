@@ -1576,7 +1576,6 @@ struct PackOpConversion : public OpConversionPattern<stdx::PackOp> {
         }
       }
       // Default case is a no-op
-      Type foo = val.getType();
       scalarizedOperands.push_back(val);
     }
     rewriter.replaceOpWithNewOp<stdx::PackOp>(op, TypeRange(argpackType),
