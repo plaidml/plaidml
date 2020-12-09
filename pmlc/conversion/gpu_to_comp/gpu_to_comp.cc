@@ -155,13 +155,9 @@ mlir::LogicalResult
 RewriteLaunchFunc::getConsecutiveOps(T op, std::vector<T> &ops) const {
   // Collect consecutive ops of type T starting from a given op.
   auto operation = op.getOperation();
-  while (operation != nullptr) {
-    if (auto opT = mlir::dyn_cast<T>(operation)) {
-      ops.push_back(opT);
-      operation = operation->getNextNode();
-    } else {
-      return mlir::success();
-    }
+  while (auto opT = mlir::dyn_cast<T>(operation)) {
+    ops.push_back(opT);
+    operation = operation->getNextNode();
   }
   return mlir::success();
 }
@@ -175,9 +171,6 @@ mlir::LogicalResult RewriteLaunchFunc::allocateDeviceMemory(
     for (mlir::Value hostArg : ops[i].operands()) {
       if (bufferPool.count(hostArg) == 0) {
         if (auto memRefType = hostArg.getType().dyn_cast<mlir::MemRefType>()) {
-          if (execEnvType.supportsMemorySpace(memRefType.getMemorySpace())) {
-            break;
-          }
           mlir::MemRefType newMemRefType =
               mlir::MemRefType::Builder(memRefType)
                   .setMemorySpace(execEnvType.getDefaultMemorySpace());
@@ -230,15 +223,9 @@ mlir::LogicalResult RewriteLaunchFunc::createScheduleFuncOps(
     // Add launch_func with new operands inside schedule_func.
     mlir::PatternRewriter::InsertionGuard insertionGuard(rewriter);
     rewriter.createBlock(&scheduleFuncOp.body(), scheduleFuncOp.body().end());
-    if (newOperands[i].size() == 0) {
-      rewriter.create<gpu::LaunchFuncOp>(
-          loc, kernelOp, op.getGridSizeOperandValues(),
-          op.getBlockSizeOperandValues(), op.operands());
-    } else {
-      rewriter.create<gpu::LaunchFuncOp>(
-          loc, kernelOp, op.getGridSizeOperandValues(),
-          op.getBlockSizeOperandValues(), newOperands[i]);
-    }
+    rewriter.create<gpu::LaunchFuncOp>(
+        loc, kernelOp, op.getGridSizeOperandValues(),
+        op.getBlockSizeOperandValues(), newOperands[i]);
     rewriter.create<comp::ScheduleEnd>(loc);
   }
   return mlir::success();
