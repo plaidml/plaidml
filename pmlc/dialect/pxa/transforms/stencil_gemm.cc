@@ -65,6 +65,7 @@ private:
   Optional<LoadStoreOps> capture() {
     using matchers::m_Any;
     // Looking for load..load..mul..reduce..terminator
+    IVLOG(3, "StencilGEMMPass - in capture() function ");
     Value load1, load2, reduce;
     Operation *yield = op.getBody()->getTerminator();
     if (matchPattern(
@@ -83,12 +84,16 @@ private:
                              m_Op<MulIOp>(m_Capture(&load1, m_Op<PxaLoadOp>()),
                                           m_Capture(&load2, m_Op<PxaLoadOp>())),
                              m_Any()))))) {
+      IVLOG(3, "StencilGEMMPass - returning a match in capture() function ");
       return LoadStoreOps{{reduce}, {load1, load2}};
     }
+
+    IVLOG(3, "StencilGEMMPass - returning NO match in capture() function ");
     return llvm::None;
   }
 
   double getCost(TensorAndIndexPermutation perm, ArrayRef<int64_t> tileSize) {
+    IVLOG(3, "StencilGEMMPass - in getCost() function ");
     unsigned tot_inner_loop = tileSize[0] * tileSize[1] * tileSize[2];
 
     SmallVector<Type, 3> types;
@@ -219,6 +224,7 @@ private:
   }
 
   void transform(TensorAndIndexPermutation perm, ArrayRef<int64_t> tileSize) {
+    IVLOG(3, "StencilGEMMPass - in transform() function ");
     int64_t numBatches = 1;
     int64_t kRange = getIdxRange(perm.indexes[2]);
     IVLOG(3, "kRange: " << kRange);

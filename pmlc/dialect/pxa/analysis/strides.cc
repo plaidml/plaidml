@@ -292,6 +292,7 @@ AffineValueMap convertToValueMap(MLIRContext *ctx, ArrayRef<StrideInfo> dims) {
 
 static Optional<StrideInfo> computeStrideInfo(AffineParallelOp op,
                                               BlockArgument arg) {
+  IVLOG(4, "computeStrideInfo(AffineParallelOp op, BlockArgument arg ");
   // Start at the lower bound, fail early if lower bound fails.
   size_t idx = arg.getArgNumber();
   auto out = computeStrideInfo(op.lowerBoundsMap().getResult(idx),
@@ -307,6 +308,7 @@ static Optional<StrideInfo> computeStrideInfo(AffineParallelOp op,
 
 static Optional<StrideInfo> computeStrideInfo(AffineForOp op,
                                               BlockArgument arg) {
+  IVLOG(4, "computeStrideInfo(AffineForOp op, BlockArgument arg ");
   // Get lower bound
   auto map = op.getLowerBoundMap();
 
@@ -326,6 +328,7 @@ static Optional<StrideInfo> computeStrideInfo(AffineForOp op,
 }
 
 Optional<StrideInfo> computeStrideInfo(Value expr) {
+  IVLOG(4, "computeStrideInfo(Value expr)");
   // First, check for a block argument.
   if (auto arg = expr.dyn_cast<BlockArgument>()) {
     // Check the kind of loop we are part of, and dispatch.
@@ -352,6 +355,7 @@ Optional<StrideInfo> computeStrideInfo(Value expr) {
 }
 
 Optional<StrideInfo> computeStrideInfo(AffineExpr expr, ValueRange args) {
+  IVLOG(4, "computeStrideInfo(AffineExpr expr, ValueRange args)");
   // If we are a constant affine expression, it's a simple offset.
   if (auto cexpr = expr.dyn_cast<AffineConstantExpr>())
     return StrideInfo(cexpr.getValue());
@@ -379,6 +383,35 @@ Optional<StrideInfo> computeStrideInfo(AffineExpr expr, ValueRange args) {
       return lhs;
     }
 
+    if (bexpr.getKind() == AffineExprKind::FloorDiv) {
+      // For divisions, RHS should always be constant of symbolic, and symbols
+      // fail, so we cast to constant and give up if it doesn't work
+      auto rhs = bexpr.getRHS().dyn_cast<AffineConstantExpr>();
+      if (!rhs)
+        return None;
+
+      // Now compute the LHS via recursion
+      auto lhs = computeStrideInfo(bexpr.getLHS(), args);
+      if (!lhs)
+        return None;
+
+      // Divide by the divisor and return
+      // TODO: Replace the multiplication operator with division operator
+      *lhs *= (1 / rhs.getValue());
+      return lhs;
+    }
+
+    if (bexpr.getKind() == AffineExprKind::Mod) {
+      // For modulos, RHS should always be constant of symbolic, and symbols
+      // fail, so we cast to constant and give up if it doesn't work
+      auto rhs = bexpr.getRHS().dyn_cast<AffineConstantExpr>();
+      if (!rhs)
+        return None;
+
+      // TODO: Check that returning the constant value like below is correct.
+      return StrideInfo(rhs.getValue());
+    }
+
     if (bexpr.getKind() == AffineExprKind::Add) {
       // For add, we compute both sides and add them (presuming they both return
       // valid outputs).
@@ -399,6 +432,7 @@ Optional<StrideInfo> computeStrideInfo(AffineExpr expr, ValueRange args) {
 
 Optional<SmallVector<StrideInfo, 4>> computeStrideInfo(AffineMap map,
                                                        ValueRange args) {
+  IVLOG(4, "computeStrideInfo(AffineMap map, ValueRange args)");
   SmallVector<StrideInfo, 4> results;
   for (auto expr : map.getResults()) {
     auto dimStride = computeStrideInfo(expr, args);
@@ -412,6 +446,10 @@ Optional<SmallVector<StrideInfo, 4>> computeStrideInfo(AffineMap map,
 
 Optional<StrideInfo> computeStrideInfo(MemRefType memRefType, AffineMap map,
                                        ValueRange values) {
+  IVLOG(4, "computeStrideInfo(MemRefType memRefType, AffineMap map, ValueRange "
+           "values)");
+  IVLOG(4, "map: " << mlir::debugString(map));
+  IVLOG(4, "memRefType: " << mlir::debugString(memRefType));
   // Verify the in/out dimensions make sense.
   assert(map.getNumResults() == memRefType.getRank());
   assert(map.getNumInputs() == values.size());
@@ -422,48 +460,67 @@ Optional<StrideInfo> computeStrideInfo(MemRefType memRefType, AffineMap map,
   if (failed(getStridesAndOffset(memRefType, memRefStrides, memRefOffset)))
     return None;
 
+  IVLOG(4, "Calculated memRefOffset: " << memRefOffset);
+
   // Fail if anything is dynamic.
   if (ShapedType::isDynamicStrideOrOffset(memRefOffset))
     return None;
 
+  IVLOG(4, "isDynamicStrideOrOffset is false");
+  IVLOG(4, "memRefStrides.size(): " << memRefStrides.size());
+
   for (size_t i = 0; i < memRefStrides.size(); i++) {
+    IVLOG(4, " memRefStrides[i]: " << memRefStrides[i]);
     if (ShapedType::isDynamicStrideOrOffset(memRefStrides[i]))
       return None;
   }
 
+  IVLOG(4, "ALL isDynamicStrideOrOffset is false");
+
   StrideInfo out(memRefOffset);
   for (size_t i = 0; i < map.getNumResults(); i++) {
     // Collect the output for each dimension of the memRef.
+
+    // IVLOG(4, "i: " << i << " map.getResult(i): " << map.getResult(i));
     auto perDim = computeStrideInfo(map.getResult(i), values);
 
     // Fail if needed
-    if (!perDim)
+    if (!perDim) {
+      IVLOG(4, " perDim is NULL");
       return None;
+    }
 
+    IVLOG(4, " *perDim: " << *perDim);
+    IVLOG(4, " memRefStrides[i]: " << memRefStrides[i]);
     // Otherwise multiply by memRef stride and add in
     *perDim *= memRefStrides[i];
     out += *perDim;
+    IVLOG(4, " out: " << out);
   }
   // Return the accumulated results
   return out;
 }
 
 Optional<StrideInfo> computeStrideInfo(PxaLoadOp op) {
+  IVLOG(4, "computeStrideInfo(PxaLoadOp op) " << op);
   return computeStrideInfo(op.getMemRefType(), op.getAffineMap(),
                            op.getMapOperands());
 }
 
 Optional<StrideInfo> computeStrideInfo(PxaReduceOp op) {
+  IVLOG(4, "computeStrideInfo(PxaReduceOp op) " << op);
   return computeStrideInfo(op.getMemRefType(), op.getAffineMap(),
                            op.getMapOperands());
 }
 
 Optional<StrideInfo> computeStrideInfo(PxaVectorLoadOp op) {
+  IVLOG(4, "computeStrideInfo(PxaVectorLoadOp op) " << op);
   return computeStrideInfo(op.getMemRefType(), op.getAffineMap(),
                            op.getMapOperands());
 }
 
 Optional<StrideInfo> computeStrideInfo(PxaVectorReduceOp op) {
+  IVLOG(4, "computeStrideInfo(PxaVectorReduceOp op) " << op);
   return computeStrideInfo(op.getMemRefType(), op.getAffineMap(),
                            op.getMapOperands());
 }
