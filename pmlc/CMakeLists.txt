@@ -6,6 +6,7 @@ add_subdirectory(rt)
 add_subdirectory(target)
 add_subdirectory(testing)
 add_subdirectory(tools)
+add_subdirectory(transforms)
 add_subdirectory(util)
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
