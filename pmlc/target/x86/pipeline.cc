@@ -216,11 +216,11 @@ std::unique_ptr<Pass> createOpenMPWorkaroundPass() {
 void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(layer::createInlineLayersPass());
   pm.addPass(tile::createComputeBoundsPass());
+  pm.addPass(tile::createSplitMainPass());
+  pm.addPass(transforms::createHoistingPass());
   pm.addPass(tile::createPadConstraintsPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
-  pm.addPass(tile::createSplitMainPass());
-  pm.addPass(transforms::createHoistingPass());
 
   pm.addPass(pmlc::conversion::tile_to_pxa::createLowerTileToPXAPass());
   pm.addPass(createCanonicalizerPass());
