@@ -180,7 +180,6 @@ private:
   std::stack<Entry> stack;
   std::vector<ExprNodePtr> flat;
   std::unordered_set<const ExprNode *> visited;
-  std::unordered_set<ExprNodePtr> exterior;
 
 public:
   explicit AstTraversal(const std::vector<ExprNodePtr> &outputs,
@@ -196,7 +195,12 @@ public:
       } else if (!visited.count(entry.expr.get())) {
         visited.emplace(entry.expr.get());
         if (layer && entry.expr->parent.get() != layer) {
-          exterior.insert(entry.expr);
+          if (std::find(layer->operands.begin(), layer->operands.end(),
+                        entry.expr) == layer->operands.end()) {
+            throw std::runtime_error(llvm::formatv(
+                "Implicit operand detected within layer body: {0}",
+                entry.expr->str()));
+          }
         } else {
           push(entry.expr, /*post=*/true);
           visit(entry.expr.get());
@@ -207,13 +211,9 @@ public:
 
   const std::vector<ExprNodePtr> &getFlat() const { return flat; }
 
-  const std::unordered_set<ExprNodePtr> &getExterior() const {
-    return exterior;
-  }
-
 private:
   void visit(ExprNode *node) {
-    TypeSwitch<ExprNode *>(node) //
+    TypeSwitch<ExprNode *>(node)
         .Case<ExprNodeCast>([&](ExprNodeCast *expr) { push(expr->expr); })
         .Case<ExprNodeContraction>([&](ExprNodeContraction *expr) {
           // Push inputs from right-to-left so they eventually get processed in
@@ -228,6 +228,9 @@ private:
         .Case<ExprNodeElement>([&](ExprNodeElement *expr) { push(expr->expr); })
         .Case<ExprNodeLayer>([&](ExprNodeLayer *expr) {
           for (const ExprNodePtr &node : llvm::reverse(expr->results)) {
+            push(node);
+          }
+          for (const ExprNodePtr &node : llvm::reverse(expr->operands)) {
             push(node);
           }
         })
@@ -678,7 +681,7 @@ struct ProgramBuilder {
   Value handleLayer(ExprNodeLayer *node) {
     AstTraversal traversal(node->results, node);
     SmallVector<Value, 8> operands;
-    for (const ExprNodePtr &operand : traversal.getExterior()) {
+    for (const ExprNodePtr &operand : node->operands) {
       operands.push_back(builder.lookupNode(operand));
     }
     llvm::SetVector<Value> results;

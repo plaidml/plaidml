@@ -11,6 +11,7 @@
 #include "mlir/IR/AffineMap.h"
 #include "mlir/Pass/Pass.h"
 
+#include "pmlc/dialect/stdx/ir/ops.h"
 #include "pmlc/dialect/tile/ir/ops.h"
 #include "pmlc/dialect/tile/transforms/padding.h"
 #include "pmlc/dialect/tile/transforms/pass_detail.h"
@@ -116,16 +117,16 @@ void PadConstraintsPass::runOnFunction() {
       continue;
     }
 
-    // Check if it's a block argument, and if so add an IdentOp to copy the
-    // value.
-    if (auto arg = def.dyn_cast<BlockArgument>()) {
-      auto block = arg.getOwner();
-      auto loc = block->getParentOp()->getLoc();
-      OpBuilder inner(block->getParent());
+    // Check if it's a block argument or unpack source, and if so add an IdentOp
+    // to copy the value.
+    if (def.isa<BlockArgument>() ||
+        dyn_cast_or_null<stdx::UnpackOp>(def.getDefiningOp())) {
+      OpBuilder inner(&getContext());
+      inner.setInsertionPointAfterValue(def);
       // Construct an initial identity operation.
-      auto ident = inner.create<IdentOp>(loc, arg.getType(), arg);
+      auto ident = inner.create<IdentOp>(def.getLoc(), def.getType(), def);
       // Replace all uses with ident (except for newly generated use).
-      arg.replaceAllUsesExcept(ident, llvm::SmallPtrSet<Operation *, 1>{ident});
+      def.replaceAllUsesExcept(ident, llvm::SmallPtrSet<Operation *, 1>{ident});
       // Now use ident for all further work.
       def = ident;
     }

@@ -3,6 +3,7 @@
 #include "plaidml/edsl/ffi.h"
 
 #include <algorithm>
+#include <deque>
 #include <memory>
 #include <stack>
 #include <string>
@@ -101,14 +102,14 @@ struct LayerContext {
     if (stack.empty()) {
       return;
     }
-    node->parent = stack.top();
+    node->parent = stack.front();
   }
 
-  void push(const std::shared_ptr<ast::ExprNodeLayer>& layer) { stack.push(layer); }
+  void push(const std::shared_ptr<ast::ExprNodeLayer>& layer) { stack.push_front(layer); }
 
-  void pop() { stack.pop(); }
+  void pop() { stack.pop_front(); }
 
-  std::stack<std::shared_ptr<ast::ExprNodeLayer>> stack;
+  std::deque<std::shared_ptr<ast::ExprNodeLayer>> stack;
 };
 
 }  // namespace
@@ -232,7 +233,13 @@ plaidml_expr* plaidml_expr_constant(  //
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_expr_constant");
     auto node = std::make_shared<ast::ExprNodeConstTensor>(buffer->buffer, name);
-    // Constants cannot be added to layers, so no LayerContext line
+    // Constants cannot be added to layers, they must be defined in the global scope because they will eventually become
+    // program arguments.
+    // However, we need to ensure that all parent layers include the constant node as an operand.
+    for (ast::ExprNodePtr layerNode : LayerContext::get()->stack) {
+      auto* layer = llvm::dyn_cast<ast::ExprNodeLayer>(layerNode.get());
+      layer->operands.push_back(node);
+    }
     return new plaidml_expr{node};
   });
 }
@@ -796,16 +803,22 @@ void plaidml_exprs_free(  //
 plaidml_expr* plaidml_expr_layer_begin(  //
     plaidml_error* err,                  //
     const char* op,                      //
+    size_t ninputs,                      //
+    plaidml_expr** inputs,               //
     size_t nattrs,                       //
     plaidml_attr** raw_attrs) {
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_expr_layer_begin");
+    std::vector<ast::ExprNodePtr> operands(ninputs);
+    for (size_t i = 0; i < ninputs; i++) {
+      operands[i] = inputs[i]->node;
+    }
     llvm::StringMap<ast::VarNodePtr> attrs;
     for (size_t i = 0; i < nattrs; i++) {
       plaidml_attr* attr = raw_attrs[i];
       attrs[attr->key] = attr->value->node;
     }
-    auto node = std::make_shared<ast::ExprNodeLayer>(op, attrs);
+    auto node = std::make_shared<ast::ExprNodeLayer>(op, operands, attrs);
     LayerContext::get()->push(node);
     return new plaidml_expr{node};
   });
@@ -817,7 +830,7 @@ plaidml_exprs* plaidml_expr_layer_end(  //
     size_t noutputs,                    //
     plaidml_expr** outputs) {
   return ffi_wrap<plaidml_exprs*>(err, nullptr, [&] {
-    IVLOG(3, "plaidml_expr_layer");
+    IVLOG(3, "plaidml_expr_layer_end");
     auto node = std::dynamic_pointer_cast<ast::ExprNodeLayer>(expr->node);
     if (!node) {
       throw std::bad_cast();

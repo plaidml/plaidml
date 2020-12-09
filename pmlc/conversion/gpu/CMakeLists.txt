@@ -4,6 +4,7 @@ pml_cc_library(
     lowering.h
   SRCS
     kernel_outlining.cc
+    gather_gpu_launch_funcs.cc
   DEPS
     ::passes-gen
     pmlc::util

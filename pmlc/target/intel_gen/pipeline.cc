@@ -207,12 +207,14 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
-  // Do kernel outlining
+  // GPU transforms
   pm.addPass(conversion::gpu::createGpuKernelOutliningPass());
+  pm.addPass(conversion::gpu::createGatherGpuLaunchFuncsPass());
 
   // Convert GPU to comp.
   pm.addPass(pmlc::conversion::gpu_to_comp::createConvertGpuToCompPass(
       comp::ExecEnvRuntime::Vulkan, /*memorySpace=*/0));
+  pm.addPass(comp::createMinimizeBufferTransfersPass());
   pm.addPass(comp::createExecEnvCoalescingPass());
   pm.addPass(comp::createMinimizeAllocationsPass());
 

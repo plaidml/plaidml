@@ -41,7 +41,6 @@ void registerBinaryOps() {
   registerBinaryOp("Less", "cmp_lt");
   registerBinaryOp("LogicalAnd", "logical_and");
   registerBinaryOp("LogicalOr", "logical_or");
-  registerBinaryOp("LogicalAnd", "logical_and");
   registerBinaryOpCall("Maximum", op::maximum);
   registerBinaryOpCall("Minimum", op::minimum);
   registerBinaryOp("Mod", "mod");
