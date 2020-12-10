@@ -24,10 +24,10 @@ plaidml_cc_library(
     name = "transforms",
     srcs = [
         "autotile.cc",
-        "buffer_placement.cc",
         "cache.cc",
         "cpu_thread.cc",
         "dataflow_opt.cc",
+        "dealloc_placement.cc",
         "fusion.cc",
         "gpu_thread.cc",
         "layout_utils.cc",
