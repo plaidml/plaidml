@@ -55,9 +55,6 @@ void registerCumSum() {
   registerOp("cumsum", [](const Context& ctx) {
     IE_ASSERT(ctx.operands.size() == 2);
     auto I = ctx.operands.at(0);
-    if (I.rank() > 4 || I.rank() < 2) {
-      THROW_IE_EXCEPTION << "input tensor must be 2 <= rank <= 4 ";
-    }
     auto* layer = ngraph::as_type<ngraph::opset3::CumSum>(ctx.layer);
     auto axis = cast_constant_operand<int64_t>(1, layer)[0];
     if (axis < 0) {
