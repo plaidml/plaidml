@@ -26,16 +26,16 @@ std::vector<T> cast_constant_operand(size_t operand_idx, ngraph::Node* layer) {
   }
 }
 
-edsl::Tensor reverse_tensor(edsl::Tensor reverse_crop, int64_t seq_axis) {
-  std::vector<edsl::TensorDim> dims(reverse_crop.rank());
-  reverse_crop.bind_dims(dims);
-  std::vector<edsl::TensorIndex> I_idxs(reverse_crop.rank());
+edsl::Tensor reverse_tensor(edsl::Tensor I, int64_t seq_axis) {
+  std::vector<edsl::TensorDim> dims(I.rank());
+  I.bind_dims(dims);
+  std::vector<edsl::TensorIndex> I_idxs(I.rank());
   std::vector<edsl::TensorIndex> O_idxs(I_idxs);
   O_idxs[seq_axis] = dims[seq_axis] - 1 - I_idxs[seq_axis];
-  return edsl::Contraction().outShape(dims).outAccess(O_idxs).assign(reverse_crop(I_idxs));
+  return edsl::Contraction().outShape(dims).outAccess(O_idxs).assign(I(I_idxs));
 }
 
-edsl::Tensor exclued_first(edsl::Tensor I, int64_t axis) {
+edsl::Tensor exclude_first(edsl::Tensor I, int64_t axis) {
   std::vector<edsl::TensorDim> dims(I.rank());
   I.bind_dims(dims);
 
@@ -52,7 +52,7 @@ edsl::Tensor exclued_first(edsl::Tensor I, int64_t axis) {
 namespace PlaidMLPlugin {
 
 void registerCumSum() {
-  registerOp("cumsum", [](const Context& ctx) {
+  registerOp("CumSum", [](const Context& ctx) {
     IE_ASSERT(ctx.operands.size() == 2);
     auto I = ctx.operands.at(0);
     auto* layer = ngraph::as_type<ngraph::opset3::CumSum>(ctx.layer);
@@ -65,7 +65,7 @@ void registerCumSum() {
 
     auto I_reverse = is_reverse ? reverse_tensor(I, axis) : I;
     auto sum_tensor = op::cumsum(I_reverse, axis);
-    auto O = is_exclusive ? exclued_first(sum_tensor, axis) : sum_tensor;
+    auto O = is_exclusive ? exclude_first(sum_tensor, axis) : sum_tensor;
     auto O_reverse = is_reverse ? reverse_tensor(O, axis) : O;
     return edsl::make_tuple(O_reverse);
   });
