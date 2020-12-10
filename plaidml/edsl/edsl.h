@@ -737,6 +737,13 @@ inline Tensor abs(const Tensor& x) { return intrinsic("abs", x); }
 inline Tensor acos(const Tensor& x) { return intrinsic("acos", x); }
 
 ///
+/// Computes the elementwise inverse hyperbolic cosine of `x`.
+/// \param x Tensor
+/// \return Tensor
+///
+inline Tensor acosh(const Tensor& x) { return intrinsic("acosh", x); }
+
+///
 /// Computes the elementwise arcsine of `x`.
 /// \param x Tensor
 /// \return Tensor
@@ -744,11 +751,25 @@ inline Tensor acos(const Tensor& x) { return intrinsic("acos", x); }
 inline Tensor asin(const Tensor& x) { return intrinsic("asin", x); }
 
 ///
+/// Computes the elementwise inverse hyperbolic sine of `x`.
+/// \param x Tensor
+/// \return Tensor
+///
+inline Tensor asinh(const Tensor& x) { return intrinsic("asinh", x); }
+
+///
 /// Computes the elementwise arctangent of `x`.
 /// \param x Tensor
 /// \return Tensor
 ///
 inline Tensor atan(const Tensor& x) { return intrinsic("atan", x); }
+
+///
+/// Computes the elementwise inverse hyperbolic tangent of `x`.
+/// \param x Tensor
+/// \return Tensor
+///
+inline Tensor atanh(const Tensor& x) { return intrinsic("atanh", x); }
 
 ///
 /// Casts the element type of a tensor `x` to the type specified by `dtype`.
@@ -802,14 +823,88 @@ inline Tensor exp(const Tensor& x) { return intrinsic("exp", x); }
 ///
 inline Tensor floor(const Tensor& x) { return intrinsic("floor", x); }
 
+enum class InterpolationMode : uint64_t {
+  NEAREST,
+  LINEAR,
+  CUBIC,
+};
+
+enum class NearestMode : uint64_t {
+  ROUND_PREFER_FLOOR,
+  ROUND_PREFER_CEIL,
+  FLOOR,
+  CEIL,
+  SIMPLE,
+};
+
 ///
-/// Takes an input tensor (`x`) and a set of indices to gather over (`y`), and returns an output tensor that gathers the
-/// input tensor from the indices specified.
-/// \param x Tensor
-/// \param y Tensor
-/// \return Tensor
+/// Gather takes an input tensor (`x`) and a set of indices to gather over (`y`), and computes an output tensor that
+/// gathers the input tensor from the indices specified.
 ///
-inline Tensor gather(const Tensor& x, const Tensor& y) { return intrinsic("gather", x, y); }
+class gather {
+ public:
+  explicit gather(const Tensor& x, const Tensor& y) : x_(x), y_(y) {}
+
+  ///
+  /// Set the axis for gather.
+  ///
+  gather& axis(int64_t axis) {
+    if (axis < 0) {
+      axis += x_.rank();
+    }
+    axis_ = Tensor(axis);
+    return *this;
+  }
+
+  ///
+  /// Set the interpolation mode for gather.
+  ///
+  gather& interpolationMode(InterpolationMode mode) {
+    interpolation_mode_ = Tensor(static_cast<uint64_t>(mode));
+    return *this;
+  }
+
+  ///
+  /// Set the nearest mode for gather.
+  ///
+  gather& nearestMode(NearestMode mode) {
+    nearest_mode_ = Tensor(static_cast<uint64_t>(mode));
+    return *this;
+  }
+
+  ///
+  /// Set the coefficient that controls cubic interpolation for gather.
+  ///
+  gather& cubeCoeff(float cube_coeff) {
+    cube_coeff_ = Tensor(cube_coeff);
+    return *this;
+  }
+
+  ///
+  /// Construct gather.
+  ///
+  Tensor build() const {
+    std::vector<Tensor> args = {x_, y_, axis_, interpolation_mode_, nearest_mode_, cube_coeff_};
+    return intrinsicCall("gather", args);
+  }
+
+  operator Tensor() { return build(); }
+
+ private:
+  Tensor x_;
+  Tensor y_;
+
+  ///
+  /// axis_ is a dimension index to gather data from
+  /// interpolation_mode_ specifies type of interpolation
+  /// nearest_mode_ specifies type of  nearest interpolation
+  /// cube_coeff_ controls the cubic interpolation
+  ///
+  Tensor axis_ = Tensor(0);
+  Tensor interpolation_mode_ = Tensor(static_cast<uint64_t>(InterpolationMode::LINEAR));
+  Tensor nearest_mode_ = Tensor(static_cast<uint64_t>(NearestMode::ROUND_PREFER_FLOOR));
+  Tensor cube_coeff_ = Tensor(-0.75);
+};
 
 ///
 /// Returns the identity of `x`.
@@ -1288,7 +1383,8 @@ inline Tensor trace(const Tensor& x, const std::string& msg) { return pragma(x, 
 using LayerBodySingleFn = std::function<Tensor()>;
 using LayerBodyMultiFn = std::function<TensorVec()>;
 
-inline TensorVec layer(const std::string& op, const Dictionary& attrs, const LayerBodyMultiFn& fn) {
+inline TensorVec layer(const std::string& op, const TensorVec& operands, const Dictionary& attrs,
+                       const LayerBodyMultiFn& fn) {
   std::vector<plaidml_attr> elts;
   std::vector<plaidml_attr*> ptrs;
   elts.reserve(attrs.size());
@@ -1299,10 +1395,18 @@ inline TensorVec layer(const std::string& op, const Dictionary& attrs, const Lay
     ptrs.push_back(&elts.back());
   }
 
+  std::vector<plaidml_expr*> rawOperands;
+  rawOperands.reserve(operands.size());
+  for (Tensor operand : operands) {
+    rawOperands.push_back(operand.as_ptr());
+  }
+
   auto expr = details::make_ptr(     //
       ffi::call<plaidml_expr*>(      //
           plaidml_expr_layer_begin,  //
           op.c_str(),                //
+          rawOperands.size(),        //
+          rawOperands.data(),        //
           ptrs.size(),               //
           ptrs.data()));
 
@@ -1331,11 +1435,14 @@ inline TensorVec layer(const std::string& op, const Dictionary& attrs, const Lay
   return outerResults;
 }
 
-inline Tensor layer(const std::string& op, const Dictionary& attrs, const LayerBodySingleFn& fn) {
-  return layer(op, attrs, [&]() { return TensorVec{fn()}; })[0];
+inline Tensor layer(const std::string& op, const TensorVec& operands, const Dictionary& attrs,
+                    const LayerBodySingleFn& fn) {
+  return layer(op, operands, attrs, [&]() { return TensorVec{fn()}; })[0];
 }
 
-inline Tensor layer(const std::string& op, const LayerBodySingleFn& fn) { return layer(op, {}, fn); }
+inline Tensor layer(const std::string& op, const TensorVec& operands, const LayerBodySingleFn& fn) {
+  return layer(op, operands, {}, fn);
+}
 
 }  // namespace edsl
 }  // namespace plaidml

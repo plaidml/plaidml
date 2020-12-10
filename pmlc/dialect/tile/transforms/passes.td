@@ -31,4 +31,9 @@ def PadConstraints : FunctionPass<"tile-pad-constraints"> {
   let constructor = "pmlc::dialect::tile::createPadConstraintsPass()";
 }
 
+def SplitMain :  Pass<"tile-split-main", "mlir::ModuleOp"> {
+  let summary = "Split main into init/main/fini";
+  let constructor = "pmlc::dialect::tile::createSplitMainPass()";
+}
+
 #endif // __PMLC_DIALECT_TILE_PASSES__

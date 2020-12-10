@@ -17,6 +17,7 @@ plaidml_cc_library(
         "opencl_utils.h",
         "opencl_utils.cc",
     ],
+    hdrs = ["register.h"],
     deps = [
         "//pmlc/compiler",
         "//pmlc/rt",

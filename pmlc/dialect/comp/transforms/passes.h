@@ -14,6 +14,7 @@ namespace pmlc::dialect::comp {
 std::unique_ptr<mlir::Pass> createExecEnvCoalescingPass();
 
 std::unique_ptr<mlir::Pass> createMinimizeAllocationsPass();
+std::unique_ptr<mlir::Pass> createMinimizeBufferTransfersPass();
 
 std::unique_ptr<mlir::Pass> createRecalculateEventDepsPass();
 std::unique_ptr<mlir::Pass> createRecalculateEventDepsPass(bool safeDealloc);

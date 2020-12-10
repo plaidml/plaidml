@@ -1,5 +1,6 @@
 pml_cc_library(
   NAME vulkan
+  HDRS register.h
   SRCS
     vulkan_device.cc
     vulkan_device.h
