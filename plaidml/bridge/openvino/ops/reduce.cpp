@@ -78,8 +78,7 @@ void registerReduceOps() {
     auto I = ctx.operands.at(0);
     std::vector<size_t> axes = get_axis_vector_from_constant_operand(1, ctx.layer);
     auto* layer = ngraph::as_type<ngraph::opset4::ReduceL1>(ctx.layer);
-    auto O = edsl::abs(op::sum(I, edsl::make_tuple(axes), layer->get_keep_dims()));
-    return edsl::make_tuple(O);
+    return edsl::make_tuple(edsl::abs(I), edsl::make_tuple(axes), layer->get_keep_dims());
   });
 
   registerOp("ReduceL2", [](const Context& ctx) {
@@ -87,8 +86,7 @@ void registerReduceOps() {
     auto I = ctx.operands.at(0);
     std::vector<size_t> axes = get_axis_vector_from_constant_operand(1, ctx.layer);
     auto* layer = ngraph::as_type<ngraph::opset4::ReduceL2>(ctx.layer);
-    auto O = edsl::sqrt(op::sum((I * I), edsl::make_tuple(axes), layer->get_keep_dims()));
-    return edsl::make_tuple(O);
+    return edsl::make_tuple(edsl::sqrt(op::sum((I * I), edsl::make_tuple(axes), layer->get_keep_dims())));
   });
 }
 
