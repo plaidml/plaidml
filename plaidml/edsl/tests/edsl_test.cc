@@ -2024,7 +2024,6 @@ TEST_F(CppEdsl, LayerUnusedOperand) {
   runProgram(program);
 }
 
-
 TEST_F(CppEdsl, BadDataType) {
   // auto A = Placeholder(DType::BFLOAT16, {10, 20});
   // Tensor O = A + A;
@@ -2042,6 +2041,7 @@ TEST_F(CppEdsl, IndexOp) {
   I.bind_dims(X0, X1);
   Tensor O = index({X0}, 0.1);
   auto program = makeProgram("IndexOp", {}, {O});
+}
 
 TEST_F(CppEdsl, LayerMulti) {
   auto A = Placeholder(DType::FLOAT32, {10, 20});
