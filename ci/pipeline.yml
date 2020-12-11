@@ -27,7 +27,7 @@ steps:
         -G Ninja \
         -D CMAKE_BUILD_TYPE=Release \
         -D CPM_SOURCE_CACHE=$${TEMP}/cpm \
-        -D ENABLE_OPENVINO_BRIDGE=ON \
+        -D PML_OPENVINO_BRIDGE=ON \
         -D TEMP=$${TEMP}
 
       echo --- :hammer_and_wrench: ninja

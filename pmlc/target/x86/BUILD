@@ -53,6 +53,7 @@ plaidml_cc_library(
         "//pmlc/dialect/tile/transforms",
         "//pmlc/dialect/xsmm",
         "//pmlc/rt",
+        "//pmlc/transforms",
         "@llvm-project//mlir:AffineToStandardTransforms",
         "@llvm-project//mlir:AffineTransforms",
         "@llvm-project//mlir:LLVMTransforms",

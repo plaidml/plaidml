@@ -31,6 +31,7 @@
 #include "pmlc/target/x86/heatmap.h"
 #include "pmlc/target/x86/pass_detail.h"
 #include "pmlc/target/x86/passes.h"
+#include "pmlc/transforms/passes.h"
 #include "pmlc/util/env.h"
 #include "pmlc/util/logging.h"
 
@@ -215,10 +216,11 @@ std::unique_ptr<Pass> createOpenMPWorkaroundPass() {
 void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(layer::createInlineLayersPass());
   pm.addPass(tile::createComputeBoundsPass());
+  pm.addPass(tile::createSplitMainPass());
+  pm.addPass(transforms::createHoistingPass());
   pm.addPass(tile::createPadConstraintsPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
-  pm.addPass(tile::createSplitMainPass());
 
   pm.addPass(pmlc::conversion::tile_to_pxa::createLowerTileToPXAPass());
   pm.addPass(createCanonicalizerPass());
@@ -254,7 +256,7 @@ void pipelineBuilder(OpPassManager &pm) {
 
   pm.addPass(pxa::createLocalizePass());
   pm.addPass(pxa::createResizeTmpsPass());
-  pm.addPass(pxa::createBufferPlacementPass());
+  pm.addPass(pxa::createDeallocPlacementPass());
   pm.addPass(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
