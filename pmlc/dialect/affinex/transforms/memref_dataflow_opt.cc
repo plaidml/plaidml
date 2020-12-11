@@ -34,16 +34,21 @@ struct DenseMapInfo<MemAccess> {
     if (LHS.memref != RHS.memref) {
       return false;
     }
-    return true;
 
-    /*
-    AffineValueMap lhsValueMap, rhsValueMap, diff;
-    lhsValueMap.reset(LHS.map, LHS.indices);
-    rhsValueMap.reset(RHS.map, RHS.indices);
-    AffineValueMap::difference(lhsValueMap, rhsValueMap, &diff);
-    return llvm::all_of(diff.getAffineMap().getResults(),
-                        [](AffineExpr e) { return e == 0; });
-    */
+    if (LHS.map != RHS.map) {
+      return false;
+    }
+
+    if (LHS.indices.size() != RHS.indices.size()) {
+      return false;
+    }
+
+    for (size_t i = 0; i < LHS.indices.size(); ++i) {
+      if (LHS.indices[i] != RHS.indices[i]) {
+        return false;
+      }
+    }
+    return true;
   }
 };
 } // namespace llvm
@@ -59,38 +64,43 @@ struct AffinexMemRefDataFlowOpt
     llvm::DenseMap<MemAccess, AffineWriteOpInterface> lastStoreOps;
 
     for (Operation &op : block.getOperations()) {
+      // we only care about stores and loads
       if (auto storeOp = dyn_cast<AffineWriteOpInterface>(op)) {
-        MemAccess access;
-        access.memref = storeOp.getMemRef();
-        access.map = storeOp.getAffineMap();
-        access.indices.append(storeOp.getMapOperands().begin(),
-                              storeOp.getMapOperands().end());
-
+        MemAccess access{storeOp.getMemRef(), storeOp.getAffineMap(),
+                         storeOp.getMapOperands()};
+        // if we have already stored to this location in this block
         if (lastStoreOps.find(access) != lastStoreOps.end()) {
           auto lastStoreOp = lastStoreOps[access];
+          // erase the previous store (later)
           opsToErase.push_back(lastStoreOp);
         }
-
+        // update last store op
         lastStoreOps[access] = storeOp;
       } else if (auto loadOp = dyn_cast<AffineReadOpInterface>(op)) {
-        MemAccess access;
-        access.memref = loadOp.getMemRef();
-        access.map = loadOp.getAffineMap();
-        access.indices.append(loadOp.getMapOperands().begin(),
-                              loadOp.getMapOperands().end());
-
+        MemAccess access{loadOp.getMemRef(), loadOp.getAffineMap(),
+                         loadOp.getMapOperands()};
+        // if we have already stored to this location in this block
         if (lastStoreOps.find(access) != lastStoreOps.end()) {
           auto lastStoreOp = lastStoreOps[access];
+          // replace all uses of the load with the store value
           loadOp.getValue().replaceAllUsesWith(lastStoreOp.getValueToStore());
-          memrefsToErase.insert(loadOp.getMemRef());
+          // erase the load (later)
           opsToErase.push_back(loadOp);
+          // consider the memref for deletion (later)
+          memrefsToErase.insert(loadOp.getMemRef());
         }
       }
     }
 
-    for (auto *op : opsToErase)
+    // erase all redundant loads and stores
+    for (auto *op : opsToErase) {
       op->erase();
+    }
 
+    // BEGIN leverage from upstream MLIR
+    // Check if the store fwd'ed memrefs are now left with only stores and can
+    // thus be completely deleted. Note: the canonicalize pass should be able
+    // to do this as well, but we'll do it here since we collected these anyway.
     for (auto memref : memrefsToErase) {
       // If the memref hasn't been alloc'ed in this function, skip.
       Operation *defOp = memref.getDefiningOp();
@@ -108,6 +118,7 @@ struct AffinexMemRefDataFlowOpt
         user->erase();
       defOp->erase();
     }
+    // END leverage from upstream MLIR
   }
 
   void runOnFunction() override {

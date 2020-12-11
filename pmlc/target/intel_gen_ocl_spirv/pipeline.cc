@@ -136,6 +136,9 @@ void pipelineBuilder(OpPassManager &pm,
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
+  // Block level MemRef dataflow optimization
+  // WARNING: Assumes no aliasing
+  // (try disabling this pass in case of correctness errors)
   pm.addPass(pmlc::dialect::affinex::createAffinexMemRefDataFlowOpt());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
