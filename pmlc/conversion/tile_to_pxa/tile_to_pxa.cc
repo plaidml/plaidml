@@ -905,30 +905,29 @@ struct ArgSortOpConversion : public OpConversionPattern<tile::ArgSortOp> {
     result = layerOp.body().getArguments()[0];
     tensor = layerOp.body().getArguments()[1];
 
-    // Create an affine loop nest over all the dimensions, including the one
-    // we are sorting on. We will use a single iteration for the sort axis,
-    // since the body of the nest will contain the sorting loop, but we will
-    // keep the number of IVs equal to the tensor rank to simplify accounting.
-    SmallVector<int64_t, 4> outerLoopShape;
-    for (size_t i = 0; i < tensorDims; ++i) {
-      outerLoopShape.push_back((i == axis) ? 1 : shape[i]);
-    }
-    auto outerLoop = rewriter.create<AffineParallelOp>(
-        loc, ArrayRef<Type>{resultType},
-        ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign}, outerLoopShape);
-    rewriter.setInsertionPointToStart(outerLoop.getBody());
-
-    // For each load or store, we will need an array of indices, which will
-    // always be equal to the outer loop IVs for all but the sort axis.
-    SmallVector<Value, 4> ops;
-    for (size_t i = 0; i < tensorDims; ++i) {
-      ops.push_back(outerLoop.getIVs()[i]);
-    }
-
     auto icon0 =
         rewriter.create<ConstantOp>(loc, rewriter.getIndexAttr(0)).getResult();
     auto icon1 =
         rewriter.create<ConstantOp>(loc, rewriter.getIndexAttr(1)).getResult();
+
+    // Create a loop nest over all the dimensions, including the one we are
+    // sorting on. We will use a single iteration for the sort axis, since the
+    // body of the nest will contain the sorting loop, but we will keep the
+    //  number of IVs equal to the tensor rank to simplify accounting.
+    SmallVector<Value, 4> ops;
+    for (size_t i = 0; i < tensorDims; ++i) {
+      if (i == axis) {
+        ops.push_back(icon0);
+        continue;
+      }
+      auto limit =
+          rewriter.create<ConstantOp>(loc, rewriter.getIndexAttr(shape[i]))
+              .getResult();
+      auto loop = rewriter.create<scf::ForOp>(loc, icon0, limit, icon1);
+      ops.push_back(loop.getInductionVar());
+      rewriter.setInsertionPointToStart(loop.getBody());
+    }
+
     auto iconN =
         rewriter.create<ConstantOp>(loc, rewriter.getIndexAttr(shape[axis]))
             .getResult();
@@ -1096,10 +1095,8 @@ struct ArgSortOpConversion : public OpConversionPattern<tile::ArgSortOp> {
     //   }
     // }
 
-    rewriter.create<AffineYieldOp>(loc, ArrayRef<Value>{result});
     rewriter.setInsertionPointToEnd(&layerOp.body().back());
-    auto loopResult = outerLoop.getResult(0);
-    rewriter.create<layer::ReturnOp>(loc, ArrayRef<Value>{loopResult});
+    rewriter.create<layer::ReturnOp>(loc, ArrayRef<Value>{result});
     rewriter.replaceOp(op, layerOp.getResult(0));
     return success();
   }
