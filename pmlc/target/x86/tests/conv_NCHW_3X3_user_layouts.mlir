@@ -4,12 +4,14 @@
 #NCHW_to_NHWC = affine_map<(N,C,H,W) -> (N,H,W,C)>
 
 
+// If no user data layout maps are specified the code works just fine
 // !I_memref = type memref<1x64x56x56xf32> 
 // !K_memref = type memref<64x64x3x3xf32>  
 !O_memref = type memref<1x56x56x64xf32> 
 
-!I_memref = type memref<1x64x56x56xf32, #NCHW_to_NHWC>
-!K_memref = type memref<64x64x3x3xf32, #K_map>
+// FIXME: When the user data layout maps are specified, the code does not work
+ !I_memref = type memref<1x64x56x56xf32, #NCHW_to_NHWC>
+ !K_memref = type memref<64x64x3x3xf32, #K_map>
 
 
 func @print_memref_f32(memref<*xf32>)
@@ -51,23 +53,27 @@ func @baseline() {
   %CI = dim %I, %c1 : !I_memref
   %CO = dim %O, %c1 : !O_memref
 
-  affine.parallel (%x, %y, %ci, %co, %kh, %kw) = (0, 0, 0, 0, 0, 0) to (56, 56, 64, 64, 3, 3) { 
-    %0 = affine.load %I[0, %ci, %x, %y] : !I_memref 
-    %1 = affine.load %K[%co, %ci, %kh, %kw] : !K_memref 
+// Code block 1
+//  affine.parallel (%x, %y, %ci, %co, %kh, %kw) = (0, 0, 0, 0, 0, 0) to (56, 56, 64, 64, 3, 3) { 
+//    %0 = affine.load %I[0, %ci, %x, %y] : !I_memref 
+//    %1 = affine.load %K[%co, %ci, %kh, %kw] : !K_memref 
+//    %2 = mulf %0, %1 : f32 
+//    %3 = affine.load %O[0, %x, %y, %co] : !O_memref
+//    %4 = addf %2, %3 : f32
+//    affine.store %4, %O[0, %x, %y, %co] : !O_memref
+//  } 
+
+// Code block 2
+  affine.parallel (%x, %y, %ci, %co, %kh, %kw) = (0, 0, 0, 0, 0, 0) to (56, 56, 64, 64, 3, 3) reduce ("assign") -> (memref<1x56x56x64xf32>) { 
+    %0 = pxa.load %I[0, %ci, %x, %y] : !I_memref 
+    %1 = pxa.load %K[%co, %ci, %kh, %kw] : !K_memref 
     %2 = mulf %0, %1 : f32 
-    %3 = affine.load %O[0, %x, %y, %co] : !O_memref
-    %4 = addf %2, %3 : f32
-    affine.store %4, %O[0, %x, %y, %co] : !O_memref
+    %3 = pxa.reduce addf %2, %O[0, %x, %y, %co] : !O_memref 
+    affine.yield %3 : memref<1x56x56x64xf32> 
   } 
 
-// The following code block does not work very likely because pxa.load doesn't seem to support layout maps
-//  affine.parallel (%x, %y, %ci, %co, %kh, %kw) = (0, 0, 0, 0, 0, 0) to (56, 56, 64, 64, 3, 3) reduce ("assign") -> (memref<1x56x56x64xf32>) { 
-//    %0 = pxa.load %I[0, %ci, %x, %y] : !I_memref 
-//    %1 = pxa.load %K[%co, %ci, %kh, %kw] : !K_memref 
-//    %2 = mulf %0, %1 : f32 
-//    %3 = pxa.reduce addf %2, %O[0, %x, %y, %co] : !O_memref 
-//    affine.yield %3 : memref<1x56x56x64xf32> 
-//  } 
+  %O_ud = memref_cast %O : !O_memref to memref<*xf32>
+  call @print_memref_f32(%O_ud) : (memref<*xf32>) -> ()
  
   dealloc %O : !O_memref
   dealloc %K : !K_memref
