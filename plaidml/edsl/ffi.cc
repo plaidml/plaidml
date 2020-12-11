@@ -808,7 +808,7 @@ plaidml_expr* plaidml_expr_layer_begin(  //
     size_t nattrs,                       //
     plaidml_attr** raw_attrs) {
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
-    IVLOG(1, "plaidml_expr_layer_begin(" << op << ", inputs: " << ninputs << ")");
+    IVLOG(3, "plaidml_expr_layer_begin(" << op << ", inputs: " << ninputs << ")");
     std::vector<ast::ExprNodePtr> operands(ninputs);
     for (size_t i = 0; i < ninputs; i++) {
       operands[i] = inputs[i]->node;
@@ -831,7 +831,7 @@ plaidml_exprs* plaidml_expr_layer_end(  //
     size_t noutputs,                    //
     plaidml_expr** outputs) {
   return ffi_wrap<plaidml_exprs*>(err, nullptr, [&] {
-    IVLOG(1, "plaidml_expr_layer_end");
+    IVLOG(3, "plaidml_expr_layer_end");
     auto node = std::dynamic_pointer_cast<ast::ExprNodeLayer>(expr->node);
     if (!node) {
       throw std::bad_cast();
