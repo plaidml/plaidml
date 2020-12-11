@@ -33,6 +33,7 @@
 #include "pmlc/conversion/pxa_to_affine/passes.h"
 #include "pmlc/conversion/stdx_to_llvm/passes.h"
 #include "pmlc/conversion/tile_to_pxa/passes.h"
+#include "pmlc/dialect/affinex/transforms/passes.h"
 #include "pmlc/dialect/comp/ir/types.h"
 #include "pmlc/dialect/comp/transforms/passes.h"
 #include "pmlc/dialect/layer/transforms/passes.h"
@@ -182,6 +183,10 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(createLoopUnrollPass(
       /*unrollFactor=*/256,
       /*unrollUpToFactor=*/true));
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+
+  pm.addPass(pmlc::dialect::affinex::createAffinexMemRefDataFlowOpt());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
