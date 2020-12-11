@@ -119,6 +119,28 @@ func @multi_block(%arg: memref<1xf32>) {
   affine.for %i = 0 to 1 {
     // CHECK: affine.store
     affine.store %cst, %arg[0] : memref<1xf32>
+    // CHECK-NOT: affine.load
+    %0 = affine.load %arg[0] : memref<1xf32>
+    // CHECK: addf %cst, %cst
+    %1 = addf %0, %0 : f32
+  }
+  affine.for %i = 0 to 1 {
+    // CHECK: affine.store
+    affine.store %cst, %arg[0] : memref<1xf32>
+    // CHECK-NOT: affine.load
+    %0 = affine.load %arg[0] : memref<1xf32>
+    // CHECK: addf %cst, %cst
+    %1 = addf %0, %0 : f32
+  }
+  return
+}
+
+// CHECK: multi_block_neg
+func @multi_block_neg(%arg: memref<1xf32>) {
+  %cst = constant 0.000000e+00 : f32
+  affine.for %i = 0 to 1 {
+    // CHECK: affine.store
+    affine.store %cst, %arg[0] : memref<1xf32>
   }
   affine.for %i = 0 to 1 {
     // CHECK: affine.load
