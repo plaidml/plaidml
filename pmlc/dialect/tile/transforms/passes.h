@@ -12,13 +12,13 @@ namespace pmlc::dialect::tile {
 
 std::unique_ptr<mlir::Pass> createComputeBoundsPass();
 
-std::unique_ptr<mlir::Pass> createInlineLayersPass();
-
 std::unique_ptr<mlir::Pass> createMaterializePass();
 
 std::unique_ptr<mlir::Pass> createPadRangesPass();
 
 std::unique_ptr<mlir::Pass> createPadConstraintsPass();
+
+std::unique_ptr<mlir::Pass> createSplitMainPass();
 
 /// Generate the code for registering passes.
 #define GEN_PASS_REGISTRATION

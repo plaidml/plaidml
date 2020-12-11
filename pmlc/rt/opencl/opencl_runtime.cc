@@ -1,6 +1,7 @@
 // Copyright 2020 Intel Corporation
 #include <vector>
 
+#include "pmlc/rt/opencl/register.h"
 #include "pmlc/rt/runtime.h"
 #include "pmlc/rt/runtime_registry.h"
 #include "pmlc/util/logging.h"
@@ -29,6 +30,17 @@ private:
   std::vector<std::shared_ptr<OpenCLDevice>> devices;
 };
 
-pmlc::rt::RuntimeRegistration<OpenCLRuntime> reg{"opencl"};
+extern void registerSymbols();
+extern void registerMemrefCasts();
+
+void registerRuntime() {
+  try {
+    registerRuntime("opencl", std::make_shared<OpenCLRuntime>());
+    registerSymbols();
+    registerMemrefCasts();
+  } catch (std::exception &ex) {
+    IVLOG(2, "Failed to register 'opencl' runtime: " << ex.what());
+  }
+}
 
 } // namespace pmlc::rt::opencl

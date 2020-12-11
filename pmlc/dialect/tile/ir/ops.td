@@ -92,11 +92,27 @@ def GatherOp : MaterializeOp<"gather"> {
   let summary = "special gather operation";
   let arguments = (ins
     RankedTensorOf<[AnyScalar]>:$tensor,
-    RankedTensorOf<[AnyInteger]>:$dims);
+    RankedTensorOf<[AnyScalar]>:$indices,
+    DefaultValuedAttr<IndexAttr, "0">:$axis,
+    DefaultValuedAttr<InterpolationMode, "InterpolationMode::linear">:$interpolationMode,
+    DefaultValuedAttr<NearestMode, "NearestMode::round_prefer_floor">:$nearestMode,
+    DefaultValuedAttr<F64Attr, "-0.75">:$cubeCoeff
+  );
   let results = (outs RankedTensorOf<[AnyScalar]>:$result);
   let assemblyFormat = [{
-    $tensor $dims attr-dict `:` functional-type(operands, $result)
+    $tensor $indices attr-dict `:` functional-type(operands, $result)
   }];
+
+  let builders = [OpBuilder<
+    "mlir::OpBuilder &builder, "
+    "mlir::OperationState& result, "
+    "mlir::Type resultType, "
+    "mlir::ValueRange operands, "
+    "mlir::IntegerAttr axis, "
+    "mlir::IntegerAttr interpolationMode, "
+    "mlir::IntegerAttr nearestMode, "
+    "mlir::FloatAttr cubeCoeff"
+  >];
 }
 
 def IndexOp : SpecialOp<"index"> {
@@ -104,44 +120,6 @@ def IndexOp : SpecialOp<"index"> {
   let arguments = (ins IndexAttr:$axis);
   let results = (outs EltwiseIndex:$result);
   let assemblyFormat = "$axis attr-dict `:` type($result)";
-}
-
-def LayerOp : SpecialOp<"layer", [NoSideEffect, IsolatedFromAbove]> {
-  let summary = "layer operation";
-  let arguments = (ins
-    Variadic<EltwiseAny>:$operands,
-    StrAttr:$op,
-    DictionaryAttr:$attrs);
-  let results = (outs Variadic<EltwiseAny>:$results);
-  let regions = (region SizedRegion<1>:$body);
-
-  let skipDefaultBuilders = 1;
-  let builders = [OpBuilder<
-    "mlir::OpBuilder &builder, "
-    "mlir::OperationState& result, "
-    "mlir::StringRef op, "
-    "mlir::ArrayRef<mlir::Value> operands, "
-    "mlir::ArrayRef<mlir::Value> innerResults, "
-    "mlir::DictionaryAttr attrs"
-  >];
-
-  let extraClassDeclaration = [{
-    mlir::Block *getBody();
-  }];
-
-  let printer = [{ print$cppClass(p, *this); }];
-  let parser = [{ return parse$cppClass(parser, result); }];
-}
-
-def LayerReturnOp : SpecialOp<"layer.return", [
-  NoSideEffect,
-  ReturnLike,
-  Terminator,
-  HasParent<"LayerOp">
-]> {
-  let summary = "Return results from a layer";
-  let arguments = (ins Variadic<EltwiseAny>:$operands);
-  let assemblyFormat = "attr-dict ($operands^ `:` type($operands))?";
 }
 
 def PrngOp : SpecialOp<"prng"> {
@@ -166,11 +144,24 @@ def ReshapeOp : MaterializeOp<"reshape">,
 def ScatterOp : MaterializeOp<"scatter"> {
   let summary = "special scatter operation";
   let arguments = (ins
-    RankedTensorOf<[AnyScalar]>:$tensor,
-    RankedTensorOf<[AnyInteger]>:$dims);
+    RankedTensorOf<[AnyScalar]>:$data,
+    RankedTensorOf<[AnyScalar]>:$indices,
+    RankedTensorOf<[AnyScalar]>:$updates,
+    DefaultValuedAttr<IndexAttr, "0">:$axis,
+    DefaultValuedAttr<ScatterMode, "ScatterMode::normal">:$mode
+  );
   let results = (outs RankedTensorOf<[AnyScalar]>:$result);
+  let builders = [OpBuilder<
+    "mlir::OpBuilder &builder, "
+    "mlir::OperationState& result, "
+    "mlir::Type resultType, "
+    "mlir::ValueRange operands, "
+    "mlir::IntegerAttr axis, "
+    "mlir::IntegerAttr mode"
+  >];
+
   let assemblyFormat = [{
-    $tensor $dims attr-dict `:` functional-type(operands, $result)
+    $data $indices $updates attr-dict `:` functional-type(operands, $result)
   }];
 }
 

@@ -27,8 +27,11 @@ const std::map<ActivationTypes, std::vector<std::vector<float>>> activationTypes
     {Clamp, {{-2.0f, 2.0f}}},
     {Negative, {{}}},
     {Acos, {{}}},
+    {Acosh, {{}}},
     {Asin, {{}}},
+    {Asinh, {{}}},
     {Atan, {{}}},
+    {Atanh, {{}}},
     {Cos, {{}}},
     {Cosh, {{}}},
     {Floor, {{}}},
@@ -42,9 +45,9 @@ const std::map<ActivationTypes, std::vector<std::vector<float>>> activationTypes
     {Selu, {{1.6732f, 1.0507f}}},
     {Ceiling, {{}}},
     {Swish, {{1.0f}}},
-    // {Mish,        {{}}},
-    {HSwish, {{}}}
-    // {SoftPlus,    {{}}}
+    {Mish, {{}}},
+    {HSwish, {{}}},
+    {SoftPlus, {{}}}
 };
 
 // TODO

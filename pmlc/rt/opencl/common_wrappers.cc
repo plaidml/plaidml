@@ -35,18 +35,14 @@ ALL_CAST_MEMREF_TO_PTR(DECLARE_CAST_MEMREF_TO_PTR)
 #undef DECLARE_CAST_MEMREF_TO_PTR
 } // extern "C"
 
-namespace {
-struct Registration {
-  Registration() {
-    using pmlc::rt::registerSymbol;
+void registerMemrefCasts() {
+  using pmlc::rt::registerSymbol;
 #define REGISTER_CAST_MEMREF_TO_PTR(name, type)                                \
   registerSymbol("_mlir_ciface_" #name, reinterpret_cast<void *>(name));
 
-    ALL_CAST_MEMREF_TO_PTR(REGISTER_CAST_MEMREF_TO_PTR)
+  ALL_CAST_MEMREF_TO_PTR(REGISTER_CAST_MEMREF_TO_PTR)
 
 #undef REGISTER_CAST_MEMREF_TO_PTR
-  }
-};
-static Registration reg;
-} // namespace
+}
+
 } // namespace pmlc::rt::opencl

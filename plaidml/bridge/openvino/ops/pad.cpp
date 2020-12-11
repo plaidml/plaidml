@@ -30,23 +30,25 @@ std::vector<T> cast_constant_operand(size_t operand_idx, ngraph::Node* layer) {
 
 namespace PlaidMLPlugin {
 
-static OpRegistration reg("pad", [](const Context& ctx) {
-  auto* layer = ngraph::as_type<ngraph::opset1::Pad>(ctx.layer);
-  IE_ASSERT((ctx.operands.size() == 3) || (ctx.operands.size() == 4));
+void registerPad() {
+  registerOp("pad", [](const Context& ctx) {
+    auto* layer = ngraph::as_type<ngraph::opset1::Pad>(ctx.layer);
+    IE_ASSERT((ctx.operands.size() == 3) || (ctx.operands.size() == 4));
 
-  auto I = ctx.operands.at(0);
-  auto lo_pads = cast_constant_operand<int>(1, layer);
-  auto hi_pads = cast_constant_operand<int>(2, layer);
+    auto I = ctx.operands.at(0);
+    auto lo_pads = cast_constant_operand<int>(1, layer);
+    auto hi_pads = cast_constant_operand<int>(2, layer);
 
-  auto autopad_mode = to_plaidml(layer->get_pad_mode());
+    auto autopad_mode = to_plaidml(layer->get_pad_mode());
 
-  auto op = op::explicit_padding(I, lo_pads, hi_pads).mode(autopad_mode);
+    auto op = op::explicit_padding(I, lo_pads, hi_pads).mode(autopad_mode);
 
-  if (ctx.operands.size() == 4) {
-    op.padval(ctx.operands.at(3));
-  }
+    if (ctx.operands.size() == 4) {
+      op.padval(ctx.operands.at(3));
+    }
 
-  return edsl::make_tuple(op);
-});
+    return edsl::make_tuple(op);
+  });
+}
 
 }  // namespace PlaidMLPlugin

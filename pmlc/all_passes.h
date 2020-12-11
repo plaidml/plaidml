@@ -21,9 +21,11 @@
 #include "pmlc/conversion/stdx_to_llvm/passes.h"
 #include "pmlc/conversion/tile_to_pxa/passes.h"
 #include "pmlc/dialect/comp/transforms/passes.h"
+#include "pmlc/dialect/layer/transforms/passes.h"
 #include "pmlc/dialect/pxa/transforms/passes.h"
 #include "pmlc/dialect/stdx/transforms/passes.h"
 #include "pmlc/dialect/tile/transforms/passes.h"
+#include "pmlc/rt/runtime_registry.h"
 #include "pmlc/target/intel_gen/passes.h"
 #include "pmlc/target/intel_gen_ocl_spirv/passes.h"
 #include "pmlc/target/x86/passes.h"
@@ -71,6 +73,7 @@ inline void registerAllPasses() {
 
   // Dialect passes
   pmlc::dialect::comp::registerPasses();
+  pmlc::dialect::layer::registerPasses();
   pmlc::dialect::pxa::registerPasses();
   pmlc::dialect::stdx::registerPasses();
   pmlc::dialect::tile::registerPasses();
@@ -79,4 +82,6 @@ inline void registerAllPasses() {
   pmlc::target::x86::registerPasses();
   pmlc::target::intel_gen::registerPasses();
   pmlc::target::intel_gen_ocl_spirv::registerPasses();
+
+  pmlc::rt::registerRuntimes();
 }

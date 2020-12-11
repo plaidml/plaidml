@@ -62,4 +62,46 @@ def DataType : I64EnumAttr<
   let convertFromStorage = "static_cast<" # returnType # ">($_self.getValue().getZExtValue())";
 }
 
+def InterpolationMode : I64EnumAttr<
+    "InterpolationMode",
+    "Modes that controls interpolation",
+    [
+     I64EnumAttrCase<"nearest", 0>,
+     I64EnumAttrCase<"linear", 1>,
+     I64EnumAttrCase<"cubic", 2>,
+    ]> {
+  let cppNamespace = "pmlc::util";
+  let returnType = "InterpolationMode";
+  let convertFromStorage = "static_cast<" # returnType # ">($_self.getValue().getZExtValue())";
+}
+
+def NearestMode : I64EnumAttr<
+    "NearestMode",
+    "Specifies round mode when InterpolationMode == nearest ",
+    [
+     I64EnumAttrCase<"round_prefer_floor", 0>,
+     I64EnumAttrCase<"round_prefer_ceil", 1>,
+     I64EnumAttrCase<"floor", 2>,
+     I64EnumAttrCase<"ceil", 3>,
+     I64EnumAttrCase<"simple", 4>,
+    ]> {
+  let cppNamespace = "pmlc::util";
+  let returnType = "NearestMode";
+  let convertFromStorage = "static_cast<" # returnType # ">($_self.getValue().getZExtValue())";
+}
+
+def ScatterMode : I64EnumAttr<
+    "ScatterMode",
+    "Scatter update mode",
+    [
+      I64EnumAttrCase<"normal", 0>,
+      I64EnumAttrCase<"update_slice", 1>,
+      I64EnumAttrCase<"update_elt", 2>,
+      I64EnumAttrCase<"update_nd", 3>,
+    ]> {
+  let cppNamespace = "pmlc::util";
+  let returnType = "ScatterMode";
+  let convertFromStorage = "static_cast<" # returnType # ">($_self.getValue().getZExtValue())";
+}
+
 #endif // __PML_UTIL_ENUMS__

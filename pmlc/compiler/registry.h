@@ -13,18 +13,10 @@
 
 namespace pmlc::compiler {
 
-using TargetFactory = llvm::function_ref<TargetPtr()>;
-
-void registerTarget(llvm::StringRef name, TargetFactory factory);
+void registerTarget(llvm::StringRef name, TargetPtr target);
 
 TargetPtr resolveTarget(llvm::StringRef name);
 
 std::vector<llvm::StringRef> listTargets();
-
-struct TargetRegistration {
-  TargetRegistration(llvm::StringRef name, TargetFactory factory) {
-    registerTarget(name, factory);
-  }
-};
 
 } // namespace pmlc::compiler

@@ -2,6 +2,7 @@
 
 #include "pmlc/dialect/stdx/ir/ops.h"
 
+#include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpImplementation.h"
 
 using namespace mlir; // NOLINT
@@ -47,7 +48,28 @@ verifySubgroupBlockWriteINTELOp(SubgroupBlockWriteINTELOp op) {
   return success();
 }
 
+Type StdXDialect::parseType(DialectAsmParser &parser) const {
+  StringRef keyword;
+  if (parser.parseKeyword(&keyword)) {
+    return Type();
+  }
+  if (keyword == "argpack") {
+    return ArgpackType::get(getContext());
+  }
+  parser.emitError(parser.getNameLoc(), "unknown type: ") << keyword;
+  return Type();
+}
+
+void StdXDialect::printType(Type type, DialectAsmPrinter &os) const {
+  if (type.isa<ArgpackType>()) {
+    os << "argpack";
+    return;
+  }
+  llvm_unreachable("unexpected stdx type kind");
+}
+
 void StdXDialect::initialize() {
+  addTypes<ArgpackType>();
   addOperations<
 #define GET_OP_LIST
 #include "pmlc/dialect/stdx/ir/ops.cc.inc" // NOLINT

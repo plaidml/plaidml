@@ -10,6 +10,7 @@ plaidml_cc_library(
         "device.h",
         "runtime.cc",
     ],
+    hdrs = ["register.h"],
     visibility = ["//visibility:public"],
     deps = [
         ":openmp",

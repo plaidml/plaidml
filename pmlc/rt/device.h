@@ -7,7 +7,6 @@
 #include <utility>
 
 #include "pmlc/rt/executable.h"
-#include "pmlc/util/buffer.h"
 
 namespace pmlc::rt {
 

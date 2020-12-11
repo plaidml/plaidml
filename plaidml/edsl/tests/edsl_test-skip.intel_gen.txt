@@ -1,4 +1,7 @@
+CppEdsl.AcosH
 CppEdsl.Asin
+CppEdsl.AsinH
+CppEdsl.AtanH
 CppEdsl.BitLeft
 CppEdsl.BitNot
 CppEdsl.BitRightScalar
@@ -7,5 +10,4 @@ CppEdsl.ConvI8
 CppEdsl.DotF16_AccF32
 CppEdsl.Erf
 CppEdsl.HigherPrecisionConstants
-CppEdsl.Scatter1D
-CppEdsl.Scatter3D
+CppEdsl.InterpolatedGatherCubicHalf

@@ -23,7 +23,7 @@ std::unique_ptr<mlir::Pass> createAffineNormalizePass(bool promote);
 
 std::unique_ptr<mlir::Pass> createAutoTileExamplePass();
 
-std::unique_ptr<mlir::Pass> createBufferPlacementPass();
+std::unique_ptr<mlir::Pass> createDeallocPlacementPass();
 
 std::unique_ptr<mlir::Pass> createCachePass();
 

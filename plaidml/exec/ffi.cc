@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -40,9 +41,13 @@ struct plaidml_executable {
 
 void plaidml_exec_init(  //
     plaidml_error* err) {
+  static std::once_flag once;
   ffi_wrap_void(err, [&] {  //
     IVLOG(1, "plaidml_exec_init");
-    pmlc::rt::initRuntimes();
+    std::call_once(once, []() {
+      pmlc::rt::registerRuntimes();
+      pmlc::rt::initRuntimes();
+    });
   });
 }
 

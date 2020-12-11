@@ -1,5 +1,9 @@
 // Copyright 2020, Intel Corporation
 
+#include "pmlc/target/intel_gen/pipeline.h"
+
+#include <memory>
+
 #include "llvm/Support/FormatVariadic.h"
 
 #include "mlir/Conversion/GPUToVulkan/ConvertGPUToVulkanPass.h"
@@ -31,6 +35,7 @@
 #include "pmlc/conversion/tile_to_pxa/passes.h"
 #include "pmlc/dialect/comp/ir/types.h"
 #include "pmlc/dialect/comp/transforms/passes.h"
+#include "pmlc/dialect/layer/transforms/passes.h"
 #include "pmlc/dialect/pxa/transforms/passes.h"
 #include "pmlc/dialect/stdx/ir/ops.h"
 #include "pmlc/dialect/stdx/transforms/passes.h"
@@ -44,6 +49,7 @@ using namespace mlir; // NOLINT[build/namespaces]
 namespace pmlc::target::intel_gen {
 
 namespace comp = dialect::comp;
+namespace layer = dialect::layer;
 namespace pxa = dialect::pxa;
 namespace stdx = dialect::stdx;
 namespace tile = dialect::tile;
@@ -130,7 +136,7 @@ std::unique_ptr<Pass> createLowerPXAToAffinePass() {
 
 void pipelineBuilder(OpPassManager &pm) {
   // Bound + pad initial tile code
-  pm.addPass(tile::createInlineLayersPass());
+  pm.addPass(layer::createInlineLayersPass());
   pm.addPass(tile::createComputeBoundsPass());
   pm.addPass(tile::createPadRangesPass());
   pm.addPass(tile::createPadConstraintsPass());
@@ -201,12 +207,14 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
-  // Do kernel outlining
+  // GPU transforms
   pm.addPass(conversion::gpu::createGpuKernelOutliningPass());
+  pm.addPass(conversion::gpu::createGatherGpuLaunchFuncsPass());
 
   // Convert GPU to comp.
   pm.addPass(pmlc::conversion::gpu_to_comp::createConvertGpuToCompPass(
       comp::ExecEnvRuntime::Vulkan, /*memorySpace=*/0));
+  pm.addPass(comp::createMinimizeBufferTransfersPass());
   pm.addPass(comp::createExecEnvCoalescingPass());
   pm.addPass(comp::createMinimizeAllocationsPass());
 
@@ -248,8 +256,8 @@ public:
   }
 };
 
-static compiler::TargetRegistration targetReg(kTargetName, []() {
-  return std::make_shared<Target>();
-});
+void registerTarget() {
+  pmlc::compiler::registerTarget(kTargetName, std::make_shared<Target>());
+}
 
 } // namespace pmlc::target::intel_gen

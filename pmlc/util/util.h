@@ -7,6 +7,7 @@
 
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/IR/Module.h"
 #include "llvm/Support/FormatVariadic.h"
 
 #include "mlir/IR/OperationSupport.h"
@@ -28,6 +29,11 @@ bool hasTag(mlir::Operation *op, llvm::StringRef tag);
 
 // Set tags in op
 void setTags(mlir::Operation *op, llvm::ArrayRef<llvm::StringRef> tags);
+
+// Pack function arguments to an i8** pointer
+void wrapFunctionAndPackArguments(llvm::Module *module,
+                                  llvm::StringRef funcName,
+                                  llvm::StringRef newName);
 
 // A diagnostic tool for searching for problematic transformations in passes.
 // Example usage:
