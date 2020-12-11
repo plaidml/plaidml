@@ -246,7 +246,7 @@ plaidml_expr* plaidml_expr_constant(  //
     plaidml_buffer* buffer,           //
     const char* name) {
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
-    IVLOG(3, "plaidml_expr_constant");
+    IVLOG(3, "plaidml_expr_constant(name: " << name << ")");
     auto node = std::make_shared<ast::ExprNodeConstTensor>(buffer->buffer, name);
     // Constants cannot be added to layers, they must be defined in the global scope because they will eventually become
     // program arguments.
@@ -824,7 +824,7 @@ plaidml_expr* plaidml_expr_layer_begin(  //
     size_t nattrs,                       //
     plaidml_attr** raw_attrs) {
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
-    IVLOG(3, "plaidml_expr_layer_begin");
+    IVLOG(3, "plaidml_expr_layer_begin(" << op << ", inputs: " << ninputs << ")");
     std::vector<ast::ExprNodePtr> operands(ninputs);
     for (size_t i = 0; i < ninputs; i++) {
       operands[i] = inputs[i]->node;
@@ -836,6 +836,7 @@ plaidml_expr* plaidml_expr_layer_begin(  //
       attrs[attr->key] = attr->value->node;
     }
     auto node = std::make_shared<ast::ExprNodeLayer>(op, operands, attrs);
+    LayerContext::get()->addNode(node);
     LayerContext::get()->push(node);
     return new plaidml_expr{node};
   });
@@ -852,6 +853,7 @@ plaidml_exprs* plaidml_expr_layer_end(  //
     if (!node) {
       throw std::bad_cast();
     }
+    LayerContext::get()->pop();
     std::vector<ast::ExprNodePtr> outerResults;
     outerResults.reserve(noutputs);
     node->results.clear();

@@ -1426,56 +1426,80 @@ inline Tensor trace(const Tensor& x, const std::string& msg) { return pragma(x, 
 using LayerBodySingleFn = std::function<Tensor()>;
 using LayerBodyMultiFn = std::function<TensorVec()>;
 
+class LayerBuilder {
+ public:
+  LayerBuilder(const std::string& op, const TensorVec& operands, const Dictionary& attrs) {
+    std::vector<plaidml_attr> elts;
+    std::vector<plaidml_attr*> ptrs;
+    elts.reserve(attrs.size());
+    ptrs.reserve(attrs.size());
+    for (const auto& kvp : attrs) {
+      plaidml_attr attr{kvp.first.c_str(), kvp.second.as_ptr()};
+      elts.push_back(attr);
+      ptrs.push_back(&elts.back());
+    }
+
+    std::vector<plaidml_expr*> rawOperands;
+    rawOperands.reserve(operands.size());
+    for (Tensor operand : operands) {
+      rawOperands.push_back(operand.as_ptr());
+    }
+
+    expr = details::make_ptr(          //
+        ffi::call<plaidml_expr*>(      //
+            plaidml_expr_layer_begin,  //
+            op.c_str(),                //
+            rawOperands.size(),        //
+            rawOperands.data(),        //
+            ptrs.size(),               //
+            ptrs.data()));
+  }
+
+  TensorVec build(const LayerBodyMultiFn& fn) {
+    TensorVec innerResults = fn();
+
+    std::vector<plaidml_expr*> rawResults;
+    rawResults.reserve(innerResults.size());
+    for (Tensor result : innerResults) {
+      rawResults.push_back(result.as_ptr());
+    }
+
+    outerExprs = details::make_ptr(  //
+        ffi::call<plaidml_exprs*>(   //
+            plaidml_expr_layer_end,  //
+            expr.get(),              //
+            rawResults.size(),       //
+            rawResults.data()));
+
+    TensorVec outerResults;
+    outerResults.reserve(outerExprs->size);
+    for (size_t i = 0; i < outerExprs->size; i++) {
+      plaidml_expr* expr = outerExprs->elts[i];
+      outerResults.push_back(Tensor{expr});
+    }
+    return outerResults;
+  }
+
+  ~LayerBuilder() {
+    // We need to ensure that the plaidml_expr_layer_end is called even if an exception occurs.
+    if (expr && !outerExprs) {
+      details::make_ptr(               //
+          ffi::call<plaidml_exprs*>(   //
+              plaidml_expr_layer_end,  //
+              expr.get(),              //
+              0,                       //
+              nullptr));
+    }
+  }
+
+ private:
+  std::shared_ptr<plaidml_expr> expr;
+  std::shared_ptr<plaidml_exprs> outerExprs;
+};
+
 inline TensorVec layer(const std::string& op, const TensorVec& operands, const Dictionary& attrs,
                        const LayerBodyMultiFn& fn) {
-  std::vector<plaidml_attr> elts;
-  std::vector<plaidml_attr*> ptrs;
-  elts.reserve(attrs.size());
-  ptrs.reserve(attrs.size());
-  for (const auto& kvp : attrs) {
-    plaidml_attr attr{kvp.first.c_str(), kvp.second.as_ptr()};
-    elts.push_back(attr);
-    ptrs.push_back(&elts.back());
-  }
-
-  std::vector<plaidml_expr*> rawOperands;
-  rawOperands.reserve(operands.size());
-  for (Tensor operand : operands) {
-    rawOperands.push_back(operand.as_ptr());
-  }
-
-  auto expr = details::make_ptr(     //
-      ffi::call<plaidml_expr*>(      //
-          plaidml_expr_layer_begin,  //
-          op.c_str(),                //
-          rawOperands.size(),        //
-          rawOperands.data(),        //
-          ptrs.size(),               //
-          ptrs.data()));
-
-  TensorVec innerResults = fn();
-
-  std::vector<plaidml_expr*> rawResults;
-  rawResults.reserve(innerResults.size());
-  for (Tensor result : innerResults) {
-    rawResults.push_back(result.as_ptr());
-  }
-
-  auto outerExprs = details::make_ptr(  //
-      ffi::call<plaidml_exprs*>(        //
-          plaidml_expr_layer_end,       //
-          expr.get(),                   //
-          rawResults.size(),            //
-          rawResults.data()));
-
-  TensorVec outerResults;
-  outerResults.reserve(outerExprs->size);
-  for (size_t i = 0; i < outerExprs->size; i++) {
-    plaidml_expr* expr = outerExprs->elts[i];
-    outerResults.push_back(Tensor{expr});
-  }
-
-  return outerResults;
+  return LayerBuilder(op, operands, attrs).build(fn);
 }
 
 inline Tensor layer(const std::string& op, const TensorVec& operands, const Dictionary& attrs,
