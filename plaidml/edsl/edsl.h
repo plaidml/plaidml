@@ -700,6 +700,10 @@ inline Tensor Placeholder(             //
     DType dtype,                       //
     const std::vector<int64_t>& dims,  //
     const std::string& name = "") {
+  // Surfacing of builder.cc:96 - Invalid data type
+  if (dtype == DType::INVALID || dtype == DType::BFLOAT16) {
+    throw std::runtime_error("Placeholder> Invalid DType");
+  }
   TensorShape shape(dtype, dims);
   return Placeholder(shape, name);
 }
@@ -920,6 +924,10 @@ inline Tensor ident(const Tensor& x) { return intrinsic("ident", x); }
 /// \return Tensor
 ///
 inline Tensor index(const std::vector<TensorDim>& dims, size_t axis) {
+  if (dims.size() < 1) {
+    // Prevents empty dim list from causing segfault during program build
+    throw std::runtime_error("index() must be provided non-empty dims list");
+  }
   TensorVec args = {Tensor{static_cast<int64_t>(axis)}};
   for (const auto& dim : dims) {
     args.emplace_back(dim);
@@ -1128,6 +1136,7 @@ inline Tensor Tensor::operator!() const { return intrinsicCall("logical_not", {*
   inline Tensor operator _op_(uint64_t lhs, const Tensor& rhs) { return intrinsic(_fn_, lhs, rhs); }      \
   inline Tensor operator _op_(double lhs, const Tensor& rhs) { return intrinsic(_fn_, lhs, rhs); }
 
+// clang-format off
 PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(+, "add");
 PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(-, "sub");
 PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(*, "mul");
@@ -1146,6 +1155,7 @@ PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(|, "bit_or");
 PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(^, "bit_xor");
 PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(&&, "logical_and");
 PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(||, "logical_or");
+// clang-format on
 
 inline Tensor intrinsicCall(const std::string& fn, const TensorVec& args) {
   std::vector<plaidml_expr*> ptrs(args.size());

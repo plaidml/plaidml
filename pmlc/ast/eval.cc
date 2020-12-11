@@ -178,9 +178,13 @@ int64_t Evaluator::evaluate(const DimNode *node) {
         case AffineOp::Div:
           return lhs / rhs;
         case AffineOp::Max:
-          return std::max(lhs, rhs);
+          // Surfacing of error due to not being implemented at builder level
+          throw std::runtime_error("NYI: AffineOp::Max");
+          // return std::max(lhs, rhs);
         case AffineOp::Min:
-          return std::min(lhs, rhs);
+          // Surfacing of error due to not being implemented at builder level
+          throw std::runtime_error("NYI: AffineOp::Max");
+          // return std::min(lhs, rhs);
         default:
           throw std::runtime_error("Invalid AffineOp");
         }

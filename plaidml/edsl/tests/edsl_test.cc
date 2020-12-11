@@ -1832,5 +1832,25 @@ TEST_F(CppEdsl, LayerUnusedOperand) {
   runProgram(program);
 }
 
+TEST_F(CppEdsl, BadDataType) {
+  // auto A = Placeholder(DType::BFLOAT16, {10, 20});
+  // Tensor O = A + A;
+  // EXPECT_ANY_THROW({ makeProgram("BadDataType", {A}, {O}); });
+  EXPECT_ANY_THROW({ auto A = Placeholder(DType::BFLOAT16, {10, 20}); });
+}
+
+TEST_F(CppEdsl, IndexOp) {
+  EXPECT_ANY_THROW({ index({}, 0); });  // Must specify at least one dimension
+
+  TensorDim X0, X1;
+  EXPECT_ANY_THROW({ index({X0}, 0); });  // Must bind X0 to some Tensor
+
+  auto I = Placeholder(DType::FLOAT32, {10, 3});
+  I.bind_dims(X0, X1);
+  Tensor O = index({X0}, 0.1);
+  auto program = makeProgram("IndexOp", {}, {O});
+  runProgram(program);
+}
+
 }  // namespace
 }  // namespace plaidml::edsl
