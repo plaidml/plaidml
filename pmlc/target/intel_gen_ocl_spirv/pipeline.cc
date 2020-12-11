@@ -187,6 +187,7 @@ void pipelineBuilder(OpPassManager &pm,
 
   // SPIR-V passes for lowering attributes.
   pm.addPass(createSetSubgroupSizePass());
+  pm.addPass(createSetAccessQualifiersPass());
   pm.addPass(createLegalizeSpirvPass());
   pm.addPass(spirv::createLowerABIAttributesPass());
   pm.addPass(spirv::createUpdateVersionCapabilityExtensionPass());
