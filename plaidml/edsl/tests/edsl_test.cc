@@ -1886,7 +1886,7 @@ TEST_F(CppEdsl, ScatterElt) {
       1, 1, 1, 1,  //
   };
   checkExact(program, {data, indices, updates}, {expected});
-};
+}
 
 TEST_F(CppEdsl, Trace) {
   auto I = Placeholder(DType::FLOAT32, {3, 3});
@@ -2018,6 +2018,59 @@ TEST_F(CppEdsl, LayerUnusedOperand) {
   // CHECK: func @main(%[[ARG0:.*]]: tensor<10x20xf32>, %[[ARG1:.*]]: tensor<10x20xf32> {tile.const = 0 : index}, %[[ARG2:.*]]: tensor<10x20xf32> {tile.const = 1 : index}) -> tensor<10x20xf32>
   // CHECK:   %[[X0:.*]] = layer.box "sum" (%[[ARG3:.*]], %[[ARG4:.*]], %[[ARG5:.*]]) = (%[[ARG0]], %[[ARG1]], %[[ARG2]]) : (tensor<10x20xf32>, tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
   // CHECK:     %[[X1:.*]] = tile.add %[[ARG3]], %[[ARG5]] : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
+  // CHECK:     layer.return %[[X1]] : tensor<10x20xf32>
+  // CHECK:   return %[[X0]] : tensor<10x20xf32>
+  // clang-format on
+  runProgram(program);
+}
+
+TEST_F(CppEdsl, LayerMulti) {
+  auto A = Placeholder(DType::FLOAT32, {10, 20});
+  std::vector<int> data = {1, 2, 3, 4};
+  Tensor B = layer("sum", {A}, [&]() {
+    auto C = Constant(makeBuffer(DType::FLOAT32, {10, 20}, data), "C");
+    return A + C;
+  });
+  Tensor O = layer("sum", {B}, [&]() {
+    auto C = Constant(makeBuffer(DType::FLOAT32, {10, 20}, data), "C");
+    return B + C;
+  });
+  auto program = makeProgram("LayerMulti", {A}, {O});
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.LayerMulti
+  // CHECK: module @LayerMulti
+  // CHECK: func @main(%[[ARG0:.*]]: tensor<10x20xf32>, %[[ARG1:.*]]: tensor<10x20xf32> {tile.const = 0 : index}, %[[ARG2:.*]]: tensor<10x20xf32> {tile.const = 1 : index}) -> tensor<10x20xf32> {
+  // CHECK:   %[[X0:.*]] = layer.box "sum" (%[[ARG3:.*]], %[[ARG4:.*]]) = (%[[ARG0]], %[[ARG1]]) : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32> {
+  // CHECK:     %[[X2:.*]] = tile.add %[[ARG3]], %[[ARG4]] : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
+  // CHECK:     layer.return %[[X2]] : tensor<10x20xf32>
+  // CHECK:   %[[X1:.*]] = layer.box "sum" (%[[ARG3:.*]], %[[ARG4:.*]]) = (%[[X0]], %[[ARG2]]) : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32> {
+  // CHECK:     %[[X2:.*]] = tile.add %[[ARG3]], %[[ARG4]] : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
+  // CHECK:     layer.return %[[X2]] : tensor<10x20xf32>
+  // CHECK:   return %[[X1]] : tensor<10x20xf32>
+  // clang-format on
+  runProgram(program);
+}
+
+TEST_F(CppEdsl, LayerException) {
+  auto A = Placeholder(DType::FLOAT32, {10, 20});
+  std::vector<int> data = {1, 2, 3, 4};
+  EXPECT_ANY_THROW({
+    layer("sum", {A}, [&]() -> Tensor {
+      auto C = Constant(makeBuffer(DType::FLOAT32, {10, 20}, data), "C");
+      throw std::runtime_error("exception");
+    });
+  });
+  Tensor O = layer("sum", {A}, [&]() {
+    auto C = Constant(makeBuffer(DType::FLOAT32, {10, 20}, data), "C");
+    return A + C;
+  });
+  auto program = makeProgram("LayerException", {A}, {O});
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.LayerException
+  // CHECK: module @LayerException
+  // CHECK: func @main(%[[ARG0:.*]]: tensor<10x20xf32>, %[[ARG1:.*]]: tensor<10x20xf32> {tile.const = 0 : index}) -> tensor<10x20xf32>
+  // CHECK:   %[[X0:.*]] = layer.box "sum" (%[[ARG2:.*]], %[[ARG3:.*]]) = (%[[ARG0]], %[[ARG1]]) : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
+  // CHECK:     %[[X1:.*]] = tile.add %[[ARG2]], %[[ARG3]] : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
   // CHECK:     layer.return %[[X1]] : tensor<10x20xf32>
   // CHECK:   return %[[X0]] : tensor<10x20xf32>
   // clang-format on
