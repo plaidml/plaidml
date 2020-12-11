@@ -33,18 +33,6 @@ edsl::Tensor reverse_tensor(edsl::Tensor I, int64_t seq_axis) {
   return edsl::Contraction().outShape(dims).outAccess(O_idxs).assign(I(I_idxs));
 }
 
-edsl::Tensor exclude_first(edsl::Tensor I, int64_t axis) {
-  std::vector<edsl::TensorDim> dims(I.rank());
-  I.bind_dims(dims);
-
-  std::vector<int> lo_pad(I.rank(), 0);
-  std::vector<int> hi_pad(lo_pad);
-  lo_pad[axis] = 1;
-
-  auto pad_I = op::explicit_padding(I, lo_pad, hi_pad).padval(edsl::Constant(0));
-  return edsl::gather(pad_I, edsl::index({dims[axis]}, 0)).axis(axis);
-}
-
 }  // namespace
 
 namespace PlaidMLPlugin {
@@ -62,8 +50,7 @@ void registerCumSum() {
     auto is_reverse = layer->is_reverse();
 
     auto I_reverse = is_reverse ? reverse_tensor(I, axis) : I;
-    auto sum_tensor = op::cumsum(I_reverse, axis);
-    auto O = is_exclusive ? exclude_first(sum_tensor, axis) : sum_tensor;
+    auto O = op::cumsum(I_reverse, axis, is_exclusive);
     auto O_reverse = is_reverse ? reverse_tensor(O, axis) : O;
     return edsl::make_tuple(O_reverse);
   });

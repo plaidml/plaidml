@@ -15,7 +15,7 @@ const std::vector<InferenceEngine::Precision> netPrecisions = {
     InferenceEngine::Precision::FP32,
 };
 
-const std::vector<std::vector<size_t>> inputShapes = {{3, 6, 8, 7}, {1, 5, 5, 4}};
+const std::vector<std::vector<size_t>> inputShapes = {{3, 6, 8, 7}, {2, 5, 5, 4}};
 
 INSTANTIATE_TEST_CASE_P(smoke, CumSumLayerTest,
                         ::testing::Combine(::testing::Values(std::vector<std::size_t>({4, 3, 3, 6})),  // input shape
