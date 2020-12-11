@@ -20,9 +20,7 @@ std::vector<T> cast_constant_operand(size_t operand_idx, ngraph::Node* layer) {
   if (ngraph_const) {
     return ngraph_const->cast_vector<T>();
   } else {
-    THROW_IE_EXCEPTION
-        << "Dynamic slicing not currently supported by PlaidML plugin; all of indices, offsets and default index"
-           "must be Constants.";
+    THROW_IE_EXCEPTION << "Dynamic axis not currently supported by PlaidML plugin; it must be Constants.";
   }
 }
 
