@@ -116,8 +116,16 @@ void Program::compile(StringRef targetNameAndOptions, bool collectPasses,
 
   PassManager pm(module->getContext());
   ScopedDiagnosticHandler diagHandler(pm.getContext(), [&](Diagnostic &diag) {
+    if (diag.getSeverity() == DiagnosticSeverity::Error ||
+        diag.getSeverity() == DiagnosticSeverity::Warning) {
+      llvm::errs() << getDiagKindStr(diag.getSeverity()) << ": " << diag
+                   << "\n";
+      for (const auto &note : diag.getNotes()) {
+        llvm::errs() << "  note: " << note << "\n";
+      }
+    }
     IVLOG(2, getDiagKindStr(diag.getSeverity()).str() << ": " << diag.str());
-    for (auto &note : diag.getNotes()) {
+    for (const auto &note : diag.getNotes()) {
       IVLOG(2, "  note: " << note.str());
     }
     return success();
