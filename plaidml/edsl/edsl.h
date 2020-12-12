@@ -700,7 +700,6 @@ inline Tensor Placeholder(             //
     DType dtype,                       //
     const std::vector<int64_t>& dims,  //
     const std::string& name = "") {
-  // Surfacing of builder.cc:96 - Invalid data type
   if (dtype == DType::INVALID || dtype == DType::BFLOAT16) {
     throw std::runtime_error("Placeholder> Invalid DType");
   }
@@ -1169,7 +1168,6 @@ inline Tensor Tensor::operator!() const { return intrinsicCall("logical_not", {*
   inline Tensor operator _op_(uint64_t lhs, const Tensor& rhs) { return intrinsic(_fn_, lhs, rhs); }      \
   inline Tensor operator _op_(double lhs, const Tensor& rhs) { return intrinsic(_fn_, lhs, rhs); }
 
-// clang-format off
 PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(+, "add");
 PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(-, "sub");
 PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(*, "mul");
@@ -1188,7 +1186,6 @@ PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(|, "bit_or");
 PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(^, "bit_xor");
 PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(&&, "logical_and");
 PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(||, "logical_or");
-// clang-format on
 
 inline Tensor intrinsicCall(const std::string& fn, const TensorVec& args) {
   std::vector<plaidml_expr*> ptrs(args.size());
