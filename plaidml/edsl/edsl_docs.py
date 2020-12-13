@@ -1,7 +1,7 @@
 # Copyright 2020 Intel Corporation.
 # Note:
 #    This file is being used by sphinx docs to pull in code blocks.
-#    Code blocks are pulled into docs/usage/writing_edsl.rs
+#    Code blocks are pulled into docs/usage/edsl_ops.rst
 #    Any changes made here may upset the docs.
 
 import unittest
@@ -15,7 +15,7 @@ def sum_over_axis(I):
     m, n = TensorIndexes(2)
     I.bind_dims(M, N)
     O = TensorOutput(N)
-    O[n] += I[m, n]  # contraction
+    O = Contraction().outShape(N).outAccess(n).sum(I(m, n))
     return O
 
 

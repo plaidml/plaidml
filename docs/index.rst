@@ -12,8 +12,9 @@ PlaidML
 
    usage/install
    usage/building
-   usage/contributing
-   usage/troubleshooting
-   usage/edsl
-   api/index
    usage/configuration
+   usage/contributing
+   usage/edsl_ops
+   usage/edsl_types
+   usage/troubleshooting
+   api/index
