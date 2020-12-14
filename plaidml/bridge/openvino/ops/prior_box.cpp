@@ -74,7 +74,9 @@ PriorBoxImpl::PriorBoxImpl(const Context& context, const ngraph::op::PriorBoxAtt
 void PriorBoxImpl::prepareConfig() {
   precision = to_plaidml(ctx.layer->get_output_element_type(0));
   auto* input_shape_ngraph_op = ngraph::as_type<ngraph::op::Constant>(ctx.layer->get_input_node_ptr(0));
-  IE_ASSERT(input_shape_ngraph_op);
+  if (input_shape_ngraph_op == nullptr) {
+    THROW_IE_EXCEPTION << "Dynamic output_size of PriorBox not currenly supported by PlaidML plugin";
+  }
   std::vector<int> input_shape = input_shape_ngraph_op->get_vector<int>();
   H = input_shape[0];
   W = input_shape[1];
