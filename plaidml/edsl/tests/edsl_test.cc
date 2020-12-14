@@ -2039,7 +2039,7 @@ TEST_F(CppEdsl, IndexOp) {
 
   auto I = Placeholder(DType::FLOAT32, {10, 3});
   I.bind_dims(X0, X1);
-  Tensor O = index({X0}, 0.1);
+  Tensor O = index({X0}, 1);
   auto program = makeProgram("IndexOp", {}, {O});
 }
 
