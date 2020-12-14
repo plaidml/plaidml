@@ -26,17 +26,24 @@ std::vector<CommonTestUtils::OpType> opTypes = {
 };
 
 const std::vector<ngraph::helpers::ReductionType> reductionTypes = {
-    // TODO(Liyang): LogicalAnd, LogicalOr, L1 fail tests, need fix
-    //    ngraph::helpers::ReductionType::LogicalAnd,  //
-    //    ngraph::helpers::ReductionType::LogicalOr,   //
     ngraph::helpers::ReductionType::Mean,  //
     ngraph::helpers::ReductionType::Min,   //
     ngraph::helpers::ReductionType::Max,   //
     ngraph::helpers::ReductionType::Sum,   //
     ngraph::helpers::ReductionType::Prod,  //
-    //    ngraph::helpers::ReductionType::L1,          //
-    ngraph::helpers::ReductionType::L2,  //
+    ngraph::helpers::ReductionType::L1,    //
+    ngraph::helpers::ReductionType::L2,    //
 };
+
+const auto paramSmoke = testing::Combine(testing::Values(std::vector<int>{0}),               //
+                                         testing::Values(CommonTestUtils::OpType::VECTOR),   //
+                                         testing::Values(false),                             //
+                                         testing::ValuesIn(reductionTypes),                  //
+                                         testing::Values(InferenceEngine::Precision::FP32),  //
+                                         testing::Values(std::vector<size_t>{1, 2, 4, 4}),   //
+                                         testing::Values(CommonTestUtils::DEVICE_PLAIDML));
+
+INSTANTIATE_TEST_CASE_P(smoke, ReduceOpsLayerTest, paramSmoke, ReduceOpsLayerTest::getTestCaseName);
 
 const auto paramsOneAxis = testing::Combine(testing::Values(std::vector<int>{0}),  //
                                             testing::ValuesIn(opTypes),            //
