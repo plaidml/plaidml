@@ -923,10 +923,6 @@ inline Tensor ident(const Tensor& x) { return intrinsic("ident", x); }
 /// \return Tensor
 ///
 inline Tensor index(const std::vector<TensorDim>& dims, size_t axis) {
-  if (dims.size() < 1) {
-    // Prevents empty dim list from causing segfault during program build
-    throw std::runtime_error("index() must be provided non-empty dims list");
-  }
   TensorVec args = {Tensor{static_cast<int64_t>(axis)}};
   for (const auto& dim : dims) {
     args.emplace_back(dim);
