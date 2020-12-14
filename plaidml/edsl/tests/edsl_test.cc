@@ -2025,10 +2025,7 @@ TEST_F(CppEdsl, LayerUnusedOperand) {
 }
 
 TEST_F(CppEdsl, BadDataType) {
-  // auto A = Placeholder(DType::BFLOAT16, {10, 20});
-  // Tensor O = A + A;
-  // EXPECT_ANY_THROW({ makeProgram("BadDataType", {A}, {O}); });
-  EXPECT_ANY_THROW({ auto A = Placeholder(DType::BFLOAT16, {10, 20}); });
+  EXPECT_ANY_THROW({ auto A = Placeholder(DType::INVALID, {10, 20}); });
 }
 
 TEST_F(CppEdsl, IndexOp) {

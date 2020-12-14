@@ -39,8 +39,8 @@ static llvm::Optional<double> getFloatValue(Evaluator *evaluator,
 }
 
 static bool isDataTypeFloat(DataType type) {
-  return type == DataType::bf16 || type == DataType::f16 ||
-         type == DataType::f32 || type == DataType::f64;
+  return type == DataType::f16 || type == DataType::f32 ||
+         type == DataType::f64;
 }
 
 struct BooleanOp : Intrinsic {
