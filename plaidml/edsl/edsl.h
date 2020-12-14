@@ -700,9 +700,6 @@ inline Tensor Placeholder(             //
     DType dtype,                       //
     const std::vector<int64_t>& dims,  //
     const std::string& name = "") {
-  if (dtype == DType::INVALID) {
-    throw std::runtime_error("Placeholder> Invalid DType");
-  }
   TensorShape shape(dtype, dims);
   return Placeholder(shape, name);
 }
