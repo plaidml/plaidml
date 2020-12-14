@@ -92,21 +92,6 @@ ast::AffineOp getAffineOp(plaidml_int_op op) {
   throw std::runtime_error("Unknown polynomial op");
 }
 
-void checkAttribute(const ast::VarNodePtr& node) {
-  llvm::TypeSwitch<ast::VarNode*, void>(node.get())
-      .Case<ast::VarNodeFloat>([&](ast::VarNodeFloat* node) {})
-      .Case<ast::VarNodeInt>([&](ast::VarNodeInt* node) {})
-      .Case<ast::VarNodeString>([&](ast::VarNodeString* node) {})
-      .Case<ast::VarNodeTuple>([&](ast::VarNodeTuple* node) {
-        for (const ast::VarNodePtr& value : node->values) {
-          checkAttribute(value);
-        }
-      })
-      .Default([](ast::VarNode* node) -> void {
-        throw std::runtime_error(llvm::formatv("Unsupported VarNode: {0}", node->str()));
-      });
-}
-
 struct LayerContext {
   static LayerContext* get() {
     thread_local LayerContext context;
@@ -349,7 +334,6 @@ plaidml_expr* plaidml_expr_pragma(  //
     llvm::StringMap<ast::VarNodePtr> attrs;
     for (size_t i = 0; i < nattrs; i++) {
       plaidml_attr* attr = raw_attrs[i];
-      checkAttribute(attr->value->node);
       attrs[attr->key] = attr->value->node;
     }
     auto node = std::make_shared<ast::ExprNodePragma>(expr->node, op, attrs);
@@ -832,7 +816,6 @@ plaidml_expr* plaidml_expr_layer_begin(  //
     llvm::StringMap<ast::VarNodePtr> attrs;
     for (size_t i = 0; i < nattrs; i++) {
       plaidml_attr* attr = raw_attrs[i];
-      checkAttribute(attr->value->node);
       attrs[attr->key] = attr->value->node;
     }
     auto node = std::make_shared<ast::ExprNodeLayer>(op, operands, attrs);
