@@ -314,8 +314,8 @@ inline edsl::Tensor cumprod(const edsl::Tensor& I, int axis) {
   return details::op("cumprod", args).as_tensor();
 }
 
-inline edsl::Tensor cumsum(const edsl::Tensor& I, int axis) {
-  auto args = edsl::make_tuple(I, axis);
+inline edsl::Tensor cumsum(const edsl::Tensor& I, int axis, bool exclusive = false) {
+  auto args = edsl::make_tuple(I, axis, exclusive);
   return details::op("cumsum", args).as_tensor();
 }
 

@@ -10,6 +10,4 @@ CppEdsl.ConvI8
 CppEdsl.DotF16_AccF32
 CppEdsl.Erf
 CppEdsl.HigherPrecisionConstants
-CppEdsl.Scatter1D
-CppEdsl.Scatter3D
 CppEdsl.InterpolatedGatherCubicHalf
