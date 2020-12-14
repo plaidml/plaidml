@@ -325,7 +325,7 @@ struct VectorizeMemImpl {
     auto results = loopOp.results();
     for (auto res : results) {
       res.setType(nemMemrefType);
-      // Update also AffineYieldOp
+      // Update also AffineYieldOp if type does not match
       for (auto yieldOp : loopOp.getOps<AffineYieldOp>()) {
         if (yieldOp.getOperand(0).getType() != nemMemrefType)
           yieldOp.getOperand(0).setType(nemMemrefType);
