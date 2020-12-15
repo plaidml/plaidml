@@ -16,7 +16,7 @@ plaidml_cc_library(
     hdrs = [
         "affine_expr.h",
         "affine_constraints.h",
-        "memref_access.h"
+        "memref_access.h",
         "strides.h",
         "uses.h",
     ],
