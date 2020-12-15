@@ -39,8 +39,8 @@ static llvm::Optional<double> getFloatValue(Evaluator *evaluator,
 }
 
 static bool isDataTypeFloat(DataType type) {
-  return type == DataType::bf16 || type == DataType::f16 ||
-         type == DataType::f32 || type == DataType::f64;
+  return type == DataType::f16 || type == DataType::f32 ||
+         type == DataType::f64;
 }
 
 struct BooleanOp : Intrinsic {
@@ -53,8 +53,8 @@ struct BooleanOp : Intrinsic {
 struct IndexOp : Intrinsic {
   TensorShapes getShapes(Evaluator *evaluator, ArrayRef<ExprNodePtr> operands,
                          ArrayRef<TensorShape> shapes) const final {
-    if (operands.size() < 1) {
-      throw std::runtime_error("'index' requires at least one operand.");
+    if (operands.size() < 2) {
+      throw std::runtime_error("'index' requires an axis operand and at least 1 dimension");
     }
     TensorShape ret(DataType::si32); // TODO
     for (const ExprNodePtr &operand : operands.drop_front()) {

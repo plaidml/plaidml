@@ -140,7 +140,11 @@ std::string ExprNodeElement::str() const {
 //
 
 ExprNodeInput::ExprNodeInput(const TensorShape &shape, llvm::StringRef name)
-    : Base(name), shape(shape) {}
+    : Base(name), shape(shape) {
+      if (shape.elementType == DataType::invalid) {
+        throw std::runtime_error("DType::INVALID not appropriate here");
+      }
+    }
 
 std::string ExprNodeInput::str() const {
   if (name.size()) {

@@ -94,8 +94,6 @@ static mlir::FailureOr<mlir::StringRef> getTypeMangling(mlir::Type type) {
     return mlir::StringRef("I32");
   if (type.isInteger(64))
     return mlir::StringRef("I64");
-  if (type.isBF16())
-    return mlir::StringRef("BF16");
   if (type.isF16())
     return mlir::StringRef("F16");
   if (type.isF32())
@@ -110,8 +108,8 @@ getManglingTypes(mlir::MLIRContext *context) {
   return mlir::SmallVector<mlir::Type, 8>{
       mlir::IntegerType::get(8, context),  mlir::IntegerType::get(16, context),
       mlir::IntegerType::get(32, context), mlir::IntegerType::get(64, context),
-      mlir::FloatType::getBF16(context),   mlir::FloatType::getF16(context),
-      mlir::FloatType::getF32(context),    mlir::FloatType::getF64(context)};
+      mlir::FloatType::getF16(context),    mlir::FloatType::getF32(context),
+      mlir::FloatType::getF64(context)};
 }
 
 void populateCommonPatterns(mlir::MLIRContext *context,
