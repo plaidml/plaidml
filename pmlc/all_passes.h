@@ -20,6 +20,7 @@
 #include "pmlc/conversion/scf_to_omp/passes.h"
 #include "pmlc/conversion/stdx_to_llvm/passes.h"
 #include "pmlc/conversion/tile_to_pxa/passes.h"
+#include "pmlc/dialect/affinex/transforms/passes.h"
 #include "pmlc/dialect/comp/transforms/passes.h"
 #include "pmlc/dialect/layer/transforms/passes.h"
 #include "pmlc/dialect/pxa/transforms/passes.h"
@@ -73,6 +74,7 @@ inline void registerAllPasses() {
   pmlc::conversion::gpu::registerPasses();
 
   // Dialect passes
+  pmlc::dialect::affinex::registerPasses();
   pmlc::dialect::comp::registerPasses();
   pmlc::dialect::layer::registerPasses();
   pmlc::dialect::pxa::registerPasses();

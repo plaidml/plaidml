@@ -111,16 +111,13 @@ class DType(enum.IntEnum):
     UINT64 = 12
     """A 64-bit unsigned integer data type"""
 
-    BFLOAT16 = 13
-    """A 16-bit blocked floating point data type"""
-
-    FLOAT16 = 14
+    FLOAT16 = 13
     """A 16-bit floating point data type"""
 
-    FLOAT32 = 15
+    FLOAT32 = 14
     """A 32-bit floating point data type"""
 
-    FLOAT64 = 16
+    FLOAT64 = 15
     """A 64-bit floating point data type"""
 
     def into_numpy(self):
@@ -164,7 +161,6 @@ NUMPY_DTYPE_TO_PLAIDML = {
     'uint16': DType.UINT16,
     'uint32': DType.UINT32,
     'uint64': DType.UINT64,
-    'bfloat16': DType.BFLOAT16,
 }
 
 PLAIDML_DTYPE_TO_NUMPY = {v: k for k, v in NUMPY_DTYPE_TO_PLAIDML.items()}
@@ -198,7 +194,6 @@ DTYPE_INFOS = {
     DType.FLOAT16: DTypeInfo(base='float', width=2),
     DType.FLOAT32: DTypeInfo(base='float', width=4),
     DType.FLOAT64: DTypeInfo(base='float', width=8),
-    DType.BFLOAT16: DTypeInfo(base='float', width=2),
 }
 
 
