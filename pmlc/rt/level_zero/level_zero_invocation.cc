@@ -85,7 +85,7 @@ LevelZeroInvocation::~LevelZeroInvocation() {
   for (size_t i = 0; i < kernels.size(); i++) {
     delete kernels[i];
   }
-  device->clearQueues();
+  //device->clearQueues();
 #if 0
   // Gather profiling information.
   using std::chrono::nanoseconds;

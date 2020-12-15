@@ -64,7 +64,8 @@ LevelZeroDevice::LevelZeroDevice(ze_device_handle_t device)
 LevelZeroDevice::~LevelZeroDevice() {
     // TODO maybe other place
     // Once multiple devices, shall change
-    //lzt::destroy_context(context);
+    clearQueues();
+    lzt::destroy_context(context);
 }
 
 std::unique_ptr<Executable> LevelZeroDevice::compile(

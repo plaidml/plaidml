@@ -35,11 +35,11 @@ static bool isPlatformSupported(const cl::Platform &p) {
 }
 #endif
 std::vector<ze_device_handle_t> getSupportedDevices() {
-  static bool first = true;
+  /*static bool first = true;
   if(first) {
     zeInit(0);
     first = false;
-  }
+  }*/
   std::vector<ze_device_handle_t> supportedDevices;
   for (auto driver : lzt::get_all_driver_handles()) {
     for (auto device : lzt::get_devices(driver)) {
