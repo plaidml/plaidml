@@ -52,7 +52,7 @@ public:
     if (!func)
       return;
 
-    for (auto &arg : func.getArguments()) {
+    for (mlir::BlockArgument arg : func.getArguments()) {
       auto readOnly = false;
       for (auto *op : arg.getUsers()) {
         // Case where argument is used directly by AccessChainOp
