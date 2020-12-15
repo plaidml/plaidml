@@ -37,6 +37,7 @@ plaidml_cc_library(
         "pass_detail.h",
         "reorder_layouts.cc",
         "resize_tmps.cc",
+        "simplify_arithmetic.cc",
         "simplify_with_constraints.cc",
         "stencil.cc",
         "stencil_gemm.cc",
