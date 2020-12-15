@@ -73,12 +73,17 @@ void *levelZeroScheduleFunc(void *invocation, void *kernel, uint64_t gws0,
                             uint64_t gws1, uint64_t gws2, uint64_t lws0,
                             uint64_t lws1, uint64_t lws2) {
   // ze_group_count_t gws(gws0, gws1, gws2);
-  ze_group_count_t gws = {1, 9, 9};
+  IVLOG(1, " " << gws0 << " " << gws1 << " " << gws2 << " " << lws0 << " " << lws1 << " " << lws2 << " ");
+  ze_group_count_t gws = {4, 8, 8};
   //ze_group_count_t gws = {(uint32_t)(gws0 * lws0), (uint32_t)(gws1 * lws1),
   //                        (uint32_t)(gws2 * lws2)};
+  //ze_group_count_t gws = {(uint32_t)(gws0), (uint32_t)(gws1),
+  //                        (uint32_t)(gws2)};
   ze_group_count_t lws = {(uint32_t)lws0, (uint32_t)lws1, (uint32_t)lws2};
-  return static_cast<LevelZeroInvocation *>(invocation)
+  void * result = static_cast<LevelZeroInvocation *>(invocation)
       ->enqueueKernel(static_cast<LevelZeroKernel *>(kernel), gws, lws);
+  //levelZeroSubmit(invocation);
+  return result;
 }
 
 void *levelZeroBarrier(void *invocation, uint32_t count, ...) {

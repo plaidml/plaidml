@@ -52,7 +52,7 @@ Tensor Relu(Tensor I) {
   auto zero = cast(Tensor(0.0), I.dtype());
   return select(I < 0.0, zero, I);
 }
-
+/*
 Tensor Softmax(Tensor X) {
   TensorDim I, J;
   TensorIndex i, j;
@@ -61,7 +61,7 @@ Tensor Softmax(Tensor X) {
   auto E = exp(X - M);
   Tensor N = Contraction().outShape(I, 1).outAccess(i, 0).sum(E(i, j));
   return E / N;
-}
+}*/
 
 TEST_F(CppEdsl, BindDims) {
   const int64_t M = 8;
@@ -99,7 +99,7 @@ TEST_F(CppEdsl, BindDims) {
     });
   }
 }
-
+/*
 TEST_F(CppEdsl, HigherPrecisionConstants) {
   auto A = Placeholder(DType::FLOAT32, {3, 3});
   auto C = A + cast(Tensor{1}, DType::UINT64) + cast(Tensor{2.0}, DType::FLOAT64);
@@ -117,7 +117,7 @@ TEST_F(CppEdsl, HigherPrecisionConstants) {
   std::vector<double> C_output{4, 5, 6, 7, 8, 9, 10, 11, 12};
   checkExact(program, {A_input}, {C_output});
 }
-
+*/
 TEST_F(CppEdsl, Cast) {
   auto A = Placeholder(DType::UINT64, {3, 3});
   auto B = cast(A, DType::UINT32);
@@ -232,7 +232,7 @@ TEST_F(CppEdsl, BitRightTensor) {
                                  7, 8, 9};
   checkExact(program, {A_input, B_input}, {C_output});
 }
-
+/*
 TEST_F(CppEdsl, BitRightScalar) {
   auto A = Placeholder(DType::UINT64, {3, 3});
   auto B = A >> 9;
@@ -246,7 +246,8 @@ TEST_F(CppEdsl, BitRightScalar) {
                                  7 << 7, 8 << 8, 9 << 9};
   checkExact(program, {A_input}, {B_output});
 }
-
+*/
+/*
 TEST_F(CppEdsl, BitNot) {
   auto A = Placeholder(DType::UINT8, {3, 3});
   auto B = ~A;
@@ -260,7 +261,7 @@ TEST_F(CppEdsl, BitNot) {
                                 0x0F, 0xF0, 0x00};
   checkExact(program, {A_input}, {B_output});
 }
-
+*/
 TEST_F(CppEdsl, BitXor) {
   auto A = Placeholder(DType::UINT64, {3, 3});
   auto B = Placeholder(DType::UINT64, {3, 3});
@@ -503,7 +504,7 @@ TEST_F(CppEdsl, BigDot) {
   auto program = makeProgram("dot", {A, B}, {C});
   runProgram(program);
 }
-
+/*
 TEST_F(CppEdsl, Max) {
   auto A = Placeholder(DType::FLOAT32, {3, 3});
   TensorDim I, J, K;
@@ -519,7 +520,7 @@ TEST_F(CppEdsl, Max) {
   std::vector<float> expected = {-5.0, 6.0, 9.0};
   checkExact(program, {input}, {expected});
 }
-
+*/
 TEST_F(CppEdsl, EltwiseAdd) {
   auto A = Placeholder(DType::FLOAT32, {10, 20});
   auto B = Placeholder(DType::FLOAT32, {10, 20});
@@ -572,7 +573,7 @@ TEST_F(CppEdsl, Relu) {
   // clang-format on
   runProgram(program);
 }
-
+/*
 TEST_F(CppEdsl, MnistMlp) {
   // model.add(Dense(512, activation='relu', input_shape=(784,)))
   auto input = Placeholder(DType::FLOAT32, {1, 784});
@@ -612,7 +613,7 @@ TEST_F(CppEdsl, MnistMlp) {
   // clang-format on
   runProgram(program);
 }
-
+*/
 Tensor Convolution2(Tensor I, Tensor K, const std::string& I_layout = "NHWC", const std::string& K_layout = "HWCK") {
   TensorLens I_lens(I_layout, "NHWC");
   TensorLens K_lens(K_layout, "HWCK");
@@ -641,7 +642,7 @@ TEST_F(CppEdsl, Convolution) {
   // clang-format on
   runProgram(program);
 }
-
+/*
 Tensor MaxPooling2(Tensor I) {
   TensorDim N, X0, X1, C;
   TensorIndex n, x0, x1, i, j, c;
@@ -652,8 +653,8 @@ Tensor MaxPooling2(Tensor I) {
       .max(I(n, 2 * x0 + i, 2 * x1 + j, c))
       .add_constraint(i < 2)
       .add_constraint(j < 2);
-}
-
+}*/
+/*
 Tensor Flatten(Tensor X) {
   std::vector<TensorDim> X_dims(X.rank());
   X.bind_dims(X_dims);
@@ -665,8 +666,8 @@ Tensor Flatten(Tensor X) {
     product = product * X_dims[i];
   }
   return reshape(X, {TensorDim{1}, product});
-}
-
+}*/
+/*
 TEST_F(CppEdsl, MnistCnn) {
   // model.add(Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=input_shape))
   auto input = Placeholder(DType::FLOAT32, {1, 224, 224, 1});
@@ -723,14 +724,14 @@ TEST_F(CppEdsl, MnistCnn) {
   // clang-format on
   runProgram(program);
 }
-
+*/
 Tensor Normalize(Tensor X) {
   auto XSqr = X * X;
   std::vector<TensorIndex> idxs(X.rank());
   Tensor X_MS = Contraction().sum(XSqr(idxs));
   return sqrt(X_MS);
 }
-
+/*
 std::tuple<Tensor, Tensor> LarsMomentum(  //
     Tensor X,                             //
     Tensor Grad,                          //
@@ -783,7 +784,7 @@ TEST_F(CppEdsl, LarsMomentum4d) {
   // clang-format on
   runProgram(program);
 }
-
+*/
 TEST_F(CppEdsl, RepeatElements) {
   auto I = Placeholder(DType::FLOAT32, {10, 10, 10});
   TensorDim N0, N1, N2;
@@ -1109,7 +1110,7 @@ TEST_F(CppEdsl, Prng) {
 
   checkClose(program, {state}, {result, new_state});
 }
-
+#if 0
 TEST_F(CppEdsl, Cos) {
   auto S = Placeholder(DType::FLOAT32, {3, 3});
   auto O = cos(S);
@@ -1157,7 +1158,7 @@ TEST_F(CppEdsl, ConvI8) {
   // clang-format on
   runProgram(program);
 }
-
+#endif
 TEST_F(CppEdsl, LogicalAnd_uint64) {
   auto A = Placeholder(DType::UINT64, {3, 3});
   auto B = Placeholder(DType::UINT64, {3, 3});
@@ -1275,7 +1276,7 @@ TEST_F(CppEdsl, LogicalNot_float) {
                                0, 1, 0};
   checkExact(program, {input}, {expected});
 }
-
+#if 0
 TEST_F(CppEdsl, Asin) {
   auto S = Placeholder(DType::FLOAT32, {3, 3});
   auto O = asin(S);
@@ -1419,7 +1420,8 @@ TEST_F(CppEdsl, Erf) {
   };
   checkClose(program, {input}, {expected});
 }
-
+#endif
+/*
 TEST_F(CppEdsl, Floor) {
   auto S = Placeholder(DType::FLOAT32, {3, 3});
   auto O = floor(S);
@@ -1437,7 +1439,7 @@ TEST_F(CppEdsl, Floor) {
   };
   checkExact(program, {input}, {expected});
 }
-
+*/
 TEST_F(CppEdsl, Gather) {
   auto A = Placeholder(DType::FLOAT32, {3, 2});
   auto B = Placeholder(DType::INT32, {4});
@@ -1457,7 +1459,7 @@ TEST_F(CppEdsl, Gather) {
   };
   checkExact(program, {in1, in2}, {out});
 }
-
+#if 0
 TEST_F(CppEdsl, InterpolatedGatherNearest) {
   auto A = Placeholder(DType::FLOAT32, {1, 6});
   auto B = Placeholder(DType::FLOAT32, {9});
@@ -1579,7 +1581,8 @@ TEST_F(CppEdsl, InterpolatedGatherMultiDIndices) {
   };
   checkExact(program, {in1, in2}, {out});
 }
-
+#endif
+#if 0
 TEST_F(CppEdsl, Pow) {
   auto A = Placeholder(DType::FLOAT32, {3, 3});
   auto B = Placeholder(DType::FLOAT32, {3, 3});
@@ -1697,7 +1700,7 @@ TEST_F(CppEdsl, Scatter3D) {
   };
   checkExact(program, {data, indices, updates}, {expected});
 }
-
+#endif
 TEST_F(CppEdsl, ScatterDup1D) {
   auto D = Placeholder(DType::FLOAT32, {8});
   auto I = Placeholder(DType::INT32, {4});
