@@ -300,9 +300,9 @@ struct VectorizeMemImpl {
         VectorType::get({memOpsPlan.subgroupSize * tileSize},
                         vectorReduce.getVectorType().getElementType());
 
-    auto nemMemrefType =
+    auto memMemrefType =
         MemRefType::get(vectorType.getShape(), vectorType.getElementType());
-    auto newAllocOp = builder.create<AllocOp>(loopOp.getLoc(), nemMemrefType);
+    auto newAllocOp = builder.create<AllocOp>(loopOp.getLoc(), memMemrefType);
     auto const0 = builder.create<ConstantIndexOp>(loopOp.getLoc(), 0);
 
     llvm::SmallVector<AffineExpr, 1> expr;
@@ -324,11 +324,11 @@ struct VectorizeMemImpl {
 
     auto results = loopOp.results();
     for (auto res : results) {
-      res.setType(nemMemrefType);
+      res.setType(memMemrefType);
       // Update also AffineYieldOp if type does not match
       for (auto yieldOp : loopOp.getOps<AffineYieldOp>()) {
-        if (yieldOp.getOperand(0).getType() != nemMemrefType)
-          yieldOp.getOperand(0).setType(nemMemrefType);
+        if (yieldOp.getOperand(0).getType() != memMemrefType)
+          yieldOp.getOperand(0).setType(memMemrefType);
       }
     }
     auto newReduceOp = builder.create<PxaVectorReduceOp>(
