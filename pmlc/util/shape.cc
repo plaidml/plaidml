@@ -16,7 +16,6 @@ static size_t getByteSize(DataType dtype) {
     return 1;
   case DataType::si16:
   case DataType::ui16:
-  case DataType::bf16:
   case DataType::f16:
     return 2;
   case DataType::si32:
@@ -52,8 +51,6 @@ static DataType convertFromType(mlir::Type type) {
     return DataType::si64;
   if (type.isUnsignedInteger(64))
     return DataType::ui64;
-  if (type.isBF16())
-    return DataType::bf16;
   if (type.isF16())
     return DataType::f16;
   if (type.isF32())

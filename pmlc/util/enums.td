@@ -52,10 +52,9 @@ def DataType : I64EnumAttr<
       I64EnumAttrCase<"ui32", 10>,
       I64EnumAttrCase<"si64", 11>,
       I64EnumAttrCase<"ui64", 12>,
-      I64EnumAttrCase<"bf16", 13>,
-      I64EnumAttrCase<"f16", 14>,
-      I64EnumAttrCase<"f32", 15>,
-      I64EnumAttrCase<"f64", 16>,
+      I64EnumAttrCase<"f16", 13>,
+      I64EnumAttrCase<"f32", 14>,
+      I64EnumAttrCase<"f64", 15>,
     ]> {
   let cppNamespace = "pmlc::util";
   let returnType = "DataType";
@@ -87,6 +86,20 @@ def NearestMode : I64EnumAttr<
     ]> {
   let cppNamespace = "pmlc::util";
   let returnType = "NearestMode";
+  let convertFromStorage = "static_cast<" # returnType # ">($_self.getValue().getZExtValue())";
+}
+
+def ScatterMode : I64EnumAttr<
+    "ScatterMode",
+    "Scatter update mode",
+    [
+      I64EnumAttrCase<"normal", 0>,
+      I64EnumAttrCase<"update_slice", 1>,
+      I64EnumAttrCase<"update_elt", 2>,
+      I64EnumAttrCase<"update_nd", 3>,
+    ]> {
+  let cppNamespace = "pmlc::util";
+  let returnType = "ScatterMode";
   let convertFromStorage = "static_cast<" # returnType # ">($_self.getValue().getZExtValue())";
 }
 

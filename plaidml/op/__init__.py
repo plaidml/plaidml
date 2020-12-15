@@ -145,8 +145,8 @@ def cumprod(x, axis):
     return op('cumprod', [x, axis]).as_tensor()
 
 
-def cumsum(x, axis):
-    return op('cumsum', [x, axis]).as_tensor()
+def cumsum(x, axis, exclusive=False):
+    return op('cumsum', [x, axis, exclusive]).as_tensor()
 
 
 def dot(x, y):

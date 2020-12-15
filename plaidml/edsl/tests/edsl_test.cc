@@ -1659,26 +1659,29 @@ TEST_F(CppEdsl, Tan) {
 }
 
 TEST_F(CppEdsl, Scatter1D) {
+  auto D = Placeholder(DType::FLOAT32, {8});
   auto I = Placeholder(DType::INT32, {4});
   auto U = Placeholder(DType::FLOAT32, {4});
-  auto S = Placeholder(DType::INT32, {8});
-  auto O = scatter(U, I, S);
-  auto program = makeProgram("scatter", {I, U, S}, {O});
+  auto O = scatter(D, I, U);
+  auto program = makeProgram("scatter", {D, I, U}, {O});
 
+  // Don't bother initializing 'data' in default mode. Only shape of the data is needed.
+  std::vector<float> data;
   std::vector<int32_t> indices = {4, 3, 1, 7};
   std::vector<float> updates = {9, 10, 11, 12};
-  std::vector<int32_t> shape = {8};
   std::vector<float> expected = {0, 11, 0, 10, 9, 0, 0, 12};
-  checkExact(program, {indices, updates, shape}, {expected});
+  checkExact(program, {data, indices, updates}, {expected});
 }
 
 TEST_F(CppEdsl, Scatter3D) {
+  auto D = Placeholder(DType::FLOAT32, {4, 4, 4});
   auto I = Placeholder(DType::INT32, {2});
   auto U = Placeholder(DType::FLOAT32, {2, 4, 4});
-  auto S = Placeholder(DType::INT32, {4, 4, 4});
-  auto O = scatter(U, I, S);
-  auto program = makeProgram("scatter", {I, U, S}, {O});
+  auto O = scatter(D, I, U);
+  auto program = makeProgram("scatter", {D, I, U}, {O});
 
+  // Don't bother initializing 'data' in default mode. Only shape of the data is needed.
+  std::vector<float> data;
   std::vector<int32_t> indices = {0, 2};
   std::vector<float> updates = {
       5, 5, 5, 5, 6, 6, 6, 6,  //
@@ -1686,14 +1689,203 @@ TEST_F(CppEdsl, Scatter3D) {
       5, 5, 5, 5, 6, 6, 6, 6,  //
       7, 7, 7, 7, 8, 8, 8, 8   //
   };
-  std::vector<int32_t> shape = {4, 4, 4};
   std::vector<float> expected = {
       5, 5, 5, 5, 6, 6, 6, 6, 7, 7, 7, 7, 8, 8, 8, 8,  //
       0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  //
       5, 5, 5, 5, 6, 6, 6, 6, 7, 7, 7, 7, 8, 8, 8, 8,  //
       0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0   //
   };
-  checkExact(program, {indices, updates, shape}, {expected});
+  checkExact(program, {data, indices, updates}, {expected});
+}
+
+TEST_F(CppEdsl, ScatterDup1D) {
+  auto D = Placeholder(DType::FLOAT32, {8});
+  auto I = Placeholder(DType::INT32, {4});
+  auto U = Placeholder(DType::FLOAT32, {4});
+  auto O = scatter(D, I, U);
+  auto program = makeProgram("scatter", {D, I, U}, {O});
+
+  // Don't bother initializing 'data' in default mode. Only shape of the data is needed.
+  std::vector<float> data;
+  // Duplicate indices.
+  std::vector<int32_t> indices = {4, 3, 3, 7};
+  std::vector<float> updates = {9, 10, 11, 12};
+  std::vector<float> expected = {0, 0, 0, 21, 9, 0, 0, 12};
+  checkExact(program, {data, indices, updates}, {expected});
+}
+
+TEST_F(CppEdsl, ScatterDup3D) {
+  auto D = Placeholder(DType::FLOAT32, {4, 4, 4});
+  auto I = Placeholder(DType::INT32, {2});
+  auto U = Placeholder(DType::FLOAT32, {2, 4, 4});
+  auto O = scatter(D, I, U);
+  auto program = makeProgram("scatter", {D, I, U}, {O});
+
+  // Don't bother initializing 'data' in default mode. Only shape of the data is needed.
+  std::vector<float> data;
+  // Duplicate indices.
+  std::vector<int32_t> indices = {2, 2};
+  std::vector<float> updates = {
+      5, 5, 5, 5, 6, 6, 6, 6,  //
+      7, 7, 7, 7, 8, 8, 8, 8,  //
+      5, 5, 5, 5, 6, 6, 6, 6,  //
+      7, 7, 7, 7, 8, 8, 8, 8   //
+  };
+  std::vector<float> expected = {
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,   //
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,   //
+      10, 10, 10, 10, 12, 12, 12, 12, 14, 14, 14, 14, 16, 16, 16, 16,  //
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0    //
+  };
+  checkExact(program, {data, indices, updates}, {expected});
+}
+
+TEST_F(CppEdsl, Scatter1DUpdateSlice) {
+  auto D = Placeholder(DType::FLOAT32, {8});
+  auto I = Placeholder(DType::INT32, {4});
+  auto U = Placeholder(DType::FLOAT32, {4});
+  auto O = scatter(D, I, U).mode(ScatterMode::UPDATE_SLICE);
+  auto program = makeProgram("scatter", {D, I, U}, {O});
+
+  std::vector<float> data = {1, 1, 1, 1, 1, 1, 1, 1};
+  std::vector<int32_t> indices = {4, 3, 1, 7};
+  std::vector<float> updates = {9, 10, 11, 12};
+  std::vector<float> expected = {1, 11, 1, 10, 9, 1, 1, 12};
+  checkExact(program, {data, indices, updates}, {expected});
+}
+
+TEST_F(CppEdsl, Scatter3DUpdateSlice) {
+  auto D = Placeholder(DType::FLOAT32, {4, 4, 4});
+  auto I = Placeholder(DType::INT32, {2});
+  auto U = Placeholder(DType::FLOAT32, {2, 4, 4});
+  auto O = scatter(D, I, U).mode(ScatterMode::UPDATE_SLICE);
+  auto program = makeProgram("scatter", {D, I, U}, {O});
+
+  std::vector<float> data = {
+      1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  //
+      1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  //
+      1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  //
+      1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  //
+  };
+  std::vector<int32_t> indices = {0, 2};
+  std::vector<float> updates = {
+      5, 5, 5, 5, 6, 6, 6, 6,  //
+      7, 7, 7, 7, 8, 8, 8, 8,  //
+      5, 5, 5, 5, 6, 6, 6, 6,  //
+      7, 7, 7, 7, 8, 8, 8, 8   //
+  };
+  std::vector<float> expected = {
+      5, 5, 5, 5, 6, 6, 6, 6, 7, 7, 7, 7, 8, 8, 8, 8,  //
+      1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  //
+      5, 5, 5, 5, 6, 6, 6, 6, 7, 7, 7, 7, 8, 8, 8, 8,  //
+      1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  //
+  };
+  checkExact(program, {data, indices, updates}, {expected});
+}
+
+TEST_F(CppEdsl, ScatterNDUpdateSlice) {
+  auto D = Placeholder(DType::FLOAT32, {8});
+  // The only difference with 'Scatter1DUpdateSlice' is the shape of indices.
+  auto I = Placeholder(DType::INT32, {4, 1});
+  auto U = Placeholder(DType::FLOAT32, {4});
+  auto O = scatter(D, I, U).mode(ScatterMode::UPDATE_ND);
+  auto program = makeProgram("scatter", {D, I, U}, {O});
+
+  std::vector<float> data = {1, 1, 1, 1, 1, 1, 1, 1};
+  std::vector<int32_t> indices = {4, 3, 1, 7};
+  std::vector<float> updates = {9, 10, 11, 12};
+  std::vector<float> expected = {1, 11, 1, 10, 9, 1, 1, 12};
+  checkExact(program, {data, indices, updates}, {expected});
+}
+
+TEST_F(CppEdsl, ScatterNDUpdateSlice2) {
+  auto D = Placeholder(DType::FLOAT32, {4, 4, 4});
+  // The only difference with 'Scatter3DUpdateSlice' is the shape of indices.
+  auto I = Placeholder(DType::INT32, {2, 1});
+  auto U = Placeholder(DType::FLOAT32, {2, 4, 4});
+  auto O = scatter(D, I, U).mode(ScatterMode::UPDATE_ND);
+  auto program = makeProgram("scatter", {D, I, U}, {O});
+
+  std::vector<float> data = {
+      1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  //
+      1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  //
+      1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  //
+      1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  //
+  };
+  std::vector<int32_t> indices = {0, 2};
+  std::vector<float> updates = {
+      5, 5, 5, 5, 6, 6, 6, 6,  //
+      7, 7, 7, 7, 8, 8, 8, 8,  //
+      5, 5, 5, 5, 6, 6, 6, 6,  //
+      7, 7, 7, 7, 8, 8, 8, 8   //
+  };
+  std::vector<float> expected = {
+      5, 5, 5, 5, 6, 6, 6, 6, 7, 7, 7, 7, 8, 8, 8, 8,  //
+      1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  //
+      5, 5, 5, 5, 6, 6, 6, 6, 7, 7, 7, 7, 8, 8, 8, 8,  //
+      1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  //
+  };
+  checkExact(program, {data, indices, updates}, {expected});
+}
+
+TEST_F(CppEdsl, ScatterNDUpdateSlice3) {
+  auto D = Placeholder(DType::FLOAT32, {1, 4, 4, 4});
+  auto I = Placeholder(DType::INT32, {2, 3});
+  auto U = Placeholder(DType::FLOAT32, {2, 4});
+  auto O = scatter(D, I, U).mode(ScatterMode::UPDATE_ND);
+  auto program = makeProgram("scatter", {D, I, U}, {O});
+
+  std::vector<float> data = {
+      1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  //
+      1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  //
+      1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  //
+      1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  //
+  };
+  std::vector<int32_t> indices = {
+      0, 0, 0,  //
+      0, 1, 2,  //
+  };
+  std::vector<float> updates = {
+      5, 5, 5, 5,  //
+      6, 6, 6, 6,  //
+  };
+  std::vector<float> expected = {
+      5, 5, 5, 5, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  //
+      1, 1, 1, 1, 1, 1, 1, 1, 6, 6, 6, 6, 1, 1, 1, 1,  //
+      1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  //
+      1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  //
+  };
+  checkExact(program, {data, indices, updates}, {expected});
+}
+
+TEST_F(CppEdsl, ScatterElt) {
+  auto D = Placeholder(DType::FLOAT32, {4, 4});
+  auto I = Placeholder(DType::INT32, {2, 2});
+  auto U = Placeholder(DType::FLOAT32, {2, 2});
+  auto O = scatter(D, I, U).axis(1).mode(ScatterMode::UPDATE_ELT);
+  auto program = makeProgram("scatter", {D, I, U}, {O});
+
+  std::vector<int32_t> indices = {
+      2, 0,  //
+      3, 1,  //
+  };
+  std::vector<float> updates = {
+      9, 9,  //
+      9, 9,  //
+  };
+  std::vector<float> data = {
+      1, 1, 1, 1,  //
+      1, 1, 1, 1,  //
+      1, 1, 1, 1,  //
+      1, 1, 1, 1,  //
+  };
+  std::vector<float> expected = {
+      9, 1, 9, 1,  //
+      1, 9, 1, 9,  //
+      1, 1, 1, 1,  //
+      1, 1, 1, 1,  //
+  };
+  checkExact(program, {data, indices, updates}, {expected});
 }
 
 TEST_F(CppEdsl, Trace) {
@@ -1826,6 +2018,75 @@ TEST_F(CppEdsl, LayerUnusedOperand) {
   // CHECK: func @main(%[[ARG0:.*]]: tensor<10x20xf32>, %[[ARG1:.*]]: tensor<10x20xf32> {tile.const = 0 : index}, %[[ARG2:.*]]: tensor<10x20xf32> {tile.const = 1 : index}) -> tensor<10x20xf32>
   // CHECK:   %[[X0:.*]] = layer.box "sum" (%[[ARG3:.*]], %[[ARG4:.*]], %[[ARG5:.*]]) = (%[[ARG0]], %[[ARG1]], %[[ARG2]]) : (tensor<10x20xf32>, tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
   // CHECK:     %[[X1:.*]] = tile.add %[[ARG3]], %[[ARG5]] : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
+  // CHECK:     layer.return %[[X1]] : tensor<10x20xf32>
+  // CHECK:   return %[[X0]] : tensor<10x20xf32>
+  // clang-format on
+  runProgram(program);
+}
+
+TEST_F(CppEdsl, BadDataType) {
+  EXPECT_ANY_THROW({ auto A = Placeholder(DType::INVALID, {10, 20}); });
+}
+
+TEST_F(CppEdsl, IndexOp) {
+  EXPECT_ANY_THROW({ index({}, 0); });  // Must specify at least one dimension
+
+  TensorDim X0, X1;
+  EXPECT_ANY_THROW({ index({X0}, 0); });  // Must bind X0 to some Tensor
+
+  auto I = Placeholder(DType::FLOAT32, {10, 3});
+  I.bind_dims(X0, X1);
+  Tensor O = index({X0}, 1);
+  auto program = makeProgram("IndexOp", {}, {O});
+}
+
+TEST_F(CppEdsl, LayerMulti) {
+  auto A = Placeholder(DType::FLOAT32, {10, 20});
+  std::vector<int> data = {1, 2, 3, 4};
+  Tensor B = layer("sum", {A}, [&]() {
+    auto C = Constant(makeBuffer(DType::FLOAT32, {10, 20}, data), "C");
+    return A + C;
+  });
+  Tensor O = layer("sum", {B}, [&]() {
+    auto C = Constant(makeBuffer(DType::FLOAT32, {10, 20}, data), "C");
+    return B + C;
+  });
+  auto program = makeProgram("LayerMulti", {A}, {O});
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.LayerMulti
+  // CHECK: module @LayerMulti
+  // CHECK: func @main(%[[ARG0:.*]]: tensor<10x20xf32>, %[[ARG1:.*]]: tensor<10x20xf32> {tile.const = 0 : index}, %[[ARG2:.*]]: tensor<10x20xf32> {tile.const = 1 : index}) -> tensor<10x20xf32> {
+  // CHECK:   %[[X0:.*]] = layer.box "sum" (%[[ARG3:.*]], %[[ARG4:.*]]) = (%[[ARG0]], %[[ARG1]]) : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32> {
+  // CHECK:     %[[X2:.*]] = tile.add %[[ARG3]], %[[ARG4]] : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
+  // CHECK:     layer.return %[[X2]] : tensor<10x20xf32>
+  // CHECK:   %[[X1:.*]] = layer.box "sum" (%[[ARG3:.*]], %[[ARG4:.*]]) = (%[[X0]], %[[ARG2]]) : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32> {
+  // CHECK:     %[[X2:.*]] = tile.add %[[ARG3]], %[[ARG4]] : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
+  // CHECK:     layer.return %[[X2]] : tensor<10x20xf32>
+  // CHECK:   return %[[X1]] : tensor<10x20xf32>
+  // clang-format on
+  runProgram(program);
+}
+
+TEST_F(CppEdsl, LayerException) {
+  auto A = Placeholder(DType::FLOAT32, {10, 20});
+  std::vector<int> data = {1, 2, 3, 4};
+  EXPECT_ANY_THROW({
+    layer("sum", {A}, [&]() -> Tensor {
+      auto C = Constant(makeBuffer(DType::FLOAT32, {10, 20}, data), "C");
+      throw std::runtime_error("exception");
+    });
+  });
+  Tensor O = layer("sum", {A}, [&]() {
+    auto C = Constant(makeBuffer(DType::FLOAT32, {10, 20}, data), "C");
+    return A + C;
+  });
+  auto program = makeProgram("LayerException", {A}, {O});
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.LayerException
+  // CHECK: module @LayerException
+  // CHECK: func @main(%[[ARG0:.*]]: tensor<10x20xf32>, %[[ARG1:.*]]: tensor<10x20xf32> {tile.const = 0 : index}) -> tensor<10x20xf32>
+  // CHECK:   %[[X0:.*]] = layer.box "sum" (%[[ARG2:.*]], %[[ARG3:.*]]) = (%[[ARG0]], %[[ARG1]]) : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
+  // CHECK:     %[[X1:.*]] = tile.add %[[ARG2]], %[[ARG3]] : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
   // CHECK:     layer.return %[[X1]] : tensor<10x20xf32>
   // CHECK:   return %[[X0]] : tensor<10x20xf32>
   // clang-format on

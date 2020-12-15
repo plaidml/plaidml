@@ -91,7 +91,6 @@ enum class DType {
   UINT32 = PLAIDML_DATA_UINT32,
   INT64 = PLAIDML_DATA_INT64,
   UINT64 = PLAIDML_DATA_UINT64,
-  BFLOAT16 = PLAIDML_DATA_BFLOAT16,
   FLOAT16 = PLAIDML_DATA_FLOAT16,
   FLOAT32 = PLAIDML_DATA_FLOAT32,
   FLOAT64 = PLAIDML_DATA_FLOAT64,
@@ -117,8 +116,6 @@ inline const char* to_string(DType dtype) {
       return "int64";
     case DType::UINT64:
       return "uint64";
-    case DType::BFLOAT16:
-      return "bfloat16";
     case DType::FLOAT16:
       return "float16";
     case DType::FLOAT32:

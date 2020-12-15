@@ -4,6 +4,7 @@ pml_cc_library(
     passes.h
     pipeline.h
   SRCS
+    access_qualifiers.cc
     legalize_spirv.cc
     pipeline.cc
     reorder_layouts.cc

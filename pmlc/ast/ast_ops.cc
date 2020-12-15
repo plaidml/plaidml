@@ -39,8 +39,8 @@ static llvm::Optional<double> getFloatValue(Evaluator *evaluator,
 }
 
 static bool isDataTypeFloat(DataType type) {
-  return type == DataType::bf16 || type == DataType::f16 ||
-         type == DataType::f32 || type == DataType::f64;
+  return type == DataType::f16 || type == DataType::f32 ||
+         type == DataType::f64;
 }
 
 struct BooleanOp : Intrinsic {
@@ -53,8 +53,8 @@ struct BooleanOp : Intrinsic {
 struct IndexOp : Intrinsic {
   TensorShapes getShapes(Evaluator *evaluator, ArrayRef<ExprNodePtr> operands,
                          ArrayRef<TensorShape> shapes) const final {
-    if (operands.size() < 1) {
-      throw std::runtime_error("'index' requires at least one operand.");
+    if (operands.size() < 2) {
+      throw std::runtime_error("'index' requires an axis operand and at least 1 dimension");
     }
     TensorShape ret(DataType::si32); // TODO
     for (const ExprNodePtr &operand : operands.drop_front()) {
@@ -166,11 +166,12 @@ struct ReshapeOp : Intrinsic {
 struct ScatterOp : Intrinsic {
   TensorShapes getShapes(Evaluator *evaluator, ArrayRef<ExprNodePtr> operands,
                          ArrayRef<TensorShape> shapes) const final {
-    if (operands.size() != 3) {
-      throw std::runtime_error("'scatter' requires 3 operands.");
+    if (operands.size() != 5) {
+      throw std::runtime_error("'scatter' requires 5 operands.");
     }
-    // source tensor
-    if (shapes[0].sizes.empty()) {
+    // data tensor
+    int64_t rank = shapes[0].getRank();
+    if (!rank) {
       throw std::runtime_error(
           "'scatter' requires operand #1 to have at least one dimension.");
     }
@@ -181,12 +182,23 @@ struct ScatterOp : Intrinsic {
       throw std::runtime_error(
           "'scatter' requires operand #2 to be an integer.");
     }
-    // shape tensor
-    TensorShape ret(shapes[0].elementType);
-    ret.sizes.push_back(shapes[2].sizes[0]);
-    for (size_t i = shapes[1].getRank(); i < shapes[0].getRank(); i++) {
-      ret.sizes.push_back(shapes[0].sizes[i]);
+
+    auto axis = getIntegerValue(evaluator, operands[3]);
+    if (!axis || axis.getValue() >= rank) {
+      throw std::runtime_error(
+          "'scatter' primitive expects the 'axis' argument "
+          "to be a positive integer that is less than the updates tensor "
+          "rank.");
     }
+
+    auto mode = getIntegerValue(evaluator, operands[4]);
+    if (!mode) {
+      throw std::runtime_error(
+          "'scatter' primitive expects the 'mode' argument "
+          "to be a constant integer.");
+    }
+
+    TensorShape ret(shapes[0].elementType, shapes[0].sizes);
     return {ret};
   }
 };
