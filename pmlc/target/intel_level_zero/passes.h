@@ -20,6 +20,8 @@ std::unique_ptr<mlir::Pass> createIntelGenOclReorderLayoutsPass();
 std::unique_ptr<mlir::Pass>
 createIntelGenOclReorderLayoutsPass(unsigned maxThreads, bool allowReorder);
 
+std::unique_ptr<mlir::Pass> createSetAccessQualifiersPass();
+
 /// Generate the code for registering passes.
 #define GEN_PASS_REGISTRATION
 #include "pmlc/target/intel_level_zero/passes.h.inc"

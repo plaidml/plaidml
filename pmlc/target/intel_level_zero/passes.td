@@ -1,6 +1,6 @@
 // Copyright 2020, Intel Corporation
-#ifndef __PMLC_TARGET_INTEL_GEN__OCL_SPIRV_PASSES__
-#define __PMLC_TARGET_INTEL_GEN__OCL_SPIRV_PASSES__
+#ifndef __PMLC_TARGET_INTEL_LEVEL_ZERO_PASSES__
+#define __PMLC_TARGET_INTEL_LEVEL_ZERO_PASSES__
 
 include "mlir/Pass/PassBase.td"
 
@@ -47,4 +47,10 @@ def IntelGenOclReorderLayouts : FunctionPass<"intel-gen-ocl-reorder-layouts"> {
   ];
 }
 
-#endif // __PMLC_TARGET_INTEL_GEN__OCL_SPIRV_PASSES__
+def IntelGenOclSetAccessQualifiers : Pass<"intel-gen-ocl-set-access-qualifiers", "mlir::spirv::ModuleOp"> {
+  let summary = "Set access qualifiers for function arguments.";
+  let constructor = "pmlc::target::intel_level_zero::createSetAccessQualifiersPass()";
+  let dependentDialects = ["mlir::spirv::SPIRVDialect"];
+}
+
+#endif // __PMLC_TARGET_INTEL_LEVEL_ZERO_PASSES__
