@@ -18,6 +18,7 @@ struct AffinexDeadMemRefElimination
         if (isa<AffineWriteOpInterface, DeallocOp>(user)) {
           opsToErase.push_back(user);
         } else {
+          opsToErase.clear();
           return;
         }
       }
