@@ -32,6 +32,7 @@ pml_cc_library(
     pmlc::conversion::stdx_to_llvm
     pmlc::conversion::tile_to_pxa
     pmlc::dialect::abi::ir
+    pmlc::dialect::affinex::transforms
     pmlc::dialect::comp::ir
     pmlc::dialect::comp::transforms
     pmlc::dialect::layer::ir
