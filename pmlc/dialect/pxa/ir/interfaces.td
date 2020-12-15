@@ -176,6 +176,28 @@ def PxaReduceOpInterface : PxaOpInterface<"PxaReduceOpInterface"> {
         return op.getAgg();
       }]
     >,
+    InterfaceMethod<
+      /*desc=*/"Returns the idxs.",
+      /*retTy=*/"::mlir::ValueRange",
+      /*methodName=*/"getIdxs",
+      /*args=*/(ins),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        ConcreteOp op = ::mlir::cast<ConcreteOp>(this->getOperation());
+        return op.idxs();
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/"Returns the result value.",
+      /*retTy=*/"::mlir::Value",
+      /*methodName=*/"getReduceResult",
+      /*args=*/(ins),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        ConcreteOp op = ::mlir::cast<ConcreteOp>(this->getOperation());
+        return op.result();
+      }]
+    >,
   ];
 }
 
