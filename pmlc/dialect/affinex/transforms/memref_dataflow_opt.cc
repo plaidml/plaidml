@@ -9,7 +9,6 @@ struct MemAccess {
   Value memref;
   AffineMap map;
   llvm::SmallVector<Value, 4> indices;
-  MemAccess() = default;
 };
 
 namespace llvm {
@@ -22,13 +21,13 @@ struct DenseMapInfo<MemAccess> {
   }
   static inline MemAccess getTombstoneKey() {
     MemAccess access;
-    access.memref = DenseMapInfo<mlir::Value>::getEmptyKey();
+    access.memref = DenseMapInfo<mlir::Value>::getTombstoneKey();
     return access;
   }
-  static unsigned getHashValue(const MemAccess &Val) {
+  static unsigned getHashValue(const MemAccess &val) {
     return hash_combine(
-        Val.memref, Val.map,
-        hash_combine_range(Val.indices.begin(), Val.indices.end()));
+        val.memref, val.map,
+        hash_combine_range(val.indices.begin(), val.indices.end()));
   }
   static bool isEqual(const MemAccess &LHS, const MemAccess &RHS) {
     if (LHS.memref != RHS.memref) {
@@ -101,31 +100,6 @@ struct AffinexMemRefDataFlowOpt
     for (auto *op : opsToErase) {
       op->erase();
     }
-
-    // TODO: create separate pass for dead store / alloc elimination
-    // BEGIN leverage from upstream MLIR
-    // Check if the store fwd'ed memrefs are now left with only stores and
-    // can thus be completely deleted. Note: the canonicalize pass should be
-    // able to do this as well, but we'll do it here since we collected
-    // these anyway.
-    for (auto memref : memrefsToErase) {
-      // If the memref hasn't been alloc'ed in this function, skip.
-      Operation *defOp = memref.getDefiningOp();
-      if (!defOp || !isa<AllocOp>(defOp))
-        // TODO: if the memref was returned by a 'call' operation, we
-        // could still erase it if the call had no side-effects.
-        continue;
-      if (llvm::any_of(memref.getUsers(), [&](Operation *ownerOp) {
-            return !isa<AffineWriteOpInterface, DeallocOp>(ownerOp);
-          }))
-        continue;
-
-      // Erase all stores, the dealloc, and the alloc on the memref.
-      for (auto *user : llvm::make_early_inc_range(memref.getUsers()))
-        user->erase();
-      defOp->erase();
-    }
-    // END leverage from upstream MLIR
   }
 };
 
