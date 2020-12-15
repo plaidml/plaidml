@@ -65,10 +65,10 @@ void replaceAssignLoadAdd(PxaReduceOpInterface &reduceOp) {
     return;
 
   // Check if both reduce add and assign are of the same type, vector or scalar
-  if (isa<PxaReduceOp>(reduceOp.getOperation()) &&
-          !isa<PxaReduceOp>(reduceAssignOp.getOperation()) ||
-      isa<PxaVectorReduceOp>(reduceOp.getOperation()) &&
-          !isa<PxaVectorReduceOp>(reduceAssignOp.getOperation()))
+  if ((isa<PxaReduceOp>(reduceOp.getOperation()) &&
+       !isa<PxaReduceOp>(reduceAssignOp.getOperation())) ||
+      (isa<PxaVectorReduceOp>(reduceOp.getOperation()) &&
+       !isa<PxaVectorReduceOp>(reduceAssignOp.getOperation())))
     return;
 
   // Value assigned in the reduce assign op needs to come from constant op and
