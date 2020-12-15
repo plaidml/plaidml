@@ -94,6 +94,10 @@ void replaceAssignLoadAdd(PxaReduceOpInterface &reduceOp) {
       !reduceAssignOp.getMemRef().getUseList()->hasOneUse())
     return;
 
+  // Check if parent op is the same for both
+  if (reduceOp.getParentOp() != reduceAssignOp.getParentOp())
+    return;
+
   // Build new op and replace all usages
   OpBuilder builder(reduceOp);
   if (isa<PxaVectorReduceOp>(reduceOp.getOperation())) {
