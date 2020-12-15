@@ -69,6 +69,8 @@ std::unique_ptr<mlir::Pass> createVectorizePass();
 std::unique_ptr<mlir::Pass> createVectorizePass(mlir::StringRef strategy,
                                                 unsigned vectorWidth = 8);
 
+std::unique_ptr<mlir::Pass> createSimplifyArithmeticPass();
+
 std::unique_ptr<mlir::Pass> createSimplifyWithConstraintsPass();
 
 std::unique_ptr<mlir::Pass> createReorderLayoutsPass();
