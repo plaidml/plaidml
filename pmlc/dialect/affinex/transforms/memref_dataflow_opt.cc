@@ -59,7 +59,6 @@ struct AffinexMemRefDataFlowOpt
 
   void runOnFunction() override {
     Block *cur = nullptr;
-    llvm::SmallPtrSet<Value, 4> memrefsToErase;
     llvm::SmallVector<Operation *, 8> opsToErase;
     llvm::DenseMap<MemAccess, AffineWriteOpInterface> lastStoreOps;
 
@@ -90,8 +89,6 @@ struct AffinexMemRefDataFlowOpt
           loadOp.getValue().replaceAllUsesWith(lastStoreOp.getValueToStore());
           // erase the load (later)
           opsToErase.push_back(loadOp);
-          // consider the memref for deletion (later)
-          memrefsToErase.insert(loadOp.getMemRef());
         }
       }
     });
