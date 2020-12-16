@@ -10,6 +10,7 @@
 namespace pmlc::dialect::affinex {
 
 std::unique_ptr<mlir::Pass> createAffinexMemRefDataFlowOpt();
+std::unique_ptr<mlir::Pass> createAffinexDeadMemRefElimination();
 
 /// Generate the code for registering passes.
 #define GEN_PASS_REGISTRATION
