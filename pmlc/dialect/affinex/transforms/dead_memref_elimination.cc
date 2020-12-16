@@ -14,7 +14,7 @@ struct AffinexDeadMemRefElimination
     llvm::SmallVector<Operation *, 8> opsToErase;
     getFunction().walk([&](AllocOp alloc) {
       auto memref = alloc.getResult();
-      for (auto user : memref.getUsers()) {
+      for (Operation *user : memref.getUsers()) {
         if (isa<AffineWriteOpInterface, DeallocOp>(user)) {
           opsToErase.push_back(user);
         } else {
@@ -30,7 +30,7 @@ struct AffinexDeadMemRefElimination
   }
 };
 
-std::unique_ptr<mlir::Pass> createAffinexDeadMemRefElimination() {
+std::unique_ptr<Pass> createAffinexDeadMemRefElimination() {
   return std::make_unique<AffinexDeadMemRefElimination>();
 }
 } // namespace pmlc::dialect::affinex
