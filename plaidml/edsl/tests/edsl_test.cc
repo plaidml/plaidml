@@ -2345,5 +2345,26 @@ TEST_F(CppEdsl, ArgSort3dAxis2Desc) {
   checkExact(program, {input}, {output});
 }
 
+TEST_F(CppEdsl, ArgSort3dAxisNeg2Asc) {
+  auto I = Placeholder(DType::FLOAT32, {2, 2, 2});
+  auto O = argsort(I, /*axis=*/-2, SortDirection::ASC);
+  auto program = makeProgram("argsort", {I}, {O});
+  std::vector<float> input = {
+      1, 2,  //
+      3, 4,  //
+      //
+      5, 6,  //
+      7, 8,  //
+  };
+  std::vector<int32_t> output = {
+      0, 0,  //
+      1, 1,  //
+      //
+      0, 0,  //
+      1, 1,  //
+  };
+  checkExact(program, {input}, {output});
+}
+
 }  // namespace
 }  // namespace plaidml::edsl

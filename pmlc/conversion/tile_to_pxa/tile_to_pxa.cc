@@ -878,10 +878,11 @@ struct ArgSortOpConversion : public OpConversionPattern<tile::ArgSortOp> {
     Value tensor = adaptor.tensor();
     auto shape = tensor.getType().cast<MemRefType>().getShape();
     size_t tensorDims = shape.size();
+    if (axisAttr < 0) {
+      axisAttr += static_cast<int64_t>(tensorDims);
+    }
     size_t axis = static_cast<size_t>(axisAttr);
-    if (-1 == axisAttr) {
-      axis = axisAttr + static_cast<int64_t>(tensorDims);
-    } else if (axisAttr < 0 || axis >= tensorDims) {
+    if (axisAttr < 0 || axis >= tensorDims) {
       return failure();
     }
     auto elementType = tensor.getType().cast<MemRefType>().getElementType();
