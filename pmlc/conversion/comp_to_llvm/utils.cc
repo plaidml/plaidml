@@ -27,11 +27,11 @@ LLVM::GlobalOp addGlobalString(mlir::OpBuilder &builder, mlir::Location loc,
 
 mlir::Value getPtrToGlobalString(mlir::OpBuilder &builder, mlir::Location &loc,
                                  mlir::LLVM::GlobalOp globalOp) {
-  LLVM::LLVMType llvmInt32Ty = LLVM::LLVMType::getInt32Ty(builder.getContext());
+  LLVM::LLVMType llvmInt64Ty = LLVM::LLVMType::getInt64Ty(builder.getContext());
   LLVM::LLVMType llvmPtrTy = LLVM::LLVMType::getInt8PtrTy(builder.getContext());
   mlir::Value globalPtr = builder.create<LLVM::AddressOfOp>(loc, globalOp);
   mlir::Value cst0 = builder.create<LLVM::ConstantOp>(
-      loc, llvmInt32Ty, builder.getI32IntegerAttr(0));
+      loc, llvmInt64Ty, builder.getI64IntegerAttr(0));
   mlir::Value stringPtr = builder.create<LLVM::GEPOp>(
       loc, llvmPtrTy, globalPtr, mlir::ArrayRef<mlir::Value>({cst0, cst0}));
   return stringPtr;
@@ -42,9 +42,9 @@ void getPtrToBinaryModule(mlir::OpBuilder &builder, mlir::Location &loc,
                           mlir::Value &pointer, mlir::Value &bytes) {
   pointer = getPtrToGlobalString(builder, loc, binaryInfo.symbol);
 
-  LLVM::LLVMType llvmInt32Ty = LLVM::LLVMType::getInt32Ty(builder.getContext());
+  LLVM::LLVMType llvmInt64Ty = LLVM::LLVMType::getInt64Ty(builder.getContext());
   bytes = builder.create<LLVM::ConstantOp>(
-      loc, llvmInt32Ty, builder.getI32IntegerAttr(binaryInfo.bytes));
+      loc, llvmInt64Ty, builder.getI64IntegerAttr(binaryInfo.bytes));
 }
 
 } // namespace pmlc::conversion::comp_to_llvm

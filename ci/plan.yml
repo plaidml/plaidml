@@ -96,8 +96,6 @@ SUITES:
     platforms:
       pml-llvm-cpu:
         pipelines: [nightly, plaidml]
-      pml-vk-gen:
-        pipelines: [nightly, plaidml]
       pml-ocl-gen:
         pipelines: [nightly, plaidml]
     params:
@@ -132,8 +130,6 @@ SUITES:
   base:
     platforms:
       pml-llvm-cpu:
-        pipelines: [nightly, plaidml, ci]
-      pml-vk-gen:
         pipelines: [nightly, plaidml, ci]
       pml-ocl-gen:
         pipelines: [nightly, plaidml, ci]
@@ -198,8 +194,6 @@ SUITES:
     platforms:
       pml-llvm-cpu:
         pipelines: [nightly, plaidml, ci]
-      pml-vk-gen:
-        pipelines: [nightly, plaidml]
       pml-ocl-gen:
         pipelines: [nightly, plaidml, ci]
     params:
