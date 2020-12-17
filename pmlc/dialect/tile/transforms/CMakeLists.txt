@@ -5,6 +5,7 @@ pml_cc_library(
     passes.h
   SRCS
     contraction.cc
+    expand_reshape.cc
     materialize.cc
     pad_constraints.cc
     pad_ranges.cc
