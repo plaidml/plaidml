@@ -1,4 +1,4 @@
-// RUN: pmlc-opt -affinex-loop-unroll %s | FileCheck %s
+// RUN: pmlc-opt -affinex-loop-unroll="operation-limit=12" %s | FileCheck %s
 
 // CHECK: simple
 func @simple() {
