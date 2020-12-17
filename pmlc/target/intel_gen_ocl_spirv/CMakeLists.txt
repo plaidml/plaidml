@@ -26,6 +26,7 @@ pml_cc_library(
     pmlc::dialect::pxa::transforms
     pmlc::dialect::stdx::transforms
     pmlc::dialect::tile::transforms
+    pmlc::transforms
     pmlc::target::intel_gen
     pmlc::target::x86::prng_lowering
     MLIRAffineToStandard
