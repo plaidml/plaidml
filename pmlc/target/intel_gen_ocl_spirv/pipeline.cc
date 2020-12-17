@@ -177,13 +177,12 @@ void pipelineBuilder(OpPassManager &pm,
       createAddSpirvTargetPass(oclPipelineOptions.spirvVersion.getValue()));
   pm.addPass(conversion::gpu::createGpuKernelOutliningPass(
       comp::ExecEnvRuntime::OpenCL, /*memorySpace=*/11));
-  pm.addPass(conversion::gpu::createGatherGpuLaunchFuncsPass());
-  pm.addPass(comp::createMinimizeBufferTransfersPass());
-  pm.addPass(comp::createMinimizeBufferTransfersPass());
-  pm.addPass(comp::createExecEnvCoalescingPass());
-  pm.addPass(comp::createMinimizeAllocationsPass());
-  pm.addPass(comp::createRemoveRedundantRWPass());
-  pm.addPass(comp::createRecalculateEventDepsPass(/*safeDealloc=*/false));
+  //pm.addPass(conversion::gpu::createGatherGpuLaunchFuncsPass());
+  //pm.addPass(comp::createMinimizeBufferTransfersPass());
+  //pm.addPass(comp::createExecEnvCoalescingPass());
+  //pm.addPass(comp::createMinimizeAllocationsPass());
+  //pm.addPass(comp::createRemoveRedundantRWPass());
+  //pm.addPass(comp::createRecalculateEventDepsPass(/*safeDealloc=*/false));
 
   // GPU to SPIR-V.
   pm.addPass(createLegalizeStdOpsForSPIRVLoweringPass());
