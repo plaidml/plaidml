@@ -324,13 +324,13 @@ class Tensor {
   ///
   /// Verify that the specified dims match the dims of this tensor.
   ///
-  void bind_dims(const std::vector<TensorDim>& dims) const {
+  void bind_dims(const std::vector<TensorDim>& dims, edsl_source_location loc = edsl_source_location::current()) const {
     std::vector<plaidml_dim_expr*> raw_dims(dims.size());
     for (size_t i = 0; i < dims.size(); i++) {
       raw_dims[i] = dims[i].as_ptr();
     }
     raw_dims = lens_.apply(raw_dims);
-    ffi::call_void(plaidml_expr_bind_dims, as_ptr(), raw_dims.size(), raw_dims.data());
+    ffi::call_void(loc, plaidml_expr_bind_dims, as_ptr(), raw_dims.size(), raw_dims.data());
   }
 
   ///
@@ -364,6 +364,14 @@ class Tensor {
 
 using TensorVec = std::vector<Tensor>;
 
+struct LocatedIndexedTensor {
+  const IndexedTensor& tensor;
+  edsl_source_location loc;
+  LocatedIndexedTensor(const IndexedTensor& tensor,
+                       edsl_source_location loc = edsl_source_location::current())  // NOLINT
+      : tensor(tensor), loc(loc) {}
+};
+
 ///
 /// \ingroup edsl_objects
 /// \class IndexedTensor
@@ -389,7 +397,9 @@ class IndexedTensor {
   ///
   /// Performs a multiplication combination within a contraction.
   ///
-  IndexedTensor operator*(const IndexedTensor& rhs) const { return IndexedTensor(PLAIDML_COMBO_OP_MUL, {*this, rhs}); }
+  IndexedTensor operator*(LocatedIndexedTensor rhs) const {
+    return IndexedTensor(PLAIDML_COMBO_OP_MUL, {*this, rhs.tensor});
+  }
 
   ///
   /// Performs an equality comparison combination within a contraction.
@@ -708,11 +718,20 @@ inline Tensor Zero() { return Tensor(0); }
 
 Tensor intrinsicCall(const std::string& fn, const TensorVec& args);
 
+Tensor intrinsicCall(edsl_source_location loc, const std::string& fn, const TensorVec& args);
+
 template <typename... Ts>
 Tensor intrinsic(const std::string& fn, Ts... args) {
   TensorVec vec;
   details::into_vector(&vec, std::forward<Ts>(args)...);
   return intrinsicCall(fn, vec);
+}
+
+template <typename... Ts>
+Tensor intrinsic(edsl_source_location loc, const std::string& fn, Ts... args) {
+  TensorVec vec;
+  details::into_vector(&vec, std::forward<Ts>(args)...);
+  return intrinsicCall(loc, fn, vec);
 }
 
 ///
@@ -1150,16 +1169,27 @@ inline Tensor Tensor::operator-() const { return intrinsicCall("neg", {*this}); 
 inline Tensor Tensor::operator~() const { return intrinsicCall("bit_not", {*this}); }
 inline Tensor Tensor::operator!() const { return intrinsicCall("logical_not", {*this}); }
 
-#define PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(_op_, _fn_)                                                 \
-  inline Tensor operator _op_(const Tensor& lhs, const Tensor& rhs) { return intrinsic(_fn_, lhs, rhs); } \
-  inline Tensor operator _op_(const Tensor& lhs, int rhs) { return intrinsic(_fn_, lhs, rhs); }           \
-  inline Tensor operator _op_(const Tensor& lhs, int64_t rhs) { return intrinsic(_fn_, lhs, rhs); }       \
-  inline Tensor operator _op_(const Tensor& lhs, uint64_t rhs) { return intrinsic(_fn_, lhs, rhs); }      \
-  inline Tensor operator _op_(const Tensor& lhs, double rhs) { return intrinsic(_fn_, lhs, rhs); }        \
-  inline Tensor operator _op_(int lhs, const Tensor& rhs) { return intrinsic(_fn_, lhs, rhs); }           \
-  inline Tensor operator _op_(int64_t lhs, const Tensor& rhs) { return intrinsic(_fn_, lhs, rhs); }       \
-  inline Tensor operator _op_(uint64_t lhs, const Tensor& rhs) { return intrinsic(_fn_, lhs, rhs); }      \
-  inline Tensor operator _op_(double lhs, const Tensor& rhs) { return intrinsic(_fn_, lhs, rhs); }
+struct LocatedTensor {
+  const Tensor& tensor;
+  edsl_source_location loc;
+  LocatedTensor(const Tensor& tensor, edsl_source_location loc = edsl_source_location::current())  // NOLINT
+      : tensor(tensor), loc(loc) {}
+  LocatedTensor(Contraction tensor, edsl_source_location loc = edsl_source_location::current())  // NOLINT
+      : tensor(tensor), loc(loc) {}
+};
+
+#define PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(_op_, _fn_)                                                            \
+  inline Tensor operator _op_(LocatedTensor lhs, LocatedTensor rhs) {                                                \
+    return intrinsic(lhs.loc, _fn_, lhs.tensor, rhs.tensor);                                                         \
+  }                                                                                                                  \
+  inline Tensor operator _op_(LocatedTensor lhs, int rhs) { return intrinsic(lhs.loc, _fn_, lhs.tensor, rhs); }      \
+  inline Tensor operator _op_(LocatedTensor lhs, int64_t rhs) { return intrinsic(lhs.loc, _fn_, lhs.tensor, rhs); }  \
+  inline Tensor operator _op_(LocatedTensor lhs, uint64_t rhs) { return intrinsic(lhs.loc, _fn_, lhs.tensor, rhs); } \
+  inline Tensor operator _op_(LocatedTensor lhs, double rhs) { return intrinsic(lhs.loc, _fn_, lhs.tensor, rhs); }   \
+  inline Tensor operator _op_(int lhs, LocatedTensor rhs) { return intrinsic(rhs.loc, _fn_, lhs, rhs.tensor); }      \
+  inline Tensor operator _op_(int64_t lhs, LocatedTensor rhs) { return intrinsic(rhs.loc, _fn_, lhs, rhs.tensor); }  \
+  inline Tensor operator _op_(uint64_t lhs, LocatedTensor rhs) { return intrinsic(rhs.loc, _fn_, lhs, rhs.tensor); } \
+  inline Tensor operator _op_(double lhs, LocatedTensor rhs) { return intrinsic(rhs.loc, _fn_, lhs, rhs.tensor); }
 
 PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(+, "add");
 PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(-, "sub");
@@ -1186,6 +1216,14 @@ inline Tensor intrinsicCall(const std::string& fn, const TensorVec& args) {
     ptrs[i] = args[i].as_ptr();
   }
   return Tensor{ffi::call<plaidml_expr*>(plaidml_expr_intrinsic, fn.c_str(), ptrs.size(), ptrs.data())};
+}
+
+inline Tensor intrinsicCall(edsl_source_location loc, const std::string& fn, const TensorVec& args) {
+  std::vector<plaidml_expr*> ptrs(args.size());
+  for (size_t i = 0; i < args.size(); i++) {
+    ptrs[i] = args[i].as_ptr();
+  }
+  return Tensor{ffi::call<plaidml_expr*>(loc, plaidml_expr_intrinsic, fn.c_str(), ptrs.size(), ptrs.data())};
 }
 
 class Value {
