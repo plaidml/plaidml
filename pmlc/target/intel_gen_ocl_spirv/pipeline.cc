@@ -91,6 +91,8 @@ void pipelineBuilder(OpPassManager &pm,
                                    /*loopDepth=*/3));
   pm.addPass(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
+  pm.addPass(pxa::createSimplifyArithmeticPass());
+  pm.addPass(createCanonicalizerPass());
   pm.addPass(pxa::createMemRefDataFlowOptPass(/*onlyParallelNested=*/true));
   pm.addPass(createCanonicalizerPass());
   // TODO: parametrize localize pass depending on memory size and HW caps
@@ -140,6 +142,10 @@ void pipelineBuilder(OpPassManager &pm,
   // WARNING: Assumes no aliasing
   // (try disabling this pass in case of correctness errors)
   pm.addPass(pmlc::dialect::affinex::createAffinexMemRefDataFlowOpt());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+
+  pm.addPass(pmlc::dialect::affinex::createAffinexDeadMemRefElimination());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 

@@ -20,6 +20,7 @@ gentbl(
 plaidml_cc_library(
     name = "transforms",
     srcs = [
+        "dead_memref_elimination.cc",
         "memref_dataflow_opt.cc",
         "pass_detail.h",
     ],
