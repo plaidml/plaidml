@@ -8,7 +8,6 @@
 #include "pmlc/dialect/tile/transforms/pass_detail.h"
 
 #include <numeric>
-#include <iostream>
 
 using namespace mlir;                // NOLINT
 using namespace pmlc::dialect::stdx; // NOLINT
@@ -21,83 +20,117 @@ struct ExpandReshapePass : public ExpandReshapeBase<ExpandReshapePass> {
   void runOnFunction() final;
 
   void expandReshape(ReshapeOp reshapeOp);
+  void expandOutOfOrderReshape(ReshapeOp reshapeOp);
 };
 
 void ExpandReshapePass::expandReshape(ReshapeOp reshapeOp) {
   auto src = reshapeOp.tensor();
   auto srcShape = src.getType().cast<RankedTensorType>().getShape();
   SmallVector<int64_t, 4> srcDims(srcShape.begin(), srcShape.end());
-  auto dest = reshapeOp.getResult();
-  auto destShape = dest.getType().cast<RankedTensorType>().getShape();
-  SmallVector<int64_t, 4> destDims(destShape.begin(), destShape.end());
+  auto dst = reshapeOp.getResult();
+  auto dstType = dst.getType().cast<RankedTensorType>();
+  auto dstShape = dstType.getShape();
+  SmallVector<int64_t, 4> dstDims(dstShape.begin(), dstShape.end());
 
-  // Dump
-  for (unsigned dim : srcDims) std::cerr << dim << " ";
-  std::cerr << "\n";
-  for (unsigned dim : destDims) std::cerr << dim << " ";
-  std::cerr << "\n";
-
+  auto context = reshapeOp.getContext();
   SmallVector<int64_t, 4> idxs;
-  SmallVector<SmallVector<unsigned, 4>, 4> srcIdxs(srcDims.size());
-  SmallVector<SmallVector<unsigned, 4>, 4> destIdxs(destDims.size());
+  auto zeroExpr = getAffineConstantExpr(0, context);
+  SmallVector<AffineExpr, 4> srcExprs(srcDims.size(), zeroExpr);
+  SmallVector<AffineExpr, 4> dstExprs(dstDims.size(), zeroExpr);
 
   int pSrc = srcDims.size() - 1;
-  int pDest = destDims.size() - 1;
-  while (pSrc >= 0 && pDest >=0) {
+  int pDst = dstDims.size() - 1;
+  int64_t mulSrc = 1;
+  int64_t mulDst = 1;
+  while (pSrc >= 0 && pDst >=0) {
     while (pSrc >= 0 && srcDims[pSrc] == 1) {
       --pSrc;
+      mulSrc = 1;
     }
     if (pSrc < 0) {
       break;
     }
-    while (pDest >= 0 && destDims[pDest] == 1) {
-      --pDest;
+    while (pDst >= 0 && dstDims[pDst] == 1) {
+      --pDst;
+      mulDst = 1;
     }
-    if (pDest < 0) {
+    if (pDst < 0) {
       break;
     }
-    int64_t gcd = std::gcd(srcDims[pSrc], destDims[pDest]);
+    int64_t gcd = std::gcd(srcDims[pSrc], dstDims[pDst]);
+    if (gcd == 1) {
+      // The indices of src and dst are out-of-order
+      expandOutOfOrderReshape(reshapeOp);
+      return;
+    }
     unsigned idxId = idxs.size();
     idxs.emplace_back(gcd);
-    srcIdxs[pSrc].emplace_back(idxId);
-    destIdxs[pDest].emplace_back(idxId);
+    srcExprs[pSrc] = srcExprs[pSrc] + getAffineConstantExpr(mulSrc, context) * getAffineDimExpr(idxId, context);
+    dstExprs[pDst] = dstExprs[pDst] + getAffineConstantExpr(mulDst, context) * getAffineDimExpr(idxId, context);
     srcDims[pSrc] /= gcd;
-    destDims[pDest] /= gcd;
+    dstDims[pDst] /= gcd;
+    mulSrc *= gcd;
+    mulDst *= gcd;
   } 
 
   while (pSrc >= 0) {
     if (srcDims[pSrc] > 1) {
       unsigned idxId = idxs.size();
       idxs.emplace_back(srcDims[pSrc]);
-      srcIdxs[pSrc].emplace_back(idxId);
+      srcExprs[pSrc] = srcExprs[pSrc] + getAffineConstantExpr(mulSrc, context) * getAffineDimExpr(idxId, context);
     }
     --pSrc;
+    mulSrc = 1;
   }
-  while (pDest >= 0) {
-    if (destDims[pDest] > 1) {
+  while (pDst >= 0) {
+    if (dstDims[pDst] > 1) {
       unsigned idxId = idxs.size();
-      idxs.emplace_back(destDims[pDest]);
-      destIdxs[pDest].emplace_back(idxId);
+      idxs.emplace_back(dstDims[pDst]);
+      dstExprs[pDst] = dstExprs[pDst] + getAffineConstantExpr(mulDst, context) * getAffineDimExpr(idxId, context);
     }
-    --pDest;
+    --pDst;
+    mulDst = 1;
   }
 
-  // Dump
-  std::cerr << "Idxs: ";
-  for (auto idx : idxs) std::cerr << idx << " ";
-  std::cerr << "\n";
-  for (unsigned i = 0; i < srcDims.size(); ++i) {
-    std::cerr << i << ": ";
-    auto &ids = srcIdxs[i];
-    for (auto j : ids) std::cerr << j << " ";
-    std::cerr << "\n";
+  // Reverse the dim indices
+  DenseMap<AffineExpr, AffineExpr> map;
+  unsigned numIdxs = idxs.size();
+  for (unsigned i = 0; i < numIdxs / 2; ++i) {
+    auto expr0 = getAffineDimExpr(i, context);
+    auto expr1 = getAffineDimExpr(numIdxs - i - 1, context);
+    map[expr0] = expr1;
+    map[expr1] = expr0;
   }
-  for (unsigned i = 0; i < destDims.size(); ++i) {
-    std::cerr << i << ": ";
-    auto &ids = destIdxs[i];
-    for (auto j : ids) std::cerr << j << " ";
-    std::cerr << "\n";
+  for (unsigned i = 0; i < srcExprs.size(); ++i) {
+    srcExprs[i] = srcExprs[i].replace(map);
   }
+  for (unsigned i = 0; i < dstExprs.size(); ++i) {
+    dstExprs[i] = dstExprs[i].replace(map);
+  }
+
+  AffineMap srcMap = AffineMap::get(idxs.size(), 0, srcExprs, context);
+  AffineMap sinkMap = AffineMap::get(idxs.size(), 0, dstExprs, context);
+
+  OpBuilder builder(reshapeOp);
+  auto elementType = dst.getType().cast<RankedTensorType>().getElementType();
+  auto ident = tile::createIdentity(builder, reshapeOp.getLoc(), elementType, AggregationKind::assign);
+  auto res = builder.create<ContractionOp>(reshapeOp.getLoc(),
+    /* resultType = */ dst.getType(),
+    /* init = */       ident,
+    /* tensors = */    ArrayRef{src},
+    /* agg = */        util::AggregationKind::assign,
+    /* combo = */      util::CombinationKind::none,
+    /* sink = */       sinkMap,
+    /* srcs = */       ArrayRef{srcMap},
+    /* cons = */       IntegerSet::getEmptySet(dstType.getRank(), 0, context),
+    /* name = */       "reshape");
+  dst.replaceAllUsesWith(res);
+  reshapeOp.erase();
+}
+
+void ExpandReshapePass::expandOutOfOrderReshape(ReshapeOp reshapeOp) {
+  // TODO: expand reshape with out-of-order indices
+  return;
 }
 
 void ExpandReshapePass::runOnFunction() {
