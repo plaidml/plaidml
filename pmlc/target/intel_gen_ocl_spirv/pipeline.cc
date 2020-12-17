@@ -43,6 +43,7 @@
 #include "pmlc/dialect/tile/transforms/passes.h"
 #include "pmlc/target/intel_gen/passes.h"
 #include "pmlc/target/intel_gen_ocl_spirv/passes.h"
+#include "pmlc/transforms/passes.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
 
@@ -70,6 +71,8 @@ void pipelineBuilder(OpPassManager &pm,
   pm.addPass(tile::createComputeBoundsPass());
   pm.addPass(tile::createPadRangesPass());
   pm.addPass(tile::createPadConstraintsPass());
+  pm.addPass(tile::createSplitMainPass());
+  pm.addPass(transforms::createHoistingPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
