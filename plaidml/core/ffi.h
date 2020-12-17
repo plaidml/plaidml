@@ -14,22 +14,6 @@
 extern "C" {
 #endif  // __cplusplus
 
-#if __cplusplus >= 202002L
-#include <source_location>
-using edsl_source_location = std::source_location;
-#elif __cplusplus >= 201703L
-#include <experimental/source_location>
-using edsl_source_location = std::experimental::source_location;
-#else
-struct edsl_source_location {
-  static edsl_source_location current() { return edsl_source_location{}; }
-  constexpr uint_least32_t line() const noexcept { return 0; }
-  constexpr uint_least32_t column() const noexcept { return 0; }
-  constexpr const char* file_name() const noexcept { return nullptr; }
-  constexpr const char* function_name() const noexcept { return nullptr; }
-};
-#endif
-
 //
 // Core API
 //
