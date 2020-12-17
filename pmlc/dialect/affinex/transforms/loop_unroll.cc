@@ -10,6 +10,10 @@ using namespace mlir; // NOLINT
 namespace pmlc::dialect::affinex {
 
 struct AffinexLoopUnroll : public AffinexLoopUnrollBase<AffinexLoopUnroll> {
+  explicit AffinexLoopUnroll(uint64_t operationLimit) {
+    this->operationLimit = operationLimit;
+  }
+
   void runOnFunction() override {
     DenseMap<Operation *, uint64_t> opCount;
     SmallVector<AffineForOp, 4> loopsToUnroll;
@@ -19,7 +23,7 @@ struct AffinexLoopUnroll : public AffinexLoopUnrollBase<AffinexLoopUnroll> {
       if (AffineForOp forOp = dyn_cast<AffineForOp>(op)) {
         Optional<uint64_t> tripCount = getConstantTripCount(forOp);
         if (tripCount.hasValue()) {
-          count *= *tripCount;
+          count *= tripCount.getValue();
           if (count <= operationLimit.getValue()) {
             loopsToUnroll.push_back(forOp);
           }
@@ -45,7 +49,7 @@ struct AffinexLoopUnroll : public AffinexLoopUnrollBase<AffinexLoopUnroll> {
   }
 };
 
-std::unique_ptr<Pass> createAffinexLoopUnroll() {
-  return std::make_unique<AffinexLoopUnroll>();
+std::unique_ptr<Pass> createAffinexLoopUnroll(uint64_t operationLimit) {
+  return std::make_unique<AffinexLoopUnroll>(operationLimit);
 }
 } // namespace pmlc::dialect::affinex

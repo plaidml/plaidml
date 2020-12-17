@@ -180,9 +180,8 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(createLowerPXAToAffinePass());
 
   // Unroll affine.for loops.
-  pm.addPass(createLoopUnrollPass(
-      /*unrollFactor=*/256,
-      /*unrollUpToFactor=*/true));
+  pm.addPass(pmlc::dialect::affinex::createAffinexLoopUnroll(
+      /*operationLimit =*/2048));
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
