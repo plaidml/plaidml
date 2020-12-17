@@ -26,6 +26,7 @@
 #include "pmlc/dialect/pxa/transforms/layout_utils.h"
 #include "pmlc/dialect/pxa/transforms/pass_detail.h"
 #include "pmlc/dialect/pxa/transforms/passes.h"
+#include "pmlc/dialect/pxa/transforms/tile.h"
 #include "pmlc/util/logging.h"
 #include "pmlc/util/tags.h"
 
@@ -62,10 +63,70 @@ public:
       }
       IVLOG(3, "Failed to change layout in-place, inserting reorder");
       reorderMemoryReads(createReorder, reorder, memoryDesc);
+      tileLoopNestsToAlignWithDataMaps(memoryDesc);
     }
   }
 };
 
+void tileLoopNestsToAlignWithDataMaps(MemoryUsageDesc &memoryDesc) {
+  if (memoryDesc.parallelOp.hasValue()) {
+    IVLOG(4, "In tileLoopNestsToAlignWithDataMaps()");
+    if (memoryDesc.parallelOp.hasValue()) {
+      auto parallelOp = memoryDesc.parallelOp.getValue();
+
+      parallelOp.walk([&](PxaReadOpInterface read) {
+        mlir::Value readMem = read.getMemRef();
+        IVLOG(4, "read.getMemRef: " << mlir::debugString(readMem));
+      });
+
+      parallelOp.walk([&](PxaLoadOp op) {
+        IVLOG(4, "read load op: " << op);
+        mlir::Value memRef = op.getMemRef();
+        IVLOG(4, "op.getMemRef(): " << mlir::debugString(memRef));
+        IVLOG(4, "op.getMapOperands().size(): " << op.getMapOperands().size());
+        for (auto operand : op.getMapOperands()) {
+          IVLOG(4, "operand: " << mlir::debugString(operand));
+        }
+
+        mlir::AffineMap map = op.getAffineMap();
+        IVLOG(4, "map: " << mlir::debugString(map));
+        for (unsigned idx = 0; idx < map.getNumResults(); ++idx) {
+          mlir::AffineExpr expr = map.getResult(idx);
+
+          if (expr.getKind() == mlir::AffineExprKind::FloorDiv) {
+            auto divExpr = expr.cast<mlir::AffineBinaryOpExpr>();
+            mlir::AffineExpr rhsExpr = divExpr.getRHS();
+
+            if (rhsExpr.getKind() == mlir::AffineExprKind::Constant) {
+              auto constantExpr = rhsExpr.cast<mlir::AffineConstantExpr>();
+              int64_t res = constantExpr.getValue();
+              IVLOG(4, "The floor div constantValue: " << res);
+            }
+          }
+        }
+
+        IVLOG(4, "PxaLoadOp description ends");
+      });
+
+      mlir::Block *outerBody = parallelOp.getBody();
+      auto outerIdxs = outerBody->getArguments();
+
+      for (unsigned i = 0; i < outerIdxs.size(); ++i) {
+        mlir::Value val = outerIdxs[i];
+        IVLOG(4, "index i: " << i << ": " << mlir::debugString(val));
+      }
+    }
+
+    mlir::SmallVector<int64_t, 6> tileSizes;
+    tileSizes.push_back(1);
+    tileSizes.push_back(1);
+    tileSizes.push_back(16);
+    tileSizes.push_back(16);
+    tileSizes.push_back(1);
+    tileSizes.push_back(1);
+    performTiling(memoryDesc.parallelOp.getValue(), tileSizes);
+  }
+}
 // =============================================================================
 // gatherGlobalMemoryDescs - helpers and implementation.
 // =============================================================================
@@ -154,7 +215,7 @@ static MemoryUsageDesc getEmptyUsageDesc(mlir::Value memory) {
   auto memoryType = memory.getType().cast<mlir::MemRefType>();
   mlir::ArrayRef<int64_t> shapeRef = memoryType.getShape();
   mlir::SmallVector<int64_t, 4> shape(shapeRef.begin(), shapeRef.end());
-  auto desc = MemoryUsageDesc{memory, shape};
+  auto desc = MemoryUsageDesc{memory, shape, llvm::None};
   desc.count = std::accumulate(shapeRef.begin(), shapeRef.end(),
                                /*init=*/(int64_t)1, std::multiplies<int64_t>());
   return desc;
@@ -181,6 +242,7 @@ gatherGlobalMemoryDescs(mlir::FuncOp func, const ScheduleModel &model) {
         return;
       MemoryUsageDesc &memoryDesc = getOrCreateGlobalDesc(indirectDef);
       memoryDesc.reads.emplace_back(gatherReadDesc(read, model));
+      memoryDesc.parallelOp = parallelOp;
     });
     parallelOp.walk([&](PxaReduceOpInterface reduce) {
       mlir::Value indirectDef = getIndirectDef(reduce.getMemRef());
@@ -189,6 +251,7 @@ gatherGlobalMemoryDescs(mlir::FuncOp func, const ScheduleModel &model) {
         return;
       MemoryUsageDesc &memoryDesc = getOrCreateGlobalDesc(indirectDef);
       memoryDesc.writes.emplace_back(gatherWriteDesc(reduce));
+      memoryDesc.parallelOp = parallelOp;
     });
   }
 

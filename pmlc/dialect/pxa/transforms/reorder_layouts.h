@@ -42,6 +42,8 @@ struct MemoryUsageDesc {
   mlir::Value value;
   // Shape of memory.
   mlir::SmallVector<int64_t, 4> shape;
+  // The AffineParallelOp surrouding the read/write.
+  mlir::Optional<mlir::AffineParallelOp> parallelOp;
   // Number of elements in memory.
   int64_t count;
   // List of descriptions of reads accessing memory.
@@ -119,6 +121,7 @@ using ReorderCreator = std::function<mlir::Value(
 void reorderMemoryReads(const ReorderCreator &creator, ReorderDesc &reorderDesc,
                         MemoryUsageDesc &memoryDesc);
 
+void tileLoopNestsToAlignWithDataMaps(MemoryUsageDesc &memoryDesc);
 // ============================================================================
 // Helper affine map transformations
 // ============================================================================
