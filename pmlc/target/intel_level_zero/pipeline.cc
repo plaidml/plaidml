@@ -91,6 +91,8 @@ void pipelineBuilder(OpPassManager &pm,
                                    /*loopDepth=*/3));
   pm.addPass(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
+  pm.addPass(pxa::createSimplifyArithmeticPass());
+  pm.addPass(createCanonicalizerPass());
   pm.addPass(pxa::createMemRefDataFlowOptPass(/*onlyParallelNested=*/true));
   pm.addPass(createCanonicalizerPass());
   // TODO: parametrize localize pass depending on memory size and HW caps
@@ -140,6 +142,10 @@ void pipelineBuilder(OpPassManager &pm,
   // WARNING: Assumes no aliasing
   // (try disabling this pass in case of correctness errors)
   pm.addPass(pmlc::dialect::affinex::createAffinexMemRefDataFlowOpt());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+
+  pm.addPass(pmlc::dialect::affinex::createAffinexDeadMemRefElimination());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
@@ -202,7 +208,8 @@ void pipelineBuilder(OpPassManager &pm,
   // pm.addPass(pmlc::conversion::comp_to_llvm::createConvertCompToOclPass());
 
   // Comp to LLVM - L0 function calls.
-  pm.addPass(pmlc::conversion::comp_to_llvm::createConvertCompToLevelZeroPass());
+  pm.addPass(
+      pmlc::conversion::comp_to_llvm::createConvertCompToLevelZeroPass());
 
   // Convert to LLVM code.
   pm.addPass(pmlc::target::intel_gen::createConvertStandardToLLVM());
