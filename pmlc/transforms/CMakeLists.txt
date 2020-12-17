@@ -10,6 +10,7 @@ pml_cc_library(
     MLIRIR
     pmlc::util
     pmlc::dialect::stdx::ir
+    pmlc::dialect::tile::ir
     ::passes-gen
 )
 
