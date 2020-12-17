@@ -145,6 +145,10 @@ void pipelineBuilder(OpPassManager &pm,
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
+  pm.addPass(pmlc::dialect::affinex::createAffinexDeadMemRefElimination());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+
   // Pack dims
   pm.addPass(pmlc::target::intel_gen::createAffineIndexPackPass());
   pm.addPass(createCanonicalizerPass());

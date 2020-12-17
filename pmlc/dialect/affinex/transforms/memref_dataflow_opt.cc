@@ -100,7 +100,7 @@ struct AffinexMemRefDataFlowOpt
   }
 };
 
-std::unique_ptr<mlir::Pass> createAffinexMemRefDataFlowOpt() {
+std::unique_ptr<Pass> createAffinexMemRefDataFlowOpt() {
   return std::make_unique<AffinexMemRefDataFlowOpt>();
 }
 } // namespace pmlc::dialect::affinex
