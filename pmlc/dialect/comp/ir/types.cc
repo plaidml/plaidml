@@ -135,6 +135,14 @@ static Type parseExecEnvType(DialectAsmParser &parser, Location loc) {
   return ExecEnvType::getChecked(runtime, tag, memorySpaces, loc);
 }
 
+static void printKernelType(KernelType type, DialectAsmPrinter &printer) {
+  printer << "kernel";
+}
+
+static Type parseKernelType(DialectAsmParser &parser, Location loc) {
+  return KernelType::getChecked(loc);
+}
+
 void pmlc::dialect::comp::detail::printType(mlir::Type type,
                                             mlir::DialectAsmPrinter &printer) {
   llvm::TypeSwitch<mlir::Type>(type)
@@ -145,6 +153,8 @@ void pmlc::dialect::comp::detail::printType(mlir::Type type,
       .Case<ExecEnvType>([&](ExecEnvType execEnvType) {
         printExecEnvType(execEnvType, printer);
       })
+      .Case<KernelType>(
+          [&](KernelType kernelType) { printKernelType(kernelType, printer); })
       .Default([](Type) { llvm_unreachable("Unhandled 'comp' type"); });
 }
 
@@ -159,6 +169,7 @@ Type pmlc::dialect::comp::detail::parseType(mlir::DialectAsmParser &parser) {
       .Case("device", [&] { return parseDeviceType(parser, loc); })
       .Case("event", [&] { return parseEventType(parser, loc); })
       .Case("execenv", [&] { return parseExecEnvType(parser, loc); })
+      .Case("kernel", [&] { return parseKernelType(parser, loc); })
       .Default([&] {
         parser.emitError(parser.getNameLoc(),
                          "unknown comp type " + typeKeyword);

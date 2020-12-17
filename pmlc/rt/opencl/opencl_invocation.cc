@@ -44,6 +44,7 @@ cl::Event OpenCLKernel::enqueue(cl::CommandQueue queue, cl::NDRange gws,
   cl::Event result;
   queue.enqueueNDRangeKernel(kernel, /*offset=*/cl::NDRange(), gws, lws,
                              &dependencies, &result);
+  dependencies.clear();
   return result;
 }
 
@@ -52,6 +53,11 @@ OpenCLEvent::OpenCLEvent(cl::Event event, OpenCLActionKind kind,
     : event(event), kind(kind), name(std::move(name)) {}
 
 void OpenCLEvent::wait(const std::vector<OpenCLEvent *> &events) {
+  if (events.size() == 0) {
+    // Really you would imageine OpenCL should handle this side cse internally,
+    // but it throws, so we just handle it here
+    return;
+  }
   std::vector<cl::Event> oclEvents;
   std::transform(events.begin(), events.end(), std::back_inserter(oclEvents),
                  [](const OpenCLEvent *event) { return event->getEvent(); });
@@ -159,7 +165,6 @@ OpenCLEvent *OpenCLInvocation::enqueueKernel(OpenCLKernel *kernel,
   cl::Event event = kernel->enqueue(queueUser.getOclQueue(), gws, lws);
   OpenCLEvent *result =
       wrapEvent(event, OpenCLActionKind::Kernel, kernel->getName());
-  delete kernel;
   return result;
 }
 

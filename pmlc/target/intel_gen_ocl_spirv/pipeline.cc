@@ -27,8 +27,7 @@
 
 #include "pmlc/compiler/registry.h"
 #include "pmlc/conversion/comp_to_llvm/passes.h"
-#include "pmlc/conversion/gpu/lowering.h"
-#include "pmlc/conversion/gpu_to_comp/passes.h"
+#include "pmlc/conversion/gpu/passes.h"
 #include "pmlc/conversion/gpu_to_spirv/passes.h"
 #include "pmlc/conversion/pxa_to_affine/passes.h"
 #include "pmlc/conversion/stdx_to_llvm/passes.h"
@@ -86,9 +85,10 @@ void pipelineBuilder(OpPassManager &pm,
   pm.addPass(createCSEPass());
 
   // Do tiled fusion
-  pm.addPass(pxa::createFusionPass(/*memoryActivityThreshold=*/0,
-                                   /*exactlyMatch=*/false, /*tiledFusion=*/true,
-                                   /*loopDepth=*/3));
+  // pm.addPass(pxa::createFusionPass(/*memoryActivityThreshold=*/0,
+  //                                 /*exactlyMatch=*/false,
+  //                                 /*tiledFusion=*/true,
+  //                                 /*loopDepth=*/3));
   pm.addPass(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(pxa::createSimplifyArithmeticPass());
@@ -175,12 +175,10 @@ void pipelineBuilder(OpPassManager &pm,
   // GPU transforms
   pm.addPass(
       createAddSpirvTargetPass(oclPipelineOptions.spirvVersion.getValue()));
-  pm.addPass(conversion::gpu::createGpuKernelOutliningPass());
-  pm.addPass(conversion::gpu::createGatherGpuLaunchFuncsPass());
-
-  // Convert GPU to comp.
-  pm.addPass(pmlc::conversion::gpu_to_comp::createConvertGpuToCompPass(
+  pm.addPass(conversion::gpu::createGpuKernelOutliningPass(
       comp::ExecEnvRuntime::OpenCL, /*memorySpace=*/11));
+  pm.addPass(conversion::gpu::createGatherGpuLaunchFuncsPass());
+  pm.addPass(comp::createMinimizeBufferTransfersPass());
   pm.addPass(comp::createMinimizeBufferTransfersPass());
   pm.addPass(comp::createExecEnvCoalescingPass());
   pm.addPass(comp::createMinimizeAllocationsPass());
@@ -207,7 +205,8 @@ void pipelineBuilder(OpPassManager &pm,
   pm.addPass(spirv::createUpdateVersionCapabilityExtensionPass());
 
   // Comp to LLVM - OpenCL function calls.
-  pm.addPass(pmlc::conversion::comp_to_llvm::createConvertCompToOclPass());
+  pm.addPass(
+      pmlc::conversion::comp_to_llvm::createConvertCompToLLVMPass("ocl_"));
 
   // Convert to LLVM code.
   pm.addPass(pmlc::target::intel_gen::createConvertStandardToLLVM());
