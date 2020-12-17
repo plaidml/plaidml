@@ -288,6 +288,8 @@ class convolution {
     return details::op("convolution", args).as_tensor();
   }
 
+  operator edsl::LocatedTensor() { return edsl::LocatedTensor(edsl::Tensor(*this)); }
+
  private:
   edsl::Tensor I_;
   edsl::Tensor F_;
@@ -360,6 +362,8 @@ class explicit_padding {
     return details::op("explicit_padding", args).as_tensor();
   }
 
+  operator edsl::LocatedTensor() { return edsl::LocatedTensor(edsl::Tensor(*this)); }
+
  private:
   edsl::Tensor I_;
   std::vector<int> lo_pads_;
@@ -418,6 +422,8 @@ class lrn {
     auto args = edsl::make_tuple(I_, edsl::make_tuple(window_size_), edsl::make_tuple(axes_), alpha_, beta_, epsilon_);
     return details::op("lrn", args).as_tensor();
   }
+
+  operator edsl::LocatedTensor() { return edsl::LocatedTensor(edsl::Tensor(*this)); }
 
  private:
   edsl::Tensor I_;
@@ -529,6 +535,8 @@ class l2norm {
     return details::op("l2norm", args).as_tensor();
   }
 
+  operator edsl::LocatedTensor() { return edsl::LocatedTensor(edsl::Tensor(*this)); }
+
  private:
   edsl::Tensor I_;
   std::vector<int64_t> axes_;
@@ -589,6 +597,8 @@ class relu {
     return details::op("relu", args).as_tensor();
   }
 
+  operator edsl::LocatedTensor() { return edsl::LocatedTensor(edsl::Tensor(*this)); }
+
  private:
   edsl::Tensor I_;
   edsl::Tensor alpha_;
@@ -624,6 +634,8 @@ class repeat {
     auto args = edsl::make_tuple(I_, count_, axis_);
     return details::op("repeat", args).as_tensor();
   }
+
+  operator edsl::LocatedTensor() { return edsl::LocatedTensor(edsl::Tensor(*this)); }
 
  private:
   edsl::Tensor I_;
@@ -671,6 +683,8 @@ class slice {
     auto args = edsl::make_tuple(I_, dims_);
     return details::op("slice", args).as_tensor();
   }
+
+  operator edsl::LocatedTensor() { return edsl::LocatedTensor(edsl::Tensor(*this)); }
 
  private:
   edsl::Tensor I_;
