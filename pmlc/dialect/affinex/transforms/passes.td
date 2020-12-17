@@ -3,6 +3,11 @@
 
 include "mlir/Pass/PassBase.td"
 
+def AffinexLoopUnroll : FunctionPass<"affinex-loop-unroll"> {
+  let summary = "Performs loop unrolling.";
+  let constructor = "pmlc::dialect::affinex::createAffinexLoopUnroll()";
+}
+
 def AffinexMemRefDataFlowOpt : FunctionPass<"affinex-memref-dataflow-opt"> {
   let summary = "Performs store to load forwarding.";
   let constructor = "pmlc::dialect::affinex::createAffinexMemRefDataFlowOpt()";

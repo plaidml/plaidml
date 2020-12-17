@@ -21,6 +21,7 @@ plaidml_cc_library(
     name = "transforms",
     srcs = [
         "dead_memref_elimination.cc",
+        "loop_unroll.cc",
         "memref_dataflow_opt.cc",
         "pass_detail.h",
     ],
