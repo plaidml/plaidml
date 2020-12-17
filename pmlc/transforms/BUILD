@@ -33,6 +33,7 @@ plaidml_cc_library(
         ":gen-pass",
         "//pmlc/util",
         "//pmlc/dialect/stdx/ir",
+        "//pmlc/dialect/tile/ir", 
         "@llvm-project//mlir:Pass",
     ],
 )

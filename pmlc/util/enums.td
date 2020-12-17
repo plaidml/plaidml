@@ -103,4 +103,17 @@ def ScatterMode : I64EnumAttr<
   let convertFromStorage = "static_cast<" # returnType # ">($_self.getValue().getZExtValue())";
 }
 
+def MemUse : I64EnumAttr<
+    "MemUse",
+    "How is a buffer used",
+    [
+      I64EnumAttrCase<"none", 0>,
+      I64EnumAttrCase<"read_only", 1>,
+      I64EnumAttrCase<"write_only", 2>,
+      I64EnumAttrCase<"read_write", 3>,
+    ]> {
+  let cppNamespace = "pmlc::util";
+  let returnType = "MemUse";
+}
+
 #endif // __PML_UTIL_ENUMS__

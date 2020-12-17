@@ -3,6 +3,7 @@
 #include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Dialect/SPIRV/SPIRVDialect.h"
 #include "mlir/Pass/Pass.h"
+#include "pmlc/dialect/comp/ir/dialect.h"
 
 namespace pmlc::conversion::gpu {
 

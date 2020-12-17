@@ -13,7 +13,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "mlir/Conversion/GPUToSPIRV/ConvertGPUToSPIRVPass.h"
-#include "mlir/Conversion/GPUToVulkan/ConvertGPUToVulkanPass.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
 #include "mlir/Conversion/StandardToSPIRV/ConvertStandardToSPIRVPass.h"
 #include "mlir/Dialect/GPU/Passes.h"
@@ -30,8 +29,7 @@
 #include "pmlc/all_dialects.h"
 #include "pmlc/compiler/program.h"
 #include "pmlc/conversion/comp_to_llvm/passes.h"
-#include "pmlc/conversion/gpu/lowering.h"
-#include "pmlc/conversion/gpu_to_comp/passes.h"
+#include "pmlc/conversion/gpu/passes.h"
 #include "pmlc/dialect/comp/ir/types.h"
 #include "pmlc/dialect/comp/transforms/passes.h"
 #include "pmlc/rt/executable.h"
@@ -48,13 +46,10 @@ static LogicalResult runMLIRPasses(ModuleOp module) {
   PassManager passManager(module.getContext());
   applyPassManagerCLOptions(passManager);
 
-  passManager.addPass(createGpuKernelOutliningPass());
-
-  // Convert GPU to comp.
-  passManager.addPass(pmlc::conversion::gpu_to_comp::createConvertGpuToCompPass(
+  passManager.addPass(pmlc::conversion::gpu::createGpuKernelOutliningPass(
       comp::ExecEnvRuntime::Vulkan, /*memorySpace=*/0));
-  passManager.addPass(comp::createExecEnvCoalescingPass());
-  passManager.addPass(comp::createMinimizeAllocationsPass());
+
+  passManager.addPass(createGpuKernelOutliningPass());
 
   passManager.addPass(createLegalizeStdOpsForSPIRVLoweringPass());
   passManager.addPass(createConvertGPUToSPIRVPass());
@@ -63,7 +58,7 @@ static LogicalResult runMLIRPasses(ModuleOp module) {
   modulePM.addPass(spirv::createUpdateVersionCapabilityExtensionPass());
   // Comp to LLVM - Vulkan function calls.
   passManager.addPass(
-      pmlc::conversion::comp_to_llvm::createConvertCompToVulkanPass());
+      pmlc::conversion::comp_to_llvm::createConvertCompToLLVMPass());
   passManager.addPass(createLowerToLLVMPass(LowerToLLVMOptions{
       /*useBarePtrCallConv=*/false,
       /*emitCWrappers=*/true,
