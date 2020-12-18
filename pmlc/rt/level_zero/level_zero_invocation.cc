@@ -193,6 +193,8 @@ LevelZeroKernel *LevelZeroInvocation::createKernelFromIL(char *data,
 LevelZeroEvent *LevelZeroInvocation::enqueueKernel(LevelZeroKernel *kernel,
                                                    ze_group_count_t gws,
                                                    ze_group_count_t lws) {
+  lzu::set_group_size(kernel->getKernel(), lws.groupCountX, lws.groupCountY,
+                      lws.groupCountZ);
   ze_event_handle_t event;
   eventPool.create_event(event);
   kernel->enqueue(queueUser.getLevelZeroList(), gws, lws, event);

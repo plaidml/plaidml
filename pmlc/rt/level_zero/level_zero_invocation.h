@@ -61,6 +61,8 @@ public:
   /// Returns name of this kernel.
   const std::string &getName() const { return name; }
 
+  ze_kernel_handle_t getKernel() { return kernel; }
+
 private:
   ze_module_handle_t module;
   ze_kernel_handle_t kernel;

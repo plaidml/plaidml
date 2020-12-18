@@ -73,16 +73,20 @@ void *levelZeroScheduleFunc(void *invocation, void *kernel, uint64_t gws0,
                             uint64_t gws1, uint64_t gws2, uint64_t lws0,
                             uint64_t lws1, uint64_t lws2) {
   // ze_group_count_t gws(gws0, gws1, gws2);
-  IVLOG(1, " " << gws0 << " " << gws1 << " " << gws2 << " " << lws0 << " " << lws1 << " " << lws2 << " ");
-  ze_group_count_t gws = {4, 8, 8};
-  //ze_group_count_t gws = {(uint32_t)(gws0 * lws0), (uint32_t)(gws1 * lws1),
+  // IVLOG(1, " " << gws0 << " " << gws1 << " " << gws2 << " " << lws0 << " " <<
+  // lws1 << " " << lws2 << " "); ze_group_count_t gws = {(uint32_t)(gws0 *
+  // lws0), (uint32_t)(gws1 * lws1),
   //                        (uint32_t)(gws2 * lws2)};
-  //ze_group_count_t gws = {(uint32_t)(gws0), (uint32_t)(gws1),
-  //                        (uint32_t)(gws2)};
-  ze_group_count_t lws = {(uint32_t)lws0, (uint32_t)lws1, (uint32_t)lws2};
-  void * result = static_cast<LevelZeroInvocation *>(invocation)
-      ->enqueueKernel(static_cast<LevelZeroKernel *>(kernel), gws, lws);
-  //levelZeroSubmit(invocation);
+  ze_group_count_t gws = {static_cast<uint32_t>(gws0),
+                          static_cast<uint32_t>(gws1),
+                          static_cast<uint32_t>(gws2)};
+  ze_group_count_t lws = {static_cast<uint32_t>(lws0),
+                          static_cast<uint32_t>(lws1),
+                          static_cast<uint32_t>(lws2)};
+  void *result =
+      static_cast<LevelZeroInvocation *>(invocation)
+          ->enqueueKernel(static_cast<LevelZeroKernel *>(kernel), gws, lws);
+  // levelZeroSubmit(invocation);
   return result;
 }
 

@@ -374,6 +374,24 @@ void append_barrier(ze_command_list_handle_t cl, ze_event_handle_t hSignalEvent,
                                        phWaitEvents));
 }
 
+// Group
+void set_group_size(ze_kernel_handle_t hFunction, uint32_t groupSizeX,
+                    uint32_t groupSizeY, uint32_t groupSizeZ) {
+  EXPECT_EQ(ZE_RESULT_SUCCESS, zeKernelSetGroupSize(hFunction, groupSizeX,
+                                                    groupSizeY, groupSizeZ));
+}
+
+void suggest_group_size(ze_kernel_handle_t hFunction, uint32_t globalSizeX,
+                        uint32_t globalSizeY, uint32_t globalSizeZ,
+                        uint32_t &groupSizeX, uint32_t &groupSizeY,
+                        uint32_t &groupSizeZ) {
+  EXPECT_EQ(ZE_RESULT_SUCCESS,
+            zeKernelSuggestGroupSize(hFunction, globalSizeX, globalSizeY,
+                                     globalSizeZ, &groupSizeX, &groupSizeY,
+                                     &groupSizeZ));
+}
+
+// Helper
 std::string to_string(const ze_result_t result) {
   if (result == ZE_RESULT_SUCCESS) {
     return "ZE_RESULT_SUCCESS";

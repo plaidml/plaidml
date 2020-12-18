@@ -31,8 +31,6 @@ namespace pmlc::rt::level_zero::lzu {
 
 #define ASSERT_EQ(x, y) EXPECT_EQ(x, y)
 
-std::string to_string(const ze_result_t result);
-
 // Context
 ze_context_handle_t get_context(ze_driver_handle_t driver);
 
@@ -157,6 +155,18 @@ public:
 
 void append_barrier(ze_command_list_handle_t cl, ze_event_handle_t hSignalEvent,
                     uint32_t numWaitEvents, ze_event_handle_t *phWaitEvents);
+
+// Group
+void set_group_size(ze_kernel_handle_t hFunction, uint32_t groupSizeX,
+                    uint32_t groupSizeY, uint32_t groupSizeZ);
+
+void suggest_group_size(ze_kernel_handle_t hFunction, uint32_t globalSizeX,
+                        uint32_t globalSizeY, uint32_t globalSizeZ,
+                        uint32_t &groupSizeX, uint32_t &groupSizeY,
+                        uint32_t &groupSizeZ);
+
+// Helper
+std::string to_string(const ze_result_t result);
 
 } // namespace pmlc::rt::level_zero::lzu
 
