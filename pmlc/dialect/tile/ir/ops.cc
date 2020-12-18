@@ -21,9 +21,7 @@ namespace pmlc::dialect::tile {
 using llvm::SmallVector;
 
 LogicalResult ArgSortOp::materializeOperands(OpBuilder &builder) {
-  Operation *op = getOperation();
-  return tile::materializeOperands(builder, op,
-                                   op->getOpOperands().take_front());
+  return tile::materializeOperands(builder, getOperation());
 }
 
 LogicalResult ContractionOp::materializeOperands(OpBuilder &builder) {
