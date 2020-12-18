@@ -9,6 +9,8 @@
 
 namespace pmlc::dialect::affinex {
 
+std::unique_ptr<mlir::Pass>
+createAffinexLoopUnroll(uint64_t operationLimit = 256);
 std::unique_ptr<mlir::Pass> createAffinexMemRefDataFlowOpt();
 std::unique_ptr<mlir::Pass> createAffinexDeadMemRefElimination();
 
