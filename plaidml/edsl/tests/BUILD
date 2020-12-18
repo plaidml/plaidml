@@ -38,6 +38,7 @@ plaidml_cc_test(
         "//plaidml:testenv",
         "//plaidml/edsl",
         "//plaidml/exec",
+        "//plaidml/op",
     ],
 )
 
@@ -57,36 +58,4 @@ lit_test(
     name = "edsl_test.cc",
     size = "medium",
     data = [":cc_test"],
-)
-
-plaidml_cc_test(
-    name = "edsl_error_test",
-    size = "medium",
-    testonly = 0,
-    srcs = ["edsl_error_test.cc"],
-    args = [
-        "--plaidml_device=$(plaidml_device)",
-        "--plaidml_target=$(plaidml_target)",
-    ] + select({
-        "//plaidml:intel_gen": ["--skip_test_file=$(location edsl_test-skip.intel_gen.txt)"],
-        "//plaidml:intel_gen_ocl_spirv": ["--skip_test_file=$(location edsl_test-skip.intel_gen_ocl_spirv.txt)"],
-        "//conditions:default": [],
-    }),
-    copts = select({
-        "@bazel_tools//src/conditions:windows": [],
-        "//conditions:default": ["-Wno-comment"],
-    }),
-    data = select({
-        "//plaidml:intel_gen": [":edsl_test-skip.intel_gen.txt"],
-        "//plaidml:intel_gen_ocl_spirv": [":edsl_test-skip.intel_gen_ocl_spirv.txt"],
-        "//conditions:default": [],
-    }),
-    linkstatic = True,
-    toolchains = ["//plaidml:settings"],
-    visibility = ["//visibility:public"],
-    deps = [
-        "//plaidml:testenv",
-        "//plaidml/edsl",
-        "//plaidml/exec",
-    ],
 )
