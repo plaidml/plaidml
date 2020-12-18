@@ -1170,9 +1170,9 @@ inline Tensor Tensor::operator~() const { return intrinsicCall("bit_not", {*this
 inline Tensor Tensor::operator!() const { return intrinsicCall("logical_not", {*this}); }
 
 struct LocatedTensor {
-  const Tensor& tensor;
+  Tensor tensor;
   edsl_source_location loc;
-  LocatedTensor(const Tensor& tensor, edsl_source_location loc = edsl_source_location::current())  // NOLINT
+  LocatedTensor(Tensor tensor, edsl_source_location loc = edsl_source_location::current())  // NOLINT
       : tensor(tensor), loc(loc) {}
   LocatedTensor(Contraction tensor, edsl_source_location loc = edsl_source_location::current())  // NOLINT
       : tensor(tensor), loc(loc) {}
