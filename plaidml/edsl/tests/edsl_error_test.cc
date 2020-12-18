@@ -12,11 +12,18 @@
 
 #include "plaidml/edsl/edsl.h"
 #include "plaidml/exec/exec.h"
+#include "plaidml/op/op.h"
 #include "plaidml/testenv.h"
 #include "pmlc/util/env.h"
 #include "pmlc/util/logging.h"
 
 using ::testing::HasSubstr;
+
+#if ERRORTRACING
+#define EXPECT_ERROR_LINE(errmsg, eline) EXPECT_THAT(errmsg, HasSubstr(std::to_string(eline)))
+#else
+#define EXPECT_ERROR_LINE(errmsg, eline) EXPECT_THAT(errmsg, HasSubstr(":0"));
+#endif
 
 namespace plaidml::edsl {
 
@@ -39,7 +46,7 @@ TEST_F(CppEdsl, BindDims) {
   } catch (const std::exception& e) {
     errmsg = e.what();
   }
-  EXPECT_THAT(errmsg, HasSubstr(std::to_string(eline)));
+  EXPECT_ERROR_LINE(errmsg, eline);
 }
 
 TEST_F(CppEdsl, EltwiseMismatch) {
@@ -54,7 +61,24 @@ TEST_F(CppEdsl, EltwiseMismatch) {
   } catch (const std::exception& e) {
     errmsg = e.what();
   }
-  EXPECT_THAT(errmsg, HasSubstr(std::to_string(eline)));
+  EXPECT_ERROR_LINE(errmsg, HasSubstr(std::to_string(eline)));
+}
+
+TEST_F(CppEdsl, OpOperators) {
+  const char* errmsg;
+  int eline;
+  try {
+    auto X = Placeholder(DType::FLOAT32, {10, 10});
+    auto Y = Placeholder(DType::FLOAT32, {12, 12});
+    auto RX = plaidml::op::relu(X);
+    auto RY = plaidml::op::relu(Y);
+    // clang-format off
+    eline = __LINE__; auto O = X + Y;
+    // clang-format on
+  } catch (const std::exception& e) {
+    errmsg = e.what();
+  }
+  EXPECT_ERROR_LINE(errmsg, HasSubstr(std::to_string(eline)));
 }
 
 }  // namespace
