@@ -292,10 +292,10 @@ naiveScheduleModel(mlir::ArrayRef<mlir::AffineParallelOp> loopNest) {
 // ============================================================================
 // Helper function to get pack\unpack ops.
 // ============================================================================
-template <typename funcType>
-void getPackOp(funcType &packOp, mlir::FuncOp &funcOp) {
+template <typename OpType>
+void getPackOp(OpType &packOp, mlir::FuncOp funcOp) {
   // Assume there is single pack op in function
-  auto packOps = funcOp.getOps<funcType>();
+  auto packOps = funcOp.getOps<OpType>();
   if (!packOps.empty())
     packOp = *packOps.begin();
 }
