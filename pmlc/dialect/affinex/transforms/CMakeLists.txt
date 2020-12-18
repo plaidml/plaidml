@@ -5,6 +5,7 @@ pml_cc_library(
     passes.h
   SRCS
     dead_memref_elimination.cc
+    loop_unroll.cc
     memref_dataflow_opt.cc
   DEPS
     ::passes-gen
