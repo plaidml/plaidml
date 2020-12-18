@@ -1,7 +1,3 @@
-add_subdirectory(utils)
-
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/utils/include)
-
 pml_cc_library(
   NAME level_zero
   HDRS register.h
@@ -15,13 +11,14 @@ pml_cc_library(
     level_zero_wrappers.cc
     level_zero_utils.h
     level_zero_utils.cc
+    utils.cc
+    utils.h
   DEPS
     pmlc::compiler
     pmlc::rt
     MLIRPass
     MLIRSPIRV
     mlir_runner_utils
-    pmlc::rt::level_zero::utils::lz_wrapper
     LevelZero::LevelZero
 )
 
@@ -29,11 +26,9 @@ pml_cc_binary(
     NAME level_zero_probe
     SRCS
       level_zero_probe.cc
-      level_zero_utils.h
-      level_zero_utils.cc
     COPTS
       -g
     DEPS
-      pmlc::rt::level_zero::utils::lz_wrapper
+      pmlc::rt::level_zero
       pmlc::rt
 )

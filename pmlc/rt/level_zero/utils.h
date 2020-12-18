@@ -1,6 +1,6 @@
 // Copyright 2020 Intel Corporation
-#ifndef PMLC_RT_LEVEL_ZERO_UTILS_UTILS_H_
-#define PMLC_RT_LEVEL_ZERO_UTILS_UTILS_H_
+#ifndef PMLC_RT_LEVEL_ZERO_UTILS_H_
+#define PMLC_RT_LEVEL_ZERO_UTILS_H_
 
 #include <level_zero/ze_api.h>
 #include <level_zero/zet_api.h>
@@ -170,4 +170,4 @@ std::string to_string(const ze_result_t result);
 
 } // namespace pmlc::rt::level_zero::lzu
 
-#endif // PMLC_RT_LEVEL_ZERO_UTILS_UTILS_H_
+#endif // PMLC_RT_LEVEL_ZERO_UTILS_H_

@@ -1,6 +1,6 @@
 // Copyright 2020 Intel Corporation
 
-#include "pmlc/rt/level_zero/utils/utils.h"
+#include "pmlc/rt/level_zero/utils.h"
 
 namespace pmlc::rt::level_zero::lzu {
 // Context
