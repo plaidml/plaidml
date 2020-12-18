@@ -1,13 +1,11 @@
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 file(GLOB SOURCES
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/harness/*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/utils.cc
 )
 
 file(GLOB HEADERS
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/utils/.hpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/test_harness/.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/utils.h
 )
 
 pml_cc_library(

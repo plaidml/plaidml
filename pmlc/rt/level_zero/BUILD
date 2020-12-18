@@ -37,6 +37,9 @@ plaidml_cc_binary(
         "level_zero_utils.h",
         "level_zero_utils.cc",
     ],
+    linkopts = [
+        "-lze_loader",
+    ],
     deps = ["@Level_Zero"],
 )
 

@@ -11,15 +11,15 @@ LevelZeroQueue::LevelZeroQueue(const ze_context_handle_t &context,
                                ze_command_queue_group_properties_t properties)
     : properties(properties) {
   // seems no need to use proiority
-  queue = lzt::create_command_queue(context, device, 0,
+  queue = lzu::create_command_queue(context, device, 0,
                                     ZE_COMMAND_QUEUE_MODE_DEFAULT,
-                                    ZE_COMMAND_QUEUE_PRIORITY_NORMAL, 0);
-  list = lzt::create_command_list(context, device, 0, 0);
+                                    ZE_COMMAND_QUEUE_PRIORITY_NORMAL, 0, 0);
+  list = lzu::create_command_list(context, device, 0, 0);
 }
 
 LevelZeroQueue::~LevelZeroQueue() {
-    lzt::destroy_command_list(list);
-    lzt::destroy_command_queue(queue);
+  lzu::destroy_command_list(list);
+  lzu::destroy_command_queue(queue);
 }
 
 LevelZeroQueueUser::LevelZeroQueueUser()
@@ -55,17 +55,20 @@ LevelZeroQueueUser LevelZeroQueueGuard::use() {
   return LevelZeroQueueUser(this, queue);
 }
 
-LevelZeroDevice::LevelZeroDevice(ze_device_handle_t device)
-    : context(lzt::get_default_context()), device(device) {
-  IVLOG(1, "Instantiating LevelZero device: " << lzt::get_device_properties(device).name);
+LevelZeroDevice::LevelZeroDevice(ze_driver_handle_t driver,
+                                 ze_device_handle_t device)
+    : driver(driver), device(device) {
+  context = lzu::get_context(driver);
+  IVLOG(1, "Instantiating LevelZero device: "
+               << lzu::get_device_properties(device).name);
   queues.clear();
 }
 
 LevelZeroDevice::~LevelZeroDevice() {
-    // TODO maybe other place
-    // Once multiple devices, shall change
-    clearQueues();
-    lzt::destroy_context(context);
+  // TODO maybe other place
+  // Once multiple devices, shall change
+  clearQueues();
+  lzu::destroy_context(context);
 }
 
 std::unique_ptr<Executable> LevelZeroDevice::compile(
@@ -79,7 +82,8 @@ LevelZeroDevice::getQueue(ze_command_queue_group_properties_t properties) {
   // Lock modification of queues vector.
   std::lock_guard<std::mutex> lock(queuesMutex);
   for (std::unique_ptr<LevelZeroQueueGuard> &guard : queues) {
-    if (/*!(guard->getLevelZeroProperties() & properties) ||*/ guard->isUsed()) {
+    if (/*!(guard->getLevelZeroProperties() & properties) ||*/ guard
+            ->isUsed()) {
       continue;
     }
     LevelZeroQueueUser user = guard->use();
@@ -94,10 +98,10 @@ LevelZeroDevice::getQueue(ze_command_queue_group_properties_t properties) {
 }
 
 void LevelZeroDevice::clearQueues() {
-    for (std::unique_ptr<LevelZeroQueueGuard> &guard : queues) {
-        guard.reset();
-    }
-    queues.clear();
+  for (std::unique_ptr<LevelZeroQueueGuard> &guard : queues) {
+    guard.reset();
+  }
+  queues.clear();
 }
 
 } // namespace pmlc::rt::level_zero

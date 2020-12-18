@@ -14,13 +14,14 @@ class LevelZeroRuntime final : public pmlc::rt::Runtime {
 public:
   LevelZeroRuntime() {
     zeInit(0);
-    std::vector<ze_device_handle_t> supportedDevices =
-        pmlc::rt::level_zero::getSupportedDevices();
-    for (ze_device_handle_t &device : supportedDevices)
-      devices.emplace_back(std::make_shared<LevelZeroDevice>(device));
+    std::vector<std::pair<ze_driver_handle_t, ze_device_handle_t>>
+        supportedDevices = lzu::getSupportedDevices();
+    for (auto &target : supportedDevices)
+      devices.emplace_back(
+          std::make_shared<LevelZeroDevice>(target.first, target.second));
   }
 
-  ~LevelZeroRuntime() { IVLOG(1, "xin " << __func__);}
+  ~LevelZeroRuntime() {}
 
   std::size_t deviceCount() const noexcept final { return devices.size(); }
   std::shared_ptr<pmlc::rt::Device> device(std::size_t idx) override {

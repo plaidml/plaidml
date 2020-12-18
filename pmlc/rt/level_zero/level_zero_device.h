@@ -81,7 +81,7 @@ class LevelZeroQueueGuard {
 public:
   explicit LevelZeroQueueGuard(LevelZeroQueue *queue, bool init = false)
       : used(init), queue(queue) {}
-  ~LevelZeroQueueGuard() {delete queue;}
+  ~LevelZeroQueueGuard() { delete queue; }
 
   /// Returns properties of contained queue.
   ze_command_queue_group_properties_t getLevelZeroProperties() {
@@ -110,7 +110,8 @@ class LevelZeroDevice final
     : public pmlc::rt::Device,
       public std::enable_shared_from_this<LevelZeroDevice> {
 public:
-  explicit LevelZeroDevice(ze_device_handle_t device);
+  explicit LevelZeroDevice(ze_driver_handle_t driver,
+                           ze_device_handle_t device);
   ~LevelZeroDevice();
 
   std::unique_ptr<Executable>
@@ -126,8 +127,9 @@ public:
   void clearQueues();
 
 private:
-  ze_context_handle_t context;
+  ze_driver_handle_t driver;
   ze_device_handle_t device;
+  ze_context_handle_t context;
   std::vector<std::unique_ptr<LevelZeroQueueGuard>> queues;
   std::mutex queuesMutex;
 };

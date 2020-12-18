@@ -14,8 +14,9 @@ class LevelZeroEvent;
 /// Class encapsulating level zero memory buffer allocated on device.
 class LevelZeroMemory {
 public:
-  LevelZeroMemory(void *buffer, size_t bytes) : buffer(buffer), bytes(bytes) {}
-  ~LevelZeroMemory() {lzt::free_memory(buffer);}
+  LevelZeroMemory(void *buffer, size_t bytes, ze_context_handle_t context)
+      : buffer(buffer), bytes(bytes), context(context) {}
+  ~LevelZeroMemory() { lzu::free_memory(context, buffer); }
 
   /// Returns OpenCL buffer.
   void *getBuffer() { return buffer; }
@@ -23,18 +24,19 @@ public:
   size_t size() { return bytes; }
   /// Enqueues read operation from this buffer into `dst` pointer
   /// on specified command queue.
-  void
-  enqueueRead(ze_command_list_handle_t list, void *dst,
-              std::vector<ze_event_handle_t> &dependencies, ze_event_handle_t &resultE);
+  void enqueueRead(ze_command_list_handle_t list, void *dst,
+                   std::vector<ze_event_handle_t> &dependencies,
+                   ze_event_handle_t &resultE);
   /// Enqueues write operation from `src` pointer into this buffer
   /// on specified command queue.
-  void
-  enqueueWrite(ze_command_list_handle_t list, void *src,
-               std::vector<ze_event_handle_t> &dependencies, ze_event_handle_t &resultE);
+  void enqueueWrite(ze_command_list_handle_t list, void *src,
+                    std::vector<ze_event_handle_t> &dependencies,
+                    ze_event_handle_t &resultE);
 
 private:
   void *buffer;
   size_t bytes;
+  ze_context_handle_t context;
 };
 
 /// OpenCL kernel with additional state information:
@@ -48,14 +50,14 @@ public:
   ~LevelZeroKernel();
 
   /// Adds event dependency that must be completed before this kernel.
-  void addDependency(LevelZeroEvent* event);
+  void addDependency(LevelZeroEvent *event);
   /// Sets kernel argument `idx` to `memory`.
   void setArg(unsigned idx, LevelZeroMemory *memory);
   /// Enqueues wrapped kernel on specified command queue `queue` with
   /// `gws` global work size and `lws` local work size.
   /// Returns OpenCL event tracking execution of kernel execution.
   void enqueue(ze_command_list_handle_t list, ze_group_count_t gws,
-                            ze_group_count_t lws, ze_event_handle_t &resultE);
+               ze_group_count_t lws, ze_event_handle_t &resultE);
   /// Returns name of this kernel.
   const std::string &getName() const { return name; }
 
@@ -84,7 +86,7 @@ public:
   const std::string &getName() const { return name; }
 
   /// Blocks execution untill all `events` have finished executing.
-  static void wait(const std::vector<LevelZeroEvent* > &events);
+  static void wait(const std::vector<LevelZeroEvent *> &events);
 
 private:
   ze_event_handle_t event;
@@ -141,7 +143,7 @@ public:
 private:
   std::shared_ptr<LevelZeroDevice> device;
   LevelZeroQueueUser queueUser;
-  level_zero_tests::zeEventPool eventPool;
+  lzu::zeEventPool eventPool;
   // clear list
   std::vector<std::unique_ptr<LevelZeroEvent>> events;
   std::vector<LevelZeroKernel *> kernels;

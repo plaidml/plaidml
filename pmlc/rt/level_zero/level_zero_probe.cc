@@ -1,31 +1,31 @@
 // Copyright 2020 Intel Corporation
 
-#include <iostream>
 #include <vector>
 
 #include "pmlc/rt/level_zero/level_zero_utils.h"
+#include "pmlc/util/logging.h"
 
 int main(int argc, char **argv) {
   zeInit(0);
   std::vector<ze_driver_handle_t> drivers;
   try {
-    drivers = lzt::get_all_driver_handles();
+    drivers = pmlc::rt::level_zero::lzu::get_all_driver_handles();
   } catch (std::exception &e) {
-    std::cout << e.what() << std::endl;
+    IVLOG(1, e.what());
     throw;
   }
-  std::vector<ze_device_handle_t> supportedDevices =
-      pmlc::rt::level_zero::getSupportedDevices();
+  std::vector<std::pair<ze_driver_handle_t, ze_device_handle_t>>
+      supportedDevices = pmlc::rt::level_zero::lzu::getSupportedDevices();
   if (supportedDevices.empty()) {
-    std::cout << "No supported level zero devices available" << std::endl;
+    IVLOG(1, "No supported level zero devices available");
     return 0;
   }
 
-  std::cout << "Available level zero devices: " << std::endl;
-  std::cout << supportedDevices.size() << std::endl;
-  for (ze_device_handle_t &device : supportedDevices) {
-    std::cout << "  " << lzt::get_device_properties(device).name << std::endl;
+  IVLOG(1, "Available level zero devices: " << supportedDevices.size());
+  for (auto &target : supportedDevices) {
+    IVLOG(1, "  " << pmlc::rt::level_zero::lzu::get_device_properties(
+                         target.second)
+                         .name);
   }
-
   return 0;
 }

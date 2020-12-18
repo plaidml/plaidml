@@ -13,25 +13,25 @@ namespace pmlc::rt::level_zero {
 void LevelZeroMemory::enqueueRead(ze_command_list_handle_t list, void *dst,
                                   std::vector<ze_event_handle_t> &dependencies,
                                   ze_event_handle_t &resultE) {
-  lzt::append_memory_copy(list, dst, buffer, bytes, resultE,
+  lzu::append_memory_copy(list, dst, buffer, bytes, resultE,
                           dependencies.size(), dependencies.data());
 }
 
 void LevelZeroMemory::enqueueWrite(ze_command_list_handle_t list, void *src,
                                    std::vector<ze_event_handle_t> &dependencies,
                                    ze_event_handle_t &resultE) {
-  lzt::append_memory_copy(list, buffer, src, bytes, resultE,
+  lzu::append_memory_copy(list, buffer, src, bytes, resultE,
                           dependencies.size(), dependencies.data());
 }
 
 LevelZeroKernel::LevelZeroKernel(ze_module_handle_t module, std::string name)
     : module(module), name(name) {
-  kernel = lzt::create_function(module, name);
+  kernel = lzu::create_function(module, 0, name);
 }
 
 LevelZeroKernel::~LevelZeroKernel() {
-  lzt::destroy_function(kernel);
-  lzt::destroy_module(module);
+  lzu::destroy_function(kernel);
+  lzu::destroy_module(module);
 }
 
 void LevelZeroKernel::addDependency(LevelZeroEvent *event) {
@@ -40,13 +40,13 @@ void LevelZeroKernel::addDependency(LevelZeroEvent *event) {
 
 void LevelZeroKernel::setArg(unsigned idx, LevelZeroMemory *memory) {
   void *buf = reinterpret_cast<int64_t *>(memory->getBuffer());
-  lzt::set_argument_value(kernel, idx, sizeof(buf), &buf);
+  lzu::set_argument_value(kernel, idx, sizeof(buf), &buf);
 }
 
 void LevelZeroKernel::enqueue(ze_command_list_handle_t list,
                               ze_group_count_t gws, ze_group_count_t lws,
                               ze_event_handle_t &resultE) {
-  lzt::append_launch_function(list, kernel, &gws, resultE, dependencies.size(),
+  lzu::append_launch_function(list, kernel, &gws, resultE, dependencies.size(),
                               dependencies.data());
 }
 
@@ -85,7 +85,7 @@ LevelZeroInvocation::~LevelZeroInvocation() {
   for (size_t i = 0; i < kernels.size(); i++) {
     delete kernels[i];
   }
-  //device->clearQueues();
+  // device->clearQueues();
 #if 0
   // Gather profiling information.
   using std::chrono::nanoseconds;
@@ -141,13 +141,11 @@ LevelZeroInvocation::~LevelZeroInvocation() {
 }
 
 LevelZeroMemory *LevelZeroInvocation::allocateMemory(size_t bytes) {
-  // TODO host memory
+  // TODO host memory, device memory
   void *buffer =
-      lzt::allocate_shared_memory(bytes, 1, 0, 0, device->getLevelZeroDevice(),
+      lzu::allocate_shared_memory(bytes, 1, 0, 0, device->getLevelZeroDevice(),
                                   device->getLevelZeroContext());
-  // void *buffer = lzt::allocate_host_memory(bytes, 1,
-  // device->getLevelZeroContext());
-  return new LevelZeroMemory(buffer, bytes);
+  return new LevelZeroMemory(buffer, bytes, device->getLevelZeroContext());
 }
 
 void LevelZeroInvocation::deallocateMemory(LevelZeroMemory *memory) {
@@ -183,19 +181,10 @@ LevelZeroKernel *LevelZeroInvocation::createKernelFromIL(char *data,
                                                          size_t bytes,
                                                          const char *name) {
   uint8_t *buf = reinterpret_cast<uint8_t *>(data);
-  ze_module_handle_t module = lzt::create_module(
+  ze_module_handle_t module = lzu::create_module(
       device->getLevelZeroContext(), device->getLevelZeroDevice(), buf, bytes,
       ZE_MODULE_FORMAT_IL_SPIRV, "", nullptr);
-  /*std::vector<uint8_t> binary_file = lzt::load_binary_file("spirv_0");
-  ze_module_handle_t module = lzt::create_module(device->getLevelZeroContext(),
-                                                 device->getLevelZeroDevice(),
-                                                 binary_file.data(),
-                                                 binary_file.size(),
-                                                 ZE_MODULE_FORMAT_IL_SPIRV,
-                                                 "",
-                                                 nullptr);*/
-  // ze_module_handle_t module =
-  // lzt::create_module(device->getLevelZeroDevice(), "spirv_0");
+
   LevelZeroKernel *kernel = new LevelZeroKernel(module, name);
   kernels.push_back(kernel);
   return kernel;
@@ -220,7 +209,7 @@ LevelZeroInvocation::enqueueBarrier(const std::vector<LevelZeroEvent *> &deps) {
   std::vector<ze_event_handle_t> dependencies;
   std::transform(deps.begin(), deps.end(), std::back_inserter(dependencies),
                  [](const LevelZeroEvent *event) { return event->getEvent(); });
-  lzt::append_barrier(queueUser.getLevelZeroList(), result, dependencies.size(),
+  lzu::append_barrier(queueUser.getLevelZeroList(), result, dependencies.size(),
                       dependencies.data());
 
   return wrapEvent(result, LevelZeroActionKind::Barrier, "barrier");
@@ -229,15 +218,15 @@ LevelZeroInvocation::enqueueBarrier(const std::vector<LevelZeroEvent *> &deps) {
 void LevelZeroInvocation::flush() {
   ze_command_list_handle_t command_list = queueUser.getLevelZeroList();
   ze_command_queue_handle_t command_queue = queueUser.getLevelZeroQueue();
-  lzt::close_command_list(command_list);
-  lzt::execute_command_lists(command_queue, 1, &command_list, nullptr);
-  lzt::synchronize(command_queue, UINT64_MAX);
-  lzt::reset_command_list(command_list);
+  lzu::close_command_list(command_list);
+  lzu::execute_command_lists(command_queue, 1, &command_list, nullptr);
+  lzu::synchronize(command_queue, UINT64_MAX);
+  lzu::reset_command_list(command_list);
 }
 
 void LevelZeroInvocation::finish() {
   // xin can not wait twice
-  lzt::synchronize(queueUser.getLevelZeroQueue(), UINT64_MAX);
+  lzu::synchronize(queueUser.getLevelZeroQueue(), UINT64_MAX);
 }
 
 LevelZeroEvent *LevelZeroInvocation::wrapEvent(ze_event_handle_t event,
