@@ -12,7 +12,8 @@ namespace pmlc::dialect::tile {
 mlir::Value flattenTensor(mlir::OpBuilder &builder, mlir::Value src);
 
 // Reshape src according to dstShape. Must set the proper builder insertion
-// point before this function.
+// point before this function. Return null Value if src indices and dst indices
+// are out-of-order.
 mlir::Value reshapeTensor(mlir::OpBuilder &builder, mlir::Value src,
                           llvm::ArrayRef<int64_t> dstShape);
 

@@ -65,11 +65,10 @@ Value flattenTensor(OpBuilder &builder, Value src) {
   int64_t size = 1;
 
   // Compute the Affine exprs and maps
-  SmallVector<AffineExpr, 4> srcExprs(shape.size(),
-                                      getAffineConstantExpr(0, context));
+  SmallVector<AffineExpr, 4> srcExprs(shape.size());
   AffineExpr dstExpr = getAffineConstantExpr(0, context);
   for (int dim = shape.size() - 1; dim >= 0; --dim) {
-    srcExprs.emplace_back(getAffineDimExpr(dim, context));
+    srcExprs[dim] = getAffineDimExpr(dim, context);
     dstExpr = dstExpr + getAffineConstantExpr(size, context) *
                             getAffineDimExpr(dim, context);
     size *= shape[dim];
@@ -79,7 +78,7 @@ Value flattenTensor(OpBuilder &builder, Value src) {
 
   // Allocate the linear tensor
   auto elementType = srcType.getElementType();
-  auto dstType = RankedTensorType::get(shape, elementType);
+  auto dstType = RankedTensorType::get({size}, elementType);
   auto ident = tile::createIdentity(builder, builder.getUnknownLoc(),
                                     elementType, AggregationKind::assign);
   return builder.create<ContractionOp>(
@@ -223,7 +222,6 @@ void ExpandReshapePass::runOnFunction() {
   for (auto op : func.getOps<ReshapeOp>()) {
     expandReshape(op);
   }
-  func.dump();
   return;
 }
 
