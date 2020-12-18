@@ -30,7 +30,7 @@
 #include "pmlc/all_dialects.h"
 #include "pmlc/compiler/program.h"
 #include "pmlc/conversion/comp_to_llvm/passes.h"
-#include "pmlc/conversion/gpu_to_comp/passes.h"
+#include "pmlc/conversion/gpu/passes.h"
 #include "pmlc/rt/executable.h"
 #include "pmlc/rt/runtime_registry.h"
 #include "pmlc/util/logging.h"
@@ -39,26 +39,22 @@ using namespace mlir; // NOLINT[build/namespaces]
 using pmlc::compiler::Program;
 using pmlc::rt::Executable;
 using pmlc::util::BufferPtr;
+namespace comp = pmlc::dialect::comp;
 
 static LogicalResult runMLIRPasses(ModuleOp module) {
   PassManager passManager(module.getContext());
   applyPassManagerCLOptions(passManager);
 
-  passManager.addPass(createGpuKernelOutliningPass());
-  {
-    std::unique_ptr<mlir::Pass> convertPass =
-        pmlc::conversion::gpu_to_comp::createConvertGpuToCompPass();
-    convertPass->initializeOptions(
-        "comp-execenv-runtime=1 comp-execenv-memory-space=11");
-    passManager.addPass(std::move(convertPass));
-  }
+  passManager.addPass(pmlc::conversion::gpu::createGpuKernelOutliningPass(
+      comp::ExecEnvRuntime::OpenCL, /*memorySpace=*/11));
+
   passManager.addPass(createLegalizeStdOpsForSPIRVLoweringPass());
   passManager.addPass(createConvertGPUToSPIRVPass());
   OpPassManager &modulePM = passManager.nest<spirv::ModuleOp>();
   modulePM.addPass(spirv::createLowerABIAttributesPass());
   modulePM.addPass(spirv::createUpdateVersionCapabilityExtensionPass());
   passManager.addPass(
-      pmlc::conversion::comp_to_llvm::createConvertCompToOclPass());
+      pmlc::conversion::comp_to_llvm::createConvertCompToLLVMPass());
   passManager.addPass(createLowerToLLVMPass(LowerToLLVMOptions{
       /*useBarePtrCallConv=*/false,
       /*emitCWrappers=*/true,

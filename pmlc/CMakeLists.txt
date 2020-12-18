@@ -25,7 +25,6 @@ pml_cc_library(
     MLIRTransforms
     pmlc::conversion::comp_to_llvm
     pmlc::conversion::gpu
-    pmlc::conversion::gpu_to_comp
     pmlc::conversion::gpu_to_spirv
     pmlc::conversion::pxa_to_affine
     pmlc::conversion::scf_to_omp
