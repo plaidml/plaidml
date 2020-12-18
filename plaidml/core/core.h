@@ -11,10 +11,10 @@
 
 #include "plaidml/core/ffi.h"
 
-#if __cplusplus >= 202002L
+#if __has_include(<source_location>)
 #include <source_location>
 using edsl_source_location = std::source_location;
-#elif __cplusplus >= 201703L
+#elif __has_include(<experimental/source_location>)
 #include <experimental/source_location>
 using edsl_source_location = std::experimental::source_location;
 #else
