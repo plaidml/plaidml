@@ -14,22 +14,8 @@ using namespace pmlc::dialect::stdx; // NOLINT
 
 namespace pmlc::dialect::tile {
 
-namespace {
-
-struct ExpandReshapePass : public ExpandReshapeBase<ExpandReshapePass> {
-  void runOnFunction() final;
-
-  // Compute the number of indices needed
-  int computeNumIdxs(ArrayRef<int64_t> srcShape, ArrayRef<int64_t> dstShape);
-  // Expand in-order reshape operation
-  void expandReshape(ReshapeOp reshapeOp);
-  // Expand out-of-order reshape operation
-  void expandOutOfOrderReshape(ReshapeOp reshapeOp);
-};
-
 // Compute the number of indices needed
-int ExpandReshapePass::computeNumIdxs(ArrayRef<int64_t> srcShape,
-                                      ArrayRef<int64_t> dstShape) {
+int computeNumIdxs(ArrayRef<int64_t> srcShape, ArrayRef<int64_t> dstShape) {
   SmallVector<int64_t, 4> srcDims(srcShape.begin(), srcShape.end());
   SmallVector<int64_t, 4> dstDims(dstShape.begin(), dstShape.end());
   int pSrc = srcDims.size() - 1;
@@ -71,21 +57,54 @@ int ExpandReshapePass::computeNumIdxs(ArrayRef<int64_t> srcShape,
   return numIdxs;
 }
 
-// Expand in-order reshape operation
-void ExpandReshapePass::expandReshape(ReshapeOp reshapeOp) {
-  auto src = reshapeOp.tensor();
+Value flattenTensor(OpBuilder &builder, Value src) {
+  auto context = builder.getContext();
+  auto srcType = src.getType().cast<RankedTensorType>();
+  auto shape = srcType.getShape();
+  unsigned numIdxs = shape.size();
+  int64_t size = 1;
+
+  // Compute the Affine exprs and maps
+  SmallVector<AffineExpr, 4> srcExprs(shape.size(),
+                                      getAffineConstantExpr(0, context));
+  AffineExpr dstExpr = getAffineConstantExpr(0, context);
+  for (int dim = shape.size() - 1; dim >= 0; --dim) {
+    srcExprs.emplace_back(getAffineDimExpr(dim, context));
+    dstExpr = dstExpr + getAffineConstantExpr(size, context) *
+                            getAffineDimExpr(dim, context);
+    size *= shape[dim];
+  }
+  AffineMap srcMap = AffineMap::get(numIdxs, 0, srcExprs, context);
+  AffineMap sinkMap = AffineMap::get(numIdxs, 0, dstExpr);
+
+  // Allocate the linear tensor
+  auto elementType = srcType.getElementType();
+  auto dstType = RankedTensorType::get(shape, elementType);
+  auto ident = tile::createIdentity(builder, builder.getUnknownLoc(),
+                                    elementType, AggregationKind::assign);
+  return builder.create<ContractionOp>(
+      builder.getUnknownLoc(),
+      /* resultType = */ dstType,
+      /* init = */ ident,
+      /* tensors = */ ArrayRef{src},
+      /* agg = */ util::AggregationKind::assign,
+      /* combo = */ util::CombinationKind::none,
+      /* sink = */ sinkMap,
+      /* srcs = */ ArrayRef{srcMap},
+      /* cons = */ IntegerSet::getEmptySet(dstType.getRank(), 0, context),
+      /* name = */ "flatten");
+}
+
+Value reshapeTensor(OpBuilder &builder, Value src, ArrayRef<int64_t> dstShape) {
   auto srcShape = src.getType().cast<RankedTensorType>().getShape();
-  auto dst = reshapeOp.getResult();
-  auto dstType = dst.getType().cast<RankedTensorType>();
-  auto dstShape = dstType.getShape();
 
   int numIdxs = computeNumIdxs(srcShape, dstShape);
   if (numIdxs < 0) {
     // The indices of src and dst are out-of-order
-    expandOutOfOrderReshape(reshapeOp);
+    return Value();
   }
 
-  auto context = reshapeOp.getContext();
+  auto context = builder.getContext();
   SmallVector<int64_t, 4> srcDims(srcShape.begin(), srcShape.end());
   SmallVector<int64_t, 4> dstDims(dstShape.begin(), dstShape.end());
   SmallVector<int64_t, 4> ranges;
@@ -154,37 +173,59 @@ void ExpandReshapePass::expandReshape(ReshapeOp reshapeOp) {
   AffineMap sinkMap = AffineMap::get(numIdxs, 0, dstExprs, context);
 
   // Replace the original reshape with constraction
-  OpBuilder builder(reshapeOp);
-  auto elementType = dst.getType().cast<RankedTensorType>().getElementType();
-  auto ident = tile::createIdentity(builder, reshapeOp.getLoc(), elementType,
-                                    AggregationKind::assign);
-  auto res = builder.create<ContractionOp>(
-      reshapeOp.getLoc(),
-      /* resultType = */ dst.getType(),
+  auto elementType = src.getType().cast<RankedTensorType>().getElementType();
+  auto dstType = RankedTensorType::get(dstShape, elementType);
+  auto ident = tile::createIdentity(builder, builder.getUnknownLoc(),
+                                    elementType, AggregationKind::assign);
+  return builder.create<ContractionOp>(
+      builder.getUnknownLoc(),
+      /* resultType = */ dstType,
       /* init = */ ident,
       /* tensors = */ ArrayRef{src},
       /* agg = */ util::AggregationKind::assign,
       /* combo = */ util::CombinationKind::none,
       /* sink = */ sinkMap,
       /* srcs = */ ArrayRef{srcMap},
-      /* cons = */ IntegerSet::getEmptySet(dstType.getRank(), 0, context),
+      /* cons = */ IntegerSet::getEmptySet(0, 0, context),
       /* name = */ "reshape");
+}
+
+struct ExpandReshapePass : public ExpandReshapeBase<ExpandReshapePass> {
+  void runOnFunction() final;
+
+  // Expand in-order reshape operation
+  void expandReshape(ReshapeOp reshapeOp);
+};
+
+// Expand in-order reshape operation
+void ExpandReshapePass::expandReshape(ReshapeOp reshapeOp) {
+  auto src = reshapeOp.tensor();
+  auto dst = reshapeOp.getResult();
+  auto dstShape = dst.getType().cast<RankedTensorType>().getShape();
+
+  OpBuilder builder(reshapeOp);
+  builder.setInsertionPoint(reshapeOp);
+  // Try to expand reshape
+  Value res = reshapeTensor(builder, src, dstShape);
+  if (!res) {
+    // If failed, flatten src to a linear buffer
+    Value buf = flattenTensor(builder, src);
+    // Expand reshape again
+    res = reshapeTensor(builder, buf, dstShape);
+  }
+  assert(res);
   dst.replaceAllUsesWith(res);
   reshapeOp.erase();
 }
-
-// Expand out-of-order reshape operation
-void ExpandReshapePass::expandOutOfOrderReshape(ReshapeOp reshapeOp) { return; }
 
 void ExpandReshapePass::runOnFunction() {
   auto func = getFunction();
   for (auto op : func.getOps<ReshapeOp>()) {
     expandReshape(op);
   }
+  func.dump();
   return;
 }
-
-} // namespace
 
 std::unique_ptr<Pass> createExpandReshapePass() {
   return std::make_unique<ExpandReshapePass>();

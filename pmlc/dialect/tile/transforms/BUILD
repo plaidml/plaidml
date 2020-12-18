@@ -27,6 +27,7 @@ plaidml_cc_library(
     ],
     hdrs = [
         "contraction.h",
+        "expand_reshape.h",
         "padding.h",
         "passes.h",
     ],

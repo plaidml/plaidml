@@ -2,6 +2,7 @@ pml_cc_library(
   NAME transforms
   HDRS
     contraction.h
+    expand_reshape.h
     passes.h
   SRCS
     contraction.cc
