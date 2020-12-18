@@ -330,9 +330,16 @@ void reorderMemoryReads(const ReorderCreator &creator, ReorderDesc &reorderDesc,
   // assume there is single pack and unpack invocation
   pmlc::dialect::stdx::PackOp packOp;
   pmlc::dialect::stdx::UnpackOp mainUnpackOp, finiUnpackOp;
-  getPackOp(mainUnpackOp, moduleOp.lookupSymbol<mlir::FuncOp>("main"));
-  getPackOp(packOp, moduleOp.lookupSymbol<mlir::FuncOp>("init"));
-  getPackOp(finiUnpackOp, moduleOp.lookupSymbol<mlir::FuncOp>("fini"));
+  if (moduleOp) {
+    auto initFunc = moduleOp.lookupSymbol<mlir::FuncOp>("init");
+    auto mainFunc = moduleOp.lookupSymbol<mlir::FuncOp>("main");
+    auto finiFunc = moduleOp.lookupSymbol<mlir::FuncOp>("fini");
+    if (mainFunc && initFunc && finiFunc) {
+      getPackOp(packOp, initFunc);
+      getPackOp(mainUnpackOp, mainFunc);
+      getPackOp(finiUnpackOp, finiFunc);
+    }
+  }
 
   for (mlir::Value originalMem : memoryToReorder) {
     mlir::OpBuilder builder(originalMem.getContext());
