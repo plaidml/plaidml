@@ -169,7 +169,6 @@ void ExpandReshapePass::expandReshape(ReshapeOp reshapeOp) {
       /* srcs = */ ArrayRef{srcMap},
       /* cons = */ IntegerSet::getEmptySet(dstType.getRank(), 0, context),
       /* name = */ "reshape");
-  res.setUpperBounds(ranges);
   dst.replaceAllUsesWith(res);
   reshapeOp.erase();
 }
