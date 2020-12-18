@@ -61,7 +61,7 @@ TEST_F(CppEdsl, EltwiseMismatch) {
   } catch (const std::exception& e) {
     errmsg = e.what();
   }
-  EXPECT_ERROR_LINE(errmsg, HasSubstr(std::to_string(eline)));
+  EXPECT_ERROR_LINE(errmsg, eline);
 }
 
 TEST_F(CppEdsl, OpOperators) {
@@ -78,7 +78,7 @@ TEST_F(CppEdsl, OpOperators) {
   } catch (const std::exception& e) {
     errmsg = e.what();
   }
-  EXPECT_ERROR_LINE(errmsg, HasSubstr(std::to_string(eline)));
+  EXPECT_ERROR_LINE(errmsg, eline);
 }
 
 }  // namespace
