@@ -76,7 +76,7 @@ Value flattenTensor(OpBuilder &builder, Value src) {
   AffineMap srcMap = AffineMap::get(numIdxs, 0, srcExprs, context);
   AffineMap sinkMap = AffineMap::get(numIdxs, 0, dstExpr);
 
-  // Allocate the linear tensor
+  // Build contraction for the flattening
   auto elementType = srcType.getElementType();
   auto dstType = RankedTensorType::get({size}, elementType);
   auto ident = tile::createIdentity(builder, builder.getUnknownLoc(),
@@ -132,6 +132,7 @@ Value reshapeTensor(OpBuilder &builder, Value src, ArrayRef<int64_t> dstShape) {
     }
     int64_t gcd = std::gcd(srcDims[pSrc], dstDims[pDst]);
     assert(gcd > 1);
+    // The dim should be reversed
     int idxId = numIdxs - ranges.size() - 1;
     assert(idxId >= 0);
     ranges.emplace_back(gcd);
@@ -171,7 +172,7 @@ Value reshapeTensor(OpBuilder &builder, Value src, ArrayRef<int64_t> dstShape) {
   AffineMap srcMap = AffineMap::get(numIdxs, 0, srcExprs, context);
   AffineMap sinkMap = AffineMap::get(numIdxs, 0, dstExprs, context);
 
-  // Replace the original reshape with constraction
+  // Build contraction for the reshape
   auto elementType = src.getType().cast<RankedTensorType>().getElementType();
   auto dstType = RankedTensorType::get(dstShape, elementType);
   auto ident = tile::createIdentity(builder, builder.getUnknownLoc(),
@@ -207,9 +208,9 @@ void ExpandReshapePass::expandReshape(ReshapeOp reshapeOp) {
   // Try to expand reshape
   Value res = reshapeTensor(builder, src, dstShape);
   if (!res) {
-    // If failed, flatten src to a linear buffer
+    // If failed, flatten src to a linear tensor
     Value buf = flattenTensor(builder, src);
-    // Expand reshape again
+    // Reshape the linear tensor tensor according to dstShape
     res = reshapeTensor(builder, buf, dstShape);
   }
   assert(res);
