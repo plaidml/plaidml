@@ -4,11 +4,11 @@ pml_cc_library(
     passes.h
   SRCS
     common.cc
-    comp_to_ocl.cc
-    comp_to_vulkan.cc
+    comp_to_llvm.cc
     utils.cc
   DEPS
     ::passes-gen
+    pmlc::conversion::stdx_to_llvm
     pmlc::dialect::comp::ir
     pmlc::util
     MLIRLLVMIR
@@ -17,6 +17,7 @@ pml_cc_library(
     MLIRIR
     MLIRPass
     MLIRTransforms
+    MLIRStandardOpsTransforms
     MLIRSupport
 )
 

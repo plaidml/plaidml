@@ -28,10 +28,11 @@ plaidml_cc_library(
         "pass_detail.h",
     ],
     hdrs = [
-        "lowering.h",
+        "passes.h",
     ],
     deps = [
         ":gen-pass",
+        "//pmlc/dialect/comp/ir",
         "//pmlc/util",
         "@llvm-project//mlir:GPUToSPIRVTransforms",
         "@llvm-project//mlir:GPUTransforms",
