@@ -17,6 +17,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/DebugStringHelper.h"
 #include "llvm/ADT/SetOperations.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/TypeSwitch.h"
 
 #include "pmlc/dialect/pxa/analysis/affine_constraints.h"
@@ -43,6 +44,8 @@ public:
     mlir::FuncOp func = getFunction();
     mlir::DenseMap<mlir::Value, MemoryUsageDesc> globalMemory =
         gatherGlobalMemoryDescs(func, naiveScheduleModel);
+    llvm::SmallSet<mlir::AffineParallelOp, 4> parallelOps;
+
     for (auto &valueDesc : globalMemory) {
       MemoryUsageDesc &memoryDesc = valueDesc.second;
       IVLOG(3, "Optimizing layout for " << mlir::debugString(memoryDesc.value));
@@ -63,68 +66,120 @@ public:
       }
       IVLOG(3, "Failed to change layout in-place, inserting reorder");
       reorderMemoryReads(createReorder, reorder, memoryDesc);
-      tileLoopNestsToAlignWithDataMaps(memoryDesc);
+      if (memoryDesc.parallelOp.hasValue()) {
+        parallelOps.insert(memoryDesc.parallelOp.getValue());
+      }
+    }
+
+    for (auto parallelOp : parallelOps) {
+      tileLoopNestsToAlignWithDataMaps(parallelOp);
     }
   }
 };
 
-void tileLoopNestsToAlignWithDataMaps(MemoryUsageDesc &memoryDesc) {
-  if (memoryDesc.parallelOp.hasValue()) {
-    IVLOG(4, "In tileLoopNestsToAlignWithDataMaps()");
-    if (memoryDesc.parallelOp.hasValue()) {
-      auto parallelOp = memoryDesc.parallelOp.getValue();
+void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {
+  mlir::DenseMap<mlir::Value, int64_t> tileSizeMap;
+  bool tileSizesAreConsistent = true;
+  IVLOG(4, "In tileLoopNestsToAlignWithDataMaps()");
 
-      parallelOp.walk([&](PxaReadOpInterface read) {
-        mlir::Value readMem = read.getMemRef();
-        IVLOG(4, "read.getMemRef: " << mlir::debugString(readMem));
-      });
+  mlir::Block *outerBody = parallelOp.getBody();
+  auto outerIdxs = outerBody->getArguments();
 
-      parallelOp.walk([&](PxaLoadOp op) {
-        IVLOG(4, "read load op: " << op);
-        mlir::Value memRef = op.getMemRef();
-        IVLOG(4, "op.getMemRef(): " << mlir::debugString(memRef));
-        IVLOG(4, "op.getMapOperands().size(): " << op.getMapOperands().size());
-        for (auto operand : op.getMapOperands()) {
-          IVLOG(4, "operand: " << mlir::debugString(operand));
-        }
+  for (unsigned i = 0; i < outerIdxs.size(); ++i) {
+    mlir::Value val = outerIdxs[i];
+    IVLOG(4, "index i: " << i << ": " << mlir::debugString(val));
+  }
 
-        mlir::AffineMap map = op.getAffineMap();
-        IVLOG(4, "map: " << mlir::debugString(map));
-        for (unsigned idx = 0; idx < map.getNumResults(); ++idx) {
-          mlir::AffineExpr expr = map.getResult(idx);
-
-          if (expr.getKind() == mlir::AffineExprKind::FloorDiv) {
-            auto divExpr = expr.cast<mlir::AffineBinaryOpExpr>();
-            mlir::AffineExpr rhsExpr = divExpr.getRHS();
-
-            if (rhsExpr.getKind() == mlir::AffineExprKind::Constant) {
-              auto constantExpr = rhsExpr.cast<mlir::AffineConstantExpr>();
-              int64_t res = constantExpr.getValue();
-              IVLOG(4, "The floor div constantValue: " << res);
-            }
-          }
-        }
-
-        IVLOG(4, "PxaLoadOp description ends");
-      });
-
-      mlir::Block *outerBody = parallelOp.getBody();
-      auto outerIdxs = outerBody->getArguments();
+  parallelOp.walk([&](PxaLoadOp op) {
+    IVLOG(4, "read load op: " << op);
+    mlir::Value memRef = op.getMemRef();
+    IVLOG(4, "op.getMemRef(): " << mlir::debugString(memRef));
+    IVLOG(4, "op.getMapOperands().size(): " << op.getMapOperands().size());
+    int j = 0;
+    for (auto operand : op.getMapOperands()) {
+      IVLOG(4, "operand: " << mlir::debugString(operand));
 
       for (unsigned i = 0; i < outerIdxs.size(); ++i) {
         mlir::Value val = outerIdxs[i];
-        IVLOG(4, "index i: " << i << ": " << mlir::debugString(val));
+        if (val == operand) {
+          IVLOG(4, "MATCH found. j: " << j << " i: " << i);
+        }
+        // IVLOG(4, "index i: " << i << ": " << mlir::debugString(val));
+      }
+
+      j++;
+    }
+
+    mlir::AffineMap map = op.getAffineMap();
+    IVLOG(4, "map: " << mlir::debugString(map));
+    for (unsigned idx = 0; idx < map.getNumResults(); ++idx) {
+      mlir::AffineExpr expr = map.getResult(idx);
+
+      if (expr.getKind() == mlir::AffineExprKind::FloorDiv) {
+        auto divExpr = expr.cast<mlir::AffineBinaryOpExpr>();
+        mlir::AffineExpr rhsExpr = divExpr.getRHS();
+
+        if (rhsExpr.getKind() == mlir::AffineExprKind::Constant) {
+          auto constantExpr = rhsExpr.cast<mlir::AffineConstantExpr>();
+          int64_t res = constantExpr.getValue();
+          IVLOG(4, "The floor div constantValue: " << res);
+          mlir::Value operand = op.getOperands()[idx];
+          IVLOG(4, "operand: " << mlir::debugString(operand));
+
+          for (unsigned i = 0; i < outerIdxs.size(); ++i) {
+            mlir::Value loopVar = outerIdxs[i];
+
+            if (loopVar == operand) {
+              auto tileSizeMapIt = tileSizeMap.find(loopVar);
+              if (tileSizeMapIt == tileSizeMap.end()) {
+                IVLOG(4, "MATCH found. tile size = " << res);
+                tileSizeMap.insert({loopVar, res});
+              } else {
+                int64_t existingTileSize = tileSizeMapIt->second;
+                if (res != existingTileSize) {
+                  IVLOG(4, "Tile Sizes are not consistent: res = "
+                               << res << " old size: " << existingTileSize);
+                  tileSizesAreConsistent = false;
+                }
+              }
+            }
+            // IVLOG(4, "index i: " << i << ": " << mlir::debugString(val));
+          }
+        }
       }
     }
 
+    IVLOG(4, "PxaLoadOp description ends");
+  });
+
+  for (unsigned i = 0; i < outerIdxs.size(); ++i) {
+    mlir::Value val = outerIdxs[i];
+    IVLOG(4, "index i: " << i << ": " << mlir::debugString(val));
+  }
+
+  if (tileSizesAreConsistent) {
+    IVLOG(4, "Tile sizes are consistent. Performing tiling");
     mlir::SmallVector<int64_t, 6> tileSizes;
-    tileSizes.push_back(1);
-    tileSizes.push_back(1);
-    tileSizes.push_back(16);
-    tileSizes.push_back(16);
-    tileSizes.push_back(1);
-    tileSizes.push_back(1);
-    performTiling(memoryDesc.parallelOp.getValue(), tileSizes);
+    bool nonUnitTileSizesPresent = false;
+    for (unsigned i = 0; i < outerIdxs.size(); ++i) {
+      mlir::Value loopVar = outerIdxs[i];
+      auto tileSizeMapIt = tileSizeMap.find(loopVar);
+      int64_t tileSize = 1;
+      if (tileSizeMapIt != tileSizeMap.end()) {
+        tileSize = tileSizeMapIt->second;
+
+        if (tileSize != 1) {
+          nonUnitTileSizesPresent = true;
+        }
+      }
+
+      tileSizes.push_back(tileSize);
+      IVLOG(4, "tile size: " << tileSize);
+    }
+
+    if (nonUnitTileSizesPresent) {
+      performTiling(parallelOp, tileSizes);
+    }
   }
 }
 // =============================================================================

@@ -121,7 +121,7 @@ using ReorderCreator = std::function<mlir::Value(
 void reorderMemoryReads(const ReorderCreator &creator, ReorderDesc &reorderDesc,
                         MemoryUsageDesc &memoryDesc);
 
-void tileLoopNestsToAlignWithDataMaps(MemoryUsageDesc &memoryDesc);
+void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp);
 // ============================================================================
 // Helper affine map transformations
 // ============================================================================
