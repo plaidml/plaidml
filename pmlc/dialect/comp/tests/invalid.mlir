@@ -9,51 +9,6 @@ func @invalid_runtime(%dev: !comp.device) {
 
 // -----
 
-func @invalid_schedule(%dev: !comp.device) {
-  %env = comp.create_execenv %dev : (!comp.device) -> !comp.execenv<0:0,(11)>
-  // expected-error@+1 {{'comp.schedule_func' op body must have one operation - 'gpu.launch_func'}}
-  "comp.schedule_func"(%env) ({
-    "comp.schedule_end"() : () -> ()
-  }) : (!comp.execenv<0:0,(11)>) -> (!comp.event<0>)
-  return
-}
-
-// -----
-
-func @invalid_schedule(%dev: !comp.device) {
-  %env = comp.create_execenv %dev : (!comp.device) -> !comp.execenv<0:0,(11)>
-  // expected-error@+1 {{'comp.schedule_func' op body must have one operation - 'gpu.launch_func'}}
-  "comp.schedule_func"(%env) ({
-    %cst = constant 42 : i32
-    "comp.schedule_end"() : () -> ()
-  }) : (!comp.execenv<0:0,(11)>) -> (!comp.event<0>)
-  return
-}
-
-// -----
-
-module attributes { gpu.container_module } {
-  func @invalid_schedule(%dev: !comp.device) {
-    %env = comp.create_execenv %dev : (!comp.device) -> !comp.execenv<0:0,(11)>
-    %ev = "op"() : () -> (!comp.event<1>)
-    %idx = "op"() : () -> (index)
-    // expected-error@+1 {{'comp.schedule_func' op mismatch between execenv runtime and dependant event runtime}}
-    "comp.schedule_func"(%env, %ev) ({
-      "gpu.launch_func"(%idx, %idx, %idx, %idx, %idx, %idx) {kernel = @kernel::@kernel} : (index, index, index, index, index, index) -> ()
-      "comp.schedule_end"() : () -> ()
-    }) : (!comp.execenv<0:0,(11)>, !comp.event<1>) -> (!comp.event<0>)
-    return
-  }
-
-  gpu.module @kernel {
-    gpu.func @kernel() kernel {
-      gpu.return
-    }
-  }
-}
-
-// -----
-
 func @invalid_alloc(%dev: !comp.device) {
   %env = comp.create_execenv %dev : (!comp.device) -> !comp.execenv<0:0,(11)>
   // expected-error@+1 {{'comp.alloc' op failed to verify that memory space is supported by execenv}}

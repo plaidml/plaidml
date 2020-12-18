@@ -12,6 +12,7 @@ pml_cc_library(
     ident.h
     logging.h
     matchers.h
+    memuse.h
     shape.h
     strides.h
     tags.h
@@ -21,6 +22,7 @@ pml_cc_library(
     env.cc
     ident.cc
     logging.cc
+    memuse.cc
     shape.cc
     strides.cc
     tags.cc

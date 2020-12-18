@@ -6,6 +6,7 @@
 #include "mlir/Support/DebugStringHelper.h"
 
 #include "pmlc/dialect/stdx/ir/ops.h"
+#include "pmlc/dialect/tile/ir/ops.h"
 #include "pmlc/transforms/pass_detail.h"
 #include "pmlc/util/logging.h"
 
@@ -49,7 +50,7 @@ private:
   UnpackOp mainUnpack;
   UnpackOp finiUnpack;
   // List of values to consider as boundry crossing in disconnect
-  DenseSet<Value> maybeCrossFunc;
+  DenseSet<Value> inInit;
 };
 
 bool HoistingState::matchesProtocol() {
@@ -89,7 +90,7 @@ void HoistingState::connectFunctions() {
   for (unsigned i = 0; i < initPack.getNumOperands(); i++) {
     mainUnpack.getResult(i).replaceAllUsesWith(initPack.getOperand(i));
     finiUnpack.getResult(i).replaceAllUsesWith(initPack.getOperand(i));
-    maybeCrossFunc.insert(initPack.getOperand(i));
+    inInit.insert(initPack.getOperand(i));
   }
 }
 
@@ -106,11 +107,14 @@ void HoistingState::doHoisting() {
       continue;
     if (!innerEffect.hasNoEffect())
       continue;
+    // Skip constant ops
+    if (isa<pmlc::dialect::tile::ConstantOp>(innerOp))
+      continue;
     // Check if all operands (if any) are in init
     IVLOG(3, "Checking operands " << debugString(innerOp));
     bool allOperandsInInit = true;
     for (auto operand : innerOp.getOperands()) {
-      if (!maybeCrossFunc.count(operand)) {
+      if (!inInit.count(operand)) {
         allOperandsInInit = false;
         break;
       }
@@ -122,7 +126,7 @@ void HoistingState::doHoisting() {
     // Yes?  Hoist to init, add results as possible cross function results
     innerOp.moveBefore(initPack);
     for (auto result : innerOp.getResults()) {
-      maybeCrossFunc.insert(result);
+      inInit.insert(result);
     }
   }
 }
@@ -134,7 +138,7 @@ void HoistingState::disconnectFunctions() {
   DenseMap<Value, unsigned> toIndex;
   SmallVector<OpOperand *, 8> mainUnpackUses;
   SmallVector<OpOperand *, 8> finiUnpackUses;
-  for (auto val : maybeCrossFunc) {
+  for (auto val : inInit) {
     bool crossFunc = false;
     for (auto &use : val.getUses()) {
       if (mainFunc.getOperation()->isAncestor(use.getOwner())) {
