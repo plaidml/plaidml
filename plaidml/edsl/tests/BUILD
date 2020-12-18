@@ -38,7 +38,6 @@ plaidml_cc_test(
         "//plaidml:testenv",
         "//plaidml/edsl",
         "//plaidml/exec",
-        "//plaidml/op",
     ],
 )
 
