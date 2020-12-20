@@ -26,6 +26,7 @@
 #include "pmlc/dialect/pxa/transforms/layout_utils.h"
 #include "pmlc/dialect/pxa/transforms/pass_detail.h"
 #include "pmlc/dialect/pxa/transforms/passes.h"
+#include "pmlc/dialect/stdx/ir/ops.h"
 #include "pmlc/util/logging.h"
 #include "pmlc/util/tags.h"
 
@@ -60,8 +61,10 @@ public:
               "Failed to change layout in-place, separate reorder not allowed");
         continue;
       }
+      mlir::ModuleOp moduleOp = func.getParentOfType<mlir::ModuleOp>();
+
       IVLOG(3, "Failed to change layout in-place, inserting reorder");
-      reorderMemoryReads(createReorder, reorder, memoryDesc);
+      reorderMemoryReads(createReorder, reorder, memoryDesc, moduleOp);
     }
   }
 };
@@ -286,24 +289,101 @@ naiveScheduleModel(mlir::ArrayRef<mlir::AffineParallelOp> loopNest) {
   return result;
 }
 
+// ============================================================================
+// Helper function to get pack\unpack ops.
+// ============================================================================
+template <typename OpType>
+void getPackOp(OpType &packOp, mlir::FuncOp funcOp) {
+  // Assume there is single pack op in function
+  auto packOps = funcOp.getOps<OpType>();
+  if (!packOps.empty())
+    packOp = *packOps.begin();
+}
+
+// ============================================================================
+// Helper function to replace unpackOps with updated types in sync with packOp.
+// ============================================================================
+pmlc::dialect::stdx::UnpackOp
+updateUnpackOp(pmlc::dialect::stdx::UnpackOp &unpackOp,
+               pmlc::dialect::stdx::PackOp &packOp) {
+  mlir::OpBuilder builder(unpackOp);
+  auto newUnpackOp = builder.create<pmlc::dialect::stdx::UnpackOp>(
+      unpackOp.getLoc(), packOp.getOperandTypes(), unpackOp.in());
+  unpackOp.replaceAllUsesWith(newUnpackOp);
+  unpackOp.erase();
+  return newUnpackOp;
+}
+
 // =============================================================================
 // naiveScheduleModel - implementation.
 // =============================================================================
 void reorderMemoryReads(const ReorderCreator &creator, ReorderDesc &reorderDesc,
-                        MemoryUsageDesc &memoryDesc) {
+                        MemoryUsageDesc &memoryDesc, mlir::ModuleOp &moduleOp) {
   mlir::DenseSet<mlir::Value> memoryToReorder;
   for (MemoryReadDesc &readDesc : memoryDesc.reads) {
     PxaReadOpInterface readOp = readDesc.readOp;
     mlir::Value readMem = readOp.getMemRef();
     memoryToReorder.insert(readMem);
   }
+
+  // Check for init and main functions for pack and unpack ops,
+  // assume there is single pack and unpack invocation
+  pmlc::dialect::stdx::PackOp packOp;
+  pmlc::dialect::stdx::UnpackOp mainUnpackOp, finiUnpackOp;
+  if (moduleOp) {
+    auto initFunc = moduleOp.lookupSymbol<mlir::FuncOp>("init");
+    auto mainFunc = moduleOp.lookupSymbol<mlir::FuncOp>("main");
+    auto finiFunc = moduleOp.lookupSymbol<mlir::FuncOp>("fini");
+    if (mainFunc && initFunc && finiFunc) {
+      getPackOp(packOp, initFunc);
+      getPackOp(mainUnpackOp, mainFunc);
+      getPackOp(finiUnpackOp, finiFunc);
+    }
+  }
+
   for (mlir::Value originalMem : memoryToReorder) {
     mlir::OpBuilder builder(originalMem.getContext());
     builder.setInsertionPointAfterValue(originalMem);
+
+    auto memToReorder = originalMem;
+    auto loc = originalMem.getLoc();
+    auto unpackIdx = 0;
+    // Check if memory comes from init function, if so, create new reorder there
+    if (originalMem.getDefiningOp()) {
+      // Get unpack op to know if data comes from init
+      if (mlir::isa<pmlc::dialect::stdx::UnpackOp>(
+              originalMem.getDefiningOp())) {
+        if (auto unpackAsResult = originalMem.dyn_cast<mlir::OpResult>()) {
+          // Get index of the buffer so we could map it later in init
+          unpackIdx = unpackAsResult.getResultNumber();
+          // Replace originalMem with the pack op operand
+          memToReorder = packOp.getOperand(unpackIdx);
+          // Move the new function insert point to init
+          builder.setInsertionPoint(packOp);
+          loc = packOp.getLoc();
+        }
+      }
+    }
+
     // TODO: It should be fused location of all reads.
-    mlir::Value reorderedMem =
-        creator(originalMem.getLoc(), builder, reorderDesc, originalMem);
-    replaceMemoryLayoutForReading(reorderedMem, originalMem, reorderDesc);
+    mlir::Value reorderedMem = creator(loc, builder, reorderDesc, memToReorder);
+    replaceMemoryLayoutForReading(reorderedMem, memToReorder, reorderDesc);
+
+    if (memToReorder != originalMem) {
+      // Update the pack operand with new reordered mem
+      packOp.setOperand(unpackIdx, reorderedMem);
+
+      // Update the unpack functions in both main and fini
+      // TODO: move this part outside of the loop or create option to update the
+      // result type in the unpack ops so we would not need to replace
+      // the op per mem reorder
+      auto newMainUnpackOp = updateUnpackOp(mainUnpackOp, packOp);
+      replaceMemoryLayoutForReading(newMainUnpackOp.getResult(unpackIdx),
+                                    originalMem, reorderDesc);
+      auto newFiniUnpackOp = updateUnpackOp(finiUnpackOp, packOp);
+      replaceMemoryLayoutForReading(newFiniUnpackOp.getResult(unpackIdx),
+                                    originalMem, reorderDesc);
+    }
   }
 }
 
