@@ -8,7 +8,7 @@ def ComputeBounds : FunctionPass<"tile-compute-bounds"> {
   let constructor = "pmlc::dialect::tile::createComputeBoundsPass()";
 }
 
-def ExpandReshape : FunctionPass<"expand-reshape"> {
+def ExpandReshape : FunctionPass<"tile-expand-reshape"> {
   let summary = "Expand reshape and generate contraction";
   let constructor = "pmlc::dialect::tile::createExpandReshapePass()";
 }

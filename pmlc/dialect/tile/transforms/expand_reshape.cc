@@ -15,7 +15,8 @@ using namespace pmlc::dialect::stdx; // NOLINT
 namespace pmlc::dialect::tile {
 
 // Compute the number of indices needed
-int computeNumIdxs(ArrayRef<int64_t> srcShape, ArrayRef<int64_t> dstShape) {
+static int computeNumIdxs(ArrayRef<int64_t> srcShape,
+                          ArrayRef<int64_t> dstShape) {
   SmallVector<int64_t, 4> srcDims(srcShape.begin(), srcShape.end());
   SmallVector<int64_t, 4> dstDims(dstShape.begin(), dstShape.end());
   int pSrc = srcDims.size() - 1;
@@ -83,15 +84,15 @@ Value flattenTensor(OpBuilder &builder, Value src) {
                                     elementType, AggregationKind::assign);
   return builder.create<ContractionOp>(
       builder.getUnknownLoc(),
-      /* resultType = */ dstType,
-      /* init = */ ident,
-      /* tensors = */ ArrayRef{src},
-      /* agg = */ util::AggregationKind::assign,
-      /* combo = */ util::CombinationKind::none,
-      /* sink = */ sinkMap,
-      /* srcs = */ ArrayRef{srcMap},
-      /* cons = */ IntegerSet::getEmptySet(dstType.getRank(), 0, context),
-      /* name = */ "flatten");
+      /*resultType=*/dstType,
+      /*init=*/ident,
+      /*tensors=*/ArrayRef{src},
+      /*agg=*/util::AggregationKind::assign,
+      /*combo=*/util::CombinationKind::none,
+      /*sink=*/sinkMap,
+      /*srcs=*/ArrayRef{srcMap},
+      /*cons=*/IntegerSet::getEmptySet(dstType.getRank(), 0, context),
+      /*name=*/"flatten");
 }
 
 Value reshapeTensor(OpBuilder &builder, Value src, ArrayRef<int64_t> dstShape) {
@@ -179,15 +180,15 @@ Value reshapeTensor(OpBuilder &builder, Value src, ArrayRef<int64_t> dstShape) {
                                     elementType, AggregationKind::assign);
   return builder.create<ContractionOp>(
       builder.getUnknownLoc(),
-      /* resultType = */ dstType,
-      /* init = */ ident,
-      /* tensors = */ ArrayRef{src},
-      /* agg = */ util::AggregationKind::assign,
-      /* combo = */ util::CombinationKind::none,
-      /* sink = */ sinkMap,
-      /* srcs = */ ArrayRef{srcMap},
-      /* cons = */ IntegerSet::getEmptySet(0, 0, context),
-      /* name = */ "reshape");
+      /*resultType=*/dstType,
+      /*init=*/ident,
+      /*tensors=*/ArrayRef{src},
+      /*agg=*/util::AggregationKind::assign,
+      /*combo=*/util::CombinationKind::none,
+      /*sink=*/sinkMap,
+      /*srcs=*/ArrayRef{srcMap},
+      /*cons=*/IntegerSet::getEmptySet(0, 0, context),
+      /*name=*/"reshape");
 }
 
 struct ExpandReshapePass : public ExpandReshapeBase<ExpandReshapePass> {
@@ -201,16 +202,21 @@ struct ExpandReshapePass : public ExpandReshapeBase<ExpandReshapePass> {
 void ExpandReshapePass::expandReshape(ReshapeOp reshapeOp) {
   auto src = reshapeOp.tensor();
   auto dst = reshapeOp.getResult();
-  auto dstShape = dst.getType().cast<RankedTensorType>().getShape();
+  auto dstType = dst.getType().dyn_cast<RankedTensorType>();
+  if (!dstType) {
+    reshapeOp.emitOpError(
+        "The return type of reshape is not RankedTensorType.");
+    return;
+  }
+  auto dstShape = dstType.getShape();
 
   OpBuilder builder(reshapeOp);
-  builder.setInsertionPoint(reshapeOp);
   // Try to expand reshape
   Value res = reshapeTensor(builder, src, dstShape);
   if (!res) {
     // If failed, flatten src to a linear tensor
     Value buf = flattenTensor(builder, src);
-    // Reshape the linear tensor tensor according to dstShape
+    // Reshape the linear tensor according to dstShape
     res = reshapeTensor(builder, buf, dstShape);
   }
   assert(res);
