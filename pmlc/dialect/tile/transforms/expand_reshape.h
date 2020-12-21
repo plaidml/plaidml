@@ -2,8 +2,8 @@
 
 #pragma once
 
-#include "mlir/include/IR/Builder.h"
-#include "mlir/include/IR/Value.h"
+#include "mlir/IR/Builders.h"
+#include "mlir/IR/Value.h"
 
 namespace pmlc::dialect::tile {
 

@@ -1,13 +1,16 @@
 // Copyright 2020, Intel Corporation
 
-#include "mlir/Pass/Pass.h"
+#include "pmlc/dialect/tile/transforms/expand_reshape.h"
 
+#include <numeric>
+
+#include "mlir/Pass/Pass.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+
 #include "pmlc/dialect/stdx/ir/ops.h"
 #include "pmlc/dialect/tile/ir/ops.h"
 #include "pmlc/dialect/tile/transforms/pass_detail.h"
-
-#include <numeric>
+#include "pmlc/util/logging.h"
 
 using namespace mlir;                // NOLINT
 using namespace pmlc::dialect::stdx; // NOLINT
@@ -204,9 +207,8 @@ void ExpandReshapePass::expandReshape(ReshapeOp reshapeOp) {
   auto dst = reshapeOp.getResult();
   auto dstType = dst.getType().dyn_cast<RankedTensorType>();
   if (!dstType) {
-    reshapeOp.emitOpError(
-        "The return type of reshape is not RankedTensorType.");
-    return;
+    dstType = getRankedTensorType(dstType);
+    IVLOG(1, "The return type of reshape is not RankedTensorType.");
   }
   auto dstShape = dstType.getShape();
 
