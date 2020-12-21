@@ -1665,8 +1665,7 @@ TEST_F(CppEdsl, Scatter1D) {
   auto O = scatter(D, I, U);
   auto program = makeProgram("scatter", {D, I, U}, {O});
 
-  // Don't bother initializing 'data' in default mode. Only shape of the data is needed.
-  std::vector<float> data;
+  std::vector<float> data = {0, 0, 0, 0, 0, 0, 0, 0};
   std::vector<int32_t> indices = {4, 3, 1, 7};
   std::vector<float> updates = {9, 10, 11, 12};
   std::vector<float> expected = {0, 11, 0, 10, 9, 0, 0, 12};
@@ -1680,8 +1679,12 @@ TEST_F(CppEdsl, Scatter3D) {
   auto O = scatter(D, I, U);
   auto program = makeProgram("scatter", {D, I, U}, {O});
 
-  // Don't bother initializing 'data' in default mode. Only shape of the data is needed.
-  std::vector<float> data;
+  std::vector<float> data = {
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  //
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  //
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  //
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0   //
+  };
   std::vector<int32_t> indices = {0, 2};
   std::vector<float> updates = {
       5, 5, 5, 5, 6, 6, 6, 6,  //
@@ -1705,8 +1708,7 @@ TEST_F(CppEdsl, ScatterDup1D) {
   auto O = scatter(D, I, U);
   auto program = makeProgram("scatter", {D, I, U}, {O});
 
-  // Don't bother initializing 'data' in default mode. Only shape of the data is needed.
-  std::vector<float> data;
+  std::vector<float> data = {0, 0, 0, 0, 0, 0, 0, 0};
   // Duplicate indices.
   std::vector<int32_t> indices = {4, 3, 3, 7};
   std::vector<float> updates = {9, 10, 11, 12};
@@ -1721,8 +1723,12 @@ TEST_F(CppEdsl, ScatterDup3D) {
   auto O = scatter(D, I, U);
   auto program = makeProgram("scatter", {D, I, U}, {O});
 
-  // Don't bother initializing 'data' in default mode. Only shape of the data is needed.
-  std::vector<float> data;
+  std::vector<float> data = {
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  //
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  //
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  //
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0   //
+  };
   // Duplicate indices.
   std::vector<int32_t> indices = {2, 2};
   std::vector<float> updates = {

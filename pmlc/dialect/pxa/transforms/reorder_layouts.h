@@ -117,7 +117,7 @@ using ReorderCreator = std::function<mlir::Value(
 /// It guards against reordering same memory used by two read operations
 /// twice, which could happen when directly using "creator".
 void reorderMemoryReads(const ReorderCreator &creator, ReorderDesc &reorderDesc,
-                        MemoryUsageDesc &memoryDesc);
+                        MemoryUsageDesc &memoryDesc, mlir::ModuleOp &moduleOp);
 
 // ============================================================================
 // Helper affine map transformations
