@@ -5,7 +5,6 @@
 #include "plaidml_ops.hpp"
 #include "plaidml_util.hpp"
 
-#include "ngraph/opsets/opset.hpp"
 #include "ngraph/opsets/opset1.hpp"
 #include "ngraph/opsets/opset4.hpp"
 

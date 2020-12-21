@@ -54,38 +54,40 @@ const std::vector<ngraph::helpers::ReductionType> reductionTypes = {
     ngraph::helpers::ReductionType::L2,    //
 };
 
+// TODO: ReduceLogicalAnd and ReduceLogicalOr require Boolean datatype which seems not well supported.
+//  Should add test for Logical reduce Type later
 const std::vector<ngraph::helpers::ReductionType> reductionLogicalTypes = {
     ngraph::helpers::ReductionType::LogicalOr,   //
     ngraph::helpers::ReductionType::LogicalAnd,  //
 };
 
-const auto paramSmoke = testing::Combine(testing::Values(axes[0]),                           //
-                                         testing::Values(CommonTestUtils::OpType::VECTOR),   //
-                                         testing::Values(keepDims[1]),                       //
-                                         testing::ValuesIn(reductionTypes),                  //
-                                         testing::Values(InferenceEngine::Precision::FP32),  //
-                                         testing::Values(std::vector<size_t>{1, 2, 4, 4}),   //
-                                         testing::Values(CommonTestUtils::DEVICE_PLAIDML));
+INSTANTIATE_TEST_CASE_P(ReduceOneAxis, ReduceOpsLayerTest,
+                        ::testing::Combine(testing::ValuesIn(axes),            //
+                                           testing::ValuesIn(opTypes),         //
+                                           testing::ValuesIn(keepDims),        //
+                                           testing::ValuesIn(reductionTypes),  //
+                                           testing::ValuesIn(netPrecisions),   //
+                                           testing::ValuesIn(inputShapes),     //
+                                           testing::Values(CommonTestUtils::DEVICE_PLAIDML)),
+                        ReduceOpsLayerTest::getTestCaseName);
 
-INSTANTIATE_TEST_CASE_P(smoke, ReduceOpsLayerTest, paramSmoke, ReduceOpsLayerTest::getTestCaseName);
+INSTANTIATE_TEST_CASE_P(ReduceMultiAxis, ReduceOpsLayerTest,
+                        ::testing::Combine(testing::ValuesIn(axesND),          //
+                                           testing::ValuesIn(opTypes),         //
+                                           testing::ValuesIn(keepDims),        //
+                                           testing::ValuesIn(reductionTypes),  //
+                                           testing::ValuesIn(netPrecisions),   //
+                                           testing::ValuesIn(inputShapes),     //
+                                           testing::Values(CommonTestUtils::DEVICE_PLAIDML)),
+                        ReduceOpsLayerTest::getTestCaseName);
 
-const auto paramsOneAxis = testing::Combine(testing::ValuesIn(axes),            //
-                                            testing::Values(opTypes[1]),        //
-                                            testing::ValuesIn(keepDims),        //
-                                            testing::ValuesIn(reductionTypes),  //
-                                            testing::ValuesIn(netPrecisions),   //
-                                            testing::ValuesIn(inputShapes),     //
-                                            testing::Values(CommonTestUtils::DEVICE_PLAIDML));
-
-INSTANTIATE_TEST_CASE_P(ReduceOneAxis, ReduceOpsLayerTest, paramsOneAxis, ReduceOpsLayerTest::getTestCaseName);
-
-const auto paramsMultiAxis = testing::Combine(testing::ValuesIn(axesND),          //
-                                              testing::Values(opTypes[1]),        //
-                                              testing::Values(keepDims[0]),       //
-                                              testing::ValuesIn(reductionTypes),  //
-                                              testing::ValuesIn(netPrecisions),   //
-                                              testing::ValuesIn(inputShapes),     //
-                                              testing::Values(CommonTestUtils::DEVICE_PLAIDML));
-
-INSTANTIATE_TEST_CASE_P(ReduceMultiAxis, ReduceOpsLayerTest, paramsMultiAxis, ReduceOpsLayerTest::getTestCaseName);
+INSTANTIATE_TEST_CASE_P(smoke, ReduceOpsLayerTest,
+                        ::testing::Combine(testing::Values(axes[0]),                          //
+                                           testing::Values(CommonTestUtils::OpType::VECTOR),  //
+                                           testing::Values(keepDims[1]),                      //
+                                           testing::ValuesIn(reductionTypes),                 //
+                                           testing::Values(netPrecisions[0]),                 //
+                                           testing::Values(std::vector<size_t>{1, 2, 4, 4}),  //
+                                           testing::Values(CommonTestUtils::DEVICE_PLAIDML)),
+                        ReduceOpsLayerTest::getTestCaseName);
 }  // namespace
