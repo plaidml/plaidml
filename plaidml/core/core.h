@@ -40,13 +40,11 @@ inline std::string str(plaidml_string* ptr) {
 template <typename T, typename F, typename... Args>
 T call(edsl_source_location loc, F fn, Args... args) {
   plaidml_error err;
-  err.origin_file = loc.file_name();
-  err.origin_line = loc.line();
   auto ret = fn(&err, args...);
   if (err.code) {
-    std::string fullmsg = "Exception at " + std::string(err.origin_file) + ":" + std::to_string(err.origin_line) +
-                          " with message: " + str(err.msg);
-    throw std::runtime_error(fullmsg);
+    std::stringstream ss;
+    ss << "Exception at " << loc.file_name() << ":" << loc.line() << " with message: " << err.msg;
+    throw std::runtime_error(ss.str());
   }
   return ret;
 }
@@ -64,13 +62,11 @@ T call(F fn, Args... args) {
 template <typename F, typename... Args>
 void call_void(edsl_source_location loc, F fn, Args... args) {
   plaidml_error err;
-  err.origin_file = loc.file_name();
-  err.origin_line = loc.line();
   fn(&err, args...);
   if (err.code) {
-    std::string fullmsg = "Exception at " + std::string(err.origin_file) + ":" + std::to_string(err.origin_line) +
-                          " with message: " + str(err.msg);
-    throw std::runtime_error(fullmsg);
+    std::stringstream ss;
+    ss << "Exception at " << loc.file_name() << ":" << loc.line() << " with message: " << err.msg;
+    throw std::runtime_error(ss.str());
   }
 }
 

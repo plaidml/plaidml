@@ -82,8 +82,6 @@ void plaidml_string_free(  //
 typedef struct {
   size_t code;
   plaidml_string* msg;
-  const char* origin_file;
-  uint32_t origin_line;
 } plaidml_error;
 
 //
