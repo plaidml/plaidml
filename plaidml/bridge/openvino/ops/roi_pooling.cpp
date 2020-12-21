@@ -20,12 +20,12 @@ std::vector<T> cast_constant_operand(size_t operand_idx, ngraph::Node* layer) {
   if (ngraph_const) {
     return ngraph_const->cast_vector<T>();
   } else {
-    THROW_IE_EXCEPTION << "Dynamic slicing not currently supported by PlaidML plugin; all of begin, end, and stride "
-                          "must be Constants.";
+    THROW_IE_EXCEPTION
+        << "Dynamic coordinate is not currently supported by PlaidML plugin; all coordinate must be Constants. ";
   }
 }
 
-edsl::Tensor crop_pooling(edsl::Tensor I, std::vector<float>& coord, int64_t pooled_h, int64_t pooled_w) {
+edsl::Tensor crop_max_pooling(edsl::Tensor I, std::vector<float>& coord, int64_t pooled_h, int64_t pooled_w) {
   auto x_1 = coord[0];
   auto y_1 = coord[1];
   auto x_2 = coord[2];
@@ -129,19 +129,21 @@ void registerROIPooling() {
       auto slice_I = edsl::gather(I, batch_indices).axis(0);
 
       edsl::Tensor pooled_tensor;
-      if (method != "bilinear") {
-        // translate ROI coordinates from their input spatial scale to the scale used when pooling
+      if (method == "max") {
+        // translate ROI coordinates from their input normalize scale to feature map scale.
         for (int i = 1; i < coord.size(); i++) {
           coord[i] = std::round(coord[i] * spatial_ratio);
         }
-        pooled_tensor = crop_pooling(slice_I, coord, pooled_height, pooled_width);
-      } else {
-        // follow ngraph implement, it don't use spatial_ratio in "bilinear" method.
+        pooled_tensor = crop_max_pooling(slice_I, coord, pooled_height, pooled_width);
+      } else if (method == "bilinear") {
+        // follow ngraph implementation, which doesn't use spatial_ratio in "bilinear" method.
         coord[1] *= (width - 1);
         coord[3] *= (width - 1);
         coord[2] *= (height - 1);
         coord[4] *= (height - 1);
         pooled_tensor = bilinear_pooling(slice_I, coord, pooled_height, pooled_width);
+      } else {
+        THROW_IE_EXCEPTION << "ROIPooling op currently only support 'max' and 'bilinear' method;";
       }
       ROI_pools.push_back(pooled_tensor);
     }
