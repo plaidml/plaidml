@@ -226,7 +226,11 @@ void ExpandReshapePass::expandReshape(ReshapeOp reshapeOp) {
 
 void ExpandReshapePass::runOnFunction() {
   auto func = getFunction();
-  for (auto op : func.getOps<ReshapeOp>()) {
+  // Save the reshape operations in another buffer. Otherwise, removing a
+  // reshape may crash the next loop iteration sometimes.
+  auto ops = func.getOps<ReshapeOp>();
+  SmallVector<ReshapeOp, 8> reshapes(ops.begin(), ops.end());
+  for (auto op : reshapes) {
     expandReshape(op);
   }
   return;
