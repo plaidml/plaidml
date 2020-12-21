@@ -18,11 +18,11 @@ const std::vector<InferenceEngine::Precision> netPrecisions = {InferenceEngine::
 
 const std::vector<std::vector<size_t>> inputShape = {
     {1, 3, 12, 12},
-    //{2, 3, 24, 24},
+    {2, 3, 24, 24},
 };
 const std::vector<std::vector<float>> coords = {
-    //    {0, 0, 0, 8, 8},  //
-    {0, 1, 0, 6, 5}  //
+    {0, 0, 0, 8, 8},  //
+    {0, 1, 0, 6, 5}   //
 };
 
 const auto SpecificParams = ::testing::Combine(::testing::ValuesIn(std::vector<std::string>{"max", "bilinear"}),  //
