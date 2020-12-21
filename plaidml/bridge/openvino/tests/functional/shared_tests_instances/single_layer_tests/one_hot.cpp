@@ -16,7 +16,7 @@ std::vector<InferenceEngine::Precision> netPrecisions = {
     InferenceEngine::Precision::I32,
 };
 
-const std::vector<int64_t> axis = {0, 1, -1};
+const std::vector<int64_t> axis = {-1, 1, 0};
 const std::vector<size_t> depthes = {2, 5};
 const std::vector<float> onValues = {1, 5};
 const std::vector<float> offValues = {0, 10};
