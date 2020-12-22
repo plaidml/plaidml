@@ -2149,7 +2149,7 @@ TEST_F(CppEdsl, OpOperators) {
     auto RX = plaidml::op::relu(X);
     auto RY = plaidml::op::relu(Y);
     // clang-format off
-    eline = __LINE__; auto O = X + Y;
+    eline = __LINE__; auto O = RX + RY;
     // clang-format on
   } catch (const std::exception& e) {
     errmsg = e.what();

@@ -1172,12 +1172,29 @@ inline Tensor Tensor::operator-() const { return intrinsicCall("neg", {*this}); 
 inline Tensor Tensor::operator~() const { return intrinsicCall("bit_not", {*this}); }
 inline Tensor Tensor::operator!() const { return intrinsicCall("logical_not", {*this}); }
 
+template <typename T>
+class has_tensor {
+  typedef char one;
+  typedef int two;
+
+  template <typename C>
+  static one test(decltype(&C::operator Tensor));
+  template <typename C>
+  static two test(...);
+
+ public:
+  enum { value = sizeof(test<T>(0)) == sizeof(char) };
+};
+
 struct LocatedTensor {
   Tensor tensor;
   edsl_source_location loc;
-  LocatedTensor(Tensor tensor, edsl_source_location loc = edsl_source_location::current())  // NOLINT
+
+  template <typename T, typename = std::enable_if_t<has_tensor<T>::value>>
+  LocatedTensor(T tensor, edsl_source_location loc = edsl_source_location::current())  // NOLINT
       : tensor(tensor), loc(loc) {}
-  LocatedTensor(Contraction tensor, edsl_source_location loc = edsl_source_location::current())  // NOLINT
+
+  LocatedTensor(Tensor tensor, edsl_source_location loc = edsl_source_location::current())  // NOLINT
       : tensor(tensor), loc(loc) {}
 };
 
