@@ -39,7 +39,7 @@ TEST_P(PlaidMLDotOperationTest, SimpleDotOp) {
   HloInstruction* rhs = builder.AddInstruction(HloInstruction::CreateParameter(1, param_shape, "input"));
 
   builder.AddInstruction(CreateCanonicalDot(param_shape, lhs, rhs));
-  CompileAndCheck(builder.Build(), testcases);
+  CompileAndCheck(builder.Build(), testcases, /*tolerance=*/1e-06);
 }
 
 TEST_P(PlaidMLDotOperationTest, DotTransposeOp) {
@@ -59,7 +59,7 @@ TEST_P(PlaidMLDotOperationTest, DotTransposeOp) {
   HloInstruction* lhs_transposed = builder.AddInstruction(HloInstruction::CreateTranspose(param_shape, lhs, {1, 0}));
 
   builder.AddInstruction(CreateCanonicalDot(param_shape, lhs_transposed, rhs));
-  CompileAndCheck(builder.Build(), testcases);
+  CompileAndCheck(builder.Build(), testcases, /*tolerance=*/1e-06);
 }
 
 std::vector<DotTestSpec> GetDotTestCases() {

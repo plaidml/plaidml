@@ -105,6 +105,8 @@ test:asan --test_env=ASAN_SYMBOLIZER_PATH
 test:asan --test_env=DYLD_INSERT_LIBRARIES
 
 # For building tensorflow
+test:tf_nightly --test_tag_filters=tf_nightly
+test:tf_nightly --test_timeout_filters=eternal --test_timeout 800
 build --define=no_aws_support=true
 build --nocheck_visibility
 common --experimental_repo_remote_exec

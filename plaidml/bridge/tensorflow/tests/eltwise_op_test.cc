@@ -7,6 +7,7 @@
 #include <string>
 
 #include "tensorflow/compiler/xla/tests/test_utils.h"
+#include "tensorflow/compiler/xla/tests/literal_test_util.h"
 
 #include "plaidml/bridge/tensorflow/tests/codegen_test.h"
 
@@ -26,22 +27,23 @@ class PlaidMLEltwiseOperationTest : public PlaidMLCodegenTest, public ::testing:
 
 // Unary Eltwise Ops
 TEST_P(PlaidMLEltwiseOperationTest, EltwiseAbsOp) {
-  std::vector<float> input_val = {-1, 2, -3, -4, 5, 6, -7, -8, -9};
+  auto input_val = LiteralUtil::CreateR1<float>({-1, 2, -3, -4, 5, 6, -7, -8, -9});
   std::vector<float> expected_val = {1, 2, 3, 4, 5, 6, 7, 8, 9};
 
   TestCases testcases = {
-      TestCaseIO{{input_val}, {expected_val}},
+      TestCaseIO{{}, {expected_val}},
   };
 
   HloComputation::Builder builder("EltwiseAbsOp");
   EltwiseTestSpec spec = GetParam();
 
-  auto param_shape = ShapeUtil::MakeShape(spec.primitive_type, {3, 3});
+  Shape input_shape = input_val.shape();
 
-  HloInstruction* lhs = builder.AddInstruction(HloInstruction::CreateParameter(0, param_shape, "input"));
+  HloInstruction* lhs = builder.AddInstruction(
+    HloInstruction::CreateConstant(std::move(input_val)));
 
-  builder.AddInstruction(HloInstruction::CreateUnary(param_shape, HloOpcode::kAbs, lhs));
-  CompileAndCheck(builder.Build(), testcases);
+  builder.AddInstruction(HloInstruction::CreateUnary(input_shape, HloOpcode::kAbs, lhs));
+  CompileAndCheck(builder.Build(), testcases, /*tolerance=*/1e-06);
 }
 
 TEST_P(PlaidMLEltwiseOperationTest, EltwiseCeilOp) {
@@ -60,7 +62,7 @@ TEST_P(PlaidMLEltwiseOperationTest, EltwiseCeilOp) {
   HloInstruction* lhs = builder.AddInstruction(HloInstruction::CreateParameter(0, param_shape, "input"));
 
   builder.AddInstruction(HloInstruction::CreateUnary(param_shape, HloOpcode::kCeil, lhs));
-  CompileAndCheck(builder.Build(), testcases);
+  CompileAndCheck(builder.Build(), testcases, /*tolerance=*/1e-06);
 }
 
 TEST_P(PlaidMLEltwiseOperationTest, EltwiseCosOp) {
@@ -80,7 +82,7 @@ TEST_P(PlaidMLEltwiseOperationTest, EltwiseCosOp) {
   HloInstruction* lhs = builder.AddInstruction(HloInstruction::CreateParameter(0, param_shape, "input"));
 
   builder.AddInstruction(HloInstruction::CreateUnary(param_shape, HloOpcode::kCos, lhs));
-  CompileAndCheck(builder.Build(), testcases);
+  CompileAndCheck(builder.Build(), testcases, /*tolerance=*/1e-06);
 }
 
 TEST_P(PlaidMLEltwiseOperationTest, EltwiseExpOp) {
@@ -100,7 +102,7 @@ TEST_P(PlaidMLEltwiseOperationTest, EltwiseExpOp) {
   HloInstruction* lhs = builder.AddInstruction(HloInstruction::CreateParameter(0, param_shape, "input"));
 
   builder.AddInstruction(HloInstruction::CreateUnary(param_shape, HloOpcode::kExp, lhs));
-  CompileAndCheck(builder.Build(), testcases);
+  CompileAndCheck(builder.Build(), testcases, /*tolerance=*/1e-06);
 }
 
 TEST_P(PlaidMLEltwiseOperationTest, EltwiseFloorOp) {
@@ -119,7 +121,7 @@ TEST_P(PlaidMLEltwiseOperationTest, EltwiseFloorOp) {
   HloInstruction* lhs = builder.AddInstruction(HloInstruction::CreateParameter(0, param_shape, "input"));
 
   builder.AddInstruction(HloInstruction::CreateUnary(param_shape, HloOpcode::kFloor, lhs));
-  CompileAndCheck(builder.Build(), testcases);
+  CompileAndCheck(builder.Build(), testcases, /*tolerance=*/1e-06);
 }
 
 TEST_P(PlaidMLEltwiseOperationTest, EltwiseLogOp) {
@@ -139,7 +141,7 @@ TEST_P(PlaidMLEltwiseOperationTest, EltwiseLogOp) {
   HloInstruction* lhs = builder.AddInstruction(HloInstruction::CreateParameter(0, param_shape, "input"));
 
   builder.AddInstruction(HloInstruction::CreateUnary(param_shape, HloOpcode::kLog, lhs));
-  CompileAndCheck(builder.Build(), testcases);
+  CompileAndCheck(builder.Build(), testcases, /*tolerance=*/1e-06);
 }
 
 TEST_P(PlaidMLEltwiseOperationTest, EltwiseNegOp) {
@@ -158,7 +160,7 @@ TEST_P(PlaidMLEltwiseOperationTest, EltwiseNegOp) {
   HloInstruction* lhs = builder.AddInstruction(HloInstruction::CreateParameter(0, param_shape, "input"));
 
   builder.AddInstruction(HloInstruction::CreateUnary(param_shape, HloOpcode::kNegate, lhs));
-  CompileAndCheck(builder.Build(), testcases);
+  CompileAndCheck(builder.Build(), testcases, /*tolerance=*/1e-06);
 }
 
 TEST_P(PlaidMLEltwiseOperationTest, EltwiseRsqrtOp) {
@@ -177,7 +179,7 @@ TEST_P(PlaidMLEltwiseOperationTest, EltwiseRsqrtOp) {
   HloInstruction* lhs = builder.AddInstruction(HloInstruction::CreateParameter(0, param_shape, "input"));
 
   builder.AddInstruction(HloInstruction::CreateUnary(param_shape, HloOpcode::kRsqrt, lhs));
-  CompileAndCheck(builder.Build(), testcases);
+  CompileAndCheck(builder.Build(), testcases, /*tolerance=*/1e-06);
 }
 
 TEST_P(PlaidMLEltwiseOperationTest, EltwiseSinOp) {
@@ -197,7 +199,7 @@ TEST_P(PlaidMLEltwiseOperationTest, EltwiseSinOp) {
   HloInstruction* lhs = builder.AddInstruction(HloInstruction::CreateParameter(0, param_shape, "input"));
 
   builder.AddInstruction(HloInstruction::CreateUnary(param_shape, HloOpcode::kSin, lhs));
-  CompileAndCheck(builder.Build(), testcases);
+  CompileAndCheck(builder.Build(), testcases, /*tolerance=*/1e-06);
 }
 
 TEST_P(PlaidMLEltwiseOperationTest, EltwiseSqrtOp) {
@@ -216,7 +218,7 @@ TEST_P(PlaidMLEltwiseOperationTest, EltwiseSqrtOp) {
   HloInstruction* lhs = builder.AddInstruction(HloInstruction::CreateParameter(0, param_shape, "input"));
 
   builder.AddInstruction(HloInstruction::CreateUnary(param_shape, HloOpcode::kSqrt, lhs));
-  CompileAndCheck(builder.Build(), testcases);
+  CompileAndCheck(builder.Build(), testcases, /*tolerance=*/1e-06);
 }
 
 // Binary Eltwise Ops
@@ -237,7 +239,7 @@ TEST_P(PlaidMLEltwiseOperationTest, EltwiseAddOp) {
   HloInstruction* rhs = builder.AddInstruction(HloInstruction::CreateParameter(1, param_shape, "input"));
 
   builder.AddInstruction(HloInstruction::CreateBinary(param_shape, HloOpcode::kAdd, lhs, rhs));
-  CompileAndCheck(builder.Build(), testcases);
+  CompileAndCheck(builder.Build(), testcases, /*tolerance=*/1e-06);
 }
 
 TEST_P(PlaidMLEltwiseOperationTest, EltwiseDivOp) {
@@ -258,7 +260,7 @@ TEST_P(PlaidMLEltwiseOperationTest, EltwiseDivOp) {
   HloInstruction* rhs = builder.AddInstruction(HloInstruction::CreateParameter(1, param_shape, "input"));
 
   builder.AddInstruction(HloInstruction::CreateBinary(param_shape, HloOpcode::kDivide, lhs, rhs));
-  CompileAndCheck(builder.Build(), testcases);
+  CompileAndCheck(builder.Build(), testcases, /*tolerance=*/1e-06);
 }
 
 TEST_P(PlaidMLEltwiseOperationTest, EltwiseMaxOp) {
@@ -279,7 +281,7 @@ TEST_P(PlaidMLEltwiseOperationTest, EltwiseMaxOp) {
   HloInstruction* rhs = builder.AddInstruction(HloInstruction::CreateParameter(1, param_shape, "input"));
 
   builder.AddInstruction(HloInstruction::CreateBinary(param_shape, HloOpcode::kMaximum, lhs, rhs));
-  CompileAndCheck(builder.Build(), testcases);
+  CompileAndCheck(builder.Build(), testcases, /*tolerance=*/1e-06);
 }
 
 TEST_P(PlaidMLEltwiseOperationTest, EltwiseMinOp) {
@@ -300,7 +302,7 @@ TEST_P(PlaidMLEltwiseOperationTest, EltwiseMinOp) {
   HloInstruction* rhs = builder.AddInstruction(HloInstruction::CreateParameter(1, param_shape, "input"));
 
   builder.AddInstruction(HloInstruction::CreateBinary(param_shape, HloOpcode::kMinimum, lhs, rhs));
-  CompileAndCheck(builder.Build(), testcases);
+  CompileAndCheck(builder.Build(), testcases, /*tolerance=*/1e-06);
 }
 
 TEST_P(PlaidMLEltwiseOperationTest, EltwiseMulOp) {
@@ -320,7 +322,7 @@ TEST_P(PlaidMLEltwiseOperationTest, EltwiseMulOp) {
   HloInstruction* rhs = builder.AddInstruction(HloInstruction::CreateParameter(1, param_shape, "input"));
 
   builder.AddInstruction(HloInstruction::CreateBinary(param_shape, HloOpcode::kMultiply, lhs, rhs));
-  CompileAndCheck(builder.Build(), testcases);
+  CompileAndCheck(builder.Build(), testcases, /*tolerance=*/1e-06);
 }
 
 TEST_P(PlaidMLEltwiseOperationTest, EltwisePowOp) {
@@ -341,7 +343,7 @@ TEST_P(PlaidMLEltwiseOperationTest, EltwisePowOp) {
   HloInstruction* rhs = builder.AddInstruction(HloInstruction::CreateParameter(1, param_shape, "input"));
 
   builder.AddInstruction(HloInstruction::CreateBinary(param_shape, HloOpcode::kPower, lhs, rhs));
-  CompileAndCheck(builder.Build(), testcases);
+  CompileAndCheck(builder.Build(), testcases, /*tolerance=*/1e-06);
 }
 
 TEST_P(PlaidMLEltwiseOperationTest, EltwiseRemOp) {
@@ -362,7 +364,7 @@ TEST_P(PlaidMLEltwiseOperationTest, EltwiseRemOp) {
   HloInstruction* rhs = builder.AddInstruction(HloInstruction::CreateParameter(1, param_shape, "input"));
 
   builder.AddInstruction(HloInstruction::CreateBinary(param_shape, HloOpcode::kRemainder, lhs, rhs));
-  CompileAndCheck(builder.Build(), testcases);
+  CompileAndCheck(builder.Build(), testcases, /*tolerance=*/1e-06);
 }
 
 TEST_P(PlaidMLEltwiseOperationTest, EltwiseSubOp) {
@@ -383,7 +385,7 @@ TEST_P(PlaidMLEltwiseOperationTest, EltwiseSubOp) {
   HloInstruction* rhs = builder.AddInstruction(HloInstruction::CreateParameter(1, param_shape, "input"));
 
   builder.AddInstruction(HloInstruction::CreateBinary(param_shape, HloOpcode::kSubtract, lhs, rhs));
-  CompileAndCheck(builder.Build(), testcases);
+  CompileAndCheck(builder.Build(), testcases, /*tolerance=*/1e-06);
 }
 
 std::vector<EltwiseTestSpec> GetEltwiseTestCases() {

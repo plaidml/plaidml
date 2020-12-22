@@ -47,7 +47,7 @@ class PlaidMLShapeOperationTest : public PlaidMLCodegenTest, public ::testing::W
 
 //     hlo_module->ParseHloStringAndVerifyModule(module_text);
 
-//     CompileAndCheck(std::move(hlo_module),  testcase_pairs);
+//     CompileAndCheck(std::move(hlo_module), testcase_pairs, /*tolerance=*/1e-06);
 //   }
 // }
 
@@ -73,7 +73,7 @@ class PlaidMLShapeOperationTest : public PlaidMLCodegenTest, public ::testing::W
 
 //     hlo_module->ParseHloStringAndVerifyModule(module_text);
 
-//     CompileAndCheck(std::move(hlo_module),  testcase_pairs);
+//     CompileAndCheck(std::move(hlo_module), testcase_pairs, /*tolerance=*/1e-06);
 //   }
 // }
 
@@ -99,7 +99,7 @@ class PlaidMLShapeOperationTest : public PlaidMLCodegenTest, public ::testing::W
 
 //     hlo_module->ParseHloStringAndVerifyModule(module_text);
 
-//     CompileAndCheck(std::move(hlo_module),  testcase_pairs);
+//     CompileAndCheck(std::move(hlo_module), testcase_pairs, /*tolerance=*/1e-06);
 //   }
 // }
 
@@ -125,7 +125,7 @@ class PlaidMLShapeOperationTest : public PlaidMLCodegenTest, public ::testing::W
 
 //     hlo_module->ParseHloStringAndVerifyModule(module_text);
 
-//     CompileAndCheck(std::move(hlo_module),  testcase_pairs);
+//     CompileAndCheck(std::move(hlo_module), testcase_pairs, /*tolerance=*/1e-06);
 //   }
 // }
 
@@ -151,7 +151,7 @@ class PlaidMLShapeOperationTest : public PlaidMLCodegenTest, public ::testing::W
 
 //     hlo_module->ParseHloStringAndVerifyModule(module_text);
 
-//     CompileAndCheck(std::move(hlo_module),  testcase_pairs);
+//     CompileAndCheck(std::move(hlo_module), testcase_pairs, /*tolerance=*/1e-06);
 //   }
 // }
 

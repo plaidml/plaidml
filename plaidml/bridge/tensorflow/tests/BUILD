@@ -26,6 +26,7 @@ cc_library(
     hdrs = ["codegen_test.h"],
     tags = ["skip_windows"],
     deps = [
+        ":archive_cc_fbs",
         "//plaidml:testenv",
         "//plaidml/bridge/tensorflow/service:compiler",
         "@org_tensorflow//tensorflow/compiler/xla/tests:test_utils",
@@ -106,15 +107,16 @@ tf_cc_test(
     deps = [
         ":codegen_test",
         "//plaidml/bridge/tensorflow/service:compiler",
+	"@org_tensorflow//tensorflow/compiler/xla/tests:literal_test_util"
     ],
 )
 
 py_binary(
-    name = "i3d_control",
-    srcs = ["i3d_control.py"],
-    data = ["@kinetics-i3d//:i3d-data"],
+    name = "i3d_reference_impl",
+    testonly = 1,
+    srcs = ["i3d_reference_impl.py"],
     tags = ["skip_windows"],
-    deps = ["@kinetics-i3d//:i3d"],
+    deps = [],
 )
 
 py_binary(
@@ -131,8 +133,11 @@ py_binary(
 genrule(
     name = "i3d_test_genrule",
     testonly = 1,
-    outs = ["i3d.pml"],
-    cmd = "$(location :i3d_test_gen) $(location @tfhub_i3d_kinetics_400//:saved_model.pb) $@",
+    outs = [
+        "i3d.pml",
+        "i3d_hlo.pb"
+    ],
+    cmd = "$(location :i3d_test_gen) $(location @tfhub_i3d_kinetics_400//:saved_model.pb) $(location i3d.pml) $(location i3d_hlo.pb)",
     tags = ["skip_windows"],
     tools = [
         ":i3d_test_gen",
@@ -143,18 +148,22 @@ genrule(
 tf_cc_test(
     name = "i3d_test",
     srcs = ["i3d_test.cc"],
-    data = [":i3d_test_genrule"],
+    data = [
+        ":i3d_test_genrule",
+        "i3d_hlo.pb",
+    ],
     extra_copts = ["-fexceptions"],
     linkstatic = 1,
     tags = [
-        "manual",
         "skip_windows",
+        "tf_nightly",
     ],
+    timeout = "eternal",
     deps = [
         ":archive_cc_fbs",
         ":codegen_test",
         "//plaidml/bridge/tensorflow/service:compiler",
-        "@org_tensorflow//tensorflow/compiler/xla/tests:verified_hlo_module",
+        "@org_tensorflow//tensorflow/compiler/xla/service:hlo_runner",
     ],
 )
 
@@ -167,6 +176,119 @@ tf_cc_test(
     deps = [
         ":codegen_test",
         "//plaidml/bridge/tensorflow/service:compiler",
+    ],
+)
+
+py_binary(
+    name = "resnet152_reference_impl",
+    testonly = 1,
+    srcs = ["resnet152_reference_impl.py"],
+    tags = ["skip_windows"],
+    deps = [],
+)
+
+py_binary(
+    name = "resnet152_test_gen",
+    testonly = 1,
+    srcs = ["resnet152_test_gen.py"],
+    tags = ["skip_windows"],
+    deps = [
+        ":util",
+        "@flatbuffers//:runtime_py",
+    ],
+)
+
+genrule(
+    name = "resnet152_test_genrule",
+    testonly = 1,
+    outs = [
+        "resnet152.pml",
+        "resnet152_hlo.pb"
+    ],
+    cmd = "$(location :resnet152_test_gen) $(location @tfhub_resnet152//:saved_model.pb) $(location resnet152.pml) $(location resnet152_hlo.pb)",
+    tags = ["skip_windows"],
+    tools = [
+        ":resnet152_test_gen",
+        "@tfhub_resnet152//:saved_model.pb",
+    ],
+)
+
+tf_cc_test(
+    name = "resnet152_test",
+    srcs = ["resnet152_test.cc"],
+    data = [
+        ":resnet152_test_genrule",
+        "resnet152_hlo.pb",
+    ],
+    extra_copts = ["-fexceptions"],
+    linkstatic = 1,
+    tags = [
+        "skip_windows",
+        "tf_nightly",
+    ],
+    timeout = "eternal",
+    deps = [
+        ":archive_cc_fbs",
+        ":codegen_test",
+        "//plaidml/bridge/tensorflow/service:compiler",
+        "@org_tensorflow//tensorflow/compiler/xla/service:hlo_runner",
+    ],
+)
+
+py_binary(
+    name = "resnext_reference_impl",
+    testonly = 1,
+    srcs = ["resnext_reference_impl.py"],
+    data = ["@models_resnext50//file"],
+    tags = ["skip_windows"],
+    deps = [],
+)
+
+py_binary(
+    name = "resnext_test_gen",
+    testonly = 1,
+    srcs = ["resnext_test_gen.py"],
+    data = ["@models_resnext50//file"],
+    tags = ["skip_windows"],
+    deps = [
+        ":util",
+        "@flatbuffers//:runtime_py",
+    ],
+)
+
+genrule(
+    name = "resnext_test_genrule",
+    testonly = 1,
+    srcs = ["@models_resnext50//file"],
+    outs = [
+        "resnext.pml",
+        "resnext_hlo.pb"
+    ],
+    cmd = "$(location :resnext_test_gen) $(location @models_resnext50//file) $(location resnext.pml) $(location resnext_hlo.pb)",
+    tags = ["skip_windows"],
+    tools = [
+        ":resnext_test_gen",
+    ],
+)
+
+tf_cc_test(
+    name = "resnext_test",
+    srcs = ["resnext_test.cc"],
+    data = [
+        ":resnext_test_genrule",
+    ],
+    extra_copts = ["-fexceptions"],
+    linkstatic = 1,
+    tags = [
+        "skip_windows",
+        "tf_nightly",
+    ],
+    timeout = "eternal",
+    deps = [
+        ":archive_cc_fbs",
+        ":codegen_test",
+        "//plaidml/bridge/tensorflow/service:compiler",
+        "@org_tensorflow//tensorflow/compiler/xla/service:hlo_runner",
     ],
 )
 

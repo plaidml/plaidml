@@ -19,18 +19,18 @@ namespace xla {
 namespace plaidml {
 namespace {
 
-struct I3DTestSpec {
+struct ResNextTestSpec {
   PrimitiveType primitive_type;
 };
 
-string I3DTestSpecToString(const ::testing::TestParamInfo<I3DTestSpec>& info) {
+string ResNextTestSpecToString(const ::testing::TestParamInfo<ResNextTestSpec>& info) {
   return PrimitiveType_Name(info.param.primitive_type);
 }
 
-class PlaidMLI3DOperationTest : public PlaidMLCodegenTest, public ::testing::WithParamInterface<I3DTestSpec> {};
+class PlaidMLResNextOperationTest : public PlaidMLCodegenTest, public ::testing::WithParamInterface<ResNextTestSpec> {};
 
-TEST_P(PlaidMLI3DOperationTest, SimpleI3D) {
-  auto data = ReadFile("plaidml/bridge/tensorflow/tests/i3d.pml");
+TEST_P(PlaidMLResNextOperationTest, ResNext50) {
+  auto data = ReadFile("plaidml/bridge/tensorflow/tests/resnext.pml");
   zoo::ArchiveT archive;
   zoo::GetArchive(data.data())->UnPackTo(&archive);
 
@@ -39,7 +39,7 @@ TEST_P(PlaidMLI3DOperationTest, SimpleI3D) {
 
   // FIXME: Placeholders created for the purpose of internal computations are needlessly becoming inputs to the Program.
   std::vector<float> const_0 = {0};
-  for (int i = 0; i < 30; i++) {
+  for (int i = 0; i < 4; i++) {
     inputs.emplace_back(const_0);
   }
 
@@ -57,20 +57,20 @@ TEST_P(PlaidMLI3DOperationTest, SimpleI3D) {
   }
 
   auto hlo_module =
-      HloRunner::ReadModuleFromBinaryProtoFile("plaidml/bridge/tensorflow/tests/i3d_hlo.pb", DebugOptions())
+      HloRunner::ReadModuleFromBinaryProtoFile("plaidml/bridge/tensorflow/tests/resnext_hlo.pb", DebugOptions())
           .ValueOrDie();
 
-  CompileAndCheck(std::move(hlo_module), {{inputs, outputs}}, /*tolerance=*/1e-03);
+  CompileAndCheck(std::move(hlo_module), {{inputs, outputs}}, /*tolerance=*/1e-02);
 }
 
-std::vector<I3DTestSpec> GetI3DTestCases() {
-  std::vector<I3DTestSpec> result;
+std::vector<ResNextTestSpec> GetResNextTestCases() {
+  std::vector<ResNextTestSpec> result;
   result.push_back({F32});
   return result;
 }
 
-INSTANTIATE_TEST_SUITE_P(All, PlaidMLI3DOperationTest, ::testing::ValuesIn(GetI3DTestCases()), I3DTestSpecToString);
-
+INSTANTIATE_TEST_SUITE_P(All, PlaidMLResNextOperationTest, ::testing::ValuesIn(GetResNextTestCases()),
+                         ResNextTestSpecToString);
 }  // namespace
 }  // namespace plaidml
 }  // namespace xla

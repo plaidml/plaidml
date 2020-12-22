@@ -25,11 +25,12 @@ def main(args):
             # Initialize weights in this session
             sess.run(tf.compat.v1.global_variables_initializer())
             # Create placeholders for graphdef generation
-            input_shape = [1, 79, 224, 224, 3]
+            input_shape = [1, 224, 224, 3]
             x_name = 'Placeholder'
-            y_name = 'module_apply_default/RGB/inception_i3d/Mean'
+            y_name = 'module_apply_default/resnet_v2/use_global_pool'
             x = tf.compat.v1.placeholder(tf.float32, shape=input_shape)
-            y = layer(x)
+            y = layer(dict(inputs=x, decay_rate=0))
+            print(y.op.name)
             output_graph_def = tf.compat.v1.graph_util.convert_variables_to_constants(
                 sess,  # The session in which the weights were initialized
                 sess.graph.as_graph_def(),  # The original (non-frozen) graph def
@@ -45,7 +46,9 @@ def main(args):
                                                                 ':0')
                 x_input = np.random.default_rng().random(input_shape, np.float32)
                 y_output = sess.run(output_tensor, feed_dict={input_tensor: x_input})
+                print(y_output.shape)
 
+        os.system('ls ' + str(tmp_path))
         module_path = tmp_path / 'module_0001.before_optimizations.hlo.pb'
         os.system('cp ' + str(module_path) + ' ' + args.hlo_pb)
 
@@ -61,7 +64,7 @@ def main(args):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Generate archive for i3d')
+    parser = argparse.ArgumentParser(description='Generate archive for resnet')
     parser.add_argument('model', type=pathlib.Path, help='location to read the model')
     parser.add_argument('archive',
                         type=argparse.FileType('wb'),

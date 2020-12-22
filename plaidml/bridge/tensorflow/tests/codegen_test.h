@@ -16,11 +16,18 @@ limitations under the License.
 #pragma once
 
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "tensorflow/compiler/xla/status.h"
 
+#include "plaidml/bridge/tensorflow/tests/archive_generated.h"
+#include "plaidml/edsl/edsl.h"
 #include "plaidml/testenv.h"
+
+using plaidml::MultiBuffer;
+
+namespace zoo = plaidml::zoo;
 
 namespace xla {
 
@@ -28,6 +35,9 @@ class HloComputation;
 class HloModule;
 
 namespace plaidml {
+
+MultiBuffer convertBuffer(const zoo::DataUnion& data);
+std::vector<char> ReadFile(const std::string& path);
 
 struct TestCaseIO {
   std::vector<::plaidml::MultiBuffer> inputs;
@@ -42,8 +52,8 @@ class PlaidMLCodegenTest : public ::plaidml::TestFixture {
   // Compiles hlo_module with the JIT compiler.
   ::plaidml::Program CompileToProgram(std::unique_ptr<HloModule> hlo_module);
 
-  Status CompileAndCheck(std::unique_ptr<HloModule> hlo_module, const TestCases& testcases);
-  Status CompileAndCheck(std::unique_ptr<HloComputation> entry_computation, const TestCases& testcases);
+  Status CompileAndCheck(std::unique_ptr<HloModule> hlo_module, const TestCases& testcases, double tolerance);
+  Status CompileAndCheck(std::unique_ptr<HloComputation> entry_computation, const TestCases& testcases, double tolerance);
 };
 
 }  // namespace plaidml

@@ -51,7 +51,7 @@ class PlaidMLConvOperationTest : public PlaidMLCodegenTest, public ::testing::Wi
 
 //     hlo_module->ParseHloStringAndVerifyModule(module_text);
 
-//     CompileAndCheck(std::move(hlo_module), testcases);
+//     CompileAndCheck(std::move(hlo_module), testcases, /*tolerance=*/1e-06);
 //   }
 // }
 
@@ -123,7 +123,7 @@ TEST_P(PlaidMLConvOperationTest, SimpleConvOp) {
   auto convolution_19 = builder.AddInstruction(
       HloAllGatherInstruction::CreateConvolve(conv_shape, input, kernel, 1, 1, conv_window, conv_dnums, conv_pc));
 
-  CompileAndCheck(builder.Build(), testcases);
+  CompileAndCheck(builder.Build(), testcases, /*tolerance=*/1e-06);
 }
 
 std::vector<ConvTestSpec> GetConvTestCases() {

@@ -67,3 +67,7 @@ tf_workspace(
     path_prefix = "",
     tf_repo_name = "org_tensorflow",
 )
+
+load("//vendor/models:workspace.bzl", "models_workspace")
+
+models_workspace()

@@ -238,6 +238,12 @@ StatusOr<::plaidml::Program> PlaidMLCompiler::ProgramFromHloModule(std::unique_p
           instr_map.insert(std::make_pair(cur_instr_id, op));
           break;
         }
+        case HloOpcode::kLog1p: {
+          // Tensor elementwise natural logarithm
+          auto op = edsl::log(1 + instr_map[operand_ids[0]]);
+          instr_map.insert(std::make_pair(cur_instr_id, op));
+          break;
+        }
         case HloOpcode::kNegate: {
           // Tensor elementwise negate
           auto op = -(instr_map[operand_ids[0]]);
@@ -359,6 +365,12 @@ StatusOr<::plaidml::Program> PlaidMLCompiler::ProgramFromHloModule(std::unique_p
           instr_map.insert(std::make_pair(cur_instr_id, op));
           break;
         }
+        case HloOpcode::kRoundNearestAfz: {
+          // Tensor elementwise round
+          auto op = edsl::round(instr_map[operand_ids[0]]);
+          instr_map.insert(std::make_pair(cur_instr_id, op));
+          break;
+        }
         case HloOpcode::kSubtract: {
           // Tensor elementwse subtraction
           auto op = instr_map[operand_ids[0]] - instr_map[operand_ids[1]];
@@ -368,6 +380,12 @@ StatusOr<::plaidml::Program> PlaidMLCompiler::ProgramFromHloModule(std::unique_p
         case HloOpcode::kXor: {
           // Tensor elementwise bitwise XOR
           auto op = instr_map[operand_ids[0]] ^ instr_map[operand_ids[1]];
+          instr_map.insert(std::make_pair(cur_instr_id, op));
+          break;
+        }
+        case HloOpcode::kClamp: {
+          // Tensor elementwise clip
+          auto op = plaidml_op::clip(instr_map[operand_ids[1]], instr_map[operand_ids[0]], instr_map[operand_ids[2]]);
           instr_map.insert(std::make_pair(cur_instr_id, op));
           break;
         }
@@ -409,6 +427,56 @@ StatusOr<::plaidml::Program> PlaidMLCompiler::ProgramFromHloModule(std::unique_p
           // TODO: make sure optional operands are passed correctly
           auto op = plaidml_op::convolution(instr_map[operand_ids[0]], instr_map[operand_ids[1]]);
           auto conv_dnums = instruction->convolution_dimension_numbers();
+          // Infer tensor layouts from conv dimension numbers
+          char batch_dim = 'n';
+          char spatial_dim = 'x';
+          char input_feature_dim = 'c';
+          char output_feature_dim = 'k';
+          std::vector<char> input_dims(2 + conv_dnums.input_spatial_dimensions().size());
+          std::string input_layout;
+          input_dims[conv_dnums.input_batch_dimension()] = batch_dim;
+          input_dims[conv_dnums.input_feature_dimension()] = input_feature_dim;
+          for (int64 i = 0; i < conv_dnums.input_spatial_dimensions().size(); ++i) {
+            input_dims[conv_dnums.input_spatial_dimensions(i)] = spatial_dim;
+          }
+          char last_visited = ' ';
+          for (char cur_dim : input_dims) {
+            if (cur_dim != last_visited) {
+              input_layout += cur_dim;
+            }
+            last_visited = cur_dim;
+          }
+          std::vector<char> kernel_dims(2 + conv_dnums.kernel_spatial_dimensions().size());
+          std::string kernel_layout;
+          kernel_dims[conv_dnums.kernel_input_feature_dimension()] = input_feature_dim;
+          kernel_dims[conv_dnums.kernel_output_feature_dimension()] = output_feature_dim;
+          for (int64 i = 0; i < conv_dnums.kernel_spatial_dimensions().size(); ++i) {
+            kernel_dims[conv_dnums.kernel_spatial_dimensions(i)] = spatial_dim;
+          }
+          last_visited = ' ';
+          for (char cur_dim : kernel_dims) {
+            if (cur_dim != last_visited) {
+              kernel_layout += cur_dim;
+            }
+            last_visited = cur_dim;
+          }
+          VLOG(2) << "Input layout: " << input_layout;
+          VLOG(2) << "Kernel layout: " << kernel_layout;
+          // Set tensor layouts in the op
+          if (input_layout == "nxc") {
+            op.input_layout(plaidml_op::TensorLayout::NXC);
+          } else if (input_layout == "ncx") {
+            op.input_layout(plaidml_op::TensorLayout::NCX);
+          } else {
+            VLOG(2) << "Unknown input layout specified";
+          }
+          if (kernel_layout == "xck") {
+            op.filter_layout(plaidml_op::TensorLayout::XCK);
+          } else if (kernel_layout == "kcx") {
+            op.filter_layout(plaidml_op::TensorLayout::KCX);
+          } else {
+            VLOG(2) << "Unknown kernel layout specified";
+          }
           auto input_spatial_dims = conv_dnums.input_spatial_dimensions();
           auto kernel_spatial_dims = conv_dnums.kernel_spatial_dimensions();
           // This window, unlike pooling, only takes spatial dimensions into account
@@ -513,8 +581,8 @@ StatusOr<::plaidml::Program> PlaidMLCompiler::ProgramFromHloModule(std::unique_p
           // Default pool mode and pad mode
           plaidml_op::PoolMode pm = plaidml_op::PoolMode::AVG;
           plaidml_op::AutoPadMode am = plaidml_op::AutoPadMode::EXPLICIT;
-          // This window is in NXC format: for example, a window of 1x2x2x1 translates to {2, 2} in the pooling op
-          // Spatial rank in this case has to take NXC into account, so subtract 2
+          // TODO: Infer tensor layout, then calculate the window
+          // Currently tensor layout is being assumed to be NXC, when that's not always the case
           auto raw_window = instruction->window();
           auto spatial_rank = raw_window.dimensions_size() - 2;
           std::vector<int> window_size;
@@ -649,7 +717,6 @@ StatusOr<::plaidml::Program> PlaidMLCompiler::ProgramFromHloModule(std::unique_p
           break;
         }
         // TODO: Unary ops.
-        case HloOpcode::kRoundNearestAfz:
         case HloOpcode::kBitcast:
         case HloOpcode::kClz:
         case HloOpcode::kCopy:
@@ -658,7 +725,6 @@ StatusOr<::plaidml::Program> PlaidMLCompiler::ProgramFromHloModule(std::unique_p
         case HloOpcode::kExpm1:
         case HloOpcode::kImag:
         case HloOpcode::kIsFinite:
-        case HloOpcode::kLog1p:
         case HloOpcode::kPopulationCount:
         case HloOpcode::kReal:
         case HloOpcode::kSign:

@@ -43,7 +43,7 @@ TEST_P(PlaidMLCompareOperationTest, CompEqOp) {
   HloInstruction* rhs = builder.AddInstruction(HloInstruction::CreateParameter(1, param_shape, "input"));
 
   builder.AddInstruction(HloInstruction::CreateCompare(param_shape, lhs, rhs, comp_type));
-  CompileAndCheck(builder.Build(), testcases);
+  CompileAndCheck(builder.Build(), testcases, /*tolerance=*/1e-06);
 }
 
 TEST_P(PlaidMLCompareOperationTest, CompLtOp) {
@@ -65,7 +65,7 @@ TEST_P(PlaidMLCompareOperationTest, CompLtOp) {
   HloInstruction* rhs = builder.AddInstruction(HloInstruction::CreateParameter(1, param_shape, "input"));
 
   builder.AddInstruction(HloInstruction::CreateCompare(param_shape, lhs, rhs, comp_type));
-  CompileAndCheck(builder.Build(), testcases);
+  CompileAndCheck(builder.Build(), testcases, /*tolerance=*/1e-06);
 }
 
 TEST_P(PlaidMLCompareOperationTest, CompLeOp) {
@@ -87,7 +87,7 @@ TEST_P(PlaidMLCompareOperationTest, CompLeOp) {
   HloInstruction* rhs = builder.AddInstruction(HloInstruction::CreateParameter(1, param_shape, "input"));
 
   builder.AddInstruction(HloInstruction::CreateCompare(param_shape, lhs, rhs, comp_type));
-  CompileAndCheck(builder.Build(), testcases);
+  CompileAndCheck(builder.Build(), testcases, /*tolerance=*/1e-06);
 }
 
 TEST_P(PlaidMLCompareOperationTest, CompGtOp) {
@@ -109,7 +109,7 @@ TEST_P(PlaidMLCompareOperationTest, CompGtOp) {
   HloInstruction* rhs = builder.AddInstruction(HloInstruction::CreateParameter(1, param_shape, "input"));
 
   builder.AddInstruction(HloInstruction::CreateCompare(param_shape, lhs, rhs, comp_type));
-  CompileAndCheck(builder.Build(), testcases);
+  CompileAndCheck(builder.Build(), testcases, /*tolerance=*/1e-06);
 }
 
 TEST_P(PlaidMLCompareOperationTest, CompGeOp) {
@@ -131,7 +131,7 @@ TEST_P(PlaidMLCompareOperationTest, CompGeOp) {
   HloInstruction* rhs = builder.AddInstruction(HloInstruction::CreateParameter(1, param_shape, "input"));
 
   builder.AddInstruction(HloInstruction::CreateCompare(param_shape, lhs, rhs, comp_type));
-  CompileAndCheck(builder.Build(), testcases);
+  CompileAndCheck(builder.Build(), testcases, /*tolerance=*/1e-06);
 }
 
 std::vector<CompareTestSpec> GetCompareTestCases() {

@@ -42,7 +42,7 @@ TEST_P(PlaidMLLogicalOperationTest, LogicalAndOp) {
   HloInstruction* rhs = builder.AddInstruction(HloInstruction::CreateParameter(1, param_shape, "input"));
 
   builder.AddInstruction(HloInstruction::CreateBinary(param_shape, HloOpcode::kAnd, lhs, rhs));
-  CompileAndCheck(builder.Build(), testcases);
+  CompileAndCheck(builder.Build(), testcases, /*tolerance=*/1e-06);
 }
 
 TEST_P(PlaidMLLogicalOperationTest, LogicalNotOp) {
@@ -67,7 +67,7 @@ TEST_P(PlaidMLLogicalOperationTest, LogicalNotOp) {
   HloInstruction* lhs = builder.AddInstruction(HloInstruction::CreateParameter(0, param_shape, "input"));
 
   builder.AddInstruction(HloInstruction::CreateUnary(param_shape, HloOpcode::kNot, lhs));
-  CompileAndCheck(builder.Build(), testcases);
+  CompileAndCheck(builder.Build(), testcases, /*tolerance=*/1e-06);
 }
 
 TEST_P(PlaidMLLogicalOperationTest, LogicalOrOp) {
@@ -88,7 +88,7 @@ TEST_P(PlaidMLLogicalOperationTest, LogicalOrOp) {
   HloInstruction* rhs = builder.AddInstruction(HloInstruction::CreateParameter(1, param_shape, "input"));
 
   builder.AddInstruction(HloInstruction::CreateBinary(param_shape, HloOpcode::kOr, lhs, rhs));
-  CompileAndCheck(builder.Build(), testcases);
+  CompileAndCheck(builder.Build(), testcases, /*tolerance=*/1e-06);
 }
 
 TEST_P(PlaidMLLogicalOperationTest, LogicalXorOp) {
@@ -109,7 +109,7 @@ TEST_P(PlaidMLLogicalOperationTest, LogicalXorOp) {
   HloInstruction* rhs = builder.AddInstruction(HloInstruction::CreateParameter(1, param_shape, "input"));
 
   builder.AddInstruction(HloInstruction::CreateBinary(param_shape, HloOpcode::kXor, lhs, rhs));
-  CompileAndCheck(builder.Build(), testcases);
+  CompileAndCheck(builder.Build(), testcases, /*tolerance=*/1e-06);
 }
 
 std::vector<LogicalTestSpec> GetLogicalTestCases() {
