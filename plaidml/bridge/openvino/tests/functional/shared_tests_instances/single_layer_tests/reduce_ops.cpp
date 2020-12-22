@@ -71,12 +71,12 @@ INSTANTIATE_TEST_CASE_P(ReduceOneAxis, ReduceOpsLayerTest,
                         ReduceOpsLayerTest::getTestCaseName);
 
 INSTANTIATE_TEST_CASE_P(ReduceMultiAxis, ReduceOpsLayerTest,
-                        ::testing::Combine(testing::ValuesIn(axesND),          //
-                                           testing::ValuesIn(opTypes),         //
-                                           testing::ValuesIn(keepDims),        //
-                                           testing::ValuesIn(reductionTypes),  //
-                                           testing::ValuesIn(netPrecisions),   //
-                                           testing::ValuesIn(inputShapes),     //
+                        ::testing::Combine(testing::ValuesIn(axesND),                         //
+                                           testing::Values(CommonTestUtils::OpType::VECTOR),  //
+                                           testing::ValuesIn(keepDims),                       //
+                                           testing::ValuesIn(reductionTypes),                 //
+                                           testing::ValuesIn(netPrecisions),                  //
+                                           testing::ValuesIn(inputShapes),                    //
                                            testing::Values(CommonTestUtils::DEVICE_PLAIDML)),
                         ReduceOpsLayerTest::getTestCaseName);
 
