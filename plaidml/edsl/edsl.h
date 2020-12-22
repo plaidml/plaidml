@@ -1190,7 +1190,7 @@ struct LocatedTensor {
   Tensor tensor;
   edsl_source_location loc;
 
-  template <typename T, std::enable_if_t<has_tensor<T>::value, bool> = true>
+  template <typename T, typename U = std::enable_if_t<has_tensor<T>::value>>
   LocatedTensor(T tensor, edsl_source_location loc = edsl_source_location::current())  // NOLINT
       : tensor(tensor), loc(loc) {}
 
