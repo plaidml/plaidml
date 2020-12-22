@@ -68,7 +68,7 @@ public:
       mlir::ModuleOp moduleOp = func.getParentOfType<mlir::ModuleOp>();
 
       IVLOG(3, "Failed to change layout in-place, inserting reorder");
-      reorderMemoryReads(createReorder, reorder, memoryDesc);
+      reorderMemoryReads(createReorder, reorder, memoryDesc, moduleOp);
       if (memoryDesc.parallelOp.hasValue()) {
         parallelOps.insert(memoryDesc.parallelOp.getValue());
       }
@@ -76,7 +76,6 @@ public:
 
     for (auto parallelOp : parallelOps) {
       tileLoopNestsToAlignWithDataMaps(parallelOp);
-
     }
   }
 };
