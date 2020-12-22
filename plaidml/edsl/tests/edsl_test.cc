@@ -24,12 +24,17 @@
 
 using half_float::half;
 using llvm::StringRef;
+using ::testing::AnyOf;
 using ::testing::ContainerEq;
 using ::testing::Eq;
 using ::testing::HasSubstr;
 
 #if ERRORTRACING
+#ifdef _WIN32
+#define EXPECT_ERROR_LINE(errmsg, eline) EXPECT_THAT(errmsg, AnyOf(HasSubstr(":0"), HasSubstr(std::to_string(eline))))
+#else
 #define EXPECT_ERROR_LINE(errmsg, eline) EXPECT_THAT(errmsg, HasSubstr(std::to_string(eline)))
+#endif
 #else
 #define EXPECT_ERROR_LINE(errmsg, eline) EXPECT_THAT(errmsg, HasSubstr(":0"));
 #endif

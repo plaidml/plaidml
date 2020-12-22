@@ -1190,14 +1190,26 @@ struct LocatedTensor {
   Tensor tensor;
   edsl_source_location loc;
 
-  template <typename T>
-  LocatedTensor(T tensor, std::enable_if_t<has_tensor<T>::value, edsl_source_location> loc = edsl_source_location::current())  // NOLINT
+  template <typename T, typename = std::enable_if_t<has_tensor<T>::value>>
+  LocatedTensor(T tensor, edsl_source_location loc = edsl_source_location::current())  // NOLINT
       : tensor(tensor), loc(loc) {}
 
   LocatedTensor(Tensor tensor, edsl_source_location loc = edsl_source_location::current())  // NOLINT
       : tensor(tensor), loc(loc) {}
 };
 
+#ifdef _WIN32
+#define PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(_op_, _fn_)                                                          \
+  inline Tensor operator _op_(Tensor lhs, Tensor rhs) { return intrinsic(lhs.loc, _fn_, lhs.tensor, rhs.tensor); } \
+  inline Tensor operator _op_(Tensor lhs, int rhs) { return intrinsic(lhs.loc, _fn_, lhs.tensor, rhs); }           \
+  inline Tensor operator _op_(Tensor lhs, int64_t rhs) { return intrinsic(lhs.loc, _fn_, lhs.tensor, rhs); }       \
+  inline Tensor operator _op_(Tensor lhs, uint64_t rhs) { return intrinsic(lhs.loc, _fn_, lhs.tensor, rhs); }      \
+  inline Tensor operator _op_(Tensor lhs, double rhs) { return intrinsic(lhs.loc, _fn_, lhs.tensor, rhs); }        \
+  inline Tensor operator _op_(int lhs, Tensor rhs) { return intrinsic(rhs.loc, _fn_, lhs, rhs.tensor); }           \
+  inline Tensor operator _op_(int64_t lhs, Tensor rhs) { return intrinsic(rhs.loc, _fn_, lhs, rhs.tensor); }       \
+  inline Tensor operator _op_(uint64_t lhs, Tensor rhs) { return intrinsic(rhs.loc, _fn_, lhs, rhs.tensor); }      \
+  inline Tensor operator _op_(double lhs, Tensor rhs) { return intrinsic(rhs.loc, _fn_, lhs, rhs.tensor); }
+#else
 #define PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(_op_, _fn_)                                                            \
   inline Tensor operator _op_(LocatedTensor lhs, LocatedTensor rhs) {                                                \
     return intrinsic(lhs.loc, _fn_, lhs.tensor, rhs.tensor);                                                         \
@@ -1210,6 +1222,7 @@ struct LocatedTensor {
   inline Tensor operator _op_(int64_t lhs, LocatedTensor rhs) { return intrinsic(rhs.loc, _fn_, lhs, rhs.tensor); }  \
   inline Tensor operator _op_(uint64_t lhs, LocatedTensor rhs) { return intrinsic(rhs.loc, _fn_, lhs, rhs.tensor); } \
   inline Tensor operator _op_(double lhs, LocatedTensor rhs) { return intrinsic(rhs.loc, _fn_, lhs, rhs.tensor); }
+#endif
 
 PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(+, "add");
 PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(-, "sub");
