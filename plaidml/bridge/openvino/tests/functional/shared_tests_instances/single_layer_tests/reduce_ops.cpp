@@ -54,8 +54,7 @@ const std::vector<ngraph::helpers::ReductionType> reductionTypes = {
     ngraph::helpers::ReductionType::L2,    //
 };
 
-// TODO: ReduceLogicalAnd and ReduceLogicalOr require Boolean datatype which seems not well supported.
-//  Should add test for Logical reduce Type later
+// ReduceLogicalAnd and ReduceLogicalOr require Boolean datatype which seems not well supported.
 const std::vector<ngraph::helpers::ReductionType> reductionLogicalTypes = {
     ngraph::helpers::ReductionType::LogicalOr,   //
     ngraph::helpers::ReductionType::LogicalAnd,  //
@@ -82,12 +81,12 @@ INSTANTIATE_TEST_CASE_P(ReduceMultiAxis, ReduceOpsLayerTest,
                         ReduceOpsLayerTest::getTestCaseName);
 
 INSTANTIATE_TEST_CASE_P(smoke, ReduceOpsLayerTest,
-                        ::testing::Combine(testing::Values(axes[0]),                          //
-                                           testing::Values(CommonTestUtils::OpType::VECTOR),  //
-                                           testing::Values(keepDims[1]),                      //
-                                           testing::ValuesIn(reductionTypes),                 //
-                                           testing::Values(netPrecisions[0]),                 //
-                                           testing::Values(std::vector<size_t>{1, 2, 4, 4}),  //
+                        ::testing::Combine(testing::Values(axes[0]),                           //
+                                           testing::Values(CommonTestUtils::OpType::VECTOR),   //
+                                           testing::Values(false),                             //
+                                           testing::ValuesIn(reductionTypes),                  //
+                                           testing::Values(InferenceEngine::Precision::FP32),  //
+                                           testing::Values(std::vector<size_t>{1, 2, 4, 4}),   //
                                            testing::Values(CommonTestUtils::DEVICE_PLAIDML)),
                         ReduceOpsLayerTest::getTestCaseName);
 }  // namespace
