@@ -27,12 +27,12 @@
 
 #include "pmlc/compiler/registry.h"
 #include "pmlc/conversion/comp_to_llvm/passes.h"
-#include "pmlc/conversion/gpu/lowering.h"
-#include "pmlc/conversion/gpu_to_comp/passes.h"
+#include "pmlc/conversion/gpu/passes.h"
 #include "pmlc/conversion/gpu_to_spirv/passes.h"
 #include "pmlc/conversion/pxa_to_affine/passes.h"
 #include "pmlc/conversion/stdx_to_llvm/passes.h"
 #include "pmlc/conversion/tile_to_pxa/passes.h"
+#include "pmlc/dialect/affinex/transforms/passes.h"
 #include "pmlc/dialect/comp/ir/types.h"
 #include "pmlc/dialect/comp/transforms/passes.h"
 #include "pmlc/dialect/layer/transforms/passes.h"
@@ -179,9 +179,19 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(createLowerPXAToAffinePass());
 
   // Unroll affine.for loops.
-  pm.addPass(createLoopUnrollPass(
-      /*unrollFactor=*/256,
-      /*unrollUpToFactor=*/true));
+  pm.addPass(pmlc::dialect::affinex::createAffinexLoopUnroll(
+      /*operationLimit =*/2048));
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+
+  // Block level MemRef dataflow optimization
+  // WARNING: Assumes no aliasing
+  // (try disabling this pass in case of correctness errors)
+  pm.addPass(pmlc::dialect::affinex::createAffinexMemRefDataFlowOpt());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+
+  pm.addPass(pmlc::dialect::affinex::createAffinexDeadMemRefElimination());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
@@ -208,15 +218,8 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(createCSEPass());
 
   // GPU transforms
-  pm.addPass(conversion::gpu::createGpuKernelOutliningPass());
-  pm.addPass(conversion::gpu::createGatherGpuLaunchFuncsPass());
-
-  // Convert GPU to comp.
-  pm.addPass(pmlc::conversion::gpu_to_comp::createConvertGpuToCompPass(
+  pm.addPass(conversion::gpu::createGpuKernelOutliningPass(
       comp::ExecEnvRuntime::Vulkan, /*memorySpace=*/0));
-  pm.addPass(comp::createMinimizeBufferTransfersPass());
-  pm.addPass(comp::createExecEnvCoalescingPass());
-  pm.addPass(comp::createMinimizeAllocationsPass());
 
   // GPU to SPIR-V.
   pm.addPass(createLegalizeStdOpsForSPIRVLoweringPass());
@@ -230,7 +233,8 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(spirv::createUpdateVersionCapabilityExtensionPass());
 
   // Comp to LLVM - Vulkan function calls.
-  pm.addPass(pmlc::conversion::comp_to_llvm::createConvertCompToVulkanPass());
+  pm.addPass(
+      pmlc::conversion::comp_to_llvm::createConvertCompToLLVMPass("vlk_"));
 
   // Convert Vulkan calls to LLVM code
   pm.addPass(createConvertStandardToLLVM());

@@ -11,93 +11,148 @@ namespace pmlc::rt::opencl {
 
 extern "C" {
 
-void *oclCreate(void *device) {
-  return new OpenCLInvocation(static_cast<OpenCLDevice *>(device));
+void *ocl_create_execenv(void *device) {
+  IVLOG(2, "ocl_create_execenv device=" << device);
+  void *result = new OpenCLInvocation(static_cast<OpenCLDevice *>(device));
+  IVLOG(2, "  ->" << result);
+  return result;
 }
 
-void oclDestroy(void *invocation) {
+void ocl_destroy_execenv(void *invocation) {
+  IVLOG(2, "ocl_destroy_execenv env=" << invocation);
   delete static_cast<OpenCLInvocation *>(invocation);
 }
 
-void *oclAlloc(void *invocation, size_t bytes) {
-  return static_cast<OpenCLInvocation *>(invocation)->allocateMemory(bytes);
+void *ocl_create_kernel(void *invocation, char *binary, uint64_t bytes,
+                        const char *name) {
+  IVLOG(2, "ocl_create_kernel env=" << invocation << ", size=" << bytes
+                                    << ", name=" << name);
+  void *result = static_cast<OpenCLInvocation *>(invocation)
+                     ->createKernelFromIL(binary, bytes, name);
+  IVLOG(2, "  ->" << result);
+  return result;
 }
 
-void oclDealloc(void *invocation, void *memory) {
+void ocl_destroy_kernel(void *invocation, void *kernel) {
+  IVLOG(2, "ocl_destroy_execenv env=" << invocation << ", kernel=" << kernel);
+  delete static_cast<OpenCLKernel *>(kernel);
+}
+
+void *ocl_schedule_compute(void *invocation, void *kernel,              //
+                           uint64_t gws0, uint64_t gws1, uint64_t gws2, //
+                           uint64_t lws0, uint64_t lws1, uint64_t lws2, //
+                           uint64_t bufferCount, uint64_t eventCount, ...) {
+  IVLOG(2, "ocl_schedule_compute env=" << invocation << ", kernel=" << kernel);
+  IVLOG(2, "  grid=(" << gws0 << ", " << gws1 << ", " << gws2 << ")");
+  IVLOG(2, "  block=(" << lws0 << ", " << lws1 << ", " << lws2 << ")");
+  va_list args;
+  va_start(args, eventCount);
+  auto oclKernel = static_cast<OpenCLKernel *>(kernel);
+  for (size_t i = 0; i < bufferCount; i++) {
+    OpenCLMemory *mem = va_arg(args, OpenCLMemory *);
+    IVLOG(2, "  arg[" << i << "]=" << mem);
+    oclKernel->setArg(i, mem);
+  }
+  for (size_t i = 0; i < eventCount; i++) {
+    OpenCLEvent *evt = va_arg(args, OpenCLEvent *);
+    IVLOG(2, "  event=" << evt);
+    oclKernel->addDependency(evt);
+  }
+  va_end(args);
+  cl::NDRange gws(gws0 * lws0, gws1 * lws1, gws2 * lws2);
+  cl::NDRange lws(lws0, lws1, lws2);
+  void *result = static_cast<OpenCLInvocation *>(invocation)
+                     ->enqueueKernel(oclKernel, gws, lws);
+  IVLOG(2, "  ->" << result);
+  return result;
+}
+
+void ocl_submit(void *invocation) {
+  IVLOG(2, "ocl_submit env=" << invocation);
+  static_cast<OpenCLInvocation *>(invocation)->flush();
+}
+
+void *ocl_alloc(void *invocation, size_t bytes) {
+  IVLOG(2, "ocl_alloc env=" << invocation << ", size=" << bytes);
+  void *result =
+      static_cast<OpenCLInvocation *>(invocation)->allocateMemory(bytes);
+  IVLOG(2, "  ->" << result);
+  return result;
+}
+
+void ocl_dealloc(void *invocation, void *memory) {
+  IVLOG(2, "ocl_dealloc env=" << invocation << ", buffer=" << memory);
   static_cast<OpenCLInvocation *>(invocation)
       ->deallocateMemory(static_cast<OpenCLMemory *>(memory));
 }
 
-void *oclRead(void *dst, void *src, void *invocation, uint32_t count, ...) {
+void *ocl_schedule_read(void *host, void *dev, void *invocation, uint64_t count,
+                        ...) {
+  IVLOG(2, "ocl_schedule_read env=" << invocation << ", host=" << host
+                                    << ", dev=" << dev);
   std::vector<OpenCLEvent *> dependencies;
   va_list args;
   va_start(args, count);
-  for (unsigned i = 0; i < count; ++i)
-    dependencies.push_back(va_arg(args, OpenCLEvent *));
+  for (unsigned i = 0; i < count; ++i) {
+    OpenCLEvent *evt = va_arg(args, OpenCLEvent *);
+    IVLOG(2, "  event=" << evt);
+    dependencies.push_back(evt);
+  }
   va_end(args);
-  return static_cast<OpenCLInvocation *>(invocation)
-      ->enqueueRead(static_cast<OpenCLMemory *>(src), dst, dependencies);
+  void *result =
+      static_cast<OpenCLInvocation *>(invocation)
+          ->enqueueRead(static_cast<OpenCLMemory *>(dev), host, dependencies);
+  IVLOG(2, "  ->" << result);
+  return result;
 }
 
-void *oclWrite(void *src, void *dst, void *invocation, uint32_t count, ...) {
+void *ocl_schedule_write(void *host, void *dev, void *invocation,
+                         uint64_t count, ...) {
+  IVLOG(2, "ocl_schedule_write env=" << invocation << ", host=" << host
+                                     << ", dev=" << dev);
   std::vector<OpenCLEvent *> dependencies;
   va_list args;
   va_start(args, count);
-  for (unsigned i = 0; i < count; ++i)
-    dependencies.push_back(va_arg(args, OpenCLEvent *));
+  for (unsigned i = 0; i < count; ++i) {
+    OpenCLEvent *evt = va_arg(args, OpenCLEvent *);
+    IVLOG(2, "  event=" << evt);
+    dependencies.push_back(evt);
+  }
   va_end(args);
-  return static_cast<OpenCLInvocation *>(invocation)
-      ->enqueueWrite(static_cast<OpenCLMemory *>(dst), src, dependencies);
+  void *result =
+      static_cast<OpenCLInvocation *>(invocation)
+          ->enqueueWrite(static_cast<OpenCLMemory *>(dev), host, dependencies);
+  IVLOG(2, "  ->" << result);
+  return result;
 }
 
-void *oclCreateKernel(void *invocation, char *binary, uint32_t bytes,
-                      const char *name) {
-  return static_cast<OpenCLInvocation *>(invocation)
-      ->createKernelFromIL(binary, bytes, name);
-}
-
-void oclAddKernelDep(void *kernel, void *event) {
-  static_cast<OpenCLKernel *>(kernel)->addDependency(
-      static_cast<OpenCLEvent *>(event));
-}
-
-void oclSetKernelArg(void *kernel, uint32_t idx, void *memory) {
-  static_cast<OpenCLKernel *>(kernel)->setArg(
-      idx, static_cast<OpenCLMemory *>(memory));
-}
-
-void *oclScheduleFunc(void *invocation, void *kernel, uint64_t gws0,
-                      uint64_t gws1, uint64_t gws2, uint64_t lws0,
-                      uint64_t lws1, uint64_t lws2) {
-  cl::NDRange gws(gws0, gws1, gws2);
-  cl::NDRange lws(lws0, lws1, lws2);
-  return static_cast<OpenCLInvocation *>(invocation)
-      ->enqueueKernel(static_cast<OpenCLKernel *>(kernel), gws, lws);
-}
-
-void *oclBarrier(void *invocation, uint32_t count, ...) {
-  std::vector<OpenCLEvent *> dependencies;
-  va_list args;
-  va_start(args, count);
-  for (unsigned i = 0; i < count; ++i)
-    dependencies.push_back(va_arg(args, OpenCLEvent *));
-  va_end(args);
-  return static_cast<OpenCLInvocation *>(invocation)
-      ->enqueueBarrier(dependencies);
-}
-
-void oclSubmit(void *invocation) {
-  static_cast<OpenCLInvocation *>(invocation)->flush();
-}
-
-void oclWait(uint32_t count, ...) {
+void ocl_wait(uint64_t count, ...) {
+  IVLOG(2, "ocl_wait");
   std::vector<OpenCLEvent *> events;
   va_list args;
   va_start(args, count);
-  for (unsigned i = 0; i < count; ++i)
-    events.push_back(va_arg(args, OpenCLEvent *));
+  for (unsigned i = 0; i < count; ++i) {
+    OpenCLEvent *evt = va_arg(args, OpenCLEvent *);
+    IVLOG(2, "  event=" << evt);
+    events.push_back(evt);
+  }
   va_end(args);
   OpenCLEvent::wait(events);
+}
+
+void *ocl_schedule_barrier(void *invocation, uint64_t count, ...) {
+  IVLOG(2, "ocl_schedule_barrier env=" << invocation);
+  std::vector<OpenCLEvent *> dependencies;
+  va_list args;
+  va_start(args, count);
+  for (unsigned i = 0; i < count; ++i) {
+    OpenCLEvent *evt = va_arg(args, OpenCLEvent *);
+    IVLOG(2, "  event=" << evt);
+    dependencies.push_back(evt);
+  }
+  va_end(args);
+  return static_cast<OpenCLInvocation *>(invocation)
+      ->enqueueBarrier(dependencies);
 }
 
 } // extern "C"
@@ -106,20 +161,20 @@ void registerSymbols() {
   using pmlc::rt::registerSymbol;
 
   // OpenCL Runtime functions
-  registerSymbol("oclCreate", reinterpret_cast<void *>(oclCreate));
-  registerSymbol("oclDestroy", reinterpret_cast<void *>(oclDestroy));
-  registerSymbol("oclAlloc", reinterpret_cast<void *>(oclAlloc));
-  registerSymbol("oclDealloc", reinterpret_cast<void *>(oclDealloc));
-  registerSymbol("oclRead", reinterpret_cast<void *>(oclRead));
-  registerSymbol("oclWrite", reinterpret_cast<void *>(oclWrite));
-  registerSymbol("oclCreateKernel", reinterpret_cast<void *>(oclCreateKernel));
-  registerSymbol("oclSetKernelArg", reinterpret_cast<void *>(oclSetKernelArg));
-  registerSymbol("oclAddKernelDep", reinterpret_cast<void *>(oclAddKernelDep));
-  registerSymbol("_mlir_ciface_oclScheduleFunc",
-                 reinterpret_cast<void *>(oclScheduleFunc));
-  registerSymbol("oclBarrier", reinterpret_cast<void *>(oclBarrier));
-  registerSymbol("oclSubmit", reinterpret_cast<void *>(oclSubmit));
-  registerSymbol("oclWait", reinterpret_cast<void *>(oclWait));
+#define REG(x) registerSymbol(#x, reinterpret_cast<void *>(x));
+  REG(ocl_create_execenv)
+  REG(ocl_destroy_execenv)
+  REG(ocl_create_kernel)
+  REG(ocl_destroy_kernel)
+  REG(ocl_schedule_compute)
+  REG(ocl_submit)
+  REG(ocl_alloc)
+  REG(ocl_dealloc)
+  REG(ocl_schedule_write)
+  REG(ocl_schedule_read)
+  REG(ocl_wait)
+  REG(ocl_schedule_barrier)
+#undef REG
 }
 
 } // namespace pmlc::rt::opencl

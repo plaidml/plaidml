@@ -4,14 +4,19 @@
 
 #include <memory>
 
+#include "pmlc/dialect/comp/ir/dialect.h"
+
 namespace mlir {
 class Pass;
 } // namespace mlir
 
 namespace pmlc::conversion::gpu {
 
-// Set spv.target_env and spv.entry_point_abi
+// Find all GPU loops + convert to kernels
 std::unique_ptr<mlir::Pass> createGpuKernelOutliningPass();
+std::unique_ptr<mlir::Pass>
+createGpuKernelOutliningPass(pmlc::dialect::comp::ExecEnvRuntime runtime,
+                             unsigned memorySpace);
 
 // Gather gpu.launch_func Ops separated by std.alloc
 std::unique_ptr<mlir::Pass> createGatherGpuLaunchFuncsPass();

@@ -1,18 +1,15 @@
 pml_cc_library(
-  NAME gpu_to_comp
+  NAME transforms
   HDRS
+    pass_detail.h
     passes.h
   SRCS
-    gpu_to_comp.cc
+    dead_memref_elimination.cc
+    loop_unroll.cc
+    memref_dataflow_opt.cc
   DEPS
     ::passes-gen
-    pmlc::dialect::comp::ir
-    pmlc::util
-    MLIRGPU
-    MLIRIR
-    MLIRPass
-    MLIRTransforms
-    MLIRSupport
+  PUBLIC
 )
 
 pml_tblgen_library(

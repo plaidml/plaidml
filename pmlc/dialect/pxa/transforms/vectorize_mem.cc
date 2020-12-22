@@ -95,20 +95,20 @@ struct VectorizeMemImpl {
 
   // Apply checks for vector ops, qualify those for vectorization
   template <typename T>
-  void checkMemOp(T memOp) {
+  LogicalResult checkMemOp(T memOp) {
     auto defOp = memOp.getMemRef().getDefiningOp();
     // Check if vector_load reads from global memory. Currently it is not
     // allowed to use block ops on in-kernel memory
     if (defOp && std::find(globalAllocList.begin(), globalAllocList.end(),
                            defOp) == globalAllocList.end()) {
-      return;
+      return failure();
     }
     IVLOG(3, "Mem Op: " << debugString(*memOp));
 
     // Get strides
     auto maybeSI = computeStrideInfo(memOp);
     if (!maybeSI) {
-      return;
+      return failure();
     }
     IVLOG(3, "StrideInfo: " << debugString(*maybeSI));
 
@@ -122,13 +122,13 @@ struct VectorizeMemImpl {
     // Check if block number is not empty,
     // In case it is bigger than one we will handle this upon tiling
     if (orgBlockArgs.empty()) {
-      return;
+      return failure();
     }
 
     // Get the size of the considered dimension
     auto ranges = loopOp.getConstantRanges();
     if (!ranges) {
-      return;
+      return failure();
     }
 
     auto argNum = orgBlockArgs[orgBlockArgs.size() - 1].getArgNumber();
@@ -148,14 +148,14 @@ struct VectorizeMemImpl {
       }
     }
     if (!tileSize)
-      return;
+      return failure();
 
     // Get the current vector size for vector_load op, this is modelled
     // as subgroup size. With this pass it will be expanded to
     // mem op vector size x subgroup size.
     auto vecShape = memOp.getVectorType().getShape();
     if (vecShape.size() != 1)
-      return;
+      return failure();
     auto subgroupSize = vecShape[0];
 
     // Check if data allows for the vectorized block read. Right now it is
@@ -163,11 +163,11 @@ struct VectorizeMemImpl {
     // layout pass. Thie minimum number of dimensions is 2.
     auto memrefTypeShape = memOp.getMemRefType().getShape();
     if (memrefTypeShape.size() < 2)
-      return;
+      return failure();
 
     // Verify if our loop size matches the dimension size.
     if (memrefTypeShape[memrefTypeShape.size() - 2] != loopVectorSize)
-      return;
+      return failure();
 
     // Last checks for vectorReduceOp
     auto vectorReduceOp =
@@ -179,7 +179,7 @@ struct VectorizeMemImpl {
           loopOp.getParentOfType<AffineParallelOp>() &&
           loopOp.getParentOfType<AffineParallelOp>().getResult(0).getType() !=
               loopOp.getResult(0).getType()))) {
-      return;
+      return failure();
     }
 
     // Make sure we consider only ops with the same parameters.
@@ -196,7 +196,10 @@ struct VectorizeMemImpl {
       memOpsPlan.loopVectorSize = loopVectorSize;
       memOpsPlan.subgroupSize = subgroupSize;
       memOpsPlan.tileSize = tileSize;
+    } else {
+      return failure();
     }
+    return success();
   }
 
   LogicalResult getWritesAndReads() {
@@ -204,11 +207,13 @@ struct VectorizeMemImpl {
     // reads optimization that are more costly than writes
     for (auto vectorLoadOp :
          llvm::make_early_inc_range(loopOp.getOps<PxaVectorLoadOp>())) {
-      checkMemOp<PxaVectorLoadOp>(vectorLoadOp);
+      if (failed(checkMemOp<PxaVectorLoadOp>(vectorLoadOp)))
+        return failure();
     }
     for (auto vectorReduceOp :
          llvm::make_early_inc_range(loopOp.getOps<PxaVectorReduceOp>())) {
-      checkMemOp<PxaVectorReduceOp>(vectorReduceOp);
+      if (failed(checkMemOp<PxaVectorReduceOp>(vectorReduceOp)))
+        return failure();
     }
     if (!memOpsPlan.memOps.size())
       return failure();
@@ -295,9 +300,9 @@ struct VectorizeMemImpl {
         VectorType::get({memOpsPlan.subgroupSize * tileSize},
                         vectorReduce.getVectorType().getElementType());
 
-    auto nemMemrefType =
+    auto newMemrefType =
         MemRefType::get(vectorType.getShape(), vectorType.getElementType());
-    auto newAllocOp = builder.create<AllocOp>(loopOp.getLoc(), nemMemrefType);
+    auto newAllocOp = builder.create<AllocOp>(loopOp.getLoc(), newMemrefType);
     auto const0 = builder.create<ConstantIndexOp>(loopOp.getLoc(), 0);
 
     llvm::SmallVector<AffineExpr, 1> expr;
@@ -319,7 +324,12 @@ struct VectorizeMemImpl {
 
     auto results = loopOp.results();
     for (auto res : results) {
-      res.setType(nemMemrefType);
+      res.setType(newMemrefType);
+      // Update also AffineYieldOp if type does not match
+      for (auto yieldOp : loopOp.getOps<AffineYieldOp>()) {
+        if (yieldOp.getOperand(0).getType() != newMemrefType)
+          yieldOp.getOperand(0).setType(newMemrefType);
+      }
     }
     auto newReduceOp = builder.create<PxaVectorReduceOp>(
         vectorReduce.getLoc(), AtomicRMWKind::assign,

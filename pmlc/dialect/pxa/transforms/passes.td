@@ -163,6 +163,11 @@ def Vectorize : FunctionPass<"pxa-vectorize"> {
   ];
 }
 
+def SimplifyArithmetic : FunctionPass<"pxa-simplify-arithmetic"> {
+  let summary = "Simplifies arithmetic";
+  let constructor = "pmlc::dialect::pxa::createSimplifyArithmeticPass()";
+}
+
 def SimplifyWithConstraints : FunctionPass<"pxa-simplify-with-constraints"> {
   let summary = "Simplfies affine maps using constraints on input dimensions";
   let constructor = "pmlc::dialect::pxa::createSimplifyWithConstraintsPass()";

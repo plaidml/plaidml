@@ -1665,8 +1665,7 @@ TEST_F(CppEdsl, Scatter1D) {
   auto O = scatter(D, I, U);
   auto program = makeProgram("scatter", {D, I, U}, {O});
 
-  // Don't bother initializing 'data' in default mode. Only shape of the data is needed.
-  std::vector<float> data;
+  std::vector<float> data = {0, 0, 0, 0, 0, 0, 0, 0};
   std::vector<int32_t> indices = {4, 3, 1, 7};
   std::vector<float> updates = {9, 10, 11, 12};
   std::vector<float> expected = {0, 11, 0, 10, 9, 0, 0, 12};
@@ -1680,8 +1679,12 @@ TEST_F(CppEdsl, Scatter3D) {
   auto O = scatter(D, I, U);
   auto program = makeProgram("scatter", {D, I, U}, {O});
 
-  // Don't bother initializing 'data' in default mode. Only shape of the data is needed.
-  std::vector<float> data;
+  std::vector<float> data = {
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  //
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  //
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  //
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0   //
+  };
   std::vector<int32_t> indices = {0, 2};
   std::vector<float> updates = {
       5, 5, 5, 5, 6, 6, 6, 6,  //
@@ -1705,8 +1708,7 @@ TEST_F(CppEdsl, ScatterDup1D) {
   auto O = scatter(D, I, U);
   auto program = makeProgram("scatter", {D, I, U}, {O});
 
-  // Don't bother initializing 'data' in default mode. Only shape of the data is needed.
-  std::vector<float> data;
+  std::vector<float> data = {0, 0, 0, 0, 0, 0, 0, 0};
   // Duplicate indices.
   std::vector<int32_t> indices = {4, 3, 3, 7};
   std::vector<float> updates = {9, 10, 11, 12};
@@ -1721,8 +1723,12 @@ TEST_F(CppEdsl, ScatterDup3D) {
   auto O = scatter(D, I, U);
   auto program = makeProgram("scatter", {D, I, U}, {O});
 
-  // Don't bother initializing 'data' in default mode. Only shape of the data is needed.
-  std::vector<float> data;
+  std::vector<float> data = {
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  //
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  //
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  //
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0   //
+  };
   // Duplicate indices.
   std::vector<int32_t> indices = {2, 2};
   std::vector<float> updates = {
@@ -1886,7 +1892,7 @@ TEST_F(CppEdsl, ScatterElt) {
       1, 1, 1, 1,  //
   };
   checkExact(program, {data, indices, updates}, {expected});
-};
+}
 
 TEST_F(CppEdsl, Trace) {
   auto I = Placeholder(DType::FLOAT32, {3, 3});
@@ -2018,6 +2024,75 @@ TEST_F(CppEdsl, LayerUnusedOperand) {
   // CHECK: func @main(%[[ARG0:.*]]: tensor<10x20xf32>, %[[ARG1:.*]]: tensor<10x20xf32> {tile.const = 0 : index}, %[[ARG2:.*]]: tensor<10x20xf32> {tile.const = 1 : index}) -> tensor<10x20xf32>
   // CHECK:   %[[X0:.*]] = layer.box "sum" (%[[ARG3:.*]], %[[ARG4:.*]], %[[ARG5:.*]]) = (%[[ARG0]], %[[ARG1]], %[[ARG2]]) : (tensor<10x20xf32>, tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
   // CHECK:     %[[X1:.*]] = tile.add %[[ARG3]], %[[ARG5]] : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
+  // CHECK:     layer.return %[[X1]] : tensor<10x20xf32>
+  // CHECK:   return %[[X0]] : tensor<10x20xf32>
+  // clang-format on
+  runProgram(program);
+}
+
+TEST_F(CppEdsl, BadDataType) {
+  EXPECT_ANY_THROW({ auto A = Placeholder(DType::INVALID, {10, 20}); });
+}
+
+TEST_F(CppEdsl, IndexOp) {
+  EXPECT_ANY_THROW({ index({}, 0); });  // Must specify at least one dimension
+
+  TensorDim X0, X1;
+  EXPECT_ANY_THROW({ index({X0}, 0); });  // Must bind X0 to some Tensor
+
+  auto I = Placeholder(DType::FLOAT32, {10, 3});
+  I.bind_dims(X0, X1);
+  Tensor O = index({X0}, 1);
+  auto program = makeProgram("IndexOp", {}, {O});
+}
+
+TEST_F(CppEdsl, LayerMulti) {
+  auto A = Placeholder(DType::FLOAT32, {10, 20});
+  std::vector<int> data = {1, 2, 3, 4};
+  Tensor B = layer("sum", {A}, [&]() {
+    auto C = Constant(makeBuffer(DType::FLOAT32, {10, 20}, data), "C");
+    return A + C;
+  });
+  Tensor O = layer("sum", {B}, [&]() {
+    auto C = Constant(makeBuffer(DType::FLOAT32, {10, 20}, data), "C");
+    return B + C;
+  });
+  auto program = makeProgram("LayerMulti", {A}, {O});
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.LayerMulti
+  // CHECK: module @LayerMulti
+  // CHECK: func @main(%[[ARG0:.*]]: tensor<10x20xf32>, %[[ARG1:.*]]: tensor<10x20xf32> {tile.const = 0 : index}, %[[ARG2:.*]]: tensor<10x20xf32> {tile.const = 1 : index}) -> tensor<10x20xf32> {
+  // CHECK:   %[[X0:.*]] = layer.box "sum" (%[[ARG3:.*]], %[[ARG4:.*]]) = (%[[ARG0]], %[[ARG1]]) : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32> {
+  // CHECK:     %[[X2:.*]] = tile.add %[[ARG3]], %[[ARG4]] : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
+  // CHECK:     layer.return %[[X2]] : tensor<10x20xf32>
+  // CHECK:   %[[X1:.*]] = layer.box "sum" (%[[ARG3:.*]], %[[ARG4:.*]]) = (%[[X0]], %[[ARG2]]) : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32> {
+  // CHECK:     %[[X2:.*]] = tile.add %[[ARG3]], %[[ARG4]] : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
+  // CHECK:     layer.return %[[X2]] : tensor<10x20xf32>
+  // CHECK:   return %[[X1]] : tensor<10x20xf32>
+  // clang-format on
+  runProgram(program);
+}
+
+TEST_F(CppEdsl, LayerException) {
+  auto A = Placeholder(DType::FLOAT32, {10, 20});
+  std::vector<int> data = {1, 2, 3, 4};
+  EXPECT_ANY_THROW({
+    layer("sum", {A}, [&]() -> Tensor {
+      auto C = Constant(makeBuffer(DType::FLOAT32, {10, 20}, data), "C");
+      throw std::runtime_error("exception");
+    });
+  });
+  Tensor O = layer("sum", {A}, [&]() {
+    auto C = Constant(makeBuffer(DType::FLOAT32, {10, 20}, data), "C");
+    return A + C;
+  });
+  auto program = makeProgram("LayerException", {A}, {O});
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.LayerException
+  // CHECK: module @LayerException
+  // CHECK: func @main(%[[ARG0:.*]]: tensor<10x20xf32>, %[[ARG1:.*]]: tensor<10x20xf32> {tile.const = 0 : index}) -> tensor<10x20xf32>
+  // CHECK:   %[[X0:.*]] = layer.box "sum" (%[[ARG2:.*]], %[[ARG3:.*]]) = (%[[ARG0]], %[[ARG1]]) : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
+  // CHECK:     %[[X1:.*]] = tile.add %[[ARG2]], %[[ARG3]] : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
   // CHECK:     layer.return %[[X1]] : tensor<10x20xf32>
   // CHECK:   return %[[X0]] : tensor<10x20xf32>
   // clang-format on

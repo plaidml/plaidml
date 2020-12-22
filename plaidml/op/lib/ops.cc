@@ -1482,11 +1482,12 @@ Value cumprod(const Value& value) {
 Value cumsum(const Value& value) {
   IVLOG(1, "cumsum");
   auto args = value.as_tuple();
-  if (args.size() != 2) {
+  if (args.size() != 3) {
     throw std::runtime_error("cumsum expects 2 arguments");
   }
   auto I = args[0].as_tensor();
   auto raw_axis = args[1].as_int();
+  auto is_exclusive = args[2].as_bool();
 
   auto ndims = I.rank();
   auto axis = normalize_axis(raw_axis, ndims, "cumsum");
@@ -1495,7 +1496,7 @@ Value cumsum(const Value& value) {
   std::vector<TensorIndex> I_idxs(ndims);
   std::vector<TensorIndex> O_idxs(I_idxs);
   TensorIndex cumulator_idx;
-  I_idxs[axis] = I_idxs[axis] - cumulator_idx;
+  I_idxs[axis] = is_exclusive ? I_idxs[axis] - cumulator_idx - 1 : I_idxs[axis] - cumulator_idx;
   Tensor O = Contraction(dims, O_idxs).sum(I(I_idxs)).add_constraint(cumulator_idx < dims[axis]);
   return Value{O};
 }

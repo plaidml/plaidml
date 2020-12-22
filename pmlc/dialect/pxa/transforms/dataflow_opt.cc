@@ -5,6 +5,7 @@
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Support/DebugStringHelper.h"
 
+#include "pmlc/dialect/pxa/analysis/memref_access.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/dialect/pxa/transforms/pass_detail.h"
 #include "pmlc/util/logging.h"
@@ -14,35 +15,6 @@ using namespace mlir; // NOLINT[build/namespaces]
 namespace pmlc::dialect::pxa {
 
 namespace {
-
-struct MemRefAccess {
-  AffineValueMap accessMap;
-
-  explicit MemRefAccess(PxaReadOpInterface op) {
-    getAccessMap(op.getAffineMap(), op.getMapOperands(), &accessMap);
-  }
-
-  explicit MemRefAccess(PxaReduceOpInterface op) {
-    getAccessMap(op.getAffineMap(), op.getMapOperands(), &accessMap);
-  }
-
-  static void getAccessMap(AffineMap map, SmallVector<Value, 8> operands,
-                           AffineValueMap *accessMap) {
-    fullyComposeAffineMapAndOperands(&map, &operands);
-    map = simplifyAffineMap(map);
-    canonicalizeMapAndOperands(&map, &operands);
-    accessMap->reset(map, operands);
-  }
-
-  bool operator==(const MemRefAccess &rhs) const {
-    AffineValueMap diff, lhsMap, rhsMap;
-    AffineValueMap::difference(accessMap, rhs.accessMap, &diff);
-    return llvm::all_of(diff.getAffineMap().getResults(),
-                        [](AffineExpr expr) { return expr == 0; });
-  }
-
-  bool operator!=(const MemRefAccess &rhs) const { return !(*this == rhs); }
-};
 
 struct MemRefDataFlowOptPass
     : public MemRefDataFlowOptBase<MemRefDataFlowOptPass> {

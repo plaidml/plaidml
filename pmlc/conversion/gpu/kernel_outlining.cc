@@ -13,20 +13,28 @@
 #include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Dialect/GPU/Passes.h"
 #include "mlir/Dialect/GPU/Utils.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
-#include "mlir/IR/BlockAndValueMapping.h"
-#include "mlir/IR/Builders.h"
-#include "mlir/IR/SymbolTable.h"
-#include "mlir/Transforms/RegionUtils.h"
-
 #include "mlir/Dialect/SPIRV/SPIRVAttributes.h"
 #include "mlir/Dialect/SPIRV/SPIRVOps.h"
 #include "mlir/Dialect/SPIRV/Serialization.h"
 #include "mlir/Dialect/SPIRV/TargetAndABI.h"
-
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/IR/BlockAndValueMapping.h"
+#include "mlir/IR/Builders.h"
+#include "mlir/IR/SymbolTable.h"
+#include "mlir/Support/DebugStringHelper.h"
+#include "mlir/Transforms/RegionUtils.h"
 #include "pmlc/conversion/gpu/pass_detail.h"
+#include "pmlc/dialect/comp/ir/dialect.h"
+#include "pmlc/util/logging.h"
+#include "pmlc/util/memuse.h"
 #include "pmlc/util/tags.h"
+#include "llvm/ADT/MapVector.h"
+
+namespace pmlc::conversion::gpu {
+
 using namespace mlir; // NOLINT[build/namespaces]
+namespace gpu = mlir::gpu;
+namespace comp = pmlc::dialect::comp;
 
 template <typename OpTy>
 static void createForAllDimensions(OpBuilder &builder, Location loc,
@@ -62,6 +70,7 @@ static void injectGpuIndexOperations(Location loc, Region &launchFuncOpBody,
 // Outline the `gpu.launch` operation body into a kernel function. Replace
 // `gpu.terminator` operations by `gpu.return` in the generated function.
 static gpu::GPUFuncOp outlineKernelFuncImpl(gpu::LaunchOp launchOp,
+                                            unsigned memorySpace,
                                             StringRef kernelFnName,
                                             llvm::SetVector<Value> &operands) {
   Location loc = launchOp.getLoc();
@@ -78,7 +87,11 @@ static gpu::GPUFuncOp outlineKernelFuncImpl(gpu::LaunchOp launchOp,
   SmallVector<Type, 4> kernelOperandTypes;
   kernelOperandTypes.reserve(operands.size());
   for (Value operand : operands) {
-    kernelOperandTypes.push_back(operand.getType());
+    Type type = operand.getType();
+    if (auto memRefType = type.dyn_cast<MemRefType>()) {
+      type = MemRefType::Builder(memRefType).setMemorySpace(memorySpace);
+    }
+    kernelOperandTypes.push_back(type);
   }
   FunctionType type =
       FunctionType::get(kernelOperandTypes, {}, launchOp.getContext());
@@ -120,25 +133,150 @@ static gpu::GPUFuncOp outlineKernelFuncImpl(gpu::LaunchOp launchOp,
   return outlinedFunc;
 }
 
-// Replace `gpu.launch` operations with an `gpu.launch_func` operation launching
-// `kernelFunc`. The kernel func contains the body of the `gpu.launch` with
-// constant region arguments inlined.
-static void convertToLaunchFuncOp(gpu::LaunchOp launchOp,
-                                  gpu::GPUFuncOp kernelFunc,
-                                  ValueRange operands) {
-  OpBuilder builder(launchOp);
-  auto launchFuncOp = builder.create<gpu::LaunchFuncOp>(
-      launchOp.getLoc(), kernelFunc, launchOp.getGridSizeOperandValues(),
-      launchOp.getBlockSizeOperandValues(), operands);
+// A class holding state during gpu->comp + outlining of a single function
+class OutlineToComp {
+public:
+  // Begin rewrite of the funciton op for comp support, initalize state
+  OutlineToComp(FuncOp func, comp::ExecEnvRuntime runtime, unsigned memorySpace)
+      : func(func), memorySpace(memorySpace) {
+    // Precompute the various types
+    execEnvType = comp::ExecEnvType::get(func.getContext(), runtime, /*tag=*/0,
+                                         {memorySpace});
+    eventType = execEnvType.getEventType();
 
-  if (pmlc::hasTags(launchOp))
-    pmlc::copyTags(launchFuncOp, launchOp);
+    // Make a builder pointer to the begining of the function
+    OpBuilder builder(func.getBody());
 
-  launchOp.erase();
-}
+    // Add in comp device parameter to function
+    auto oldFuncTy = func.getType();
+    auto deviceTy = builder.getType<comp::DeviceType>();
+    SmallVector<Type, 4> inputs{deviceTy};
+    inputs.insert(inputs.end(), oldFuncTy.getInputs().begin(),
+                  oldFuncTy.getInputs().end());
+    auto newFuncTy = builder.getFunctionType(inputs, oldFuncTy.getResults());
+    func.front().insertArgument(0u, deviceTy);
+    func.setType(newFuncTy);
 
-namespace pmlc::conversion::gpu {
-namespace gpu = mlir::gpu;
+    // Insert CreateExecEnv
+    auto device = func.getArgument(0);
+    execEnv =
+        builder.create<comp::CreateExecEnv>(func.getLoc(), execEnvType, device);
+  }
+
+  void convertLaunch(gpu::LaunchOp launchOp, gpu::GPUFuncOp kernelFunc,
+                     ValueRange operands) {
+    assert(operands.size() == kernelFunc.getNumArguments());
+
+    // Compute how arguments are used (RO/WO/RW)
+    SmallVector<util::MemUse, 4> useTypes;
+    for (size_t i = 0; i < operands.size(); i++) {
+      useTypes.push_back(util::getMemoryUses(kernelFunc.getArgument(i)));
+    }
+
+    // Make a builder before the op we are replacing
+    OpBuilder builder(launchOp);
+    auto loc = launchOp.getLoc();
+
+    // Convert operands to GPU memory, allocating as needed
+    SmallVector<Value, 4> kernelArgs;
+    SmallVector<Value, 4> memoryArgs;
+    DenseMap<Value, util::MemUse> memoryUse;
+    for (size_t i = 0; i < operands.size(); i++) {
+      Value operand = operands[i];
+      if (auto memrefTy = operand.getType().dyn_cast<MemRefType>()) {
+        if (!gpuMemRefs.count(operand)) {
+          MemRefType newType =
+              MemRefType::Builder(memrefTy).setMemorySpace(memorySpace);
+          Value out = builder.create<comp::Alloc>(loc, newType, execEnv);
+          gpuMemRefs[operand] = out;
+        }
+        Value gpuMem = gpuMemRefs[operand];
+        kernelArgs.push_back(gpuMem);
+        memoryArgs.push_back(operand);
+        memoryUse[operand] = useTypes[i];
+      } else {
+        kernelArgs.push_back(operand);
+      }
+    }
+
+    // Do host -> GPU transfers
+    SmallVector<Value, 4> events;
+    for (auto mem : memoryArgs) {
+      if (doesRead(memoryUse[mem])) {
+        events.push_back(builder.create<comp::ScheduleWrite>(
+            loc, eventType, mem, gpuMemRefs[mem], execEnv, ValueRange()));
+      }
+    }
+
+    // Create the kernel
+    auto kernelModule = kernelFunc.getParentOfType<gpu::GPUModuleOp>();
+    auto kernelSymbol = builder.getSymbolRefAttr(
+        kernelModule.getName(),
+        {builder.getSymbolRefAttr(kernelFunc.getName())});
+    auto kernel = builder.create<comp::CreateKernel>(
+        loc, builder.getType<comp::KernelType>(), execEnv, kernelSymbol);
+    kernelsToDestroy.push_back(kernel);
+
+    // Call the kernel
+    auto gridValues = launchOp.getGridSizeOperandValues();
+    auto blockSizeValues = launchOp.getBlockSizeOperandValues();
+    auto callKernel =
+        builder
+            .create<comp::ScheduleCompute>(
+                loc, eventType, execEnv, kernel,                         //
+                gridValues.x, gridValues.y, gridValues.z,                //
+                blockSizeValues.x, blockSizeValues.y, blockSizeValues.z, //
+                kernelArgs, events)
+            .getResult();
+
+    // Update memory state post kernel
+    events.clear();
+    for (auto mem : memoryArgs) {
+      if (doesWrite(memoryUse[mem])) {
+        // Make copy back to host
+        events.push_back(builder.create<comp::ScheduleRead>(
+            loc, eventType, mem, gpuMemRefs[mem], execEnv,
+            ValueRange(callKernel)));
+      }
+    }
+    if (events.size()) {
+      // Wait until all data is copied back
+      builder.create<comp::Wait>(loc, events);
+    }
+    launchOp.erase();
+  }
+
+  void finalize() {
+    // Make a builder at the end of the function entry block
+    auto builder = OpBuilder::atBlockTerminator(&func.back());
+    Location loc = func.getLoc();
+    // Destroy all the kernels
+    for (auto kernel : kernelsToDestroy) {
+      builder.create<comp::DestroyKernel>(loc, execEnv, kernel);
+    }
+    // Insert DestroyExecEnv
+    builder.create<comp::DestroyExecEnv>(loc, execEnv);
+  }
+
+private:
+  // The host side function being rewritten into comp
+  FuncOp func;
+  // THe memory space for GPU buffers
+  unsigned memorySpace;
+  // The type of the execution environement
+  comp::ExecEnvType execEnvType;
+  // The type of events
+  comp::EventType eventType;
+  // The comp execution environment
+  Value execEnv;
+  // A map from device memory reference to their GPU eqivilant.  Using
+  // MapVector to make ordering of deletions deterministic
+  llvm::MapVector<Value, Value> gpuMemRefs;
+  // A list of all the kernels to be destoryed.  Not a 'SmallVector' since # of
+  // kernels is more O(N) than O(1)
+  std::vector<Value> kernelsToDestroy;
+};
+
 /// Pass that moves the kernel of each LaunchOp into its separate nested module.
 ///
 /// This pass moves the kernel code of each LaunchOp into a function created
@@ -151,6 +289,12 @@ namespace gpu = mlir::gpu;
 class GpuKernelOutliningPass
     : public GpuKernelOutliningPassBase<GpuKernelOutliningPass> {
 public:
+  GpuKernelOutliningPass() = default;
+  GpuKernelOutliningPass(comp::ExecEnvRuntime runtime, unsigned memorySpace) {
+    this->execEnvRuntime = static_cast<unsigned>(runtime);
+    this->execEnvMemorySpace = memorySpace;
+  }
+
   void runOnOperation() override {
     // set spv.target_env to moduleOp
     auto target_env = getOperation().getAttrOfType<spirv::TargetEnvAttr>(
@@ -178,8 +322,18 @@ public:
     SymbolTable symbolTable(getOperation());
     bool modified = false;
     for (auto func : getOperation().getOps<FuncOp>()) {
+      // Skip external functions
+      if (func.isExternal()) {
+        continue;
+      }
       // Insert just after the function.
       Block::iterator insertPt(func.getOperation()->getNextNode());
+      // Prep for comp conversion
+      auto runtime =
+          static_cast<comp::ExecEnvRuntime>(execEnvRuntime.getValue());
+      unsigned memorySpace = execEnvMemorySpace.getValue();
+      OutlineToComp toComp(func, runtime, memorySpace);
+
       auto funcWalkResult = func.walk([&](gpu::LaunchOp op) {
         llvm::SetVector<Value> operands;
         std::string kernelFnName =
@@ -189,7 +343,7 @@ public:
         if (failed(sinkOperationsIntoLaunchOp(op)))
           return WalkResult::interrupt();
         gpu::GPUFuncOp outlinedFunc =
-            outlineKernelFuncImpl(op, kernelFnName, operands);
+            outlineKernelFuncImpl(op, memorySpace, kernelFnName, operands);
 
         // Create nested module and insert outlinedFunc. The module will
         // originally get the same name as the function, but may be renamed on
@@ -201,11 +355,15 @@ public:
             createKernelModule(outlinedFunc, symbolTable, blockSize);
         symbolTable.insert(kernelModule, insertPt);
 
-        // Potentially changes signature, pulling in constants.
-        convertToLaunchFuncOp(op, outlinedFunc, operands.getArrayRef());
+        // Convert to comp
+        toComp.convertLaunch(op, outlinedFunc, operands.getArrayRef());
         modified = true;
         return WalkResult::advance();
       });
+
+      // Finalize comp conversion
+      toComp.finalize();
+
       if (funcWalkResult.wasInterrupted())
         return signalPassFailure();
     }
@@ -279,4 +437,11 @@ private:
 std::unique_ptr<mlir::Pass> createGpuKernelOutliningPass() {
   return std::make_unique<GpuKernelOutliningPass>();
 }
+
+std::unique_ptr<mlir::Pass>
+createGpuKernelOutliningPass(comp::ExecEnvRuntime runtime,
+                             unsigned memorySpace) {
+  return std::make_unique<GpuKernelOutliningPass>(runtime, memorySpace);
+}
+
 } // namespace pmlc::conversion::gpu

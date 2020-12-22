@@ -276,6 +276,14 @@ TEST_F(OpTest, CumSum) {
   runProgram(program);
 }
 
+TEST_F(OpTest, CumSumExclusive) {
+  auto I = Placeholder(DType::FLOAT32, {4}, "I");
+  auto program = makeProgram("cumsum", {I}, {op::cumsum(I, 0, true)});
+  std::vector<float> input = {2, 4, 6, 8};
+  std::vector<float> output = {0, 2, 6, 12};
+  checkExact(program, {input}, {output});
+}
+
 TEST_F(OpTest, Dot) {
   auto I = Placeholder(DType::FLOAT32, {7, 7, 3, 64}, "I");
   auto K = Placeholder(DType::FLOAT32, {7, 7, 3, 64}, "K");
