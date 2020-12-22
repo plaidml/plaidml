@@ -4,7 +4,7 @@
 
 include "mlir/Pass/PassBase.td"
 
-def IntelGenOclAddSpirvTarget : Pass<"intel-gen-ocl-add-spirv-target", "mlir::ModuleOp"> {
+def IntelLevelZeroAddSpirvTarget : Pass<"intel-level-zero-add-spirv-target", "mlir::ModuleOp"> {
   let summary = "Add spirv target environment attributes";
   let constructor = "pmlc::target::intel_level_zero::createAddSpirvTargetPass()";
   let dependentDialects = ["mlir::spirv::SPIRVDialect"];
@@ -14,19 +14,19 @@ def IntelGenOclAddSpirvTarget : Pass<"intel-gen-ocl-add-spirv-target", "mlir::Mo
   ];
 }
 
-def IntelGenOclSetSubgroupSize : Pass<"intel-gen-ocl-set-subgroup-size", "mlir::spirv::ModuleOp"> {
+def IntelLevelZeroSetSubgroupSize : Pass<"intel-level-zero-set-subgroup-size", "mlir::spirv::ModuleOp"> {
   let summary = "Set sub-group size for each spirv module to first (x) block dimension";
   let constructor = "pmlc::target::intel_level_zero::createSetSubgroupSizePass()";
   let dependentDialects = ["mlir::spirv::SPIRVDialect"];
 }
 
-def IntelGenOclLegalizeSpirv : Pass<"intel-gen-ocl-legalize-spirv", "mlir::spirv::ModuleOp"> {
+def IntelLevelZeroLegalizeSpirv : Pass<"intel-level-zero-legalize-spirv", "mlir::spirv::ModuleOp"> {
   let summary = "Legalize spirv for OpenCL execution environment";
   let constructor = "pmlc::target::intel_level_zero::createLegalizeSpirvPass()";
   let dependentDialects = ["mlir::spirv::SPIRVDialect"];
 }
 
-def IntelGenOclReorderLayouts : FunctionPass<"intel-gen-ocl-reorder-layouts"> {
+def IntelLevelZeroReorderLayouts : FunctionPass<"intel-level-zero-reorder-layouts"> {
   let summary = "Optimize data layouts for Intel GPUs";
   let description = [{
     Specialization of pxa-reorder-layouts for Intel GPUs with OpenCL backend.
@@ -47,7 +47,7 @@ def IntelGenOclReorderLayouts : FunctionPass<"intel-gen-ocl-reorder-layouts"> {
   ];
 }
 
-def IntelGenOclSetAccessQualifiers : Pass<"intel-gen-ocl-set-access-qualifiers", "mlir::spirv::ModuleOp"> {
+def IntelLevelZeroSetAccessQualifiers : Pass<"intel-level-zero-set-access-qualifiers", "mlir::spirv::ModuleOp"> {
   let summary = "Set access qualifiers for function arguments.";
   let constructor = "pmlc::target::intel_level_zero::createSetAccessQualifiersPass()";
   let dependentDialects = ["mlir::spirv::SPIRVDialect"];

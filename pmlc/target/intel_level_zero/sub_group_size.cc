@@ -13,8 +13,8 @@ namespace spirv = mlir::spirv;
 
 namespace {
 
-class IntelGenOclSetSubgroupSize
-    : public IntelGenOclSetSubgroupSizeBase<IntelGenOclSetSubgroupSize> {
+class IntelLevelZeroSetSubgroupSize
+    : public IntelLevelZeroSetSubgroupSizeBase<IntelLevelZeroSetSubgroupSize> {
 public:
   /// Returns entry point function in module or nullptr if there is none.
   spirv::FuncOp getEntryPoint(spirv::ModuleOp module) {
@@ -59,7 +59,7 @@ public:
 } // namespace
 
 std::unique_ptr<mlir::Pass> createSetSubgroupSizePass() {
-  return std::make_unique<IntelGenOclSetSubgroupSize>();
+  return std::make_unique<IntelLevelZeroSetSubgroupSize>();
 }
 
 } // namespace pmlc::target::intel_level_zero
