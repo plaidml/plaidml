@@ -25,7 +25,7 @@ std::vector<T> cast_constant_operand(size_t operand_idx, ngraph::Node* layer) {
   }
 }
 
-edsl::Tensor crop_max_pooling(edsl::Tensor I, std::vector<float>& coord, int64_t pooled_h, int64_t pooled_w) {
+edsl::Tensor crop_max_pooling(edsl::Tensor I, const std::vector<float>& coord, int64_t pooled_h, int64_t pooled_w) {
   auto x_1 = coord[0];
   auto y_1 = coord[1];
   auto x_2 = coord[2];
@@ -70,7 +70,7 @@ edsl::Tensor crop_max_pooling(edsl::Tensor I, std::vector<float>& coord, int64_t
   return pooled_tensor;
 }
 
-edsl::Tensor bilinear_pooling(edsl::Tensor I, std::vector<float>& coord, int64_t pooled_h, int64_t pooled_w) {
+edsl::Tensor bilinear_pooling(edsl::Tensor I, const std::vector<float>& coord, int64_t pooled_h, int64_t pooled_w) {
   auto x_1 = coord[0];
   auto y_1 = coord[1];
   auto x_2 = coord[2];
