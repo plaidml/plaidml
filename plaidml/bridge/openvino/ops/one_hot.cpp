@@ -2,8 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include <iostream>
-
 #include "plaidml_ops.hpp"
 #include "plaidml_util.hpp"
 
@@ -21,7 +19,7 @@ void registerOneHot() {
     IE_ASSERT(ctx.operands.size() == 4);
 
     auto indices = ctx.operands.at(0);
-    auto depth = get_shape_from_constant_operand(1, ctx.layer);  // ctx.operands.at(1);
+    auto depth = get_shape_from_constant_operand(1, ctx.layer);
     auto on_value = ctx.operands.at(2);
     auto off_value = ctx.operands.at(3);
     auto* layer = ngraph::as_type<ngraph::opset1::OneHot>(ctx.layer);
