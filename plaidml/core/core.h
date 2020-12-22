@@ -47,7 +47,7 @@ T call(edsl_source_location loc, F fn, Args... args) {
   auto ret = fn(&err, args...);
   if (err.code) {
     std::stringstream ss;
-    ss << "Exception at " << loc.file_name() << ":" << loc.line() << " with message: " << err.msg;
+    ss << "Exception at " << loc.file_name() << ":" << std::to_string(loc.line()) << " with message: " << str(err.msg);
     throw std::runtime_error(ss.str());
   }
   return ret;
@@ -69,7 +69,7 @@ void call_void(edsl_source_location loc, F fn, Args... args) {
   fn(&err, args...);
   if (err.code) {
     std::stringstream ss;
-    ss << "Exception at " << loc.file_name() << ":" << loc.line() << " with message: " << err.msg;
+    ss << "Exception at " << loc.file_name() << ":" << std::to_string(loc.line()) << " with message: " << str(err.msg);
     throw std::runtime_error(ss.str());
   }
 }
