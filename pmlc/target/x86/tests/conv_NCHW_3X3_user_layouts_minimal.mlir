@@ -1,4 +1,8 @@
+// Command line: bazel-bin/pmlc/opt -convert-linalg-to-loops --normalize-memrefs --simplify-affine-structures -x86-affine-stencil-xsmm -x86-convert-pxa-to-affine -lower-affine  -canonicalize -convert-scf-to-std -x86-convert-std-to-llvm pmlc/target/x86/tests/conv_NCHW_3X3_user_layouts_minimal.mlir | bazel-bin/pmlc/jit -e baseline
+
 // Command line:  bazel-bin/pmlc/opt -convert-linalg-to-loops --normalize-memrefs --simplify-affine-structures -x86-affine-stencil-xsmm -x86-convert-pxa-to-affine -lower-affine  -canonicalize -convert-scf-to-std -x86-convert-std-to-llvm pmlc/target/x86/tests/conv_NCHW_3X3_user_layouts.mlir | bazel-bin/pmlc/jit -e baseline
+
+// MLIR command line: <path>/llvm-project/build/bin/mlir-opt -convert-linalg-to-loops -lower-affine -convert-scf-to-std -convert-std-to-llvm pmlc/target/x86/tests/conv_NCHW_3X3_user_layouts_minimal.mlir | <path>/llvm-project/build/bin/mlir-cpu-runner -O3 -e baseline -entry-point-result=void
 
 #K_map = affine_map<(K,C,R,S) -> (R, S, C, K)>
 #NCHW_to_NHWC = affine_map<(N,C,H,W) -> (N,H,W,C)>
@@ -10,11 +14,10 @@
 !O_memref = type memref<1x56x56x64xf32> 
 
 // FIXME: When the user data layout maps are specified, the code does not work
- !I_memref = type memref<1x64x56x56xf32, #NCHW_to_NHWC>
- !K_memref = type memref<64x64x3x3xf32, #K_map>
+!I_memref = type memref<1x64x56x56xf32, #NCHW_to_NHWC>
+!K_memref = type memref<64x64x3x3xf32, #K_map>
 
 
-//func @print_memref_f32(memref<*xf32>)
 
 func @baseline() {
   %f0 = constant 0.0 : f32
@@ -72,8 +75,6 @@ func @baseline() {
 //    affine.yield %3 : memref<1x56x56x64xf32> 
 //  } 
 
-//  %O_ud = memref_cast %O : !O_memref to memref<*xf32>
-//  call @print_memref_f32(%O_ud) : (memref<*xf32>) -> ()
  
   dealloc %O : !O_memref
   dealloc %K : !K_memref
