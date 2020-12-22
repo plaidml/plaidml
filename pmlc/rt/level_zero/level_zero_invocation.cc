@@ -46,13 +46,18 @@ void LevelZeroKernel::setArg(unsigned idx, LevelZeroMemory *memory) {
 void LevelZeroKernel::enqueue(ze_command_list_handle_t list,
                               ze_group_count_t gws, ze_group_count_t lws,
                               ze_event_handle_t &resultE) {
-  lzu::append_launch_function(list, kernel, &gws, resultE, dependencies.size(),
-                              dependencies.data());
+  ze_group_count_t groupCount = {
+      gws.groupCountX / lws.groupCountX,
+      gws.groupCountY / lws.groupCountY,
+      gws.groupCountZ / lws.groupCountZ,
+  };
+  // lzu::append_launch_function(list, kernel, &gws, resultE,
+  // dependencies.size(),
+  //                            dependencies.data());
   // lzu::append_launch_function(
   //    list, kernel, &lws, resultE, dependencies.size(), dependencies.data());
-  // lzu::append_launch_function(
-  //    list, kernel, &groupCount, resultE, dependencies.size(),
-  //    dependencies.data());
+  lzu::append_launch_function(list, kernel, &groupCount, resultE,
+                              dependencies.size(), dependencies.data());
 }
 
 LevelZeroEvent::LevelZeroEvent(ze_event_handle_t event,
@@ -208,6 +213,7 @@ LevelZeroEvent *LevelZeroInvocation::enqueueKernel(LevelZeroKernel *kernel,
   // gws.groupCountY, gws.groupCountZ);
   lzu::set_group_size(kernel->getKernel(), lws.groupCountX, lws.groupCountY,
                       lws.groupCountZ);
+  // lzu::set_group_size(kernel->getKernel(), 1, 1, 1);
   // ze_group_count_t groupCount;
   // groupCount.groupCountX = gws.groupCountX * lws.groupCountX / groupSizeX;
   // groupCount.groupCountY = gws.groupCountY * lws.groupCountY / groupSizeY;
