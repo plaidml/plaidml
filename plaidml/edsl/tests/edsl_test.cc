@@ -17,6 +17,7 @@
 
 #include "plaidml/edsl/edsl.h"
 #include "plaidml/exec/exec.h"
+#include "plaidml/op/op.h"
 #include "plaidml/testenv.h"
 #include "pmlc/util/env.h"
 #include "pmlc/util/logging.h"
@@ -25,6 +26,13 @@ using half_float::half;
 using llvm::StringRef;
 using ::testing::ContainerEq;
 using ::testing::Eq;
+using ::testing::HasSubstr;
+
+#if ERRORTRACING
+#define EXPECT_ERROR_LINE(errmsg, eline) EXPECT_THAT(errmsg, HasSubstr(std::to_string(eline)))
+#else
+#define EXPECT_ERROR_LINE(errmsg, eline) EXPECT_THAT(errmsg, HasSubstr(":0"));
+#endif
 
 namespace plaidml::edsl {
 
@@ -2097,6 +2105,56 @@ TEST_F(CppEdsl, LayerException) {
   // CHECK:   return %[[X0]] : tensor<10x20xf32>
   // clang-format on
   runProgram(program);
+}
+
+TEST_F(CppEdsl, BindBadDims) {
+  const char* errmsg;
+  int eline;
+  try {
+    auto X = Placeholder(DType::FLOAT32, {10, 10});
+    auto Y = Placeholder(DType::FLOAT32, {12, 10});
+    TensorDim I, J, K;
+    TensorIndex i, j, k;
+    X.bind_dims({I, K});
+    // clang-format off
+    eline = __LINE__; Y.bind_dims({K, J});
+    // clang-format on
+  } catch (const std::exception& e) {
+    errmsg = e.what();
+  }
+  EXPECT_ERROR_LINE(errmsg, eline);
+}
+
+TEST_F(CppEdsl, EltwiseMismatch) {
+  const char* errmsg;
+  int eline;
+  try {
+    auto X = Placeholder(DType::FLOAT32, {10, 10});
+    auto Y = Placeholder(DType::FLOAT32, {12, 10});
+    // clang-format off
+    eline = __LINE__; auto O = X + Y;
+    // clang-format on
+  } catch (const std::exception& e) {
+    errmsg = e.what();
+  }
+  EXPECT_ERROR_LINE(errmsg, eline);
+}
+
+TEST_F(CppEdsl, OpOperators) {
+  const char* errmsg;
+  int eline;
+  try {
+    auto X = Placeholder(DType::FLOAT32, {10, 10});
+    auto Y = Placeholder(DType::FLOAT32, {12, 12});
+    auto RX = plaidml::op::relu(X);
+    auto RY = plaidml::op::relu(Y);
+    // clang-format off
+    eline = __LINE__; auto O = X + Y;
+    // clang-format on
+  } catch (const std::exception& e) {
+    errmsg = e.what();
+  }
+  EXPECT_ERROR_LINE(errmsg, eline);
 }
 
 }  // namespace

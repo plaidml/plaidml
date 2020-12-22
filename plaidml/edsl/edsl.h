@@ -250,41 +250,46 @@ class Tensor {
   /// \param value int
   /// \return Tensor
   ///
-  explicit Tensor(int value) : ptr_(details::make_ptr(ffi::call<plaidml_expr*>(plaidml_expr_int, value))) {}
+  explicit Tensor(int value, edsl_source_location loc = edsl_source_location::current())
+      : ptr_(details::make_ptr(ffi::call<plaidml_expr*>(loc, plaidml_expr_int, value))) {}
 
   ///
   /// Tensor constructor
   /// \param value unsigned int
   /// \return Tensor
   ///
-  explicit Tensor(unsigned value) : ptr_(details::make_ptr(ffi::call<plaidml_expr*>(plaidml_expr_int, value))) {}
+  explicit Tensor(unsigned value, edsl_source_location loc = edsl_source_location::current())
+      : ptr_(details::make_ptr(ffi::call<plaidml_expr*>(loc, plaidml_expr_int, value))) {}
 
   ///
   /// Tensor constructor
   /// \param value uint64_t
   /// \return Tensor
   ///
-  explicit Tensor(uint64_t value) : ptr_(details::make_ptr(ffi::call<plaidml_expr*>(plaidml_expr_uint, value))) {}
+  explicit Tensor(uint64_t value, edsl_source_location loc = edsl_source_location::current())
+      : ptr_(details::make_ptr(ffi::call<plaidml_expr*>(loc, plaidml_expr_uint, value))) {}
 
   ///
   /// Tensor constructor
   /// \param value int64_t
   /// \return Tensor
   ///
-  explicit Tensor(int64_t value) : ptr_(details::make_ptr(ffi::call<plaidml_expr*>(plaidml_expr_int, value))) {}
+  explicit Tensor(int64_t value, edsl_source_location loc = edsl_source_location::current())
+      : ptr_(details::make_ptr(ffi::call<plaidml_expr*>(loc, plaidml_expr_int, value))) {}
 
   ///
   /// Tensor constructor
   /// \param value double
   /// \return Tensor
   ///
-  explicit Tensor(double value) : ptr_(details::make_ptr(ffi::call<plaidml_expr*>(plaidml_expr_float, value))) {}
+  explicit Tensor(double value, edsl_source_location loc = edsl_source_location::current())
+      : ptr_(details::make_ptr(ffi::call<plaidml_expr*>(loc, plaidml_expr_float, value))) {}
 
   ///
   /// Tensor constructor
   ///
-  explicit Tensor(const TensorDim& dim)
-      : ptr_(details::make_ptr(ffi::call<plaidml_expr*>(plaidml_expr_dim, dim.as_ptr()))) {}
+  explicit Tensor(const TensorDim& dim, edsl_source_location loc = edsl_source_location::current())
+      : ptr_(details::make_ptr(ffi::call<plaidml_expr*>(loc, plaidml_expr_dim, dim.as_ptr()))) {}
 
   template <typename... Ts>
   IndexedTensor operator()(Ts... idxs) const;
@@ -308,18 +313,24 @@ class Tensor {
   ///
   /// TODO
   ///
-  std::string str() const {  //
-    return ffi::str(ffi::call<plaidml_string*>(plaidml_expr_repr, as_ptr()));
+  std::string str(edsl_source_location loc = edsl_source_location::current()) const {  //
+    return ffi::str(ffi::call<plaidml_string*>(loc, plaidml_expr_repr, as_ptr()));
   }
 
   ///
   /// Return the tensor's shape
   ///
-  TensorShape compute_shape() const { return TensorShape(ffi::call<plaidml_shape*>(plaidml_expr_get_shape, as_ptr())); }
+  TensorShape compute_shape(edsl_source_location loc = edsl_source_location::current()) const {
+    return TensorShape(ffi::call<plaidml_shape*>(loc, plaidml_expr_get_shape, as_ptr()));
+  }
 
-  DType dtype() const { return static_cast<DType>(ffi::call<plaidml_datatype>(plaidml_expr_get_dtype, as_ptr())); }
+  DType dtype(edsl_source_location loc = edsl_source_location::current()) const {
+    return static_cast<DType>(ffi::call<plaidml_datatype>(loc, plaidml_expr_get_dtype, as_ptr()));
+  }
 
-  size_t rank() const { return ffi::call<size_t>(plaidml_expr_get_rank, as_ptr()); }
+  size_t rank(edsl_source_location loc = edsl_source_location::current()) const {
+    return ffi::call<size_t>(loc, plaidml_expr_get_rank, as_ptr());
+  }
 
   ///
   /// Verify that the specified dims match the dims of this tensor.
@@ -352,7 +363,9 @@ class Tensor {
 
   plaidml_expr* as_ptr() const { return ptr_.get(); }
 
-  void* raw_ptr() const { return ffi::call<void*>(plaidml_expr_ptr, as_ptr()); }
+  void* raw_ptr(edsl_source_location loc = edsl_source_location::current()) const {
+    return ffi::call<void*>(loc, plaidml_expr_ptr, as_ptr());
+  }
 
  private:
   Tensor(const Tensor& rhs, const TensorLens& lens) : ptr_(rhs.ptr_), lens_(lens) {}
@@ -363,14 +376,6 @@ class Tensor {
 };
 
 using TensorVec = std::vector<Tensor>;
-
-struct LocatedIndexedTensor {
-  const IndexedTensor& tensor;
-  edsl_source_location loc;
-  LocatedIndexedTensor(const IndexedTensor& tensor,
-                       edsl_source_location loc = edsl_source_location::current())  // NOLINT
-      : tensor(tensor), loc(loc) {}
-};
 
 ///
 /// \ingroup edsl_objects
@@ -397,9 +402,7 @@ class IndexedTensor {
   ///
   /// Performs a multiplication combination within a contraction.
   ///
-  IndexedTensor operator*(LocatedIndexedTensor rhs) const {
-    return IndexedTensor(PLAIDML_COMBO_OP_MUL, {*this, rhs.tensor});
-  }
+  IndexedTensor operator*(const IndexedTensor rhs) const { return IndexedTensor(PLAIDML_COMBO_OP_MUL, {*this, rhs}); }
 
   ///
   /// Performs an equality comparison combination within a contraction.

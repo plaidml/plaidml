@@ -288,6 +288,8 @@ class convolution {
     return details::op("convolution", args).as_tensor();
   }
 
+  operator edsl::LocatedTensor() const { return edsl::Tensor(*this); }
+
  private:
   edsl::Tensor I_;
   edsl::Tensor F_;
@@ -360,6 +362,8 @@ class explicit_padding {
     return details::op("explicit_padding", args).as_tensor();
   }
 
+  operator edsl::LocatedTensor() const { return edsl::Tensor(*this); }
+
  private:
   edsl::Tensor I_;
   std::vector<int> lo_pads_;
@@ -418,6 +422,8 @@ class lrn {
     auto args = edsl::make_tuple(I_, edsl::make_tuple(window_size_), edsl::make_tuple(axes_), alpha_, beta_, epsilon_);
     return details::op("lrn", args).as_tensor();
   }
+
+  operator edsl::LocatedTensor() const { return edsl::Tensor(*this); }
 
  private:
   edsl::Tensor I_;
@@ -529,6 +535,8 @@ class l2norm {
     return details::op("l2norm", args).as_tensor();
   }
 
+  operator edsl::LocatedTensor() const { return edsl::Tensor(*this); }
+
  private:
   edsl::Tensor I_;
   std::vector<int64_t> axes_;
@@ -589,6 +597,8 @@ class relu {
     return details::op("relu", args).as_tensor();
   }
 
+  operator edsl::LocatedTensor() const { return edsl::Tensor(*this); }
+
  private:
   edsl::Tensor I_;
   edsl::Tensor alpha_;
@@ -624,6 +634,8 @@ class repeat {
     auto args = edsl::make_tuple(I_, count_, axis_);
     return details::op("repeat", args).as_tensor();
   }
+
+  operator edsl::LocatedTensor() const { return edsl::Tensor(*this); }
 
  private:
   edsl::Tensor I_;
@@ -671,6 +683,8 @@ class slice {
     auto args = edsl::make_tuple(I_, dims_);
     return details::op("slice", args).as_tensor();
   }
+
+  operator edsl::LocatedTensor() const { return edsl::Tensor(*this); }
 
  private:
   edsl::Tensor I_;
@@ -724,50 +738,6 @@ inline edsl::Tensor variance(const edsl::Tensor& I, const edsl::Value& axes = ed
   auto args = edsl::make_tuple(I, axes, keepdims);
   return details::op("variance", args).as_tensor();
 }
-
-struct OpTensor {
-  edsl::Tensor tensor;
-  OpTensor(convolution op) : tensor(edsl::Tensor(op)) {}       // NOLINT
-  OpTensor(explicit_padding op) : tensor(edsl::Tensor(op)) {}  // NOLINT
-  OpTensor(lrn op) : tensor(edsl::Tensor(op)) {}               // NOLINT
-  OpTensor(mvn op) : tensor(edsl::Tensor(op)) {}               // NOLINT
-  OpTensor(l2norm op) : tensor(edsl::Tensor(op)) {}            // NOLINT
-  OpTensor(relu op) : tensor(edsl::Tensor(op)) {}              // NOLINT
-  OpTensor(repeat op) : tensor(edsl::Tensor(op)) {}            // NOLINT
-  OpTensor(slice op) : tensor(edsl::Tensor(op)) {}             // NOLINT
-};
-
-#define PLAIDML_OPLIB_OP_CONVERSION(_op_)                                                               \
-  inline edsl::Tensor operator _op_(OpTensor lhs, OpTensor rhs) { return lhs.tensor + rhs.tensor; }     \
-  inline edsl::Tensor operator _op_(OpTensor lhs, int rhs) { return lhs.tensor + rhs; }                 \
-  inline edsl::Tensor operator _op_(OpTensor lhs, int64_t rhs) { return lhs.tensor + rhs; }             \
-  inline edsl::Tensor operator _op_(OpTensor lhs, uint64_t rhs) { return lhs.tensor + rhs; }            \
-  inline edsl::Tensor operator _op_(OpTensor lhs, double rhs) { return lhs.tensor + rhs; }              \
-  inline edsl::Tensor operator _op_(OpTensor lhs, const edsl::Tensor& rhs) { return lhs.tensor + rhs; } \
-  inline edsl::Tensor operator _op_(int lhs, OpTensor rhs) { return lhs + rhs.tensor; }                 \
-  inline edsl::Tensor operator _op_(int64_t lhs, OpTensor rhs) { return lhs + rhs.tensor; }             \
-  inline edsl::Tensor operator _op_(uint64_t lhs, OpTensor rhs) { return lhs + rhs.tensor; }            \
-  inline edsl::Tensor operator _op_(double lhs, OpTensor rhs) { return lhs + rhs.tensor; }              \
-  inline edsl::Tensor operator _op_(const edsl::Tensor& lhs, OpTensor rhs) { return lhs + rhs.tensor; }
-
-PLAIDML_OPLIB_OP_CONVERSION(+);
-PLAIDML_OPLIB_OP_CONVERSION(-);
-PLAIDML_OPLIB_OP_CONVERSION(*);
-PLAIDML_OPLIB_OP_CONVERSION(/);
-PLAIDML_OPLIB_OP_CONVERSION(%);
-PLAIDML_OPLIB_OP_CONVERSION(==);
-PLAIDML_OPLIB_OP_CONVERSION(!=);
-PLAIDML_OPLIB_OP_CONVERSION(<);
-PLAIDML_OPLIB_OP_CONVERSION(>);
-PLAIDML_OPLIB_OP_CONVERSION(<=);
-PLAIDML_OPLIB_OP_CONVERSION(>=);
-PLAIDML_OPLIB_OP_CONVERSION(<<);
-PLAIDML_OPLIB_OP_CONVERSION(>>);
-PLAIDML_OPLIB_OP_CONVERSION(&);
-PLAIDML_OPLIB_OP_CONVERSION(|);
-PLAIDML_OPLIB_OP_CONVERSION(^);
-PLAIDML_OPLIB_OP_CONVERSION(&&);
-PLAIDML_OPLIB_OP_CONVERSION(||);
 
 }  // namespace op
 }  // namespace plaidml

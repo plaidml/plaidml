@@ -15,9 +15,11 @@
 #if __has_include(<source_location>)
 #include <source_location>
 using edsl_source_location = std::source_location;
+#define ERRORTRACING true
 #elif __has_include(<experimental/source_location>)
 #include <experimental/source_location>
 using edsl_source_location = std::experimental::source_location;
+#define ERRORTRACING true
 #else
 struct edsl_source_location {
   static edsl_source_location current() { return edsl_source_location{}; }
@@ -26,6 +28,7 @@ struct edsl_source_location {
   constexpr const char* file_name() const noexcept { return "??"; }
   constexpr const char* function_name() const noexcept { return "??"; }
 };
+#define ERRORTRACING true
 #endif
 
 namespace plaidml {
