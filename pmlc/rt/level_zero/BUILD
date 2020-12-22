@@ -16,6 +16,8 @@ plaidml_cc_library(
         "level_zero_wrappers.cc",
         "level_zero_utils.h",
         "level_zero_utils.cc",
+        "utils.h",
+        "utils.cc",
     ],
     hdrs = ["register.h"],
     deps = [
@@ -24,7 +26,7 @@ plaidml_cc_library(
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:SPIRVLowering",
         "@llvm-project//mlir:mlir_runner_utils",
-        "@Level_Zero"
+        "@Level_Zero//:ze_loader",
     ],
     alwayslink = 1,
     linkstatic = 1,
@@ -36,11 +38,13 @@ plaidml_cc_binary(
         "level_zero_probe.cc",
         "level_zero_utils.h",
         "level_zero_utils.cc",
+        "utils.h",
+        "utils.cc",
     ],
-    linkopts = [
-        "-lze_loader",
+    deps = [
+        "@Level_Zero//:ze_loader",
+        "//pmlc/util",
     ],
-    deps = ["@Level_Zero"],
 )
 
 cc_test(
@@ -49,7 +53,12 @@ cc_test(
         "level_zero_probe.cc",
         "level_zero_utils.h",
         "level_zero_utils.cc",
+        "utils.h",
+        "utils.cc",
     ],
-    deps = ["@Level_Zero"],
+    deps = [
+        "@Level_Zero//:ze_loader",
+        "//pmlc/util",
+    ],
     size = "small",
 )

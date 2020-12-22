@@ -223,11 +223,19 @@ config_setting(
     },
 )
 
+config_setting(
+    name = "intel_level_zero",
+    flag_values = {
+        ":target": "intel_level_zero",
+    },
+)
+
 selects.config_setting_group(
     name = "gpu_target",
     match_any = [
         ":intel_gen",
         ":intel_gen_ocl_spirv",
+        ":intel_level_zero",
     ],
 )
 

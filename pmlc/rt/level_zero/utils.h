@@ -2,9 +2,9 @@
 #ifndef PMLC_RT_LEVEL_ZERO_UTILS_H_
 #define PMLC_RT_LEVEL_ZERO_UTILS_H_
 
-#include <level_zero/ze_api.h>
-#include <level_zero/zet_api.h>
 #include <string.h>
+#include <ze_api.h>
+#include <zet_api.h>
 
 #include <array>
 #include <map>

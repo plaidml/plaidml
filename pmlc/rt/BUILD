@@ -55,6 +55,7 @@ plaidml_cc_library(
     defines = [
         "PML_ENABLE_OPENCL",
         "PML_ENABLE_VULKAN",
+        "PML_ENABLE_LEVEL_ZERO",
     ],
     visibility = ["//visibility:public"],
     deps = [

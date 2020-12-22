@@ -7,6 +7,7 @@ load("//pmlc:lit.bzl", "lit_test")
 exports_files([
     "edsl_test-skip.intel_gen.txt",
     "edsl_test-skip.intel_gen_ocl_spirv.txt",
+    "edsl_test-skip.intel_level_zero.txt",
 ])
 
 plaidml_cc_test(
@@ -20,6 +21,7 @@ plaidml_cc_test(
     ] + select({
         "//plaidml:intel_gen": ["--skip_test_file=$(location edsl_test-skip.intel_gen.txt)"],
         "//plaidml:intel_gen_ocl_spirv": ["--skip_test_file=$(location edsl_test-skip.intel_gen_ocl_spirv.txt)"],
+        "//plaidml:intel_level_zero": ["--skip_test_file=$(location edsl_test-skip.intel_level_zero.txt)"],
         "//conditions:default": [],
     }),
     copts = select({
@@ -29,6 +31,7 @@ plaidml_cc_test(
     data = select({
         "//plaidml:intel_gen": [":edsl_test-skip.intel_gen.txt"],
         "//plaidml:intel_gen_ocl_spirv": [":edsl_test-skip.intel_gen_ocl_spirv.txt"],
+        "//plaidml:intel_level_zero": [":edsl_test-skip.intel_level_zero.txt"],
         "//conditions:default": [],
     }),
     linkstatic = True,

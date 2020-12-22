@@ -195,11 +195,10 @@ def plaidml_workspace():
         build_file = clean_dep("//vendor/opencl_icd_loader:opencl_icd_loader.BUILD"),
     )
 
-    # Todo,  add level_zero.BUILD
-    #http_archive(
-    #    name = "level_zero",
-    #    url = "https://github.com/oneapi-src/level-zero/archive/v1.0.22.zip",
-    #    sha256 = "ad9a757c5e07cd44d8e63019e63ba8a8ea19981ea4b7567d3099d3ef80567908",
-    #    strip_prefix = "level-zero-1.0.22",
-    #    build_file = clean_dep("//vendor/level_zero:level_zero.BUILD"),
-    #)
+    http_archive(
+        name = "Level_Zero",
+        url = "https://github.com/oneapi-src/level-zero/archive/v1.0.22.zip",
+        sha256 = "ad9a757c5e07cd44d8e63019e63ba8a8ea19981ea4b7567d3099d3ef80567908",
+        strip_prefix = "level-zero-1.0.22",
+        build_file = clean_dep("//vendor/level_zero:Level_Zero.BUILD"),
+    )

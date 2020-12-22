@@ -6,7 +6,14 @@
 #include "pmlc/util/logging.h"
 
 int main(int argc, char **argv) {
-  zeInit(0);
+  ze_result_t result = ZE_RESULT_NOT_READY;
+  try {
+    result = zeInit(0);
+  } catch (std::exception &e) {
+    IVLOG(1, "failed to init level zero driver, result:" << result << " info:"
+                                                         << e.what());
+    throw;
+  }
   std::vector<ze_driver_handle_t> drivers;
   try {
     drivers = pmlc::rt::level_zero::lzu::get_all_driver_handles();

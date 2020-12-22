@@ -1,6 +1,7 @@
 // Copyright 2020 Intel Corporation
 
 #include "pmlc/rt/level_zero/utils.h"
+#include "pmlc/util/logging.h"
 
 namespace pmlc::rt::level_zero::lzu {
 // Context
@@ -308,7 +309,11 @@ zeEventPool::zeEventPool() {}
 
 zeEventPool::~zeEventPool() {
   if (event_pool_) {
-    EXPECT_EQ(ZE_RESULT_SUCCESS, zeEventPoolDestroy(event_pool_));
+    ze_result_t result = zeEventPoolDestroy(event_pool_);
+    if (ZE_RESULT_SUCCESS != result) {
+      IVLOG(1, "Failed to destroy event pool " +
+                   std::to_string(static_cast<int>(result)));
+    }
   }
 }
 

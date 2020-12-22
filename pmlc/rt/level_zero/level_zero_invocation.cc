@@ -46,8 +46,13 @@ void LevelZeroKernel::setArg(unsigned idx, LevelZeroMemory *memory) {
 void LevelZeroKernel::enqueue(ze_command_list_handle_t list,
                               ze_group_count_t gws, ze_group_count_t lws,
                               ze_event_handle_t &resultE) {
-  lzu::append_launch_function(list, kernel, &gws, resultE, dependencies.size(),
-                              dependencies.data());
+  // ze_group_count_t groupCount = {1, 1, 1};
+  lzu::append_launch_function(
+      list, kernel, &gws, resultE, dependencies.size(),
+      // lzu::append_launch_function(list, kernel, &lws, resultE,
+      // dependencies.size(), lzu::append_launch_function(list, kernel,
+      // &groupCount, resultE, dependencies.size(),
+      dependencies.data());
 }
 
 LevelZeroEvent::LevelZeroEvent(ze_event_handle_t event,
@@ -65,7 +70,7 @@ void LevelZeroEvent::wait(const std::vector<LevelZeroEvent *> &events) {
 ze_command_queue_group_properties_t p;
 LevelZeroInvocation::LevelZeroInvocation(LevelZeroDevice *device)
     : device{device->shared_from_this()}, queueUser(device->getQueue(p)) {
-  eventPool.InitEventPool(device->getLevelZeroContext(), 100);
+  eventPool.InitEventPool(device->getLevelZeroContext(), 600);
   // ze_command_queue_group_properties_t p;
   // p.flags = ZE_COMMAND_QUEUE_GROUP_PROPERTY_FLAG_COMPUTE;
   // queueUser = device->getQueue(p);
@@ -193,10 +198,22 @@ LevelZeroKernel *LevelZeroInvocation::createKernelFromIL(char *data,
 LevelZeroEvent *LevelZeroInvocation::enqueueKernel(LevelZeroKernel *kernel,
                                                    ze_group_count_t gws,
                                                    ze_group_count_t lws) {
+  // uint32_t groupSizeX, groupSizeY, groupSizeZ;
+  // lzu::suggest_group_size(kernel->getKernel(), gws.groupCountX *
+  // lws.groupCountX, gws.groupCountY * lws.groupCountY, gws.groupCountZ *
+  // lws.groupCountZ, groupSizeX, groupSizeY, groupSizeZ);
+  // lzu::set_group_size(kernel->getKernel(), groupSizeX, groupSizeY,
+  // groupSizeZ); lzu::set_group_size(kernel->getKernel(), gws.groupCountX,
+  // gws.groupCountY, gws.groupCountZ);
   lzu::set_group_size(kernel->getKernel(), lws.groupCountX, lws.groupCountY,
                       lws.groupCountZ);
+  // ze_group_count_t groupCount;
+  // groupCount.groupCountX = gws.groupCountX * lws.groupCountX / groupSizeX;
+  // groupCount.groupCountY = gws.groupCountY * lws.groupCountY / groupSizeY;
+  // groupCount.groupCountZ = gws.groupCountZ * lws.groupCountZ / groupSizeZ;
   ze_event_handle_t event;
   eventPool.create_event(event);
+  // kernel->enqueue(queueUser.getLevelZeroList(), groupCount, lws, event);
   kernel->enqueue(queueUser.getLevelZeroList(), gws, lws, event);
   LevelZeroEvent *result =
       wrapEvent(event, LevelZeroActionKind::Kernel, kernel->getName());
