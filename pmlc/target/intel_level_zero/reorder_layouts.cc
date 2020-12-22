@@ -27,7 +27,7 @@ namespace {
 /// It assumes that difference of one in OpenCL schedule dimensions
 /// is equal to one iteration of sequential loop.
 pxa::LoopNestSchedule
-intelGenOclScheduleModel(mlir::ArrayRef<mlir::AffineParallelOp> loopNest) {
+intelLevelZeroScheduleModel(mlir::ArrayRef<mlir::AffineParallelOp> loopNest) {
   pxa::LoopNestSchedule result;
   result.resize(loopNest.size());
   unsigned subGroupSize = getIntegerTag(loopNest[0], subgroupSizeTag(), 1);
@@ -83,12 +83,13 @@ struct ThreadedReorderCreator {
   unsigned maxThreads;
 };
 
-class IntelGenOclReorderLayoutsPass final
-    : public IntelGenOclReorderLayoutsBase<IntelGenOclReorderLayoutsPass> {
+class IntelLevelZeroReorderLayoutsPass final
+    : public IntelLevelZeroReorderLayoutsBase<
+          IntelLevelZeroReorderLayoutsPass> {
 public:
-  IntelGenOclReorderLayoutsPass() = default;
+  IntelLevelZeroReorderLayoutsPass() = default;
 
-  IntelGenOclReorderLayoutsPass(unsigned maxThreads, bool allowReorder) {
+  IntelLevelZeroReorderLayoutsPass(unsigned maxThreads, bool allowReorder) {
     this->maxThreads = maxThreads;
     this->allowReorder = allowReorder;
   }
@@ -96,7 +97,7 @@ public:
   void runOnFunction() {
     mlir::FuncOp func = getFunction();
     mlir::DenseMap<mlir::Value, pxa::MemoryUsageDesc> globalMemory =
-        pxa::gatherGlobalMemoryDescs(func, intelGenOclScheduleModel);
+        pxa::gatherGlobalMemoryDescs(func, intelLevelZeroScheduleModel);
     for (auto &valueDesc : globalMemory) {
       pxa::MemoryUsageDesc &memoryDesc = valueDesc.second;
       IVLOG(3, "Optimizing layout for " << mlir::debugString(memoryDesc.value));
@@ -125,13 +126,13 @@ public:
 } // namespace
 
 std::unique_ptr<mlir::Pass> createIntelGenOclReorderLayoutsPass() {
-  return std::make_unique<IntelGenOclReorderLayoutsPass>();
+  return std::make_unique<IntelLevelZeroReorderLayoutsPass>();
 }
 
 std::unique_ptr<mlir::Pass>
 createIntelGenOclReorderLayoutsPass(unsigned maxThreads, bool allowReorder) {
-  return std::make_unique<IntelGenOclReorderLayoutsPass>(maxThreads,
-                                                         allowReorder);
+  return std::make_unique<IntelLevelZeroReorderLayoutsPass>(maxThreads,
+                                                            allowReorder);
 }
 
 } // namespace pmlc::target::intel_level_zero

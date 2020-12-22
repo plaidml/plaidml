@@ -33,8 +33,8 @@ mlir::Optional<spirv::BuiltIn> getGlobalBuiltIn(spirv::GlobalVariableOp op);
 /// either i32 or vector of i32 type.
 bool isI32BuiltIn(spirv::GlobalVariableOp op);
 
-class IntelGenOclLegalizeSpirvPass final
-    : public IntelGenOclLegalizeSpirvBase<IntelGenOclLegalizeSpirvPass> {
+class IntelLevelZeroLegalizeSpirvPass final
+    : public IntelLevelZeroLegalizeSpirvBase<IntelLevelZeroLegalizeSpirvPass> {
   void runOnOperation() {
     mlir::OwningRewritePatternList patterns;
     patterns.insert<BuiltInConversion>(&getContext());
@@ -155,7 +155,7 @@ mlir::LogicalResult BuiltInConversion::matchAndRewrite(
 } // namespace
 
 std::unique_ptr<mlir::Pass> createLegalizeSpirvPass() {
-  return std::make_unique<IntelGenOclLegalizeSpirvPass>();
+  return std::make_unique<IntelLevelZeroLegalizeSpirvPass>();
 }
 
 } // namespace pmlc::target::intel_level_zero

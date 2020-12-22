@@ -13,11 +13,11 @@ namespace spirv = mlir::spirv;
 
 namespace {
 
-class IntelGenOclAddSpirvTarget
-    : public IntelGenOclAddSpirvTargetBase<IntelGenOclAddSpirvTarget> {
+class IntelLevelZeroAddSpirvTarget
+    : public IntelLevelZeroAddSpirvTargetBase<IntelLevelZeroAddSpirvTarget> {
 public:
-  IntelGenOclAddSpirvTarget() = default;
-  explicit IntelGenOclAddSpirvTarget(unsigned spirvVersion) {
+  IntelLevelZeroAddSpirvTarget() = default;
+  explicit IntelLevelZeroAddSpirvTarget(unsigned spirvVersion) {
     this->spirvVersion = spirvVersion;
   }
   void runOnOperation() {
@@ -54,11 +54,11 @@ public:
 } // namespace
 
 std::unique_ptr<mlir::Pass> createAddSpirvTargetPass() {
-  return std::make_unique<IntelGenOclAddSpirvTarget>();
+  return std::make_unique<IntelLevelZeroAddSpirvTarget>();
 }
 
 std::unique_ptr<mlir::Pass> createAddSpirvTargetPass(unsigned spirvVersion) {
-  return std::make_unique<IntelGenOclAddSpirvTarget>(spirvVersion);
+  return std::make_unique<IntelLevelZeroAddSpirvTarget>(spirvVersion);
 }
 
 } // namespace pmlc::target::intel_level_zero
