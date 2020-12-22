@@ -2,9 +2,11 @@ pml_cc_library(
   NAME transforms
   HDRS
     contraction.h
+    expand_reshape.h
     passes.h
   SRCS
     contraction.cc
+    expand_reshape.cc
     materialize.cc
     pad_constraints.cc
     pad_ranges.cc
