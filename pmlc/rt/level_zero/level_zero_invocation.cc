@@ -46,13 +46,13 @@ void LevelZeroKernel::setArg(unsigned idx, LevelZeroMemory *memory) {
 void LevelZeroKernel::enqueue(ze_command_list_handle_t list,
                               ze_group_count_t gws, ze_group_count_t lws,
                               ze_event_handle_t &resultE) {
-  // ze_group_count_t groupCount = {1, 1, 1};
-  lzu::append_launch_function(
-      list, kernel, &gws, resultE, dependencies.size(),
-      // lzu::append_launch_function(list, kernel, &lws, resultE,
-      // dependencies.size(), lzu::append_launch_function(list, kernel,
-      // &groupCount, resultE, dependencies.size(),
-      dependencies.data());
+  lzu::append_launch_function(list, kernel, &gws, resultE, dependencies.size(),
+                              dependencies.data());
+  // lzu::append_launch_function(
+  //    list, kernel, &lws, resultE, dependencies.size(), dependencies.data());
+  // lzu::append_launch_function(
+  //    list, kernel, &groupCount, resultE, dependencies.size(),
+  //    dependencies.data());
 }
 
 LevelZeroEvent::LevelZeroEvent(ze_event_handle_t event,
@@ -70,6 +70,7 @@ void LevelZeroEvent::wait(const std::vector<LevelZeroEvent *> &events) {
 ze_command_queue_group_properties_t p;
 LevelZeroInvocation::LevelZeroInvocation(LevelZeroDevice *device)
     : device{device->shared_from_this()}, queueUser(device->getQueue(p)) {
+  // Need a way to ensure event is not used and then can release it
   eventPool.InitEventPool(device->getLevelZeroContext(), 600);
   // ze_command_queue_group_properties_t p;
   // p.flags = ZE_COMMAND_QUEUE_GROUP_PROPERTY_FLAG_COMPUTE;
