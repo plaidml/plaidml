@@ -28,7 +28,7 @@ struct edsl_source_location {
   constexpr const char* file_name() const noexcept { return "??"; }
   constexpr const char* function_name() const noexcept { return "??"; }
 };
-#define ERRORTRACING true
+#define ERRORTRACING false
 #endif
 
 namespace plaidml {
