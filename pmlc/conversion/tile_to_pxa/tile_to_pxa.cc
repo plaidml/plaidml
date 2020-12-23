@@ -4,6 +4,7 @@
 #include <utility>
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/Pass/Pass.h"
@@ -176,16 +177,14 @@ struct AlwaysTrue : Matcher {
   bool match(Operation *op) const final { return true; }
 };
 
-template <typename InnerPredicate>
-struct ResultIs : Matcher {
+template <typename InnerPredicate> struct ResultIs : Matcher {
   bool match(Operation *op) const final {
     InnerPredicate pred;
     return pred.match(op->getResult(0).getType());
   }
 };
 
-template <typename InnerPredicate>
-struct AnyOperandIs : Matcher {
+template <typename InnerPredicate> struct AnyOperandIs : Matcher {
   bool match(Operation *op) const final {
     for (auto operand : op->getOperands()) {
       InnerPredicate pred;
@@ -197,8 +196,7 @@ struct AnyOperandIs : Matcher {
   }
 };
 
-template <typename InnerPredicate>
-struct OperandsAre : Matcher {
+template <typename InnerPredicate> struct OperandsAre : Matcher {
   bool match(Operation *op) const final {
     for (auto operand : op->getOperands()) {
       InnerPredicate pred;
@@ -210,8 +208,7 @@ struct OperandsAre : Matcher {
   }
 };
 
-template <typename InnerPredicate>
-struct FirstOperandIs : Matcher {
+template <typename InnerPredicate> struct FirstOperandIs : Matcher {
   bool match(Operation *op) const final {
     InnerPredicate pred;
     if (op->getNumOperands() == 0) {
@@ -221,8 +218,7 @@ struct FirstOperandIs : Matcher {
   }
 };
 
-template <typename InnerPredicate>
-struct AnyComparandIs : Matcher {
+template <typename InnerPredicate> struct AnyComparandIs : Matcher {
   bool match(Operation *op) const final {
     SmallVector<Value, 4> allOperands(op->getOperands());
     tile::ContractionOpAdaptor adaptor(allOperands);
@@ -233,8 +229,7 @@ struct AnyComparandIs : Matcher {
   }
 };
 
-template <typename InnerPredicate>
-struct ComparandsAre : Matcher {
+template <typename InnerPredicate> struct ComparandsAre : Matcher {
   bool match(Operation *op) const final {
     SmallVector<Value, 4> allOperands(op->getOperands());
     tile::ContractionOpAdaptor adaptor(allOperands);
@@ -245,8 +240,7 @@ struct ComparandsAre : Matcher {
   }
 };
 
-template <typename InnerPredicate>
-struct Not {
+template <typename InnerPredicate> struct Not {
   bool match(Type type) const {
     InnerPredicate pred;
     return !pred.match(type);
@@ -324,8 +318,7 @@ struct NotOp {
   }
 };
 
-template <typename OpType>
-struct StdOp {
+template <typename OpType> struct StdOp {
   Value create(ConversionPatternRewriter &rewriter, Location loc,
                Type resultType, ArrayRef<Value> operands,
                ArrayRef<Type> types) {
@@ -351,8 +344,7 @@ struct SelectOp {
   }
 };
 
-template <CmpFPredicate predicate>
-struct CmpFloatOp {
+template <CmpFPredicate predicate> struct CmpFloatOp {
   Value create(ConversionPatternRewriter &rewriter, Location loc,
                Type resultType, ArrayRef<Value> operands,
                ArrayRef<Type> types) {
@@ -364,8 +356,7 @@ struct CmpFloatOp {
   }
 };
 
-template <CmpIPredicate predicate>
-struct CmpIntOp {
+template <CmpIPredicate predicate> struct CmpIntOp {
   Value create(ConversionPatternRewriter &rewriter, Location loc,
                Type resultType, ArrayRef<Value> operands,
                ArrayRef<Type> types) {
@@ -391,8 +382,7 @@ struct CmpIntInequalityOp {
   }
 };
 
-template <typename OpType>
-struct LogicalOp {
+template <typename OpType> struct LogicalOp {
   Value create(ConversionPatternRewriter &rewriter, Location loc,
                Type resultType, ArrayRef<Value> operands,
                ArrayRef<Type> types) {
@@ -488,8 +478,7 @@ static Value createInit(OpBuilder &builder, Location loc, Type type,
   llvm_unreachable("Unknown type for createInit");
 }
 
-template <typename CmpOpBuilder>
-struct CondOp {
+template <typename CmpOpBuilder> struct CondOp {
   Value create(ConversionPatternRewriter &rewriter, Location loc,
                Type resultType, ArrayRef<Value> operands,
                ArrayRef<Type> types) {
@@ -1690,6 +1679,30 @@ struct UnpackOpConversion : public OpConversionPattern<stdx::UnpackOp> {
   }
 };
 
+struct ScfForOpConversion : public OpConversionPattern<scf::ForOp> {
+  using OpConversionPattern<scf::ForOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(scf::ForOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const final {
+    auto &oldBodyOps = op.getBody()->getOperations();
+    auto newOp =
+        rewriter.create<scf::ForOp>(op.getLoc(), op.lowerBound(),
+                                    op.upperBound(), op.step(), op.initArgs());
+    auto &newBodyOps = newOp.getBody()->getOperations();
+    newBodyOps.splice(std::prev(newBodyOps.end()), oldBodyOps,
+                      oldBodyOps.begin(), oldBodyOps.end());
+    auto oldArgs = op.getBody()->getArguments();
+    auto newArgs = newOp.getBody()->getArguments();
+    for (unsigned i = 0; i < oldArgs.size(); ++i) {
+      oldArgs[i].replaceAllUsesWith(newArgs[i]);
+    }
+    rewriter.replaceOp(op, newOp.results());
+    rewriter.eraseOp(op);
+    return success();
+  }
+};
+
 struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
   void runOnOperation() final {
     // Inject tile.ident ops for each return operand that needs it.
@@ -1716,6 +1729,7 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
     TypeConverter converter;
     target.addLegalDialect<mlir::AffineDialect>();
     target.addLegalDialect<mlir::StandardOpsDialect>();
+    target.addLegalDialect<mlir::scf::SCFDialect>();
     target.addLegalDialect<dialect::pxa::PXADialect>();
     target.addLegalDialect<dialect::stdx::StdXDialect>();
     target.addLegalOp<mlir::ModuleOp, mlir::ModuleTerminatorOp, ReturnOp>();
@@ -1729,6 +1743,8 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
     target.addDynamicallyLegalOp<stdx::UnpackOp>([&](stdx::UnpackOp op) {
       return converter.isLegal(op.getResultTypes());
     });
+    target.addDynamicallyLegalOp<scf::ForOp>(
+        [&](scf::ForOp op) { return converter.isLegal(op.getResultTypes()); });
 
     // Setup rewrite patterns
     using CmpIntLtOp =
@@ -1755,6 +1771,7 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         TraceOpConversion,    //
         PackOpConversion,     //
         UnpackOpConversion,   //
+        ScfForOpConversion,   //
         ContractionOpConversion<CombinationKind::none, FirstOperand>,
         ContractionOpConversion<CombinationKind::add, StdOp<mlir::AddFOp>,
                                 ResultIs<EltwiseFloat>>,

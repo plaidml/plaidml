@@ -1,4 +1,4 @@
-// RUN: pmlc-opt -tile-compute-bounds -convert-tile-to-pxa %s
+// RUN: pmlc-opt -tile-compute-bounds -convert-tile-to-pxa %s | FileCheck %s
 
 #map0 = affine_map<(i, j) -> (i, j)>
 
@@ -14,3 +14,4 @@ func @matrixPower(%m : tensor<16x16xf32>) -> tensor<16x16xf32> {
 }
 
 // CHECK-label: @matrixPower
+// CHECK:ABC
