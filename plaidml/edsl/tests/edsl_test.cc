@@ -30,9 +30,6 @@ using ::testing::Eq;
 using ::testing::HasSubstr;
 
 #if ERRORTRACING
-#ifdef _WIN32
-#define EXPECT_ERROR_LINE(errmsg, eline) EXPECT_THAT(errmsg, AnyOf(HasSubstr(":0"), HasSubstr(std::to_string(eline))))
-#else
 #define EXPECT_ERROR_LINE(errmsg, eline) EXPECT_THAT(errmsg, HasSubstr(std::to_string(eline)))
 #endif
 #else
@@ -2130,6 +2127,7 @@ TEST_F(CppEdsl, BindBadDims) {
   EXPECT_ERROR_LINE(errmsg, eline);
 }
 
+#if !defined(_WIN32)
 TEST_F(CppEdsl, EltwiseMismatch) {
   const char* errmsg;
   int eline;
@@ -2144,7 +2142,9 @@ TEST_F(CppEdsl, EltwiseMismatch) {
   }
   EXPECT_ERROR_LINE(errmsg, eline);
 }
+#endif
 
+#if !defined(_WIN32)
 TEST_F(CppEdsl, OpOperators) {
   const char* errmsg;
   int eline;
@@ -2161,6 +2161,7 @@ TEST_F(CppEdsl, OpOperators) {
   }
   EXPECT_ERROR_LINE(errmsg, eline);
 }
+#endif
 
 }  // namespace
 }  // namespace plaidml::edsl
