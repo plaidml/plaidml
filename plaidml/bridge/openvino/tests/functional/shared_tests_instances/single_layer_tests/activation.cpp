@@ -53,7 +53,7 @@ const std::map<ActivationTypes, std::vector<std::vector<float>>> activationTypes
 //     {PReLu, {{-0.01f}}},
 //     {LeakyRelu, {{0.01f}}}
 // };
-
+//
 std::map<std::vector<size_t>, std::vector<std::vector<size_t>>> basic = {
     {{1, 50}, {{}}},
     {{1, 128}, {{}}},
