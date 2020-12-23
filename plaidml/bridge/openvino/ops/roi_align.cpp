@@ -1,8 +1,7 @@
 // Copyright (C) 2020 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 //
-
-#include <algorithm>
+#include <iostream>
 
 #include "ngraph/opsets/opset3.hpp"
 #include "plaidml/op/op.h"
@@ -48,17 +47,16 @@ void registerROIAlign() {
 
     op::PoolMode pool_mode;
     switch (mode) {
-      case ngraph::op::v3::ROIAlign::PoolingMode::AVG:
+      case ngraph::opset3::ROIAlign::PoolingMode::AVG:
         pool_mode = op::PoolMode::AVG;
         break;
-      case ngraph::op::v3::ROIAlign::PoolingMode::MAX:
+      case ngraph::opset3::ROIAlign::PoolingMode::MAX:
         pool_mode = op::PoolMode::MAX;
         break;
       default:
         std::runtime_error("Unsupported Pooling Mode");
     }
 
-    // Crop, Resize and Pool
     std::vector<edsl::Tensor> pooled_rois;
     for (int i = 0; i < num_rois; i++) {
       auto x_1 = spatial_scale * boxes[4 * i];
@@ -75,8 +73,9 @@ void registerROIAlign() {
       auto indices_h = edsl::index({edsl::TensorDim(total_sampling_h)}, 0) * interval_h + x_1 + interval_h / 2;
       auto indices_w = edsl::index({edsl::TensorDim(total_sampling_w)}, 0) * interval_w + y_1 + interval_w / 2;
 
-      auto batch_X =
-          edsl::gather(X, edsl::Tensor(batch_indices[i])).axis(0).interpolationMode(edsl::InterpolationMode::NEAREST);
+      auto batch_idx = edsl::index({edsl::TensorDim(1)}, 0) + i;
+      auto batch_X = edsl::gather(X, batch_idx).axis(0).interpolationMode(edsl::InterpolationMode::NEAREST);
+
       auto gather_w = edsl::gather(batch_X, indices_w).axis(3).interpolationMode(edsl::InterpolationMode::LINEAR);
       auto gather_h = edsl::gather(gather_w, indices_h).axis(2).interpolationMode(edsl::InterpolationMode::LINEAR);
       auto pooled_T =
