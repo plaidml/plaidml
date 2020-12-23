@@ -31,7 +31,6 @@ using ::testing::HasSubstr;
 
 #if ERRORTRACING
 #define EXPECT_ERROR_LINE(errmsg, eline) EXPECT_THAT(errmsg, HasSubstr(std::to_string(eline)))
-#endif
 #else
 #define EXPECT_ERROR_LINE(errmsg, eline) EXPECT_THAT(errmsg, HasSubstr(":0"));
 #endif
