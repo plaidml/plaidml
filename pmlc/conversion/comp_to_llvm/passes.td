@@ -17,13 +17,4 @@ def ConvertCompToLLVM : Pass<"pmlc-convert-comp-to-llvm", "mlir::ModuleOp"> {
   ];
 }
 
-def ConvertCompToLevelZero : Pass<"pmlc-convert-comp-to-level-zero", "mlir::ModuleOp"> {
-  let summary = "Convert comp operations to level zero runtime calls";
-  let constructor = "pmlc::conversion::comp_to_llvm::createConvertCompToLevelZeroPass()";
-  let dependentDialects = [
-    "mlir::LLVM::LLVMDialect",
-    "mlir::StandardOpsDialect"
-  ];
-}
-
 #endif // __PMLC_CONVERSION_COMP_TO_LLVM_PASSES__

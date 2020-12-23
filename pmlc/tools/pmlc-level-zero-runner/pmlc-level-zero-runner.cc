@@ -23,6 +23,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/FileUtilities.h"
+#include "mlir/Transforms/Passes.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/TargetSelect.h"
@@ -31,8 +32,11 @@
 #include "pmlc/compiler/program.h"
 #include "pmlc/conversion/comp_to_llvm/passes.h"
 #include "pmlc/conversion/gpu/passes.h"
+#include "pmlc/conversion/gpu_to_spirv/passes.h"
 #include "pmlc/rt/executable.h"
 #include "pmlc/rt/runtime_registry.h"
+#include "pmlc/target/intel_gen/passes.h"
+#include "pmlc/target/intel_level_zero/passes.h"
 #include "pmlc/util/logging.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
@@ -40,28 +44,64 @@ using pmlc::compiler::Program;
 using pmlc::rt::Executable;
 using pmlc::util::BufferPtr;
 namespace comp = pmlc::dialect::comp;
+namespace L0 = pmlc::target::intel_level_zero;
+
+struct OclPipelineOptions : public PassPipelineOptions<OclPipelineOptions> {
+  Option<bool> useBlockOps{*this, "use-block-ops",
+                           llvm::cl::desc("Support for block operations"),
+                           llvm::cl::initializer(true)};
+  Option<unsigned> spirvVersion{*this, "spirv-version",
+                                llvm::cl::desc("SPIR-V Version"),
+                                llvm::cl::initializer(150)};
+};
 
 static LogicalResult runMLIRPasses(ModuleOp module) {
-  PassManager passManager(module.getContext());
-  applyPassManagerCLOptions(passManager);
+  PassManager pm(module.getContext());
+  applyPassManagerCLOptions(pm);
 
-  passManager.addPass(pmlc::conversion::gpu::createGpuKernelOutliningPass(
+  OclPipelineOptions oclPipelineOptions;
+
+  // Lower mapped scf.parallel's to GPU
+  pm.addPass(pmlc::target::intel_gen::createParallelLoopToGpuPass());
+  pm.addPass(createCanonicalizerPass());
+
+  pm.addPass(
+      L0::createAddSpirvTargetPass(oclPipelineOptions.spirvVersion.getValue()));
+  pm.addPass(pmlc::conversion::gpu::createGpuKernelOutliningPass(
       comp::ExecEnvRuntime::OpenCL, /*memorySpace=*/11));
+  // pm.addPass(conversion::gpu::createGatherGpuLaunchFuncsPass());
+  // pm.addPass(comp::createMinimizeBufferTransfersPass());
+  // pm.addPass(comp::createExecEnvCoalescingPass());
+  // pm.addPass(comp::createMinimizeAllocationsPass());
+  // pm.addPass(comp::createRemoveRedundantRWPass());
+  // pm.addPass(comp::createRecalculateEventDepsPass(/*safeDealloc=*/false));
 
-  passManager.addPass(createLegalizeStdOpsForSPIRVLoweringPass());
-  passManager.addPass(createConvertGPUToSPIRVPass());
-  OpPassManager &modulePM = passManager.nest<spirv::ModuleOp>();
-  modulePM.addPass(spirv::createLowerABIAttributesPass());
-  modulePM.addPass(spirv::createUpdateVersionCapabilityExtensionPass());
-  passManager.addPass(
-      pmlc::conversion::comp_to_llvm::createConvertCompToLLVMPass());
-  passManager.addPass(createLowerToLLVMPass(LowerToLLVMOptions{
-      /*useBarePtrCallConv=*/false,
-      /*emitCWrappers=*/true,
-      /*indexBitwidth=*/kDeriveIndexBitwidthFromDataLayout,
-      /*useAlignedAlloc=*/false,
-  }));
-  return passManager.run(module);
+  // GPU to SPIR-V.
+  pm.addPass(createLegalizeStdOpsForSPIRVLoweringPass());
+  pm.addPass(mlir::createCanonicalizerPass());
+  pm.addPass(mlir::createCSEPass());
+
+  bool nonUniformBroadcast = false;
+  if (oclPipelineOptions.spirvVersion.getValue() >= 150) {
+    nonUniformBroadcast = true;
+  }
+  pm.addPass(pmlc::conversion::gpu_to_spirv::createGPUToSPIRVCustomPass(
+      nonUniformBroadcast));
+
+  // SPIR-V passes for lowering attributes.
+  pm.addPass(L0::createSetSubgroupSizePass());
+  pm.addPass(L0::createSetAccessQualifiersPass());
+  pm.addPass(L0::createLegalizeSpirvPass());
+  pm.addPass(spirv::createLowerABIAttributesPass());
+  pm.addPass(spirv::createUpdateVersionCapabilityExtensionPass());
+
+  // Comp to LLVM - LevelZero function calls.
+  pm.addPass(pmlc::conversion::comp_to_llvm::createConvertCompToLLVMPass(
+      "level_zero_"));
+
+  // Convert to LLVM code.
+  pm.addPass(pmlc::target::intel_gen::createConvertStandardToLLVM());
+  return pm.run(module);
 }
 
 namespace {
@@ -127,6 +167,7 @@ int main(int argc, char **argv) {
   llvm::InitializeNativeTarget();
   llvm::InitializeNativeTargetAsmPrinter();
   mlir::initializeLLVMPasses();
+  pmlc::rt::registerRuntimes();
   pmlc::rt::initRuntimes();
 
   return JitRunnerMain(argc, argv);

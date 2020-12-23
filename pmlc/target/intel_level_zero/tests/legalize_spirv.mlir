@@ -1,4 +1,4 @@
-// RUN: pmlc-opt --intel-gen-ocl-legalize-spirv %s | FileCheck %s
+// RUN: pmlc-opt --intel-level-zero-legalize-spirv %s | FileCheck %s
 
 spv.module @__spv__main_kernel Physical64 OpenCL requires #spv.vce<v1.0, [Kernel, Addresses], []> {
   // CHECK: spv.globalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi64>, Input>

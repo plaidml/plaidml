@@ -8,4 +8,4 @@ func @eltwise_add(%A: !tensor, %B: !tensor, %C: !tensor) -> !tensor {
   return %1 : !tensor
 }
 
-// CHECK: llvm.call @levelZeroScheduleFunc
+// CHECK: llvm.call @level_zero_schedule_compute

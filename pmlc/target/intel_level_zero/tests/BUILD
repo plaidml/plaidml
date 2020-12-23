@@ -4,6 +4,7 @@ load("//pmlc:lit.bzl", "glob_lit_tests")
 
 package(default_visibility = ["//visibility:public"])
 
+# Disable LevelZero tests
 glob_lit_tests(
-    data = ["//pmlc/rt/opencl:clprobe"],
+    data = ["//pmlc/rt/level_zero:level_zero_probe"],
 )
