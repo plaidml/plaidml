@@ -27,8 +27,7 @@
 
 #include "pmlc/compiler/registry.h"
 #include "pmlc/conversion/comp_to_llvm/passes.h"
-#include "pmlc/conversion/gpu/lowering.h"
-#include "pmlc/conversion/gpu_to_comp/passes.h"
+#include "pmlc/conversion/gpu/passes.h"
 #include "pmlc/conversion/gpu_to_spirv/passes.h"
 #include "pmlc/conversion/pxa_to_affine/passes.h"
 #include "pmlc/conversion/stdx_to_llvm/passes.h"
@@ -43,6 +42,7 @@
 #include "pmlc/dialect/tile/transforms/passes.h"
 #include "pmlc/target/intel_gen/passes.h"
 #include "pmlc/target/intel_level_zero/passes.h"
+#include "pmlc/transforms/passes.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
 
@@ -70,6 +70,8 @@ void pipelineBuilder(OpPassManager &pm,
   pm.addPass(tile::createComputeBoundsPass());
   pm.addPass(tile::createPadRangesPass());
   pm.addPass(tile::createPadConstraintsPass());
+  pm.addPass(tile::createSplitMainPass());
+  pm.addPass(transforms::createHoistingPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
@@ -87,7 +89,8 @@ void pipelineBuilder(OpPassManager &pm,
 
   // Do tiled fusion
   pm.addPass(pxa::createFusionPass(/*memoryActivityThreshold=*/0,
-                                   /*exactlyMatch=*/false, /*tiledFusion=*/true,
+                                   /*exactlyMatch=*/false,
+                                   /*tiledFusion=*/true,
                                    /*loopDepth=*/3));
   pm.addPass(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
@@ -132,9 +135,8 @@ void pipelineBuilder(OpPassManager &pm,
   pm.addPass(createCSEPass());
 
   // Unroll affine.for loops.
-  pm.addPass(createLoopUnrollPass(
-      /*unrollFactor=*/256,
-      /*unrollUpToFactor=*/true));
+  pm.addPass(pmlc::dialect::affinex::createAffinexLoopUnroll(
+      /*operationLimit =*/2048));
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
@@ -175,15 +177,14 @@ void pipelineBuilder(OpPassManager &pm,
   // Do kernel outlining
   pm.addPass(
       createAddSpirvTargetPass(oclPipelineOptions.spirvVersion.getValue()));
-  pm.addPass(conversion::gpu::createGpuKernelOutliningPass());
-
-  // Convert GPU to comp.
-  pm.addPass(pmlc::conversion::gpu_to_comp::createConvertGpuToCompPass(
+  pm.addPass(conversion::gpu::createGpuKernelOutliningPass(
       comp::ExecEnvRuntime::OpenCL, /*memorySpace=*/11));
-  pm.addPass(comp::createExecEnvCoalescingPass());
-  pm.addPass(comp::createMinimizeAllocationsPass());
-  pm.addPass(comp::createRemoveRedundantRWPass());
-  pm.addPass(comp::createRecalculateEventDepsPass(/*safeDealloc=*/false));
+  // pm.addPass(conversion::gpu::createGatherGpuLaunchFuncsPass());
+  // pm.addPass(comp::createMinimizeBufferTransfersPass());
+  // pm.addPass(comp::createExecEnvCoalescingPass());
+  // pm.addPass(comp::createMinimizeAllocationsPass());
+  // pm.addPass(comp::createRemoveRedundantRWPass());
+  // pm.addPass(comp::createRecalculateEventDepsPass(/*safeDealloc=*/false));
 
   // GPU to SPIR-V.
   pm.addPass(createLegalizeStdOpsForSPIRVLoweringPass());
@@ -204,12 +205,9 @@ void pipelineBuilder(OpPassManager &pm,
   pm.addPass(spirv::createLowerABIAttributesPass());
   pm.addPass(spirv::createUpdateVersionCapabilityExtensionPass());
 
-  // Comp to LLVM - OpenCL function calls.
-  // pm.addPass(pmlc::conversion::comp_to_llvm::createConvertCompToOclPass());
-
-  // Comp to LLVM - L0 function calls.
-  pm.addPass(
-      pmlc::conversion::comp_to_llvm::createConvertCompToLevelZeroPass());
+  // Comp to LLVM - LevelZero function calls.
+  pm.addPass(pmlc::conversion::comp_to_llvm::createConvertCompToLLVMPass(
+      "level_zero_"));
 
   // Convert to LLVM code.
   pm.addPass(pmlc::target::intel_gen::createConvertStandardToLLVM());

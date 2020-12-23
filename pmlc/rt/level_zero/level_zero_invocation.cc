@@ -47,15 +47,17 @@ void LevelZeroKernel::enqueue(ze_command_list_handle_t list,
                               ze_group_count_t gws, ze_group_count_t lws,
                               ze_event_handle_t &resultE) {
   // Need to find a better way to find right group count.
-  // lzu::append_launch_function(list, kernel, &gws, resultE,
-  // dependencies.size(), dependencies.data());
-  ze_group_count_t groupCount = {
-      gws.groupCountX / lws.groupCountX,
-      gws.groupCountY / lws.groupCountY,
-      gws.groupCountZ / lws.groupCountZ,
-  };
-  lzu::append_launch_function(list, kernel, &groupCount, resultE,
-                              dependencies.size(), dependencies.data());
+  lzu::append_launch_function(list, kernel, &gws, resultE, dependencies.size(),
+                              dependencies.data());
+  // As changes in wrapper, do not need to divide now.
+  // ze_group_count_t groupCount = {
+  //    gws.groupCountX / lws.groupCountX,
+  //    gws.groupCountY / lws.groupCountY,
+  //    gws.groupCountZ / lws.groupCountZ,
+  //};
+  // lzu::append_launch_function(list, kernel, &groupCount, resultE,
+  //                            dependencies.size(), dependencies.data());
+  dependencies.clear();
 }
 
 LevelZeroEvent::LevelZeroEvent(ze_event_handle_t event,
@@ -93,9 +95,9 @@ LevelZeroInvocation::~LevelZeroInvocation() {
   for (std::unique_ptr<LevelZeroEvent> &event : events) {
     eventPool.destroy_event(event->getEvent());
   }
-  for (size_t i = 0; i < kernels.size(); i++) {
-    delete kernels[i];
-  }
+  // for (size_t i = 0; i < kernels.size(); i++) {
+  //  delete kernels[i];
+  //}
 }
 
 LevelZeroMemory *LevelZeroInvocation::allocateMemory(size_t bytes) {
@@ -145,7 +147,7 @@ LevelZeroKernel *LevelZeroInvocation::createKernelFromIL(char *data,
       ZE_MODULE_FORMAT_IL_SPIRV, "", nullptr);
 
   LevelZeroKernel *kernel = new LevelZeroKernel(module, name);
-  kernels.push_back(kernel);
+  // kernels.push_back(kernel);
   return kernel;
 }
 
