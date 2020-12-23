@@ -12,7 +12,6 @@ filegroup(
     name = "lit_tests",
     srcs = [
         "//pmlc/conversion/comp_to_llvm/tests:all",
-        "//pmlc/conversion/gpu_to_comp/tests:all",
         "//pmlc/conversion/gpu_to_spirv/tests:all",
         "//pmlc/conversion/pxa_to_affine/tests:all",
         "//pmlc/conversion/stdx_to_llvm/tests:all",
@@ -29,7 +28,6 @@ filegroup(
         "//pmlc/rt/levle_zero/tests:all",
         "//pmlc/rt/tests:all",
         "//pmlc/rt/vulkan/tests:all",
-        "//pmlc/target/intel_gen/tests:all",
         "//pmlc/target/x86/tests:all",
         "//pmlc/target/intel_level_zero/tests:all",
     ],
@@ -63,7 +61,6 @@ plaidml_cc_library(
         ":hdrs",
         "//pmlc/conversion/comp_to_llvm",
         "//pmlc/conversion/gpu",
-        "//pmlc/conversion/gpu_to_comp",
         "//pmlc/conversion/gpu_to_spirv",
         "//pmlc/conversion/pxa_to_affine",
         "//pmlc/conversion/scf_to_omp",

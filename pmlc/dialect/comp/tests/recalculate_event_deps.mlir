@@ -16,42 +16,6 @@ func @chain_of_two(%env: !comp.execenv<ocl:0,(11)>, %host: memref<2x3xf32>) {
   return
 }
 
-// -----
-
-module attributes {gpu.container_module} {
-  // CHECK-LABEL: func @schedule_func
-  //       CHECK:   %[[EV1:.*]] = comp.schedule_write %{{.*}} to %{{.*}} on %{{.*}} :
-  //   CHECK-NOT:   comp.wait
-  //       CHECK:   %[[EV2:.*]] = "comp.schedule_func"(%{{.*}}, %[[EV1]])
-  //   CHECK-NOT:   comp.wait
-  //       CHECK:   %[[EV3:.*]] = comp.schedule_read %{{.*}} from %{{.*}} on %{{.*}} wait for
-  //  CHECK-SAME:     %[[EV2]]
-  //       CHECK:   comp.wait %[[EV3]]
-  func @schedule_func(%env : !comp.execenv<ocl:0,(11)>, %host: memref<2x3xf32>) {
-    %c1 = constant 1 : index
-    %mem = comp.alloc %env : (!comp.execenv<ocl:0,(11)>) -> memref<2x3xf32, 11>
-    %ev1 = comp.schedule_write %host to %mem on %env : (memref<2x3xf32>, memref<2x3xf32, 11>, !comp.execenv<ocl:0,(11)>) -> !comp.event<ocl>
-    comp.wait %ev1 : !comp.event<ocl>
-    %ev2 = "comp.schedule_func"(%env) ({
-      "gpu.launch_func"(%c1, %c1, %c1, %c1, %c1, %c1, %mem) {kernel = @gpu_module::@kernel} : (index, index, index, index, index, index, memref<2x3xf32, 11>) -> ()
-      "comp.schedule_end"() : () -> ()
-    }) : (!comp.execenv<ocl:0,(11)>) -> !comp.event<ocl>
-    comp.wait %ev2 : !comp.event<ocl>
-    %ev3 = comp.schedule_read %host from %mem on %env : (memref<2x3xf32>, memref<2x3xf32, 11>, !comp.execenv<ocl:0,(11)>) -> !comp.event<ocl>
-    comp.wait %ev3 : !comp.event<ocl>
-    comp.dealloc %env %mem : (!comp.execenv<ocl:0,(11)>, memref<2x3xf32, 11>) -> ()
-    return
-  }
-
-  gpu.module @gpu_module {
-    gpu.func @kernel(%arg0: memref<2x3xf32, 11>) kernel attributes {spv.entry_point_abi = {local_size = dense<[1, 1, 1]> : vector<3xi32>}} {
-      gpu.return
-    }
-  }
-}
-
-// -----
-
 // CHECK-LABEL: func @external_event
 //  CHECK-SAME:     %[[EXT:[a-zA-Z0-9]*]]: !comp.event
 //       CHECK:   %[[EV1:.*]] = comp.schedule_write %{{.*}} to %{{.*}} on %{{.*}} :

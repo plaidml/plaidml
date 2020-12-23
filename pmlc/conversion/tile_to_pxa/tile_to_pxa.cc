@@ -1337,22 +1337,20 @@ struct ScatterOpConversion : public OpConversionPattern<tile::ScatterOp> {
     auto resultMemRef =
         rewriter.create<AllocOp>(loc, resultMemRefType).getResult();
 
-    if (op.mode() != ScatterMode::normal) {
-      auto dataShape = data.getType().cast<MemRefType>().getShape();
-      auto copyLoop = rewriter.create<AffineParallelOp>(
-          loc, ArrayRef<Type>{data.getType()},
-          ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign}, dataShape);
-      rewriter.setInsertionPointToStart(copyLoop.getBody());
-      size_t dataDims = dataShape.size();
-      auto dataLoadMap = AffineMap::getMultiDimIdentityMap(dataDims, ctx);
-      auto loadData = rewriter.create<pxa::PxaLoadOp>(loc, data, dataLoadMap,
-                                                      copyLoop.getIVs());
-      auto stored = buildSimpleStore(rewriter, loc, loadData, resultMemRef,
-                                     tile::getPaddingInfo(op));
+    auto dataShape = data.getType().cast<MemRefType>().getShape();
+    auto copyLoop = rewriter.create<AffineParallelOp>(
+        loc, ArrayRef<Type>{data.getType()},
+        ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign}, dataShape);
+    rewriter.setInsertionPointToStart(copyLoop.getBody());
+    size_t dataDims = dataShape.size();
+    auto dataLoadMap = AffineMap::getMultiDimIdentityMap(dataDims, ctx);
+    auto loadData = rewriter.create<pxa::PxaLoadOp>(loc, data, dataLoadMap,
+                                                    copyLoop.getIVs());
+    auto stored = buildSimpleStore(rewriter, loc, loadData, resultMemRef,
+                                   tile::getPaddingInfo(op));
 
-      rewriter.create<AffineYieldOp>(loc, ArrayRef<Value>{stored});
-      rewriter.setInsertionPointAfter(copyLoop);
-    }
+    rewriter.create<AffineYieldOp>(loc, ArrayRef<Value>{stored});
+    rewriter.setInsertionPointAfter(copyLoop);
 
     // Get the shape of the update tensor and create a parallel loop over its
     // indexes; we will load each value from the updates, load its destination

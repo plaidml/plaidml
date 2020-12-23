@@ -15,7 +15,6 @@ pml_cc_library(
     pmlc::compiler
     pmlc::conversion::comp_to_llvm
     pmlc::conversion::gpu
-    pmlc::conversion::gpu_to_comp
     pmlc::conversion::gpu_to_spirv
     pmlc::conversion::pxa_to_affine
     pmlc::conversion::stdx_to_llvm
@@ -26,6 +25,7 @@ pml_cc_library(
     pmlc::dialect::pxa::transforms
     pmlc::dialect::stdx::transforms
     pmlc::dialect::tile::transforms
+    pmlc::transforms
     pmlc::target::intel_gen
     pmlc::target::x86::prng_lowering
     MLIRAffineToStandard
