@@ -595,9 +595,7 @@ inline Tensor Contraction::build(edsl_source_location loc) {
     if (!strstr(loc.file_name(), "edsl/edsl.h")) {
       ss << "Exception at " << loc.file_name() << ":" << std::to_string(loc.line());
     } else {
-      ss << "Exception at "
-         << "??"
-         << ":" << std::to_string(0);
+      ss << "Exception at ??:0";
     }
     ss << " with message: Rank mismatch between outShape and outAccess";
     throw std::runtime_error(ss.str());
@@ -665,9 +663,7 @@ inline TensorLens::TensorLens(const std::string& source, const std::string& targ
     if (!strstr(loc.file_name(), "edsl/edsl.h")) {
       ss << "Exception at " << loc.file_name() << ":" << std::to_string(loc.line());
     } else {
-      ss << "Exception at "
-         << "??"
-         << ":" << std::to_string(0);
+      ss << "Exception at ??:0";
     }
     ss << " with message: source and target rank mismatch: " << source << " != " << target;
     throw std::runtime_error(ss.str());
@@ -679,9 +675,7 @@ inline TensorLens::TensorLens(const std::string& source, const std::string& targ
       if (!strstr(loc.file_name(), "edsl/edsl.h")) {
         ss << "Exception at " << loc.file_name() << ":" << std::to_string(loc.line());
       } else {
-        ss << "Exception at "
-           << "??"
-           << ":" << std::to_string(0);
+        ss << "Exception at ??:0";
       }
       ss << " with message: source and target dims mismatch: " << source << " != " << target;
       throw std::runtime_error(ss.str());
@@ -700,9 +694,7 @@ inline std::vector<T> TensorLens::apply(const std::vector<T>& dims, edsl_source_
     if (!strstr(loc.file_name(), "edsl/edsl.h")) {
       ss << "Exception at " << loc.file_name() << ":" << std::to_string(loc.line());
     } else {
-      ss << "Exception at "
-         << "??"
-         << ":" << std::to_string(0);
+      ss << "Exception at ??:0";
     }
     ss << " with message: rank mismatch in TensorLens apply";
     throw std::runtime_error(ss.str());
@@ -774,7 +766,7 @@ inline Tensor Placeholder(             //
     const std::vector<int64_t>& dims,  //
     const std::string& name = "",      //
     edsl_source_location loc = edsl_source_location::current()) {
-  TensorShape shape(dtype, dims);
+  TensorShape shape(dtype, dims, loc);
   return Placeholder(shape, name, loc);
 }
 
@@ -1494,9 +1486,7 @@ class Value {
     if (!strstr(loc.file_name(), "edsl/edsl.h")) {
       ss << "Exception at " << loc.file_name() << ":" << std::to_string(loc.line());
     } else {
-      ss << "Exception at "
-         << "??"
-         << ":" << std::to_string(0);
+      ss << "Exception at ??:0";
     }
     ss << " with message: Value cannot be coerced into Tensor";
     throw std::runtime_error(ss.str());
