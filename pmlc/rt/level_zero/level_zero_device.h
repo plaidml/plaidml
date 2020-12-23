@@ -10,7 +10,7 @@
 
 namespace pmlc::rt::level_zero {
 
-/// OpenCL command queue wrapper.
+/// LevelZero command queue wrapper.
 class LevelZeroQueue {
 public:
   LevelZeroQueue(const ze_context_handle_t &context,
@@ -21,7 +21,7 @@ public:
   /// Returns wrapped level_zero queue.
   ze_command_queue_handle_t getLevelZeroQueue() { return queue; }
   ze_command_list_handle_t getLevelZeroList() { return list; }
-  /// Returns properties wrapped OpenCL queue was created with.
+  /// Returns properties wrapped LevelZero queue was created with.
   ze_command_queue_group_properties_t getLevelZeroProperties() {
     return properties;
   }
@@ -34,14 +34,9 @@ private:
 
 class LevelZeroQueueGuard;
 
-/// Class providing RAII idiomatic way for reserving OpenCLQueue for use.
-/// This class is not intended to be created manually, instead instance
-/// should be obtained from OpenCLDevice.
-/// Upon destruction this queue will be released and made availiable for
-/// future reuse.
 class LevelZeroQueueUser {
 public:
-  /// Creates null user not referencing any level zero queue.
+  /// Creates null user not referencing any LevelZero queue.
   LevelZeroQueueUser();
   /// Deleted copy constructor.
   LevelZeroQueueUser(const LevelZeroQueueUser &copy) = delete;
@@ -52,7 +47,7 @@ public:
   /// Deleted copy assignment.
   LevelZeroQueueUser &operator=(const LevelZeroQueueUser &) = delete;
 
-  /// Returns level zero queue this user has reserved.
+  /// Returns LevelZero queue this user has reserved.
   ze_command_queue_handle_t getLevelZeroQueue() {
     return queue->getLevelZeroQueue();
   }

@@ -1,4 +1,4 @@
-// RUN: pmlc-opencl-runner %s | FileCheck %s
+// RUN: pmlc-level-zero-runner %s | FileCheck %s
 
 // CHECK: [3.3,  3.3,  3.3,  3.3,  3.3,  3.3,  3.3,  3.3]
 module attributes {

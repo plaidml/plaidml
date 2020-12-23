@@ -109,8 +109,8 @@ void pipelineBuilder(OpPassManager &pm,
   pm.addPass(createCSEPass());
 
   // Data layout optimization.
-  pm.addPass(createIntelGenOclReorderLayoutsPass(/*maxThreads=*/64,
-                                                 /*allowReorder=*/false));
+  pm.addPass(createIntelLevelZeroReorderLayoutsPass(/*maxThreads=*/64,
+                                                    /*allowReorder=*/false));
   pm.addPass(pxa::createSimplifyWithConstraintsPass());
   pm.addPass(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());

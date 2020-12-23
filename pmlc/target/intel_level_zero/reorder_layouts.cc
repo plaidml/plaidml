@@ -125,12 +125,12 @@ public:
 
 } // namespace
 
-std::unique_ptr<mlir::Pass> createIntelGenOclReorderLayoutsPass() {
+std::unique_ptr<mlir::Pass> createIntelLevelZeroReorderLayoutsPass() {
   return std::make_unique<IntelLevelZeroReorderLayoutsPass>();
 }
 
 std::unique_ptr<mlir::Pass>
-createIntelGenOclReorderLayoutsPass(unsigned maxThreads, bool allowReorder) {
+createIntelLevelZeroReorderLayoutsPass(unsigned maxThreads, bool allowReorder) {
   return std::make_unique<IntelLevelZeroReorderLayoutsPass>(maxThreads,
                                                             allowReorder);
 }

@@ -2,7 +2,6 @@ pml_cc_library(
   NAME level_zero
   HDRS register.h
   SRCS
-    common_wrappers.cc
     level_zero_device.cc
     level_zero_device.h
     level_zero_invocation.cc
@@ -11,8 +10,6 @@ pml_cc_library(
     level_zero_wrappers.cc
     level_zero_utils.h
     level_zero_utils.cc
-    utils.cc
-    utils.h
   DEPS
     pmlc::compiler
     pmlc::rt
@@ -26,8 +23,6 @@ pml_cc_binary(
     NAME level_zero_probe
     SRCS
       level_zero_probe.cc
-    COPTS
-      -g
     DEPS
       pmlc::rt::level_zero
       pmlc::rt

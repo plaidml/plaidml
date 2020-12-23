@@ -10,7 +10,6 @@ LevelZeroQueue::LevelZeroQueue(const ze_context_handle_t &context,
                                const ze_device_handle_t &device,
                                ze_command_queue_group_properties_t properties)
     : properties(properties) {
-  // seems no need to use proiority
   queue = lzu::create_command_queue(context, device, 0,
                                     ZE_COMMAND_QUEUE_MODE_DEFAULT,
                                     ZE_COMMAND_QUEUE_PRIORITY_NORMAL, 0, 0);
@@ -65,7 +64,6 @@ LevelZeroDevice::LevelZeroDevice(ze_driver_handle_t driver,
 }
 
 LevelZeroDevice::~LevelZeroDevice() {
-  // TODO maybe other place
   // Once multiple devices, shall change
   clearQueues();
   lzu::destroy_context(context);
@@ -82,6 +80,7 @@ LevelZeroDevice::getQueue(ze_command_queue_group_properties_t properties) {
   // Lock modification of queues vector.
   std::lock_guard<std::mutex> lock(queuesMutex);
   for (std::unique_ptr<LevelZeroQueueGuard> &guard : queues) {
+    // Use same kind of queue now, open once open new device
     if (/*!(guard->getLevelZeroProperties() & properties) ||*/ guard
             ->isUsed()) {
       continue;
@@ -91,7 +90,7 @@ LevelZeroDevice::getQueue(ze_command_queue_group_properties_t properties) {
       return user;
   }
   // Because queues is locked and not visible to other threads yet it
-  // is safe to assume that new guard will return non-empty OpenCLQueueUser.
+  // is safe to assume that new guard will return non-empty LevelZeroQueueUser.
   LevelZeroQueue *newQueue = new LevelZeroQueue(context, device, properties);
   queues.emplace_back(std::make_unique<LevelZeroQueueGuard>(newQueue));
   return queues.back()->use();

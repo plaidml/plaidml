@@ -21,7 +21,7 @@ def IntelLevelZeroSetSubgroupSize : Pass<"intel-level-zero-set-subgroup-size", "
 }
 
 def IntelLevelZeroLegalizeSpirv : Pass<"intel-level-zero-legalize-spirv", "mlir::spirv::ModuleOp"> {
-  let summary = "Legalize spirv for OpenCL execution environment";
+  let summary = "Legalize spirv for LevelZero execution environment";
   let constructor = "pmlc::target::intel_level_zero::createLegalizeSpirvPass()";
   let dependentDialects = ["mlir::spirv::SPIRVDialect"];
 }
@@ -29,7 +29,7 @@ def IntelLevelZeroLegalizeSpirv : Pass<"intel-level-zero-legalize-spirv", "mlir:
 def IntelLevelZeroReorderLayouts : FunctionPass<"intel-level-zero-reorder-layouts"> {
   let summary = "Optimize data layouts for Intel GPUs";
   let description = [{
-    Specialization of pxa-reorder-layouts for Intel GPUs with OpenCL backend.
+    Specialization of pxa-reorder-layouts for Intel GPUs with LevelZero backend.
     It extends scheduling operation to take into account reversed order
     global and local dimensions are processed by backend.
     Additionally it interleaves global and local loops with sequential ones
@@ -38,7 +38,7 @@ def IntelLevelZeroReorderLayouts : FunctionPass<"intel-level-zero-reorder-layout
     Reorders created by this pass conform to GPU threading semantics with
     separate global and local loops.
   }];
-  let constructor = "pmlc::target::intel_level_zero::createIntelGenOclReorderLayoutsPass()";
+  let constructor = "pmlc::target::intel_level_zero::createIntelLevelZeroReorderLayoutsPass()";
   let options = [
     Option<"maxThreads", "max-threads", "unsigned", /*default=*/"64",
            "Set maximum/goal inner threads for created reorders">,

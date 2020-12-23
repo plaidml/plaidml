@@ -16,9 +16,9 @@ std::unique_ptr<mlir::Pass> createSetSubgroupSizePass();
 
 std::unique_ptr<mlir::Pass> createLegalizeSpirvPass();
 
-std::unique_ptr<mlir::Pass> createIntelGenOclReorderLayoutsPass();
+std::unique_ptr<mlir::Pass> createIntelLevelZeroReorderLayoutsPass();
 std::unique_ptr<mlir::Pass>
-createIntelGenOclReorderLayoutsPass(unsigned maxThreads, bool allowReorder);
+createIntelLevelZeroReorderLayoutsPass(unsigned maxThreads, bool allowReorder);
 
 std::unique_ptr<mlir::Pass> createSetAccessQualifiersPass();
 

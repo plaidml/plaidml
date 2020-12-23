@@ -1,4 +1,4 @@
-// RUN: pmlc-opt --intel-gen-ocl-set-subgroup-size %s | FileCheck %s
+// RUN: pmlc-opt --intel-level-zero-set-subgroup-size %s | FileCheck %s
 
 spv.module @subgroup Physical64 OpenCL {
   spv.func @kernel() "None" attributes {spv.entry_point_abi = {local_size = dense<[16, 3, 3]> : vector<3xi32>}, workgroup_attributions = 0 : i64} {

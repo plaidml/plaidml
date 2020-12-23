@@ -46,16 +46,14 @@ void LevelZeroKernel::setArg(unsigned idx, LevelZeroMemory *memory) {
 void LevelZeroKernel::enqueue(ze_command_list_handle_t list,
                               ze_group_count_t gws, ze_group_count_t lws,
                               ze_event_handle_t &resultE) {
+  // Need to find a better way to find right group count.
+  // lzu::append_launch_function(list, kernel, &gws, resultE,
+  // dependencies.size(), dependencies.data());
   ze_group_count_t groupCount = {
       gws.groupCountX / lws.groupCountX,
       gws.groupCountY / lws.groupCountY,
       gws.groupCountZ / lws.groupCountZ,
   };
-  // lzu::append_launch_function(list, kernel, &gws, resultE,
-  // dependencies.size(),
-  //                            dependencies.data());
-  // lzu::append_launch_function(
-  //    list, kernel, &lws, resultE, dependencies.size(), dependencies.data());
   lzu::append_launch_function(list, kernel, &groupCount, resultE,
                               dependencies.size(), dependencies.data());
 }
@@ -77,6 +75,8 @@ LevelZeroInvocation::LevelZeroInvocation(LevelZeroDevice *device)
     : device{device->shared_from_this()}, queueUser(device->getQueue(p)) {
   // Need a way to ensure event is not used and then can release it
   eventPool.InitEventPool(device->getLevelZeroContext(), 600);
+
+  // May create queue based on properties once multiple device used
   // ze_command_queue_group_properties_t p;
   // p.flags = ZE_COMMAND_QUEUE_GROUP_PROPERTY_FLAG_COMPUTE;
   // queueUser = device->getQueue(p);
@@ -96,63 +96,10 @@ LevelZeroInvocation::~LevelZeroInvocation() {
   for (size_t i = 0; i < kernels.size(); i++) {
     delete kernels[i];
   }
-  // device->clearQueues();
-#if 0
-  // Gather profiling information.
-  using std::chrono::nanoseconds;
-  using fp_milliseconds =
-      std::chrono::duration<double, std::chrono::milliseconds::period>;
-  // Calculate total time as difference between earliest enqueue
-  // and latest execution end.
-  cl_ulong allQueued = static_cast<cl_ulong>(-1);
-  cl_ulong allEnd = 0;
-  nanoseconds totalExecuteTime{0};
-  nanoseconds kernelExecuteTime{0};
-  nanoseconds memoryExecuteTime{0};
-  unsigned kernelsCnt = 0;
-  unsigned memoryCnt = 0;
-  for (std::unique_ptr<LevelZeroEvent> &event : events) {
-    cl::Event oclEvent = event->getEvent();
-    cl_ulong queued = oclEvent.getProfilingInfo<CL_PROFILING_COMMAND_QUEUED>();
-    cl_ulong start = oclEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>();
-    cl_ulong end = oclEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>();
-
-    allQueued = std::min(allQueued, queued);
-    allEnd = std::max(allEnd, end);
-
-    nanoseconds executeTime{end - start};
-    totalExecuteTime += executeTime;
-
-    if (event->getKind() == LevelZeroActionKind::Kernel) {
-      kernelExecuteTime += executeTime;
-      kernelsCnt += 1;
-      IVLOG(2, "  Kernel '" << event->getName() << "' execute time: "
-                            << fp_milliseconds(executeTime).count() << "ms");
-    } else if (event->getKind() == LevelZeroActionKind::Read ||
-               event->getKind() == LevelZeroActionKind::Write) {
-      memoryExecuteTime += executeTime;
-      memoryCnt += 1;
-      IVLOG(2, "  Memory " << event->getName() << " execute time: "
-                           << fp_milliseconds(executeTime).count() << "ms");
-    }
-  }
-  nanoseconds totalTime{allEnd - allQueued};
-  IVLOG(1, "Total LevelZero time: " << fp_milliseconds(totalTime).count() << "ms");
-  IVLOG(1, "Total LevelZero execute time: "
-               << fp_milliseconds(totalExecuteTime).count() << "ms");
-  IVLOG(1, "Total LevelZero kernels: " << kernelsCnt);
-  IVLOG(1, "Total LevelZero kernel execute time: "
-               << fp_milliseconds(kernelExecuteTime).count() << "ms");
-  IVLOG(1, "Total LevelZero memory transfers: " << memoryCnt);
-  IVLOG(1, "Total LevelZero memory transfer time: "
-               << fp_milliseconds(memoryExecuteTime).count() << "ms");
-
-  device->execTimeInMS = fp_milliseconds(totalExecuteTime).count();
-#endif
 }
 
 LevelZeroMemory *LevelZeroInvocation::allocateMemory(size_t bytes) {
-  // TODO host memory, device memory
+  // Can add host memory, device memory based on device config
   void *buffer =
       lzu::allocate_shared_memory(bytes, 1, 0, 0, device->getLevelZeroDevice(),
                                   device->getLevelZeroContext());
@@ -160,6 +107,7 @@ LevelZeroMemory *LevelZeroInvocation::allocateMemory(size_t bytes) {
 }
 
 void LevelZeroInvocation::deallocateMemory(LevelZeroMemory *memory) {
+  // Release memory shall depend on the work flow
   // delete memory;
   memories.push_back(memory);
 }
@@ -204,27 +152,13 @@ LevelZeroKernel *LevelZeroInvocation::createKernelFromIL(char *data,
 LevelZeroEvent *LevelZeroInvocation::enqueueKernel(LevelZeroKernel *kernel,
                                                    ze_group_count_t gws,
                                                    ze_group_count_t lws) {
-  // uint32_t groupSizeX, groupSizeY, groupSizeZ;
-  // lzu::suggest_group_size(kernel->getKernel(), gws.groupCountX *
-  // lws.groupCountX, gws.groupCountY * lws.groupCountY, gws.groupCountZ *
-  // lws.groupCountZ, groupSizeX, groupSizeY, groupSizeZ);
-  // lzu::set_group_size(kernel->getKernel(), groupSizeX, groupSizeY,
-  // groupSizeZ); lzu::set_group_size(kernel->getKernel(), gws.groupCountX,
-  // gws.groupCountY, gws.groupCountZ);
   lzu::set_group_size(kernel->getKernel(), lws.groupCountX, lws.groupCountY,
                       lws.groupCountZ);
-  // lzu::set_group_size(kernel->getKernel(), 1, 1, 1);
-  // ze_group_count_t groupCount;
-  // groupCount.groupCountX = gws.groupCountX * lws.groupCountX / groupSizeX;
-  // groupCount.groupCountY = gws.groupCountY * lws.groupCountY / groupSizeY;
-  // groupCount.groupCountZ = gws.groupCountZ * lws.groupCountZ / groupSizeZ;
   ze_event_handle_t event;
   eventPool.create_event(event);
-  // kernel->enqueue(queueUser.getLevelZeroList(), groupCount, lws, event);
   kernel->enqueue(queueUser.getLevelZeroList(), gws, lws, event);
   LevelZeroEvent *result =
       wrapEvent(event, LevelZeroActionKind::Kernel, kernel->getName());
-  // delete kernel;
   return result;
 }
 
@@ -251,7 +185,6 @@ void LevelZeroInvocation::flush() {
 }
 
 void LevelZeroInvocation::finish() {
-  // xin can not wait twice
   lzu::synchronize(queueUser.getLevelZeroQueue(), UINT64_MAX);
 }
 

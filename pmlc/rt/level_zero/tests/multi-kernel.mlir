@@ -1,4 +1,4 @@
-// RUN: pmlc-opencl-runner %s | FileCheck %s
+// RUN: pmlc-level-zero-runner %s | FileCheck %s
 
 // CHECK: [23,   23,   23],
 // CHECK: [23,   23,   23],

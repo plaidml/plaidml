@@ -7,7 +7,6 @@ package(default_visibility = ["//visibility:public"])
 plaidml_cc_library(
     name = "level_zero",
     srcs = [
-        "common_wrappers.cc",
         "level_zero_device.cc",
         "level_zero_device.h",
         "level_zero_invocation.cc",
@@ -16,8 +15,6 @@ plaidml_cc_library(
         "level_zero_wrappers.cc",
         "level_zero_utils.h",
         "level_zero_utils.cc",
-        "utils.h",
-        "utils.cc",
     ],
     hdrs = ["register.h"],
     deps = [
@@ -38,8 +35,6 @@ plaidml_cc_binary(
         "level_zero_probe.cc",
         "level_zero_utils.h",
         "level_zero_utils.cc",
-        "utils.h",
-        "utils.cc",
     ],
     deps = [
         "@Level_Zero//:ze_loader",
@@ -53,8 +48,6 @@ cc_test(
         "level_zero_probe.cc",
         "level_zero_utils.h",
         "level_zero_utils.cc",
-        "utils.h",
-        "utils.cc",
     ],
     deps = [
         "@Level_Zero//:ze_loader",

@@ -52,7 +52,7 @@ void registerRuntime() {
     registerRuntime("level_zero", std::make_shared<LevelZeroRuntime>());
     registerSymbols();
   } catch (std::exception &ex) {
-    IVLOG(2, "Failed to register 'level_zero' runtime: " << ex.what());
+    IVLOG(1, "Failed to register 'level_zero' runtime: " << ex.what());
   }
 }
 
