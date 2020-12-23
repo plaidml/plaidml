@@ -16,44 +16,46 @@ const std::vector<InferenceEngine::Precision> netPrecisions = {
     // InferenceEngine::Precision::FP16
 };
 
-const std::map<ActivationTypes, std::vector<std::vector<float>>> activationTypes = {{Sigmoid, {{}}},
-                                                                                    {Tanh, {{}}},
-                                                                                    // {Relu,        {}},  // TODO
-                                                                                    {Exp, {{}}},
-                                                                                    {Log, {{}}},
-                                                                                    {Sign, {{}}},
-                                                                                    {Abs, {{}}},
-                                                                                    {Clamp, {{-2.0f, 2.0f}}},
-                                                                                    {Negative, {{}}},
-                                                                                    {Acos, {{}}},
-                                                                                    {Acosh, {{}}},
-                                                                                    {Asin, {{}}},
-                                                                                    {Asinh, {{}}},
-                                                                                    {Atan, {{}}},
-                                                                                    {Atanh, {{}}},
-                                                                                    {Cos, {{}}},
-                                                                                    {Cosh, {{}}},
-                                                                                    {Floor, {{}}},
-                                                                                    {Sin, {{}}},
-                                                                                    {Sinh, {{}}},
-                                                                                    {Sqrt, {{}}},
-                                                                                    {Tan, {{}}},
-                                                                                    {Elu, {{0.1f}}},
-                                                                                    {Erf, {{}}},
-                                                                                    {HardSigmoid, {{0.2f, 0.5f}}},
-                                                                                    {Selu, {{1.6732f, 1.0507f}}},
-                                                                                    {Ceiling, {{}}},
-                                                                                    {Swish, {{1.0f}}},
-                                                                                    {Mish, {{}}},
-                                                                                    {HSwish, {{}}},
-                                                                                    {SoftPlus, {{}}}};
+const std::map<ActivationTypes, std::vector<std::vector<float>>> activationTypes = {
+    {Sigmoid, {{}}},
+    {Tanh, {{}}},
+    // {Relu,        {}},  // TODO
+    {Exp, {{}}},
+    {Log, {{}}},
+    {Sign, {{}}},
+    {Abs, {{}}},
+    {Clamp, {{-2.0f, 2.0f}}},
+    {Negative, {{}}},
+    {Acos, {{}}},
+    {Acosh, {{}}},
+    {Asin, {{}}},
+    {Asinh, {{}}},
+    {Atan, {{}}},
+    {Atanh, {{}}},
+    {Cos, {{}}},
+    {Cosh, {{}}},
+    {Floor, {{}}},
+    {Sin, {{}}},
+    {Sinh, {{}}},
+    {Sqrt, {{}}},
+    {Tan, {{}}},
+    {Elu, {{0.1f}}},
+    {Erf, {{}}},
+    {HardSigmoid, {{0.2f, 0.5f}}},
+    {Selu, {{1.6732f, 1.0507f}}},
+    {Ceiling, {{}}},
+    {Swish, {{1.0f}}},
+    {Mish, {{}}},
+    {HSwish, {{}}},
+    {SoftPlus, {{}}},
+};
 
 // TODO
 // const std::map<ActivationTypes, std::vector<std::vector<float>>> activationParamTypes = {
 //     {PReLu, {{-0.01f}}},
 //     {LeakyRelu, {{0.01f}}}
 // };
-//
+
 std::map<std::vector<size_t>, std::vector<std::vector<size_t>>> basic = {
     {{1, 50}, {{}}},
     {{1, 128}, {{}}},
