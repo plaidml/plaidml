@@ -9,10 +9,8 @@
 using LayerTestsDefinitions::BatchNormLayerTest;
 
 namespace {
-const std::vector<InferenceEngine::Precision> netPrecisions = {
-    InferenceEngine::Precision::FP32,
-    // InferenceEngine::Precision::FP16
-};
+const std::vector<InferenceEngine::Precision> netPrecisions = {InferenceEngine::Precision::FP32,
+                                                               InferenceEngine::Precision::FP16};
 
 const std::vector<double> epsilon = {1e-6, 1e-5, 1e-4};
 const std::vector<std::vector<size_t>> inputShapes = {
