@@ -26,7 +26,7 @@ void LevelZeroMemory::enqueueWrite(ze_command_list_handle_t list, void *src,
 
 LevelZeroKernel::LevelZeroKernel(ze_module_handle_t module, std::string name)
     : module(module), name(name) {
-  kernel = lzu::create_function(module, 0, name);
+  kernel = lzu::create_function(module, /*flag*/ 0, name);
 }
 
 LevelZeroKernel::~LevelZeroKernel() {
@@ -46,17 +46,10 @@ void LevelZeroKernel::setArg(unsigned idx, LevelZeroMemory *memory) {
 void LevelZeroKernel::enqueue(ze_command_list_handle_t list,
                               ze_group_count_t gws, ze_group_count_t lws,
                               ze_event_handle_t &resultE) {
-  // Need to find a better way to find right group count.
+  // The usage of gws and lws will depend on their meaning.
+  // "gws / lws" in some cases.
   lzu::append_launch_function(list, kernel, &gws, resultE, dependencies.size(),
                               dependencies.data());
-  // As changes in wrapper, do not need to divide now.
-  // ze_group_count_t groupCount = {
-  //    gws.groupCountX / lws.groupCountX,
-  //    gws.groupCountY / lws.groupCountY,
-  //    gws.groupCountZ / lws.groupCountZ,
-  //};
-  // lzu::append_launch_function(list, kernel, &groupCount, resultE,
-  //                            dependencies.size(), dependencies.data());
   dependencies.clear();
 }
 
@@ -72,13 +65,14 @@ void LevelZeroEvent::wait(const std::vector<LevelZeroEvent *> &events) {
     zeEventHostSynchronize(e, UINT64_MAX);
   }
 }
-ze_command_queue_group_properties_t p;
+
 LevelZeroInvocation::LevelZeroInvocation(LevelZeroDevice *device)
     : device{device->shared_from_this()}, queueUser(device->getQueue(p)) {
-  // Need a way to ensure event is not used and then can release it
-  eventPool.InitEventPool(device->getLevelZeroContext(), 600);
+  // Create an eventPool with fixed count, need to release event as soon as
+  // possible
+  eventPool.InitEventPool(device->getLevelZeroContext(), /*count*/ 600);
 
-  // May create queue based on properties once multiple device used
+  // Use fixed properties to create command queue, keep for further improvement.
   // ze_command_queue_group_properties_t p;
   // p.flags = ZE_COMMAND_QUEUE_GROUP_PROPERTY_FLAG_COMPUTE;
   // queueUser = device->getQueue(p);
@@ -95,21 +89,18 @@ LevelZeroInvocation::~LevelZeroInvocation() {
   for (std::unique_ptr<LevelZeroEvent> &event : events) {
     eventPool.destroy_event(event->getEvent());
   }
-  // for (size_t i = 0; i < kernels.size(); i++) {
-  //  delete kernels[i];
-  //}
 }
 
 LevelZeroMemory *LevelZeroInvocation::allocateMemory(size_t bytes) {
   // Can add host memory, device memory based on device config
-  void *buffer =
-      lzu::allocate_shared_memory(bytes, 1, 0, 0, device->getLevelZeroDevice(),
-                                  device->getLevelZeroContext());
+  void *buffer = lzu::allocate_shared_memory(
+      bytes, /*alignment*/ 1, /*dev_flags*/ 0, /*host_flags*/ 0,
+      device->getLevelZeroDevice(), device->getLevelZeroContext());
   return new LevelZeroMemory(buffer, bytes, device->getLevelZeroContext());
 }
 
 void LevelZeroInvocation::deallocateMemory(LevelZeroMemory *memory) {
-  // Release memory shall depend on the work flow
+  // Memory release shall run after kernel excution, postpone to destructor.
   // delete memory;
   memories.push_back(memory);
 }
@@ -144,11 +135,9 @@ LevelZeroKernel *LevelZeroInvocation::createKernelFromIL(char *data,
   uint8_t *buf = reinterpret_cast<uint8_t *>(data);
   ze_module_handle_t module = lzu::create_module(
       device->getLevelZeroContext(), device->getLevelZeroDevice(), buf, bytes,
-      ZE_MODULE_FORMAT_IL_SPIRV, "", nullptr);
+      ZE_MODULE_FORMAT_IL_SPIRV, /*build_flags*/ "", /*p_build_log*/ nullptr);
 
-  LevelZeroKernel *kernel = new LevelZeroKernel(module, name);
-  // kernels.push_back(kernel);
-  return kernel;
+  return new LevelZeroKernel(module, name);
 }
 
 LevelZeroEvent *LevelZeroInvocation::enqueueKernel(LevelZeroKernel *kernel,
@@ -181,13 +170,14 @@ void LevelZeroInvocation::flush() {
   ze_command_list_handle_t command_list = queueUser.getLevelZeroList();
   ze_command_queue_handle_t command_queue = queueUser.getLevelZeroQueue();
   lzu::close_command_list(command_list);
-  lzu::execute_command_lists(command_queue, 1, &command_list, nullptr);
-  lzu::synchronize(command_queue, UINT64_MAX);
+  lzu::execute_command_lists(command_queue, /*numCommandLists*/ 1,
+                             &command_list, /*hfence*/ nullptr);
+  lzu::synchronize(command_queue, /*timeout*/ UINT64_MAX);
   lzu::reset_command_list(command_list);
 }
 
 void LevelZeroInvocation::finish() {
-  lzu::synchronize(queueUser.getLevelZeroQueue(), UINT64_MAX);
+  lzu::synchronize(queueUser.getLevelZeroQueue(), /*timeout*/ UINT64_MAX);
 }
 
 LevelZeroEvent *LevelZeroInvocation::wrapEvent(ze_event_handle_t event,

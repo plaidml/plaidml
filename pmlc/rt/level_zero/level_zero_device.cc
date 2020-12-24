@@ -10,10 +10,11 @@ LevelZeroQueue::LevelZeroQueue(const ze_context_handle_t &context,
                                const ze_device_handle_t &device,
                                ze_command_queue_group_properties_t properties)
     : properties(properties) {
-  queue = lzu::create_command_queue(context, device, 0,
+  queue = lzu::create_command_queue(context, device, /*flags*/ 0,
                                     ZE_COMMAND_QUEUE_MODE_DEFAULT,
-                                    ZE_COMMAND_QUEUE_PRIORITY_NORMAL, 0, 0);
-  list = lzu::create_command_list(context, device, 0, 0);
+                                    ZE_COMMAND_QUEUE_PRIORITY_NORMAL,
+                                    /*ordinal*/ 0, /*index*/ 0);
+  list = lzu::create_command_list(context, device, /*flags*/ 0, /*ordinal*/ 0);
 }
 
 LevelZeroQueue::~LevelZeroQueue() {

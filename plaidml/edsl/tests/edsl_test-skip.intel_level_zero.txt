@@ -1,14 +1,8 @@
 CppEdsl.HigherPrecisionConstants
-CppEdsl.BitRightScalar
-CppEdsl.Max
 CppEdsl.Floor
 CppEdsl.Pow
 CppEdsl.Round
-CppEdsl.Scatter1D
-CppEdsl.Scatter3D
 CppEdsl.BitNot
-CppEdsl.MnistMlp
-CppEdsl.MnistCnn
 CppEdsl.Cos
 CppEdsl.Sin
 CppEdsl.Asin
@@ -28,4 +22,3 @@ CppEdsl.InterpolatedGatherCubic
 CppEdsl.InterpolatedGatherCubicDouble
 CppEdsl.InterpolatedGatherCubicHalf
 CppEdsl.InterpolatedGatherMultiDIndices
-CppEdsl.BitNot

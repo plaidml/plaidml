@@ -25,7 +25,7 @@ filegroup(
         "//pmlc/dialect/tile/tests:all",
         "//pmlc/dialect/xsmm/tests:all",
         "//pmlc/rt/opencl/tests:all",
-        "//pmlc/rt/levle_zero/tests:all",
+        "//pmlc/rt/level_zero/tests:all",
         "//pmlc/rt/tests:all",
         "//pmlc/rt/vulkan/tests:all",
         "//pmlc/target/x86/tests:all",
