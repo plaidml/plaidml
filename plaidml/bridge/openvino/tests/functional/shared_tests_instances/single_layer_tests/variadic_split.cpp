@@ -13,7 +13,7 @@ namespace {
 
 const std::vector<InferenceEngine::Precision> netPrecisions = {
     InferenceEngine::Precision::FP32,
-    // InferenceEngine::Precision::FP16
+    InferenceEngine::Precision::FP16,
 };
 
 INSTANTIATE_TEST_CASE_P(smoke, VariadicSplitLayerTest,

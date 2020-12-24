@@ -22,7 +22,7 @@ std::vector<std::vector<size_t>> bucketsShapes{{3}};
 // Output_type shall support i64 && i32, close i64 for openvino limitation
 std::vector<InferenceEngine::Precision> outputPrecision = {
     InferenceEngine::Precision::I32,
-    // InferenceEngine::Precision::I64,
+    InferenceEngine::Precision::I64,
 };
 std::vector<bool> withRightBound{true, false};
 
