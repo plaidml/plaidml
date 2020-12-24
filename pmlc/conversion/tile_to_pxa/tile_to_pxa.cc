@@ -1536,6 +1536,9 @@ struct FuncOpConversion : public OpConversionPattern<FuncOp> {
       resultTypes.push_back(newResultType);
     }
 
+    // Save old arguments here. Otherwise, it would be eliminated later.
+    auto oldArgs = op.getArguments();
+
     // Create a new function with an updated signature.
     auto newOp = rewriter.cloneWithoutRegions(op);
     rewriter.inlineRegionBefore(op.getBody(), newOp.getBody(), newOp.end());
@@ -1544,6 +1547,16 @@ struct FuncOpConversion : public OpConversionPattern<FuncOp> {
 
     // Tell the rewriter to convert the region signature.
     rewriter.applySignatureConversion(&newOp.getBody(), result);
+
+    // The above rewriter.applySignatureConversion does not replace the old
+    // arguments with new ones. It would be performed later automatically. It is
+    // usually feasible for the simple cases. However, for the complex cases,
+    // the automatic replacement may be after some op conversions. Something in
+    // these op conversions may depend on the new arguments.
+    auto newArgs = newOp.getArguments();
+    for (unsigned i = 0; i < oldArgs.size(); ++i) {
+      oldArgs[i].replaceAllUsesWith(newArgs[i]);
+    }
 
     // Finally cause the old func op to be erased
     rewriter.eraseOp(op);
