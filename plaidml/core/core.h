@@ -15,11 +15,9 @@
 #if __has_include(<source_location>)
 #include <source_location>
 using edsl_source_location = std::source_location;
-#define ERRORTRACING true
 #elif __has_include(<experimental/source_location>)
 #include <experimental/source_location>
 using edsl_source_location = std::experimental::source_location;
-#define ERRORTRACING true
 #else
 struct edsl_source_location {
   static edsl_source_location current() { return edsl_source_location{}; }
@@ -28,12 +26,22 @@ struct edsl_source_location {
   constexpr const char* file_name() const noexcept { return "??"; }
   constexpr const char* function_name() const noexcept { return "??"; }
 };
-#define ERRORTRACING false
 #endif
 
 namespace plaidml {
 
 namespace ffi {
+
+inline void throw_exception(std::string msg, edsl_source_location loc) {
+  std::stringstream ss;
+  if (msg.find("edsl/edsl.h") == std::string::npos) {
+    ss << "Exception at " << loc.file_name() << ":" << std::to_string(loc.line());
+  } else {
+    ss << "Exception at ??:0";
+  }
+  ss << " with message: " << msg;
+  throw std::runtime_error(ss.str());
+}
 
 inline std::string str(plaidml_string* ptr) {
   std::string ret{plaidml_string_ptr(ptr)};
@@ -46,14 +54,7 @@ T call(edsl_source_location loc, F fn, Args... args) {
   plaidml_error err;
   auto ret = fn(&err, args...);
   if (err.code) {
-    std::stringstream ss;
-    if (!strstr(loc.file_name(), "edsl/edsl.h")) {
-      ss << "Exception at " << loc.file_name() << ":" << std::to_string(loc.line());
-    } else {
-      ss << "Exception at ??:0";
-    }
-    ss << " with message: " << str(err.msg);
-    throw std::runtime_error(ss.str());
+    ffi::throw_exception(str(err.msg), loc);
   }
   return ret;
 }
@@ -73,14 +74,7 @@ void call_void(edsl_source_location loc, F fn, Args... args) {
   plaidml_error err;
   fn(&err, args...);
   if (err.code) {
-    std::stringstream ss;
-    if (!strstr(loc.file_name(), "edsl/edsl.h")) {
-      ss << "Exception at " << loc.file_name() << ":" << std::to_string(loc.line());
-    } else {
-      ss << "Exception at ??:0";
-    }
-    ss << " with message: " << str(err.msg);
-    throw std::runtime_error(ss.str());
+    ffi::throw_exception(str(err.msg), loc);
   }
 }
 

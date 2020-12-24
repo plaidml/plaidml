@@ -29,7 +29,7 @@ using ::testing::ContainerEq;
 using ::testing::Eq;
 using ::testing::HasSubstr;
 
-#if ERRORTRACING
+#if __has_include(<source_location>) || __has_include(<experimental/source_location>)
 #define EXPECT_ERROR_LINE(errmsg, eline) EXPECT_THAT(errmsg, HasSubstr(std::to_string(eline)))
 #else
 #define EXPECT_ERROR_LINE(errmsg, eline) EXPECT_THAT(errmsg, HasSubstr(":0"));
