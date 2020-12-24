@@ -12,8 +12,8 @@ using LayerTestsDefinitions::ReverseLayerTest;
 namespace {
 const std::vector<InferenceEngine::Precision> netPrecisions = {
     InferenceEngine::Precision::FP32,
-    // InferenceEngine::Precision::FP16,
-    // InferenceEngine::Precision::I64
+    InferenceEngine::Precision::FP16,
+    InferenceEngine::Precision::I64,
 };
 
 std::vector<std::vector<size_t>> shape_index{{4, 6, 5}, {3, 9, 2}, {1, 4, 2, 1, 1, 3}};
