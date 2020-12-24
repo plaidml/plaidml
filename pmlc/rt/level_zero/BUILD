@@ -42,16 +42,16 @@ plaidml_cc_binary(
     ],
 )
 
-cc_test(
-    name = "level_zero_probe_test",
-    srcs = [
-        "level_zero_probe.cc",
-        "level_zero_utils.h",
-        "level_zero_utils.cc",
-    ],
-    deps = [
-        "@Level_Zero//:ze_loader",
-        "//pmlc/util",
-    ],
-    size = "small",
-)
+#cc_test(
+#    name = "level_zero_probe_test",
+#    srcs = [
+#        "level_zero_probe.cc",
+#        "level_zero_utils.h",
+#        "level_zero_utils.cc",
+#    ],
+#    deps = [
+#        "@Level_Zero//:ze_loader",
+#        "//pmlc/util",
+#    ],
+#    size = "small",
+#)
