@@ -10,6 +10,8 @@ pml_cc_library(
     level_zero_wrappers.cc
     level_zero_utils.h
     level_zero_utils.cc
+  DEFINES
+    PML_USE_DEVICE_LEVEL_ZERO
   DEPS
     pmlc::compiler
     pmlc::rt

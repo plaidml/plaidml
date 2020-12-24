@@ -75,7 +75,7 @@ if(PML_ENABLE_VULKAN)
 endif()
 
 if(PML_ENABLE_LEVEL_ZERO)
-    list(APPEND _RT_DEFINES PML_ENABLE_LEVEL_ZERO)
+  list(APPEND _RT_DEFINES PML_ENABLE_LEVEL_ZERO)
   list(APPEND _RT_DEPS pmlc::rt::level_zero)
 endif()
 

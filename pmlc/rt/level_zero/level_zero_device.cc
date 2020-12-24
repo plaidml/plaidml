@@ -65,7 +65,9 @@ LevelZeroDevice::LevelZeroDevice(ze_driver_handle_t driver,
 }
 
 LevelZeroDevice::~LevelZeroDevice() {
-  // Once multiple devices, shall change
+  clearQueues();
+  // When we use multiple devices for one driver, the context shall be released
+  // carefully.
   clearQueues();
   lzu::destroy_context(context);
 }
@@ -81,7 +83,8 @@ LevelZeroDevice::getQueue(ze_command_queue_group_properties_t properties) {
   // Lock modification of queues vector.
   std::lock_guard<std::mutex> lock(queuesMutex);
   for (std::unique_ptr<LevelZeroQueueGuard> &guard : queues) {
-    // Use same kind of queue now, open once open new device
+    // TODO: Open check when other kind of queues are added.
+    // All queues are with fixed type now.
     if (/*!(guard->getLevelZeroProperties() & properties) ||*/ guard
             ->isUsed()) {
       continue;

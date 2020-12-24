@@ -3,8 +3,13 @@
 #define PMLC_RT_LEVEL_ZERO_LEVEL_ZERO_UTILS_H_
 
 #include <string.h>
+#ifdef PML_USE_DEVICE_LEVEL_ZERO
+#include <level_zero/ze_api.h>
+#include <level_zero/zet_api.h>
+#else
 #include <ze_api.h>
 #include <zet_api.h>
+#endif
 
 #include <array>
 #include <map>
