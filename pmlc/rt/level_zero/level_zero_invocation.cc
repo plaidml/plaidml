@@ -8,6 +8,8 @@
 
 #include "pmlc/util/logging.h"
 
+#define UNUSED_VARIABLE(x) (void)(x)
+
 namespace pmlc::rt::level_zero {
 
 void LevelZeroMemory::enqueueRead(ze_command_list_handle_t list, void *dst,
@@ -46,11 +48,10 @@ void LevelZeroKernel::setArg(unsigned idx, LevelZeroMemory *memory) {
 void LevelZeroKernel::enqueue(ze_command_list_handle_t list,
                               ze_group_count_t gws, ze_group_count_t lws,
                               ze_event_handle_t &resultE) {
-  // The usage of gws and lws will depend on their meaning.
-  // "gws / lws" in some cases.
   lzu::append_launch_function(list, kernel, &gws, resultE, dependencies.size(),
                               dependencies.data());
   dependencies.clear();
+  UNUSED_VARIABLE(lws);
 }
 
 LevelZeroEvent::LevelZeroEvent(ze_event_handle_t event,
@@ -143,6 +144,7 @@ LevelZeroKernel *LevelZeroInvocation::createKernelFromIL(char *data,
 LevelZeroEvent *LevelZeroInvocation::enqueueKernel(LevelZeroKernel *kernel,
                                                    ze_group_count_t gws,
                                                    ze_group_count_t lws) {
+  // In LevelZero, gws is group count, lws is group size.
   lzu::set_group_size(kernel->getKernel(), lws.groupCountX, lws.groupCountY,
                       lws.groupCountZ);
   ze_event_handle_t event;
