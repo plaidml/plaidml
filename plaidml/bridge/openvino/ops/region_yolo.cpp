@@ -21,10 +21,10 @@ void registerRegionYolo() {
     auto I = ctx.operands.at(0);
 
     auto input_shape = I.compute_shape().sizes();
-    const int batches = input_shape[0];
-    const int channels = input_shape[1];
-    const int height = input_shape[2];
-    const int width = input_shape[3];
+    size_t batches = input_shape[0];
+    size_t channels = input_shape[1];
+    size_t height = input_shape[2];
+    size_t width = input_shape[3];
 
     auto coords = layer->get_num_coords();
     auto classes = layer->get_num_classes();
@@ -33,25 +33,42 @@ void registerRegionYolo() {
     auto mask = layer->get_mask();
     auto mask_size = mask.size();
 
-    edsl::Tensor O = I;
-
-    int num_regions = 0;
-    int end_index = 0;
+    size_t num_regions = 0;
+    size_t end_index = 0;
 
     if (do_softmax) {
       // Region layer (Yolo v2)
       num_regions = regions;
-      end_index = width * height;
+      end_index = 1;
     } else {
       // Yolo layer (Yolo v3)
       num_regions = mask_size;
-      end_index = width * height * (classes + 1);
+      end_index = classes + 1;
     }
 
-    const int inputs_size = width * height * num_regions * (classes + coords + 1);
+    std::vector<int64_t> yolo_shape = {static_cast<int64_t>(batches), static_cast<int64_t>(num_regions),
+                                       static_cast<int64_t>(classes + coords + 1), static_cast<int64_t>(height),
+                                       static_cast<int64_t>(width)};
+    edsl::Tensor O = edsl::reshape(I, yolo_shape);
 
-    return edsl::make_tuple(O);
+    int64_t index_axis = 2;
+
+    auto IX = edsl::cast(edsl::index({edsl::TensorDim(2)}, 0), DType::INT32);
+    edsl::Tensor O_update = op::sigmoid(edsl::gather(O, IX).axis(index_axis));
+    O = edsl::scatter(O, IX, O_update).axis(index_axis).mode(edsl::ScatterMode::UPDATE_SLICE);
+
+    IX = edsl::cast(edsl::index({edsl::TensorDim(end_index)}, 0), DType::INT32) + coords;
+    O_update = op::sigmoid(edsl::gather(O, IX).axis(index_axis));
+    O = edsl::scatter(O, IX, O_update).axis(index_axis).mode(edsl::ScatterMode::UPDATE_SLICE);
+
+    if (do_softmax) {
+      edsl::TensorDim O_dim(classes);
+      IX = edsl::cast(edsl::index({O_dim}, 0), DType::INT32) + coords + 1;
+      O_update = op::softmax(edsl::gather(O, IX).axis(index_axis), index_axis);
+      O = edsl::scatter(O, IX, O_update).axis(index_axis).mode(edsl::ScatterMode::UPDATE_SLICE);
+    }
+
+    return edsl::make_tuple(edsl::reshape(O, input_shape));
   });
 }
-
 }  // namespace PlaidMLPlugin
