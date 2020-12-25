@@ -18,7 +18,7 @@ pml_cc_library(
     MLIRPass
     MLIRSPIRV
     mlir_runner_utils
-    LevelZero::LevelZero
+    ze_loader
 )
 
 pml_cc_binary(

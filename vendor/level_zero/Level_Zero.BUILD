@@ -7,13 +7,12 @@ cc_library(
     srcs = glob([
         "source/lib/*cpp",
         "source/loader/*cpp",
-        "source/loader/linux/*cpp",
-        #"source/ZeLoaderVersion.rc",
-    ]),
+    ]) + select({
+        "@bazel_tools//src/conditions:windows": glob(["source/loader/windows/*cpp"]),
+        "//conditions:default": glob(["source/loader/linux/*cpp"]),
+    }),
     hdrs = [
-        #"source/inc/ze_util.h",
         "source/lib/ze_lib.h",
-        #"include/ze_api.h",
     ] + glob([
         "include/layers/*h",
         "include/*h",
