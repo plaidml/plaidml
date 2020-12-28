@@ -3,6 +3,7 @@
 #pragma once
 
 #include <cstring>
+#include <exception>
 #include <functional>
 #include <memory>
 #include <sstream>
@@ -28,20 +29,28 @@ struct edsl_source_location {
 };
 #endif
 
+class ffi_exception : public std::exception {
+  std::string msg_;
+  edsl_source_location loc;
+
+ public:
+  explicit ffi_exception(const std::string& message, edsl_source_location loc) : loc(loc) {
+    std::stringstream ss;
+    if (!strstr(loc.file_name(), "edsl/edsl.h")) {
+      ss << "Exception at " << loc.file_name() << ":" << std::to_string(loc.line());
+    } else {
+      ss << "Exception at ??:0";
+    }
+    ss << " with message: " << message;
+    msg_ = ss.str();
+  }
+  virtual ~ffi_exception() noexcept {}
+  virtual const char* what() const noexcept { return msg_.c_str(); }
+};
+
 namespace plaidml {
 
 namespace ffi {
-
-inline void throw_exception(std::string msg, edsl_source_location loc) {
-  std::stringstream ss;
-  if (msg.find("edsl/edsl.h") == std::string::npos) {
-    ss << "Exception at " << loc.file_name() << ":" << std::to_string(loc.line());
-  } else {
-    ss << "Exception at ??:0";
-  }
-  ss << " with message: " << msg;
-  throw std::runtime_error(ss.str());
-}
 
 inline std::string str(plaidml_string* ptr) {
   std::string ret{plaidml_string_ptr(ptr)};
@@ -54,7 +63,7 @@ T call(edsl_source_location loc, F fn, Args... args) {
   plaidml_error err;
   auto ret = fn(&err, args...);
   if (err.code) {
-    ffi::throw_exception(str(err.msg), loc);
+    throw ffi_exception(str(err.msg), loc);
   }
   return ret;
 }
@@ -74,7 +83,7 @@ void call_void(edsl_source_location loc, F fn, Args... args) {
   plaidml_error err;
   fn(&err, args...);
   if (err.code) {
-    ffi::throw_exception(str(err.msg), loc);
+    throw ffi_exception(str(err.msg), loc);
   }
 }
 
@@ -211,7 +220,7 @@ class TensorShape {
               const std::vector<int64_t>& sizes,  //
               const std::vector<int64_t>& strides, edsl_source_location loc = edsl_source_location::current()) {
     if (sizes.size() != strides.size()) {
-      ffi::throw_exception("Sizes and strides must have the same rank.", loc);
+      throw ffi_exception("Sizes and strides must have the same rank.", loc);
     }
     ptr_ = details::make_ptr(ffi::call<plaidml_shape*>(  //
         loc,                                             //

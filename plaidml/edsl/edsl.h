@@ -591,7 +591,7 @@ inline Contraction& Contraction::add_constraints(const std::vector<Constraint>& 
 inline Tensor Contraction::build(edsl_source_location loc) {
   size_t rank = outDims_.size();
   if (rank != outIdxs_.size()) {
-    ffi::throw_exception("Rank mismatch between outShape and outAccess", loc);
+    throw ffi_exception("Rank mismatch between outShape and outAccess", loc);
   }
   std::vector<plaidml_poly_expr*> idxs(rank);
   std::vector<plaidml_dim_expr*> dims(rank);
@@ -654,14 +654,14 @@ inline TensorLens::TensorLens(const std::string& source, const std::string& targ
   if (source.size() != target.size()) {
     std::stringstream ss;
     ss << "source and target rank mismatch: " << source << " != " << target;
-    ffi::throw_exception(ss.str(), loc);
+    throw ffi_exception(ss.str(), loc);
   }
   for (unsigned i = 0; i < source.size(); i++) {
     auto pos = target.find(source[i]);
     if (pos == std::string::npos) {
       std::stringstream ss;
       ss << "source and target dims mismatch: " << source << " != " << target;
-      ffi::throw_exception(ss.str(), loc);
+      throw ffi_exception(ss.str(), loc);
     }
     map[i] = pos;
   }
@@ -673,7 +673,7 @@ inline std::vector<T> TensorLens::apply(const std::vector<T>& dims, edsl_source_
     return dims;
   }
   if (dims.size() != map.size()) {
-    ffi::throw_exception("rank mismatch in TensorLens apply", loc);
+    throw ffi_exception("rank mismatch in TensorLens apply", loc);
   }
   std::vector<T> ret(dims.size());
   for (unsigned i = 0; i < dims.size(); i++) {
@@ -1461,8 +1461,7 @@ class Value {
     if (is_int(loc)) {
       return Tensor(as_int(loc));
     }
-    ffi::throw_exception("Value cannot be coerced into Tensor", loc);
-    return Tensor();
+    throw ffi_exception("Value cannot be coerced into Tensor", loc);
   }
 
   TensorDim as_dim(edsl_source_location loc = edsl_source_location::current()) const {  //
