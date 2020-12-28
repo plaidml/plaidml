@@ -209,6 +209,7 @@ void pipelineBuilder(OpPassManager &pm,
   pm.addPass(layer::createInlineLayersPass());
   pm.addPass(pmlc::target::intel_gen::createLowerPXAToAffinePass());
   pm.addPass(createLowerAffinePass());
+  pm.addPass(createLowerToCFGPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
