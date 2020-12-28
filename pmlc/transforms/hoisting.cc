@@ -134,7 +134,7 @@ void HoistingState::doHoisting() {
     for (auto constantOp : constantsToCopy) {
       OpBuilder builder(innerOp.getBlock(), innerOp.getIterator());
       auto newConstOp = builder.clone(*constantOp);
-      for (auto i = 0; i < innerOp.getOperands().size(); i++) {
+      for (size_t i = 0; i < innerOp.getOperands().size(); i++) {
         if (innerOp.getOperand(i).getDefiningOp() == constantOp)
           innerOp.setOperand(i, newConstOp->getResult(0));
       }
