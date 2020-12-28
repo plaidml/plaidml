@@ -3,7 +3,7 @@
 // Without stenciling pass, it works:
 //  bazel-bin/pmlc/opt -convert-linalg-to-loops --normalize-memrefs --simplify-affine-structures  -x86-convert-pxa-to-affine -lower-affine  -canonicalize -convert-scf-to-std --normalize-memrefs -x86-convert-std-to-llvm pmlc/target/x86/tests/conv_NCHW_3X3_user_layouts.mlir 
 
-// However, llvm code cannot still be run: bazel-bin/pmlc/opt -convert-linalg-to-loops --normalize-memrefs --simplify-affine-structures  -x86-convert-pxa-to-affine -lower-affine  -canonicalize -convert-scf-to-std --normalize-memrefs -x86-convert-std-to-llvm pmlc/target/x86/tests/conv_NCHW_3X3_user_layouts.mlir | bazel-bin/pmlc/jit -e baseline
+// The following command line works: --normalize-memrefs needs to be run BEFORE lowering the affine code: bazel-bin/pmlc/opt -convert-linalg-to-loops -x86-convert-pxa-to-affine --normalize-memrefs --simplify-affine-structures -lower-affine  -canonicalize -convert-scf-to-std --normalize-memrefs -x86-convert-std-to-llvm pmlc/target/x86/tests/conv_NCHW_3X3_user_layouts.mlir | bazel-bin/pmlc/jit -e baseline
 
 
 #K_map = affine_map<(K,C,R,S) -> (R, S, C, K)>
