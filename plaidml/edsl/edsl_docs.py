@@ -1,7 +1,7 @@
 # Copyright 2020 Intel Corporation.
 # Note:
 #    This file is being used by sphinx docs to pull in code blocks.
-#    Code blocks are pulled into docs/usage/edsl_ops.rst
+#    Code blocks are pulled into docs/usage/*.rst
 #    Any changes made here may upset the docs.
 
 import unittest

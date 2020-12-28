@@ -57,26 +57,41 @@ The arbitrary precision types are: ``INTX``, ``UINTX``, and ``FLOATX`` for signe
  
 When a user writes eDSL code that defines a new constant scalar value, this value can take on one of the arbitrary precision types.
 For instance:
-Tensor zero = Tensor(0.0); // This will have a FLOATX type
-Tensor one = Tensor(1); // This will have a INTX type
+
+.. code-block:: cpp
+
+     Tensor zero = Tensor(0.0); // This will have a FLOATX type
+     Tensor one = Tensor(1); // This will have a INTX type
  
 Arbitrary precision types will be materialized to a concrete type when they come in contact with other concrete types. For instance:
-Tensor A = Placeholder(DType::FLOAT16, {3, 3}); // create a 3x3xf16 input
-Tensor B = A + zero; // The data type of B will be 3x3xf16, because the ‘zero’ tensor gets materialized as a FLOAT16.
-Tensor C = A + one; // The data type of C will be 3x3xf16 as well.
+
+.. code-block:: cpp
+
+     Tensor A = Placeholder(DType::FLOAT16, {3, 3}); // create a 3x3xf16 input
+     Tensor B = A + zero; // The data type of B will be 3x3xf16, because the ‘zero’ tensor gets materialized as a FLOAT16.
+     Tensor C = A + one; // The data type of C will be 3x3xf16 as well.
  
 Materialization is a function of type inference, it depends on other context clues to decide how to materialize a given type. There are certain situations where there isn’t enough context to make a decision on which type an arbitrary precision type should materialize into. In these cases an explicit cast is required. One such case is with the select op:
-Tensor D = select(A < one, one, zero);
+
+.. code-block:: cpp
+
+     Tensor D = select(A < one, one, zero);
  
 The problem here is that the select op can’t decide what the output type should be because both the true and false cases are arbitrary precision types. The eDSL will produce an error that advises the user to use an explicit cast.
-Tensor zero = cast(Tensor{0}, A.dtype());
-Tensor one = cast(Tensor{1}, A.dtype());
-Tensor D = select(A < one, one, zero);
+
+.. code-block:: cpp
+
+     Tensor zero = cast(Tensor{0}, A.dtype());
+     Tensor one = cast(Tensor{1}, A.dtype());
+     Tensor D = select(A < one, one, zero);
  
 Another situation can occur with an assignment contraction:
-TensorIndex i;
-Tensor one = Tensor{1};
-Tensor E = Contraction().outShape(3).outAccess(i).assign(one).build();
+
+.. code-block:: cpp
+
+     TensorIndex i;
+     Tensor one = Tensor{1};
+     Tensor E = Contraction().outShape(3).outAccess(i).assign(one).build();
  
 In this case, there’s not enough context to decide what the output type of the contraction. Again, the eDSL provides an error message because the output type is ambiguous. In this situation, the user will need to use an explicit cast.
  

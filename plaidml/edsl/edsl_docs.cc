@@ -1,7 +1,7 @@
 // Copyright 2020 Intel Corporation.
 // Note:
 //    This file is being used by sphinx docs to pull in code blocks.
-//    Code blocks are pulled into docs/usage/writing_edsl.rs
+//    Code blocks are pulled into docs/usage/*.rst
 //    Any changes made here may upset the docs.
 
 #include <gmock/gmock.h>
@@ -115,15 +115,6 @@ Tensor ValidIndices(const Tensor& I) {
   return O;
 }
 
-// max_pool_1d_start
-Tensor MaxPool1D(const Tensor& I) {
-  TensorDim N;
-  TensorIndex i, j;
-  I.bind_dims(N);
-  return Contraction().outShape(N / 2).outAccess(i).max(I(2 * i + j)).add_constraint(j < 2);
-}
-// max_pool_1d_end
-
 // max_pool_1d_odd_start
 Tensor MaxPool1DOdd(const Tensor& I) {
   TensorDim N;
@@ -150,16 +141,6 @@ Tensor CumSum(const Tensor& I) {
   return Contraction().outShape(N).outAccess(i).sum(I(k)).add_constraint(i - k < N);
 }
 // cumsum_end
-
-// conv_1d_start
-Tensor Conv1D(const Tensor& I, const Tensor& K) {
-  TensorDim N, X, KX, CI, CO;
-  TensorIndex n, x, k, ci, co;
-  I.bind_dims(N, X, CI);
-  K.bind_dims(KX, CI, CO);
-  return Contraction().outShape(N, X - KX + 1, CO).outAccess(n, x, co).sum(I(n, x + k, ci) * K(k, ci, co));
-}
-// conv_1d_end
 
 // conv_2d_dilated_start
 Tensor Conv2DDilated(const Tensor& I, const Tensor& K) {
@@ -258,11 +239,6 @@ TEST_F(DocCppEdsl, ValidIndices) {
   runProgram(makeProgram("valid_indices", {I}, {ValidIndices(I)}));
 }
 
-TEST_F(DocCppEdsl, MaxPool1D) {
-  auto I = Placeholder(DType::UINT64, {3});
-  runProgram(makeProgram("max_pool_1d", {I}, {MaxPool1D(I)}));
-}
-
 TEST_F(DocCppEdsl, MaxPool1DOdd) {
   auto I = Placeholder(DType::UINT64, {3});
   runProgram(makeProgram("max_poo_1d_odd", {I}, {MaxPool1DOdd(I)}));
@@ -276,12 +252,6 @@ TEST_F(DocCppEdsl, Skip) {
 TEST_F(DocCppEdsl, CumSum) {
   auto I = Placeholder(DType::FLOAT32, {10}, "I");
   runProgram(makeProgram("cumsum", {I}, {CumSum(I)}));
-}
-
-TEST_F(DocCppEdsl, Conv1D) {
-  auto I = Placeholder(DType::UINT64, {1, 244, 3});
-  auto K = Placeholder(DType::UINT64, {3, 3, 1});
-  runProgram(makeProgram("conv_1d", {I, K}, {Conv1D(I, K)}));
 }
 
 TEST_F(DocCppEdsl, Conv2DDilated) {

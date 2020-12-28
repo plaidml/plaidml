@@ -19,7 +19,7 @@ filegroup(
         "edsl.h",
         "edsl_docs.cc",
         "edsl_docs.py",
-    ],
+    ] + glob(["examples/**"]),
     visibility = ["//visibility:public"],
 )
 

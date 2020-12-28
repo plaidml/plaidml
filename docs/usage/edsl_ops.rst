@@ -1,15 +1,15 @@
 eDSL Operations 
 ###############
-The Tile eDSL has three main types of operations: contractions, elementwise, 
+The eDSL has three main types of operations: contractions, elementwise, 
 and specials.
 
 - :ref:`Contraction operations<contractions>` are best described as 
-aggregations that are performed over a sequence of numbers.
+  aggregations that are performed over a sequence of numbers.
 - :ref:`Elementwise operations<eltwise>` are performed on each individual 
-element(s) of the input tensor(s), resulting in an output that has the same 
-shape as the input.
+  element(s) of the input tensor(s), resulting in an output that has the same 
+  shape as the input.
 - :ref:`Special operations<specials>` are those which have access patterns or 
-behaviors that are somehow unique from contractions and elementwise operations.
+  behaviors that are somehow unique from contractions and elementwise operations.
 
 This tutorial will walk through each of these types of operations and 
 demonstrate their usage.
@@ -18,27 +18,56 @@ demonstrate their usage.
 
 Contraction Operations
 ************************
+Contractions are built up from a few key components: `index expressions`,
+`constraints`, `combinations`, and `aggregations`.
 
-Aggregations
-============
-There are five different types of aggregations that a ``Contraction`` can 
-perform. 
+Contractions allow the use of complex `index expressions` to determine which
+elements are read from a tensor. If there is only one tensor used in the
+contraction, such index manipulations are the only legal options. A set of
+indices is valid for a contraction if and only if: 
 
-- ``sum``: When multiple values are computed for the same output location, they 
-are added together.
-- ``product``: when multiple values are computed for the same output location, 
-they are multiplied together.
-- ``max``: when multiple values are computed for the same output location, the 
-largest one is used.
-- ``min``: when multiple values are computed for the same output location, the 
-smallest one is used.
-- ``assign``: when multiple values are computed for the same output location, 
-an error is raised. Note that the compiler errs on the side of caution and may 
-raise an error even when no output location is assigned to multiple times. If 
-the programmer manually confirms that there is at most one value computed for 
-each output location, then any of the other aggregation operations will have 
-equivalent behavior and can be used to bypass this error checking.
+- All index variables are integers
+- All index expressions used in tensors are within bounds
+- All user-specified `constraints` are satisfied
 
+`Constraints` always take the form ``[index expression] < [constant expression]``
+(where ``[index expression]`` is a linear polynomial in the index variables and
+``[constant expression]`` is a linear polynomial in the input dimensions), and
+they always implicitly include ``0 <= [index expression]``. We'll show a few
+examples of constraints later in this document.
+
+Therefore, we could also state the `index expression` requirement as: "Every
+constraint’s index expression is non-negative and less than its specified upper
+bound."
+
+If there are multiple tensors used inside a contraction, you have the ability to
+choose a `combination` operation to determine how their values are combined. The
+only combination operations that are currently well-supported are multiplication
+(``*``) and addition (``+``). 
+
+Contractions `aggregate` over all sets of valid indices. There are five
+different types of aggregations that a Contraction can perform. 
+
+- ``sum``: When multiple values are computed for the same output location, they
+  are added together.
+- ``product``: When multiple values are computed for the same output location, 
+  they are multiplied together.
+
+- ``max``: When multiple values are computed for the same output location, the 
+  largest one is used.
+
+- ``min``: When multiple values are computed for the same output location, the 
+  smallest one is used.
+
+- ``assign``: When multiple values are computed for the same output location, 
+  an error is raised. Note that the compiler errs on the side of caution and may 
+  raise an error even when no output location is assigned to multiple times. If 
+  the programmer manually confirms that there is at most one value computed for 
+  each output location, then any of the other aggregation operations will have 
+  equivalent behavior and can be used to bypass this error checking.
+
+Now that we've gone over the key components that build up a contraction, let's
+walk through a few simple examples. Additional examples are available in the `eDSL Examples page`_.
 
 Sum Over Axis
 ================
@@ -60,7 +89,7 @@ axis `0` of a 2D tensor (in Numpy this would be ``np.sum(I, axis=0)``):
         :pyobject: sum_over_axis
 
 As a rule of thumb, a ``Contraction`` merges together values across one or more
-indices. Below we compare the Tile eDSL code to the mathematical formula for 
+indices. Below we compare the eDSL code to the mathematical formula for 
 the operation by using colors to highlight corresponding pieces:
 
 .. math::
@@ -78,15 +107,15 @@ the operation by using colors to highlight corresponding pieces:
   \color{green}\verb!)!
 
 In green, notice that the summation symbol is represented using ``.sum()`` in 
-Tile code. In blue, notice that the input ``I`` is indexed using ``m`` and 
+eDSL code. In blue, notice that the input ``I`` is indexed using ``m`` and 
 ``n``. Some portions of the notation do not perfectly correspond. Here's why:
 
 - Summation notation includes a ``m`` subscript to indicate that ``m`` is the
-  variable being summed over. Tile code implicitly sums over all valid indices
+  variable being summed over. eDSL code implicitly sums over all valid indices
   (valid means not out of range for any tensor, and not failing any additional
   user-specified constraints as discussed in later examples).
 
-- Tile must be explicitly given the shape of any new tensor created, done in
+- eDSL must be explicitly given the shape of any new tensor created, done in
   this code by ``Contraction().outShape(N)``. In this case we want ``N`` to
   match the size of the last dimension of ``I``, which is specified by using
   ``I.bind_dims(M, N)``. It is possible, however, to make this dimension of
@@ -113,12 +142,11 @@ Tile code. In blue, notice that the input ``I`` is indexed using ``m`` and
 
 Max Over Axis
 ================
-Taking the maximum over axis ``0`` looks very similar to taking the sum over 
-axis
-``0``. Just like a sum is represented in Tile with ``+=``, a max is represented 
-by
-``>=``. Thus, the Tile code for max over axis ``0`` is just a single character
-change from sum over axis ``0``. Let's look at it as a Tile function:
+Taking the maximum over axis ``0`` looks very similar to taking the sum over
+axis ``0``. Just like a sum is represented in eDSL with ``.sum()``, a max is
+represented by ``.max()``. Thus, to perform a max over axis ``0``, we can take
+the same exact code for sum over axis ``0``, and switch ``.sum()`` to
+``.max()``. Let's look at it as a eDSL function:
 
 .. tabs::
 
@@ -145,9 +173,11 @@ Again, this corresponds closely to mathematical notation:
 
 .. math::
 
-  \color{red}\verb|O(n)|
-  \color{green}\verb| >= |
-  \color{blue}\verb|I(m, n)|\color{default}\verb|;|
+  \color{default}\verb!Contraction().outShape(N)!
+  \color{red}\verb!.outAccess(n)!
+  \color{green}\verb!.max(!
+  \color{blue}\verb!I[m, n]!
+  \color{green}\verb!)!
 
 Matrix Multiply
 ==================
@@ -160,28 +190,22 @@ detail:
 
   C[i, j] = \sum_{k} (A[i, k] \cdot B[k, j])
 
-We can convert this to Tile code using the same correspondence as the
+We can convert this to eDSL code using the same correspondence as the
 previous example: The summation sign becomes plus-assignment, the summation
 index is omitted, dimensions are given for the output tensor, and the statement
 ends in a semicolon. Here's the result:
 
-.. tabs::
+.. math::
 
-  .. group-tab:: C++
-
-      .. code-block:: c++
-       
-        C(i, j) += A(i, k) * B(k, j);
-
-  .. group-tab:: Python
-
-      .. code-block:: python
-        
-        C[i, j] += A[i, k] * B[k, j]
+  \color{default}\verb!Contraction().outShape(C)!
+  \color{red}\verb!.outAccess(i, j)!
+  \color{green}\verb!.sum(!
+  \color{blue}\verb!A[i, k] * B[k, j]!
+  \color{green}\verb!)!
 
 To have correct dimensions, we need ``I`` to be the first dimension of ``A`` 
 and ``J`` the last dimension of ``B``. Here's how this looks as part of a full 
-Tile
+eDSL
 function:
 
 .. tabs::
@@ -199,7 +223,7 @@ function:
         :pyobject: matmul
 
 Notice that we use ``bind_dims`` on inputs and we use ``TensorOutput`` on
-outputs. Input dimensions can be repeated, which results in an error if the Tile
+outputs. Input dimensions can be repeated, which results in an error if the eDSL
 function is passed inputs whose corresponding dimensions don't all have the
 specified size (for example `A.bind_dims(K, K)` would be constrained to a
 square).
@@ -238,7 +262,7 @@ the same shape as ``I``, and ``O`` has the same shape as ``O_Neg``. When an
 elementwise binary operation is performed, the output shape is determined using
 :ref:`broadcasting semantics <broadcasting-semantics>`_.
 Which brings us to the next novelty: we have our first example of a 0D tensor,
-``O_Neg``. Tensors in Tile are allowed to have zero dimensions. In such a case 
+``O_Neg``. Tensors in eDSL are allowed to have zero dimensions. In such a case 
 the tensor represents a scalar, i.e., a single value. In places where 
 dimensions are
 specified, you can indicate a 0-dimensional tensor by using ``()`` for the
@@ -304,178 +328,10 @@ it is more straightforward to merge the elementwise operations:
     .. literalinclude:: ../../plaidml/edsl/edsl_docs.py
       :pyobject: avg_merge
 
-Max Pool 1D
-==============
-
-Next let's implement a size 2 stride 2 maxpool in Tile. This is the operation
-that splits a tensor into groups of 2 and takes the larger element from each
-group, yielding a tensor of half the original size. This is straightforward to
-implement in straight C++/Python:
-
-.. tabs:: 
-
-  .. group-tab:: C++
-
-    .. literalinclude:: ../../plaidml/edsl/edsl_docs.cc
-      :language: cpp
-      :start-after: for_loop_max_pool_start
-      :end-before: for_loop_max_pool_end
-    
-  .. group-tab:: Python
-
-      .. literalinclude:: ../../plaidml/edsl/edsl_docs.py
-        :start-after: for_loop_max_pool_1d_start
-        :end-before: for_loop_max_pool_1d_end
-
-
-``for`` loops over tensor indices get translated into contractions when written 
-in Tile. The most direct (and, sadly, wrong) implementation in Tile is:
-
-.. tabs::
-
-  .. group-tab:: C++
-
-    .. literalinclude:: ../../plaidml/edsl/edsl_docs.cc
-      :language: cpp
-      :start-after: wrong_max_pool_start
-      :end-before: wrong_max_pool_end
-
-  .. group-tab:: Python
-
-    .. literalinclude:: ../../plaidml/edsl/edsl_docs.py
-      :pyobject: wrong_max_pool_1d
-
-If you were to run this code, every entry of ``O`` would equal the global max of
-``I``. We correctly determined that this was a maximization operation, and the
-indices for ``O`` and ``I`` match those used in the straight C++/Python code, 
-so what went wrong?
-The problem with this Tile code is that there are too many "valid" indices. For
-example, the case ``i = 1`` , ``j = 3`` means that ``O[1]`` checks ``I[5]`` as 
-one of the potential maximum values, even though ``O[1]`` is intended to be 
-``max(I[2], I[3])``.
-When we wrote the code with for loops, the inner loop restricted ``j`` to ``0`` 
-or ``1``; in the Tile code, the compiler figured out the allowed values of 
-``j`` by looking at the shapes of the tensors, and the only restriction that 
-imposes on ``j`` is that ``j`` must be an integer satisfying ``0 <= 2 * i + j < 
-N``.
-When can use ``add_constraint`` in Tile to handle such situations:
-
-.. tabs::
-
-  .. group-tab:: C++
-
-    .. literalinclude:: ../../plaidml/edsl/edsl_docs.cc
-      :language: cpp
-      :start-after: max_pool_1d_start
-      :end-before: max_pool_1d_end
-
-  .. group-tab:: Python
-
-    .. literalinclude:: ../../plaidml/edsl/edsl_docs.py
-      :pyobject: max_pool_1d
-
-Something important to note here is that while we wrote ``j < 2``, this 
-constraint actually means ``0<= j < 2``. Constraints are always bounded below 
-by ``0``. (Without a constraint, however, index variables may still be 
-negative: the original code included e.g. ``i = 1``, ``j = -1`` as valid index 
-pair.)
-We determined the Tile code for this example by starting from imperative code,
-but this Tile code is still very similar to mathematical notation, and we could
-have started there instead:
-
-.. math::
-
-  \color{red}O[i]
-  \color{default}=
-  \color{green}\max_{\color{magenta}0 \leq j < 2}
-  \color{blue}I[2i + j]
-
-.. math::
-
-  \begin{aligned}
-  &
-  \color{red}\verb|O(i)|
-  \color{green}\verb| >= |
-  \color{blue}\verb|I(2 * i + j)|\color{default}\verb|;|
-  \cr
-  &
-  \color{default}\verb|O.add_constraint(|
-  \color{magenta}\verb|j < 2|\color{default}\verb|);|
-  \end{aligned}
-
-This Tile code handles odd values of ``N`` by rounding down the output tensor
-size. You may instead want to round up the output tensor size and use a smaller
-pool at the edge. This can be accomplished by simply adjusting the size of 
-``O``:
-
-.. tabs::
-
-  .. group-tab:: C++
-
-    .. literalinclude:: ../../plaidml/edsl/edsl_docs.cc
-      :language: cpp
-      :start-after: max_pool_1d_odd_start
-      :end-before: max_pool_1d_odd_end
-
-  .. group-tab:: Python
-
-    .. literalinclude:: ../../plaidml/edsl/edsl_docs.py
-      :pyobject: max_pool_1d_odd
-
-No special handling is needed for the case ``i = (N - 1) / 2``, ``j = 1``; this 
-is
-out of range for ``I`` and so is ignored by Tile, which is exactly the intended
-behavior.
-
-Valid Indices
-=============
-When discussing contractions, we've mentioned that they accumulate over "all
-valid indices". Hopefully the significance of this has been clear for the
-specific examples we've looked at, but to write complex or novel code it helps
-to have a precise understanding of what is meant by "valid indices".
-First, index validity is determined for a full set of index variables: ``j = 1``
-is not valid or invalid as a standalone index value, but may be part of a valid
-or invalid set of index variables. For example, in the code:
-
-.. tabs::
-
-  .. group-tab:: C++
-
-    .. literalinclude:: ../../plaidml/edsl/edsl_docs.cc
-      :language: cpp
-      :start-after: valid_indices_start
-      :end-before: valid_indices_end
-    
-  .. group-tab:: Python
-
-    .. literalinclude:: ../../plaidml/edsl/edsl_docs.py
-      :start-after: valid_indices_start
-      :end-before: valid_indices_end
-
-with ``N = 5``, the indices ``i = 1``, ``j = 1`` are valid indices.
-However, ``i = 2``, ``j = 1`` are not valid indices for this operation, nor are 
-``i = -1000``, ``j = 1``.
-A set of indices are *valid* if and only if:
-
-1. All the index variables are integers.
-
-2. All the index expressions for every tensor are in range. Specifically, if the
-   index variable values are plugged into every index expression, all the
-   resulting indices are non-negative integers less than the appropriate
-   dimension.
-
-3. All the constraints are satisfied.
-   Constraints always take the form ``[index expression] < [constant 
-expression]`` (where ``[index expression]`` is a linear polynomial in the index 
-variables and ``[constant expression]`` is a linear polynomial in the input 
-dimensions), and they always implicitly include ``0 <= [index expression]``.
-   Therefore we could also state this requirement as "every constraint's index
-   expression is non-negative and less than its specified upper bound".
-
 Skipping
 ========
 The rule that all index variables must be integers allows us to "skip" certain
-otherwise valid entries. For example, consider the Tile function:
+otherwise valid entries. For example, consider the eDSL function:
 
 .. tabs::
   
@@ -509,14 +365,14 @@ summation notation, this is:
 
   O[i] = \sum_{k \leq i} I[k]
 
-However, we can't use ``k <= i`` as a constraint in Tile; all the index 
+However, we can't use ``k <= i`` as a constraint in eDSL; all the index 
 variables must be gathered into a single index expression on one side of the 
 inequality.
 Thus, we rewrite this as ``0 <= i - k``. Since the ``0`` bound is implicitly 
 included in all constraints, we just need to choose an upper bound large enough 
 to never
 be hit. From the dimensions of the tensors, we already know ``i < N`` and ``0 
-<= k``, and so ``N`` is an appropriate upper bound. The resulting Tile code is:
+<= k``, and so ``N`` is an appropriate upper bound. The resulting eDSL code is:
 
 .. tabs::
 
@@ -532,179 +388,6 @@ be hit. From the dimensions of the tensors, we already know ``i < N`` and ``0
       .. literalinclude:: ../../plaidml/edsl/edsl_docs.py
         :pyobject: cumsum
 
-Convolution
-===========
-
-Let's implement a 1D convolution with output size equal to input size. This is
-implementing the Keras backend operation:
-
-.. code-block:: python
-
-  K.conv1d(x, kernel, padding='valid')
-
-Let's start with the mathematical formula for this operation:
-
-.. math::
-
-  O[n, x, c_o] = \sum_k \sum_{c_i}(I[n, x + k, c_i] \cdot K[k, c_i, c_o])
-
-This is rather complicated, so let's walk through why this is the same
-convolution formula we're used to in machine learning.
-A convolution produces output for a specific batch element at a specific
-location in a specific channel by taking a weighted sum of the input for that
-same batch element at that same location *and a surrounding region* over all
-input channels. The weights are given by ``K``, which depends on the output
-channel, the input channel, and the displacement within the input region
-relative to the reference location.
-This generally matches the given formula: The output ``O`` is given as a sum of
-elements from the input ``I``, weighted by ``K``. Looking at the meaning of the
-index variables, we see that it matches exactly:
-
-- `n` represents which element of the batch we're on.
-- `ci` represents which input channel we're on.
-- `co` represents which output channel we're on.
-- `x` represents our spatial location, giving the location being written to in
-  `O` and the smallest element read from in `I`.
-- Finally, `k` represents the kernel offset, that is, how far (in the spatial
-  dimension) the input element we're reading is from the lower bound of the
-  kernel.
-
-This formula directly translates to Tile, although note that ``padding='valid'``
-means that the spatial dimension of the output will be reduced by one less than
-the kernel size relative to the spatial dimension of the input:
-
-.. math::
-
-  \color{red}O[n, x, c_o]
-  \color{default}=
-  \color{green}\sum_k \sum_{c_i}
-  \color{blue}I[n, x + k, c_i]
-  \color{orange}\cdot
-  \color{lightblue}K[k, c_i, c_o]
-
-
-.. math::
-
-  \color{red}\verb|O(n, x, co)|
-  \color{green}\verb| += |
-  \color{blue}\verb|I(n, x + k, ci)|
-  \color{orange}\verb| * |
-  \color{lightblue}\verb|K(k, ci, co)|\color{default}\verb|;|
-
-
-.. tabs::
-
-  .. group-tab:: C++
-
-    .. literalinclude:: ../../plaidml/edsl/edsl_docs.cc
-      :language: cpp
-      :start-after: conv_1d_start
-      :end-before: conv_1d_end
-
-  .. group-tab:: Python
-
-    .. literalinclude:: ../../plaidml/edsl/edsl_docs.py
-      :pyobject: conv_1d
-
-
-Dilated 2D Convolution
-======================
-We can tweak this general formula for a convolution to add various features,
-such as different strides, changing the padding, performing the convolution
-depthwise, etc. For this example, we will implement a dilated 2D convolution
-with dilation rate (2, 3). Specfically, we'll implement the Keras backend
-function:
-
-.. code-block:: python
-
-  K.conv2d(x, kernel, padding='valid', dilation_rate=(2, 3))
-
-
-The formula for this is very similar to the previous convolution; we just have
-an additional spatial dimension for each tensor, and the kernel offset index
-variables are multiplied by dilation scaling factors when used to determine
-indices for ``I``:
-
-.. math::
-
-  O[n, x, y, c_o] = \sum_{k_x} \sum_{k_y} \sum_{c_i}
-  I[n, x + 2k_x, y + 3k_y, c_i] *
-  K[k_x, k_y, c_i, c_o]
-
-The effective size for a dilated kernel with kernel size ``K`` and dilation rate
-``d`` is ``d * (K - 1) + 1``, and so to achieve `'valid'` padding for this
-convolution, the x dimension must be reduced by ``2 * (KX - 1)`` and the y
-dimension must be reduced by ``3 * (KY - 1)``, where ``KX`` and ``KY`` are the 
-x and y
-dimensions of the kernel respectively. The rest of the Tile code corresponds
-directly to the formula, and so we get:
-
-.. tabs::
-
-  .. group-tab:: C++
-
-    .. literalinclude:: ../../plaidml/edsl/edsl_docs.cc
-      :language: cpp
-      :start-after: conv_2d_dilated_start
-      :end-before: conv_2d_dilated_end
-
-  .. group-tab:: Python
-
-    .. literalinclude:: ../../plaidml/edsl/edsl_docs.py
-      :pyobject: conv_2d_dilated
-
-Complex Convolution
-===================
-This final example demonstrates a strided dilated padded grouped convolution.
-
-.. math::
-
-  \begin{aligned}
-  O&[n, x_0, x_1, g, c_{o, g}] \cr
-  &=\sum_{k_0, k_1, c_{i, g}}
-  (
-    I[n, s_0 x_0 + d_0 k_0 - P_0, s_1 x_1 + d_1 k_1 - P_1, c_{i, g}] *
-    K[k_0, k_1, g, c_{i, g}, c_{o, g}]
-  )
-  \end{aligned}
-
-where ``s`` gives the stride coefficients, ``d`` gives the dilation
-coefficients, and ``P`` gives the padding offsets.
-
-.. tabs::
-
-  .. group-tab:: C++
-
-    .. literalinclude:: ../../plaidml/edsl/edsl_docs.cc
-      :language: cpp
-      :start-after: complex_conv_start
-      :end-before: complex_conv_end
-
-  .. group-tab:: Python
-
-    .. literalinclude:: ../../plaidml/edsl/edsl_docs.py
-      :pyobject: complex_conv_2d
-
-
-
-Contractions
-============
-
-There are limited operations available inside a contraction. Principally,
-contractions allow the use of complex index expressions to determine which
-elements are read from a tensor. If there is only one tensor used in the
-contraction, such index manipulations are the only legal options. If there are
-two tensors used inside the contraction, you also choose a *combination*
-operation to determine how their values are combined. The only combination
-operations that are currently well-supported are multiplication (`*`) and
-addition (`+`).
-Contractions aggregate over all sets of *valid indices*. A set of indices is
-valid for a contraction if and only if:
-
-- All index variables are integers
-- All index expressions used in tensors are within bounds
-- All user-specified constraints are satisfied
-
 .. _eltwise:
 
 Elementwise Operations
@@ -718,25 +401,25 @@ error.
 Common operations (not comprehensive; example tensor variable names provided to
 illustrate syntax):
 
-- Addition: `O = A + B;`
-- Subtraction: `O = A - B;`
-- Multiplication: `O = A * B;`
-- Division: `O = A / B;`
-- Equality: `O = A == B;`
-- Inequality: `O = A != B;`
-- Less: `O = A < B;`
-- Square Root: `O = sqrt(A);`
-- Exponential: `O = exp(A);`
-- Power: `O = pow(A, B);`
-- Sine: `O = sin(A);`
+- Addition: ``O = A + B;``
+- Subtraction: ``O = A - B;``
+- Multiplication: ``O = A * B;``
+- Division: ``O = A / B;``
+- Equality: ``O = A == B;``
+- Inequality: ``O = A != B;``
+- Less: ``O = A < B;``
+- Square Root: ``O = sqrt(A);``
+- Exponential: ``O = exp(A);``
+- Power: ``O = pow(A, B);``
+- Sine: ``O = sin(A);``
 - Cosine: ``O = cos(A);``
-- Hyperbolic Tangent: `O = tanh(A);`
-- Natural Log: `O = log(A);`
-- Sigmoid: `O = sigmoid(A);`
-- Conditional: `O = select(C, T, F);` (`C` may be a single value or a higher
-  dimensional tensor to be evaluated elementwise. `T` and `F` must have the same
-  shape, and unless `C` is known to be a constant at compile time, both will be
-  evaluated.)
+- Hyperbolic Tangent: ``O = tanh(A);``
+- Natural Log: ``O = log(A);``
+- Sigmoid: ``O = sigmoid(A);``
+- Conditional: ``O = select(C, T, F);`` (Note: ``C`` may be a single value or a
+  higher dimensional tensor to be evaluated elementwise. ``T`` and ``F`` must
+  have the same shape, and unless ``C`` is known to be a constant at compile
+  time, both will be evaluated.)
 
 .. _specials:
 
@@ -754,7 +437,7 @@ Operation Broadcasting Semantics
 
 Automatic Broadcasting
 ======================
-The Tile eDSL automatically attempts to broadcast the input ``Tensors`` of each 
+The eDSL automatically attempts to broadcast the input ``Tensors`` of each 
 operation in order to obtain valid input shapes. To do this, it follows `Numpy 
 broadcasting semantics`_.
 
@@ -767,5 +450,5 @@ For example, ...
 This type of broadcast is perfectly valid, but it does not follow Numpy 
 broadcasting semantics.
 
-
+.. _eDSL Examples page: edsl_examples.html
 .. _Numpy broadcasting semantics: https://numpy.org/doc/stable/user/basics.broadcasting.html
