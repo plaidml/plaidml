@@ -45,6 +45,7 @@ struct TypeConverter : public mlir::TypeConverter {
     addConversion([](FunctionType type) { return type; });
     addConversion([](FloatType type) { return type; });
     addConversion([](IntegerType type) { return tile::toSignlessType(type); });
+    addConversion([](IndexType type) { return type; });
     addConversion([](MemRefType type) { return type; });
     addConversion([](stdx::ArgpackType type) { return type; });
     addConversion([this](RankedTensorType type) {
