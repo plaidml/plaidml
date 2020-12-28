@@ -15,7 +15,7 @@
 #if __has_include(<source_location>)
 #include <source_location>
 using edsl_source_location = std::source_location;
-#elif __cplusplus >= 201402 and __has_include(<experimental/source_location>)
+#elif __cplusplus >= 201402 && __has_include(<experimental/source_location>)
 #include <experimental/source_location>
 using edsl_source_location = std::experimental::source_location;
 #else
