@@ -211,14 +211,7 @@ class TensorShape {
               const std::vector<int64_t>& sizes,  //
               const std::vector<int64_t>& strides, edsl_source_location loc = edsl_source_location::current()) {
     if (sizes.size() != strides.size()) {
-      std::stringstream ss;
-      if (!strstr(loc.file_name(), "edsl/edsl.h")) {
-        ss << "Exception at " << loc.file_name() << ":" << std::to_string(loc.line());
-      } else {
-        ss << "Exception at ??:0";
-      }
-      ss << " with message: Sizes and strides must have the same rank.";
-      throw std::runtime_error(ss.str());
+      ffi::throw_exception("Sizes and strides must have the same rank.", loc);
     }
     ptr_ = details::make_ptr(ffi::call<plaidml_shape*>(  //
         loc,                                             //
