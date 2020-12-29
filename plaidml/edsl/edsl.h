@@ -413,7 +413,7 @@ class IndexedTensor {
   ///
   /// Performs a multiplication combination within a contraction.
   ///
-  IndexedTensor operator*(const IndexedTensor rhs) const { return IndexedTensor(PLAIDML_COMBO_OP_MUL, {*this, rhs}); }
+  IndexedTensor operator*(const IndexedTensor& rhs) const { return IndexedTensor(PLAIDML_COMBO_OP_MUL, {*this, rhs}); }
 
   ///
   /// Performs an equality comparison combination within a contraction.
@@ -1281,7 +1281,7 @@ struct LocatedTensor {
       : tensor(tensor), loc(loc) {}
 };
 
-#ifdef _WIN32
+#ifdef _MSC_VER
 #define PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(_op_, _fn_)                                     \
   inline Tensor operator _op_(Tensor lhs, Tensor rhs) { return intrinsic(_fn_, lhs, rhs); }   \
   inline Tensor operator _op_(Tensor lhs, int rhs) { return intrinsic(_fn_, lhs, rhs); }      \

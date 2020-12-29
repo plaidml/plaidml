@@ -2109,7 +2109,7 @@ TEST_F(CppEdsl, LayerException) {
 }
 
 TEST_F(CppEdsl, BindBadDims) {
-  const char* errmsg;
+  std::string errmsg;
   int eline;
   try {
     auto X = Placeholder(DType::FLOAT32, {10, 10});
@@ -2128,7 +2128,7 @@ TEST_F(CppEdsl, BindBadDims) {
 
 #if !defined(_WIN32)
 TEST_F(CppEdsl, EltwiseMismatch) {
-  const char* errmsg;
+  std::string errmsg;
   int eline;
   try {
     auto X = Placeholder(DType::FLOAT32, {10, 10});
@@ -2145,7 +2145,7 @@ TEST_F(CppEdsl, EltwiseMismatch) {
 
 #if !defined(_WIN32)
 TEST_F(CppEdsl, OpOperators) {
-  const char* errmsg;
+  std::string errmsg;
   int eline;
   try {
     auto X = Placeholder(DType::FLOAT32, {10, 10});

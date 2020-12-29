@@ -30,13 +30,13 @@ struct edsl_source_location {
 #endif
 
 class ffi_exception : public std::exception {
+ private:
   std::string msg_;
-  edsl_source_location loc;
 
  public:
-  explicit ffi_exception(const std::string& message, edsl_source_location loc) : loc(loc) {
+  explicit ffi_exception(const std::string& message, edsl_source_location loc) {
     std::stringstream ss;
-    if (!strstr(loc.file_name(), "edsl/edsl.h")) {
+    if (std::string(loc.file_name()).find("edsl/edsl.h") == std::string::npos) {
       ss << "Exception at " << loc.file_name() << ":" << std::to_string(loc.line());
     } else {
       ss << "Exception at ??:0";
@@ -44,7 +44,6 @@ class ffi_exception : public std::exception {
     ss << " with message: " << message;
     msg_ = ss.str();
   }
-  virtual ~ffi_exception() noexcept {}
   virtual const char* what() const noexcept { return msg_.c_str(); }
 };
 
