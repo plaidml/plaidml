@@ -1,7 +1,8 @@
 // Copyright 2019, Intel Corporation
 
-#include "mlir/Pass/Pass.h"
+#include "llvm/Support/FormatVariadic.h"
 
+#include "mlir/Pass/Pass.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "pmlc/dialect/stdx/ir/ops.h"
 #include "pmlc/dialect/tile/ir/ops.h"
@@ -22,8 +23,9 @@ void SplitMainPass::runOnOperation() {
   // Get the modules
   ModuleOp op = getOperation();
   // Find main
-  FuncOp main = op.lookupSymbol<FuncOp>("main");
+  FuncOp main = op.lookupSymbol<FuncOp>(mainFunction);
   if (!main) {
+    op.emitError(llvm::formatv("No main function: {0}", mainFunction));
     signalPassFailure();
     return;
   }
@@ -48,7 +50,7 @@ void SplitMainPass::runOnOperation() {
   // Construct actual ops
   OpBuilder builder(main);
   auto initOp = builder.create<FuncOp>(main.getLoc(), "init", initFuncType);
-  auto bodyOp = builder.create<FuncOp>(main.getLoc(), "main", bodyFuncType);
+  auto bodyOp = builder.create<FuncOp>(main.getLoc(), mainFunction, bodyFuncType);
   auto finiOp = builder.create<FuncOp>(main.getLoc(), "fini", finiFuncType);
 
   // Build init function (pack inputs + return)
