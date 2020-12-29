@@ -17,14 +17,23 @@
 
 #include "plaidml/edsl/edsl.h"
 #include "plaidml/exec/exec.h"
+#include "plaidml/op/op.h"
 #include "plaidml/testenv.h"
 #include "pmlc/util/env.h"
 #include "pmlc/util/logging.h"
 
 using half_float::half;
 using llvm::StringRef;
+using ::testing::AnyOf;
 using ::testing::ContainerEq;
 using ::testing::Eq;
+using ::testing::HasSubstr;
+
+#if __has_include(<source_location>) || __has_include(<experimental/source_location>)
+#define EXPECT_ERROR_LINE(errmsg, eline) EXPECT_THAT(errmsg, HasSubstr(std::to_string(eline)))
+#else
+#define EXPECT_ERROR_LINE(errmsg, eline) EXPECT_THAT(errmsg, HasSubstr(":0"));
+#endif
 
 namespace plaidml::edsl {
 
@@ -2098,6 +2107,60 @@ TEST_F(CppEdsl, LayerException) {
   // clang-format on
   runProgram(program);
 }
+
+TEST_F(CppEdsl, BindBadDims) {
+  std::string errmsg;
+  int eline;
+  try {
+    auto X = Placeholder(DType::FLOAT32, {10, 10});
+    auto Y = Placeholder(DType::FLOAT32, {12, 10});
+    TensorDim I, J, K;
+    TensorIndex i, j, k;
+    X.bind_dims({I, K});
+    // clang-format off
+    eline = __LINE__; Y.bind_dims({K, J});
+    // clang-format on
+  } catch (const std::exception& e) {
+    errmsg = e.what();
+  }
+  EXPECT_ERROR_LINE(errmsg, eline);
+}
+
+#if !defined(_WIN32)
+TEST_F(CppEdsl, EltwiseMismatch) {
+  std::string errmsg;
+  int eline;
+  try {
+    auto X = Placeholder(DType::FLOAT32, {10, 10});
+    auto Y = Placeholder(DType::FLOAT32, {12, 10});
+    // clang-format off
+    eline = __LINE__; auto O = X + Y;
+    // clang-format on
+  } catch (const std::exception& e) {
+    errmsg = e.what();
+  }
+  EXPECT_ERROR_LINE(errmsg, eline);
+}
+#endif
+
+#if !defined(_WIN32)
+TEST_F(CppEdsl, OpOperators) {
+  std::string errmsg;
+  int eline;
+  try {
+    auto X = Placeholder(DType::FLOAT32, {10, 10});
+    auto Y = Placeholder(DType::FLOAT32, {12, 12});
+    auto RX = plaidml::op::relu(X);
+    auto RY = plaidml::op::relu(Y);
+    // clang-format off
+    eline = __LINE__; auto O = RX + RY;
+    // clang-format on
+  } catch (const std::exception& e) {
+    errmsg = e.what();
+  }
+  EXPECT_ERROR_LINE(errmsg, eline);
+}
+#endif
 
 }  // namespace
 }  // namespace plaidml::edsl
