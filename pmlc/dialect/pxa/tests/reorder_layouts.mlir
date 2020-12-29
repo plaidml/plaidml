@@ -136,8 +136,13 @@ func @different_vector() -> memref<4xf32> {
 }
 
 // CHECK-LABEL: func @init
-//   CHECK-NEXT:  alloc()
-//   CHECK-NEXT:  affine.parallel ({{.*}}], {{.*}})
+//       CHECK:   alloc()
+//    RDR-NEXT:   affine.parallel
+//    RDR-NEXT:   pxa.load
+//    RDR-NEXT:   pxa.reduce
+//    RDR-NEXT:   affine.yield
+//    RDR-NEXT:   }
+//    RDR-NEXT:   stdx.pack
   func @init(%arg0: memref<16x16xf32>) -> !stdx.argpack {
     %0 = stdx.pack %arg0 : memref<16x16xf32>
     return %0 : !stdx.argpack
