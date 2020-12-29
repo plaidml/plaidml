@@ -5,6 +5,7 @@
 #include <chrono>
 #include <string>
 #include <utility>
+#include <limits>
 
 #include "pmlc/util/logging.h"
 
@@ -83,6 +84,74 @@ LevelZeroInvocation::~LevelZeroInvocation() {
   // Need to explicitly wait for all operations to avoid unfinished events
   // when gathering profiling information.
   finish();
+
+  // Gather profiling information
+  using std::chrono::nanoseconds;
+  using fp_milliseconds =
+      std::chrono::duration<double, std::chrono::milliseconds::period>;
+
+  uint64_t allStart = std::numeric_limits<uint64_t>::max();
+  uint64_t allEnd = 0;
+  nanoseconds totalExecuteTime{0};
+  nanoseconds kernelExecuteTime{0};
+  nanoseconds memoryExecuteTime{0};
+  unsigned kernelsCnt = 0;
+  unsigned memoryCnt = 0;
+
+  auto getEventKernelTimestamp =
+      [](ze_event_handle_t event) -> ze_kernel_timestamp_result_t {
+    ze_kernel_timestamp_result_t value = {};
+    // EXPECT_EQ(ZE_RESULT_SUCCESS, zeEventQueryKernelTimestamp(event, &value));
+    zeEventQueryKernelTimestamp(event, &value);
+    return value;
+  };
+
+  for (std::unique_ptr<LevelZeroEvent> &event : events) {
+    ze_kernel_timestamp_result_t timestamp =
+        getEventKernelTimestamp(event->getEvent());
+    uint64_t globalStart = timestamp.context.kernelStart;
+    uint64_t start = timestamp.context.kernelStart;
+    uint64_t end = timestamp.context.kernelEnd;
+
+    allStart = std::min(allStart, globalStart);
+    allEnd = std::max(allEnd, end);
+
+    nanoseconds executeTime{end - start};
+    totalExecuteTime += executeTime;
+
+    if (event->getKind() == LevelZeroActionKind::Kernel) {
+      kernelExecuteTime += executeTime;
+      kernelsCnt += 1;
+      IVLOG(2, "  Kernel '" << event->getName() << "' execute time: "
+                            << fp_milliseconds(executeTime).count() << "ms");
+    } else if (event->getKind() == LevelZeroActionKind::Read ||
+               event->getKind() == LevelZeroActionKind::Write) {
+      memoryExecuteTime += executeTime;
+      memoryCnt += 1;
+      IVLOG(2, "  Memory " << event->getName() << " execute time: "
+                           << fp_milliseconds(executeTime).count() << "ms");
+    }
+  }
+
+  auto resolution = pmlc::rt::level_zero::lzu::get_device_properties(
+                        device->getLevelZeroDevice())
+                        .timerResolution;
+
+  auto totalTime = fp_milliseconds(allEnd - allStart).count();
+  IVLOG(1, "Total Level Zero time: " << totalTime << "ms");
+  IVLOG(1, "Total Level Zero execution time: "
+               << (fp_milliseconds(totalExecuteTime).count() * resolution)
+               << "ms");
+  IVLOG(1, "Total Level Zero Kernels: " << kernelsCnt);
+  IVLOG(1, "Total Level Zero Kernel execution time: "
+               << (fp_milliseconds(kernelExecuteTime).count() * resolution)
+               << "ms");
+  IVLOG(1, "Total Level Zero memory transfers: " << memoryCnt);
+  IVLOG(1, "Total Level Zero memory transfer time: "
+               << (fp_milliseconds(memoryExecuteTime).count() * resolution)
+               << "ms");
+
+  device->execTimeInMS = fp_milliseconds(totalExecuteTime).count() * resolution;
 
   for (size_t i = 0; i < memories.size(); i++) {
     delete memories[i];

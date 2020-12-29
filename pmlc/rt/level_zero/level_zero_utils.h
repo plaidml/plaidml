@@ -132,9 +132,10 @@ public:
   zeEventPool();
   ~zeEventPool();
 
-  void
-  InitEventPool(ze_context_handle_t context, uint32_t count,
-                ze_event_pool_flags_t flags = ZE_EVENT_POOL_FLAG_HOST_VISIBLE);
+  void InitEventPool(
+      ze_context_handle_t context, uint32_t count,
+      ze_event_pool_flags_t flags = (ZE_EVENT_POOL_FLAG_HOST_VISIBLE |
+                                     ZE_EVENT_POOL_FLAG_KERNEL_TIMESTAMP));
 
   void create_event(ze_event_handle_t &event, ze_event_scope_flags_t signal = 0,
                     ze_event_scope_flags_t wait = 0);
