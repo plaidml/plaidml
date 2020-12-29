@@ -1,30 +1,37 @@
 set(BUILD_SHARED_LIBS OFF)
+set(CROSS_TOOLCHAIN_FLAGS_ "" CACHE STRING "" FORCE)
+set(CROSS_TOOLCHAIN_FLAGS_NATIVE "" CACHE STRING "" FORCE)
 set(LLVM_APPEND_VC_REV OFF CACHE BOOL "" FORCE)
 set(LLVM_ENABLE_IDE OFF CACHE BOOL "" FORCE)
 set(LLVM_ENABLE_ASSERTIONS ON CACHE BOOL "" FORCE)
 set(LLVM_ENABLE_BINDINGS OFF CACHE BOOL "" FORCE)
-set(LLVM_ENABLE_PROJECTS "mlir;openmp" CACHE STRING "" FORCE)
+if(CMAKE_CROSSCOMPILING)
+  set(LLVM_ENABLE_PROJECTS "mlir" CACHE STRING "" FORCE)
+else()
+  set(LLVM_ENABLE_PROJECTS "mlir;openmp" CACHE STRING "" FORCE)
+endif()
 set(LLVM_ENABLE_RTTI ON CACHE BOOL "" FORCE)
 set(LLVM_ENABLE_WARNINGS OFF CACHE BOOL "" FORCE)
 set(LLVM_INCLUDE_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(LLVM_INCLUDE_TESTS OFF CACHE BOOL "" FORCE)
+set(LLVM_INCLUDE_TOOLS ON CACHE BOOL "" FORCE)
 set(LLVM_INCLUDE_BENCHMARKS OFF CACHE BOOL "" FORCE)
 set(LLVM_TARGETS_TO_BUILD "X86" CACHE STRING "" FORCE)
 set(OPENMP_ENABLE_LIBOMPTARGET OFF CACHE BOOL "" FORCE)
 set(OPENMP_ENABLE_OMPT_TOOLS OFF CACHE BOOL "" FORCE)
 set(OPENMP_STANDALONE_BUILD ON CACHE BOOL "" FORCE)
 
-message("LOCAL_LLVM_DIR: ${LOCAL_LLVM_DIR}")
-
 if(LOCAL_LLVM_DIR)
+  message("LOCAL_LLVM_DIR: ${LOCAL_LLVM_DIR}")
   set(LLVM_SOURCE_DIR ${LOCAL_LLVM_DIR})
   set(LLVM_BINARY_DIR ${CMAKE_BINARY_DIR}/_deps/llvm-project-build)
+  set(LLVM_EXTERNAL_MLIR_SOURCE_DIR "${LLVM_SOURCE_DIR}/mlir")
   add_subdirectory(${LLVM_SOURCE_DIR}/llvm ${LLVM_BINARY_DIR} EXCLUDE_FROM_ALL)
 else()
   FetchContent_Declare(
     llvm-project
-    URL      https://github.com/plaidml/llvm-project/archive/182eb478559f27191b7373616f30a608065aaaa3.tar.gz
-    URL_HASH SHA256=606ce4fae35c72b951f31402741403d568287933712db5ae4e735e51b00bab46
+    URL      https://github.com/plaidml/llvm-project/archive/ed1cc32d894cf3ef838fef9c0a27810f22d695f8.tar.gz
+    # URL_HASH SHA256=606ce4fae35c72b951f31402741403d568287933712db5ae4e735e51b00bab46
   )
   FetchContent_GetProperties(llvm-project)
   if(NOT llvm-project_POPULATED)
@@ -35,13 +42,15 @@ else()
   endif()
 endif()
 
+set(MLIR_SOURCE_DIR "${LLVM_SOURCE_DIR}/mlir")
+
 list(APPEND LLVM_INCLUDE_DIRS
   ${LLVM_SOURCE_DIR}/llvm/include
   ${LLVM_BINARY_DIR}/include
 )
 
 list(APPEND MLIR_INCLUDE_DIRS
-  ${LLVM_SOURCE_DIR}/mlir/include
+  ${MLIR_SOURCE_DIR}/include
   ${LLVM_BINARY_DIR}/tools/mlir/include
 )
 
@@ -54,7 +63,9 @@ include_directories(SYSTEM
   ${LIBOMP_INCLUDE_DIR}
 )
 
-target_include_directories(omp PUBLIC
-  ${LLVM_SOURCE_DIR}/openmp/runtime/src
-  ${LLVM_BINARY_DIR}/projects/openmp/runtime/src
-)
+if(NOT CMAKE_CROSSCOMPILING)
+  target_include_directories(omp PUBLIC
+    ${LLVM_SOURCE_DIR}/openmp/runtime/src
+    ${LLVM_BINARY_DIR}/projects/openmp/runtime/src
+  )
+endif()
