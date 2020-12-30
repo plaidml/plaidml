@@ -90,8 +90,6 @@ LevelZeroInvocation::~LevelZeroInvocation() {
   using fp_milliseconds =
       std::chrono::duration<double, std::chrono::milliseconds::period>;
 
-  // uint64_t allStart = std::numeric_limits<uint64_t>::max();
-  // uint64_t allEnd = 0;
   nanoseconds totalExecuteTime{0};
   nanoseconds kernelExecuteTime{0};
   nanoseconds memoryExecuteTime{0};
@@ -101,7 +99,6 @@ LevelZeroInvocation::~LevelZeroInvocation() {
   auto getEventKernelTimestamp =
       [](ze_event_handle_t event) -> ze_kernel_timestamp_result_t {
     ze_kernel_timestamp_result_t value = {};
-    // EXPECT_EQ(ZE_RESULT_SUCCESS, zeEventQueryKernelTimestamp(event, &value));
     zeEventQueryKernelTimestamp(event, &value);
     return value;
   };
@@ -115,12 +112,8 @@ LevelZeroInvocation::~LevelZeroInvocation() {
   for (std::unique_ptr<LevelZeroEvent> &event : events) {
     ze_kernel_timestamp_result_t timestamp =
         getEventKernelTimestamp(event->getEvent());
-    // uint64_t globalStart = timestamp.context.kernelStart;
     uint64_t start = timestamp.context.kernelStart;
     uint64_t end = timestamp.context.kernelEnd;
-
-    // allStart = std::min(allStart, globalStart);
-    // allEnd = std::max(allEnd, end);
 
     auto eventExecuteTime =
         (end >= start)
@@ -143,8 +136,6 @@ LevelZeroInvocation::~LevelZeroInvocation() {
     }
   }
 
-  // auto totalTime = fp_milliseconds(allEnd - allStart).count();
-  // IVLOG(1, "Total Level Zero time: " << totalTime << "ms");
   IVLOG(1, "Total Level Zero execution time: "
                << (fp_milliseconds(totalExecuteTime).count()) << "ms");
   IVLOG(1, "Total Level Zero Kernels: " << kernelsCnt);

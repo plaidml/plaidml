@@ -12,14 +12,14 @@ int main(int argc, char **argv) {
   } catch (std::exception &e) {
     IVLOG(1, "failed to init level zero driver, result:" << result << " info:"
                                                          << e.what());
-    throw;
+    return -1;
   }
   std::vector<ze_driver_handle_t> drivers;
   try {
     drivers = pmlc::rt::level_zero::lzu::get_all_driver_handles();
   } catch (std::exception &e) {
     IVLOG(1, e.what());
-    throw;
+    return -1;
   }
   std::vector<std::pair<ze_driver_handle_t, ze_device_handle_t>>
       supportedDevices = pmlc::rt::level_zero::lzu::getSupportedDevices();
