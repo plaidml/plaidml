@@ -225,6 +225,7 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(pmlc::conversion::tile_to_pxa::createLowerTileToPXAPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
+  pm.addPass(layer::createInlineLayersPass());
 
   pm.addPass(pxa::createStencilGEMMPass(/*numThreads=*/1, /*doBatch=*/true,
                                         heatmapCostTransposed));

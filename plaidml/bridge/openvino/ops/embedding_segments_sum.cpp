@@ -40,7 +40,7 @@ void registerEmbeddingSegmentsSum() {
     IE_ASSERT(indices.rank() == 1);
     auto segment_ids = ctx.operands.at(2);
     auto num_segments = cast_constant_operand<int32_t>(3, layer)[0];
-    int32_t default_index;
+    int32_t default_index = 0;
     edsl::Tensor per_sample_weights;
     bool with_default_index = false;
     bool with_weights = false;

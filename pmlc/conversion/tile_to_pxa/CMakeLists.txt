@@ -6,6 +6,7 @@ pml_cc_library(
     tile_to_pxa.cc
   DEPS
     ::passes-gen
+    pmlc::dialect::layer::ir
     pmlc::dialect::pxa::analysis
     pmlc::dialect::pxa::ir
     pmlc::dialect::stdx::ir
