@@ -85,7 +85,8 @@ class TensorDim {
   ///
   /// TensorDim constructor
   ///
-  TensorDim() : ptr_(details::make_ptr(ffi::call<plaidml_dim_expr*>(plaidml_dim_expr_none))) {}
+  TensorDim(edsl_source_location loc = edsl_source_location::current())  // NOLINT
+      : ptr_(details::make_ptr(ffi::call<plaidml_dim_expr*>(loc, plaidml_dim_expr_none))) {}
 
   ///
   /// TensorDim constructor
@@ -95,10 +96,12 @@ class TensorDim {
   ///
   /// TensorDim constructor
   ///
-  explicit TensorDim(int64_t value)
-      : ptr_(details::make_ptr(ffi::call<plaidml_dim_expr*>(plaidml_dim_expr_int, value))) {}
+  explicit TensorDim(int64_t value, edsl_source_location loc = edsl_source_location::current())
+      : ptr_(details::make_ptr(ffi::call<plaidml_dim_expr*>(loc, plaidml_dim_expr_int, value))) {}
 
-  TensorDim(plaidml_int_op op, const std::vector<TensorDim>& args) : ptr_(details::make_ptr(makeOp(op, args))) {}
+  TensorDim(plaidml_int_op op, const std::vector<TensorDim>& args,
+            edsl_source_location loc = edsl_source_location::current())
+      : ptr_(details::make_ptr(makeOp(op, args, loc))) {}
 
   ///
   /// Represents a subtraction operator overload.
@@ -108,17 +111,20 @@ class TensorDim {
   ///
   /// Returns the TensorDim as a string.
   ///
-  std::string str() const { return ffi::str(ffi::call<plaidml_string*>(plaidml_dim_expr_repr, as_ptr())); }
+  std::string str(edsl_source_location loc = edsl_source_location::current()) const {
+    return ffi::str(ffi::call<plaidml_string*>(loc, plaidml_dim_expr_repr, as_ptr()));
+  }
 
   plaidml_dim_expr* as_ptr() const { return ptr_.get(); }
 
  private:
-  static plaidml_dim_expr* makeOp(plaidml_int_op op, const std::vector<TensorDim>& args) {
+  static plaidml_dim_expr* makeOp(plaidml_int_op op, const std::vector<TensorDim>& args,
+                                  edsl_source_location loc = edsl_source_location::current()) {
     std::vector<plaidml_dim_expr*> operands;
     for (const auto& arg : args) {
       operands.push_back(arg.as_ptr());
     }
-    return ffi::call<plaidml_dim_expr*>(plaidml_dim_expr_op, op, operands.size(), operands.data());
+    return ffi::call<plaidml_dim_expr*>(loc, plaidml_dim_expr_op, op, operands.size(), operands.data());
   }
 
  private:
@@ -135,20 +141,22 @@ class TensorIndex {
   ///
   /// TensorIndex constructor
   ///
-  explicit TensorIndex(int64_t value)
-      : ptr_(details::make_ptr(ffi::call<plaidml_poly_expr*>(plaidml_poly_expr_literal, value))) {}
+  explicit TensorIndex(int64_t value, edsl_source_location loc = edsl_source_location::current())
+      : ptr_(details::make_ptr(ffi::call<plaidml_poly_expr*>(loc, plaidml_poly_expr_literal, value))) {}
 
   ///
   /// TensorIndex constructor
   ///
-  explicit TensorIndex(const std::string& name = "")
-      : ptr_(details::make_ptr(ffi::call<plaidml_poly_expr*>(plaidml_poly_expr_index, name.c_str()))) {}
+  explicit TensorIndex(const std::string& name = "", edsl_source_location loc = edsl_source_location::current())
+      : ptr_(details::make_ptr(ffi::call<plaidml_poly_expr*>(loc, plaidml_poly_expr_index, name.c_str()))) {}
 
-  TensorIndex(plaidml_int_op op, const std::vector<TensorIndex>& args)
-      : ptr_(details::make_ptr(makePolyOp(op, args))) {}
+  TensorIndex(plaidml_int_op op, const std::vector<TensorIndex>& args,
+              edsl_source_location loc = edsl_source_location::current())
+      : ptr_(details::make_ptr(makePolyOp(op, args, loc))) {}
 
-  TensorIndex(plaidml_int_op op, const TensorIndex& idx, const TensorDim& dim, bool lhs_first)
-      : ptr_(details::make_ptr(makeDimPolyOp(op, idx, dim, lhs_first))) {}
+  TensorIndex(plaidml_int_op op, const TensorIndex& idx, const TensorDim& dim, bool lhs_first,
+              edsl_source_location loc = edsl_source_location::current())
+      : ptr_(details::make_ptr(makeDimPolyOp(op, idx, dim, lhs_first, loc))) {}
 
   ///
   /// Represents an subtraction operator overload on a TensorIndex
@@ -168,25 +176,26 @@ class TensorIndex {
   ///
   /// Returns the TensorIndex as a string.
   ///
-  std::string str() const {  //
-    return ffi::str(ffi::call<plaidml_string*>(plaidml_poly_expr_repr, as_ptr()));
+  std::string str(edsl_source_location loc = edsl_source_location::current()) const {  //
+    return ffi::str(ffi::call<plaidml_string*>(loc, plaidml_poly_expr_repr, as_ptr()));
   }
 
   plaidml_poly_expr* as_ptr() const { return ptr_.get(); }
 
  private:
-  static plaidml_poly_expr* makePolyOp(plaidml_int_op op, const std::vector<TensorIndex>& args) {
+  static plaidml_poly_expr* makePolyOp(plaidml_int_op op, const std::vector<TensorIndex>& args,
+                                       edsl_source_location loc = edsl_source_location::current()) {
     std::vector<plaidml_poly_expr*> operands;
     for (const auto& arg : args) {
       operands.push_back(arg.as_ptr());
     }
-    return ffi::call<plaidml_poly_expr*>(plaidml_poly_expr_op, op, operands.size(), operands.data());
+    return ffi::call<plaidml_poly_expr*>(loc, plaidml_poly_expr_op, op, operands.size(), operands.data());
   }
 
   static plaidml_poly_expr* makeDimPolyOp(plaidml_int_op op, const TensorIndex& idx, const TensorDim& dim,
-                                          bool lhs_first) {
+                                          bool lhs_first, edsl_source_location loc = edsl_source_location::current()) {
     std::vector<plaidml_poly_expr*> operands;
-    auto* dim_ptr = ffi::call<plaidml_poly_expr*>(plaidml_poly_expr_dim, dim.as_ptr());
+    auto* dim_ptr = ffi::call<plaidml_poly_expr*>(loc, plaidml_poly_expr_dim, dim.as_ptr());
     if (lhs_first) {
       operands.emplace_back(idx.as_ptr());
       operands.emplace_back(dim_ptr);
@@ -194,7 +203,7 @@ class TensorIndex {
       operands.emplace_back(dim_ptr);
       operands.emplace_back(idx.as_ptr());
     }
-    return ffi::call<plaidml_poly_expr*>(plaidml_poly_expr_op, op, operands.size(), operands.data());
+    return ffi::call<plaidml_poly_expr*>(loc, plaidml_poly_expr_op, op, operands.size(), operands.data());
   }
 
  private:
@@ -222,10 +231,11 @@ class TensorLens {
  public:
   TensorLens() = default;
 
-  TensorLens(const std::string& source, const std::string& target);
+  TensorLens(const std::string& source, const std::string& target,
+             edsl_source_location loc = edsl_source_location::current());
 
   template <typename T>
-  std::vector<T> apply(const std::vector<T>& dims) const;
+  std::vector<T> apply(const std::vector<T>& dims, edsl_source_location loc = edsl_source_location::current()) const;
 
  private:
   std::vector<size_t> map;
@@ -250,45 +260,51 @@ class Tensor {
   /// \param value int
   /// \return Tensor
   ///
-  explicit Tensor(int value) : ptr_(details::make_ptr(ffi::call<plaidml_expr*>(plaidml_expr_int, value))) {}
+  explicit Tensor(int value, edsl_source_location loc = edsl_source_location::current())
+      : ptr_(details::make_ptr(ffi::call<plaidml_expr*>(loc, plaidml_expr_int, value))) {}
 
   ///
   /// Tensor constructor
   /// \param value unsigned int
   /// \return Tensor
   ///
-  explicit Tensor(unsigned value) : ptr_(details::make_ptr(ffi::call<plaidml_expr*>(plaidml_expr_int, value))) {}
+  explicit Tensor(unsigned value, edsl_source_location loc = edsl_source_location::current())
+      : ptr_(details::make_ptr(ffi::call<plaidml_expr*>(loc, plaidml_expr_int, value))) {}
 
   ///
   /// Tensor constructor
   /// \param value uint64_t
   /// \return Tensor
   ///
-  explicit Tensor(uint64_t value) : ptr_(details::make_ptr(ffi::call<plaidml_expr*>(plaidml_expr_uint, value))) {}
+  explicit Tensor(uint64_t value, edsl_source_location loc = edsl_source_location::current())
+      : ptr_(details::make_ptr(ffi::call<plaidml_expr*>(loc, plaidml_expr_uint, value))) {}
 
   ///
   /// Tensor constructor
   /// \param value int64_t
   /// \return Tensor
   ///
-  explicit Tensor(int64_t value) : ptr_(details::make_ptr(ffi::call<plaidml_expr*>(plaidml_expr_int, value))) {}
+  explicit Tensor(int64_t value, edsl_source_location loc = edsl_source_location::current())
+      : ptr_(details::make_ptr(ffi::call<plaidml_expr*>(loc, plaidml_expr_int, value))) {}
 
   ///
   /// Tensor constructor
   /// \param value double
   /// \return Tensor
   ///
-  explicit Tensor(double value) : ptr_(details::make_ptr(ffi::call<plaidml_expr*>(plaidml_expr_float, value))) {}
+  explicit Tensor(double value, edsl_source_location loc = edsl_source_location::current())
+      : ptr_(details::make_ptr(ffi::call<plaidml_expr*>(loc, plaidml_expr_float, value))) {}
 
   ///
   /// Tensor constructor
   ///
-  explicit Tensor(const TensorDim& dim)
-      : ptr_(details::make_ptr(ffi::call<plaidml_expr*>(plaidml_expr_dim, dim.as_ptr()))) {}
+  explicit Tensor(const TensorDim& dim, edsl_source_location loc = edsl_source_location::current())
+      : ptr_(details::make_ptr(ffi::call<plaidml_expr*>(loc, plaidml_expr_dim, dim.as_ptr()))) {}
 
   template <typename... Ts>
   IndexedTensor operator()(Ts... idxs) const;
-  IndexedTensor operator()(const std::vector<TensorIndex>& idxs) const;
+  IndexedTensor operator()(const std::vector<TensorIndex>& idxs,
+                           edsl_source_location loc = edsl_source_location::current()) const;
 
   ///
   /// Represents an eltwise negation
@@ -308,29 +324,35 @@ class Tensor {
   ///
   /// TODO
   ///
-  std::string str() const {  //
-    return ffi::str(ffi::call<plaidml_string*>(plaidml_expr_repr, as_ptr()));
+  std::string str(edsl_source_location loc = edsl_source_location::current()) const {  //
+    return ffi::str(ffi::call<plaidml_string*>(loc, plaidml_expr_repr, as_ptr()));
   }
 
   ///
   /// Return the tensor's shape
   ///
-  TensorShape compute_shape() const { return TensorShape(ffi::call<plaidml_shape*>(plaidml_expr_get_shape, as_ptr())); }
+  TensorShape compute_shape(edsl_source_location loc = edsl_source_location::current()) const {
+    return TensorShape(ffi::call<plaidml_shape*>(loc, plaidml_expr_get_shape, as_ptr()));
+  }
 
-  DType dtype() const { return static_cast<DType>(ffi::call<plaidml_datatype>(plaidml_expr_get_dtype, as_ptr())); }
+  DType dtype(edsl_source_location loc = edsl_source_location::current()) const {
+    return static_cast<DType>(ffi::call<plaidml_datatype>(loc, plaidml_expr_get_dtype, as_ptr()));
+  }
 
-  size_t rank() const { return ffi::call<size_t>(plaidml_expr_get_rank, as_ptr()); }
+  size_t rank(edsl_source_location loc = edsl_source_location::current()) const {
+    return ffi::call<size_t>(loc, plaidml_expr_get_rank, as_ptr());
+  }
 
   ///
   /// Verify that the specified dims match the dims of this tensor.
   ///
-  void bind_dims(const std::vector<TensorDim>& dims) const {
+  void bind_dims(const std::vector<TensorDim>& dims, edsl_source_location loc = edsl_source_location::current()) const {
     std::vector<plaidml_dim_expr*> raw_dims(dims.size());
     for (size_t i = 0; i < dims.size(); i++) {
       raw_dims[i] = dims[i].as_ptr();
     }
-    raw_dims = lens_.apply(raw_dims);
-    ffi::call_void(plaidml_expr_bind_dims, as_ptr(), raw_dims.size(), raw_dims.data());
+    raw_dims = lens_.apply(raw_dims, loc);
+    ffi::call_void(loc, plaidml_expr_bind_dims, as_ptr(), raw_dims.size(), raw_dims.data());
   }
 
   ///
@@ -346,13 +368,15 @@ class Tensor {
   ///
   /// Get an element of an operation that returns a tuple (i.e. multiple results).
   ///
-  Tensor element(size_t ordinal) const;
+  Tensor element(size_t ordinal, edsl_source_location loc = edsl_source_location::current()) const;
 
   Tensor use(const TensorLens& lens) const { return Tensor(*this, lens); }
 
   plaidml_expr* as_ptr() const { return ptr_.get(); }
 
-  void* raw_ptr() const { return ffi::call<void*>(plaidml_expr_ptr, as_ptr()); }
+  void* raw_ptr(edsl_source_location loc = edsl_source_location::current()) const {
+    return ffi::call<void*>(loc, plaidml_expr_ptr, as_ptr());
+  }
 
  private:
   Tensor(const Tensor& rhs, const TensorLens& lens) : ptr_(rhs.ptr_), lens_(lens) {}
@@ -472,7 +496,8 @@ class Contraction {
   ///
   /// Construct a contraction.
   ///
-  Tensor build();
+
+  Tensor build(edsl_source_location loc = edsl_source_location::current());
 
   operator Tensor() { return build(); }
 
@@ -563,10 +588,10 @@ inline Contraction& Contraction::add_constraints(const std::vector<Constraint>& 
   return *this;
 }
 
-inline Tensor Contraction::build() {
+inline Tensor Contraction::build(edsl_source_location loc) {
   size_t rank = outDims_.size();
   if (rank != outIdxs_.size()) {
-    throw std::runtime_error("Rank mismatch between outShape and outAccess");
+    throw ffi_exception("Rank mismatch between outShape and outAccess", loc);
   }
   std::vector<plaidml_poly_expr*> idxs(rank);
   std::vector<plaidml_dim_expr*> dims(rank);
@@ -575,10 +600,11 @@ inline Tensor Contraction::build() {
     dims[i] = outDims_[i].as_ptr();
   }
 
-  idxs = lens_.apply(idxs);
-  dims = lens_.apply(dims);
+  idxs = lens_.apply(idxs, loc);
+  dims = lens_.apply(dims, loc);
 
   auto* ptr = ffi::call<plaidml_expr*>(  //
+      loc,                               //
       plaidml_expr_contraction,          //
       agg_op_,                           //
       rhs_.op_,                          //
@@ -602,6 +628,7 @@ inline Tensor Contraction::build() {
       idxs[i] = operand.idxs_[i].as_ptr();
     }
     ffi::call_void(                       //
+        loc,                              //
         plaidml_contraction_add_operand,  //
         ptr,                              //
         operand.ref_.as_ptr(),            //
@@ -611,40 +638,42 @@ inline Tensor Contraction::build() {
 
   for (const Constraint& constraint : constraints_) {
     ffi::call_void(                          //
+        loc,                                 //
         plaidml_contraction_add_constraint,  //
         ptr,                                 //
         constraint.lhs.as_ptr(),             //
         constraint.rhs.as_ptr());
   }
 
-  ffi::call_void(plaidml_contraction_build, ptr);
+  ffi::call_void(loc, plaidml_contraction_build, ptr);
   return Tensor(ptr);
 }
 
-inline TensorLens::TensorLens(const std::string& source, const std::string& target) : map(source.size()) {
+inline TensorLens::TensorLens(const std::string& source, const std::string& target, edsl_source_location loc)
+    : map(source.size()) {
   if (source.size() != target.size()) {
     std::stringstream ss;
     ss << "source and target rank mismatch: " << source << " != " << target;
-    throw std::runtime_error(ss.str());
+    throw ffi_exception(ss.str(), loc);
   }
   for (unsigned i = 0; i < source.size(); i++) {
     auto pos = target.find(source[i]);
     if (pos == std::string::npos) {
       std::stringstream ss;
       ss << "source and target dims mismatch: " << source << " != " << target;
-      throw std::runtime_error(ss.str());
+      throw ffi_exception(ss.str(), loc);
     }
     map[i] = pos;
   }
 }
 
 template <typename T>
-inline std::vector<T> TensorLens::apply(const std::vector<T>& dims) const {
+inline std::vector<T> TensorLens::apply(const std::vector<T>& dims, edsl_source_location loc) const {
   if (map.empty()) {
     return dims;
   }
   if (dims.size() != map.size()) {
-    throw std::runtime_error("rank mismatch in TensorLens apply");
+    throw ffi_exception("rank mismatch in TensorLens apply", loc);
   }
   std::vector<T> ret(dims.size());
   for (unsigned i = 0; i < dims.size(); i++) {
@@ -660,36 +689,48 @@ inline IndexedTensor Tensor::operator()(Ts... idxs) const {
   return IndexedTensor(*this, lens_.apply(vec));
 }
 
-inline IndexedTensor Tensor::operator()(const std::vector<TensorIndex>& idxs) const {
-  return IndexedTensor(*this, lens_.apply(idxs));
+inline IndexedTensor Tensor::operator()(const std::vector<TensorIndex>& idxs, edsl_source_location loc) const {
+  return IndexedTensor(*this, lens_.apply(idxs, loc));
 }
 
-inline Tensor Tensor::element(size_t ordinal) const {
-  return Tensor(ffi::call<plaidml_expr*>(plaidml_expr_element, as_ptr(), ordinal));
+inline Tensor Tensor::element(size_t ordinal, edsl_source_location loc) const {
+  return Tensor(ffi::call<plaidml_expr*>(loc, plaidml_expr_element, as_ptr(), ordinal));
 }
 
-inline Tensor Constant(    //
-    const Buffer& buffer,  //
-    const std::string& name) {
+inline Tensor Constant(       //
+    const Buffer& buffer,     //
+    const std::string& name,  //
+    edsl_source_location loc = edsl_source_location::current()) {
   auto* ptr = ffi::call<plaidml_expr*>(  //
+      loc,                               //
       plaidml_expr_constant,             //
       buffer.as_ptr(),                   //
       name.c_str());
   return Tensor(ptr);
 }
 
-inline Tensor Constant(int value) { return Tensor(value); }
+inline Tensor Constant(int value, edsl_source_location loc = edsl_source_location::current()) {
+  return Tensor(value, loc);
+}
 
-inline Tensor Constant(int64_t value) { return Tensor(value); }
+inline Tensor Constant(int64_t value, edsl_source_location loc = edsl_source_location::current()) {
+  return Tensor(value, loc);
+}
 
-inline Tensor Constant(uint64_t value) { return Tensor(value); }
+inline Tensor Constant(uint64_t value, edsl_source_location loc = edsl_source_location::current()) {
+  return Tensor(value, loc);
+}
 
-inline Tensor Constant(double value) { return Tensor(value); }
+inline Tensor Constant(double value, edsl_source_location loc = edsl_source_location::current()) {
+  return Tensor(value, loc);
+}
 
-inline Tensor Placeholder(     //
-    const TensorShape& shape,  //
-    const std::string& name = "") {
+inline Tensor Placeholder(         //
+    const TensorShape& shape,      //
+    const std::string& name = "",  //
+    edsl_source_location loc = edsl_source_location::current()) {
   auto* ptr = ffi::call<plaidml_expr*>(  //
+      loc,                               //
       plaidml_expr_input,                //
       shape.as_ptr(),                    //
       name.c_str());
@@ -699,20 +740,30 @@ inline Tensor Placeholder(     //
 inline Tensor Placeholder(             //
     DType dtype,                       //
     const std::vector<int64_t>& dims,  //
-    const std::string& name = "") {
-  TensorShape shape(dtype, dims);
-  return Placeholder(shape, name);
+    const std::string& name = "",      //
+    edsl_source_location loc = edsl_source_location::current()) {
+  TensorShape shape(dtype, dims, loc);
+  return Placeholder(shape, name, loc);
 }
 
-inline Tensor Zero() { return Tensor(0); }
+inline Tensor Zero(edsl_source_location loc = edsl_source_location::current()) { return Tensor(0, loc); }
 
 Tensor intrinsicCall(const std::string& fn, const TensorVec& args);
+
+Tensor intrinsicCall(edsl_source_location loc, const std::string& fn, const TensorVec& args);
 
 template <typename... Ts>
 Tensor intrinsic(const std::string& fn, Ts... args) {
   TensorVec vec;
   details::into_vector(&vec, std::forward<Ts>(args)...);
   return intrinsicCall(fn, vec);
+}
+
+template <typename... Ts>
+Tensor intrinsic(edsl_source_location loc, const std::string& fn, Ts... args) {
+  TensorVec vec;
+  details::into_vector(&vec, std::forward<Ts>(args)...);
+  return intrinsicCall(loc, fn, vec);
 }
 
 ///
@@ -727,49 +778,80 @@ Tensor intrinsic(const std::string& fn, Ts... args) {
 /// \param x Tensor
 /// \return Tensor
 ///
-inline Tensor abs(const Tensor& x) { return intrinsic("abs", x); }
+inline Tensor abs(const Tensor& x, edsl_source_location loc = edsl_source_location::current()) {
+  return intrinsic(loc, "abs", x);
+}
 
 ///
 /// Computes the elementwise arccosine of `x`.
 /// \param x Tensor
 /// \return Tensor
 ///
-inline Tensor acos(const Tensor& x) { return intrinsic("acos", x); }
+inline Tensor acos(const Tensor& x, edsl_source_location loc = edsl_source_location::current()) {
+  return intrinsic(loc, "acos", x);
+}
+
+enum class SortDirection {
+  ASC,
+  DESC,
+};
+
+///
+/// Returns the indices of `x` which give its sorted order along `axis` in
+/// the specified `direction`, where -1 represents the last axis.
+/// \param x Tensor
+/// \param axis int
+/// \param direction SortDirection
+/// \return Tensor
+///
+inline Tensor argsort(const Tensor& x, int axis = -1, SortDirection direction = SortDirection::ASC) {
+  return intrinsic("argsort", x, static_cast<int64_t>(axis), static_cast<int64_t>(direction));
+}
 
 ///
 /// Computes the elementwise inverse hyperbolic cosine of `x`.
 /// \param x Tensor
 /// \return Tensor
 ///
-inline Tensor acosh(const Tensor& x) { return intrinsic("acosh", x); }
+inline Tensor acosh(const Tensor& x, edsl_source_location loc = edsl_source_location::current()) {
+  return intrinsic(loc, "acosh", x);
+}
 
 ///
 /// Computes the elementwise arcsine of `x`.
 /// \param x Tensor
 /// \return Tensor
 ///
-inline Tensor asin(const Tensor& x) { return intrinsic("asin", x); }
+inline Tensor asin(const Tensor& x, edsl_source_location loc = edsl_source_location::current()) {
+  return intrinsic(loc, "asin", x);
+}
 
 ///
 /// Computes the elementwise inverse hyperbolic sine of `x`.
 /// \param x Tensor
 /// \return Tensor
 ///
-inline Tensor asinh(const Tensor& x) { return intrinsic("asinh", x); }
+inline Tensor asinh(const Tensor& x, edsl_source_location loc = edsl_source_location::current()) {
+  return intrinsic(loc, "asinh", x);
+}
 
 ///
 /// Computes the elementwise arctangent of `x`.
 /// \param x Tensor
 /// \return Tensor
 ///
-inline Tensor atan(const Tensor& x) { return intrinsic("atan", x); }
+inline Tensor atan(const Tensor& x, edsl_source_location loc = edsl_source_location::current()) {
+  return intrinsic(loc, "atan", x);
+}
 
 ///
 /// Computes the elementwise inverse hyperbolic tangent of `x`.
 /// \param x Tensor
 /// \return Tensor
 ///
-inline Tensor atanh(const Tensor& x) { return intrinsic("atanh", x); }
+inline Tensor atanh(const Tensor& x, edsl_source_location loc = edsl_source_location::current()) {
+  return intrinsic(loc, "atanh", x);
+}
 
 ///
 /// Casts the element type of a tensor `x` to the type specified by `dtype`.
@@ -777,8 +859,8 @@ inline Tensor atanh(const Tensor& x) { return intrinsic("atanh", x); }
 /// \param dtype DType
 /// \return Tensor
 ///
-inline Tensor cast(const Tensor& x, DType dtype) {
-  return Tensor{ffi::call<plaidml_expr*>(plaidml_expr_cast, x.as_ptr(), static_cast<plaidml_datatype>(dtype))};
+inline Tensor cast(const Tensor& x, DType dtype, edsl_source_location loc = edsl_source_location::current()) {
+  return Tensor{ffi::call<plaidml_expr*>(loc, plaidml_expr_cast, x.as_ptr(), static_cast<plaidml_datatype>(dtype))};
 }
 
 ///
@@ -786,42 +868,54 @@ inline Tensor cast(const Tensor& x, DType dtype) {
 /// \param x Tensor
 /// \return Tensor
 ///
-inline Tensor ceil(const Tensor& x) { return intrinsic("ceil", x); }
+inline Tensor ceil(const Tensor& x, edsl_source_location loc = edsl_source_location::current()) {
+  return intrinsic(loc, "ceil", x);
+}
 
 ///
 /// Computes the elementwise cosine of `x`.
 /// \param x Tensor
 /// \return Tensor
 ///
-inline Tensor cos(const Tensor& x) { return intrinsic("cos", x); }
+inline Tensor cos(const Tensor& x, edsl_source_location loc = edsl_source_location::current()) {
+  return intrinsic(loc, "cos", x);
+}
 
 ///
 /// Computes the elementwise hyperbolic cosine of `x`.
 /// \param x Tensor
 /// \return Tensor
 ///
-inline Tensor cosh(const Tensor& x) { return intrinsic("cosh", x); }
+inline Tensor cosh(const Tensor& x, edsl_source_location loc = edsl_source_location::current()) {
+  return intrinsic(loc, "cosh", x);
+}
 
 ///
 /// Computes the elementwise Gauss error function of `x`
 /// \param x Tensor
 /// \return Tensor
 ///
-inline Tensor erf(const Tensor& x) { return intrinsic("erf", x); }
+inline Tensor erf(const Tensor& x, edsl_source_location loc = edsl_source_location::current()) {
+  return intrinsic(loc, "erf", x);
+}
 
 ///
 /// Computes the elementwise natural exponential function of `x`: _e_<sup>x</sup>.
 /// \param x Tensor
 /// \return Tensor
 ///
-inline Tensor exp(const Tensor& x) { return intrinsic("exp", x); }
+inline Tensor exp(const Tensor& x, edsl_source_location loc = edsl_source_location::current()) {
+  return intrinsic(loc, "exp", x);
+}
 
 ///
 /// Computes the elementwise floor of `x`.
 /// \param x Tensor
 /// \return Tensor
 ///
-inline Tensor floor(const Tensor& x) { return intrinsic("floor", x); }
+inline Tensor floor(const Tensor& x, edsl_source_location loc = edsl_source_location::current()) {
+  return intrinsic(loc, "floor", x);
+}
 
 enum class InterpolationMode : uint64_t {
   NEAREST,
@@ -883,9 +977,9 @@ class gather {
   ///
   /// Construct gather.
   ///
-  Tensor build() const {
+  Tensor build(edsl_source_location loc = edsl_source_location::current()) const {
     std::vector<Tensor> args = {x_, y_, axis_, interpolation_mode_, nearest_mode_, cube_coeff_};
-    return intrinsicCall("gather", args);
+    return intrinsicCall(loc, "gather", args);
   }
 
   operator Tensor() { return build(); }
@@ -911,7 +1005,9 @@ class gather {
 /// \param x Tensor
 /// \return Tensor
 ///
-inline Tensor ident(const Tensor& x) { return intrinsic("ident", x); }
+inline Tensor ident(const Tensor& x, edsl_source_location loc = edsl_source_location::current()) {
+  return intrinsic(loc, "ident", x);
+}
 
 ///
 /// Returns a tensor populated with the index value of the shape and axis specified.
@@ -919,12 +1015,13 @@ inline Tensor ident(const Tensor& x) { return intrinsic("ident", x); }
 /// \param axis size_t
 /// \return Tensor
 ///
-inline Tensor index(const std::vector<TensorDim>& dims, size_t axis) {
+inline Tensor index(const std::vector<TensorDim>& dims, size_t axis,
+                    edsl_source_location loc = edsl_source_location::current()) {
   TensorVec args = {Tensor{static_cast<int64_t>(axis)}};
   for (const auto& dim : dims) {
     args.emplace_back(dim);
   }
-  return intrinsicCall("index", args);
+  return intrinsicCall(loc, "index", args);
 }
 
 ///
@@ -932,7 +1029,9 @@ inline Tensor index(const std::vector<TensorDim>& dims, size_t axis) {
 /// \param x Tensor
 /// \return Tensor
 ///
-inline Tensor log(const Tensor& x) { return intrinsic("log", x); }
+inline Tensor log(const Tensor& x, edsl_source_location loc = edsl_source_location::current()) {
+  return intrinsic(loc, "log", x);
+}
 
 ///
 /// Computes the elementwise `y`th power of `x`.
@@ -940,7 +1039,9 @@ inline Tensor log(const Tensor& x) { return intrinsic("log", x); }
 /// \param y Tensor
 /// \return Tensor
 ///
-inline Tensor pow(const Tensor& x, const Tensor& y) { return intrinsic("pow", x, y); }
+inline Tensor pow(const Tensor& x, const Tensor& y, edsl_source_location loc = edsl_source_location::current()) {
+  return intrinsic(loc, "pow", x, y);
+}
 
 ///
 /// Generates a Tensor of elementwise pseudorandom numbers using the seed values specified in `state`.
@@ -948,12 +1049,13 @@ inline Tensor pow(const Tensor& x, const Tensor& y) { return intrinsic("pow", x,
 /// \param dims vector<int64_t>
 /// \return Tensor
 ///
-inline std::pair<Tensor, Tensor> prng(const Tensor& state, const std::vector<int64_t>& dims) {
+inline std::pair<Tensor, Tensor> prng(const Tensor& state, const std::vector<int64_t>& dims,
+                                      edsl_source_location loc = edsl_source_location::current()) {
   TensorVec args = {state};
   for (int64_t dim : dims) {
     args.emplace_back(TensorDim(dim));
   }
-  Tensor R = intrinsicCall("prng", args);
+  Tensor R = intrinsicCall(loc, "prng", args);
   return std::make_pair(R.element(0), R.element(1));
 }
 
@@ -963,12 +1065,13 @@ inline std::pair<Tensor, Tensor> prng(const Tensor& state, const std::vector<int
 /// \param dims vector<int64_t>
 /// \return Tensor
 ///
-inline Tensor reshape(const Tensor& x, const std::vector<int64_t>& dims) {
+inline Tensor reshape(const Tensor& x, const std::vector<int64_t>& dims,
+                      edsl_source_location loc = edsl_source_location::current()) {
   TensorVec args = {x};
   for (int64_t dim : dims) {
     args.emplace_back(dim);
   }
-  return intrinsicCall("reshape", args);
+  return intrinsicCall(loc, "reshape", args);
 }
 
 ///
@@ -977,12 +1080,13 @@ inline Tensor reshape(const Tensor& x, const std::vector<int64_t>& dims) {
 /// \param dims vector<TensorDim>
 /// \return Tensor
 ///
-inline Tensor reshape(const Tensor& x, const std::vector<TensorDim>& dims) {
+inline Tensor reshape(const Tensor& x, const std::vector<TensorDim>& dims,
+                      edsl_source_location loc = edsl_source_location::current()) {
   TensorVec args = {x};
   for (const TensorDim& dim : dims) {
     args.emplace_back(dim);
   }
-  return intrinsicCall("reshape", args);
+  return intrinsicCall(loc, "reshape", args);
 }
 
 ///
@@ -990,7 +1094,9 @@ inline Tensor reshape(const Tensor& x, const std::vector<TensorDim>& dims) {
 /// \param x Tensor
 /// \return Tensor
 ///
-inline Tensor round(const Tensor& x) { return intrinsic("round", x); }
+inline Tensor round(const Tensor& x, edsl_source_location loc = edsl_source_location::current()) {
+  return intrinsic(loc, "round", x);
+}
 
 ///
 /// Takes an input tensor (`x`), a set of indices to scatter over (`y`), and the number of elements in the scattered
@@ -1020,9 +1126,9 @@ class scatter {
     return *this;
   }
 
-  Tensor build() const {
+  Tensor build(edsl_source_location loc = edsl_source_location::current()) const {
     std::vector<Tensor> args = {x_, y_, z_, axis_, mode_};
-    return intrinsicCall("scatter", args);
+    return intrinsicCall(loc, "scatter", args);
   }
 
   operator Tensor() { return build(); }
@@ -1045,8 +1151,9 @@ class scatter {
 /// \param false_case Tensor
 /// \return Tensor
 ///
-inline Tensor select(const Tensor& cond, const Tensor& true_case, const Tensor& false_case) {
-  return intrinsic("select", cond, true_case, false_case);
+inline Tensor select(const Tensor& cond, const Tensor& true_case, const Tensor& false_case,
+                     edsl_source_location loc = edsl_source_location::current()) {
+  return intrinsic(loc, "select", cond, true_case, false_case);
 }
 
 ///
@@ -1054,42 +1161,54 @@ inline Tensor select(const Tensor& cond, const Tensor& true_case, const Tensor& 
 /// \param x Tensor
 /// \return Tensor
 ///
-inline Tensor shape(const Tensor& x) { return intrinsic("shape", x); }
+inline Tensor shape(const Tensor& x, edsl_source_location loc = edsl_source_location::current()) {
+  return intrinsic(loc, "shape", x);
+}
 
 ///
 /// Computes the elementwise sine of `x`.
 /// \param x Tensor
 /// \return Tensor
 ///
-inline Tensor sin(const Tensor& x) { return intrinsic("sin", x); }
+inline Tensor sin(const Tensor& x, edsl_source_location loc = edsl_source_location::current()) {
+  return intrinsic(loc, "sin", x);
+}
 
 ///
 /// Computes the elementwise hyperbolic sine of `x`.
 /// \param x Tensor
 /// \return Tensor
 ///
-inline Tensor sinh(const Tensor& x) { return intrinsic("sinh", x); }
+inline Tensor sinh(const Tensor& x, edsl_source_location loc = edsl_source_location::current()) {
+  return intrinsic(loc, "sinh", x);
+}
 
 ///
 /// Computes the elementwise square root of `x`.
 /// \param x Tensor
 /// \return Tensor
 ///
-inline Tensor sqrt(const Tensor& x) { return intrinsic("sqrt", x); }
+inline Tensor sqrt(const Tensor& x, edsl_source_location loc = edsl_source_location::current()) {
+  return intrinsic(loc, "sqrt", x);
+}
 
 ///
 /// Computes the elementwise tangent of `x`.
 /// \param x Tensor
 /// \return Tensor
 ///
-inline Tensor tan(const Tensor& x) { return intrinsic("tan", x); }
+inline Tensor tan(const Tensor& x, edsl_source_location loc = edsl_source_location::current()) {
+  return intrinsic(loc, "tan", x);
+}
 
 ///
 /// Computes the elementwise hyperbolic tangent of `x`.
 /// \param x Tensor
 /// \return Tensor
 ///
-inline Tensor tanh(const Tensor& x) { return intrinsic("tanh", x); }
+inline Tensor tanh(const Tensor& x, edsl_source_location loc = edsl_source_location::current()) {
+  return intrinsic(loc, "tanh", x);
+}
 
 /// @}
 
@@ -1150,16 +1269,60 @@ inline Tensor Tensor::operator-() const { return intrinsicCall("neg", {*this}); 
 inline Tensor Tensor::operator~() const { return intrinsicCall("bit_not", {*this}); }
 inline Tensor Tensor::operator!() const { return intrinsicCall("logical_not", {*this}); }
 
-#define PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(_op_, _fn_)                                                 \
-  inline Tensor operator _op_(const Tensor& lhs, const Tensor& rhs) { return intrinsic(_fn_, lhs, rhs); } \
-  inline Tensor operator _op_(const Tensor& lhs, int rhs) { return intrinsic(_fn_, lhs, rhs); }           \
-  inline Tensor operator _op_(const Tensor& lhs, int64_t rhs) { return intrinsic(_fn_, lhs, rhs); }       \
-  inline Tensor operator _op_(const Tensor& lhs, uint64_t rhs) { return intrinsic(_fn_, lhs, rhs); }      \
-  inline Tensor operator _op_(const Tensor& lhs, double rhs) { return intrinsic(_fn_, lhs, rhs); }        \
-  inline Tensor operator _op_(int lhs, const Tensor& rhs) { return intrinsic(_fn_, lhs, rhs); }           \
-  inline Tensor operator _op_(int64_t lhs, const Tensor& rhs) { return intrinsic(_fn_, lhs, rhs); }       \
-  inline Tensor operator _op_(uint64_t lhs, const Tensor& rhs) { return intrinsic(_fn_, lhs, rhs); }      \
-  inline Tensor operator _op_(double lhs, const Tensor& rhs) { return intrinsic(_fn_, lhs, rhs); }
+template <typename T>
+class has_tensor {
+  typedef char one;
+  typedef int two;
+
+  template <typename C>
+  static one test(decltype(&C::operator Tensor));
+  template <typename C>
+  static two test(...);
+
+ public:
+  enum { value = sizeof(test<T>(0)) == sizeof(char) };
+};
+
+template <bool B, class T = void>
+using enable_if_t = typename std::enable_if<B, T>::type;
+
+struct LocatedTensor {
+  Tensor tensor;
+  edsl_source_location loc;
+
+  template <typename T, typename = enable_if_t<has_tensor<T>::value>>
+  LocatedTensor(T tensor, edsl_source_location loc = edsl_source_location::current())  // NOLINT
+      : tensor(tensor), loc(loc) {}
+
+  LocatedTensor(Tensor tensor, edsl_source_location loc = edsl_source_location::current())  // NOLINT
+      : tensor(tensor), loc(loc) {}
+};
+
+#ifdef _MSC_VER
+#define PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(_op_, _fn_)                                     \
+  inline Tensor operator _op_(Tensor lhs, Tensor rhs) { return intrinsic(_fn_, lhs, rhs); }   \
+  inline Tensor operator _op_(Tensor lhs, int rhs) { return intrinsic(_fn_, lhs, rhs); }      \
+  inline Tensor operator _op_(Tensor lhs, int64_t rhs) { return intrinsic(_fn_, lhs, rhs); }  \
+  inline Tensor operator _op_(Tensor lhs, uint64_t rhs) { return intrinsic(_fn_, lhs, rhs); } \
+  inline Tensor operator _op_(Tensor lhs, double rhs) { return intrinsic(_fn_, lhs, rhs); }   \
+  inline Tensor operator _op_(int lhs, Tensor rhs) { return intrinsic(_fn_, lhs, rhs); }      \
+  inline Tensor operator _op_(int64_t lhs, Tensor rhs) { return intrinsic(_fn_, lhs, rhs); }  \
+  inline Tensor operator _op_(uint64_t lhs, Tensor rhs) { return intrinsic(_fn_, lhs, rhs); } \
+  inline Tensor operator _op_(double lhs, Tensor rhs) { return intrinsic(_fn_, lhs, rhs); }
+#else
+#define PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(_op_, _fn_)                                                            \
+  inline Tensor operator _op_(LocatedTensor lhs, LocatedTensor rhs) {                                                \
+    return intrinsic(lhs.loc, _fn_, lhs.tensor, rhs.tensor);                                                         \
+  }                                                                                                                  \
+  inline Tensor operator _op_(LocatedTensor lhs, int rhs) { return intrinsic(lhs.loc, _fn_, lhs.tensor, rhs); }      \
+  inline Tensor operator _op_(LocatedTensor lhs, int64_t rhs) { return intrinsic(lhs.loc, _fn_, lhs.tensor, rhs); }  \
+  inline Tensor operator _op_(LocatedTensor lhs, uint64_t rhs) { return intrinsic(lhs.loc, _fn_, lhs.tensor, rhs); } \
+  inline Tensor operator _op_(LocatedTensor lhs, double rhs) { return intrinsic(lhs.loc, _fn_, lhs.tensor, rhs); }   \
+  inline Tensor operator _op_(int lhs, LocatedTensor rhs) { return intrinsic(rhs.loc, _fn_, lhs, rhs.tensor); }      \
+  inline Tensor operator _op_(int64_t lhs, LocatedTensor rhs) { return intrinsic(rhs.loc, _fn_, lhs, rhs.tensor); }  \
+  inline Tensor operator _op_(uint64_t lhs, LocatedTensor rhs) { return intrinsic(rhs.loc, _fn_, lhs, rhs.tensor); } \
+  inline Tensor operator _op_(double lhs, LocatedTensor rhs) { return intrinsic(rhs.loc, _fn_, lhs, rhs.tensor); }
+#endif
 
 PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(+, "add");
 PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(-, "sub");
@@ -1188,123 +1351,142 @@ inline Tensor intrinsicCall(const std::string& fn, const TensorVec& args) {
   return Tensor{ffi::call<plaidml_expr*>(plaidml_expr_intrinsic, fn.c_str(), ptrs.size(), ptrs.data())};
 }
 
+inline Tensor intrinsicCall(edsl_source_location loc, const std::string& fn, const TensorVec& args) {
+  std::vector<plaidml_expr*> ptrs(args.size());
+  for (size_t i = 0; i < args.size(); i++) {
+    ptrs[i] = args[i].as_ptr();
+  }
+  return Tensor{ffi::call<plaidml_expr*>(loc, plaidml_expr_intrinsic, fn.c_str(), ptrs.size(), ptrs.data())};
+}
+
 class Value {
  public:
-  Value() : ptr_(details::make_ptr(ffi::call<plaidml_value*>(plaidml_value_none))) {}
+  Value(edsl_source_location loc = edsl_source_location::current())  // NOLINT
+      : ptr_(details::make_ptr(ffi::call<plaidml_value*>(loc, plaidml_value_none))) {}
 
-  explicit Value(plaidml_value* ptr) : ptr_(details::make_ptr(ffi::call<plaidml_value*>(plaidml_value_clone, ptr))) {}
+  explicit Value(plaidml_value* ptr, edsl_source_location loc = edsl_source_location::current())
+      : ptr_(details::make_ptr(ffi::call<plaidml_value*>(loc, plaidml_value_clone, ptr))) {}
 
-  explicit Value(int8_t value) : ptr_(details::make_ptr(ffi::call<plaidml_value*>(plaidml_value_int, value))) {}
+  explicit Value(int8_t value, edsl_source_location loc = edsl_source_location::current())
+      : ptr_(details::make_ptr(ffi::call<plaidml_value*>(loc, plaidml_value_int, value))) {}
 
-  explicit Value(int16_t value) : ptr_(details::make_ptr(ffi::call<plaidml_value*>(plaidml_value_int, value))) {}
+  explicit Value(int16_t value, edsl_source_location loc = edsl_source_location::current())
+      : ptr_(details::make_ptr(ffi::call<plaidml_value*>(loc, plaidml_value_int, value))) {}
 
-  explicit Value(int32_t value) : ptr_(details::make_ptr(ffi::call<plaidml_value*>(plaidml_value_int, value))) {}
+  explicit Value(int32_t value, edsl_source_location loc = edsl_source_location::current())
+      : ptr_(details::make_ptr(ffi::call<plaidml_value*>(loc, plaidml_value_int, value))) {}
 
-  explicit Value(int64_t value) : ptr_(details::make_ptr(ffi::call<plaidml_value*>(plaidml_value_int, value))) {}
+  explicit Value(int64_t value, edsl_source_location loc = edsl_source_location::current())
+      : ptr_(details::make_ptr(ffi::call<plaidml_value*>(loc, plaidml_value_int, value))) {}
 
-  explicit Value(uint8_t value) : ptr_(details::make_ptr(ffi::call<plaidml_value*>(plaidml_value_int, value))) {}
+  explicit Value(uint8_t value, edsl_source_location loc = edsl_source_location::current())
+      : ptr_(details::make_ptr(ffi::call<plaidml_value*>(loc, plaidml_value_int, value))) {}
 
-  explicit Value(uint16_t value) : ptr_(details::make_ptr(ffi::call<plaidml_value*>(plaidml_value_int, value))) {}
+  explicit Value(uint16_t value, edsl_source_location loc = edsl_source_location::current())
+      : ptr_(details::make_ptr(ffi::call<plaidml_value*>(loc, plaidml_value_int, value))) {}
 
-  explicit Value(uint32_t value) : ptr_(details::make_ptr(ffi::call<plaidml_value*>(plaidml_value_int, value))) {}
+  explicit Value(uint32_t value, edsl_source_location loc = edsl_source_location::current())
+      : ptr_(details::make_ptr(ffi::call<plaidml_value*>(loc, plaidml_value_int, value))) {}
 
-  explicit Value(uint64_t value) : ptr_(details::make_ptr(ffi::call<plaidml_value*>(plaidml_value_int, value))) {}
+  explicit Value(uint64_t value, edsl_source_location loc = edsl_source_location::current())
+      : ptr_(details::make_ptr(ffi::call<plaidml_value*>(loc, plaidml_value_int, value))) {}
 
-  explicit Value(double value) : ptr_(details::make_ptr(ffi::call<plaidml_value*>(plaidml_value_float, value))) {}
+  explicit Value(double value, edsl_source_location loc = edsl_source_location::current())
+      : ptr_(details::make_ptr(ffi::call<plaidml_value*>(loc, plaidml_value_float, value))) {}
 
-  explicit Value(const std::string& value)
-      : ptr_(details::make_ptr(ffi::call<plaidml_value*>(plaidml_value_str, value.c_str()))) {}
+  explicit Value(const std::string& value, edsl_source_location loc = edsl_source_location::current())
+      : ptr_(details::make_ptr(ffi::call<plaidml_value*>(loc, plaidml_value_str, value.c_str()))) {}
 
-  explicit Value(const TensorDim& dim)
-      : ptr_(details::make_ptr(ffi::call<plaidml_value*>(plaidml_value_dim, dim.as_ptr()))) {}
+  explicit Value(const TensorDim& dim, edsl_source_location loc = edsl_source_location::current())
+      : ptr_(details::make_ptr(ffi::call<plaidml_value*>(loc, plaidml_value_dim, dim.as_ptr()))) {}
 
-  explicit Value(const Tensor& tensor) {
+  explicit Value(const Tensor& tensor, edsl_source_location loc = edsl_source_location::current()) {
     if (auto* ptr = tensor.as_ptr()) {
-      ptr_ = details::make_ptr(ffi::call<plaidml_value*>(plaidml_value_expr, ptr));
+      ptr_ = details::make_ptr(ffi::call<plaidml_value*>(loc, plaidml_value_expr, ptr));
     } else {
-      ptr_ = details::make_ptr(ffi::call<plaidml_value*>(plaidml_value_none));
+      ptr_ = details::make_ptr(ffi::call<plaidml_value*>(loc, plaidml_value_none));
     }
   }
 
-  explicit Value(const std::vector<Value>& tuple) {
+  explicit Value(const std::vector<Value>& tuple, edsl_source_location loc = edsl_source_location::current()) {
     std::vector<plaidml_value*> args(tuple.size());
     for (size_t i = 0; i < args.size(); i++) {
       args[i] = tuple[i].as_ptr();
     }
-    ptr_ = details::make_ptr(ffi::call<plaidml_value*>(plaidml_value_tuple, args.size(), args.data()));
+    ptr_ = details::make_ptr(ffi::call<plaidml_value*>(loc, plaidml_value_tuple, args.size(), args.data()));
   }
 
-  std::string str() const {  //
-    return ffi::str(ffi::call<plaidml_string*>(plaidml_value_repr, as_ptr()));
+  std::string str(edsl_source_location loc = edsl_source_location::current()) const {  //
+    return ffi::str(ffi::call<plaidml_string*>(loc, plaidml_value_repr, as_ptr()));
   }
 
-  bool is_none() const {  //
-    return ffi::call<plaidml_value_kind>(plaidml_value_get_kind, as_ptr()) == PLAIDML_VALUE_NONE;
+  bool is_none(edsl_source_location loc = edsl_source_location::current()) const {  //
+    return ffi::call<plaidml_value_kind>(loc, plaidml_value_get_kind, as_ptr()) == PLAIDML_VALUE_NONE;
   }
 
-  bool is_int() const {  //
-    return ffi::call<plaidml_value_kind>(plaidml_value_get_kind, as_ptr()) == PLAIDML_VALUE_INT;
+  bool is_int(edsl_source_location loc = edsl_source_location::current()) const {  //
+    return ffi::call<plaidml_value_kind>(loc, plaidml_value_get_kind, as_ptr()) == PLAIDML_VALUE_INT;
   }
 
-  bool is_float() const {  //
-    return ffi::call<plaidml_value_kind>(plaidml_value_get_kind, as_ptr()) == PLAIDML_VALUE_FLOAT;
+  bool is_float(edsl_source_location loc = edsl_source_location::current()) const {  //
+    return ffi::call<plaidml_value_kind>(loc, plaidml_value_get_kind, as_ptr()) == PLAIDML_VALUE_FLOAT;
   }
 
-  bool is_tensor() const {
-    return ffi::call<plaidml_value_kind>(plaidml_value_get_kind, as_ptr()) == PLAIDML_VALUE_EXPR;
+  bool is_tensor(edsl_source_location loc = edsl_source_location::current()) const {
+    return ffi::call<plaidml_value_kind>(loc, plaidml_value_get_kind, as_ptr()) == PLAIDML_VALUE_EXPR;
   }
 
-  bool is_tuple() const {  //
-    return ffi::call<plaidml_value_kind>(plaidml_value_get_kind, as_ptr()) == PLAIDML_VALUE_TUPLE;
+  bool is_tuple(edsl_source_location loc = edsl_source_location::current()) const {  //
+    return ffi::call<plaidml_value_kind>(loc, plaidml_value_get_kind, as_ptr()) == PLAIDML_VALUE_TUPLE;
   }
 
-  bool is_str() const {  //
-    return ffi::call<plaidml_value_kind>(plaidml_value_get_kind, as_ptr()) == PLAIDML_VALUE_STR;
+  bool is_str(edsl_source_location loc = edsl_source_location::current()) const {  //
+    return ffi::call<plaidml_value_kind>(loc, plaidml_value_get_kind, as_ptr()) == PLAIDML_VALUE_STR;
   }
 
-  bool is_dim() const {  //
-    return ffi::call<plaidml_value_kind>(plaidml_value_get_kind, as_ptr()) == PLAIDML_VALUE_DIM;
+  bool is_dim(edsl_source_location loc = edsl_source_location::current()) const {  //
+    return ffi::call<plaidml_value_kind>(loc, plaidml_value_get_kind, as_ptr()) == PLAIDML_VALUE_DIM;
   }
 
-  bool as_bool() const {
+  bool as_bool(edsl_source_location loc = edsl_source_location::current()) const {
     // bools are integers under the hood, but we can still return a bool type
-    return static_cast<bool>(ffi::call<int64_t>(plaidml_value_int_get, as_ptr()));
+    return static_cast<bool>(ffi::call<int64_t>(loc, plaidml_value_int_get, as_ptr()));
   }
 
-  int64_t as_int() const {  //
-    return ffi::call<int64_t>(plaidml_value_int_get, as_ptr());
+  int64_t as_int(edsl_source_location loc = edsl_source_location::current()) const {  //
+    return ffi::call<int64_t>(loc, plaidml_value_int_get, as_ptr());
   }
 
-  double as_float() const {  //
-    return ffi::call<double>(plaidml_value_float_get, as_ptr());
+  double as_float(edsl_source_location loc = edsl_source_location::current()) const {  //
+    return ffi::call<double>(loc, plaidml_value_float_get, as_ptr());
   }
 
-  std::string as_str() const {  //
-    return ffi::str(ffi::call<plaidml_string*>(plaidml_value_str_get, as_ptr()));
+  std::string as_str(edsl_source_location loc = edsl_source_location::current()) const {  //
+    return ffi::str(ffi::call<plaidml_string*>(loc, plaidml_value_str_get, as_ptr()));
   }
 
-  Tensor as_tensor() const {
+  Tensor as_tensor(edsl_source_location loc = edsl_source_location::current()) const {
     if (is_tensor()) {
-      return Tensor(ffi::call<plaidml_expr*>(plaidml_value_expr_get, as_ptr()));
+      return Tensor(ffi::call<plaidml_expr*>(loc, plaidml_value_expr_get, as_ptr()));
     }
-    if (is_dim()) {
-      return Tensor(as_dim());
+    if (is_dim(loc)) {
+      return Tensor(as_dim(loc));
     }
-    if (is_float()) {
-      return Tensor(as_float());
+    if (is_float(loc)) {
+      return Tensor(as_float(loc));
     }
-    if (is_int()) {
-      return Tensor(as_int());
+    if (is_int(loc)) {
+      return Tensor(as_int(loc));
     }
-    throw std::runtime_error("Value cannot be coerced into Tensor");
+    throw ffi_exception("Value cannot be coerced into Tensor", loc);
   }
 
-  TensorDim as_dim() const {  //
-    return TensorDim(details::make_ptr(ffi::call<plaidml_dim_expr*>(plaidml_value_dim_get, as_ptr())));
+  TensorDim as_dim(edsl_source_location loc = edsl_source_location::current()) const {  //
+    return TensorDim(details::make_ptr(ffi::call<plaidml_dim_expr*>(loc, plaidml_value_dim_get, as_ptr())));
   }
 
-  std::vector<Value> as_tuple() const {
-    auto tuple = details::make_ptr(ffi::call<plaidml_tuple*>(plaidml_value_tuple_get, as_ptr()));
+  std::vector<Value> as_tuple(edsl_source_location loc = edsl_source_location::current()) const {
+    auto tuple = details::make_ptr(ffi::call<plaidml_tuple*>(loc, plaidml_value_tuple_get, as_ptr()));
     std::vector<Value> ret(tuple->size);
     for (size_t i = 0; i < ret.size(); i++) {
       ret[i] = Value{tuple->elts[i]};
@@ -1312,8 +1494,8 @@ class Value {
     return ret;
   }
 
-  std::vector<int64_t> as_int_tuple() const {
-    auto tuple = details::make_ptr(ffi::call<plaidml_tuple*>(plaidml_value_tuple_get, as_ptr()));
+  std::vector<int64_t> as_int_tuple(edsl_source_location loc = edsl_source_location::current()) const {
+    auto tuple = details::make_ptr(ffi::call<plaidml_tuple*>(loc, plaidml_value_tuple_get, as_ptr()));
     std::vector<int64_t> ret(tuple->size);
     for (size_t i = 0; i < ret.size(); i++) {
       ret[i] = Value{tuple->elts[i]}.as_int();
@@ -1321,8 +1503,8 @@ class Value {
     return ret;
   }
 
-  std::vector<int64_t> as_int_tuple_or_empty() const {  //
-    return is_none() ? std::vector<int64_t>{} : as_int_tuple();
+  std::vector<int64_t> as_int_tuple_or_empty(edsl_source_location loc = edsl_source_location::current()) const {  //
+    return is_none(loc) ? std::vector<int64_t>{} : as_int_tuple(loc);
   }
 
   plaidml_value* as_ptr() const { return ptr_.get(); }
@@ -1339,21 +1521,23 @@ Value make_tuple(Ts... elts) {
 }
 
 template <typename T>
-Value make_tuple(const std::vector<T>& elts) {
+Value make_tuple(const std::vector<T>& elts, edsl_source_location loc = edsl_source_location::current()) {
   std::vector<Value> vec(elts.size());
   for (size_t i = 0; i < vec.size(); i++) {
-    vec[i] = Value{elts[i]};
+    vec[i] = Value{elts[i], loc};
   }
-  return Value{vec};
+  return Value{vec, loc};
 }
 
-inline Value make_tuple(const std::vector<Value>& elts) {  //
-  return Value{elts};
+inline Value make_tuple(const std::vector<Value>& elts,
+                        edsl_source_location loc = edsl_source_location::current()) {  //
+  return Value{elts, loc};
 }
 
-inline Value None() { return Value(); }
+inline Value None(edsl_source_location loc = edsl_source_location::current()) { return Value(loc); }
 
-inline Program buildProgram(const std::string& name, const TensorVec& inputs, const TensorVec& outputs) {
+inline Program buildProgram(const std::string& name, const TensorVec& inputs, const TensorVec& outputs,
+                            edsl_source_location loc = edsl_source_location::current()) {
   std::vector<plaidml_expr*> input_exprs(inputs.size());
   for (size_t i = 0; i < inputs.size(); i++) {
     input_exprs[i] = inputs[i].as_ptr();
@@ -1363,6 +1547,7 @@ inline Program buildProgram(const std::string& name, const TensorVec& inputs, co
     output_exprs[i] = outputs[i].as_ptr();
   }
   auto* ptr = ffi::call<plaidml_program*>(  //
+      loc,                                  //
       plaidml_build,                        //
       name.c_str(),                         //
       inputs.size(),                        //
@@ -1395,7 +1580,8 @@ inline std::ostream& operator<<(std::ostream& os, const Value& x) {
 
 using Dictionary = std::unordered_map<std::string, Value>;
 
-inline Tensor pragma(const Tensor& tensor, const std::string& op, const Dictionary& attrs) {
+inline Tensor pragma(const Tensor& tensor, const std::string& op, const Dictionary& attrs,
+                     edsl_source_location loc = edsl_source_location::current()) {
   std::vector<plaidml_attr> elts;
   std::vector<plaidml_attr*> ptrs;
   elts.reserve(attrs.size());
@@ -1405,20 +1591,25 @@ inline Tensor pragma(const Tensor& tensor, const std::string& op, const Dictiona
     elts.push_back(attr);
     ptrs.push_back(&elts.back());
   }
-  return Tensor{ffi::call<plaidml_expr*>(plaidml_expr_pragma, tensor.as_ptr(), op.c_str(), elts.size(), ptrs.data())};
+  return Tensor{
+      ffi::call<plaidml_expr*>(loc, plaidml_expr_pragma, tensor.as_ptr(), op.c_str(), elts.size(), ptrs.data())};
 }
 
 ///
 /// Adds a tracepoint to the graph
 ///
-inline Tensor trace(const Tensor& x, const std::string& msg) { return pragma(x, "trace", {{"msg", Value(msg)}}); }
+inline Tensor trace(const Tensor& x, const std::string& msg,
+                    edsl_source_location loc = edsl_source_location::current()) {
+  return pragma(x, "trace", {{"msg", Value(msg)}}, loc);
+}
 
 using LayerBodySingleFn = std::function<Tensor()>;
 using LayerBodyMultiFn = std::function<TensorVec()>;
 
 class LayerBuilder {
  public:
-  LayerBuilder(const std::string& op, const TensorVec& operands, const Dictionary& attrs) {
+  LayerBuilder(const std::string& op, const TensorVec& operands, const Dictionary& attrs,
+               edsl_source_location loc = edsl_source_location::current()) {
     std::vector<plaidml_attr> elts;
     std::vector<plaidml_attr*> ptrs;
     elts.reserve(attrs.size());
@@ -1437,6 +1628,7 @@ class LayerBuilder {
 
     expr = details::make_ptr(          //
         ffi::call<plaidml_expr*>(      //
+            loc,                       //
             plaidml_expr_layer_begin,  //
             op.c_str(),                //
             rawOperands.size(),        //
@@ -1445,7 +1637,7 @@ class LayerBuilder {
             ptrs.data()));
   }
 
-  TensorVec build(const LayerBodyMultiFn& fn) {
+  TensorVec build(const LayerBodyMultiFn& fn, edsl_source_location loc = edsl_source_location::current()) {
     TensorVec innerResults = fn();
 
     std::vector<plaidml_expr*> rawResults;
@@ -1456,6 +1648,7 @@ class LayerBuilder {
 
     outerExprs = details::make_ptr(  //
         ffi::call<plaidml_exprs*>(   //
+            loc,                     //
             plaidml_expr_layer_end,  //
             expr.get(),              //
             rawResults.size(),       //
@@ -1488,17 +1681,18 @@ class LayerBuilder {
 };
 
 inline TensorVec layer(const std::string& op, const TensorVec& operands, const Dictionary& attrs,
-                       const LayerBodyMultiFn& fn) {
-  return LayerBuilder(op, operands, attrs).build(fn);
+                       const LayerBodyMultiFn& fn, edsl_source_location loc = edsl_source_location::current()) {
+  return LayerBuilder(op, operands, attrs, loc).build(fn, loc);
 }
 
 inline Tensor layer(const std::string& op, const TensorVec& operands, const Dictionary& attrs,
-                    const LayerBodySingleFn& fn) {
-  return layer(op, operands, attrs, [&]() { return TensorVec{fn()}; })[0];
+                    const LayerBodySingleFn& fn, edsl_source_location loc = edsl_source_location::current()) {
+  return layer(op, operands, attrs, [&]() { return TensorVec{fn()}; }, loc)[0];
 }
 
-inline Tensor layer(const std::string& op, const TensorVec& operands, const LayerBodySingleFn& fn) {
-  return layer(op, operands, {}, fn);
+inline Tensor layer(const std::string& op, const TensorVec& operands, const LayerBodySingleFn& fn,
+                    edsl_source_location loc = edsl_source_location::current()) {
+  return layer(op, operands, {}, fn, loc);
 }
 
 }  // namespace edsl
