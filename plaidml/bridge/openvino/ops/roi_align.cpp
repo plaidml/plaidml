@@ -24,12 +24,13 @@ std::vector<T> cast_constant_operand(size_t operand_idx, ngraph::Node* layer) {
            "must be Constants.";
   }
 }
+
 }  // namespace
 
 namespace PlaidMLPlugin {
 
 void registerROIAlign() {
-  registerOp("roialign", [](const Context& ctx) {
+  registerOp("ROIAlign", [](const Context& ctx) {
     IE_ASSERT(ctx.operands.size() == 3);
     auto X = ctx.operands.at(0);
     auto* layer = ngraph::as_type<ngraph::opset3::ROIAlign>(ctx.layer);
@@ -45,7 +46,7 @@ void registerROIAlign() {
     auto mode = layer->get_mode();
     auto num_rois = static_cast<int32_t>(batch_indices.size());
 
-    op::PoolMode pool_mode;
+    op::PoolMode pool_mode = op::PoolMode::AVG;
     switch (mode) {
       case ngraph::opset3::ROIAlign::PoolingMode::AVG:
         pool_mode = op::PoolMode::AVG;
@@ -54,7 +55,7 @@ void registerROIAlign() {
         pool_mode = op::PoolMode::MAX;
         break;
       default:
-        std::runtime_error("Unsupported Pooling Mode");
+        throw std::runtime_error("Unsupported Pooling Mode");
     }
 
     std::vector<edsl::Tensor> pooled_rois;
