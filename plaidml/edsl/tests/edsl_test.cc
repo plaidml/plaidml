@@ -2184,6 +2184,13 @@ TEST_F(CppEdsl, ArgSort1d) {
       7, 9, 10, 12, 2, 8, 3, 17, 4, 5, 6, 14, 13, 11, 16, 15, 19, 0, 18, 1,  //
   };
   checkExact(program, {input}, {output});
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.ArgSort1d
+  // CHECK: module @argsort
+  // CHECK: func @main(%[[ARG0:.*]]: tensor<20xf32>) -> tensor<20xsi32>
+  // CHECK: %[[X0:.*]] = tile.argsort "asc" %[[ARG0]][0] : (tensor<20xf32>) -> tensor<20xsi32>
+  // CHECK: return %[[X0]] : tensor<20xsi32>
+  // clang-format on
 }
 
 TEST_F(CppEdsl, ArgSort2dAxis0) {
@@ -2217,6 +2224,13 @@ TEST_F(CppEdsl, ArgSort2dAxis0) {
       0, 0, 4, 4,  //
   };
   checkExact(program, {input}, {output});
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.ArgSort2dAxis0
+  // CHECK: module @argsort
+  // CHECK: func @main(%[[ARG0:.*]]: tensor<5x4xf32>) -> tensor<5x4xsi32>
+  // CHECK:  %[[X0:.*]] = tile.argsort "asc" %[[ARG0]][0] : (tensor<5x4xf32>) -> tensor<5x4xsi32>
+  // CHECK:  return %[[X0]] : tensor<5x4xsi32>
+  // clang-format on
 }
 
 TEST_F(CppEdsl, ArgSort2dAxis1) {
@@ -2250,6 +2264,13 @@ TEST_F(CppEdsl, ArgSort2dAxis1) {
       1, 0, 3, 2,  //
   };
   checkExact(program, {input}, {output});
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.ArgSort2dAxis1
+  // CHECK: module @argsort
+  // CHECK: func @main(%[[ARG0:.*]]: tensor<5x4xf32>) -> tensor<5x4xsi32>
+  // CHECK:  %[[X0:.*]] = tile.argsort "asc" %[[ARG0]][1] : (tensor<5x4xf32>) -> tensor<5x4xsi32>
+  // CHECK:  return %[[X0]] : tensor<5x4xsi32>
+  // clang-format on
 }
 
 TEST_F(CppEdsl, ArgSort3dAxis0Asc) {
@@ -2289,6 +2310,13 @@ TEST_F(CppEdsl, ArgSort3dAxis0Asc) {
       2, 1, 2, 1, 0,  //
   };
   checkExact(program, {input}, {output});
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.ArgSort3dAxis0Asc
+  // CHECK: module @argsort
+  // CHECK: func @main(%[[ARG0:.*]]: tensor<3x4x5xf32>) -> tensor<3x4x5xsi32>
+  // CHECK:  %[[X0:.*]] = tile.argsort "asc" %[[ARG0]][0] : (tensor<3x4x5xf32>) -> tensor<3x4x5xsi32>
+  // CHECK:  return %[[X0]] : tensor<3x4x5xsi32>
+  // clang-format on
 }
 
 TEST_F(CppEdsl, ArgSort3dAxis2Desc) {
@@ -2343,6 +2371,13 @@ TEST_F(CppEdsl, ArgSort3dAxis2Desc) {
       0, 2, 1, 3, 4,  //
   };
   checkExact(program, {input}, {output});
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.ArgSort3dAxis2Desc
+  // CHECK: module @argsort
+  // CHECK: func @main(%[[ARG0:.*]]: tensor<3x4x5xf32>) -> tensor<3x4x5xsi32>
+  // CHECK:  %[[X0:.*]] = tile.argsort "desc" %[[ARG0]][2] : (tensor<3x4x5xf32>) -> tensor<3x4x5xsi32>
+  // CHECK:  return %[[X0]] : tensor<3x4x5xsi32>
+  // clang-format on
 }
 
 TEST_F(CppEdsl, ArgSort3dAxisNeg2Asc) {
@@ -2364,6 +2399,13 @@ TEST_F(CppEdsl, ArgSort3dAxisNeg2Asc) {
       1, 1,  //
   };
   checkExact(program, {input}, {output});
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.ArgSort3dAxisNeg2Asc
+  // CHECK: module @argsort
+  // CHECK: func @main(%[[ARG0:.*]]: tensor<2x2x2xf32>) -> tensor<2x2x2xsi32>
+  // CHECK:   %[[X0:.*]] = tile.argsort "asc" %[[ARG0]][-2] : (tensor<2x2x2xf32>) -> tensor<2x2x2xsi32>
+  // CHECK:   return %[[X0]] : tensor<2x2x2xsi32>
+  // clang-format on
 }
 
 }  // namespace
