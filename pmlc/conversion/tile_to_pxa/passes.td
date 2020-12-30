@@ -8,8 +8,10 @@ def LowerTileToPXA : Pass<"convert-tile-to-pxa", "mlir::ModuleOp"> {
   let constructor = "pmlc::conversion::tile_to_pxa::createLowerTileToPXAPass()";
   let dependentDialects = [
     "dialect::pxa::PXADialect",
+    "dialect::layer::LayerDialect",
     "dialect::stdx::StdXDialect",
-    "mlir::AffineDialect"
+    "mlir::AffineDialect",
+    "mlir::scf::SCFDialect",
   ];
 }
 
