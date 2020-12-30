@@ -43,6 +43,9 @@ def SplitMain :  Pass<"tile-split-main", "mlir::ModuleOp"> {
     Option<"mainFunction", "main-function", "std::string", /*default=*/"\"main\"",
            "The main function name">
   ];
+  let dependentDialects = [
+    "pmlc::dialect::stdx::StdXDialect"
+  ];
 }
 
 #endif // __PMLC_DIALECT_TILE_PASSES__

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "mlir/Pass/Pass.h"
+#include "pmlc/dialect/stdx/ir/ops.h"
 
 namespace pmlc::dialect::tile {
 
