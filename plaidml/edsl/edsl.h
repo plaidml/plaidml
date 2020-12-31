@@ -791,6 +791,23 @@ inline Tensor acos(const Tensor& x, edsl_source_location loc = edsl_source_locat
   return intrinsic(loc, "acos", x);
 }
 
+enum class SortDirection {
+  ASC,
+  DESC,
+};
+
+///
+/// Returns the indices of `x` which give its sorted order along `axis` in
+/// the specified `direction`, where -1 represents the last axis.
+/// \param x Tensor
+/// \param axis int
+/// \param direction SortDirection
+/// \return Tensor
+///
+inline Tensor argsort(const Tensor& x, int axis = -1, SortDirection direction = SortDirection::ASC) {
+  return intrinsic("argsort", x, static_cast<int64_t>(axis), static_cast<int64_t>(direction));
+}
+
 ///
 /// Computes the elementwise inverse hyperbolic cosine of `x`.
 /// \param x Tensor

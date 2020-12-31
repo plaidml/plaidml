@@ -662,6 +662,7 @@ struct ProgramBuilder {
     using IntrinsicBuilder = std::function<Value()>;
     auto intrinsicBuilder =
         llvm::StringSwitch<IntrinsicBuilder>(node->op)
+            .Case("argsort", [&]() { return makeArgSortOp(node, operands); })
             .Case("index", [&]() { return makeIndexOp(node, operands); })
             .Case("prng", [&]() { return makePrngOp(node, operands); })
             .Case("reshape", [&]() { return makeReshapeOp(node, operands); })
@@ -779,6 +780,29 @@ struct ProgramBuilder {
         loc, resultType, operands.take_front(2),
         builder.getIndexAttr(axis.getInt()), interpolationMode, nearestMode,
         cubeCoeff);
+    return op.result();
+  }
+  
+  Value makeArgSortOp(ExprNodeIntrinsic *node, ArrayRef<Value> operands) {
+    TensorShape shape = evaluator.getShape(node);
+    auto i32Type = builder.getIntegerType(32, /*isSigned=*/true);
+    RankedTensorType resultType = RankedTensorType::get(shape.sizes, i32Type);
+    Value tensor = operands[0];
+    Value axis = operands[1];
+    Value direction = operands[2];
+    IntegerAttr axisAttr;
+    if (!matchPattern(axis, m_Constant(&axisAttr))) {
+      throw std::runtime_error(
+          "'argsort' requires operand #2 to be a constant integer.");
+    }
+    IntegerAttr directionAttr;
+    if (!matchPattern(direction, m_Constant(&directionAttr))) {
+      throw std::runtime_error(
+          "'argsort' requires operand #3 to be a constant integer.");
+    }
+    IntegerAttr axisIndexAttr = builder.getIndexAttr(axisAttr.getInt());
+    auto op = builder.create<tile::ArgSortOp>(loc, resultType, tensor,
+                                              axisIndexAttr, directionAttr);
     return op.result();
   }
 
