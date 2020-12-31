@@ -304,8 +304,8 @@ void getPackOp(OpType &packOp, mlir::FuncOp funcOp) {
 // Helper function to replace unpackOps with updated types in sync with packOp.
 // ============================================================================
 pmlc::dialect::stdx::UnpackOp
-updateUnpackOp(pmlc::dialect::stdx::UnpackOp &unpackOp,
-               pmlc::dialect::stdx::PackOp &packOp) {
+updateUnpackOp(pmlc::dialect::stdx::UnpackOp unpackOp,
+               pmlc::dialect::stdx::PackOp packOp) {
   mlir::OpBuilder builder(unpackOp);
   auto newUnpackOp = builder.create<pmlc::dialect::stdx::UnpackOp>(
       unpackOp.getLoc(), packOp.getOperandTypes(), unpackOp.in());

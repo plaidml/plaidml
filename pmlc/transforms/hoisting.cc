@@ -113,8 +113,13 @@ void HoistingState::doHoisting() {
     // Check if all operands (if any) are in init
     IVLOG(3, "Checking operands " << debugString(innerOp));
     bool allOperandsInInit = true;
+    DenseSet<mlir::Operation *> constantsToCopy;
     for (auto operand : innerOp.getOperands()) {
-      if (!inInit.count(operand)) {
+      if (operand.getDefiningOp() &&
+          isa<pmlc::dialect::tile::ConstantOp>(operand.getDefiningOp())) {
+        if (!constantsToCopy.count(operand.getDefiningOp()))
+          constantsToCopy.insert(operand.getDefiningOp());
+      } else if (!inInit.count(operand)) {
         allOperandsInInit = false;
         break;
       }
@@ -125,6 +130,15 @@ void HoistingState::doHoisting() {
     IVLOG(3, "Hoisting " << debugString(innerOp));
     // Yes?  Hoist to init, add results as possible cross function results
     innerOp.moveBefore(initPack);
+    // Copy the constant operands into init
+    for (auto constantOp : constantsToCopy) {
+      OpBuilder builder(innerOp.getBlock(), innerOp.getIterator());
+      auto newConstOp = builder.clone(*constantOp);
+      for (size_t i = 0; i < innerOp.getOperands().size(); i++) {
+        if (innerOp.getOperand(i).getDefiningOp() == constantOp)
+          innerOp.setOperand(i, newConstOp->getResult(0));
+      }
+    }
     for (auto result : innerOp.getResults()) {
       inInit.insert(result);
     }

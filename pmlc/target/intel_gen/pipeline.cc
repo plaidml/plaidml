@@ -232,9 +232,20 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(spirv::createLowerABIAttributesPass());
   pm.addPass(spirv::createUpdateVersionCapabilityExtensionPass());
 
+  // Unbox wrapped argsort and lower remaining affine loops.
+  pm.addPass(layer::createInlineLayersPass());
+  pm.addPass(pmlc::target::intel_gen::createLowerPXAToAffinePass());
+  pm.addPass(createLowerAffinePass());
+  pm.addPass(createLowerToCFGPass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+
   // Comp to LLVM - Vulkan function calls.
   pm.addPass(
       pmlc::conversion::comp_to_llvm::createConvertCompToLLVMPass("vlk_"));
+
+  // Lower SCF to Standard before converting to LLVM
+  pm.addPass(createLowerToCFGPass());
 
   // Convert Vulkan calls to LLVM code
   pm.addPass(createConvertStandardToLLVM());

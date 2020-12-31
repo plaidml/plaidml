@@ -20,6 +20,10 @@ namespace pmlc::dialect::tile {
 
 using llvm::SmallVector;
 
+LogicalResult ArgSortOp::materializeOperands(OpBuilder &builder) {
+  return tile::materializeOperands(builder, getOperation());
+}
+
 LogicalResult ContractionOp::materializeOperands(OpBuilder &builder) {
   Operation *op = getOperation();
   if (combo() == CombinationKind::cond) {
@@ -342,6 +346,8 @@ void ScatterOp::build(OpBuilder &builder, OperationState &result,
 }
 
 } // namespace pmlc::dialect::tile
+
+#include "pmlc/dialect/tile/ir/enums.cc.inc"
 
 #define GET_OP_CLASSES
 #include "pmlc/dialect/tile/ir/ops.cc.inc"
