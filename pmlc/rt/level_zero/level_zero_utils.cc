@@ -5,7 +5,7 @@
 
 namespace pmlc::rt::level_zero::lzu {
 
-#define MYASSERT(x)                                                            \
+#define PMLC_LEVEL_ZERO_ASSERT(x)                                              \
   {                                                                            \
     if (!(x)) {                                                                \
       std::ostringstream oss;                                                  \
@@ -13,12 +13,11 @@ namespace pmlc::rt::level_zero::lzu {
       throw std::runtime_error(oss.str());                                     \
     }                                                                          \
   }
-#define EXPECT_EQ(x, y) MYASSERT((x) == (y))
-#define EXPECT_NE(x, y) MYASSERT((x) != (y))
-#define EXPECT_GT(x, y) MYASSERT((x) > (y))
-#define EXPECT_TRUE(x) MYASSERT((x))
-#define ASSERT_EQ(x, y) EXPECT_EQ(x, y)
-#define ERRSTR(_err_)                                                          \
+#define PMLC_LEVEL_ZERO_EXPECT_EQ(x, y) PMLC_LEVEL_ZERO_ASSERT((x) == (y))
+#define PMLC_LEVEL_ZERO_EXPECT_NE(x, y) PMLC_LEVEL_ZERO_ASSERT((x) != (y))
+#define PMLC_LEVEL_ZERO_EXPECT_GT(x, y) PMLC_LEVEL_ZERO_ASSERT((x) > (y))
+#define PMLC_LEVEL_ZERO_EXPECT_TRUE(x) PMLC_LEVEL_ZERO_ASSERT((x))
+#define PMLC_LEVEL_ZERO_ERRSTR(_err_)                                          \
   if (result == _err_)                                                         \
     return #_err_;
 
@@ -51,7 +50,7 @@ ze_context_handle_t get_context(ze_driver_handle_t driver) {
 }
 
 void destroy_context(ze_context_handle_t context) {
-  EXPECT_TRUE(ZE_RESULT_SUCCESS == zeContextDestroy(context));
+  PMLC_LEVEL_ZERO_EXPECT_TRUE(ZE_RESULT_SUCCESS == zeContextDestroy(context));
 }
 
 // Driver
@@ -107,7 +106,8 @@ std::vector<ze_device_handle_t> get_devices(ze_driver_handle_t driver) {
 ze_device_properties_t get_device_properties(ze_device_handle_t device) {
   ze_device_properties_t properties = {ZE_STRUCTURE_TYPE_DEVICE_PROPERTIES};
 
-  EXPECT_EQ(ZE_RESULT_SUCCESS, zeDeviceGetProperties(device, &properties));
+  PMLC_LEVEL_ZERO_EXPECT_EQ(ZE_RESULT_SUCCESS,
+                            zeDeviceGetProperties(device, &properties));
   return properties;
 }
 
@@ -121,9 +121,10 @@ void *allocate_host_memory(const size_t size, const size_t alignment,
   host_desc.pNext = nullptr;
 
   void *memory = nullptr;
-  EXPECT_EQ(ZE_RESULT_SUCCESS,
-            zeMemAllocHost(context, &host_desc, size, alignment, &memory));
-  EXPECT_NE(nullptr, memory);
+  PMLC_LEVEL_ZERO_EXPECT_EQ(
+      ZE_RESULT_SUCCESS,
+      zeMemAllocHost(context, &host_desc, size, alignment, &memory));
+  PMLC_LEVEL_ZERO_EXPECT_NE(nullptr, memory);
 
   return memory;
 }
@@ -141,10 +142,10 @@ void *allocate_device_memory(const size_t size, const size_t alignment,
 
   device_desc.pNext = nullptr;
 
-  EXPECT_EQ(ZE_RESULT_SUCCESS,
-            zeMemAllocDevice(context, &device_desc, size, alignment,
-                             device_handle, &memory));
-  EXPECT_NE(nullptr, memory);
+  PMLC_LEVEL_ZERO_EXPECT_EQ(
+      ZE_RESULT_SUCCESS, zeMemAllocDevice(context, &device_desc, size,
+                                          alignment, device_handle, &memory));
+  PMLC_LEVEL_ZERO_EXPECT_NE(nullptr, memory);
 
   return memory;
 }
@@ -167,16 +168,16 @@ void *allocate_shared_memory(const size_t size, const size_t alignment,
   host_desc.flags = host_flags;
 
   host_desc.pNext = nullptr;
-  EXPECT_EQ(ZE_RESULT_SUCCESS,
-            zeMemAllocShared(context, &device_desc, &host_desc, size, alignment,
-                             device, &memory));
-  EXPECT_NE(nullptr, memory);
+  PMLC_LEVEL_ZERO_EXPECT_EQ(ZE_RESULT_SUCCESS,
+                            zeMemAllocShared(context, &device_desc, &host_desc,
+                                             size, alignment, device, &memory));
+  PMLC_LEVEL_ZERO_EXPECT_NE(nullptr, memory);
 
   return memory;
 }
 
 void free_memory(ze_context_handle_t context, void *ptr) {
-  EXPECT_EQ(ZE_RESULT_SUCCESS, zeMemFree(context, ptr));
+  PMLC_LEVEL_ZERO_EXPECT_EQ(ZE_RESULT_SUCCESS, zeMemFree(context, ptr));
 }
 
 void append_memory_copy(ze_command_list_handle_t cl, void *dstptr,
@@ -184,9 +185,10 @@ void append_memory_copy(ze_command_list_handle_t cl, void *dstptr,
                         ze_event_handle_t hSignalEvent,
                         uint32_t num_wait_events,
                         ze_event_handle_t *wait_events) {
-  EXPECT_EQ(ZE_RESULT_SUCCESS, zeCommandListAppendMemoryCopy(
-                                   cl, dstptr, srcptr, size, hSignalEvent,
-                                   num_wait_events, wait_events));
+  PMLC_LEVEL_ZERO_EXPECT_EQ(
+      ZE_RESULT_SUCCESS,
+      zeCommandListAppendMemoryCopy(cl, dstptr, srcptr, size, hSignalEvent,
+                                    num_wait_events, wait_events));
 }
 
 // Module
@@ -201,8 +203,8 @@ ze_module_handle_t create_module(ze_context_handle_t context,
   ze_module_constants_t module_constants = {};
   const std::vector<uint8_t> binary_file(data, data + bytes);
 
-  EXPECT_TRUE((format == ZE_MODULE_FORMAT_IL_SPIRV) ||
-              (format == ZE_MODULE_FORMAT_NATIVE));
+  PMLC_LEVEL_ZERO_EXPECT_TRUE((format == ZE_MODULE_FORMAT_IL_SPIRV) ||
+                              (format == ZE_MODULE_FORMAT_NATIVE));
 
   module_description.pNext = nullptr;
   module_description.format = format;
@@ -211,15 +213,15 @@ ze_module_handle_t create_module(ze_context_handle_t context,
   module_description.pBuildFlags = build_flags;
   module_description.pConstants = &module_constants;
 
-  EXPECT_EQ(ZE_RESULT_SUCCESS,
-            zeModuleCreate(context, device, &module_description, &module,
-                           p_build_log));
+  PMLC_LEVEL_ZERO_EXPECT_EQ(ZE_RESULT_SUCCESS,
+                            zeModuleCreate(context, device, &module_description,
+                                           &module, p_build_log));
 
   return module;
 }
 
 void destroy_module(ze_module_handle_t module) {
-  EXPECT_EQ(ZE_RESULT_SUCCESS, zeModuleDestroy(module));
+  PMLC_LEVEL_ZERO_EXPECT_EQ(ZE_RESULT_SUCCESS, zeModuleDestroy(module));
 }
 
 // Kernel
@@ -234,15 +236,16 @@ ze_kernel_handle_t create_function(ze_module_handle_t module,
   kernel_description.flags = flag;
   kernel_description.pKernelName = func_name.c_str();
 
-  EXPECT_EQ(ZE_RESULT_SUCCESS,
-            zeKernelCreate(module, &kernel_description, &kernel));
+  PMLC_LEVEL_ZERO_EXPECT_EQ(
+      ZE_RESULT_SUCCESS, zeKernelCreate(module, &kernel_description, &kernel));
   return kernel;
 }
 
 void set_argument_value(ze_kernel_handle_t hFunction, uint32_t argIndex,
                         size_t argSize, const void *pArgValue) {
-  EXPECT_EQ(ZE_RESULT_SUCCESS,
-            zeKernelSetArgumentValue(hFunction, argIndex, argSize, pArgValue));
+  PMLC_LEVEL_ZERO_EXPECT_EQ(
+      ZE_RESULT_SUCCESS,
+      zeKernelSetArgumentValue(hFunction, argIndex, argSize, pArgValue));
 }
 
 void append_launch_function(ze_command_list_handle_t hCommandList,
@@ -251,13 +254,14 @@ void append_launch_function(ze_command_list_handle_t hCommandList,
                             ze_event_handle_t hSignalEvent,
                             uint32_t numWaitEvents,
                             ze_event_handle_t *phWaitEvents) {
-  EXPECT_EQ(ZE_RESULT_SUCCESS, zeCommandListAppendLaunchKernel(
-                                   hCommandList, hFunction, pLaunchFuncArgs,
-                                   hSignalEvent, numWaitEvents, phWaitEvents));
+  PMLC_LEVEL_ZERO_EXPECT_EQ(ZE_RESULT_SUCCESS,
+                            zeCommandListAppendLaunchKernel(
+                                hCommandList, hFunction, pLaunchFuncArgs,
+                                hSignalEvent, numWaitEvents, phWaitEvents));
 }
 
 void destroy_function(ze_kernel_handle_t kernel) {
-  EXPECT_EQ(ZE_RESULT_SUCCESS, zeKernelDestroy(kernel));
+  PMLC_LEVEL_ZERO_EXPECT_EQ(ZE_RESULT_SUCCESS, zeKernelDestroy(kernel));
 }
 
 // Command list
@@ -272,32 +276,33 @@ ze_command_list_handle_t create_command_list(ze_context_handle_t context,
   descriptor.flags = flags;
   descriptor.commandQueueGroupOrdinal = ordinal;
   ze_command_list_handle_t command_list = nullptr;
-  EXPECT_EQ(ZE_RESULT_SUCCESS,
-            zeCommandListCreate(context, device, &descriptor, &command_list));
-  EXPECT_NE(nullptr, command_list);
+  PMLC_LEVEL_ZERO_EXPECT_EQ(
+      ZE_RESULT_SUCCESS,
+      zeCommandListCreate(context, device, &descriptor, &command_list));
+  PMLC_LEVEL_ZERO_EXPECT_NE(nullptr, command_list);
 
   return command_list;
 }
 
 void close_command_list(ze_command_list_handle_t cl) {
-  EXPECT_EQ(ZE_RESULT_SUCCESS, zeCommandListClose(cl));
+  PMLC_LEVEL_ZERO_EXPECT_EQ(ZE_RESULT_SUCCESS, zeCommandListClose(cl));
 }
 
 void execute_command_lists(ze_command_queue_handle_t cq,
                            uint32_t numCommandLists,
                            ze_command_list_handle_t *phCommandLists,
                            ze_fence_handle_t hFence) {
-  EXPECT_EQ(ZE_RESULT_SUCCESS,
-            zeCommandQueueExecuteCommandLists(cq, numCommandLists,
-                                              phCommandLists, hFence));
+  PMLC_LEVEL_ZERO_EXPECT_EQ(ZE_RESULT_SUCCESS,
+                            zeCommandQueueExecuteCommandLists(
+                                cq, numCommandLists, phCommandLists, hFence));
 }
 
 void reset_command_list(ze_command_list_handle_t cl) {
-  EXPECT_EQ(ZE_RESULT_SUCCESS, zeCommandListReset(cl));
+  PMLC_LEVEL_ZERO_EXPECT_EQ(ZE_RESULT_SUCCESS, zeCommandListReset(cl));
 }
 
 void destroy_command_list(ze_command_list_handle_t cl) {
-  EXPECT_EQ(ZE_RESULT_SUCCESS, zeCommandListDestroy(cl));
+  PMLC_LEVEL_ZERO_EXPECT_EQ(ZE_RESULT_SUCCESS, zeCommandListDestroy(cl));
 }
 
 // Command queue
@@ -314,24 +319,27 @@ ze_command_queue_handle_t create_command_queue(
   descriptor.mode = mode;
   descriptor.priority = priority;
   ze_device_properties_t properties;
-  EXPECT_EQ(ZE_RESULT_SUCCESS, zeDeviceGetProperties(device, &properties));
+  PMLC_LEVEL_ZERO_EXPECT_EQ(ZE_RESULT_SUCCESS,
+                            zeDeviceGetProperties(device, &properties));
 
   descriptor.ordinal = ordinal;
   descriptor.index = index;
   ze_command_queue_handle_t command_queue = nullptr;
-  EXPECT_EQ(ZE_RESULT_SUCCESS,
-            zeCommandQueueCreate(context, device, &descriptor, &command_queue));
-  EXPECT_NE(nullptr, command_queue);
+  PMLC_LEVEL_ZERO_EXPECT_EQ(
+      ZE_RESULT_SUCCESS,
+      zeCommandQueueCreate(context, device, &descriptor, &command_queue));
+  PMLC_LEVEL_ZERO_EXPECT_NE(nullptr, command_queue);
 
   return command_queue;
 }
 
 void synchronize(ze_command_queue_handle_t cq, uint64_t timeout) {
-  EXPECT_EQ(ZE_RESULT_SUCCESS, zeCommandQueueSynchronize(cq, timeout));
+  PMLC_LEVEL_ZERO_EXPECT_EQ(ZE_RESULT_SUCCESS,
+                            zeCommandQueueSynchronize(cq, timeout));
 }
 
 void destroy_command_queue(ze_command_queue_handle_t cq) {
-  EXPECT_EQ(ZE_RESULT_SUCCESS, zeCommandQueueDestroy(cq));
+  PMLC_LEVEL_ZERO_EXPECT_EQ(ZE_RESULT_SUCCESS, zeCommandQueueDestroy(cq));
 }
 
 // Event
@@ -349,7 +357,7 @@ zeEventPool::~zeEventPool() {
 
 void zeEventPool::InitEventPool(ze_context_handle_t context, uint32_t count,
                                 ze_event_pool_flags_t flags) {
-  EXPECT_NE(nullptr, context);
+  PMLC_LEVEL_ZERO_EXPECT_NE(nullptr, context);
   context_ = context;
   if (event_pool_ == nullptr) {
     ze_event_pool_desc_t descriptor = {};
@@ -359,9 +367,10 @@ void zeEventPool::InitEventPool(ze_context_handle_t context, uint32_t count,
     descriptor.flags = flags;
     descriptor.count = count;
 
-    EXPECT_EQ(ZE_RESULT_SUCCESS, zeEventPoolCreate(context, &descriptor, 0,
-                                                   nullptr, &event_pool_));
-    EXPECT_NE(nullptr, event_pool_);
+    PMLC_LEVEL_ZERO_EXPECT_EQ(
+        ZE_RESULT_SUCCESS,
+        zeEventPoolCreate(context, &descriptor, 0, nullptr, &event_pool_));
+    PMLC_LEVEL_ZERO_EXPECT_NE(nullptr, event_pool_);
 
     pool_indexes_available_.resize(count, true);
   }
@@ -386,8 +395,9 @@ void zeEventPool::create_event(ze_event_handle_t &event,
       break;
     }
   }
-  EXPECT_EQ(ZE_RESULT_SUCCESS, zeEventCreate(event_pool_, &desc, &event));
-  EXPECT_NE(nullptr, event);
+  PMLC_LEVEL_ZERO_EXPECT_EQ(ZE_RESULT_SUCCESS,
+                            zeEventCreate(event_pool_, &desc, &event));
+  PMLC_LEVEL_ZERO_EXPECT_NE(nullptr, event);
   handle_to_index_map_[event] = desc.index;
   pool_indexes_available_[desc.index] = false;
 }
@@ -396,72 +406,73 @@ void zeEventPool::destroy_event(ze_event_handle_t event) {
   std::map<ze_event_handle_t, uint32_t>::iterator it =
       handle_to_index_map_.find(event);
 
-  EXPECT_NE(it, handle_to_index_map_.end());
+  PMLC_LEVEL_ZERO_EXPECT_NE(it, handle_to_index_map_.end());
   pool_indexes_available_[(*it).second] = true;
   handle_to_index_map_.erase(it);
-  EXPECT_EQ(ZE_RESULT_SUCCESS, zeEventDestroy(event));
+  PMLC_LEVEL_ZERO_EXPECT_EQ(ZE_RESULT_SUCCESS, zeEventDestroy(event));
 }
 
 void append_barrier(ze_command_list_handle_t cl, ze_event_handle_t hSignalEvent,
                     uint32_t numWaitEvents, ze_event_handle_t *phWaitEvents) {
-  EXPECT_EQ(ZE_RESULT_SUCCESS,
-            zeCommandListAppendBarrier(cl, hSignalEvent, numWaitEvents,
-                                       phWaitEvents));
+  PMLC_LEVEL_ZERO_EXPECT_EQ(ZE_RESULT_SUCCESS,
+                            zeCommandListAppendBarrier(
+                                cl, hSignalEvent, numWaitEvents, phWaitEvents));
 }
 
 // Group
 void set_group_size(ze_kernel_handle_t hFunction, uint32_t groupSizeX,
                     uint32_t groupSizeY, uint32_t groupSizeZ) {
-  EXPECT_EQ(ZE_RESULT_SUCCESS, zeKernelSetGroupSize(hFunction, groupSizeX,
-                                                    groupSizeY, groupSizeZ));
+  PMLC_LEVEL_ZERO_EXPECT_EQ(
+      ZE_RESULT_SUCCESS,
+      zeKernelSetGroupSize(hFunction, groupSizeX, groupSizeY, groupSizeZ));
 }
 
 void suggest_group_size(ze_kernel_handle_t hFunction, uint32_t globalSizeX,
                         uint32_t globalSizeY, uint32_t globalSizeZ,
                         uint32_t &groupSizeX, uint32_t &groupSizeY,
                         uint32_t &groupSizeZ) {
-  EXPECT_EQ(ZE_RESULT_SUCCESS,
-            zeKernelSuggestGroupSize(hFunction, globalSizeX, globalSizeY,
-                                     globalSizeZ, &groupSizeX, &groupSizeY,
-                                     &groupSizeZ));
+  PMLC_LEVEL_ZERO_EXPECT_EQ(
+      ZE_RESULT_SUCCESS,
+      zeKernelSuggestGroupSize(hFunction, globalSizeX, globalSizeY, globalSizeZ,
+                               &groupSizeX, &groupSizeY, &groupSizeZ));
 }
 
 // Helper
 std::string to_string(const ze_result_t result) {
-  ERRSTR(ZE_RESULT_SUCCESS);
-  ERRSTR(ZE_RESULT_NOT_READY);
-  ERRSTR(ZE_RESULT_ERROR_UNINITIALIZED);
-  ERRSTR(ZE_RESULT_ERROR_DEVICE_LOST);
-  ERRSTR(ZE_RESULT_ERROR_INVALID_ARGUMENT);
-  ERRSTR(ZE_RESULT_ERROR_OUT_OF_HOST_MEMORY);
-  ERRSTR(ZE_RESULT_ERROR_OUT_OF_DEVICE_MEMORY);
-  ERRSTR(ZE_RESULT_ERROR_MODULE_BUILD_FAILURE);
-  ERRSTR(ZE_RESULT_ERROR_INSUFFICIENT_PERMISSIONS);
-  ERRSTR(ZE_RESULT_ERROR_NOT_AVAILABLE);
-  ERRSTR(ZE_RESULT_ERROR_UNSUPPORTED_VERSION);
-  ERRSTR(ZE_RESULT_ERROR_UNSUPPORTED_FEATURE);
-  ERRSTR(ZE_RESULT_ERROR_INVALID_NULL_HANDLE);
-  ERRSTR(ZE_RESULT_ERROR_HANDLE_OBJECT_IN_USE);
-  ERRSTR(ZE_RESULT_ERROR_INVALID_NULL_POINTER);
-  ERRSTR(ZE_RESULT_ERROR_INVALID_SIZE);
-  ERRSTR(ZE_RESULT_ERROR_UNSUPPORTED_SIZE);
-  ERRSTR(ZE_RESULT_ERROR_UNSUPPORTED_ALIGNMENT);
-  ERRSTR(ZE_RESULT_ERROR_INVALID_SYNCHRONIZATION_OBJECT);
-  ERRSTR(ZE_RESULT_ERROR_INVALID_ENUMERATION);
-  ERRSTR(ZE_RESULT_ERROR_UNSUPPORTED_ENUMERATION);
-  ERRSTR(ZE_RESULT_ERROR_UNSUPPORTED_IMAGE_FORMAT);
-  ERRSTR(ZE_RESULT_ERROR_INVALID_NATIVE_BINARY);
-  ERRSTR(ZE_RESULT_ERROR_INVALID_GLOBAL_NAME);
-  ERRSTR(ZE_RESULT_ERROR_INVALID_KERNEL_NAME);
-  ERRSTR(ZE_RESULT_ERROR_INVALID_FUNCTION_NAME);
-  ERRSTR(ZE_RESULT_ERROR_INVALID_GROUP_SIZE_DIMENSION);
-  ERRSTR(ZE_RESULT_ERROR_INVALID_GLOBAL_WIDTH_DIMENSION);
-  ERRSTR(ZE_RESULT_ERROR_INVALID_KERNEL_ARGUMENT_INDEX);
-  ERRSTR(ZE_RESULT_ERROR_INVALID_KERNEL_ARGUMENT_SIZE);
-  ERRSTR(ZE_RESULT_ERROR_INVALID_KERNEL_ATTRIBUTE_VALUE);
-  ERRSTR(ZE_RESULT_ERROR_INVALID_COMMAND_LIST_TYPE);
-  ERRSTR(ZE_RESULT_ERROR_OVERLAPPING_REGIONS);
-  ERRSTR(ZE_RESULT_ERROR_UNKNOWN);
+  PMLC_LEVEL_ZERO_ERRSTR(ZE_RESULT_SUCCESS);
+  PMLC_LEVEL_ZERO_ERRSTR(ZE_RESULT_NOT_READY);
+  PMLC_LEVEL_ZERO_ERRSTR(ZE_RESULT_ERROR_UNINITIALIZED);
+  PMLC_LEVEL_ZERO_ERRSTR(ZE_RESULT_ERROR_DEVICE_LOST);
+  PMLC_LEVEL_ZERO_ERRSTR(ZE_RESULT_ERROR_INVALID_ARGUMENT);
+  PMLC_LEVEL_ZERO_ERRSTR(ZE_RESULT_ERROR_OUT_OF_HOST_MEMORY);
+  PMLC_LEVEL_ZERO_ERRSTR(ZE_RESULT_ERROR_OUT_OF_DEVICE_MEMORY);
+  PMLC_LEVEL_ZERO_ERRSTR(ZE_RESULT_ERROR_MODULE_BUILD_FAILURE);
+  PMLC_LEVEL_ZERO_ERRSTR(ZE_RESULT_ERROR_INSUFFICIENT_PERMISSIONS);
+  PMLC_LEVEL_ZERO_ERRSTR(ZE_RESULT_ERROR_NOT_AVAILABLE);
+  PMLC_LEVEL_ZERO_ERRSTR(ZE_RESULT_ERROR_UNSUPPORTED_VERSION);
+  PMLC_LEVEL_ZERO_ERRSTR(ZE_RESULT_ERROR_UNSUPPORTED_FEATURE);
+  PMLC_LEVEL_ZERO_ERRSTR(ZE_RESULT_ERROR_INVALID_NULL_HANDLE);
+  PMLC_LEVEL_ZERO_ERRSTR(ZE_RESULT_ERROR_HANDLE_OBJECT_IN_USE);
+  PMLC_LEVEL_ZERO_ERRSTR(ZE_RESULT_ERROR_INVALID_NULL_POINTER);
+  PMLC_LEVEL_ZERO_ERRSTR(ZE_RESULT_ERROR_INVALID_SIZE);
+  PMLC_LEVEL_ZERO_ERRSTR(ZE_RESULT_ERROR_UNSUPPORTED_SIZE);
+  PMLC_LEVEL_ZERO_ERRSTR(ZE_RESULT_ERROR_UNSUPPORTED_ALIGNMENT);
+  PMLC_LEVEL_ZERO_ERRSTR(ZE_RESULT_ERROR_INVALID_SYNCHRONIZATION_OBJECT);
+  PMLC_LEVEL_ZERO_ERRSTR(ZE_RESULT_ERROR_INVALID_ENUMERATION);
+  PMLC_LEVEL_ZERO_ERRSTR(ZE_RESULT_ERROR_UNSUPPORTED_ENUMERATION);
+  PMLC_LEVEL_ZERO_ERRSTR(ZE_RESULT_ERROR_UNSUPPORTED_IMAGE_FORMAT);
+  PMLC_LEVEL_ZERO_ERRSTR(ZE_RESULT_ERROR_INVALID_NATIVE_BINARY);
+  PMLC_LEVEL_ZERO_ERRSTR(ZE_RESULT_ERROR_INVALID_GLOBAL_NAME);
+  PMLC_LEVEL_ZERO_ERRSTR(ZE_RESULT_ERROR_INVALID_KERNEL_NAME);
+  PMLC_LEVEL_ZERO_ERRSTR(ZE_RESULT_ERROR_INVALID_FUNCTION_NAME);
+  PMLC_LEVEL_ZERO_ERRSTR(ZE_RESULT_ERROR_INVALID_GROUP_SIZE_DIMENSION);
+  PMLC_LEVEL_ZERO_ERRSTR(ZE_RESULT_ERROR_INVALID_GLOBAL_WIDTH_DIMENSION);
+  PMLC_LEVEL_ZERO_ERRSTR(ZE_RESULT_ERROR_INVALID_KERNEL_ARGUMENT_INDEX);
+  PMLC_LEVEL_ZERO_ERRSTR(ZE_RESULT_ERROR_INVALID_KERNEL_ARGUMENT_SIZE);
+  PMLC_LEVEL_ZERO_ERRSTR(ZE_RESULT_ERROR_INVALID_KERNEL_ATTRIBUTE_VALUE);
+  PMLC_LEVEL_ZERO_ERRSTR(ZE_RESULT_ERROR_INVALID_COMMAND_LIST_TYPE);
+  PMLC_LEVEL_ZERO_ERRSTR(ZE_RESULT_ERROR_OVERLAPPING_REGIONS);
+  PMLC_LEVEL_ZERO_ERRSTR(ZE_RESULT_ERROR_UNKNOWN);
   throw std::runtime_error("Unknown ze_result_t value: " +
                            std::to_string(static_cast<int>(result)));
 }
