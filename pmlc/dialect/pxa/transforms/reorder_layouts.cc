@@ -76,9 +76,82 @@ public:
 
     for (auto parallelOp : parallelOps) {
       tileLoopNestsToAlignWithDataMaps(parallelOp);
+      simplifyMemrefMaps(parallelOp);
     }
   }
 };
+
+void simplifyMemrefMaps(mlir::AffineParallelOp &parallelOp) {
+  IVLOG(4, "Entered simplifyMemrefMaps()");
+
+  parallelOp.walk([&](mlir::AffineParallelOp parallelOp2) {
+    if (parallelOp != parallelOp2) {
+      IVLOG(4, "AffineParallelOp within AffineParallelOp: " << parallelOp2);
+
+      parallelOp2.walk([&](PxaLoadOp loadOp) {
+        IVLOG(4, "PxaLoadOp: " << loadOp);
+
+        mlir::Value memRef = loadOp.getMemRef();
+        IVLOG(4, "op.getMemRef(): " << mlir::debugString(memRef));
+        mlir::AffineMap map = loadOp.getAffineMap();
+        IVLOG(4, "map: " << mlir::debugString(map));
+
+        bool newMapFormed = false;
+        mlir::SmallVector<mlir::AffineExpr, 6> simplifiedExprs;
+        for (unsigned idx = 0; idx < map.getNumResults(); ++idx) {
+          mlir::AffineExpr expr = map.getResult(idx);
+
+          if (expr.getKind() == mlir::AffineExprKind::FloorDiv) {
+            auto divExpr = expr.cast<mlir::AffineBinaryOpExpr>();
+            mlir::AffineExpr lhsExpr = divExpr.getLHS();
+            mlir::AffineExpr rhsExpr = divExpr.getRHS();
+
+            if (rhsExpr.getKind() == mlir::AffineExprKind::Constant) {
+              // auto constantExpr = rhsExpr.cast<mlir::AffineConstantExpr>();
+              // int64_t divisor = constantExpr.getValue();
+              // We want to check that the divisor value is the same as loop
+              // length of the inner loop and also the same as the loop length
+              // of the inner and that it exactly divides the loop length of the
+              // corresponding loop in the outer set of loops
+              // TODO: Perform the necessary checks
+
+              newMapFormed = true;
+              simplifiedExprs.push_back(lhsExpr);
+            }
+          } else if (expr.getKind() == mlir::AffineExprKind::Mod) {
+            auto divExpr = expr.cast<mlir::AffineBinaryOpExpr>();
+            mlir::AffineExpr lhsExpr = divExpr.getLHS();
+            mlir::AffineExpr rhsExpr = divExpr.getRHS();
+
+            if (rhsExpr.getKind() == mlir::AffineExprKind::Constant) {
+              // auto constantExpr = rhsExpr.cast<mlir::AffineConstantExpr>();
+              // int64_t divisor = constantExpr.getValue();
+              // We want to check that the divisor value is the same as loop
+              // length of the inner loop and also the same as the loop length
+              // of the inner and that it exactly divides the loop length of the
+              // corresponding loop in the outer set of loops
+              // TODO: Perform the necessary checks
+
+              newMapFormed = true;
+              simplifiedExprs.push_back(lhsExpr);
+            } else {
+              simplifiedExprs.push_back(expr);
+            }
+          }
+        }
+
+        if (newMapFormed) {
+          auto simplifiedMap = mlir::AffineMap::get(
+              map.getNumResults(), 0, simplifiedExprs, map.getContext());
+          IVLOG(4, "simplifiedMap: " << mlir::debugString(simplifiedMap));
+          //          loadOp.setAffineMap(simplifiedMap);
+        }
+      });
+    }
+  });
+
+  IVLOG(4, "Returning from simplifyMemrefMaps()");
+}
 
 void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {
   mlir::DenseMap<mlir::Value, int64_t> tileSizeMap;

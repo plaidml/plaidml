@@ -122,6 +122,8 @@ void reorderMemoryReads(const ReorderCreator &creator, ReorderDesc &reorderDesc,
                         MemoryUsageDesc &memoryDesc, mlir::ModuleOp &moduleOp);
 
 void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp);
+void simplifyMemrefMaps(mlir::AffineParallelOp &parallelOp);
+
 // ============================================================================
 // Helper affine map transformations
 // ============================================================================
