@@ -100,6 +100,7 @@ void simplifyMemrefMaps(mlir::AffineParallelOp &parallelOp) {
         mlir::SmallVector<mlir::AffineExpr, 6> simplifiedExprs;
         for (unsigned idx = 0; idx < map.getNumResults(); ++idx) {
           mlir::AffineExpr expr = map.getResult(idx);
+          bool expressionAdded = false;
 
           if (expr.getKind() == mlir::AffineExprKind::FloorDiv) {
             auto divExpr = expr.cast<mlir::AffineBinaryOpExpr>();
@@ -117,6 +118,7 @@ void simplifyMemrefMaps(mlir::AffineParallelOp &parallelOp) {
 
               newMapFormed = true;
               simplifiedExprs.push_back(lhsExpr);
+              expressionAdded = true;
             }
           } else if (expr.getKind() == mlir::AffineExprKind::Mod) {
             auto divExpr = expr.cast<mlir::AffineBinaryOpExpr>();
@@ -134,9 +136,12 @@ void simplifyMemrefMaps(mlir::AffineParallelOp &parallelOp) {
 
               newMapFormed = true;
               simplifiedExprs.push_back(lhsExpr);
-            } else {
-              simplifiedExprs.push_back(expr);
+              expressionAdded = true;
             }
+          }
+
+          if (!expressionAdded) {
+            simplifiedExprs.push_back(expr);
           }
         }
 
@@ -144,7 +149,12 @@ void simplifyMemrefMaps(mlir::AffineParallelOp &parallelOp) {
           auto simplifiedMap = mlir::AffineMap::get(
               map.getNumResults(), 0, simplifiedExprs, map.getContext());
           IVLOG(4, "simplifiedMap: " << mlir::debugString(simplifiedMap));
-          //          loadOp.setAffineMap(simplifiedMap);
+          mlir::OpBuilder builder(loadOp);
+          mlir::Value loadRes =
+              builder.create<PxaLoadOp>(loadOp.getLoc(), loadOp.getMemRef(),
+                                        simplifiedMap, loadOp.indices());
+          loadOp.replaceAllUsesWith(loadRes);
+          loadOp.erase();
         }
       });
     }
