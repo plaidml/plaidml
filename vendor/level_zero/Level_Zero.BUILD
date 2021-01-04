@@ -11,7 +11,7 @@ cc_library(
             "source/loader/*cpp",
             "source/loader/windows/*cpp",
         ]),
-        "@bazel_tools//src/conditions:darwin": [],
+        "@bazel_tools//src/conditions:darwin_x86_64": [],
         "//conditions:default": glob([
             "source/loader/*cpp",
             "source/loader/linux/*cpp",

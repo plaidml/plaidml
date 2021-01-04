@@ -57,7 +57,7 @@ plaidml_cc_library(
         "PML_ENABLE_VULKAN",
     ] + select({
         "@bazel_tools//src/conditions:windows": [],
-        "@bazel_tools//src/conditions:darwin": [],
+        "@bazel_tools//src/conditions:darwin_x86_64": [],
         "//conditions:default": ["PML_ENABLE_LEVEL_ZERO"],
     }),
     visibility = ["//visibility:public"],
@@ -68,7 +68,7 @@ plaidml_cc_library(
         "//pmlc/rt/vulkan",
     ] + select({
         "@bazel_tools//src/conditions:windows": [],
-        "@bazel_tools//src/conditions:darwin": [],
+        "@bazel_tools//src/conditions:darwin_x86_64": [],
         "//conditions:default": ["//pmlc/rt/level_zero"],
     }),
     alwayslink = 1,
