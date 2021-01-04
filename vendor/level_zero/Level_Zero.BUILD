@@ -6,10 +6,16 @@ cc_library(
     name = "ze_loader",
     srcs = glob([
         "source/lib/*cpp",
-        "source/loader/*cpp",
     ]) + select({
-        "@bazel_tools//src/conditions:windows": glob(["source/loader/windows/*cpp"]),
-        "//conditions:default": glob(["source/loader/linux/*cpp"]),
+        "@bazel_tools//src/conditions:windows": glob([
+            "source/loader/*cpp",
+            "source/loader/windows/*cpp",
+        ]),
+        "@bazel_tools//src/conditions:darwin": [],
+        "//conditions:default": glob([
+            "source/loader/*cpp",
+            "source/loader/linux/*cpp",
+        ]),
     }),
     hdrs = [
         "source/lib/ze_lib.h",

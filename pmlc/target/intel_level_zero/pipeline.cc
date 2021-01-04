@@ -54,7 +54,8 @@ namespace pxa = dialect::pxa;
 namespace stdx = dialect::stdx;
 namespace tile = dialect::tile;
 
-struct OclPipelineOptions : public PassPipelineOptions<OclPipelineOptions> {
+struct LevelZeroPipelineOptions
+    : public PassPipelineOptions<LevelZeroPipelineOptions> {
   Option<bool> useBlockOps{*this, "use-block-ops",
                            llvm::cl::desc("Support for block operations"),
                            llvm::cl::initializer(true)};
@@ -64,7 +65,7 @@ struct OclPipelineOptions : public PassPipelineOptions<OclPipelineOptions> {
 };
 
 void pipelineBuilder(OpPassManager &pm,
-                     const OclPipelineOptions &oclPipelineOptions) {
+                     const LevelZeroPipelineOptions &levelZeroPipelineOptions) {
   // Bound + pad initial tile code
   pm.addPass(layer::createInlineLayersPass());
   pm.addPass(tile::createComputeBoundsPass());
@@ -166,7 +167,7 @@ void pipelineBuilder(OpPassManager &pm,
 
   // Devectorize
   pm.addPass(pmlc::target::intel_gen::createSubgroupBroadcastPass(
-      oclPipelineOptions.useBlockOps.getValue()));
+      levelZeroPipelineOptions.useBlockOps.getValue()));
   pm.addPass(createCSEPass());
 
   // Lower mapped scf.parallel's to GPU
@@ -175,8 +176,8 @@ void pipelineBuilder(OpPassManager &pm,
   pm.addPass(createCSEPass());
 
   // Do kernel outlining
-  pm.addPass(
-      createAddSpirvTargetPass(oclPipelineOptions.spirvVersion.getValue()));
+  pm.addPass(createAddSpirvTargetPass(
+      levelZeroPipelineOptions.spirvVersion.getValue()));
   pm.addPass(conversion::gpu::createGpuKernelOutliningPass(
       comp::ExecEnvRuntime::OpenCL, /*memorySpace=*/11));
   // pm.addPass(conversion::gpu::createGatherGpuLaunchFuncsPass());
@@ -192,7 +193,7 @@ void pipelineBuilder(OpPassManager &pm,
   pm.addPass(createCSEPass());
 
   bool nonUniformBroadcast = false;
-  if (oclPipelineOptions.spirvVersion.getValue() >= 150) {
+  if (levelZeroPipelineOptions.spirvVersion.getValue() >= 150) {
     nonUniformBroadcast = true;
   }
   pm.addPass(conversion::gpu_to_spirv::createGPUToSPIRVCustomPass(
@@ -217,16 +218,16 @@ static constexpr const char *kTargetName = "intel_level_zero";
 static constexpr const char *kPassPipelineTargetName =
     "target-intel_level_zero";
 
-static PassPipelineRegistration<OclPipelineOptions>
+static PassPipelineRegistration<LevelZeroPipelineOptions>
     passPipelineReg(kPassPipelineTargetName,
                     "Target pipeline for OneAPI Level Zero", pipelineBuilder);
 
 class Target : public compiler::Target {
 public:
   void buildPipeline(mlir::OpPassManager &pm, llvm::StringRef targetOptions) {
-    auto oclPipelineOptions =
-        OclPipelineOptions::createFromString(targetOptions);
-    pipelineBuilder(pm, *oclPipelineOptions);
+    auto levelZeroPipelineOptions =
+        LevelZeroPipelineOptions::createFromString(targetOptions);
+    pipelineBuilder(pm, *levelZeroPipelineOptions);
   }
 
   util::BufferPtr save(compiler::Program &program) {

@@ -55,16 +55,22 @@ plaidml_cc_library(
     defines = [
         "PML_ENABLE_OPENCL",
         "PML_ENABLE_VULKAN",
-        "PML_ENABLE_LEVEL_ZERO",
-    ],
+    ] + select({
+        "@bazel_tools//src/conditions:windows": [],
+        "@bazel_tools//src/conditions:darwin": [],
+        "//conditions:default": ["PML_ENABLE_LEVEL_ZERO"],
+    }),
     visibility = ["//visibility:public"],
     deps = [
         ":rt",
         "//pmlc/rt/llvm",
         "//pmlc/rt/opencl",
         "//pmlc/rt/vulkan",
-        "//pmlc/rt/level_zero",
-    ],
+    ] + select({
+        "@bazel_tools//src/conditions:windows": [],
+        "@bazel_tools//src/conditions:darwin": [],
+        "//conditions:default": ["//pmlc/rt/level_zero"],
+    }),
     alwayslink = 1,
 )
 
