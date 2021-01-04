@@ -13,8 +13,11 @@ using LayerTestsDefinitions::ROIPoolingLayerTest;
 
 namespace {
 
-const std::vector<InferenceEngine::Precision> netPrecisions = {InferenceEngine::Precision::FP32,
-                                                               InferenceEngine::Precision::I32};
+const std::vector<InferenceEngine::Precision> netPrecisions = {
+    InferenceEngine::Precision::FP32,
+    InferenceEngine::Precision::I32,
+    InferenceEngine::Precision::FP16,
+};
 
 const std::vector<std::vector<size_t>> inputShape = {
     {1, 3, 12, 12},

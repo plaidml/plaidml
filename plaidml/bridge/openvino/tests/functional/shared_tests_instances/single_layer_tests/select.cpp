@@ -15,6 +15,7 @@ const std::vector<InferenceEngine::Precision> inputPrecision = {
     InferenceEngine::Precision::I64,   //
     InferenceEngine::Precision::I32,   //
     InferenceEngine::Precision::FP32,  //
+    InferenceEngine::Precision::FP16,
 };
 
 const std::vector<std::vector<std::vector<size_t>>> noneShapes = {

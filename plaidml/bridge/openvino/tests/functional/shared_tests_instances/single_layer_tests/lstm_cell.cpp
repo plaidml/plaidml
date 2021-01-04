@@ -14,6 +14,7 @@ using LayerTestsDefinitions::LSTMCellTest;
 namespace {
 std::vector<InferenceEngine::Precision> netPrecisions = {
     InferenceEngine::Precision::FP32,
+    InferenceEngine::Precision::FP16,
 };
 
 const bool shouldDecompose = true;  // false will let all test cases fail

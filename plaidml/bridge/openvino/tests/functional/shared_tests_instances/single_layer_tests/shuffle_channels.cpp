@@ -12,6 +12,7 @@ namespace {
 const std::vector<InferenceEngine::Precision> netPrecisions = {
     InferenceEngine::Precision::I32,
     InferenceEngine::Precision::FP32,
+    InferenceEngine::Precision::FP16,
 };
 
 const std::vector<std::vector<size_t>> inputShapes = {

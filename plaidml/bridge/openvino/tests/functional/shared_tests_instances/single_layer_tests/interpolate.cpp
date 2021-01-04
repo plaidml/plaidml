@@ -13,6 +13,7 @@ namespace {
 
 const std::vector<InferenceEngine::Precision> prc = {
     InferenceEngine::Precision::FP32,
+    // InferenceEngine::Precision::FP16,
 };
 
 const std::vector<std::vector<size_t>> inShapes = {

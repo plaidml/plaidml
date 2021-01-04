@@ -16,6 +16,7 @@ const std::vector<InferenceEngine::Precision> inputPrecisions = {
     InferenceEngine::Precision::FP32,
     InferenceEngine::Precision::U8,
     InferenceEngine::Precision::I16,
+    InferenceEngine::Precision::FP16,
 };
 
 const std::vector<DepthToSpace::DepthToSpaceMode> modes = {DepthToSpace::DepthToSpaceMode::BLOCKS_FIRST,

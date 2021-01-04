@@ -11,6 +11,7 @@ using LayerTestsDefinitions::ReduceOpsLayerTest;
 namespace {
 const std::vector<InferenceEngine::Precision> netPrecisions = {
     InferenceEngine::Precision::FP32,
+    // InferenceEngine::Precision::FP16,
 };
 
 const std::vector<bool> keepDims = {

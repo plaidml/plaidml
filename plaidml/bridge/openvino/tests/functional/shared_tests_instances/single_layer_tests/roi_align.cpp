@@ -13,6 +13,7 @@ using LayerTestsDefinitions::ROIAlignLayerTest;
 namespace {
 std::vector<InferenceEngine::Precision> netPrecisions = {
     InferenceEngine::Precision::FP32,
+    InferenceEngine::Precision::FP16,
 };
 
 const std::vector<std::vector<size_t>> inputShapes = {{6, 3, 128, 128}, {7, 256, 200, 200}};
