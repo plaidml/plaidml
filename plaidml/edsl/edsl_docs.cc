@@ -194,7 +194,12 @@ Tensor ComplexConv2D(const Tensor& I, const Tensor& K,
 // complex_conv_end
 
 // layer_start
-Tensor Layer(const Tensor& I) { return I; }
+Tensor Layer(const Tensor& A, const Tensor& B) {
+  std::string name = "Sum";
+  std::function<Tensor()> function = [&]() { return A + B; };
+  std::vector<Tensor> inputs = {A, B};
+  return layer(name, inputs, function);
+}
 // layer_end
 
 TEST_F(DocCppEdsl, SumOveAxis) {
@@ -269,6 +274,12 @@ TEST_F(DocCppEdsl, ComplexConv2d) {
   auto K = Placeholder(DType::FLOAT32, {3, 3, 3, 3, 32});
   auto O = ComplexConv2D(I, K, {2, 2}, {3, 3});
   runProgram(makeProgram("complex_conv_2d", {I, K}, {O}));
+}
+
+TEST_F(DocCppEdsl, Layer) {
+  auto A = Placeholder(DType::UINT64, {3, 3});
+  auto B = Placeholder(DType::UINT64, {3, 3});
+  runProgram(makeProgram("layer", {A, B}, {Layer(A, B)}));
 }
 
 }  // namespace plaidml::edsl
