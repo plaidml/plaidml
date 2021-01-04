@@ -25,12 +25,15 @@ cc_library(
         "source/loader/*h",
         "source/inc/*h",
     ]),
-    copts = [
-        "-std=c++14",
-        "-fpermissive",
-        "-fPIC",
-        "-g",
-    ],
+    copts = select({
+        "@bazel_tools//src/conditions:windows": ["cfgmgr32.lib"],
+        "@bazel_tools//src/conditions:darwin_x86_64": [],
+        "//conditions:default": [
+            "-std=c++14",
+            "-fpermissive",
+            "-fPIC",
+        ],
+    }),
     defines = [
         'L0_LOADER_VERSION=\\"1\\"',
         'L0_VALIDATION_LAYER_SUPPORTED_VERSION=\\"1\\"',

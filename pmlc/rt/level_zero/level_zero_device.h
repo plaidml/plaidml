@@ -114,6 +114,8 @@ public:
 
   /// Returns LevelZero context created with only this device.
   ze_context_handle_t getLevelZeroContext() { return context; }
+  /// Returns LevelZero driver.
+  ze_driver_handle_t getLevelZeroDriver() { return driver; }
   /// Returns LevelZero device.
   ze_device_handle_t getLevelZeroDevice() { return device; }
   /// Returns LevelZero queue with specified properties for execution
