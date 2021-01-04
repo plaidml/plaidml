@@ -193,6 +193,10 @@ Tensor ComplexConv2D(const Tensor& I, const Tensor& K,
 }
 // complex_conv_end
 
+// layer_start
+Tensor Layer(const Tensor& I) { return I; }
+// layer_end
+
 TEST_F(DocCppEdsl, SumOveAxis) {
   auto I = Placeholder(DType::UINT64, {3, 3});
   runProgram(makeProgram("sum_over_axis", {I}, {SumOverAxis(I)}));

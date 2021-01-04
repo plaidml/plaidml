@@ -429,6 +429,26 @@ Special Operations
 - Index
 - Portable Random Number Generation (PRNG)
 - Scatter
+- Layer
+
+In some cases, it may be useful to specify an arbitrary block of operations as a
+single layer function. The ``layer`` operation provides a convenient method for 
+binding ``Tensor`` inputs and (if applicable) function attributes to a function 
+definition:
+
+.. tabs::
+  
+  .. group-tab:: C++
+
+    .. literalinclude:: ../../plaidml/edsl/edsl_docs.cc
+      :language: cpp
+      :start-after: layer_start
+      :end-before: layer_end
+  
+  .. group-tab:: Python
+
+    .. literalinclude:: ../../plaidml/edsl/edsl_docs.py
+      :pyobject: layer
 
 .. _broadcast-semantics:
 

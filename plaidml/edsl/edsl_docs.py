@@ -201,6 +201,10 @@ def complex_conv_2d(I, K, s0, s1, d0, d1):
     return O
 
 
+def layer(I):
+    return I
+
+
 class TestEdslDocs(unittest.TestCase):
 
     def test_sum_over_axis(self):
