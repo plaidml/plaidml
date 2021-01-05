@@ -1934,10 +1934,11 @@ struct ScfForOpConversion : public OpConversionPattern<scf::ForOp> {
   LogicalResult
   matchAndRewrite(scf::ForOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
+    scf::ForOpAdaptor oldFor(operands);
     auto &oldBodyOps = op.getBody()->getOperations();
-    auto newOp =
-        rewriter.create<scf::ForOp>(op.getLoc(), operands[0],
-                                    operands[1], operands[2], operands[3]);
+    auto newOp = rewriter.create<scf::ForOp>(op.getLoc(), oldFor.lowerBound(),
+                                             oldFor.upperBound(), oldFor.step(),
+                                             oldFor.initArgs());
     auto &newBodyOps = newOp.getBody()->getOperations();
     newBodyOps.splice(std::prev(newBodyOps.end()), oldBodyOps,
                       oldBodyOps.begin(), oldBodyOps.end());
