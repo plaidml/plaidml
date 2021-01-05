@@ -179,6 +179,9 @@ void pipelineBuilder(OpPassManager &pm,
       createAddSpirvTargetPass(oclPipelineOptions.spirvVersion.getValue()));
   pm.addPass(conversion::gpu::createGpuKernelOutliningPass(
       comp::ExecEnvRuntime::OpenCL, /*memorySpace=*/11));
+
+  // Hoist GPU ops
+  pm.addPass(transforms::createHoistingPass());
   //pm.addPass(conversion::gpu::createGatherGpuLaunchFuncsPass());
   //pm.addPass(comp::createMinimizeBufferTransfersPass());
   //pm.addPass(comp::createExecEnvCoalescingPass());
