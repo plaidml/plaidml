@@ -66,7 +66,7 @@ struct DeallocPlacementPass
     fn.walk([&](scf::ForOp forOp) {
       auto args = forOp.getRegionIterArgs();
       for (unsigned i = 0; i < args.size(); ++i) {
-        placeDealloc(args[i].cast<Value>(), &forOp.getBody()->front(),
+        placeDealloc(cast<Value>(args[i]), &forOp.getBody()->front(),
                      forOp.getBody(), i, onPack);
       }
     });
