@@ -9,6 +9,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
+#include "llvm/ADT/SetVector.h"
 
 #include "pmlc/dialect/pxa/ir/interfaces.h"
 #include "pmlc/dialect/pxa/transforms/layout_utils.h"
@@ -117,7 +118,8 @@ using ReorderCreator = std::function<mlir::Value(
 /// It guards against reordering same memory used by two read operations
 /// twice, which could happen when directly using "creator".
 void reorderMemoryReads(const ReorderCreator &creator, ReorderDesc &reorderDesc,
-                        MemoryUsageDesc &memoryDesc, mlir::ModuleOp &moduleOp);
+                        MemoryUsageDesc &memoryDesc, mlir::ModuleOp &moduleOp,
+                        llvm::SetVector<mlir::Operation *> &toRemove);
 
 // ============================================================================
 // Helper affine map transformations
