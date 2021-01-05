@@ -1,3 +1,6 @@
+get_property(INCLUDE_LEVEL_ZERO GLOBAL PROPERTY "LEVEL_ZERO_INCLUDE_DIRS")
+include_directories(SYSTEM ${INCLUDE_LEVEL_ZERO})
+
 pml_cc_library(
   NAME level_zero
   HDRS register.h
@@ -10,8 +13,6 @@ pml_cc_library(
     level_zero_wrappers.cc
     level_zero_utils.h
     level_zero_utils.cc
-  DEFINES
-    PML_USE_DEVICE_LEVEL_ZERO
   DEPS
     pmlc::compiler
     pmlc::rt
@@ -25,7 +26,11 @@ pml_cc_binary(
     NAME level_zero_probe
     SRCS
       level_zero_probe.cc
+      level_zero_utils.h
+      level_zero_utils.cc
+    DEFINES
+      PML_ENABLE_LEVEL_ZERO
     DEPS
-      pmlc::rt::level_zero
+      ze_loader
       pmlc::rt
 )

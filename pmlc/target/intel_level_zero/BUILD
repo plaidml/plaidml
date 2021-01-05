@@ -40,7 +40,6 @@ plaidml_cc_library(
         "//pmlc/dialect/stdx/transforms",
         "//pmlc/dialect/tile/transforms",
         "//pmlc/transforms",
-        "//pmlc/rt/level_zero",
         "//pmlc/target/intel_gen",
         "//pmlc/target/x86:prng_lowering",
         "@llvm-project//mlir:AffineToStandardTransforms",

@@ -1,11 +1,13 @@
 // Copyright 2020 Intel Corporation
 
 #include <vector>
-
+#ifdef PML_ENABLE_LEVEL_ZERO
 #include "pmlc/rt/level_zero/level_zero_utils.h"
+#endif
 #include "pmlc/util/logging.h"
 
 int main(int argc, char **argv) {
+#ifdef PML_ENABLE_LEVEL_ZERO
   ze_result_t result = ZE_RESULT_NOT_READY;
   try {
     result = zeInit(0);
@@ -35,4 +37,8 @@ int main(int argc, char **argv) {
                          .name);
   }
   return 0;
+#else
+  IVLOG(1, "LevelZero is not opened on this platform");
+  return -1;
+#endif
 }
