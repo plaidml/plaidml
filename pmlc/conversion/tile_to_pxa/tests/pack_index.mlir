@@ -1,3 +1,4 @@
+// Check if pack/unpack crash for constant op.
 // RUN: pmlc-opt -convert-tile-to-pxa %s | FileCheck %s
 
 // CHECK-LABEL: @init

@@ -62,6 +62,8 @@ struct TypeConverter : public mlir::TypeConverter {
 static Type getElementType(Type type) {
   if (auto tensorType = type.dyn_cast<TensorType>()) {
     return tensorType.getElementType();
+  } else if (auto memRefType = type.dyn_cast<MemRefType>()) {
+    return memRefType.getElementType();
   }
   return type;
 }
@@ -1945,7 +1947,6 @@ struct ScfForOpConversion : public OpConversionPattern<scf::ForOp> {
       oldArgs[i].replaceAllUsesWith(newArgs[i]);
     }
     rewriter.replaceOp(op, newOp.results());
-    rewriter.eraseOp(op);
     return success();
   }
 };
