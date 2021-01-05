@@ -56,25 +56,30 @@ struct DeallocPlacementPass
   }
 
   template <typename Callback> void runOnFunction(FuncOp fn, Callback onPack) {
+    // Place deallocation for AllocOp
     fn.walk([&](AllocOp alloc) {
       IVLOG(3, "alloc: " << debugString(*alloc));
       placeDealloc(alloc.getResult(), alloc, alloc.getOperation()->getBlock(),
                    -1, onPack);
     });
+    // Place deallcation for the loop (scf.for) arguments
     fn.walk([&](scf::ForOp forOp) {
       auto args = forOp.getRegionIterArgs();
       for (unsigned i = 0; i < args.size(); ++i) {
-        IVLOG(3, "for argument: " << debugString(args[i]));
         placeDealloc(args[i].cast<Value>(), &forOp.getBody()->front(),
                      forOp.getBody(), i, onPack);
       }
     });
   }
 
+  // This function dealloc ref if possible, which is the allocated memory
+  // reference. firstOp is generally the allocation operaion. For scf.for
+  // arguments, it is virtually the first operation in the loop. argNumber is
+  // scf.for argument order number, which is useless for normal deallocation.
   template <typename Callback>
-  void placeDealloc(Value ref, Operation *allocOp, Block *allocBlock,
+  void placeDealloc(Value ref, Operation *firstOp, Block *allocBlock,
                     int argNumber, Callback onPack) {
-    Operation *lastOp = allocOp;
+    Operation *lastOp = firstOp;
     OpOperand *lastUse = nullptr;
     for (auto &itUse : getIndirectUses(ref)) {
       auto use = itUse.getOwner();
@@ -110,15 +115,17 @@ struct DeallocPlacementPass
 
     IVLOG(3, "  next operation: " << debugString(*nextOp));
     OpBuilder builder(nextOp);
-    builder.create<DeallocOp>(allocOp->getLoc(), lastUse->get());
+    builder.create<DeallocOp>(firstOp->getLoc(), lastUse->get());
     if (argNumber >= 0) {
-      // Need to copy the initial argument
-      auto scfFor = cast<scf::ForOp>(allocOp->getParentOp());
+      // Here we need to process scf.for argument, i.e., copy the initial
+      // argument
+      auto scfFor = cast<scf::ForOp>(firstOp->getParentOp());
       builder.setInsertionPoint(scfFor);
       auto inits = scfFor.getIterOperands();
-      auto argInit = inits[argNumber];
-      MemRefType resType = argInit.getType().cast<MemRefType>();
+      MemRefType resType = inits[argNumber].getType().cast<MemRefType>();
+      // Build the buffer for the new tensor
       auto newBuf = builder.create<AllocOp>(builder.getUnknownLoc(), resType);
+      // Build a element-wise for to copy the initial value to the new buffer
       auto forOp = builder.create<AffineParallelOp>(
           builder.getUnknownLoc(),
           /*resultTypes=*/ArrayRef<Type>{resType},
@@ -130,15 +137,18 @@ struct DeallocPlacementPass
       for (unsigned i = 0; i < resType.getRank(); i++) {
         operandIdxs[i] = body->getArgument(i);
       }
-      auto loadRes = builder.create<pxa::PxaLoadOp>(builder.getUnknownLoc(),
-                                                    argInit, operandIdxs);
+      // Build pxa load
+      auto loadRes = builder.create<pxa::PxaLoadOp>(
+          builder.getUnknownLoc(), inits[argNumber], operandIdxs);
       auto idMap = builder.getMultiDimIdentityMap(resType.getRank());
+      // Build pxa reduce
       auto storeRes = builder.create<pxa::PxaReduceOp>(
           builder.getUnknownLoc(), AtomicRMWKind::assign, loadRes, newBuf,
           idMap, builder.getBlock()->getArguments());
+      // Build affine yield
       builder.create<AffineYieldOp>(builder.getUnknownLoc(),
                                     ValueRange{storeRes.result()});
-      // Replace the initial argument with the result of for loop
+      // Replace the initial argument with the result of new loop
       scfFor.setOperand(scfFor.getNumControlOperands() + argNumber,
                         forOp.getResult(0));
     }
