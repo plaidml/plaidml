@@ -202,6 +202,14 @@ Tensor Layer(const Tensor& A, const Tensor& B) {
 }
 // layer_end
 
+// trace_start
+Tensor Trace(const Tensor& A, const Tensor& B) {
+  auto At = trace(A, "Pre-summation");
+  auto C = At + B;
+  return trace(C, "Post-summation");
+}
+// trace_end
+
 TEST_F(DocCppEdsl, SumOveAxis) {
   auto I = Placeholder(DType::UINT64, {3, 3});
   runProgram(makeProgram("sum_over_axis", {I}, {SumOverAxis(I)}));
@@ -280,6 +288,12 @@ TEST_F(DocCppEdsl, Layer) {
   auto A = Placeholder(DType::UINT64, {3, 3});
   auto B = Placeholder(DType::UINT64, {3, 3});
   runProgram(makeProgram("layer", {A, B}, {Layer(A, B)}));
+}
+
+TEST_F(DocCppEdsl, Trace) {
+  auto A = Placeholder(DType::UINT64, {3, 3});
+  auto B = Placeholder(DType::UINT64, {3, 3});
+  runProgram(makeProgram("trace", {A, B}, {Trace(A, B)}));
 }
 
 }  // namespace plaidml::edsl

@@ -201,8 +201,15 @@ def complex_conv_2d(I, K, s0, s1, d0, d1):
     return O
 
 
-def layer(I):
-    return I
+def layer():
+    # layer() has not been implemented for the Python frontend
+    pass
+
+
+def trace(A, B):
+    At = trace(A, "Pre-summation")
+    C = At + B
+    return trace(C, "Post-summation")
 
 
 class TestEdslDocs(unittest.TestCase):
@@ -270,3 +277,9 @@ class TestEdslDocs(unittest.TestCase):
         K = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3, 3, 3, 3, 32]))
         O = complex_conv_2d(I, K, 1, 2, 1, 2)
         program = Program('complex_conv_2d', [O])
+
+    def test_trace(self):
+        A = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3, 3]))
+        B = Tensor(LogicalShape(plaidml.DType.FLOAT32, [3, 3]))
+        O = trace(A, B)
+        program = Program('trace', [O])
