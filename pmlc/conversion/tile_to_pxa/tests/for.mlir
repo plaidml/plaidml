@@ -26,11 +26,11 @@ func @matrixPower(%m : tensor<16x16xf32>) -> tensor<16x16xf32> {
 // CHECK:   affine.parallel ({{.*}}, {{.*}}) = (0, 0) to (16, 16)
 // CHECK:     pxa.reduce assign
 // CHECK:     affine.yield
-// CHECK:   affine.parallel ({{.*}}, {{.*}}, {{.*}}) = (0, 0, 0) to (16, 16, 16)
+// CHECK:   %[[res:.*]] = affine.parallel ({{.*}}, {{.*}}, {{.*}}) = (0, 0, 0) to (16, 16, 16)
 // CHECK:     pxa.load
 // CHECK:     pxa.load
 // CHECK:     mulf
 // CHECK:     pxa.reduce addf
 // CHECK:     affine.yield
-// CHECK:   scf.yield %3
+// CHECK:   scf.yield %[[res]]
 // CHECK: return
