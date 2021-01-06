@@ -47,6 +47,7 @@ struct TypeConverter : public mlir::TypeConverter {
     addConversion([](FunctionType type) { return type; });
     addConversion([](FloatType type) { return type; });
     addConversion([](IntegerType type) { return tile::toSignlessType(type); });
+    addConversion([](IndexType type) { return type; });
     addConversion([](MemRefType type) { return type; });
     addConversion([](stdx::ArgpackType type) { return type; });
     addConversion([this](RankedTensorType type) {
@@ -61,6 +62,8 @@ struct TypeConverter : public mlir::TypeConverter {
 static Type getElementType(Type type) {
   if (auto tensorType = type.dyn_cast<TensorType>()) {
     return tensorType.getElementType();
+  } else if (auto memRefType = type.dyn_cast<MemRefType>()) {
+    return memRefType.getElementType();
   }
   return type;
 }
@@ -179,16 +182,14 @@ struct AlwaysTrue : Matcher {
   bool match(Operation *op) const final { return true; }
 };
 
-template <typename InnerPredicate>
-struct ResultIs : Matcher {
+template <typename InnerPredicate> struct ResultIs : Matcher {
   bool match(Operation *op) const final {
     InnerPredicate pred;
     return pred.match(op->getResult(0).getType());
   }
 };
 
-template <typename InnerPredicate>
-struct AnyOperandIs : Matcher {
+template <typename InnerPredicate> struct AnyOperandIs : Matcher {
   bool match(Operation *op) const final {
     for (auto operand : op->getOperands()) {
       InnerPredicate pred;
@@ -200,8 +201,7 @@ struct AnyOperandIs : Matcher {
   }
 };
 
-template <typename InnerPredicate>
-struct OperandsAre : Matcher {
+template <typename InnerPredicate> struct OperandsAre : Matcher {
   bool match(Operation *op) const final {
     for (auto operand : op->getOperands()) {
       InnerPredicate pred;
@@ -213,8 +213,7 @@ struct OperandsAre : Matcher {
   }
 };
 
-template <typename InnerPredicate>
-struct FirstOperandIs : Matcher {
+template <typename InnerPredicate> struct FirstOperandIs : Matcher {
   bool match(Operation *op) const final {
     InnerPredicate pred;
     if (op->getNumOperands() == 0) {
@@ -224,8 +223,7 @@ struct FirstOperandIs : Matcher {
   }
 };
 
-template <typename InnerPredicate>
-struct AnyComparandIs : Matcher {
+template <typename InnerPredicate> struct AnyComparandIs : Matcher {
   bool match(Operation *op) const final {
     SmallVector<Value, 4> allOperands(op->getOperands());
     tile::ContractionOpAdaptor adaptor(allOperands);
@@ -236,8 +234,7 @@ struct AnyComparandIs : Matcher {
   }
 };
 
-template <typename InnerPredicate>
-struct ComparandsAre : Matcher {
+template <typename InnerPredicate> struct ComparandsAre : Matcher {
   bool match(Operation *op) const final {
     SmallVector<Value, 4> allOperands(op->getOperands());
     tile::ContractionOpAdaptor adaptor(allOperands);
@@ -248,8 +245,7 @@ struct ComparandsAre : Matcher {
   }
 };
 
-template <typename InnerPredicate>
-struct Not {
+template <typename InnerPredicate> struct Not {
   bool match(Type type) const {
     InnerPredicate pred;
     return !pred.match(type);
@@ -327,8 +323,7 @@ struct NotOp {
   }
 };
 
-template <typename OpType>
-struct StdOp {
+template <typename OpType> struct StdOp {
   Value create(ConversionPatternRewriter &rewriter, Location loc,
                Type resultType, ArrayRef<Value> operands,
                ArrayRef<Type> types) {
@@ -354,8 +349,7 @@ struct SelectOp {
   }
 };
 
-template <CmpFPredicate predicate>
-struct CmpFloatOp {
+template <CmpFPredicate predicate> struct CmpFloatOp {
   Value create(ConversionPatternRewriter &rewriter, Location loc,
                Type resultType, ArrayRef<Value> operands,
                ArrayRef<Type> types) {
@@ -367,8 +361,7 @@ struct CmpFloatOp {
   }
 };
 
-template <CmpIPredicate predicate>
-struct CmpIntOp {
+template <CmpIPredicate predicate> struct CmpIntOp {
   Value create(ConversionPatternRewriter &rewriter, Location loc,
                Type resultType, ArrayRef<Value> operands,
                ArrayRef<Type> types) {
@@ -394,8 +387,7 @@ struct CmpIntInequalityOp {
   }
 };
 
-template <typename OpType>
-struct LogicalOp {
+template <typename OpType> struct LogicalOp {
   Value create(ConversionPatternRewriter &rewriter, Location loc,
                Type resultType, ArrayRef<Value> operands,
                ArrayRef<Type> types) {
@@ -491,8 +483,7 @@ static Value createInit(OpBuilder &builder, Location loc, Type type,
   llvm_unreachable("Unknown type for createInit");
 }
 
-template <typename CmpOpBuilder>
-struct CondOp {
+template <typename CmpOpBuilder> struct CondOp {
   Value create(ConversionPatternRewriter &rewriter, Location loc,
                Type resultType, ArrayRef<Value> operands,
                ArrayRef<Type> types) {
@@ -1937,6 +1928,30 @@ struct UnpackOpConversion : public OpConversionPattern<stdx::UnpackOp> {
   }
 };
 
+struct ScfForOpConversion : public OpConversionPattern<scf::ForOp> {
+  using OpConversionPattern<scf::ForOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(scf::ForOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const final {
+    scf::ForOpAdaptor oldFor(operands);
+    auto &oldBodyOps = op.getBody()->getOperations();
+    auto newOp = rewriter.create<scf::ForOp>(op.getLoc(), oldFor.lowerBound(),
+                                             oldFor.upperBound(), oldFor.step(),
+                                             oldFor.initArgs());
+    auto &newBodyOps = newOp.getBody()->getOperations();
+    newBodyOps.splice(std::prev(newBodyOps.end()), oldBodyOps,
+                      oldBodyOps.begin(), oldBodyOps.end());
+    auto oldArgs = op.getBody()->getArguments();
+    auto newArgs = newOp.getBody()->getArguments();
+    for (unsigned i = 0; i < oldArgs.size(); ++i) {
+      oldArgs[i].replaceAllUsesWith(newArgs[i]);
+    }
+    rewriter.replaceOp(op, newOp.results());
+    return success();
+  }
+};
+
 struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
   void runOnOperation() final {
     // Inject tile.ident ops for each return operand that needs it.
@@ -1963,6 +1978,7 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
     TypeConverter converter;
     target.addLegalDialect<mlir::AffineDialect>();
     target.addLegalDialect<mlir::StandardOpsDialect>();
+    target.addLegalDialect<mlir::scf::SCFDialect>();
     target.addLegalDialect<dialect::layer::LayerDialect>();
     target.addLegalDialect<dialect::pxa::PXADialect>();
     target.addLegalDialect<dialect::stdx::StdXDialect>();
@@ -1978,6 +1994,8 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
     target.addDynamicallyLegalOp<stdx::UnpackOp>([&](stdx::UnpackOp op) {
       return converter.isLegal(op.getResultTypes());
     });
+    target.addDynamicallyLegalOp<scf::ForOp>(
+        [&](scf::ForOp op) { return converter.isLegal(op.getResultTypes()); });
 
     // Setup rewrite patterns
     using CmpIntLtOp =
@@ -2005,6 +2023,7 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         TraceOpConversion,    //
         PackOpConversion,     //
         UnpackOpConversion,   //
+        ScfForOpConversion,   //
         ContractionOpConversion<CombinationKind::none, FirstOperand>,
         ContractionOpConversion<CombinationKind::add, StdOp<mlir::AddFOp>,
                                 ResultIs<EltwiseFloat>>,

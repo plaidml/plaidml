@@ -19,7 +19,7 @@ const std::vector<InferenceEngine::Precision> netPrecisions = {
 const std::map<ActivationTypes, std::vector<std::vector<float>>> activationTypes = {
     {Sigmoid, {{}}},
     {Tanh, {{}}},
-    // {Relu,        {}},  // TODO
+    {Relu, {}},
     {Exp, {{}}},
     {Log, {{}}},
     {Sign, {{}}},
@@ -50,11 +50,8 @@ const std::map<ActivationTypes, std::vector<std::vector<float>>> activationTypes
     {SoftPlus, {{}}},
 };
 
-// TODO
-// const std::map<ActivationTypes, std::vector<std::vector<float>>> activationParamTypes = {
-//     {PReLu, {{-0.01f}}},
-//     {LeakyRelu, {{0.01f}}}
-// };
+const std::map<ActivationTypes, std::vector<std::vector<float>>> activationParamTypes = {{PReLu, {{-0.01f}}},
+                                                                                         {LeakyRelu, {{0.01f}}}};
 
 std::map<std::vector<size_t>, std::vector<std::vector<size_t>>> basic = {
     {{1, 50}, {{}}},
@@ -72,18 +69,17 @@ const auto basicCases = ::testing::Combine(::testing::ValuesIn(CommonTestUtils::
                                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)                     //
 );
 
-// const auto basicPreluCases = ::testing::Combine(
-//         ::testing::ValuesIn(CommonTestUtils::combineParams(activationParamTypes)),
-//         ::testing::ValuesIn(netPrecisions),
-//         ::testing::ValuesIn(CommonTestUtils::combineParams(preluBasic)),
-//         ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)
-// );
+const auto basicPreluCases =
+    ::testing::Combine(::testing::ValuesIn(CommonTestUtils::combineParams(activationParamTypes)),  //
+                       ::testing::ValuesIn(netPrecisions),                                         //
+                       ::testing::ValuesIn(CommonTestUtils::combineParams(preluBasic)),            //
+                       ::testing::Values(CommonTestUtils::DEVICE_PLAIDML));
 
 INSTANTIATE_TEST_CASE_P(smoke, ActivationLayerTest, basicCases, ActivationLayerTest::getTestCaseName);
-// INSTANTIATE_TEST_CASE_P(smoke_Prelu, ActivationLayerTest, basicPreluCases,
-// ActivationLayerTest::getTestCaseName);
+INSTANTIATE_TEST_CASE_P(smoke_Prelu, ActivationLayerTest, basicPreluCases, ActivationLayerTest::getTestCaseName);
 
+// TODO: Fix & re-enable once no longer broken for CPU plugin as well
 // INSTANTIATE_TEST_CASE_P(smoke_Prelu_Param, ActivationParamLayerTest, basicPreluCases,
-// ActivationLayerTest::getTestCaseName);
+//                         ActivationLayerTest::getTestCaseName);
 
 }  // namespace
