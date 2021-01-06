@@ -452,12 +452,12 @@ definition:
 
 - Trace
 
-While degugging eDSL code it can often be desirable to insert print statements to
+While debugging eDSL code it can often be desirable to insert print statements to
 understand what the program is doing as it executes. However, typical print
 statements are not generally useful for this, as execution of eDSL occurs deep within
 the PlaidML backend. The ``trace`` operation allows print statements to be specified
 within the eDSL program and printed during the program's execution. Additionally, if
-multiple tracepoints are specified, the time ellapsed between consecutive tracepoints
+multiple tracepoints are specified, the time elapsed between consecutive tracepoints
 will printed automatically.
 
 .. tabs::
