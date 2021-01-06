@@ -88,6 +88,12 @@ void simplifyMemrefMaps(mlir::AffineParallelOp &parallelOp) {
     if (parallelOp != parallelOp2) {
       IVLOG(4, "AffineParallelOp within AffineParallelOp: " << parallelOp2);
 
+      mlir::Block *outerBody = parallelOp.getBody();
+      auto outerIdxs = outerBody->getArguments();
+
+      mlir::Block *innerBody = parallelOp2.getBody();
+      auto innerIdxs = innerBody->getArguments();
+
       parallelOp2.walk([&](PxaLoadOp loadOp) {
         IVLOG(4, "PxaLoadOp: " << loadOp);
 
@@ -98,6 +104,10 @@ void simplifyMemrefMaps(mlir::AffineParallelOp &parallelOp) {
 
         bool newMapFormed = false;
         mlir::SmallVector<mlir::AffineExpr, 6> simplifiedExprs;
+        mlir::SmallVector<mlir::Value, 8> resultOperands;
+        // mlir::ArrayRef<mlir::Value> resultOperands;
+        mlir::DenseMap<unsigned, mlir::Value> loadOpIndicesMap;
+
         for (unsigned idx = 0; idx < map.getNumResults(); ++idx) {
           mlir::AffineExpr expr = map.getResult(idx);
           bool expressionAdded = false;
@@ -116,9 +126,45 @@ void simplifyMemrefMaps(mlir::AffineParallelOp &parallelOp) {
               // corresponding loop in the outer set of loops
               // TODO: Perform the necessary checks
 
+              IVLOG(4, "lhsExpr: " << mlir::debugString(lhsExpr));
               newMapFormed = true;
               simplifiedExprs.push_back(lhsExpr);
               expressionAdded = true;
+
+              if (lhsExpr.getKind() == mlir::AffineExprKind::DimId) {
+                auto dimExpr = lhsExpr.cast<mlir::AffineDimExpr>();
+                unsigned pos = dimExpr.getPosition();
+                IVLOG(4, "lhsExpr is DimId. Position " << pos);
+                auto arg = loadOp.indices()[pos];
+                size_t innerLoopPos;
+                bool innerLoopPosFound = false;
+                for (size_t i = 0; i < innerIdxs.size(); i++) {
+                  if (arg == innerIdxs[i]) {
+                    innerLoopPos = i;
+                    innerLoopPosFound = true;
+                    IVLOG(4, "innerLoopPos: " << innerLoopPos);
+                    IVLOG(4, "outerIdxs[innerLoopPos]: "
+                                 << mlir::debugString(outerIdxs[innerLoopPos]));
+                    break;
+                  }
+                }
+
+                if (!innerLoopPosFound) {
+                  IVLOG(4, "innerLoopPos is not valid");
+                  return;
+                } else {
+                  if (outerIdxs.size() > innerLoopPos) {
+                    IVLOG(4, "innerLoopPos is out of bounds.");
+                    loadOpIndicesMap.insert(
+                        {innerLoopPos, outerIdxs[innerLoopPos]});
+                  }
+                }
+
+              } else {
+                IVLOG(4,
+                      "The result expression is not a DimId kind expression.");
+                return;
+              }
             }
           } else if (expr.getKind() == mlir::AffineExprKind::Mod) {
             auto divExpr = expr.cast<mlir::AffineBinaryOpExpr>();
@@ -150,9 +196,19 @@ void simplifyMemrefMaps(mlir::AffineParallelOp &parallelOp) {
               map.getNumResults(), 0, simplifiedExprs, map.getContext());
           IVLOG(4, "simplifiedMap: " << mlir::debugString(simplifiedMap));
           mlir::OpBuilder builder(loadOp);
+
+          for (unsigned i = 0; i < loadOp.indices().size(); i++) {
+            auto loadOpIndicesIt = loadOpIndicesMap.find(i);
+            if (loadOpIndicesIt == loadOpIndicesMap.end()) {
+              resultOperands.push_back(loadOp.indices()[i]);
+            } else {
+              resultOperands.push_back(loadOpIndicesIt->second);
+            }
+          }
+
           mlir::Value loadRes =
               builder.create<PxaLoadOp>(loadOp.getLoc(), loadOp.getMemRef(),
-                                        simplifiedMap, loadOp.indices());
+                                        simplifiedMap, resultOperands);
           loadOp.replaceAllUsesWith(loadRes);
           loadOp.erase();
         }
