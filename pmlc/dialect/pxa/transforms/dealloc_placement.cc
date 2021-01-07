@@ -55,7 +55,8 @@ struct DeallocPlacementPass
     });
   }
 
-  template <typename Callback> void runOnFunction(FuncOp fn, Callback onPack) {
+  template <typename Callback>
+  void runOnFunction(FuncOp fn, Callback onPack) {
     // Place deallocation for AllocOp
     fn.walk([&](AllocOp alloc) {
       IVLOG(3, "alloc: " << debugString(*alloc));
