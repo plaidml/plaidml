@@ -1,5 +1,4 @@
-get_property(INCLUDE_LEVEL_ZERO GLOBAL PROPERTY "LEVEL_ZERO_INCLUDE_DIRS")
-include_directories(SYSTEM ${INCLUDE_LEVEL_ZERO})
+include_directories(SYSTEM ${levelzero_SOURCE_DIR}/include)
 
 pml_cc_library(
   NAME level_zero

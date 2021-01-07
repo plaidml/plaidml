@@ -74,4 +74,9 @@ cc_test(
         "//conditions:default": ["@Level_Zero//:ze_loader"],
     }),
     size = "small",
+    tags = [
+        "manual",
+        "skip_windows",
+        "skip_macos",
+    ],
 )
