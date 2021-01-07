@@ -36,6 +36,7 @@
 #include "pmlc/rt/executable.h"
 #include "pmlc/rt/runtime_registry.h"
 #include "pmlc/target/intel_gen/passes.h"
+#include "pmlc/target/intel_gen_ocl_spirv/passes.h"
 #include "pmlc/target/intel_level_zero/passes.h"
 #include "pmlc/util/logging.h"
 
@@ -44,9 +45,9 @@ using pmlc::compiler::Program;
 using pmlc::rt::Executable;
 using pmlc::util::BufferPtr;
 namespace comp = pmlc::dialect::comp;
-namespace L0 = pmlc::target::intel_level_zero;
 
-struct OclPipelineOptions : public PassPipelineOptions<OclPipelineOptions> {
+struct LevelZeroPipelineOptions
+    : public PassPipelineOptions<LevelZeroPipelineOptions> {
   Option<bool> useBlockOps{*this, "use-block-ops",
                            llvm::cl::desc("Support for block operations"),
                            llvm::cl::initializer(true)};
@@ -59,14 +60,11 @@ static LogicalResult runMLIRPasses(ModuleOp module) {
   PassManager pm(module.getContext());
   applyPassManagerCLOptions(pm);
 
-  OclPipelineOptions oclPipelineOptions;
+  LevelZeroPipelineOptions levelZeroPipelineOptions;
 
-  // Lower mapped scf.parallel's to GPU
-  pm.addPass(pmlc::target::intel_gen::createParallelLoopToGpuPass());
-  pm.addPass(createCanonicalizerPass());
-
-  pm.addPass(
-      L0::createAddSpirvTargetPass(oclPipelineOptions.spirvVersion.getValue()));
+  // Do kernel outlining
+  pm.addPass(pmlc::target::intel_level_zero::createAddSpirvTargetPass(
+      levelZeroPipelineOptions.spirvVersion.getValue()));
   pm.addPass(pmlc::conversion::gpu::createGpuKernelOutliningPass(
       comp::ExecEnvRuntime::OpenCL, /*memorySpace=*/11));
   // pm.addPass(conversion::gpu::createGatherGpuLaunchFuncsPass());
@@ -78,20 +76,21 @@ static LogicalResult runMLIRPasses(ModuleOp module) {
 
   // GPU to SPIR-V.
   pm.addPass(createLegalizeStdOpsForSPIRVLoweringPass());
-  pm.addPass(mlir::createCanonicalizerPass());
-  pm.addPass(mlir::createCSEPass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
 
   bool nonUniformBroadcast = false;
-  if (oclPipelineOptions.spirvVersion.getValue() >= 150) {
+  if (levelZeroPipelineOptions.spirvVersion.getValue() >= 150) {
     nonUniformBroadcast = true;
   }
   pm.addPass(pmlc::conversion::gpu_to_spirv::createGPUToSPIRVCustomPass(
       nonUniformBroadcast));
 
   // SPIR-V passes for lowering attributes.
-  pm.addPass(L0::createSetSubgroupSizePass());
-  pm.addPass(L0::createSetAccessQualifiersPass());
-  pm.addPass(L0::createLegalizeSpirvPass());
+  pm.addPass(pmlc::target::intel_gen_ocl_spirv::createSetSubgroupSizePass());
+  pm.addPass(
+      pmlc::target::intel_gen_ocl_spirv::createSetAccessQualifiersPass());
+  pm.addPass(pmlc::target::intel_gen_ocl_spirv::createLegalizeSpirvPass());
   pm.addPass(spirv::createLowerABIAttributesPass());
   pm.addPass(spirv::createUpdateVersionCapabilityExtensionPass());
 

@@ -52,25 +52,26 @@ plaidml_cc_binary(
     }),
 )
 
-#cc_test(
-#    srcs = [
-#        "level_zero_probe.cc",
-#    ] + select({
-#        "@bazel_tools//src/conditions:windows": [],
-#        "@bazel_tools//src/conditions:darwin_x86_64": [],
-#        "//conditions:default": ["level_zero_utils.h", "level_zero_utils.cc",],
-#    }),
-#    defines = select({
-#        "@bazel_tools//src/conditions:windows": [],
-#        "@bazel_tools//src/conditions:darwin_x86_64": [],
-#        "//conditions:default": ["PML_ENABLE_LEVEL_ZERO"],
-#    }),
-#    deps = [
-#        "//pmlc/util",
-#    ] + select({
-#        "@bazel_tools//src/conditions:windows": [],
-#        "@bazel_tools//src/conditions:darwin_x86_64": [],
-#        "//conditions:default": ["@Level_Zero//:ze_loader"],
-#    }),
-#    size = "small",
-#)
+cc_test(
+    name = "level_zero_probe_test",
+    srcs = [
+        "level_zero_probe.cc",
+    ] + select({
+        "@bazel_tools//src/conditions:windows": [],
+        "@bazel_tools//src/conditions:darwin_x86_64": [],
+        "//conditions:default": ["level_zero_utils.h", "level_zero_utils.cc",],
+    }),
+    defines = select({
+        "@bazel_tools//src/conditions:windows": [],
+        "@bazel_tools//src/conditions:darwin_x86_64": [],
+        "//conditions:default": ["PML_ENABLE_LEVEL_ZERO"],
+    }),
+    deps = [
+        "//pmlc/util",
+    ] + select({
+        "@bazel_tools//src/conditions:windows": [],
+        "@bazel_tools//src/conditions:darwin_x86_64": [],
+        "//conditions:default": ["@Level_Zero//:ze_loader"],
+    }),
+    size = "small",
+)

@@ -68,16 +68,13 @@ void LevelZeroEvent::wait(const std::vector<LevelZeroEvent *> &events) {
   }
 }
 
-LevelZeroInvocation::LevelZeroInvocation(LevelZeroDevice *device)
-    : device{device->shared_from_this()}, queueUser(device->getQueue(p)) {
+LevelZeroInvocation::LevelZeroInvocation(
+    LevelZeroDevice *device, ze_command_queue_group_properties_t prop)
+    : device{device->shared_from_this()}, queueUser(device->getQueue(prop)),
+      p(prop) {
   // Create an eventPool with fixed count, need to release event as soon as
   // possible
   eventPool.InitEventPool(device->getLevelZeroContext(), /*count*/ 600);
-
-  // Use fixed properties to create command queue, keep for further improvement.
-  // ze_command_queue_group_properties_t p;
-  // p.flags = ZE_COMMAND_QUEUE_GROUP_PROPERTY_FLAG_COMPUTE;
-  // queueUser = device->getQueue(p);
 }
 
 LevelZeroInvocation::~LevelZeroInvocation() {

@@ -41,6 +41,7 @@
 #include "pmlc/dialect/stdx/transforms/passes.h"
 #include "pmlc/dialect/tile/transforms/passes.h"
 #include "pmlc/target/intel_gen/passes.h"
+#include "pmlc/target/intel_gen_ocl_spirv/passes.h"
 #include "pmlc/target/intel_level_zero/passes.h"
 #include "pmlc/transforms/passes.h"
 
@@ -113,8 +114,10 @@ void pipelineBuilder(OpPassManager &pm,
   pm.addPass(createCSEPass());
 
   // Data layout optimization.
-  pm.addPass(createIntelLevelZeroReorderLayoutsPass(/*maxThreads=*/64,
-                                                    /*allowReorder=*/false));
+  pm.addPass(
+      pmlc::target::intel_gen_ocl_spirv::createIntelGenOclReorderLayoutsPass(
+          /*maxThreads=*/64,
+          /*allowReorder=*/false));
   pm.addPass(pxa::createSimplifyWithConstraintsPass());
   pm.addPass(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
@@ -200,9 +203,10 @@ void pipelineBuilder(OpPassManager &pm,
       nonUniformBroadcast));
 
   // SPIR-V passes for lowering attributes.
-  pm.addPass(createSetSubgroupSizePass());
-  pm.addPass(createSetAccessQualifiersPass());
-  pm.addPass(createLegalizeSpirvPass());
+  pm.addPass(pmlc::target::intel_gen_ocl_spirv::createSetSubgroupSizePass());
+  pm.addPass(
+      pmlc::target::intel_gen_ocl_spirv::createSetAccessQualifiersPass());
+  pm.addPass(pmlc::target::intel_gen_ocl_spirv::createLegalizeSpirvPass());
   pm.addPass(spirv::createLowerABIAttributesPass());
   pm.addPass(spirv::createUpdateVersionCapabilityExtensionPass());
 

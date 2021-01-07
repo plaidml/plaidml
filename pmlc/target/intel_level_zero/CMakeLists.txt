@@ -4,12 +4,8 @@ pml_cc_library(
     passes.h
     pipeline.h
   SRCS
-    access_qualifiers.cc
-    legalize_spirv.cc
     pipeline.cc
-    reorder_layouts.cc
     spirv_target.cc
-    sub_group_size.cc
   DEPS
     ::passes-gen
     pmlc::compiler
@@ -27,6 +23,7 @@ pml_cc_library(
     pmlc::dialect::tile::transforms
     pmlc::transforms
     pmlc::target::intel_gen
+    pmlc::target::intel_gen_ocl_spirv
     pmlc::target::x86::prng_lowering
     MLIRAffineToStandard
     MLIRAffineTransforms

@@ -18,7 +18,7 @@ int main(int argc, char **argv) {
   }
   std::vector<ze_driver_handle_t> drivers;
   try {
-    drivers = pmlc::rt::level_zero::lzu::get_all_driver_handles();
+    pmlc::rt::level_zero::lzu::get_all_driver_handles();
   } catch (std::exception &e) {
     IVLOG(1, e.what());
     return -1;

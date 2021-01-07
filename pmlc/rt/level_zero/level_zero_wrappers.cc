@@ -15,8 +15,10 @@ extern "C" {
 
 void *level_zero_create_execenv(void *device) {
   IVLOG(2, "level_zero_create_execenv device=" << device);
+  ze_command_queue_group_properties_t p;
+  p.flags = ZE_COMMAND_QUEUE_GROUP_PROPERTY_FLAG_COMPUTE;
   void *result =
-      new LevelZeroInvocation(static_cast<LevelZeroDevice *>(device));
+      new LevelZeroInvocation(static_cast<LevelZeroDevice *>(device), p);
   IVLOG(2, "  ->" << result);
   instance = static_cast<LevelZeroInvocation *>(result);
   return result;

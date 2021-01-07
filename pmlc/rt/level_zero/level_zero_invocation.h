@@ -99,7 +99,8 @@ private:
 // callbacks in level_zero_wrappers.cc.
 class LevelZeroInvocation {
 public:
-  explicit LevelZeroInvocation(LevelZeroDevice *device);
+  explicit LevelZeroInvocation(LevelZeroDevice *device,
+                               ze_command_queue_group_properties_t prop);
   ~LevelZeroInvocation();
 
   /// Allocates memory on LevelZero device with specified size in bytes.
@@ -138,8 +139,8 @@ public:
 private:
   std::shared_ptr<LevelZeroDevice> device;
   LevelZeroQueueUser queueUser;
-  lzu::zeEventPool eventPool;
   ze_command_queue_group_properties_t p;
+  lzu::zeEventPool eventPool;
   // Resource clear lists
   std::vector<std::unique_ptr<LevelZeroEvent>> events;
   std::vector<LevelZeroMemory *> memories;
