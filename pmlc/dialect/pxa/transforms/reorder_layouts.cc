@@ -96,12 +96,15 @@ void simplifyMemrefMaps(mlir::AffineParallelOp &parallelOp) {
 
       parallelOp2.walk([&](PxaLoadOp loadOp) {
         IVLOG(4, "PxaLoadOp: " << loadOp);
+        mlir::OpBuilder builder(loadOp);
 
         mlir::Value memRef = loadOp.getMemRef();
         IVLOG(4, "op.getMemRef(): " << mlir::debugString(memRef));
         mlir::AffineMap map = loadOp.getAffineMap();
         IVLOG(4, "map: " << mlir::debugString(map));
 
+        unsigned currentNumDims = map.getNumDims();
+        unsigned newDims = 0;
         bool newMapFormed = false;
         mlir::SmallVector<mlir::AffineExpr, 6> simplifiedExprs;
         mlir::SmallVector<mlir::Value, 8> resultOperands;
@@ -128,8 +131,6 @@ void simplifyMemrefMaps(mlir::AffineParallelOp &parallelOp) {
 
               IVLOG(4, "lhsExpr: " << mlir::debugString(lhsExpr));
               newMapFormed = true;
-              simplifiedExprs.push_back(lhsExpr);
-              expressionAdded = true;
 
               if (lhsExpr.getKind() == mlir::AffineExprKind::DimId) {
                 auto dimExpr = lhsExpr.cast<mlir::AffineDimExpr>();
@@ -153,8 +154,14 @@ void simplifyMemrefMaps(mlir::AffineParallelOp &parallelOp) {
                   IVLOG(4, "innerLoopPos is not valid");
                   return;
                 } else {
-                  if (outerIdxs.size() > innerLoopPos) {
-                    loadOpIndicesMap.insert({pos, outerIdxs[innerLoopPos]});
+                  if (innerLoopPos < outerIdxs.size()) {
+                    loadOpIndicesMap.insert({newDims, outerIdxs[innerLoopPos]});
+                    auto newDimIdExpr =
+                        builder.getAffineDimExpr(currentNumDims + newDims);
+
+                    simplifiedExprs.push_back(newDimIdExpr);
+                    expressionAdded = true;
+                    newDims++;
                   } else {
                     IVLOG(4, "innerLoopPos is out of bounds.");
                     return;
@@ -199,17 +206,23 @@ void simplifyMemrefMaps(mlir::AffineParallelOp &parallelOp) {
           mlir::OpBuilder builder(loadOp);
 
           for (unsigned i = 0; i < loadOp.indices().size(); i++) {
+            resultOperands.push_back(loadOp.indices()[i]);
+          }
+
+          for (unsigned i = 0; i < newDims; i++) {
             auto loadOpIndicesIt = loadOpIndicesMap.find(i);
             if (loadOpIndicesIt == loadOpIndicesMap.end()) {
-              resultOperands.push_back(loadOp.indices()[i]);
+              IVLOG(4,
+                    "The newDim position " << i << "'s map operand is not set");
+              return;
             } else {
               resultOperands.push_back(loadOpIndicesIt->second);
             }
           }
 
-          mlir::Value loadRes = builder.create<PxaLoadOp>(
-              loadOp.getLoc(), loadOp.getMemRef(), simplifiedMap,
-              resultOperands /*loadOp.indices()*/);
+          mlir::Value loadRes =
+              builder.create<PxaLoadOp>(loadOp.getLoc(), loadOp.getMemRef(),
+                                        simplifiedMap, resultOperands);
           loadOp.replaceAllUsesWith(loadRes);
           loadOp.erase();
         }
