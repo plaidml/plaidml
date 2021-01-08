@@ -5,7 +5,6 @@
 
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "pmlc/dialect/tile/ir/interfaces.td"
-include "pmlc/util/enums.td"
 
 def TileDialect : Dialect {
   let name = "tile";
@@ -73,5 +72,17 @@ def EltwiseInteger : Type<RankedTensorOf<[
   "eltwise-integer">;
 
 def EltwiseIndex : Type<RankedTensorOf<[SI32]>.predicate, "eltwise-index">;
+
+def SortDirection : I64EnumAttr<
+    "SortDirection",
+    "Direction for sorting operation",
+    [
+      I64EnumAttrCase<"asc", 0>,
+      I64EnumAttrCase<"desc", 1>,
+    ]> {
+  let cppNamespace = "pmlc::dialect::tile";
+  let returnType = "SortDirection";
+  let convertFromStorage = "static_cast<" # returnType # ">($_self.getValue().getZExtValue())";
+}
 
 #endif // __PML_TILE_BASE__

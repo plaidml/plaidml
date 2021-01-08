@@ -16,9 +16,18 @@ pml_cc_library(
     util.cc
   DEPS
     pmlc::util
+    ::base-gen
     ::interfaces-gen
     ::ops-gen
   PUBLIC
+)
+
+pml_tblgen_library(
+    NAME base-gen
+    TD_FILE base.td
+    OUTS
+      -gen-enum-decls enums.h.inc
+      -gen-enum-defs enums.cc.inc
 )
 
 pml_tblgen_library(

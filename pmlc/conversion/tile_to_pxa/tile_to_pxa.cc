@@ -4,6 +4,7 @@
 #include <utility>
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/Pass/Pass.h"
@@ -12,6 +13,7 @@
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "pmlc/conversion/tile_to_pxa/pass_detail.h"
+#include "pmlc/dialect/layer/ir/ops.h"
 #include "pmlc/dialect/pxa/analysis/strides.h"
 #include "pmlc/dialect/pxa/analysis/uses.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
@@ -26,6 +28,7 @@
 namespace pmlc::conversion::tile_to_pxa {
 
 namespace tile = dialect::tile;
+namespace layer = dialect::layer;
 namespace pxa = dialect::pxa;
 namespace stdx = dialect::stdx;
 
@@ -44,6 +47,7 @@ struct TypeConverter : public mlir::TypeConverter {
     addConversion([](FunctionType type) { return type; });
     addConversion([](FloatType type) { return type; });
     addConversion([](IntegerType type) { return tile::toSignlessType(type); });
+    addConversion([](IndexType type) { return type; });
     addConversion([](MemRefType type) { return type; });
     addConversion([](stdx::ArgpackType type) { return type; });
     addConversion([this](RankedTensorType type) {
@@ -58,6 +62,8 @@ struct TypeConverter : public mlir::TypeConverter {
 static Type getElementType(Type type) {
   if (auto tensorType = type.dyn_cast<TensorType>()) {
     return tensorType.getElementType();
+  } else if (auto memRefType = type.dyn_cast<MemRefType>()) {
+    return memRefType.getElementType();
   }
   return type;
 }
@@ -853,6 +859,250 @@ struct ContractionOpConversion
 
     // Replace the op
     rewriter.replaceOp(op, forOp.getResult(0));
+  }
+};
+
+struct ArgSortOpConversion : public OpConversionPattern<tile::ArgSortOp> {
+  using OpConversionPattern<tile::ArgSortOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(tile::ArgSortOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
+    IVLOG(3, "ArgSortOpConversion::matchAndRewrite");
+    tile::ArgSortOpAdaptor adaptor(operands);
+    auto loc = op.getLoc();
+    auto i32Type = rewriter.getI32Type();
+    auto indexType = rewriter.getIndexType();
+
+    // Axis represents one of the tensor dimensions.
+    int64_t axisAttr = op.axis().getSExtValue();
+
+    // Special case value -1 indicates the last axis.
+    Value tensor = adaptor.tensor();
+    auto shape = tensor.getType().cast<MemRefType>().getShape();
+    size_t tensorDims = shape.size();
+    if (axisAttr < 0) {
+      axisAttr += static_cast<int64_t>(tensorDims);
+    }
+    size_t axis = static_cast<size_t>(axisAttr);
+    if (axisAttr < 0 || axis >= tensorDims) {
+      return failure();
+    }
+    auto elementType = tensor.getType().cast<MemRefType>().getElementType();
+
+    // Allocate an output tensor to contain the sorted argument indices.
+    auto resultType = MemRefType::get(shape, i32Type);
+    Value result = rewriter.create<AllocOp>(loc, resultType).getResult();
+
+    llvm::SmallVector<Type, 4> resultTypes;
+    resultTypes.push_back(resultType);
+    llvm::SmallVector<NamedAttribute, 4> attrs;
+    llvm::SmallVector<Value, 2> layerInputs{result, tensor};
+    auto layerOp =
+        rewriter.create<layer::BoxOp>(loc, "argsort", layerInputs, resultTypes,
+                                      rewriter.getDictionaryAttr(attrs));
+    rewriter.setInsertionPointToStart(&layerOp.body().front());
+
+    // Inside the box, the output tensor comes from the first argument,
+    // and the input data tensor comes from the next. Outputs must come
+    // first in the layer.box operands list.
+    result = layerOp.body().getArguments()[0];
+    tensor = layerOp.body().getArguments()[1];
+
+    auto icon0 =
+        rewriter.create<ConstantOp>(loc, rewriter.getIndexAttr(0)).getResult();
+    auto icon1 =
+        rewriter.create<ConstantOp>(loc, rewriter.getIndexAttr(1)).getResult();
+
+    // Create a loop nest over all the dimensions, including the one we are
+    // sorting on. We will use a single iteration for the sort axis, since the
+    // body of the nest will contain the sorting loop, but we will keep the
+    //  number of IVs equal to the tensor rank to simplify accounting.
+    SmallVector<Value, 4> ops;
+    for (size_t i = 0; i < tensorDims; ++i) {
+      if (i == axis) {
+        ops.push_back(icon0);
+        continue;
+      }
+      auto limit =
+          rewriter.create<ConstantOp>(loc, rewriter.getIndexAttr(shape[i]))
+              .getResult();
+      auto loop = rewriter.create<scf::ForOp>(loc, icon0, limit, icon1);
+      ops.push_back(loop.getInductionVar());
+      rewriter.setInsertionPointToStart(loop.getBody());
+    }
+
+    auto iconN =
+        rewriter.create<ConstantOp>(loc, rewriter.getIndexAttr(shape[axis]))
+            .getResult();
+
+    // For loads and stores from the minIdxVar and minValVar, we'll need a
+    // single, zero-value index, because that's the only way to create a memref
+    SmallVector<Value, 1> zeroIndex;
+    zeroIndex.push_back(icon0);
+
+    // Initialize result tensor using index values in ascending order
+    {
+      auto initLoop = rewriter.create<scf::ForOp>(loc, icon0, iconN, icon1);
+      auto initIV = initLoop.getInductionVar();
+      rewriter.setInsertionPointToStart(initLoop.getBody());
+      // The induction var is the index value across the sort axis.
+      // Write the value of the index to its position in the sorted output.
+      // This will be our initial argument index into the source tensor.
+      // Combine the index value with the loop dimension indexes to create the
+      // destination affine map.
+      auto indexVal =
+          rewriter.create<IndexCastOp>(loc, initIV, i32Type).getResult();
+      ops[axis] = initIV;
+      rewriter.create<StoreOp>(loc, indexVal, result, ops);
+      rewriter.setInsertionPointAfter(initLoop);
+    }
+
+    // Selection sort:
+    // for (int i = 0; i < n-1; i++) {
+    //     int min_idx = i;
+    //     for (int j = i+1; j < n; j++) {
+    //         if (arr[j] < arr[min_idx]) {
+    //             min_idx = j;
+    //         }
+    //     }
+    //     swap(&arr[min_idx], &arr[i]);
+    // }
+
+    // Build inner sorting loop
+    if (shape[axis] > 1) {
+      auto sortUB = rewriter.create<ConstantOp>(
+          loc, rewriter.getIndexAttr(shape[axis] - 1));
+      auto sortLoop = rewriter.create<scf::ForOp>(loc, icon0, sortUB, icon1);
+      auto sortIV = sortLoop.getInductionVar();
+      rewriter.setInsertionPointToStart(sortLoop.getBody());
+
+      // Get the value associated with the current minimum index position.
+      // create a MemRefType which is a single-element index
+      MemRefType minIdxVarType = MemRefType::get({1}, indexType);
+      auto minIdxVar = rewriter.create<AllocaOp>(loc, minIdxVarType);
+      rewriter.create<StoreOp>(loc, sortIV, minIdxVar, zeroIndex);
+
+      ops[axis] = sortIV;
+      auto minValIdxInt = rewriter.create<LoadOp>(loc, result, ops).getResult();
+      auto minValIdx =
+          rewriter.create<IndexCastOp>(loc, minValIdxInt, indexType)
+              .getResult();
+      ops[axis] = minValIdx;
+      Value minVal = rewriter.create<LoadOp>(loc, tensor, ops).getResult();
+      MemRefType minValVarType = MemRefType::get({1}, elementType);
+      auto minValVar = rewriter.create<AllocaOp>(loc, minValVarType);
+      rewriter.create<StoreOp>(loc, minVal, minValVar, zeroIndex);
+
+      // Iterate over the remaining elements, looking for a smaller value.
+      auto minLB = rewriter.create<AddIOp>(loc, sortIV, icon1);
+      auto minLoop = rewriter.create<scf::ForOp>(loc, minLB, iconN, icon1);
+      auto minIV = minLoop.getInductionVar();
+      rewriter.setInsertionPointToStart(minLoop.getBody());
+
+      // Get the comparison value for the search iterator position.
+      ops[axis] = minIV;
+      auto compValIdxInt =
+          rewriter.create<LoadOp>(loc, result, ops).getResult();
+      auto compValIdx =
+          rewriter.create<IndexCastOp>(loc, compValIdxInt, indexType)
+              .getResult();
+      ops[axis] = compValIdx;
+      Value compVal = rewriter.create<LoadOp>(loc, tensor, ops).getResult();
+
+      // What is the current minimum value, stored in the min val var?
+      minVal = rewriter.create<LoadOp>(loc, minValVar, zeroIndex).getResult();
+      // Is compVal smaller than minVal? If so, update the allocs
+      Value orderPred;
+      if (elementType.isSignedInteger()) {
+        CmpIPredicate dir{};
+        switch (op.direction()) {
+        case tile::SortDirection::asc:
+          dir = CmpIPredicate::slt;
+          break;
+        case tile::SortDirection::desc:
+          dir = CmpIPredicate::sgt;
+          break;
+        }
+        orderPred = rewriter.create<mlir::CmpIOp>(loc, dir, compVal, minVal)
+                        .getResult();
+      } else if (elementType.isUnsignedInteger()) {
+        CmpIPredicate dir{};
+        switch (op.direction()) {
+        case tile::SortDirection::asc:
+          dir = CmpIPredicate::ult;
+          break;
+        case tile::SortDirection::desc:
+          dir = CmpIPredicate::ugt;
+          break;
+        }
+        orderPred = rewriter.create<mlir::CmpIOp>(loc, dir, compVal, minVal)
+                        .getResult();
+      } else {
+        // Assume float; verifier will fail the conversion if not float
+        CmpFPredicate dir{};
+        switch (op.direction()) {
+        case tile::SortDirection::asc:
+          dir = CmpFPredicate::OLT;
+          break;
+        case tile::SortDirection::desc:
+          dir = CmpFPredicate::OGT;
+          break;
+        }
+        orderPred = rewriter.create<mlir::CmpFOp>(loc, dir, compVal, minVal)
+                        .getResult();
+      }
+
+      auto ifReorder = rewriter.create<scf::IfOp>(loc, orderPred, false);
+      rewriter.setInsertionPointToStart(&ifReorder.thenRegion().front());
+      // store minIV -> minIdxVar
+      rewriter.create<StoreOp>(loc, minIV, minIdxVar, zeroIndex);
+      // store compVal -> minValVar
+      rewriter.create<StoreOp>(loc, compVal, minValVar, zeroIndex);
+      // End the conditional block. We would set the insertion point after
+      // the ifReorder block, except that we are about to...
+      // End the inner sort loop, which found the smallest value in the
+      // unsorted region, by setting the insertion point after its block.
+      rewriter.setInsertionPointAfter(minLoop);
+
+      // Swap the sort position with the minimum position.
+      auto finalMinPos =
+          rewriter.create<LoadOp>(loc, minIdxVar, zeroIndex).getResult();
+      ops[axis] = finalMinPos;
+      auto finalMinIdx = rewriter.create<LoadOp>(loc, result, ops).getResult();
+      ops[axis] = sortIV;
+      auto origSortIdx = rewriter.create<LoadOp>(loc, result, ops).getResult();
+      rewriter.create<StoreOp>(loc, finalMinIdx, result, ops);
+      ops[axis] = finalMinPos;
+      rewriter.create<StoreOp>(loc, origSortIdx, result, ops);
+
+      // The minimum remaining value is now at the end of the sorted region.
+      // Advance to the next minimum in the remaining unsorted region.
+      rewriter.setInsertionPointAfter(sortLoop);
+    }
+
+    // for future reference, when N is a power of 2
+    // bitonic sort:
+    // for (int k = 2; k <= N; k = 2 * k) {
+    //   for (int j = k >> 1; j > 0; j = j >> 1) {
+    //     for (int i = 0; i < N; i++) {
+    //       int ixj = i ^ j;
+    //       if (ixj > i) {
+    //         if ((i & k) == 0 && a[i] > a[ixj]) {
+    //           swap(a[i], a[ixj]);
+    //         }
+    //         if ((i & k) != 0 && a[i] < a[ixj]) {
+    //           swap(a[i], a[ixj]);
+    //         }
+    //       }
+    //     }
+    //   }
+    // }
+
+    rewriter.setInsertionPointToEnd(&layerOp.body().back());
+    rewriter.create<layer::ReturnOp>(loc, ArrayRef<Value>{result});
+    rewriter.replaceOp(op, layerOp.getResult(0));
+    return success();
   }
 };
 
@@ -1690,6 +1940,30 @@ struct UnpackOpConversion : public OpConversionPattern<stdx::UnpackOp> {
   }
 };
 
+struct ScfForOpConversion : public OpConversionPattern<scf::ForOp> {
+  using OpConversionPattern<scf::ForOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(scf::ForOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const final {
+    scf::ForOpAdaptor oldFor(operands);
+    auto &oldBodyOps = op.getBody()->getOperations();
+    auto newOp = rewriter.create<scf::ForOp>(op.getLoc(), oldFor.lowerBound(),
+                                             oldFor.upperBound(), oldFor.step(),
+                                             oldFor.initArgs());
+    auto &newBodyOps = newOp.getBody()->getOperations();
+    newBodyOps.splice(std::prev(newBodyOps.end()), oldBodyOps,
+                      oldBodyOps.begin(), oldBodyOps.end());
+    auto oldArgs = op.getBody()->getArguments();
+    auto newArgs = newOp.getBody()->getArguments();
+    for (unsigned i = 0; i < oldArgs.size(); ++i) {
+      oldArgs[i].replaceAllUsesWith(newArgs[i]);
+    }
+    rewriter.replaceOp(op, newOp.results());
+    return success();
+  }
+};
+
 struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
   void runOnOperation() final {
     // Inject tile.ident ops for each return operand that needs it.
@@ -1716,8 +1990,11 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
     TypeConverter converter;
     target.addLegalDialect<mlir::AffineDialect>();
     target.addLegalDialect<mlir::StandardOpsDialect>();
+    target.addLegalDialect<mlir::scf::SCFDialect>();
+    target.addLegalDialect<dialect::layer::LayerDialect>();
     target.addLegalDialect<dialect::pxa::PXADialect>();
     target.addLegalDialect<dialect::stdx::StdXDialect>();
+    target.addLegalOp<scf::ForOp, scf::YieldOp, scf::IfOp>();
     target.addLegalOp<mlir::ModuleOp, mlir::ModuleTerminatorOp, ReturnOp>();
     target.addDynamicallyLegalOp<FuncOp>(
         [&](FuncOp op) { return converter.isSignatureLegal(op.getType()); });
@@ -1729,6 +2006,8 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
     target.addDynamicallyLegalOp<stdx::UnpackOp>([&](stdx::UnpackOp op) {
       return converter.isLegal(op.getResultTypes());
     });
+    target.addDynamicallyLegalOp<scf::ForOp>(
+        [&](scf::ForOp op) { return converter.isLegal(op.getResultTypes()); });
 
     // Setup rewrite patterns
     using CmpIntLtOp =
@@ -1741,6 +2020,7 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         CmpIntInequalityOp<CmpIPredicate::sge, CmpIPredicate::uge>;
     OwningRewritePatternList patterns;
     patterns.insert<
+        ArgSortOpConversion,  //
         CastOpConversion,     //
         ConstantOpConversion, //
         FuncOpConversion,     //
@@ -1755,6 +2035,7 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         TraceOpConversion,    //
         PackOpConversion,     //
         UnpackOpConversion,   //
+        ScfForOpConversion,   //
         ContractionOpConversion<CombinationKind::none, FirstOperand>,
         ContractionOpConversion<CombinationKind::add, StdOp<mlir::AddFOp>,
                                 ResultIs<EltwiseFloat>>,

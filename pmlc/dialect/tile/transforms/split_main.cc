@@ -6,6 +6,7 @@
 #include "pmlc/dialect/stdx/ir/ops.h"
 #include "pmlc/dialect/tile/ir/ops.h"
 #include "pmlc/dialect/tile/transforms/pass_detail.h"
+#include "pmlc/util/logging.h"
 
 using namespace mlir;                // NOLINT
 using namespace pmlc::dialect::stdx; // NOLINT
@@ -24,7 +25,7 @@ void SplitMainPass::runOnOperation() {
   // Find main
   FuncOp main = op.lookupSymbol<FuncOp>("main");
   if (!main) {
-    signalPassFailure();
+    IVLOG(1, "Split-main: no main function.");
     return;
   }
 

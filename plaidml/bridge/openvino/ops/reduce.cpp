@@ -5,8 +5,8 @@
 #include "plaidml_ops.hpp"
 #include "plaidml_util.hpp"
 
-#include "ngraph/opsets/opset.hpp"
 #include "ngraph/opsets/opset1.hpp"
+#include "ngraph/opsets/opset4.hpp"
 
 #include "plaidml/op/op.h"
 
@@ -70,6 +70,22 @@ void registerReduceOps() {
     std::vector<size_t> axes = get_axis_vector_from_constant_operand(1, ctx.layer);
     auto* layer = ngraph::as_type<ngraph::opset1::ReduceSum>(ctx.layer);
     return edsl::make_tuple(op::sum(I, edsl::make_tuple(axes), layer->get_keep_dims()));
+  });
+
+  registerOp("ReduceL1", [](const Context& ctx) {
+    IE_ASSERT(ctx.operands.size() == 2);
+    auto I = ctx.operands.at(0);
+    std::vector<size_t> axes = get_axis_vector_from_constant_operand(1, ctx.layer);
+    auto* layer = ngraph::as_type<ngraph::opset4::ReduceL1>(ctx.layer);
+    return edsl::make_tuple(op::sum(op::abs(I), edsl::make_tuple(axes), layer->get_keep_dims()));
+  });
+
+  registerOp("ReduceL2", [](const Context& ctx) {
+    IE_ASSERT(ctx.operands.size() == 2);
+    auto I = ctx.operands.at(0);
+    std::vector<size_t> axes = get_axis_vector_from_constant_operand(1, ctx.layer);
+    auto* layer = ngraph::as_type<ngraph::opset4::ReduceL2>(ctx.layer);
+    return edsl::make_tuple(edsl::sqrt(op::sum(I * I, edsl::make_tuple(axes), layer->get_keep_dims())));
   });
 }
 

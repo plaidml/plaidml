@@ -20,7 +20,7 @@ void registerActivations() {
     IE_ASSERT(ctx.operands.size() == 1);
     auto I = ctx.operands.at(0);
     auto alpha = layer->get_alpha();
-    return edsl::make_tuple(edsl::select(I >= 0, I, alpha * (edsl::exp(I) - 1)));
+    return edsl::make_tuple(edsl::select(I >= 0, I, edsl::cast(alpha * (edsl::exp(I) - 1), I.dtype())));
   });
 
   registerOp("gelu", [](const Context& ctx) {
@@ -34,7 +34,7 @@ void registerActivations() {
     IE_ASSERT(ctx.operands.size() == 2);
     auto I = ctx.operands.at(0);
     auto slope = ctx.operands.at(1);
-    auto O = select(I < 0.0, slope * I, I);
+    auto O = select(I < 0.0, edsl::cast(slope * I, I.dtype()), I);
     return edsl::make_tuple(O);
   });
 
@@ -49,7 +49,7 @@ void registerActivations() {
     auto I = ctx.operands.at(0);
     auto alpha = ctx.operands.at(1);
     auto lambda = ctx.operands.at(2);
-    return edsl::make_tuple(lambda * edsl::select(I > 0, I, alpha * (edsl::exp(I) - 1)));
+    return edsl::make_tuple(lambda * edsl::select(I > 0, I, edsl::cast(alpha * (edsl::exp(I) - 1), I.dtype())));
   });
 }
 

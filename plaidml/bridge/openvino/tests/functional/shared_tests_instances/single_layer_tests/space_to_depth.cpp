@@ -15,8 +15,8 @@ using ngraph::opset3::SpaceToDepth;
 namespace {
 const std::vector<InferenceEngine::Precision> inputPrecisions = {
     InferenceEngine::Precision::FP32,
-    // InferenceEngine::Precision::U8,
-    // InferenceEngine::Precision::I16,
+    InferenceEngine::Precision::U8,
+    InferenceEngine::Precision::I16,
 };
 
 const std::vector<SpaceToDepth::SpaceToDepthMode> modes = {
