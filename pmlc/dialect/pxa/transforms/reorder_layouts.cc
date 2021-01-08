@@ -154,9 +154,10 @@ void simplifyMemrefMaps(mlir::AffineParallelOp &parallelOp) {
                   return;
                 } else {
                   if (outerIdxs.size() > innerLoopPos) {
+                    loadOpIndicesMap.insert({pos, outerIdxs[innerLoopPos]});
+                  } else {
                     IVLOG(4, "innerLoopPos is out of bounds.");
-                    loadOpIndicesMap.insert(
-                        {innerLoopPos, outerIdxs[innerLoopPos]});
+                    return;
                   }
                 }
 
@@ -206,9 +207,9 @@ void simplifyMemrefMaps(mlir::AffineParallelOp &parallelOp) {
             }
           }
 
-          mlir::Value loadRes =
-              builder.create<PxaLoadOp>(loadOp.getLoc(), loadOp.getMemRef(),
-                                        simplifiedMap, resultOperands);
+          mlir::Value loadRes = builder.create<PxaLoadOp>(
+              loadOp.getLoc(), loadOp.getMemRef(), simplifiedMap,
+              resultOperands /*loadOp.indices()*/);
           loadOp.replaceAllUsesWith(loadRes);
           loadOp.erase();
         }
