@@ -139,7 +139,6 @@ public:
 private:
   std::shared_ptr<LevelZeroDevice> device;
   LevelZeroQueueUser queueUser;
-  ze_command_queue_group_properties_t p;
   lzu::zeEventPool eventPool;
   // Resource clear lists
   std::vector<std::unique_ptr<LevelZeroEvent>> events;
