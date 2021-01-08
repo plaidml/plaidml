@@ -2163,7 +2163,7 @@ Value relu(const Value& value) {
   } else {
     A = alpha.as_tensor();
   }
-  auto O = select(I < threshold, A * (I - threshold), I);
+  auto O = select(I < threshold, edsl::cast(A * (I - threshold), I.dtype()), I);
   if (!max_value.is_none()) {
     auto M = cast(max_value.as_tensor(), I.dtype());
     O = select(O < M, O, M);
