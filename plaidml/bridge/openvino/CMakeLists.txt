@@ -74,3 +74,51 @@ add_subdirectory(plugin)
 if(PML_BUILD_TESTS)
   add_subdirectory(tests/functional)
 endif()
+
+ie_cpack_add_component(BENCHMARK_APP REQUIRED)
+install(
+    DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/
+    DESTINATION bin
+    COMPONENT BENCHMARK_APP
+    USE_SOURCE_PERMISSIONS
+    FILES_MATCHING
+    PATTERN "benchmark_app"
+)
+
+install(
+    DIRECTORY ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/
+    DESTINATION bin/lib
+    COMPONENT BENCHMARK_APP
+    USE_SOURCE_PERMISSIONS
+    PATTERN "*.a" EXCLUDE
+)
+
+# libformat_reader.so
+install(
+    DIRECTORY ${CMAKE_BINARY_DIR}/_deps/openvino-src/${BIN_FOLDER}/${CMAKE_BUILD_TYPE}/lib/
+    DESTINATION bin/lib
+    COMPONENT BENCHMARK_APP
+    USE_SOURCE_PERMISSIONS
+    PATTERN "*.a" EXCLUDE
+)
+
+# tbb
+install(
+    DIRECTORY ${CMAKE_BINARY_DIR}/_deps/openvino-src/inference-engine/temp/tbb/lib/
+    DESTINATION bin/lib
+    COMPONENT BENCHMARK_APP
+    USE_SOURCE_PERMISSIONS
+    FILES_MATCHING
+    PATTERN "libtbb.so.2"
+)
+
+# opencv
+install(
+    DIRECTORY ${CMAKE_BINARY_DIR}/_deps/openvino-src/inference-engine/temp/opencv_4.5.0_ubuntu18/opencv/lib/
+    DESTINATION bin/lib
+    COMPONENT BENCHMARK_APP
+    USE_SOURCE_PERMISSIONS
+    FILES_MATCHING
+    PATTERN "libopencv_core.so*"
+    PATTERN "libopencv_img*.so*"
+)
