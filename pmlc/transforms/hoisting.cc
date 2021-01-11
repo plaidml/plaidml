@@ -197,7 +197,7 @@ void HoistingState::disconnectFunctions() {
   initPack.getResult().replaceAllUsesWith(newPack);
   initPack.erase();
   // Replace mainUnpack
-  builder.setInsertionPoint(mainUnpack);
+  builder.setInsertionPointToStart(&mainFunc.front());
   auto newMainUnpack =
       builder.create<UnpackOp>(mainUnpack.getLoc(), packTypes, mainUnpack.in());
   for (auto use : mainUnpackUses) {
@@ -205,7 +205,7 @@ void HoistingState::disconnectFunctions() {
   }
   mainUnpack.erase();
   // Replace finiUnpack
-  builder.setInsertionPoint(finiUnpack);
+  builder.setInsertionPointToStart(&finiFunc.front());
   auto newFiniUnpack =
       builder.create<UnpackOp>(finiUnpack.getLoc(), packTypes, finiUnpack.in());
   for (auto use : finiUnpackUses) {
