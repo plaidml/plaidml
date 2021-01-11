@@ -89,8 +89,8 @@ void level_zero_submit(void *invocation) {
 
 void *level_zero_alloc(void *invocation, size_t bytes) {
   IVLOG(2, "level_zero_alloc env=" << invocation << ", size=" << bytes);
-  void *result =
-      static_cast<LevelZeroInvocation *>(invocation)->allocateMemory(bytes);
+  void *result = static_cast<LevelZeroInvocation *>(invocation)
+                     ->allocateMemory(bytes, LevelZeroMemoryKind::Host);
   IVLOG(2, "  ->" << result);
   return result;
 }
@@ -112,9 +112,12 @@ void *level_zero_schedule_read(void *host, void *dev, void *invocation,
     dependencies.push_back(evt);
   }
   va_end(args);
+  LevelZeroMemory *src = static_cast<LevelZeroMemory *>(dev);
+  if (src->getKind() == LevelZeroMemoryKind::Host) {
+    level_zero_submit(invocation);
+  }
   void *result = static_cast<LevelZeroInvocation *>(invocation)
-                     ->enqueueRead(static_cast<LevelZeroMemory *>(dev), host,
-                                   dependencies);
+                     ->enqueueRead(src, host, dependencies);
   IVLOG(2, "  ->" << result);
   return result;
 }
@@ -132,9 +135,12 @@ void *level_zero_schedule_write(void *host, void *dev, void *invocation,
     dependencies.push_back(evt);
   }
   va_end(args);
+  LevelZeroMemory *dst = static_cast<LevelZeroMemory *>(dev);
+  if (dst->getKind() == LevelZeroMemoryKind::Host) {
+    level_zero_submit(invocation);
+  }
   void *result = static_cast<LevelZeroInvocation *>(invocation)
-                     ->enqueueWrite(static_cast<LevelZeroMemory *>(dev), host,
-                                    dependencies);
+                     ->enqueueWrite(dst, host, dependencies);
   IVLOG(2, "  ->" << result);
   return result;
 }

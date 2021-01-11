@@ -11,17 +11,23 @@ namespace pmlc::rt::level_zero {
 class LevelZeroInvocation;
 class LevelZeroEvent;
 
+/// Kind of memory type.
+enum class LevelZeroMemoryKind { Host, Device, Shared };
+
 /// Class encapsulating LevelZero memory buffer allocated on device.
 class LevelZeroMemory {
 public:
-  LevelZeroMemory(void *buffer, size_t bytes, ze_context_handle_t context)
-      : buffer(buffer), bytes(bytes), context(context) {}
+  LevelZeroMemory(void *buffer, size_t bytes, LevelZeroMemoryKind kind,
+                  ze_context_handle_t context)
+      : buffer(buffer), bytes(bytes), kind(kind), context(context) {}
   ~LevelZeroMemory() { lzu::free_memory(context, buffer); }
 
   /// Returns allocated buffer.
   void *getBuffer() { return buffer; }
   /// Returns size of buffer in bytes.
   size_t size() { return bytes; }
+  /// Returns kind of memory.
+  LevelZeroMemoryKind getKind() const { return kind; }
   /// Enqueues read operation from this buffer into `dst` pointer
   /// on specified command queue.
   void enqueueRead(ze_command_list_handle_t list, void *dst,
@@ -36,6 +42,7 @@ public:
 private:
   void *buffer;
   size_t bytes;
+  LevelZeroMemoryKind kind;
   ze_context_handle_t context;
 };
 
@@ -104,7 +111,7 @@ public:
   ~LevelZeroInvocation();
 
   /// Allocates memory on LevelZero device with specified size in bytes.
-  LevelZeroMemory *allocateMemory(size_t bytes);
+  LevelZeroMemory *allocateMemory(size_t bytes, LevelZeroMemoryKind kind);
   /// Releases memory obtained from `allocateMemory` call.
   /// But as kernel may not really run here, may just do record.
   void deallocateMemory(LevelZeroMemory *memory);

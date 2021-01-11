@@ -16,15 +16,33 @@ namespace pmlc::rt::level_zero {
 void LevelZeroMemory::enqueueRead(ze_command_list_handle_t list, void *dst,
                                   std::vector<ze_event_handle_t> &dependencies,
                                   ze_event_handle_t &resultE) {
-  lzu::append_memory_copy(list, dst, buffer, bytes, resultE,
-                          dependencies.size(), dependencies.data());
+  if (LevelZeroMemoryKind::Host == kind) {
+    for (auto e : dependencies) {
+      if (e != nullptr) {
+        zeEventHostSynchronize(e, UINT64_MAX);
+      }
+    }
+    std::memcpy(dst, buffer, bytes);
+  } else {
+    lzu::append_memory_copy(list, dst, buffer, bytes, resultE,
+                            dependencies.size(), dependencies.data());
+  }
 }
 
 void LevelZeroMemory::enqueueWrite(ze_command_list_handle_t list, void *src,
                                    std::vector<ze_event_handle_t> &dependencies,
                                    ze_event_handle_t &resultE) {
-  lzu::append_memory_copy(list, buffer, src, bytes, resultE,
-                          dependencies.size(), dependencies.data());
+  if (LevelZeroMemoryKind::Host == kind) {
+    for (auto e : dependencies) {
+      if (e != nullptr) {
+        zeEventHostSynchronize(e, UINT64_MAX);
+      }
+    }
+    std::memcpy(buffer, src, bytes);
+  } else {
+    lzu::append_memory_copy(list, buffer, src, bytes, resultE,
+                            dependencies.size(), dependencies.data());
+  }
 }
 
 LevelZeroKernel::LevelZeroKernel(ze_module_handle_t module, std::string name)
@@ -38,7 +56,9 @@ LevelZeroKernel::~LevelZeroKernel() {
 }
 
 void LevelZeroKernel::addDependency(LevelZeroEvent *event) {
-  dependencies.push_back(event->getEvent());
+  if (event->getEvent() != nullptr) {
+    dependencies.push_back(event->getEvent());
+  }
 }
 
 void LevelZeroKernel::setArg(unsigned idx, LevelZeroMemory *memory) {
@@ -64,7 +84,9 @@ void LevelZeroEvent::wait(const std::vector<LevelZeroEvent *> &events) {
   std::transform(events.begin(), events.end(), std::back_inserter(zeEvents),
                  [](const LevelZeroEvent *event) { return event->getEvent(); });
   for (auto e : zeEvents) {
-    zeEventHostSynchronize(e, UINT64_MAX);
+    if (e != nullptr) {
+      zeEventHostSynchronize(e, UINT64_MAX);
+    }
   }
 }
 
@@ -106,6 +128,8 @@ LevelZeroInvocation::~LevelZeroInvocation() {
       ~(-1 << deviceProperties.kernelTimestampValidBits);
 
   for (std::unique_ptr<LevelZeroEvent> &event : events) {
+    if (event->getEvent() == nullptr)
+      continue;
     ze_kernel_timestamp_result_t timestamp =
         getEventKernelTimestamp(event->getEvent());
     uint64_t start = timestamp.context.kernelStart;
@@ -147,16 +171,29 @@ LevelZeroInvocation::~LevelZeroInvocation() {
     delete memories[i];
   }
   for (std::unique_ptr<LevelZeroEvent> &event : events) {
-    eventPool.destroy_event(event->getEvent());
+    if (event->getEvent() != nullptr)
+      eventPool.destroy_event(event->getEvent());
   }
 }
 
-LevelZeroMemory *LevelZeroInvocation::allocateMemory(size_t bytes) {
+LevelZeroMemory *LevelZeroInvocation::allocateMemory(size_t bytes,
+                                                     LevelZeroMemoryKind kind) {
   // Can add host memory, device memory based on device config
-  void *buffer = lzu::allocate_shared_memory(
-      bytes, /*alignment*/ 1, /*dev_flags*/ 0, /*host_flags*/ 0,
-      device->getLevelZeroDevice(), device->getLevelZeroContext());
-  return new LevelZeroMemory(buffer, bytes, device->getLevelZeroContext());
+  void *buffer = nullptr;
+  if (LevelZeroMemoryKind::Host == kind) {
+    buffer = lzu::allocate_host_memory(bytes, /*alignment*/ 1,
+                                       device->getLevelZeroContext());
+  } else if (LevelZeroMemoryKind::Device == kind) {
+    buffer = lzu::allocate_device_memory(
+        bytes, /*alignment*/ 1, /*dev_flags*/ 0, /*ordinal*/ 0,
+        device->getLevelZeroDevice(), device->getLevelZeroContext());
+  } else {
+    buffer = lzu::allocate_shared_memory(
+        bytes, /*alignment*/ 1, /*dev_flags*/ 0, /*host_flags*/ 0,
+        device->getLevelZeroDevice(), device->getLevelZeroContext());
+  }
+  return new LevelZeroMemory(buffer, bytes, kind,
+                             device->getLevelZeroContext());
 }
 
 void LevelZeroInvocation::deallocateMemory(LevelZeroMemory *memory) {
@@ -171,8 +208,12 @@ LevelZeroInvocation::enqueueRead(LevelZeroMemory *src, void *dst,
   std::vector<ze_event_handle_t> dependencies;
   std::transform(deps.begin(), deps.end(), std::back_inserter(dependencies),
                  [](const LevelZeroEvent *event) { return event->getEvent(); });
-  ze_event_handle_t event;
-  eventPool.create_event(event);
+  ze_event_handle_t event = nullptr;
+  if (src->getKind() == LevelZeroMemoryKind::Device ||
+      src->getKind() == LevelZeroMemoryKind::Shared) {
+    eventPool.create_event(event);
+    src->enqueueRead(queueUser.getLevelZeroList(), dst, dependencies, event);
+  }
   src->enqueueRead(queueUser.getLevelZeroList(), dst, dependencies, event);
   return wrapEvent(event, LevelZeroActionKind::Read, "read");
 }
@@ -183,8 +224,11 @@ LevelZeroInvocation::enqueueWrite(LevelZeroMemory *dst, void *src,
   std::vector<ze_event_handle_t> dependencies;
   std::transform(deps.begin(), deps.end(), std::back_inserter(dependencies),
                  [](const LevelZeroEvent *event) { return event->getEvent(); });
-  ze_event_handle_t event;
-  eventPool.create_event(event);
+  ze_event_handle_t event = nullptr;
+  if (dst->getKind() == LevelZeroMemoryKind::Device ||
+      dst->getKind() == LevelZeroMemoryKind::Shared) {
+    eventPool.create_event(event);
+  }
   dst->enqueueWrite(queueUser.getLevelZeroList(), src, dependencies, event);
   return wrapEvent(event, LevelZeroActionKind::Write, "write");
 }
