@@ -349,8 +349,7 @@ zeEventPool::~zeEventPool() {
   if (event_pool_) {
     ze_result_t result = zeEventPoolDestroy(event_pool_);
     if (ZE_RESULT_SUCCESS != result) {
-      IVLOG(1, "Failed to destroy event pool " +
-                   std::to_string(static_cast<int>(result)));
+      IVLOG(1, "Failed to destroy event pool " + to_string(result));
     }
   }
 }
