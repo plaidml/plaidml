@@ -89,6 +89,8 @@ void level_zero_submit(void *invocation) {
 
 void *level_zero_alloc(void *invocation, size_t bytes) {
   IVLOG(2, "level_zero_alloc env=" << invocation << ", size=" << bytes);
+  // Can add specific optimization to switch memory kind(Host, Device, Shared)
+  // Event takes more time than computation on some machines.
   void *result = static_cast<LevelZeroInvocation *>(invocation)
                      ->allocateMemory(bytes, LevelZeroMemoryKind::Host);
   IVLOG(2, "  ->" << result);

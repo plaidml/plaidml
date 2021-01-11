@@ -178,7 +178,7 @@ void pipelineBuilder(OpPassManager &pm,
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
-  // Do kernel outlining
+  // GPU transforms
   pm.addPass(createAddSpirvTargetPass(
       levelZeroPipelineOptions.spirvVersion.getValue()));
   pm.addPass(conversion::gpu::createGpuKernelOutliningPass(
@@ -210,9 +210,20 @@ void pipelineBuilder(OpPassManager &pm,
   pm.addPass(spirv::createLowerABIAttributesPass());
   pm.addPass(spirv::createUpdateVersionCapabilityExtensionPass());
 
+  // Unbox wrapped argsort and lower remaining affine loops.
+  pm.addPass(layer::createInlineLayersPass());
+  pm.addPass(pmlc::target::intel_gen::createLowerPXAToAffinePass());
+  pm.addPass(createLowerAffinePass());
+  pm.addPass(createLowerToCFGPass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+
   // Comp to LLVM - LevelZero function calls.
   pm.addPass(pmlc::conversion::comp_to_llvm::createConvertCompToLLVMPass(
       "level_zero_"));
+
+  // Lower SCF to Standard before converting to LLVM
+  pm.addPass(createLowerToCFGPass());
 
   // Convert to LLVM code.
   pm.addPass(pmlc::target::intel_gen::createConvertStandardToLLVM());
