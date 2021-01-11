@@ -793,6 +793,26 @@ TEST_F(CppEdsl, LarsMomentum4d) {
   runProgram(program);
 }
 
+TEST_F(CppEdsl, LogSoftmax) {
+  auto I = Placeholder(DType::FLOAT32, {3, 3});
+  auto rank = I.rank();
+  auto axis = 1;
+
+  if (axis < 0) {
+    axis += rank;
+  }
+  // Need check if keepdims is needed
+  auto t = I - op::max(I, edsl::make_tuple(axis), true);
+  auto O = t - log(op::sum(exp(t), edsl::make_tuple(axis)));
+  auto program = makeProgram("logsoftmax", {I}, {O});
+
+  std::vector<float> I_input = {1, 2, 3, 4, 5, 6, 7, 8, 0};
+  std::vector<float> O_output = {-2.40761,  -1.40761, -0.313507, -2.40761, -1.40761,
+                                 -0.313507, -1.40761, -0.407606, -8.31351};
+
+  checkExact(program, {I_input}, {O_output});
+}
+
 TEST_F(CppEdsl, RepeatElements) {
   auto I = Placeholder(DType::FLOAT32, {10, 10, 10});
   TensorDim N0, N1, N2;
