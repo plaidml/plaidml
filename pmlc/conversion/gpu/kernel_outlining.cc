@@ -275,6 +275,7 @@ public:
   void finalize() {
     // Make a builder at the end of the function entry block
     auto builder = OpBuilder::atBlockTerminator(&func.back());
+    Location loc = func.getLoc();
     bool destroyEnv = true;
     if (func.getNumResults() == 1 &&
         func.getType().getResult(0).isa<stdx::ArgpackType>()) {
@@ -296,9 +297,9 @@ public:
     if (hasPack && func.getName() != "fini") {
       // If we got env in, and we are not fini, don't destroy
       destroyEnv = false;
+      builder.create<comp::DumpProfiling>(loc, execEnv);
     }
 
-    Location loc = func.getLoc();
     // Destroy all the kernels
     for (auto kernel : kernelsToDestroy) {
       builder.create<comp::DestroyKernel>(loc, execEnv, kernel);

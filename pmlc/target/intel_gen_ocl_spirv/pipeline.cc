@@ -181,12 +181,12 @@ void pipelineBuilder(OpPassManager &pm,
       comp::ExecEnvRuntime::OpenCL, /*memorySpace=*/11));
 
   // Hoist GPU ops
-  // pm.addPass(transforms::createHoistingPass());
+  pm.addPass(transforms::createHoistingPass());
   // pm.addPass(conversion::gpu::createGatherGpuLaunchFuncsPass());
   // pm.addPass(comp::createMinimizeBufferTransfersPass());
   // pm.addPass(comp::createExecEnvCoalescingPass());
   // pm.addPass(comp::createMinimizeAllocationsPass());
-  // pm.addPass(comp::createRemoveRedundantRWPass());
+  pm.addPass(comp::createRemoveRedundantRWPass());
   // pm.addPass(comp::createRecalculateEventDepsPass(/*safeDealloc=*/false));
 
   // GPU to SPIR-V.
