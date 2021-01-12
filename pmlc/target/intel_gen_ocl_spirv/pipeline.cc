@@ -3,6 +3,8 @@
 #include "pmlc/target/intel_gen_ocl_spirv/pipeline.h"
 
 #include <memory>
+#include <string>
+#include <unordered_map>
 
 #include "llvm/Support/FormatVariadic.h"
 
@@ -179,12 +181,12 @@ void pipelineBuilder(OpPassManager &pm,
       createAddSpirvTargetPass(oclPipelineOptions.spirvVersion.getValue()));
   pm.addPass(conversion::gpu::createGpuKernelOutliningPass(
       comp::ExecEnvRuntime::OpenCL, /*memorySpace=*/11));
-  //pm.addPass(conversion::gpu::createGatherGpuLaunchFuncsPass());
-  //pm.addPass(comp::createMinimizeBufferTransfersPass());
-  //pm.addPass(comp::createExecEnvCoalescingPass());
-  //pm.addPass(comp::createMinimizeAllocationsPass());
-  //pm.addPass(comp::createRemoveRedundantRWPass());
-  //pm.addPass(comp::createRecalculateEventDepsPass(/*safeDealloc=*/false));
+  // pm.addPass(conversion::gpu::createGatherGpuLaunchFuncsPass());
+  // pm.addPass(comp::createMinimizeBufferTransfersPass());
+  // pm.addPass(comp::createExecEnvCoalescingPass());
+  // pm.addPass(comp::createMinimizeAllocationsPass());
+  // pm.addPass(comp::createRemoveRedundantRWPass());
+  // pm.addPass(comp::createRecalculateEventDepsPass(/*safeDealloc=*/false));
 
   // GPU to SPIR-V.
   pm.addPass(createLegalizeStdOpsForSPIRVLoweringPass());
@@ -240,7 +242,9 @@ public:
     pipelineBuilder(pm, *oclPipelineOptions);
   }
 
-  util::BufferPtr save(compiler::Program &program) {
+  util::BufferPtr
+  save(compiler::Program &program,
+       const std::unordered_map<std::string, std::string> &config) {
     throw std::runtime_error(
         llvm::formatv("Target '{0}' does not have 'save' support.", kTargetName)
             .str());
