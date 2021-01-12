@@ -57,9 +57,6 @@ namespace stdx = dialect::stdx;
 namespace tile = dialect::tile;
 
 struct OclPipelineOptions : public PassPipelineOptions<OclPipelineOptions> {
-  Option<bool> useBlockOps{*this, "use-block-ops",
-                           llvm::cl::desc("Support for block operations"),
-                           llvm::cl::initializer(true)};
   Option<unsigned> spirvVersion{*this, "spirv-version",
                                 llvm::cl::desc("SPIR-V Version"),
                                 llvm::cl::initializer(150)};
@@ -167,8 +164,11 @@ void pipelineBuilder(OpPassManager &pm,
   pm.addPass(stdx::createI1StorageToI32Pass());
 
   // Devectorize
-  pm.addPass(pmlc::target::intel_gen::createSubgroupBroadcastPass(
-      oclPipelineOptions.useBlockOps.getValue()));
+  bool useBlockOps = false;
+  if (oclPipelineOptions.spirvVersion.getValue() >= 150) {
+    useBlockOps = true;
+  }
+  pm.addPass(pmlc::target::intel_gen::createSubgroupBroadcastPass(useBlockOps));
   pm.addPass(createCSEPass());
 
   // Lower mapped scf.parallel's to GPU

@@ -211,7 +211,7 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(stdx::createI1StorageToI32Pass());
 
   // Devectorize
-  pm.addPass(createSubgroupBroadcastPass());
+  pm.addPass(createSubgroupBroadcastPass(/*useBlockOps=*/false));
   pm.addPass(createCSEPass());
 
   // Lower mapped scf.parallel's to GPU
