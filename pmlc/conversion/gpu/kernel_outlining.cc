@@ -25,6 +25,7 @@
 #include "mlir/Transforms/RegionUtils.h"
 #include "pmlc/conversion/gpu/pass_detail.h"
 #include "pmlc/dialect/comp/ir/dialect.h"
+#include "pmlc/dialect/stdx/ir/ops.h"
 #include "pmlc/util/logging.h"
 #include "pmlc/util/memuse.h"
 #include "pmlc/util/tags.h"
@@ -35,6 +36,7 @@ namespace pmlc::conversion::gpu {
 using namespace mlir; // NOLINT[build/namespaces]
 namespace gpu = mlir::gpu;
 namespace comp = pmlc::dialect::comp;
+namespace stdx = pmlc::dialect::stdx;
 
 template <typename OpTy>
 static void createForAllDimensions(OpBuilder &builder, Location loc,
@@ -147,20 +149,44 @@ public:
     // Make a builder pointer to the begining of the function
     OpBuilder builder(func.getBody());
 
-    // Add in comp device parameter to function
-    auto oldFuncTy = func.getType();
-    auto deviceTy = builder.getType<comp::DeviceType>();
-    SmallVector<Type, 4> inputs{deviceTy};
-    inputs.insert(inputs.end(), oldFuncTy.getInputs().begin(),
-                  oldFuncTy.getInputs().end());
-    auto newFuncTy = builder.getFunctionType(inputs, oldFuncTy.getResults());
-    func.front().insertArgument(0u, deviceTy);
-    func.setType(newFuncTy);
+    // If there isn't a 'pack' parameter, add a device operand and construct the
+    // environment.  Otherwise, extract environment from pack
+    hasPack = func.getNumArguments() > 0 &&
+              func.getArgument(0).getType().isa<stdx::ArgpackType>();
+    if (!hasPack) {
+      // Add a device parameter to the function
+      auto oldFuncTy = func.getType();
+      auto deviceTy = builder.getType<comp::DeviceType>();
+      SmallVector<Type, 4> inputs{deviceTy};
+      inputs.insert(inputs.end(), oldFuncTy.getInputs().begin(),
+                    oldFuncTy.getInputs().end());
+      auto newFuncTy = builder.getFunctionType(inputs, oldFuncTy.getResults());
+      func.front().insertArgument(0u, deviceTy);
+      func.setType(newFuncTy);
 
-    // Insert CreateExecEnv
-    auto device = func.getArgument(0);
-    execEnv =
-        builder.create<comp::CreateExecEnv>(func.getLoc(), execEnvType, device);
+      // Insert CreateExecEnv
+      auto device = func.getArgument(0);
+      execEnv = builder.create<comp::CreateExecEnv>(func.getLoc(), execEnvType,
+                                                    device);
+    } else {
+      // Find the unpack
+      auto argpack = func.getArgument(0);
+      assert(argpack.hasOneUse());
+      auto unpack = cast<stdx::UnpackOp>(*argpack.user_begin());
+      // Make a new unpack that also unpacks the exec env
+      builder.setInsertionPoint(unpack.getOperation());
+      SmallVector<Type, 4> newUnpackTypes(unpack.getResultTypes().begin(),
+                                          unpack.getResultTypes().end());
+      newUnpackTypes.insert(newUnpackTypes.begin(), execEnvType);
+      auto newUnpack = builder.create<stdx::UnpackOp>(unpack.getLoc(),
+                                                      newUnpackTypes, argpack);
+      // Reconnect uses + delete old unpack
+      execEnv = newUnpack.getResult(0);
+      for (size_t i = 0; i < newUnpackTypes.size() - 1; i++) {
+        unpack.getResult(i).replaceAllUsesWith(newUnpack.getResult(i + 1));
+      }
+      unpack.erase();
+    }
   }
 
   void convertLaunch(gpu::LaunchOp launchOp, gpu::GPUFuncOp kernelFunc,
@@ -250,12 +276,42 @@ public:
     // Make a builder at the end of the function entry block
     auto builder = OpBuilder::atBlockTerminator(&func.back());
     Location loc = func.getLoc();
+    bool destroyEnv = true;
+    if (func.getNumResults() == 1 &&
+        func.getType().getResult(0).isa<stdx::ArgpackType>()) {
+      // Send env out rather than destroying it
+      destroyEnv = false;
+      // Replace argpack, and put insertion point befor it
+      auto retOp = cast<ReturnOp>(func.front().getTerminator());
+      auto pack = cast<stdx::PackOp>(retOp.getOperand(0).getDefiningOp());
+      SmallVector<Value, 4> args(pack.getOperands().begin(),
+                                 pack.getOperands().end());
+      args.insert(args.begin(), execEnv);
+      builder.setInsertionPoint(pack.getOperation());
+      auto newPack = builder.create<stdx::PackOp>(
+          pack.getLoc(), builder.getType<stdx::ArgpackType>(), args);
+      builder.setInsertionPoint(newPack);
+      pack.getResult().replaceAllUsesWith(newPack.getResult());
+      pack.erase();
+    }
+    if (hasPack && func.getName() != "fini") {
+      // If we got env in, and we are not fini, don't destroy
+      destroyEnv = false;
+      builder.create<comp::DumpProfiling>(loc, execEnv);
+    }
+
     // Destroy all the kernels
     for (auto kernel : kernelsToDestroy) {
       builder.create<comp::DestroyKernel>(loc, execEnv, kernel);
     }
+    // Destroy all the buffers
+    for (auto &kvp : gpuMemRefs) {
+      builder.create<comp::Dealloc>(loc, execEnv, kvp.second);
+    }
     // Insert DestroyExecEnv
-    builder.create<comp::DestroyExecEnv>(loc, execEnv);
+    if (destroyEnv) {
+      builder.create<comp::DestroyExecEnv>(loc, execEnv);
+    }
   }
 
 private:
@@ -267,6 +323,8 @@ private:
   comp::ExecEnvType execEnvType;
   // The type of events
   comp::EventType eventType;
+  // Did we get env from an argpack
+  bool hasPack;
   // The comp execution environment
   Value execEnv;
   // A map from device memory reference to their GPU eqivilant.  Using

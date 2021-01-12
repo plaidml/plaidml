@@ -1,5 +1,6 @@
 // Copyright 2020 Intel Corporation
 
+#include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/StandardOps/EDSC/Builders.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
@@ -252,55 +253,18 @@ void buildLoopForMemRef(
   if (!memRefType)
     return;
 
-  mlir::edsc::ScopedContext context(builder, loc);
-  mlir::edsc::MemRefBoundsCapture mBoundsCapture(memRef);
-
+  auto indexConst0 = builder.create<ConstantOp>(loc, builder.getIndexAttr(0));
   auto indexConst1 = builder.create<ConstantOp>(loc, builder.getIndexAttr(1));
-  SmallVector<Value, 8> steps, ivs;
-  int rank = memRefType.getRank();
-  steps.reserve(rank);
-  for (int i = 0; i < rank; i++)
-    steps.push_back(indexConst1);
-
-  Block *currentBlock = builder.getInsertionBlock();
-  Block *ifBlock, *thenBlock, *continueBlock;
-
-  for (int i = 0; i < rank; i++) {
-    // Create blocks
-    auto currentPoint = builder.getInsertionPoint();
-    ifBlock = currentBlock->splitBlock(currentPoint);
-    thenBlock = ifBlock->splitBlock(ifBlock->begin());
-    continueBlock = thenBlock->splitBlock(thenBlock->begin());
-
-    // Create loop entry
-    builder.setInsertionPointToEnd(currentBlock);
-    builder.create<BranchOp>(loc, ifBlock, mBoundsCapture.lb(i));
-
-    // Check up bound
-    builder.setInsertionPointToStart(ifBlock);
-    ifBlock->addArgument(mBoundsCapture.lb(i).getType());
-    auto comparsion = builder.create<CmpIOp>(
-        loc, CmpIPredicate::slt, ifBlock->getArgument(0), mBoundsCapture.ub(i));
-    builder.create<CondBranchOp>(loc, comparsion, thenBlock, ArrayRef<Value>(),
-                                 continueBlock, ArrayRef<Value>());
-
-    // Update index with step
-    builder.setInsertionPointToStart(thenBlock);
-    auto stepped =
-        builder.create<AddIOp>(loc, ifBlock->getArgument(0), steps[i])
-            .getResult();
-    builder.create<BranchOp>(loc, ifBlock, stepped);
-
-    // Ready for next dimension
-    builder.setInsertionPointToStart(thenBlock);
-    currentBlock = thenBlock;
-    ivs.push_back(ifBlock->getArgument(0));
+  SmallVector<Value, 8> lower, upper, step;
+  auto shape = memRefType.getShape();
+  for (size_t i = 0; i < shape.size(); i++) {
+    lower.push_back(indexConst0);
+    auto indexConstUB =
+        builder.create<ConstantOp>(loc, builder.getIndexAttr(shape[i]));
+    upper.push_back(indexConstUB);
+    step.push_back(indexConst1);
   }
-
-  // Create loop body
-  if (thenBlock && bodyBuilder) {
-    bodyBuilder(builder, loc, ivs);
-  }
+  mlir::scf::buildLoopNest(builder, loc, lower, upper, step, bodyBuilder);
 }
 
 struct I1StorageToI32Pass : public I1StorageToI32Base<I1StorageToI32Pass> {
@@ -324,10 +288,6 @@ struct I1StorageToI32Pass : public I1StorageToI32Base<I1StorageToI32Pass> {
 
           builder.setInsertionPointToStart(&entryBlock);
           auto alloc = builder.create<AllocOp>(loc, newMemRefType);
-
-          // Make sure to allocate at the beginning of the block.
-          auto *parentBlock = alloc.getOperation()->getBlock();
-          alloc.getOperation()->moveBefore(&parentBlock->front());
 
           // Update old memref uses with new memref
           argument.replaceUsesWithIf(alloc,

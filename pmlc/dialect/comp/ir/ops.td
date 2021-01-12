@@ -262,4 +262,13 @@ def COMP_ScheduleBarrier : COMP_Op<"schedule_barrier",
   }];
 }
 
+def COMP_DumpProfiling: COMP_Op<"dump_profiling",
+                                   [DeclareOpInterfaceMethods<COMP_ExecEnvOpInterface>]>
+                          , Arguments<(ins COMP_AnyExecEnv:$execEnv)> {
+  let summary = "Dump existing profiing data.";
+  let assemblyFormat = [{
+    $execEnv attr-dict `:` functional-type(operands, results) 
+  }];
+}
+
 #endif // __PMLC_COMP_OPS__
