@@ -95,7 +95,7 @@ install(
 
 # libformat_reader.so
 install(
-    DIRECTORY ${CMAKE_BINARY_DIR}/_deps/openvino-src/${BIN_FOLDER}/${CMAKE_BUILD_TYPE}/lib/
+    DIRECTORY ${OpenVINO_MAIN_SOURCE_DIR}/${BIN_FOLDER}/${CMAKE_BUILD_TYPE}/lib/
     DESTINATION bin/lib
     COMPONENT BENCHMARK_APP
     USE_SOURCE_PERMISSIONS
@@ -104,7 +104,7 @@ install(
 
 # tbb
 install(
-    DIRECTORY ${CMAKE_BINARY_DIR}/_deps/openvino-src/inference-engine/temp/tbb/lib/
+    DIRECTORY ${IE_MAIN_SOURCE_DIR}/temp/tbb/lib/
     DESTINATION bin/lib
     COMPONENT BENCHMARK_APP
     USE_SOURCE_PERMISSIONS
@@ -114,7 +114,7 @@ install(
 
 # opencv
 install(
-    DIRECTORY ${CMAKE_BINARY_DIR}/_deps/openvino-src/inference-engine/temp/opencv_4.5.0_ubuntu18/opencv/lib/
+    DIRECTORY ${IE_MAIN_SOURCE_DIR}/temp/opencv_4.5.0_ubuntu18/opencv/lib/
     DESTINATION bin/lib
     COMPONENT BENCHMARK_APP
     USE_SOURCE_PERMISSIONS
