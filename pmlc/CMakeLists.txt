@@ -45,6 +45,7 @@ pml_cc_library(
     pmlc::dialect::xsmm::ir
     pmlc::rt::all_runtimes
     pmlc::target::all
+    pmlc::transforms
 )
 
 pml_lit_test(
