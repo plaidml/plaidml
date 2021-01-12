@@ -3,6 +3,8 @@
 #include "pmlc/target/intel_gen_ocl_spirv/pipeline.h"
 
 #include <memory>
+#include <string>
+#include <unordered_map>
 
 #include "llvm/Support/FormatVariadic.h"
 
@@ -243,7 +245,9 @@ public:
     pipelineBuilder(pm, *oclPipelineOptions);
   }
 
-  util::BufferPtr save(compiler::Program &program) {
+  util::BufferPtr
+  save(compiler::Program &program,
+       const std::unordered_map<std::string, std::string> &config) {
     throw std::runtime_error(
         llvm::formatv("Target '{0}' does not have 'save' support.", kTargetName)
             .str());
