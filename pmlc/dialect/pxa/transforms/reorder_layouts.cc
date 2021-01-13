@@ -81,6 +81,142 @@ public:
   }
 };
 
+struct MemRefSimplificationResults {
+  bool newMapFormed;
+  mlir::SmallVector<mlir::Value, 8> resultOperands;
+  mlir::AffineMap simplifiedMap;
+};
+
+typedef struct MemRefSimplificationResults MemRefSimplificationResults;
+
+MemRefSimplificationResults simplifyMemrefMaps(mlir::OpBuilder &builder,
+                                               mlir::AffineMap &map,
+                                               mlir::ValueRange mapOperands,
+                                               mlir::ValueRange outerIdxs,
+                                               mlir::ValueRange innerIdxs) {
+  MemRefSimplificationResults results;
+  IVLOG(4, "map: " << mlir::debugString(map));
+
+  unsigned currentNumDims = map.getNumDims();
+  unsigned newDims = 0;
+  results.newMapFormed = false;
+  mlir::SmallVector<mlir::AffineExpr, 6> simplifiedExprs;
+  mlir::DenseMap<unsigned, mlir::Value> loadOpIndicesMap;
+
+  for (unsigned idx = 0; idx < map.getNumResults(); ++idx) {
+    mlir::AffineExpr expr = map.getResult(idx);
+    bool expressionAdded = false;
+
+    if (expr.getKind() == mlir::AffineExprKind::FloorDiv) {
+      auto divExpr = expr.cast<mlir::AffineBinaryOpExpr>();
+      mlir::AffineExpr lhsExpr = divExpr.getLHS();
+      mlir::AffineExpr rhsExpr = divExpr.getRHS();
+
+      if (rhsExpr.getKind() == mlir::AffineExprKind::Constant) {
+        // auto constantExpr = rhsExpr.cast<mlir::AffineConstantExpr>();
+        // int64_t divisor = constantExpr.getValue();
+        // We want to check that the divisor value is the same as loop
+        // length of the inner loop and also the same as the loop length
+        // of the inner and that it exactly divides the loop length of the
+        // corresponding loop in the outer set of loops
+        // TODO: Perform the necessary checks
+
+        IVLOG(4, "lhsExpr: " << mlir::debugString(lhsExpr));
+        results.newMapFormed = true;
+
+        if (lhsExpr.getKind() == mlir::AffineExprKind::DimId) {
+          auto dimExpr = lhsExpr.cast<mlir::AffineDimExpr>();
+          unsigned pos = dimExpr.getPosition();
+          IVLOG(4, "lhsExpr is DimId. Position " << pos);
+          auto arg = mapOperands[pos];
+          size_t innerLoopPos;
+          bool innerLoopPosFound = false;
+          for (size_t i = 0; i < innerIdxs.size(); i++) {
+            if (arg == innerIdxs[i]) {
+              innerLoopPos = i;
+              innerLoopPosFound = true;
+              IVLOG(4, "innerLoopPos: " << innerLoopPos);
+              // IVLOG(4, "outerIdxs[innerLoopPos]: "
+              //          << mlir::debugString(outerIdxs[innerLoopPos]));
+              break;
+            }
+          }
+
+          if (!innerLoopPosFound) {
+            IVLOG(4, "innerLoopPos is not valid");
+            results.newMapFormed = false;
+            return results;
+          } else {
+            if (innerLoopPos < outerIdxs.size()) {
+              loadOpIndicesMap.insert({newDims, outerIdxs[innerLoopPos]});
+              auto newDimIdExpr =
+                  builder.getAffineDimExpr(currentNumDims + newDims);
+
+              simplifiedExprs.push_back(newDimIdExpr);
+              expressionAdded = true;
+              newDims++;
+            } else {
+              IVLOG(4, "innerLoopPos is out of bounds.");
+              results.newMapFormed = false;
+              return results;
+            }
+          }
+
+        } else {
+          IVLOG(4, "The result expression is not a DimId kind expression.");
+          results.newMapFormed = false;
+          return results;
+        }
+      }
+    } else if (expr.getKind() == mlir::AffineExprKind::Mod) {
+      auto divExpr = expr.cast<mlir::AffineBinaryOpExpr>();
+      mlir::AffineExpr lhsExpr = divExpr.getLHS();
+      mlir::AffineExpr rhsExpr = divExpr.getRHS();
+
+      if (rhsExpr.getKind() == mlir::AffineExprKind::Constant) {
+        // auto constantExpr = rhsExpr.cast<mlir::AffineConstantExpr>();
+        // int64_t divisor = constantExpr.getValue();
+        // We want to check that the divisor value is the same as loop
+        // length of the inner loop and also the same as the loop length
+        // of the inner and that it exactly divides the loop length of the
+        // corresponding loop in the outer set of loops
+        // TODO: Perform the necessary checks
+
+        results.newMapFormed = true;
+        simplifiedExprs.push_back(lhsExpr);
+        expressionAdded = true;
+      }
+    }
+
+    if (!expressionAdded) {
+      simplifiedExprs.push_back(expr);
+    }
+  }
+
+  if (results.newMapFormed) {
+    results.simplifiedMap = mlir::AffineMap::get(
+        map.getNumResults(), 0, simplifiedExprs, map.getContext());
+    IVLOG(4, "simplifiedMap: " << mlir::debugString(results.simplifiedMap));
+
+    for (unsigned i = 0; i < mapOperands.size(); i++) {
+      results.resultOperands.push_back(mapOperands[i]);
+    }
+
+    for (unsigned i = 0; i < newDims; i++) {
+      auto loadOpIndicesIt = loadOpIndicesMap.find(i);
+      if (loadOpIndicesIt == loadOpIndicesMap.end()) {
+        IVLOG(4, "The newDim position " << i << "'s map operand is not set");
+        results.newMapFormed = false;
+        return results;
+      } else {
+        results.resultOperands.push_back(loadOpIndicesIt->second);
+      }
+    }
+  }
+
+  return results;
+}
+
 void simplifyMemrefMaps(mlir::AffineParallelOp &parallelOp) {
   IVLOG(4, "Entered simplifyMemrefMaps()");
 
@@ -94,135 +230,23 @@ void simplifyMemrefMaps(mlir::AffineParallelOp &parallelOp) {
       mlir::Block *innerBody = parallelOp2.getBody();
       auto innerIdxs = innerBody->getArguments();
 
+      mlir::SmallVector<mlir::Value, 8> resultOperands;
+
       parallelOp2.walk([&](PxaLoadOp loadOp) {
         IVLOG(4, "PxaLoadOp: " << loadOp);
-        mlir::OpBuilder builder(loadOp);
 
-        mlir::Value memRef = loadOp.getMemRef();
-        IVLOG(4, "op.getMemRef(): " << mlir::debugString(memRef));
         mlir::AffineMap map = loadOp.getAffineMap();
         IVLOG(4, "map: " << mlir::debugString(map));
-
-        unsigned currentNumDims = map.getNumDims();
-        unsigned newDims = 0;
-        bool newMapFormed = false;
-        mlir::SmallVector<mlir::AffineExpr, 6> simplifiedExprs;
         mlir::SmallVector<mlir::Value, 8> resultOperands;
-        // mlir::ArrayRef<mlir::Value> resultOperands;
-        mlir::DenseMap<unsigned, mlir::Value> loadOpIndicesMap;
 
-        for (unsigned idx = 0; idx < map.getNumResults(); ++idx) {
-          mlir::AffineExpr expr = map.getResult(idx);
-          bool expressionAdded = false;
+        mlir::OpBuilder builder(loadOp);
+        MemRefSimplificationResults results = simplifyMemrefMaps(
+            builder, map, loadOp.indices(), outerIdxs, innerIdxs);
 
-          if (expr.getKind() == mlir::AffineExprKind::FloorDiv) {
-            auto divExpr = expr.cast<mlir::AffineBinaryOpExpr>();
-            mlir::AffineExpr lhsExpr = divExpr.getLHS();
-            mlir::AffineExpr rhsExpr = divExpr.getRHS();
-
-            if (rhsExpr.getKind() == mlir::AffineExprKind::Constant) {
-              // auto constantExpr = rhsExpr.cast<mlir::AffineConstantExpr>();
-              // int64_t divisor = constantExpr.getValue();
-              // We want to check that the divisor value is the same as loop
-              // length of the inner loop and also the same as the loop length
-              // of the inner and that it exactly divides the loop length of the
-              // corresponding loop in the outer set of loops
-              // TODO: Perform the necessary checks
-
-              IVLOG(4, "lhsExpr: " << mlir::debugString(lhsExpr));
-              newMapFormed = true;
-
-              if (lhsExpr.getKind() == mlir::AffineExprKind::DimId) {
-                auto dimExpr = lhsExpr.cast<mlir::AffineDimExpr>();
-                unsigned pos = dimExpr.getPosition();
-                IVLOG(4, "lhsExpr is DimId. Position " << pos);
-                auto arg = loadOp.indices()[pos];
-                size_t innerLoopPos;
-                bool innerLoopPosFound = false;
-                for (size_t i = 0; i < innerIdxs.size(); i++) {
-                  if (arg == innerIdxs[i]) {
-                    innerLoopPos = i;
-                    innerLoopPosFound = true;
-                    IVLOG(4, "innerLoopPos: " << innerLoopPos);
-                    IVLOG(4, "outerIdxs[innerLoopPos]: "
-                                 << mlir::debugString(outerIdxs[innerLoopPos]));
-                    break;
-                  }
-                }
-
-                if (!innerLoopPosFound) {
-                  IVLOG(4, "innerLoopPos is not valid");
-                  return;
-                } else {
-                  if (innerLoopPos < outerIdxs.size()) {
-                    loadOpIndicesMap.insert({newDims, outerIdxs[innerLoopPos]});
-                    auto newDimIdExpr =
-                        builder.getAffineDimExpr(currentNumDims + newDims);
-
-                    simplifiedExprs.push_back(newDimIdExpr);
-                    expressionAdded = true;
-                    newDims++;
-                  } else {
-                    IVLOG(4, "innerLoopPos is out of bounds.");
-                    return;
-                  }
-                }
-
-              } else {
-                IVLOG(4,
-                      "The result expression is not a DimId kind expression.");
-                return;
-              }
-            }
-          } else if (expr.getKind() == mlir::AffineExprKind::Mod) {
-            auto divExpr = expr.cast<mlir::AffineBinaryOpExpr>();
-            mlir::AffineExpr lhsExpr = divExpr.getLHS();
-            mlir::AffineExpr rhsExpr = divExpr.getRHS();
-
-            if (rhsExpr.getKind() == mlir::AffineExprKind::Constant) {
-              // auto constantExpr = rhsExpr.cast<mlir::AffineConstantExpr>();
-              // int64_t divisor = constantExpr.getValue();
-              // We want to check that the divisor value is the same as loop
-              // length of the inner loop and also the same as the loop length
-              // of the inner and that it exactly divides the loop length of the
-              // corresponding loop in the outer set of loops
-              // TODO: Perform the necessary checks
-
-              newMapFormed = true;
-              simplifiedExprs.push_back(lhsExpr);
-              expressionAdded = true;
-            }
-          }
-
-          if (!expressionAdded) {
-            simplifiedExprs.push_back(expr);
-          }
-        }
-
-        if (newMapFormed) {
-          auto simplifiedMap = mlir::AffineMap::get(
-              map.getNumResults(), 0, simplifiedExprs, map.getContext());
-          IVLOG(4, "simplifiedMap: " << mlir::debugString(simplifiedMap));
-          mlir::OpBuilder builder(loadOp);
-
-          for (unsigned i = 0; i < loadOp.indices().size(); i++) {
-            resultOperands.push_back(loadOp.indices()[i]);
-          }
-
-          for (unsigned i = 0; i < newDims; i++) {
-            auto loadOpIndicesIt = loadOpIndicesMap.find(i);
-            if (loadOpIndicesIt == loadOpIndicesMap.end()) {
-              IVLOG(4,
-                    "The newDim position " << i << "'s map operand is not set");
-              return;
-            } else {
-              resultOperands.push_back(loadOpIndicesIt->second);
-            }
-          }
-
-          mlir::Value loadRes =
-              builder.create<PxaLoadOp>(loadOp.getLoc(), loadOp.getMemRef(),
-                                        simplifiedMap, resultOperands);
+        if (results.newMapFormed) {
+          mlir::Value loadRes = builder.create<PxaLoadOp>(
+              loadOp.getLoc(), loadOp.getMemRef(), results.simplifiedMap,
+              results.resultOperands);
           loadOp.replaceAllUsesWith(loadRes);
           loadOp.erase();
         }
