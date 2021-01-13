@@ -9,6 +9,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "plaidml/core/ffi.h"
@@ -407,8 +408,16 @@ class Program {
     return ret;
   }
 
-  Buffer save(edsl_source_location loc = edsl_source_location::current()) const {
-    return Buffer(ffi::call<plaidml_buffer*>(loc, plaidml_program_save, as_ptr()));
+  Buffer save(const std::unordered_map<std::string, std::string>& config = {},
+              edsl_source_location loc = edsl_source_location::current()) const {
+    std::vector<const char*> keys;
+    std::vector<const char*> values;
+    for (const auto& kvp : config) {
+      keys.push_back(kvp.first.c_str());
+      values.push_back(kvp.second.c_str());
+    }
+    return Buffer(
+        ffi::call<plaidml_buffer*>(loc, plaidml_program_save, as_ptr(), config.size(), keys.data(), values.data()));
   }
 
   plaidml_program* as_ptr() const { return ptr_.get(); }
