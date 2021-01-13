@@ -251,6 +251,28 @@ void simplifyMemrefMaps(mlir::AffineParallelOp &parallelOp) {
           loadOp.erase();
         }
       });
+
+      parallelOp2.walk([&](PxaReduceOp reduceOp) {
+        IVLOG(4, "PxaReduceOp: " << reduceOp);
+
+        mlir::AffineMap map = reduceOp.getAffineMap();
+        IVLOG(4, "map: " << mlir::debugString(map));
+        mlir::SmallVector<mlir::Value, 8> resultOperands;
+
+        mlir::OpBuilder builder(reduceOp);
+        MemRefSimplificationResults results = simplifyMemrefMaps(
+            builder, map, reduceOp.idxs(), outerIdxs, innerIdxs);
+
+        if (results.newMapFormed) {
+          mlir::Value reduceRes = builder.create<PxaReduceOp>(
+              reduceOp.getLoc(), reduceOp.getAgg(), reduceOp.val(),
+              reduceOp.getMemRef(), results.simplifiedMap,
+              results.resultOperands);
+
+          reduceOp.replaceAllUsesWith(reduceRes);
+          reduceOp.erase();
+        }
+      });
     }
   });
 
