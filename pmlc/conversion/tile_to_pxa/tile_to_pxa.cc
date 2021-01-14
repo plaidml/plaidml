@@ -47,6 +47,7 @@ struct TypeConverter : public mlir::TypeConverter {
     addConversion([](FunctionType type) { return type; });
     addConversion([](FloatType type) { return type; });
     addConversion([](IntegerType type) { return tile::toSignlessType(type); });
+    addConversion([](IndexType type) { return type; });
     addConversion([](MemRefType type) { return type; });
     addConversion([](stdx::ArgpackType type) { return type; });
     addConversion([this](RankedTensorType type) {
@@ -61,6 +62,8 @@ struct TypeConverter : public mlir::TypeConverter {
 static Type getElementType(Type type) {
   if (auto tensorType = type.dyn_cast<TensorType>()) {
     return tensorType.getElementType();
+  } else if (auto memRefType = type.dyn_cast<MemRefType>()) {
+    return memRefType.getElementType();
   }
   return type;
 }
@@ -1937,6 +1940,30 @@ struct UnpackOpConversion : public OpConversionPattern<stdx::UnpackOp> {
   }
 };
 
+struct ScfForOpConversion : public OpConversionPattern<scf::ForOp> {
+  using OpConversionPattern<scf::ForOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(scf::ForOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const final {
+    scf::ForOpAdaptor oldFor(operands);
+    auto &oldBodyOps = op.getBody()->getOperations();
+    auto newOp = rewriter.create<scf::ForOp>(op.getLoc(), oldFor.lowerBound(),
+                                             oldFor.upperBound(), oldFor.step(),
+                                             oldFor.initArgs());
+    auto &newBodyOps = newOp.getBody()->getOperations();
+    newBodyOps.splice(std::prev(newBodyOps.end()), oldBodyOps,
+                      oldBodyOps.begin(), oldBodyOps.end());
+    auto oldArgs = op.getBody()->getArguments();
+    auto newArgs = newOp.getBody()->getArguments();
+    for (unsigned i = 0; i < oldArgs.size(); ++i) {
+      oldArgs[i].replaceAllUsesWith(newArgs[i]);
+    }
+    rewriter.replaceOp(op, newOp.results());
+    return success();
+  }
+};
+
 struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
   void runOnOperation() final {
     // Inject tile.ident ops for each return operand that needs it.
@@ -1963,6 +1990,7 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
     TypeConverter converter;
     target.addLegalDialect<mlir::AffineDialect>();
     target.addLegalDialect<mlir::StandardOpsDialect>();
+    target.addLegalDialect<mlir::scf::SCFDialect>();
     target.addLegalDialect<dialect::layer::LayerDialect>();
     target.addLegalDialect<dialect::pxa::PXADialect>();
     target.addLegalDialect<dialect::stdx::StdXDialect>();
@@ -1978,6 +2006,8 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
     target.addDynamicallyLegalOp<stdx::UnpackOp>([&](stdx::UnpackOp op) {
       return converter.isLegal(op.getResultTypes());
     });
+    target.addDynamicallyLegalOp<scf::ForOp>(
+        [&](scf::ForOp op) { return converter.isLegal(op.getResultTypes()); });
 
     // Setup rewrite patterns
     using CmpIntLtOp =
@@ -2005,6 +2035,7 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         TraceOpConversion,    //
         PackOpConversion,     //
         UnpackOpConversion,   //
+        ScfForOpConversion,   //
         ContractionOpConversion<CombinationKind::none, FirstOperand>,
         ContractionOpConversion<CombinationKind::add, StdOp<mlir::AddFOp>,
                                 ResultIs<EltwiseFloat>>,

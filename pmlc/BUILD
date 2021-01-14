@@ -74,6 +74,7 @@ plaidml_cc_library(
         "//pmlc/dialect/xsmm",
         "//pmlc/rt:all_runtimes",
         "//pmlc/target:all_targets",
+        "//pmlc/transforms",
         "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:AffineToStandard",
         "@llvm-project//mlir:AffineTransforms",
