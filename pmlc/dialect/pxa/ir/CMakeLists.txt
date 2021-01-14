@@ -3,6 +3,7 @@ pml_cc_library(
   HDRS
     dialect.h.inc
     interfaces.h.inc
+    interfaces.cc.inc
     matchers.h
     ops.cc.inc
     ops.h.inc
