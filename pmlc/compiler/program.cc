@@ -196,11 +196,12 @@ void Program::compile(StringRef targetNameAndOptions, bool collectPasses,
   }
 }
 
-util::BufferPtr Program::save() {
+util::BufferPtr
+Program::save(const std::unordered_map<std::string, std::string> &config) {
   if (!target) {
     throw std::runtime_error("Program must be compiled to be saved.");
   }
-  return target->save(*this);
+  return target->save(*this, config);
 }
 
 } // namespace pmlc::compiler
