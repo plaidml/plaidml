@@ -11,6 +11,7 @@
 
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/dialect/pxa/transforms/pass_detail.h"
+#include "pmlc/dialect/stdx/ir/ops.h"
 #include "pmlc/util/logging.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
@@ -413,6 +414,9 @@ void getGlobalMemory(FuncOp f, std::list<Operation *> &globalAllocList) {
   }
   for (auto parallelOp : f.getOps<AffineParallelOp>()) {
     globalAllocList.push_back(parallelOp.getOperation());
+  }
+  for (auto unpackOp : f.getOps<stdx::UnpackOp>()) {
+    globalAllocList.push_back(unpackOp.getOperation());
   }
 }
 

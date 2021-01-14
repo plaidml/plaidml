@@ -4,6 +4,7 @@
 
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "mlir/IR/Module.h"
@@ -32,9 +33,13 @@ struct Program;
 class Target {
 public:
   virtual ~Target() = default;
+
   virtual void buildPipeline(mlir::OpPassManager &pm,
                              llvm::StringRef targetOptions) = 0;
-  virtual util::BufferPtr save(Program &program) = 0;
+
+  virtual util::BufferPtr
+  save(Program &program,
+       const std::unordered_map<std::string, std::string> &config) = 0;
 };
 
 using TargetPtr = std::shared_ptr<Target>;
@@ -59,7 +64,8 @@ struct Program {
   void compile(mlir::StringRef targetName, bool collectPasses = false,
                mlir::StringRef dumpDir = "");
 
-  util::BufferPtr save();
+  util::BufferPtr
+  save(const std::unordered_map<std::string, std::string> &config = {});
 };
 
 void registerTargets();

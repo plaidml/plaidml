@@ -3,6 +3,8 @@
 #include "pmlc/target/intel_gen_ocl_spirv/pipeline.h"
 
 #include <memory>
+#include <string>
+#include <unordered_map>
 
 #include "llvm/Support/FormatVariadic.h"
 
@@ -55,9 +57,6 @@ namespace stdx = dialect::stdx;
 namespace tile = dialect::tile;
 
 struct OclPipelineOptions : public PassPipelineOptions<OclPipelineOptions> {
-  Option<bool> useBlockOps{*this, "use-block-ops",
-                           llvm::cl::desc("Support for block operations"),
-                           llvm::cl::initializer(true)};
   Option<unsigned> spirvVersion{*this, "spirv-version",
                                 llvm::cl::desc("SPIR-V Version"),
                                 llvm::cl::initializer(150)};
@@ -165,8 +164,11 @@ void pipelineBuilder(OpPassManager &pm,
   pm.addPass(stdx::createI1StorageToI32Pass());
 
   // Devectorize
-  pm.addPass(pmlc::target::intel_gen::createSubgroupBroadcastPass(
-      oclPipelineOptions.useBlockOps.getValue()));
+  bool useBlockOps = false;
+  if (oclPipelineOptions.spirvVersion.getValue() >= 150) {
+    useBlockOps = true;
+  }
+  pm.addPass(pmlc::target::intel_gen::createSubgroupBroadcastPass(useBlockOps));
   pm.addPass(createCSEPass());
 
   // Lower mapped scf.parallel's to GPU
@@ -179,12 +181,15 @@ void pipelineBuilder(OpPassManager &pm,
       createAddSpirvTargetPass(oclPipelineOptions.spirvVersion.getValue()));
   pm.addPass(conversion::gpu::createGpuKernelOutliningPass(
       comp::ExecEnvRuntime::OpenCL, /*memorySpace=*/11));
-  //pm.addPass(conversion::gpu::createGatherGpuLaunchFuncsPass());
-  //pm.addPass(comp::createMinimizeBufferTransfersPass());
-  //pm.addPass(comp::createExecEnvCoalescingPass());
-  //pm.addPass(comp::createMinimizeAllocationsPass());
-  //pm.addPass(comp::createRemoveRedundantRWPass());
-  //pm.addPass(comp::createRecalculateEventDepsPass(/*safeDealloc=*/false));
+
+  // Hoist GPU ops
+  pm.addPass(transforms::createHoistingPass());
+  // pm.addPass(conversion::gpu::createGatherGpuLaunchFuncsPass());
+  // pm.addPass(comp::createMinimizeBufferTransfersPass());
+  // pm.addPass(comp::createExecEnvCoalescingPass());
+  // pm.addPass(comp::createMinimizeAllocationsPass());
+  pm.addPass(comp::createRemoveRedundantRWPass());
+  // pm.addPass(comp::createRecalculateEventDepsPass(/*safeDealloc=*/false));
 
   // GPU to SPIR-V.
   pm.addPass(createLegalizeStdOpsForSPIRVLoweringPass());
@@ -240,7 +245,9 @@ public:
     pipelineBuilder(pm, *oclPipelineOptions);
   }
 
-  util::BufferPtr save(compiler::Program &program) {
+  util::BufferPtr
+  save(compiler::Program &program,
+       const std::unordered_map<std::string, std::string> &config) {
     throw std::runtime_error(
         llvm::formatv("Target '{0}' does not have 'save' support.", kTargetName)
             .str());

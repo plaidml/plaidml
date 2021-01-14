@@ -261,7 +261,10 @@ void plaidml_program_compile(  //
 
 plaidml_buffer* plaidml_program_save(  //
     plaidml_error* err,                //
-    plaidml_program* program);
+    plaidml_program* program,          //
+    size_t nkvps,                      //
+    const char** keys,                 //
+    const char** values);
 
 #ifdef __cplusplus
 }  // extern "C"

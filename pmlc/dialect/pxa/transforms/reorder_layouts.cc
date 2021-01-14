@@ -17,6 +17,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/DebugStringHelper.h"
 #include "llvm/ADT/SetOperations.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/TypeSwitch.h"
 
 #include "pmlc/dialect/pxa/analysis/affine_constraints.h"
@@ -43,6 +44,7 @@ public:
     mlir::FuncOp func = getFunction();
     mlir::DenseMap<mlir::Value, MemoryUsageDesc> globalMemory =
         gatherGlobalMemoryDescs(func, naiveScheduleModel);
+    llvm::SetVector<mlir::Operation *> toRemove;
     for (auto &valueDesc : globalMemory) {
       MemoryUsageDesc &memoryDesc = valueDesc.second;
       IVLOG(3, "Optimizing layout for " << mlir::debugString(memoryDesc.value));
@@ -64,8 +66,12 @@ public:
       mlir::ModuleOp moduleOp = func.getParentOfType<mlir::ModuleOp>();
 
       IVLOG(3, "Failed to change layout in-place, inserting reorder");
-      reorderMemoryReads(createReorder, reorder, memoryDesc, moduleOp);
+      reorderMemoryReads(createReorder, reorder, memoryDesc, moduleOp,
+                         toRemove);
     }
+    // Cleanup
+    for (auto op : toRemove)
+      op->erase();
   }
 };
 
@@ -305,12 +311,14 @@ void getPackOp(OpType &packOp, mlir::FuncOp funcOp) {
 // ============================================================================
 pmlc::dialect::stdx::UnpackOp
 updateUnpackOp(pmlc::dialect::stdx::UnpackOp unpackOp,
-               pmlc::dialect::stdx::PackOp packOp) {
+               pmlc::dialect::stdx::PackOp packOp,
+               llvm::SetVector<mlir::Operation *> &toRemove) {
   mlir::OpBuilder builder(unpackOp);
   auto newUnpackOp = builder.create<pmlc::dialect::stdx::UnpackOp>(
       unpackOp.getLoc(), packOp.getOperandTypes(), unpackOp.in());
   unpackOp.replaceAllUsesWith(newUnpackOp);
-  unpackOp.erase();
+  if (!toRemove.count(unpackOp))
+    toRemove.insert(unpackOp);
   return newUnpackOp;
 }
 
@@ -318,7 +326,8 @@ updateUnpackOp(pmlc::dialect::stdx::UnpackOp unpackOp,
 // naiveScheduleModel - implementation.
 // =============================================================================
 void reorderMemoryReads(const ReorderCreator &creator, ReorderDesc &reorderDesc,
-                        MemoryUsageDesc &memoryDesc, mlir::ModuleOp &moduleOp) {
+                        MemoryUsageDesc &memoryDesc, mlir::ModuleOp &moduleOp,
+                        llvm::SetVector<mlir::Operation *> &toRemove) {
   mlir::DenseSet<mlir::Value> memoryToReorder;
   for (MemoryReadDesc &readDesc : memoryDesc.reads) {
     PxaReadOpInterface readOp = readDesc.readOp;
@@ -377,10 +386,10 @@ void reorderMemoryReads(const ReorderCreator &creator, ReorderDesc &reorderDesc,
       // TODO: move this part outside of the loop or create option to update the
       // result type in the unpack ops so we would not need to replace
       // the op per mem reorder
-      auto newMainUnpackOp = updateUnpackOp(mainUnpackOp, packOp);
+      auto newMainUnpackOp = updateUnpackOp(mainUnpackOp, packOp, toRemove);
       replaceMemoryLayoutForReading(newMainUnpackOp.getResult(unpackIdx),
                                     originalMem, reorderDesc);
-      auto newFiniUnpackOp = updateUnpackOp(finiUnpackOp, packOp);
+      auto newFiniUnpackOp = updateUnpackOp(finiUnpackOp, packOp, toRemove);
       replaceMemoryLayoutForReading(newFiniUnpackOp.getResult(unpackIdx),
                                     originalMem, reorderDesc);
     }
