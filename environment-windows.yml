@@ -3,6 +3,7 @@ channels:
 dependencies:
   - clang-tools
   - conda=4.6
+  - doxygen
   - numpy=1.16
   - pip=19
   - posix
@@ -10,7 +11,13 @@ dependencies:
   - python=3.7.0
   - pyyaml
   - pip:
-    - cpplint==1.4.4
-    - nbstripout
-    - yapf==0.27.0
+    - breathe
     - certifi
+    - cpplint==1.4.4
+    - livereload
+    - nbstripout
+    - sphinx-rtd-theme
+    - sphinxcontrib-katex
+    - sphinxcontrib-napoleon
+    - sphinx-tabs
+    - yapf==0.27.0
