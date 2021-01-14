@@ -54,40 +54,43 @@ const int start_axis = 1;
 const int end_axis = 3;
 
 INSTANTIATE_TEST_CASE_P(smoke_TestsRegionYolov3, RegionYoloLayerTest,
-                        ::testing::Combine(::testing::ValuesIn(inShapes_v3),                     //
-                                           ::testing::Values(classes[0]),                        //
-                                           ::testing::Values(coords),                            //
-                                           ::testing::Values(num_regions[1]),                    //
-                                           ::testing::Values(do_softmax[1]),                     //
-                                           ::testing::Values(masks[2]),                          //
-                                           ::testing::Values(start_axis),                        //
-                                           ::testing::Values(end_axis),                          //
-                                           ::testing::Values(InferenceEngine::Precision::FP32),  //
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
+                        ::testing::Combine(                                       //
+                            ::testing::ValuesIn(inShapes_v3),                     //
+                            ::testing::Values(classes[0]),                        //
+                            ::testing::Values(coords),                            //
+                            ::testing::Values(num_regions[1]),                    //
+                            ::testing::Values(do_softmax[1]),                     //
+                            ::testing::Values(masks[2]),                          //
+                            ::testing::Values(start_axis),                        //
+                            ::testing::Values(end_axis),                          //
+                            ::testing::Values(InferenceEngine::Precision::FP32),  //
+                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
                         RegionYoloLayerTest::getTestCaseName);
 
 INSTANTIATE_TEST_CASE_P(smoke_TestsRegionYoloMxnet, RegionYoloLayerTest,
-                        ::testing::Combine(::testing::ValuesIn(inShapes_mxnet),                  //
-                                           ::testing::Values(classes[1]),                        //
-                                           ::testing::Values(coords),                            //
-                                           ::testing::Values(num_regions[1]),                    //
-                                           ::testing::Values(do_softmax[1]),                     //
-                                           ::testing::Values(masks[1]),                          //
-                                           ::testing::Values(start_axis),                        //
-                                           ::testing::Values(end_axis),                          //
-                                           ::testing::Values(InferenceEngine::Precision::FP32),  //
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
+                        ::testing::Combine(                                       //
+                            ::testing::ValuesIn(inShapes_mxnet),                  //
+                            ::testing::Values(classes[1]),                        //
+                            ::testing::Values(coords),                            //
+                            ::testing::Values(num_regions[1]),                    //
+                            ::testing::Values(do_softmax[1]),                     //
+                            ::testing::Values(masks[1]),                          //
+                            ::testing::Values(start_axis),                        //
+                            ::testing::Values(end_axis),                          //
+                            ::testing::Values(InferenceEngine::Precision::FP32),  //
+                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
                         RegionYoloLayerTest::getTestCaseName);
 
 INSTANTIATE_TEST_CASE_P(smoke_TestsRegionYoloCaffe, RegionYoloLayerTest,
-                        ::testing::Combine(::testing::ValuesIn(inShapes_caffe),                  //
-                                           ::testing::Values(classes[1]),                        //
-                                           ::testing::Values(coords),                            //
-                                           ::testing::Values(num_regions[0]),                    //
-                                           ::testing::Values(do_softmax[0]),                     //
-                                           ::testing::Values(masks[0]),                          //
-                                           ::testing::Values(start_axis),                        //
-                                           ::testing::Values(end_axis),                          //
-                                           ::testing::Values(InferenceEngine::Precision::FP32),  //
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
+                        ::testing::Combine(                                       //
+                            ::testing::ValuesIn(inShapes_caffe),                  //
+                            ::testing::Values(classes[1]),                        //
+                            ::testing::Values(coords),                            //
+                            ::testing::Values(num_regions[0]),                    //
+                            ::testing::Values(do_softmax[0]),                     //
+                            ::testing::Values(masks[0]),                          //
+                            ::testing::Values(start_axis),                        //
+                            ::testing::Values(end_axis),                          //
+                            ::testing::Values(InferenceEngine::Precision::FP32),  //
+                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
                         RegionYoloLayerTest::getTestCaseName);

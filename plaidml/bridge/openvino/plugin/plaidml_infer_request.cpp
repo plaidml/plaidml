@@ -4,8 +4,6 @@
 
 #include "plaidml_infer_request.hpp"
 
-#include "ie_layers.h"
-
 using namespace plaidml;
 using namespace InferenceEngine;
 

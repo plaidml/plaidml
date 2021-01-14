@@ -25,7 +25,7 @@ namespace PlaidMLPlugin {
 
 void Engine::GetVersion(const Version*& versionInfo) noexcept {}
 
-ExecutableNetworkInternal::Ptr Engine::LoadExeNetworkImpl(const ICNNNetwork& network,
+ExecutableNetworkInternal::Ptr Engine::LoadExeNetworkImpl(const CNNNetwork& network,
                                                           const std::map<std::string, std::string>& config) {
   auto it = config.find("device");
   const auto& device = it != config.end() ? it->second : "";
@@ -36,8 +36,8 @@ void Engine::SetConfig(const std::map<std::string, std::string>& config) {
   // Do nothing
 }
 
-void Engine::QueryNetwork(const ICNNNetwork& network, const std::map<std::string, std::string>& config,
-                          QueryNetworkResult& result) const {
+InferenceEngine::QueryNetworkResult Engine::QueryNetwork(const CNNNetwork& network,
+                                                         const std::map<std::string, std::string>& config) const {
   // TODO: do we still need this?
   // std::unordered_set<std::string, details::CaselessHash<std::string>,
   // details::CaselessEq<std::string>>
@@ -51,6 +51,7 @@ void Engine::QueryNetwork(const ICNNNetwork& network, const std::map<std::string
   //         res.supportedLayersMap.insert({layer->name, plugin_name});
   //     }
   // }
+  THROW_IE_EXCEPTION << NOT_IMPLEMENTED_str;
 }
 
 Engine::Engine() {

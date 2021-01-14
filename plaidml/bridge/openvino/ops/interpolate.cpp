@@ -98,9 +98,11 @@ void registerInterpolate() {
     auto* layer = ngraph::as_type<ngraph::opset4::Interpolate>(ctx.layer);
     auto result_shape = cast_constant_operand<int64_t>(1, layer);
     auto scales = cast_constant_operand<float>(2, layer);
+    auto axes = cast_constant_operand<int64_t>(3, layer);
     auto mode = layer->get_attrs().mode;
     auto nearest_mode = layer->get_attrs().nearest_mode;
     auto cube_coeff = layer->get_attrs().cube_coeff;
+    auto shape_calculation_mode = layer->get_attrs().shape_calculation_mode;
     auto coordinate_transformation_mode = layer->get_attrs().coordinate_transformation_mode;
 
     bool is_downsample = false;
@@ -117,7 +119,8 @@ void registerInterpolate() {
     std::vector<edsl::TensorDim> I_dims(I.rank());
     I.bind_dims(I_dims);
 
-    for (int i = 0; i < result_shape.size(); i++) {
+    // for (int i = 0; i < result_shape.size(); i++) {
+    for (auto i : axes) {
       auto IX = get_output_coordinate_transformed_indices(I_dims[i], result_shape[i], coordinate_transformation_mode);
       I = edsl::gather(I, IX)
               .axis(i)

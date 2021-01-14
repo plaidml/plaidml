@@ -26,10 +26,11 @@ const std::vector<std::vector<std::vector<size_t>>> noneShapes = {
     {{2, 3, 4, 5, 6}, {2, 3, 4, 5, 6}, {2, 3, 4, 5, 6}}  //
 };
 
-const auto noneCases = ::testing::Combine(::testing::ValuesIn(noneShapes),                         //
-                                          ::testing::ValuesIn(inputPrecision),                     //
-                                          ::testing::Values(ngraph::op::AutoBroadcastSpec::NONE),  //
-                                          ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)       //
+const auto noneCases = ::testing::Combine(                   //
+    ::testing::ValuesIn(noneShapes),                         //
+    ::testing::ValuesIn(inputPrecision),                     //
+    ::testing::Values(ngraph::op::AutoBroadcastSpec::NONE),  //
+    ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)       //
 );
 
 const std::vector<std::vector<std::vector<size_t>>> numpyShapes = {
@@ -72,15 +73,13 @@ const std::vector<std::vector<std::vector<size_t>>> numpyShapes = {
     {{7, 6, 5, 8}, {4, 7, 6, 5, 8}, {6, 1, 8}}         //
 };
 
-const auto numpyCases = ::testing::Combine(::testing::ValuesIn(numpyShapes),                         //
-                                           ::testing::ValuesIn(inputPrecision),                      //
-                                           ::testing::Values(ngraph::op::AutoBroadcastSpec::NUMPY),  //
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)        //
+const auto numpyCases = ::testing::Combine(                   //
+    ::testing::ValuesIn(numpyShapes),                         //
+    ::testing::ValuesIn(inputPrecision),                      //
+    ::testing::Values(ngraph::op::AutoBroadcastSpec::NUMPY),  //
+    ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)        //
 );
 
-INSTANTIATE_TEST_CASE_P(smoke_PlaidML_TestsSelect_none, SelectLayerTest, noneCases, SelectLayerTest::getTestCaseName);
+INSTANTIATE_TEST_CASE_P(TestsSelect_none, SelectLayerTest, noneCases, SelectLayerTest::getTestCaseName);
 
-// TODO figure out the removed cases
-
-// INSTANTIATE_TEST_CASE_P(smoke_PlaidML_TestsSelect_numpy, SelectLayerTest, numpyCases,
-//                          SelectLayerTest::getTestCaseName);
+INSTANTIATE_TEST_CASE_P(TestsSelect_numpy, SelectLayerTest, numpyCases, SelectLayerTest::getTestCaseName);

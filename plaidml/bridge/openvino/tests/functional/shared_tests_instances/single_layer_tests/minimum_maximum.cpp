@@ -2,19 +2,23 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include "single_layer_tests/minimum_maximum.hpp"
-
 #include <vector>
 
 #include "common_test_utils/test_constants.hpp"
+#include "single_layer_tests/minimum_maximum.hpp"
 
-using LayerTestsDefinitions::MaxMinLayerTest;
+using namespace LayerTestsDefinitions;
 
 namespace {
 
 const std::vector<std::vector<std::vector<size_t>>> inShapes = {
-    {{2}, {1}},          {{1, 1, 1, 3}, {1}},    {{1, 2, 4}, {1}},          {{1, 4, 4}, {1}},
-    {{1, 4, 4, 1}, {1}}, {{256, 56}, {256, 56}}, {{8, 1, 6, 1}, {7, 1, 5}},
+    {{2}, {1}},                 //
+    {{1, 1, 1, 3}, {1}},        //
+    {{1, 2, 4}, {1}},           //
+    {{1, 4, 4}, {1}},           //
+    {{1, 4, 4, 1}, {1}},        //
+    {{256, 56}, {256, 56}},     //
+    {{8, 1, 6, 1}, {7, 1, 5}},  //
 };
 
 const std::vector<InferenceEngine::Precision> netPrecisions = {
@@ -33,11 +37,16 @@ const std::vector<ngraph::helpers::InputLayerType> inputType = {
 };
 
 INSTANTIATE_TEST_CASE_P(smoke, MaxMinLayerTest,
-                        ::testing::Combine(::testing::ValuesIn(inShapes),       //
-                                           ::testing::ValuesIn(opType),         //
-                                           ::testing::ValuesIn(netPrecisions),  //
-                                           ::testing::ValuesIn(inputType),      //
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),
+                        ::testing::Combine(                                              //
+                            ::testing::ValuesIn(inShapes),                               //
+                            ::testing::ValuesIn(opType),                                 //
+                            ::testing::ValuesIn(netPrecisions),                          //
+                            ::testing::Values(InferenceEngine::Precision::UNSPECIFIED),  //
+                            ::testing::Values(InferenceEngine::Precision::UNSPECIFIED),  //
+                            ::testing::Values(InferenceEngine::Layout::ANY),             //
+                            ::testing::Values(InferenceEngine::Layout::ANY),             //
+                            ::testing::ValuesIn(inputType),                              //
+                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),
                         MaxMinLayerTest::getTestCaseName);
 
 }  // namespace
