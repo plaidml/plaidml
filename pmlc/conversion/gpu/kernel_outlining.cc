@@ -174,7 +174,7 @@ public:
       assert(argpack.hasOneUse());
       auto unpack = cast<stdx::UnpackOp>(*argpack.user_begin());
       // Make a new unpack that also unpacks the exec env
-      builder.setInsertionPoint(unpack.getOperation());
+      builder.setInsertionPointToStart(&func.getBody().front());
       SmallVector<Type, 4> newUnpackTypes(unpack.getResultTypes().begin(),
                                           unpack.getResultTypes().end());
       newUnpackTypes.insert(newUnpackTypes.begin(), execEnvType);
