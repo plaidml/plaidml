@@ -45,6 +45,9 @@ def Cache : FunctionPass<"pxa-cache"> {
     Option<"innerTag", "inner-tag", "std::string",
            /*default=*/"\"inner\"",
            "Inner loop tag">,
+    Option<"wholeBlock", "whole-block", "bool",
+           /*default=*/"false",
+           "Whether cache the whole memory block">
   ];
 }
 

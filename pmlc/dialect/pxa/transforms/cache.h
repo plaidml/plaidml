@@ -34,9 +34,10 @@ struct CachePlan {
   llvm::MapVector<mlir::Value, Entry> entries;
   mlir::AffineParallelOp outerBand;
   mlir::AffineParallelOp middleBand;
+  bool wholeBlock;
 
-  CachePlan(mlir::AffineParallelOp outerBand, mlir::AffineParallelOp middleBand)
-      : outerBand(outerBand), middleBand(middleBand) {}
+  CachePlan(mlir::AffineParallelOp outerBand, mlir::AffineParallelOp middleBand, bool wholeBlock)
+      : outerBand(outerBand), middleBand(middleBand), wholeBlock(wholeBlock) {}
 
   void addLoad(PxaLoadOp op);
 
