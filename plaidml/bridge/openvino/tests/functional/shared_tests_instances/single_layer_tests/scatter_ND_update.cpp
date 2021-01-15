@@ -20,7 +20,6 @@ const std::vector<InferenceEngine::Precision> inputPrecisions = {
 
 const std::vector<InferenceEngine::Precision> idxPrecisions = {
     InferenceEngine::Precision::I32,
-    InferenceEngine::Precision::I64,
 };
 // map<inputShape map<indicesShape, indicesValue>>
 // updateShape is gotten from inputShape and indicesShape
@@ -36,7 +35,7 @@ const auto ScatterNDUpdateCases = ::testing::Combine(                           
     ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)                                 //
 );
 
-INSTANTIATE_TEST_CASE_P(smoke_ScatterNDUpdate, ScatterNDUpdateLayerTest, ScatterNDUpdateCases,
+INSTANTIATE_TEST_CASE_P(ScatterNDUpdate, ScatterNDUpdateLayerTest, ScatterNDUpdateCases,
                         ScatterNDUpdateLayerTest::getTestCaseName);
 
 }  // namespace

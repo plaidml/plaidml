@@ -31,7 +31,6 @@ const std::vector<InferenceEngine::Precision> inputPrecisions = {
 
 const std::vector<InferenceEngine::Precision> idxPrecisions = {
     InferenceEngine::Precision::I32,
-    InferenceEngine::Precision::I64,
 };
 
 const auto ScatterEltUpdateCases = ::testing::Combine(                                     //
@@ -42,7 +41,7 @@ const auto ScatterEltUpdateCases = ::testing::Combine(                          
     ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)                                     //
 );
 
-INSTANTIATE_TEST_CASE_P(smoke_ScatterEltsUpdate, ScatterElementsUpdateLayerTest, ScatterEltUpdateCases,
+INSTANTIATE_TEST_CASE_P(ScatterEltsUpdate, ScatterElementsUpdateLayerTest, ScatterEltUpdateCases,
                         ScatterElementsUpdateLayerTest::getTestCaseName);
 
 }  // namespace
