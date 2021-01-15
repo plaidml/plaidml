@@ -114,7 +114,7 @@ install(
 
 # opencv
 install(
-    DIRECTORY ${IE_MAIN_SOURCE_DIR}/temp/opencv_4.5.0_ubuntu18/opencv/lib/
+    DIRECTORY ${IE_MAIN_SOURCE_DIR}/temp/opencv_4.5.0_ubuntu20/opencv/lib/
     DESTINATION bin/lib
     COMPONENT BENCHMARK_APP
     USE_SOURCE_PERMISSIONS
