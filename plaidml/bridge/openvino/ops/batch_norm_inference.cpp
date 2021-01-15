@@ -5,7 +5,7 @@
 #include "plaidml_ops.hpp"
 
 #include "ngraph/opsets/opset.hpp"
-#include "ngraph/opsets/opset1.hpp"
+#include "ngraph/opsets/opset5.hpp"
 
 #include "plaidml/op/op.h"
 
@@ -21,11 +21,11 @@ void registerBatchNormInference() {
     // This is because the tests show that the input is expected to be the third input tensor. Presumably either the OV
     // code or the OV docs will eventually be updated to make these consistent, and when that happens we'll need to
     // update this code.
-    auto* layer = ngraph::as_type<ngraph::opset1::BatchNormInference>(ctx.layer);
+    auto* layer = ngraph::as_type<ngraph::opset5::BatchNormInference>(ctx.layer);
     IE_ASSERT(ctx.operands.size() == 5);
-    auto I = ctx.operands.at(2);
-    auto gamma = ctx.operands.at(0);
-    auto beta = ctx.operands.at(1);
+    auto I = ctx.operands.at(0);
+    auto gamma = ctx.operands.at(1);
+    auto beta = ctx.operands.at(2);
     auto mean = ctx.operands.at(3);
     auto variance = ctx.operands.at(4);
     IE_ASSERT(I.rank() >= 2);
