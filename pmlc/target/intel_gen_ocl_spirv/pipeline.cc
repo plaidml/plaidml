@@ -165,7 +165,7 @@ void pipelineBuilder(OpPassManager &pm,
 
   // Devectorize
   bool useBlockOps = false;
-  if (oclPipelineOptions.spirvVersion.getValue() >= 150) {
+  if (oclPipelineOptions.spirvVersion.getValue() >= 100) {
     useBlockOps = true;
   }
   pm.addPass(pmlc::target::intel_gen::createSubgroupBroadcastPass(useBlockOps));
