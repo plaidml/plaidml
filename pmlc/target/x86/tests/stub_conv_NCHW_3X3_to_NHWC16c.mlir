@@ -2,11 +2,8 @@
 // Command lines:
 //PLAIDML_VERBOSE=3 bazel-bin/pmlc/opt -convert-linalg-to-loops -pxa-reorder-layouts="allow-reorder=true" -x86-convert-pxa-to-affine -lower-affine  -canonicalize -convert-scf-to-std -x86-convert-std-to-llvm pmlc/target/x86/tests/stub_conv_NCHW_3X3_to_NHWC16c.mlir 
 
-//PLAIDML_VERBOSE=3 bazel-bin/pmlc/opt -convert-linalg-to-loops -pxa-reorder-layouts="allow-reorder=true" -x86-affine-stencil-xsmm -x86-convert-pxa-to-affine -lower-affine  -canonicalize -convert-scf-to-std -x86-convert-std-to-llvm pmlc/target/x86/tests/stub_conv_NCHW_3X3_to_NHWC16c.mlir
+// PLAIDML_VERBOSE=4 bazel-bin/pmlc/opt -convert-linalg-to-loops -pxa-reorder-layouts="allow-reorder=true" -canonicalize -x86-affine-stencil-xsmm  pmlc/target/x86/tests/stub_conv_NCHW_3X3_to_NHWC16c.mlir
 
-// PLAIDML_VERBOSE=3 bazel-bin/pmlc/opt -convert-linalg-to-loops -pxa-reorder-layouts="allow-reorder=true" pmlc/target/x86/tests/stub_conv_NCHW_3X3_to_NHWC16c.mlir
-
-// PLAIDML_VERBOSE=4 bazel-bin/pmlc/opt -convert-linalg-to-loops -pxa-reorder-layouts="allow-reorder=true" -x86-affine-stencil-xsmm pmlc/target/x86/tests/stub_conv_NCHW_3X3_to_NHWC16c.mlir
 
 #NCHW_to_NHWC16c = affine_map<(N,C,H,W) -> 
             (N,C floordiv 16, H,W,C mod 16)> 

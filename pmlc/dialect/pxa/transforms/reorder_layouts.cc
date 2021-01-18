@@ -17,8 +17,8 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/DebugStringHelper.h"
 #include "llvm/ADT/SetOperations.h"
-#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/TypeSwitch.h"
 
 #include "pmlc/dialect/pxa/analysis/affine_constraints.h"
@@ -303,20 +303,6 @@ void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {
     mlir::Value memRef = op.getMemRef();
     IVLOG(4, "op.getMemRef(): " << mlir::debugString(memRef));
     IVLOG(4, "op.getMapOperands().size(): " << op.getMapOperands().size());
-    int j = 0;
-    for (auto operand : op.getMapOperands()) {
-      IVLOG(4, "operand: " << mlir::debugString(operand));
-
-      for (unsigned i = 0; i < outerIdxs.size(); ++i) {
-        mlir::Value val = outerIdxs[i];
-        if (val == operand) {
-          IVLOG(4, "MATCH found. j: " << j << " i: " << i);
-        }
-        // IVLOG(4, "index i: " << i << ": " << mlir::debugString(val));
-      }
-
-      j++;
-    }
 
     mlir::AffineMap map = op.getAffineMap();
     IVLOG(4, "map: " << mlir::debugString(map));
@@ -351,7 +337,6 @@ void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {
                 }
               }
             }
-            // IVLOG(4, "index i: " << i << ": " << mlir::debugString(val));
           }
         }
       }
@@ -386,7 +371,26 @@ void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {
     }
 
     if (nonUnitTileSizesPresent) {
-      performTiling(parallelOp, tileSizes);
+      // We will check that the tile sizes divide the loop lengths exactly.
+      auto loopLengths = parallelOp.getConstantRanges();
+
+      if (loopLengths.hasValue() &&
+          loopLengths.getValue().size() == tileSizes.size()) {
+        bool tileSizesDivideLoopLengths = true;
+        for (size_t i = 0; i < loopLengths.getValue().size(); i++) {
+          int64_t loopLength = loopLengths.getValue()[i];
+          int64_t tileSize = tileSizes[i];
+          IVLOG(4, "loopLength: " << loopLength << " tile size: " << tileSize);
+          if (!(loopLength > tileSize && loopLength % tileSize == 0)) {
+            tileSizesDivideLoopLengths = false;
+            break;
+          }
+        }
+
+        if (tileSizesDivideLoopLengths) {
+          performTiling(parallelOp, tileSizes);
+        }
+      }
     }
   }
 }
