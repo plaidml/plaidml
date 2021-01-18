@@ -17,12 +17,12 @@ const std::vector<InferenceEngine::Precision> netPrecisions = {
 };
 
 // Sum of elements numSplits = inputShapes[Axis]
-const std::vector<std::vector<int32_t>> numSplits = {
-    {1, 16, 5, 8},   //
-    {2, 19, 5, 4},   //
-    {7, 13, 2, 8},   //
-    {5, 8, 12, 5},   //
-    {4, 11, -1, 9},  //
+const std::vector<std::vector<size_t>> numSplits = {
+    {1, 16, 5, 8},     //
+    {2, 19, 5, 4},     //
+    {7, 13, 2, 8},     //
+    {5, 8, 12, 5},     //
+    {4, 11, -1ul, 9},  //
 };
 
 INSTANTIATE_TEST_CASE_P(smoke_NumSplitsCheck, VariadicSplitLayerTest,
