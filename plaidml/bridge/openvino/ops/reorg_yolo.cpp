@@ -21,7 +21,7 @@ void registerReorgYolo() {
     auto I = ctx.operands.at(0);
     // as openvino op request, the strides have to be divisible by 'H' and 'W'.
     auto strides = layer->get_strides()[0];
-    return edsl::make_tuple(op::reorg_yolo(I, strides, false));
+    return edsl::make_tuple(op::reorg_yolo(I, strides, true));
   });
 }
 
