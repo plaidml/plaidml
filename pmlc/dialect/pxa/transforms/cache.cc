@@ -41,7 +41,7 @@ static AffineParallelOp createCopyLoop(OpBuilder &builder,               //
                                        ArrayRef<int64_t> size,           //
                                        Value srcMemRef, Value dstMemRef, //
                                        ArrayRef<StrideInfo> srcOffset,   //
-                                       ArrayRef<StrideInfo> dstOffset,
+                                       ArrayRef<StrideInfo> dstOffset,   //
                                        AtomicRMWKind agg) {
   assert(size.size() == srcOffset.size());
   assert(size.size() == dstOffset.size());
@@ -69,10 +69,12 @@ static AffineParallelOp createCopyLoop(OpBuilder &builder,               //
 }
 
 static Value allocateLocalCache(OpBuilder &builder, Value memref, Location loc,
-                                const RelativeAccessPattern &rap) {
+                                const RelativeAccessPattern &rap,
+                                bool wholeBlock = false) {
   auto originalType = memref.getType().cast<MemRefType>();
   auto elementType = originalType.getElementType();
-  auto memRefType = MemRefType::get(rap.innerCount, elementType);
+  auto memRefType = MemRefType::get(
+      wholeBlock ? rap.wholeInnerCount : rap.innerCount, elementType);
   auto alloc = builder.create<AllocOp>(loc, memRefType);
   alloc.getOperation()->setAttr("cache", builder.getUnitAttr());
   return alloc;
@@ -391,13 +393,15 @@ void CachePlan::execute() {
     auto builder = OpBuilder::atBlockBegin(entry.band.getBody());
     SmallVector<StrideInfo, 4> zeroOffset(entry.rap.innerCount.size());
 
-    entry.cache = allocateLocalCache(builder, memref, loc, entry.rap);
+    entry.cache =
+        allocateLocalCache(builder, memref, loc, entry.rap, wholeBlock);
     if (isInitialized(memref)) {
       // copy global -> local
       entry.copyInto = true;
-      auto copyLoop = createCopyLoop(builder, loc, entry.rap.innerCount, memref,
-                                     entry.cache, entry.rap.outer, zeroOffset,
-                                     AtomicRMWKind::assign);
+      auto copyLoop = createCopyLoop(
+          builder, loc,
+          wholeBlock ? entry.rap.wholeInnerCount : entry.rap.innerCount, memref,
+          entry.cache, entry.rap.outer, zeroOffset, AtomicRMWKind::assign);
       copyLoop.getOperation()->setAttr("cache_in", builder.getUnitAttr());
       entry.cache = copyLoop.getResult(0);
     }
@@ -429,6 +433,8 @@ void CachePlan::execute() {
 }
 
 struct CachePass : public CacheBase<CachePass> {
+  explicit CachePass(bool wholeBlock) { this->wholeBlock = wholeBlock; }
+
   void runOnFunction() final {
     auto func = getFunction();
 
@@ -451,7 +457,7 @@ struct CachePass : public CacheBase<CachePass> {
         return;
       }
 
-      CachePlan plan(outer, middle);
+      CachePlan plan(outer, middle, wholeBlock);
       inner.walk([&](PxaLoadOp load) { plan.addLoad(load); });
       inner.walk([&](PxaReduceOp reduce) { plan.addReduce(reduce); });
       plan.execute();
@@ -459,8 +465,8 @@ struct CachePass : public CacheBase<CachePass> {
   }
 };
 
-std::unique_ptr<mlir::Pass> createCachePass() {
-  return std::make_unique<CachePass>();
+std::unique_ptr<mlir::Pass> createCachePass(bool wholeBlock) {
+  return std::make_unique<CachePass>(wholeBlock);
 }
 
 } // namespace pmlc::dialect::pxa
