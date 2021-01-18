@@ -112,127 +112,218 @@ void pipelineBuilder(OpPassManager &pm,
   pm.addPass(createCSEPass());
 
   // Data layout optimization.
-  pm.addNestedPass<FuncOp>(
-      createIntelGenOclReorderLayoutsPass(/*maxThreads=*/64,
-                                          /*allowReorder=*/false));
-  pm.addNestedPass<FuncOp>(pxa::createSimplifyWithConstraintsPass());
-  pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
-  pm.addPass(createCanonicalizerPass());
-  pm.addPass(createCSEPass());
+                                                 /*allowReorder=*/true));
+                                                 pm.addNestedPass<FuncOp>(
+                                                     createIntelGenOclReorderLayoutsPass(
+                                                         /*maxThreads=*/64,
+                                                         /*allowReorder=*/
+                                                         false));
+                                                 pm.addNestedPass<FuncOp>(
+                                                     pxa::
+                                                         createSimplifyWithConstraintsPass());
+                                                 pm.addNestedPass<FuncOp>(
+                                                     pxa::
+                                                         createAffineNormalizePass());
+                                                 pm.addPass(
+                                                     createCanonicalizerPass());
+                                                 pm.addPass(createCSEPass());
 
-  // TODO: uncomment this pass after llvm upstream update with dynamic vec ops
-  /*pm.addPass(pxa::createVectorizeMemPass());
-  pm.addPass(pmlc::dialect::pxa::createAffineNormalizePass());
-  pm.addPass(createCanonicalizerPass());
-  pm.addPass(createCSEPass());*/
+                                                 // Reads/writes vectorizations
+                                                 pm.addPass(
+                                                     pxa::
+                                                         createVectorizeMemPass());
+                                                 pm.addPass(
+                                                     pmlc::dialect::pxa::
+                                                         createAffineNormalizePass());
+                                                 pm.addPass(
+                                                     createCanonicalizerPass());
+                                                 pm.addPass(createCSEPass());
 
-  // Lower out of PXA memory semantics
-  pm.addPass(pmlc::target::intel_gen::createLowerPXAToAffinePass());
-  pm.addPass(createCanonicalizerPass());
-  pm.addPass(createCSEPass());
+                                                 // Lower out of PXA memory
+                                                 // semantics
+                                                 pm.addPass(
+                                                     pmlc::target::intel_gen::
+                                                         createLowerPXAToAffinePass());
+                                                 pm.addPass(
+                                                     createCanonicalizerPass());
+                                                 pm.addPass(createCSEPass());
 
-  pm.addNestedPass<FuncOp>(createAffineLoopInvariantCodeMotionPass());
-  pm.addPass(createCanonicalizerPass());
-  pm.addPass(createCSEPass());
+                                                 pm.addNestedPass<FuncOp>(
+                                                     createAffineLoopInvariantCodeMotionPass());
+                                                 pm.addPass(
+                                                     createCanonicalizerPass());
+                                                 pm.addPass(createCSEPass());
 
-  // Unroll affine.for loops.
-  pm.addNestedPass<FuncOp>(pmlc::dialect::affinex::createAffinexLoopUnroll(
-      /*operationLimit =*/2048));
-  pm.addPass(createCanonicalizerPass());
-  pm.addPass(createCSEPass());
+                                                 // Unroll affine.for loops.
+                                                 pm.addNestedPass<FuncOp>(
+                                                     pmlc::dialect::affinex::
+                                                         createAffinexLoopUnroll(
+                                                             /*operationLimit
+                                                                =*/
+                                                             2048));
+                                                 pm.addPass(
+                                                     createCanonicalizerPass());
+                                                 pm.addPass(createCSEPass());
 
-  // Block level MemRef dataflow optimization
-  // WARNING: Assumes no aliasing
-  // (try disabling this pass in case of correctness errors)
-  pm.addNestedPass<FuncOp>(
-      pmlc::dialect::affinex::createAffinexMemRefDataFlowOpt());
-  pm.addPass(createCanonicalizerPass());
-  pm.addPass(createCSEPass());
+                                                 // Block level MemRef dataflow
+                                                 // optimization WARNING:
+                                                 // Assumes no aliasing (try
+                                                 // disabling this pass in case
+                                                 // of correctness errors)
+                                                 pm.addNestedPass<FuncOp>(
+                                                     pmlc::dialect::affinex::
+                                                         createAffinexMemRefDataFlowOpt());
+                                                 pm.addPass(
+                                                     createCanonicalizerPass());
+                                                 pm.addPass(createCSEPass());
 
-  pm.addNestedPass<FuncOp>(
-      pmlc::dialect::affinex::createAffinexDeadMemRefElimination());
-  pm.addPass(createCanonicalizerPass());
-  pm.addPass(createCSEPass());
+                                                 pm.addNestedPass<FuncOp>(
+                                                     pmlc::dialect::affinex::
+                                                         createAffinexDeadMemRefElimination());
+                                                 pm.addPass(
+                                                     createCanonicalizerPass());
+                                                 pm.addPass(createCSEPass());
 
-  // Pack dims
-  pm.addNestedPass<FuncOp>(
-      pmlc::target::intel_gen::createAffineIndexPackPass());
-  pm.addPass(createCanonicalizerPass());
-  pm.addPass(createCSEPass());
+                                                 // Pack dims
+                                                 pm.addNestedPass<FuncOp>(
+                                                     pmlc::target::intel_gen::
+                                                         createAffineIndexPackPass());
+                                                 pm.addPass(
+                                                     createCanonicalizerPass());
+                                                 pm.addPass(createCSEPass());
 
-  // Do a custom version of lower-affine which also set GPU mappings
-  pm.addNestedPass<FuncOp>(
-      pmlc::target::intel_gen::createIntelGenLowerAffinePass());
-  pm.addPass(createCanonicalizerPass());
-  pm.addPass(createCSEPass());
+                                                 // Do a custom version of
+                                                 // lower-affine which also set
+                                                 // GPU mappings
+                                                 pm.addNestedPass<FuncOp>(
+                                                     pmlc::target::intel_gen::
+                                                         createIntelGenLowerAffinePass());
+                                                 pm.addPass(
+                                                     createCanonicalizerPass());
+                                                 pm.addPass(createCSEPass());
 
-  // Fix booleans
-  pm.addNestedPass<FuncOp>(stdx::createI1StorageToI32Pass());
+                                                 // Fix booleans
+                                                 pm.addNestedPass<FuncOp>(
+                                                     stdx::
+                                                         createI1StorageToI32Pass());
 
-  // Devectorize
-  pm.addNestedPass<FuncOp>(pmlc::target::intel_gen::createSubgroupBroadcastPass(
-      /*useBlockOps=*/true));
-  pm.addPass(createCSEPass());
+                                                 // Devectorize
+                                                 pm.addNestedPass<FuncOp>(
+                                                     pmlc::target::intel_gen::
+                                                         createSubgroupBroadcastPass(
+                                                             /*useBlockOps=*/
+                                                             true));
+                                                 pm.addPass(createCSEPass());
 
-  // Lower mapped scf.parallel's to GPU
-  pm.addNestedPass<FuncOp>(
-      pmlc::target::intel_gen::createParallelLoopToGpuPass());
-  pm.addPass(createCanonicalizerPass());
-  pm.addPass(createCSEPass());
+                                                 // Lower mapped scf.parallel's
+                                                 // to GPU
+                                                 pm.addNestedPass<FuncOp>(
+                                                     pmlc::target::intel_gen::
+                                                         createParallelLoopToGpuPass());
+                                                 pm.addPass(
+                                                     createCanonicalizerPass());
+                                                 pm.addPass(createCSEPass());
 
-  // GPU transforms
-  pm.addPass(
-      createAddSpirvTargetPass(oclPipelineOptions.spirvVersion.getValue()));
-  pm.addPass(conversion::gpu::createGpuKernelOutliningPass(
-      comp::ExecEnvRuntime::OpenCL, /*memorySpace=*/11));
+                                                 // GPU transforms
+                                                 pm.addPass(
+                                                     createAddSpirvTargetPass(
+                                                         oclPipelineOptions
+                                                             .spirvVersion
+                                                             .getValue()));
+                                                 pm.addPass(
+                                                     conversion::gpu::
+                                                         createGpuKernelOutliningPass(
+                                                             comp::
+                                                                 ExecEnvRuntime::
+                                                                     OpenCL,
+                                                             /*memorySpace=*/
+                                                             11));
 
-  // Hoist GPU ops
-  pm.addPass(transforms::createHoistingPass());
-  // pm.addPass(conversion::gpu::createGatherGpuLaunchFuncsPass());
-  // pm.addPass(comp::createMinimizeBufferTransfersPass());
-  // pm.addPass(comp::createExecEnvCoalescingPass());
-  // pm.addPass(comp::createMinimizeAllocationsPass());
-  pm.addNestedPass<FuncOp>(comp::createRemoveRedundantRWPass());
-  // pm.addPass(comp::createRecalculateEventDepsPass(/*safeDealloc=*/false));
+                                                 // Hoist GPU ops
+                                                 pm.addPass(
+                                                     transforms::
+                                                         createHoistingPass());
+                                                 // pm.addPass(conversion::gpu::createGatherGpuLaunchFuncsPass());
+                                                 // pm.addPass(comp::createMinimizeBufferTransfersPass());
+                                                 // pm.addPass(comp::createExecEnvCoalescingPass());
+                                                 // pm.addPass(comp::createMinimizeAllocationsPass());
+                                                 pm.addNestedPass<FuncOp>(
+                                                     comp::
+                                                         createRemoveRedundantRWPass());
+                                                 // pm.addPass(comp::createRecalculateEventDepsPass(/*safeDealloc=*/false));
 
-  // GPU to SPIR-V.
-  pm.addPass(createLegalizeStdOpsForSPIRVLoweringPass());
-  pm.addPass(createCanonicalizerPass());
-  pm.addPass(createCSEPass());
+                                                 // GPU to SPIR-V.
+                                                 pm.addPass(
+                                                     createLegalizeStdOpsForSPIRVLoweringPass());
+                                                 pm.addPass(
+                                                     createCanonicalizerPass());
+                                                 pm.addPass(createCSEPass());
 
-  bool nonUniformBroadcast = false;
-  if (oclPipelineOptions.spirvVersion.getValue() >= 150) {
-    nonUniformBroadcast = true;
-  }
-  pm.addPass(conversion::gpu_to_spirv::createGPUToSPIRVCustomPass(
-      nonUniformBroadcast));
+                                                 bool nonUniformBroadcast =
+                                                     false;
+                                                 if (oclPipelineOptions
+                                                         .spirvVersion
+                                                         .getValue() >= 150) {
+                                                   nonUniformBroadcast = true;
+                                                 }
+                                                 pm.addPass(
+                                                     conversion::gpu_to_spirv::
+                                                         createGPUToSPIRVCustomPass(
+                                                             nonUniformBroadcast));
 
-  // SPIR-V passes for lowering attributes.
-  pm.addNestedPass<mlir::spirv::ModuleOp>(createSetSubgroupSizePass());
-  pm.addNestedPass<mlir::spirv::ModuleOp>(createSetAccessQualifiersPass());
-  pm.addNestedPass<mlir::spirv::ModuleOp>(createLegalizeSpirvPass());
-  pm.addNestedPass<mlir::spirv::ModuleOp>(
-      spirv::createLowerABIAttributesPass());
-  pm.addNestedPass<mlir::spirv::ModuleOp>(
-      spirv::createUpdateVersionCapabilityExtensionPass());
+                                                 // SPIR-V passes for lowering
+                                                 // attributes.
+                                                 pm.addNestedPass<
+                                                     mlir::spirv::ModuleOp>(
+                                                     createSetSubgroupSizePass());
+                                                 pm.addNestedPass<
+                                                     mlir::spirv::ModuleOp>(
+                                                     createSetAccessQualifiersPass());
+                                                 pm.addNestedPass<
+                                                     mlir::spirv::ModuleOp>(
+                                                     createLegalizeSpirvPass());
+                                                 pm.addNestedPass<
+                                                     mlir::spirv::ModuleOp>(
+                                                     spirv::
+                                                         createLowerABIAttributesPass());
+                                                 pm.addNestedPass<
+                                                     mlir::spirv::ModuleOp>(
+                                                     spirv::
+                                                         createUpdateVersionCapabilityExtensionPass());
 
-  // Unbox wrapped argsort and lower remaining affine loops.
-  pm.addNestedPass<FuncOp>(layer::createInlineLayersPass());
-  pm.addPass(pmlc::target::intel_gen::createLowerPXAToAffinePass());
-  pm.addPass(createLowerAffinePass());
-  pm.addPass(createLowerToCFGPass());
-  pm.addPass(createCanonicalizerPass());
-  pm.addPass(createCSEPass());
+                                                 // Unbox wrapped argsort and
+                                                 // lower remaining affine
+                                                 // loops.
+                                                 pm.addNestedPass<FuncOp>(
+                                                     layer::
+                                                         createInlineLayersPass());
+                                                 pm.addPass(
+                                                     pmlc::target::intel_gen::
+                                                         createLowerPXAToAffinePass());
+                                                 pm.addPass(
+                                                     createLowerAffinePass());
+                                                 pm.addPass(
+                                                     createLowerToCFGPass());
+                                                 pm.addPass(
+                                                     createCanonicalizerPass());
+                                                 pm.addPass(createCSEPass());
 
-  // Comp to LLVM - OpenCL function calls.
-  pm.addPass(
-      pmlc::conversion::comp_to_llvm::createConvertCompToLLVMPass("ocl_"));
+                                                 // Comp to LLVM - OpenCL
+                                                 // function calls.
+                                                 pm.addPass(
+                                                     pmlc::conversion::comp_to_llvm::
+                                                         createConvertCompToLLVMPass(
+                                                             "ocl_"));
 
-  // Lower SCF to Standard before converting to LLVM
-  pm.addPass(createLowerToCFGPass());
+                                                 // Lower SCF to Standard before
+                                                 // converting to LLVM
+                                                 pm.addPass(
+                                                     createLowerToCFGPass());
 
-  // Convert to LLVM code.
-  pm.addPass(pmlc::target::intel_gen::createConvertStandardToLLVM());
+                                                 // Convert to LLVM code.
+                                                 pm.addPass(
+                                                     pmlc::target::intel_gen::
+                                                         createConvertStandardToLLVM());
 }
 
 static constexpr const char *kTargetName = "intel_gen_ocl_spirv";
