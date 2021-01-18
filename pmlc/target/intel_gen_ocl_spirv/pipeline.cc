@@ -164,11 +164,8 @@ void pipelineBuilder(OpPassManager &pm,
   pm.addPass(stdx::createI1StorageToI32Pass());
 
   // Devectorize
-  bool useBlockOps = false;
-  if (oclPipelineOptions.spirvVersion.getValue() >= 150) {
-    useBlockOps = true;
-  }
-  pm.addPass(pmlc::target::intel_gen::createSubgroupBroadcastPass(useBlockOps));
+  pm.addPass(pmlc::target::intel_gen::createSubgroupBroadcastPass(
+      /*useBlockOps=*/true));
   pm.addPass(createCSEPass());
 
   // Lower mapped scf.parallel's to GPU
