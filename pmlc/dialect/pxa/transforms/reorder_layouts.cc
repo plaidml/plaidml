@@ -113,6 +113,57 @@ bool divisorDividesTheLoops(int64_t constantValue,
   return false;
 }
 
+bool isConstantRhsCompatibleWithSurroundingLoops(
+    mlir::ValueRange innerIdxs, mlir::ValueRange outerIdxs,
+    mlir::ValueRange mapOperands, mlir::AffineExpr &lhsExpr,
+    mlir::AffineExpr &rhsExpr, size_t *innerLoopPos,
+    mlir::AffineParallelOp outerParallelOp,
+    mlir::AffineParallelOp innerParallelOp) {
+  auto constantExpr = rhsExpr.cast<mlir::AffineConstantExpr>();
+  int64_t constantValue = constantExpr.getValue();
+
+  if (lhsExpr.getKind() == mlir::AffineExprKind::DimId) {
+    auto dimExpr = lhsExpr.cast<mlir::AffineDimExpr>();
+    unsigned pos = dimExpr.getPosition();
+    IVLOG(4, "lhsExpr is DimId. Position " << pos);
+    auto arg = mapOperands[pos];
+    bool innerLoopPosFound = false;
+    for (size_t i = 0; i < innerIdxs.size(); i++) {
+      if (arg == innerIdxs[i]) {
+        *innerLoopPos = i;
+        innerLoopPosFound = true;
+        IVLOG(4, "innerLoopPos: " << innerLoopPos);
+        break;
+      }
+    }
+
+    if (!innerLoopPosFound) {
+      IVLOG(4, "innerLoopPos is not valid");
+      return false;
+    } else {
+      if (*innerLoopPos < outerIdxs.size()) {
+        if (divisorDividesTheLoops(constantValue, outerParallelOp,
+                                   innerParallelOp, *innerLoopPos)) {
+          return true;
+        } else {
+          IVLOG(4, "The divisor in the floordiv expression does not "
+                   "divide the loop ranges.");
+          return false;
+        }
+      } else {
+        IVLOG(4, "innerLoopPos is out of bounds.");
+        return false;
+      }
+    }
+
+  } else {
+    IVLOG(4, "The result expression is not a DimId kind expression.");
+    return false;
+  }
+
+  return false;
+}
+
 struct MemRefSimplificationResults {
   bool newMapFormed;
   mlir::SmallVector<mlir::Value, 8> resultOperands;
@@ -157,64 +208,24 @@ simplifyMemrefMaps(mlir::OpBuilder &builder, mlir::AffineMap &map,
         // length of the inner loop and also the same as the loop length
         // of the inner and that it exactly divides the loop length of the
         // corresponding loop in the outer set of loops
+        size_t innerLoopPos;
+        if (isConstantRhsCompatibleWithSurroundingLoops(
+                innerIdxs, outerIdxs, mapOperands, lhsExpr, rhsExpr,
+                &innerLoopPos, outerParallelOp, innerParallelOp)) {
+          loadOpIndicesMap.insert({newDims, outerIdxs[innerLoopPos]});
+          auto newDimIdExpr =
+              builder.getAffineDimExpr(currentNumDims + newDims);
 
-        auto constantExpr = rhsExpr.cast<mlir::AffineConstantExpr>();
-        int64_t constantValue = constantExpr.getValue();
-
-        IVLOG(4, "lhsExpr: " << mlir::debugString(lhsExpr));
-        results.newMapFormed = true;
-
-        if (lhsExpr.getKind() == mlir::AffineExprKind::DimId) {
-          auto dimExpr = lhsExpr.cast<mlir::AffineDimExpr>();
-          unsigned pos = dimExpr.getPosition();
-          IVLOG(4, "lhsExpr is DimId. Position " << pos);
-          auto arg = mapOperands[pos];
-          size_t innerLoopPos;
-          bool innerLoopPosFound = false;
-          for (size_t i = 0; i < innerIdxs.size(); i++) {
-            if (arg == innerIdxs[i]) {
-              innerLoopPos = i;
-              innerLoopPosFound = true;
-              IVLOG(4, "innerLoopPos: " << innerLoopPos);
-              // IVLOG(4, "outerIdxs[innerLoopPos]: "
-              //          << mlir::debugString(outerIdxs[innerLoopPos]));
-              break;
-            }
-          }
-
-          if (!innerLoopPosFound) {
-            IVLOG(4, "innerLoopPos is not valid");
-            results.newMapFormed = false;
-            return results;
-          } else {
-            if (innerLoopPos < outerIdxs.size()) {
-              if (divisorDividesTheLoops(constantValue, outerParallelOp,
-                                         innerParallelOp, innerLoopPos)) {
-                loadOpIndicesMap.insert({newDims, outerIdxs[innerLoopPos]});
-                auto newDimIdExpr =
-                    builder.getAffineDimExpr(currentNumDims + newDims);
-
-                simplifiedExprs.push_back(newDimIdExpr);
-                expressionAdded = true;
-                newDims++;
-              } else {
-                IVLOG(4, "The divisor in the floordiv expression does not "
-                         "divide the loop ranges.");
-                results.newMapFormed = false;
-                return results;
-              }
-            } else {
-              IVLOG(4, "innerLoopPos is out of bounds.");
-              results.newMapFormed = false;
-              return results;
-            }
-          }
-
+          simplifiedExprs.push_back(newDimIdExpr);
+          expressionAdded = true;
+          newDims++;
         } else {
-          IVLOG(4, "The result expression is not a DimId kind expression.");
           results.newMapFormed = false;
           return results;
         }
+
+        IVLOG(4, "lhsExpr: " << mlir::debugString(lhsExpr));
+        results.newMapFormed = true;
       }
     } else if (expr.getKind() == mlir::AffineExprKind::Mod) {
       auto divExpr = expr.cast<mlir::AffineBinaryOpExpr>();
@@ -229,54 +240,15 @@ simplifyMemrefMaps(mlir::OpBuilder &builder, mlir::AffineMap &map,
         // of the inner and that it exactly divides the loop length of the
         // corresponding loop in the outer set of loops
 
-        auto constantExpr = rhsExpr.cast<mlir::AffineConstantExpr>();
-        int64_t constantValue = constantExpr.getValue();
-
-        if (lhsExpr.getKind() == mlir::AffineExprKind::DimId) {
-          auto dimExpr = lhsExpr.cast<mlir::AffineDimExpr>();
-          unsigned pos = dimExpr.getPosition();
-          IVLOG(4, "lhsExpr is DimId. Position " << pos);
-          auto arg = mapOperands[pos];
-          size_t innerLoopPos;
-          bool innerLoopPosFound = false;
-          for (size_t i = 0; i < innerIdxs.size(); i++) {
-            if (arg == innerIdxs[i]) {
-              innerLoopPos = i;
-              innerLoopPosFound = true;
-              IVLOG(4, "innerLoopPos: " << innerLoopPos);
-              // IVLOG(4, "outerIdxs[innerLoopPos]: "
-              //          << mlir::debugString(outerIdxs[innerLoopPos]));
-              break;
-            }
-          }
-
-          if (!innerLoopPosFound) {
-            IVLOG(4, "innerLoopPos is not valid");
-            results.newMapFormed = false;
-            return results;
-          } else {
-            if (innerLoopPos < outerIdxs.size()) {
-              if (divisorDividesTheLoops(constantValue, outerParallelOp,
-                                         innerParallelOp, innerLoopPos)) {
-                results.newMapFormed = true;
-                simplifiedExprs.push_back(lhsExpr);
-                expressionAdded = true;
-
-              } else {
-                IVLOG(4, "The divisor in the modulo expression does not divide "
-                         "the loop ranges.");
-                results.newMapFormed = false;
-                return results;
-              }
-            } else {
-              IVLOG(4, "innerLoopPos is out of bounds.");
-              results.newMapFormed = false;
-              return results;
-            }
-          }
-
+        size_t innerLoopPos;
+        if (isConstantRhsCompatibleWithSurroundingLoops(
+                innerIdxs, outerIdxs, mapOperands, lhsExpr, rhsExpr,
+                &innerLoopPos, outerParallelOp, innerParallelOp)) {
+          loadOpIndicesMap.insert({newDims, outerIdxs[innerLoopPos]});
+          results.newMapFormed = true;
+          simplifiedExprs.push_back(lhsExpr);
+          expressionAdded = true;
         } else {
-          IVLOG(4, "The result expression is not a DimId kind expression.");
           results.newMapFormed = false;
           return results;
         }
