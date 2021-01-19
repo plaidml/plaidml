@@ -187,6 +187,9 @@ struct RelativeAccessPattern {
   // For each dimension what is the number of accesses
   mlir::SmallVector<int64_t, 4> innerCount;
 
+  // For each dimension what is the number of accesses including skipped elements
+  mlir::SmallVector<int64_t, 4> wholeInnerCount;
+
   // For each dimension what is the minimal stride of the access.  Note:
   // dimensions with a count of 1 have a stride of 1 automatically
   mlir::SmallVector<int64_t, 4> innerStride() const;

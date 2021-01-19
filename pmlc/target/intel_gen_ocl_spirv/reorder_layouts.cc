@@ -97,6 +97,7 @@ public:
     mlir::FuncOp func = getFunction();
     mlir::DenseMap<mlir::Value, pxa::MemoryUsageDesc> globalMemory =
         pxa::gatherGlobalMemoryDescs(func, intelGenOclScheduleModel);
+    llvm::SetVector<mlir::Operation *> toRemove;
     for (auto &valueDesc : globalMemory) {
       pxa::MemoryUsageDesc &memoryDesc = valueDesc.second;
       IVLOG(3, "Optimizing layout for " << mlir::debugString(memoryDesc.value));
@@ -119,8 +120,11 @@ public:
 
       IVLOG(3, "Failed to change layout in-place, inserting reorder");
       pxa::reorderMemoryReads(ThreadedReorderCreator(maxThreads), reorder,
-                              memoryDesc, moduleOp);
+                              memoryDesc, moduleOp, toRemove);
     }
+    // Cleanup
+    for (auto op : toRemove)
+      op->erase();
   }
 };
 

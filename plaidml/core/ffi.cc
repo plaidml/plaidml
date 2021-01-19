@@ -6,6 +6,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -389,9 +390,16 @@ void plaidml_program_compile(  //
 
 plaidml_buffer* plaidml_program_save(  //
     plaidml_error* err,                //
-    plaidml_program* program) {
-  return ffi_wrap<plaidml_buffer*>(err, nullptr, [&] {  //
-    return new plaidml_buffer{program->program->save()};
+    plaidml_program* program,          //
+    size_t nkvps,                      //
+    const char** keys,                 //
+    const char** values) {
+  return ffi_wrap<plaidml_buffer*>(err, nullptr, [&] {
+    std::unordered_map<std::string, std::string> config;
+    for (size_t i = 0; i < nkvps; i++) {
+      config[keys[i]] = values[i];
+    }
+    return new plaidml_buffer{program->program->save(config)};
   });
 }
 

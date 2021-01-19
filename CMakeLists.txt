@@ -119,6 +119,7 @@ endif()
 
 add_subdirectory(plaidml)
 add_subdirectory(pmlc)
+add_subdirectory(docs)
 
 # Note: this must be called after all libraries have been declared.
 pml_complete_binary_link_options()

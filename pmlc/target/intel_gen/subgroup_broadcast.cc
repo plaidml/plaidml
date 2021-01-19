@@ -175,15 +175,7 @@ public:
       devectorizeVectorOp(newBlockWriteOp.getOperation());
       IVLOG(3, "Block Write Op: " << debugString(*newBlockWriteOp));
       op.erase();
-      // Case2: TODO: Change this condition to include memref being vector,
-      // where it is needed to use vector write instead
-    } else if (isa<dialect::stdx::SubgroupBlockReadINTELOp>(
-                   op.vector().getDefiningOp())) {
-      auto newStoreOp = builder.create<vector::TransferWriteOp>(
-          op.getLoc(), op.vector(), op.memref(), idxs);
-      IVLOG(3, "Block Write Op: " << debugString(*newStoreOp));
-      op.erase();
-      // Case3: No block writes or vectors, use default devectorization
+      // Case2: No block writes or vectors, use default devectorization
     } else {
       idxs.back() = builder.create<AddIOp>(op.getLoc(), idxs.back(), sid);
       auto newStoreOp =
