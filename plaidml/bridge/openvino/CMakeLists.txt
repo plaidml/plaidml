@@ -99,6 +99,8 @@ install(
         ${OUTPUT_ROOT}/bin/libplaidml.so.1
         ${OpenVINO_MAIN_SOURCE_DIR}/${BIN_FOLDER}/${CMAKE_BUILD_TYPE}/lib/libformat_reader.so
         ${IE_MAIN_SOURCE_DIR}/temp/tbb/lib/libtbb.so.2
+        ${OUTPUT_ROOT}/_deps/llvm-project-build/lib/libmlir_runner_utils.so.12git
+        ${OUTPUT_ROOT}/_deps/llvm-project-build/lib/libomp.so
     DESTINATION bin/lib
     COMPONENT BENCHMARK_APP
 )
