@@ -77,12 +77,10 @@ endif()
 
 ie_cpack_add_component(BENCHMARK_APP REQUIRED)
 install(
-    DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/
+    PROGRAMS
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/benchmark_app
     DESTINATION bin
     COMPONENT BENCHMARK_APP
-    USE_SOURCE_PERMISSIONS
-    FILES_MATCHING
-    PATTERN "benchmark_app"
 )
 
 install(
