@@ -93,26 +93,16 @@ install(
     PATTERN "*.a" EXCLUDE
 )
 
-# libformat_reader.so
 install(
-    DIRECTORY ${OpenVINO_MAIN_SOURCE_DIR}/${BIN_FOLDER}/${CMAKE_BUILD_TYPE}/lib/
+    PROGRAMS
+        ${OUTPUT_ROOT}/bin/libplaidml.so
+        ${OUTPUT_ROOT}/bin/libplaidml.so.1
+        ${OpenVINO_MAIN_SOURCE_DIR}/${BIN_FOLDER}/${CMAKE_BUILD_TYPE}/lib/libformat_reader.so
+        ${IE_MAIN_SOURCE_DIR}/temp/tbb/lib/libtbb.so.2
     DESTINATION bin/lib
     COMPONENT BENCHMARK_APP
-    USE_SOURCE_PERMISSIONS
-    PATTERN "*.a" EXCLUDE
 )
 
-# tbb
-install(
-    DIRECTORY ${IE_MAIN_SOURCE_DIR}/temp/tbb/lib/
-    DESTINATION bin/lib
-    COMPONENT BENCHMARK_APP
-    USE_SOURCE_PERMISSIONS
-    FILES_MATCHING
-    PATTERN "libtbb.so.2"
-)
-
-# opencv
 install(
     DIRECTORY ${IE_MAIN_SOURCE_DIR}/temp/opencv_4.5.0_ubuntu20/opencv/lib/
     DESTINATION bin/lib
