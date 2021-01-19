@@ -17,6 +17,8 @@
 #include "ngraph/op/util/attr_types.hpp"
 #include "ngraph/shape.hpp"
 #include "ngraph/type/element_type.hpp"
+#include "ngraph/op/constant.hpp"
+
 
 #include "plaidml/edsl/edsl.h"
 #include "plaidml/op/op.h"
@@ -36,5 +38,15 @@ ngraph::Coordinate get_coords_from_constant_operand(size_t operand_idx, ngraph::
 
 plaidml::edsl::Tensor clip_activation(const std::string& func_name, bool should_clip, float clip,
                                       const plaidml::edsl::Tensor& T);
+
+template <typename T>
+std::vector<T> get_constant_vector(size_t operand_idx, ngraph::Node* layer){
+  auto* vector_ngraph_op = ngraph::as_type<ngraph::op::Constant>(layer->get_input_node_ptr(operand_idx));
+  if (vector_ngraph_op) {
+    return vector_ngraph_op->get_vector<T>();
+  } else {
+    THROW_IE_EXCEPTION << "Dynamic vector not currently supported by PlaidML plugin";
+  }
+}
 
 }  // namespace PlaidMLPlugin

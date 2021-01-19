@@ -4,8 +4,6 @@
 
 #include "plaidml_util.hpp"
 
-#include "ngraph/op/constant.hpp"
-
 #include "plaidml/edsl/edsl.h"
 
 using namespace plaidml;          // NOLINT[build/namespaces]
