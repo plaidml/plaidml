@@ -18,7 +18,7 @@ const std::vector<std::vector<size_t>> kernels = {
     {2, 2}, {3, 3}, {4, 4}, {1, 3}, {4, 2},
 };
 const std::vector<std::vector<size_t>> strides = {
-    {3, 3}, {5, 5}, {9, 9}, {1, 3}, {6, 2},
+    {3, 3}, {5, 5}, {9, 9}, {1, 3}, {5, 2},
 };
 const std::vector<std::vector<size_t>> rates = {
     {1, 1},
