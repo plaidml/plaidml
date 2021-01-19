@@ -87,6 +87,32 @@ public:
   }
 };
 
+bool divisorDividesTheLoops(int64_t constantValue,
+                            mlir::AffineParallelOp outerParallelOp,
+                            mlir::AffineParallelOp innerParallelOp,
+                            size_t loopPos) {
+  auto outerLoopLengths = outerParallelOp.getConstantRanges();
+  auto innerLoopLengths = innerParallelOp.getConstantRanges();
+
+  if (outerLoopLengths.hasValue() && innerLoopLengths.hasValue() &&
+      outerLoopLengths.getValue().size() ==
+          innerLoopLengths.getValue().size()) {
+    int64_t outerLoopLength = outerLoopLengths.getValue()[loopPos];
+    int64_t innerLoopLength = innerLoopLengths.getValue()[loopPos];
+    IVLOG(4, "outerLoopLength: " << outerLoopLength
+                                 << " innerLoopLength: " << innerLoopLength
+                                 << " constantValue: " << constantValue);
+
+    if (constantValue == innerLoopLength &&
+        innerLoopLength <= outerLoopLength &&
+        (outerLoopLength % innerLoopLength == 0)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 struct MemRefSimplificationResults {
   bool newMapFormed;
   mlir::SmallVector<mlir::Value, 8> resultOperands;
@@ -95,11 +121,17 @@ struct MemRefSimplificationResults {
 
 typedef struct MemRefSimplificationResults MemRefSimplificationResults;
 
-MemRefSimplificationResults simplifyMemrefMaps(mlir::OpBuilder &builder,
-                                               mlir::AffineMap &map,
-                                               mlir::ValueRange mapOperands,
-                                               mlir::ValueRange outerIdxs,
-                                               mlir::ValueRange innerIdxs) {
+MemRefSimplificationResults
+simplifyMemrefMaps(mlir::OpBuilder &builder, mlir::AffineMap &map,
+                   mlir::ValueRange mapOperands,
+                   mlir::AffineParallelOp outerParallelOp,
+                   mlir::AffineParallelOp innerParallelOp) {
+  mlir::Block *outerBody = outerParallelOp.getBody();
+  auto outerIdxs = outerBody->getArguments();
+
+  mlir::Block *innerBody = innerParallelOp.getBody();
+  auto innerIdxs = innerBody->getArguments();
+
   MemRefSimplificationResults results;
   IVLOG(4, "map: " << mlir::debugString(map));
 
@@ -125,7 +157,9 @@ MemRefSimplificationResults simplifyMemrefMaps(mlir::OpBuilder &builder,
         // length of the inner loop and also the same as the loop length
         // of the inner and that it exactly divides the loop length of the
         // corresponding loop in the outer set of loops
-        // TODO: Perform the necessary checks
+
+        auto constantExpr = rhsExpr.cast<mlir::AffineConstantExpr>();
+        int64_t constantValue = constantExpr.getValue();
 
         IVLOG(4, "lhsExpr: " << mlir::debugString(lhsExpr));
         results.newMapFormed = true;
@@ -154,13 +188,21 @@ MemRefSimplificationResults simplifyMemrefMaps(mlir::OpBuilder &builder,
             return results;
           } else {
             if (innerLoopPos < outerIdxs.size()) {
-              loadOpIndicesMap.insert({newDims, outerIdxs[innerLoopPos]});
-              auto newDimIdExpr =
-                  builder.getAffineDimExpr(currentNumDims + newDims);
+              if (divisorDividesTheLoops(constantValue, outerParallelOp,
+                                         innerParallelOp, innerLoopPos)) {
+                loadOpIndicesMap.insert({newDims, outerIdxs[innerLoopPos]});
+                auto newDimIdExpr =
+                    builder.getAffineDimExpr(currentNumDims + newDims);
 
-              simplifiedExprs.push_back(newDimIdExpr);
-              expressionAdded = true;
-              newDims++;
+                simplifiedExprs.push_back(newDimIdExpr);
+                expressionAdded = true;
+                newDims++;
+              } else {
+                IVLOG(4, "The divisor in the floordiv expression does not "
+                         "divide the loop ranges.");
+                results.newMapFormed = false;
+                return results;
+              }
             } else {
               IVLOG(4, "innerLoopPos is out of bounds.");
               results.newMapFormed = false;
@@ -186,11 +228,58 @@ MemRefSimplificationResults simplifyMemrefMaps(mlir::OpBuilder &builder,
         // length of the inner loop and also the same as the loop length
         // of the inner and that it exactly divides the loop length of the
         // corresponding loop in the outer set of loops
-        // TODO: Perform the necessary checks
 
-        results.newMapFormed = true;
-        simplifiedExprs.push_back(lhsExpr);
-        expressionAdded = true;
+        auto constantExpr = rhsExpr.cast<mlir::AffineConstantExpr>();
+        int64_t constantValue = constantExpr.getValue();
+
+        if (lhsExpr.getKind() == mlir::AffineExprKind::DimId) {
+          auto dimExpr = lhsExpr.cast<mlir::AffineDimExpr>();
+          unsigned pos = dimExpr.getPosition();
+          IVLOG(4, "lhsExpr is DimId. Position " << pos);
+          auto arg = mapOperands[pos];
+          size_t innerLoopPos;
+          bool innerLoopPosFound = false;
+          for (size_t i = 0; i < innerIdxs.size(); i++) {
+            if (arg == innerIdxs[i]) {
+              innerLoopPos = i;
+              innerLoopPosFound = true;
+              IVLOG(4, "innerLoopPos: " << innerLoopPos);
+              // IVLOG(4, "outerIdxs[innerLoopPos]: "
+              //          << mlir::debugString(outerIdxs[innerLoopPos]));
+              break;
+            }
+          }
+
+          if (!innerLoopPosFound) {
+            IVLOG(4, "innerLoopPos is not valid");
+            results.newMapFormed = false;
+            return results;
+          } else {
+            if (innerLoopPos < outerIdxs.size()) {
+              if (divisorDividesTheLoops(constantValue, outerParallelOp,
+                                         innerParallelOp, innerLoopPos)) {
+                results.newMapFormed = true;
+                simplifiedExprs.push_back(lhsExpr);
+                expressionAdded = true;
+
+              } else {
+                IVLOG(4, "The divisor in the modulo expression does not divide "
+                         "the loop ranges.");
+                results.newMapFormed = false;
+                return results;
+              }
+            } else {
+              IVLOG(4, "innerLoopPos is out of bounds.");
+              results.newMapFormed = false;
+              return results;
+            }
+          }
+
+        } else {
+          IVLOG(4, "The result expression is not a DimId kind expression.");
+          results.newMapFormed = false;
+          return results;
+        }
       }
     }
 
@@ -230,14 +319,7 @@ void simplifyMemrefMaps(mlir::AffineParallelOp &parallelOp) {
     if (parallelOp != parallelOp2) {
       IVLOG(4, "AffineParallelOp within AffineParallelOp: " << parallelOp2);
 
-      mlir::Block *outerBody = parallelOp.getBody();
-      auto outerIdxs = outerBody->getArguments();
-
-      mlir::Block *innerBody = parallelOp2.getBody();
-      auto innerIdxs = innerBody->getArguments();
-
       mlir::SmallVector<mlir::Value, 8> resultOperands;
-
       parallelOp2.walk([&](PxaLoadOp loadOp) {
         IVLOG(4, "PxaLoadOp: " << loadOp);
 
@@ -247,7 +329,7 @@ void simplifyMemrefMaps(mlir::AffineParallelOp &parallelOp) {
 
         mlir::OpBuilder builder(loadOp);
         MemRefSimplificationResults results = simplifyMemrefMaps(
-            builder, map, loadOp.indices(), outerIdxs, innerIdxs);
+            builder, map, loadOp.indices(), parallelOp, parallelOp2);
 
         if (results.newMapFormed) {
           mlir::Value loadRes = builder.create<PxaLoadOp>(
@@ -267,7 +349,7 @@ void simplifyMemrefMaps(mlir::AffineParallelOp &parallelOp) {
 
         mlir::OpBuilder builder(reduceOp);
         MemRefSimplificationResults results = simplifyMemrefMaps(
-            builder, map, reduceOp.idxs(), outerIdxs, innerIdxs);
+            builder, map, reduceOp.idxs(), parallelOp, parallelOp2);
 
         if (results.newMapFormed) {
           mlir::Value reduceRes = builder.create<PxaReduceOp>(
