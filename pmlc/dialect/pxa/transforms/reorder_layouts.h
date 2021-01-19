@@ -105,7 +105,9 @@ naiveScheduleModel(mlir::ArrayRef<mlir::AffineParallelOp> loopNest);
 ///    are separated as non-empty dimensions not depending on any loop variable.
 /// 2. Permuting/sorting separated dimensions in order of loops whose variables
 ///    are used in each dimension.
-mlir::Optional<ReorderDesc> optimizeLayoutForReads(MemoryUsageDesc &desc);
+mlir::Optional<ReorderDesc>
+optimizeLayoutForReads(MemoryUsageDesc &desc,
+                       bool makeUserLayoutsExplicit = false);
 
 /// Type of function that is expected to create reordering operation
 /// from "srcMemory" to layout described by "reorderDesc".

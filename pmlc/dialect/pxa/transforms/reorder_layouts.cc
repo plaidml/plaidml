@@ -38,8 +38,9 @@ namespace pmlc::dialect::pxa {
 class ReorderLayoutsPass final : public ReorderLayoutsBase<ReorderLayoutsPass> {
 public:
   ReorderLayoutsPass() = default;
-  explicit ReorderLayoutsPass(bool allowReorder) {
+  explicit ReorderLayoutsPass(bool allowReorder, bool makeUserLayoutsExplicit) {
     this->allowReorder = allowReorder;
+    this->makeUserLayoutsExplicit = makeUserLayoutsExplicit;
   }
 
   void runOnFunction() {
@@ -53,7 +54,7 @@ public:
       MemoryUsageDesc &memoryDesc = valueDesc.second;
       IVLOG(3, "Optimizing layout for " << mlir::debugString(memoryDesc.value));
       mlir::Optional<ReorderDesc> optReorder =
-          optimizeLayoutForReads(memoryDesc);
+          optimizeLayoutForReads(memoryDesc, makeUserLayoutsExplicit);
       if (!optReorder.hasValue()) {
         IVLOG(3, "Could not select more optimal layout");
         continue;
@@ -742,9 +743,13 @@ void printSmallVector(mlir::ArrayRef<int64_t> vec) {
 }
 
 mlir::Optional<ReorderDesc>
-optimizeLayoutForReads(MemoryUsageDesc &memoryDesc) {
-  mlir::Optional<ReorderDesc> selectedReorder =
-      chooseUserProvidedTargetLayout(memoryDesc);
+optimizeLayoutForReads(MemoryUsageDesc &memoryDesc,
+                       bool makeUserLayoutsExplicit) {
+  mlir::Optional<ReorderDesc> selectedReorder = llvm::None;
+
+  if (makeUserLayoutsExplicit) {
+    selectedReorder = chooseUserProvidedTargetLayout(memoryDesc);
+  }
 
   if (!selectedReorder.hasValue()) {
     mlir::ArrayRef<int64_t> commonVector;
@@ -1091,8 +1096,10 @@ std::unique_ptr<mlir::Pass> createReorderLayoutsPass() {
   return std::make_unique<ReorderLayoutsPass>();
 }
 
-std::unique_ptr<mlir::Pass> createReorderLayoutsPass(bool allowReorder) {
-  return std::make_unique<ReorderLayoutsPass>(allowReorder);
+std::unique_ptr<mlir::Pass>
+createReorderLayoutsPass(bool allowReorder, bool makeUserLayoutsExplicit) {
+  return std::make_unique<ReorderLayoutsPass>(allowReorder,
+                                              makeUserLayoutsExplicit);
 }
 
 } // namespace pmlc::dialect::pxa
