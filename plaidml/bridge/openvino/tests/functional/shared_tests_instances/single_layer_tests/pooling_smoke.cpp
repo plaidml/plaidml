@@ -17,7 +17,7 @@ const std::vector<InferenceEngine::Precision> inputPrecisions = {
 };
 
 const std::vector<InferenceEngine::Precision> netPrecisions = {
-    InferenceEngine::Precision::FP16,
+    InferenceEngine::Precision::FP32,
 };
 
 const std::vector<std::vector<size_t>> kernels = {
@@ -26,7 +26,7 @@ const std::vector<std::vector<size_t>> kernels = {
 };
 const std::vector<std::vector<size_t>> strides = {
     {1, 1},
-    {1, 2},
+    //{1, 2},
 };
 const std::vector<std::vector<size_t>> padBegins = {
     {0, 0},
@@ -52,7 +52,6 @@ const auto maxPool_ExplicitPad_FloorRounding_Params = ::testing::Combine(  //
     ::testing::Values(ngraph::op::PadType::EXPLICIT),                      //
     ::testing::Values(false)  // placeholder value - exclude pad not applicable for max pooling
 );
-/*
 INSTANTIATE_TEST_CASE_P(smoke_MaxPool_ExplicitPad_FloorRpunding, PoolingLayerTest,
                         ::testing::Combine(                                              //
                             maxPool_ExplicitPad_FloorRounding_Params,                    //
@@ -64,7 +63,6 @@ INSTANTIATE_TEST_CASE_P(smoke_MaxPool_ExplicitPad_FloorRpunding, PoolingLayerTes
                             ::testing::Values(std::vector<size_t>({1, 3, 30, 30})),      //
                             ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),         //
                         PoolingLayerTest::getTestCaseName);
-*/
 /* ========== Explicit Pad Ceil Rounding ========== */
 const auto maxPool_ExplicitPad_CeilRounding_Params = ::testing::Combine(  //
     ::testing::Values(ngraph::helpers::PoolingTypes::MAX),                //
@@ -76,7 +74,6 @@ const auto maxPool_ExplicitPad_CeilRounding_Params = ::testing::Combine(  //
     ::testing::Values(ngraph::op::PadType::EXPLICIT),                     //
     ::testing::Values(false)  // placeholder value - exclude pad not applicable for max pooling
 );
-/*
 INSTANTIATE_TEST_CASE_P(smoke_MaxPool_ExplicitPad_CeilRpunding, PoolingLayerTest,
                         ::testing::Combine(                                              //
                             maxPool_ExplicitPad_CeilRounding_Params,                     //
@@ -88,7 +85,6 @@ INSTANTIATE_TEST_CASE_P(smoke_MaxPool_ExplicitPad_CeilRpunding, PoolingLayerTest
                             ::testing::Values(std::vector<size_t>({1, 3, 30, 30})),      //
                             ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),         //
                         PoolingLayerTest::getTestCaseName);
-*/
 ////* ========== Avg Pooling ========== */
 /* +========== Explicit Pad Ceil Rounding ========== */
 const auto avgPoolExplicitPadCeilRoundingParams = ::testing::Combine(  //
@@ -103,7 +99,6 @@ const auto avgPoolExplicitPadCeilRoundingParams = ::testing::Combine(  //
     ::testing::Values(ngraph::op::PadType::EXPLICIT),                                 //
     ::testing::Values(true, false)                                                    //
 );
-/*
 INSTANTIATE_TEST_CASE_P(smoke_AvgPool_ExplicitPad_CeilRounding, PoolingLayerTest,
                         ::testing::Combine(                                              //
                             avgPoolExplicitPadCeilRoundingParams,                        //
@@ -115,13 +110,12 @@ INSTANTIATE_TEST_CASE_P(smoke_AvgPool_ExplicitPad_CeilRounding, PoolingLayerTest
                             ::testing::Values(std::vector<size_t>({1, 3, 30, 30})),      //
                             ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),         //
                         PoolingLayerTest::getTestCaseName);
-*/
+
 std::vector<poolSpecificParams> psParams(
     {poolSpecificParams(ngraph::helpers::PoolingTypes::AVG, {2, 2}, {2, 2}, {0, 0}, {0, 0},
                         ngraph::op::RoundingType::CEIL, ngraph::op::PadType::EXPLICIT, false),
      poolSpecificParams(ngraph::helpers::PoolingTypes::AVG, {7, 7}, {1, 1}, {0, 0}, {1, 1},
                         ngraph::op::RoundingType::CEIL, ngraph::op::PadType::EXPLICIT, false)});
-/*
 INSTANTIATE_TEST_CASE_P(smoke_AvgPool_ExplicitPad_CeilRounding_corner, PoolingLayerTest,
                         ::testing::Combine(                                              //
                             ::testing::ValuesIn(psParams),                               //
@@ -133,7 +127,6 @@ INSTANTIATE_TEST_CASE_P(smoke_AvgPool_ExplicitPad_CeilRounding_corner, PoolingLa
                             ::testing::Values(std::vector<size_t>({1, 1024, 6, 6})),     //
                             ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),
                         PoolingLayerTest::getTestCaseName);
-*/
 /* +========== Explicit Pad Floor Rounding ========== */
 const auto avgPoolExplicitPadFloorRoundingParams = ::testing::Combine(        //
     ::testing::Values(ngraph::helpers::PoolingTypes::AVG),                    //
@@ -145,7 +138,6 @@ const auto avgPoolExplicitPadFloorRoundingParams = ::testing::Combine(        //
     ::testing::Values(ngraph::op::PadType::EXPLICIT),                         //
     ::testing::Values(true, false)                                            //
 );
-/*
 INSTANTIATE_TEST_CASE_P(smoke_AvgPool_ExplicitPad_FloorRounding, PoolingLayerTest,
                         ::testing::Combine(                                              //
                             avgPoolExplicitPadFloorRoundingParams,                       //
@@ -157,7 +149,6 @@ INSTANTIATE_TEST_CASE_P(smoke_AvgPool_ExplicitPad_FloorRounding, PoolingLayerTes
                             ::testing::Values(std::vector<size_t>({1, 3, 30, 30})),      //
                             ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),
                         PoolingLayerTest::getTestCaseName);
-*/
 ////* ========== Avg and Max Polling Cases ========== */
 /*    ========== Valid Pad Rounding Not Applicable ========== */
 const auto allPools_ValidPad_Params = ::testing::Combine(                                       //
