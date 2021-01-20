@@ -119,6 +119,7 @@ endif()
 
 add_subdirectory(plaidml)
 add_subdirectory(pmlc)
+add_subdirectory(docs)
 
 # Note: this must be called after all libraries have been declared.
 pml_complete_binary_link_options()
@@ -129,3 +130,5 @@ configure_lit_site_cfg(
   MAIN_CONFIG
   ${CMAKE_CURRENT_SOURCE_DIR}/lit.cfg.py
 )
+
+ie_cpack(BENCHMARK_APP)

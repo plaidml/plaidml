@@ -33,6 +33,7 @@ plaidml_cc_library(
     deps = [
         ":gen-pass",
         "//pmlc/dialect/comp/ir",
+        "//pmlc/dialect/stdx/ir",
         "//pmlc/util",
         "@llvm-project//mlir:GPUToSPIRVTransforms",
         "@llvm-project//mlir:GPUTransforms",
