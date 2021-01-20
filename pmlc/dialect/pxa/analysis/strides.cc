@@ -589,6 +589,7 @@ computeRelativeAccess(Operation *op, BlockArgumentBoundaryFn fn) {
       return None;
     }
     ret.innerRanges.push_back(range);
+    ret.wholeInnerCount.push_back(range.maxVal - range.minVal + 1);
     ret.innerCount.push_back(range.count());
   }
   return ret;
