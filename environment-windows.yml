@@ -9,7 +9,7 @@ dependencies:
   - posix
   - pre_commit=1.17.0
   - python=3.7.0
-  - pyyaml==5.3.1
+  - pyyaml=5.3.1
   - pip:
     - breathe==4.26.0
     - certifi
