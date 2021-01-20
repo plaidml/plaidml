@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include "single_layer_tests/eltwise.hpp"
-#include "common_test_utils/test_constants.hpp"
 #include <vector>
+
+#include "common_test_utils/test_constants.hpp"
+#include "single_layer_tests/eltwise.hpp"
 
 using namespace LayerTestsDefinitions;
 
@@ -27,8 +28,8 @@ std::vector<std::vector<std::vector<size_t>>> inShapes = {
 
 std::vector<InferenceEngine::Precision> netPrecisions = {
     InferenceEngine::Precision::FP32,
-    InferenceEngine::Precision::FP16,
-    InferenceEngine::Precision::I32,
+    // InferenceEngine::Precision::FP16,
+    // InferenceEngine::Precision::I32,
 };
 
 std::vector<ngraph::helpers::InputLayerType> secondaryInputTypes = {
@@ -97,7 +98,6 @@ const auto single_thread_params = ::testing::Combine(            //
     ::testing::Values(additional_config_single_thread)           //
 );
 
-// INSTANTIATE_TEST_CASE_P(smoke_SingleThread, EltwiseLayerTest, single_thread_params,
-// EltwiseLayerTest::getTestCaseName);
+INSTANTIATE_TEST_CASE_P(smoke_SingleThread, EltwiseLayerTest, single_thread_params, EltwiseLayerTest::getTestCaseName);
 
 }  // namespace
