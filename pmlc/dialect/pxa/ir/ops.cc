@@ -225,7 +225,8 @@ static void printPxaLoadOp(OpAsmPrinter &p, PxaLoadOp op) {
           op->getAttrOfType<AffineMapAttr>(op.getMapAttrName()))
     p.printAffineMapOfSSAIds(mapAttr, op.getMapOperands());
   p << ']';
-  p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{op.getMapAttrName()});
+  p.printOptionalAttrDict(op->getAttrs(),
+                          /*elidedAttrs=*/{op.getMapAttrName()});
   p << " : " << op.getMemRefType();
 }
 
@@ -279,7 +280,8 @@ static void printPxaVectorLoadOp(OpAsmPrinter &p, PxaVectorLoadOp op) {
           op->getAttrOfType<AffineMapAttr>(op.getMapAttrName()))
     p.printAffineMapOfSSAIds(mapAttr, op.getMapOperands());
   p << ']';
-  p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{op.getMapAttrName()});
+  p.printOptionalAttrDict(op->getAttrs(),
+                          /*elidedAttrs=*/{op.getMapAttrName()});
   p << " : " << op.getMemRefType() << ", " << op.getType();
 }
 
@@ -327,7 +329,7 @@ void printPxaReduceOp(OpAsmPrinter &p, PxaReduceOp op) {
   auto mapAttr = op->getAttrOfType<AffineMapAttr>("map");
   p.printAffineMapOfSSAIds(mapAttr, op.idxs());
   p << ']';
-  p.printOptionalAttrDict(op.getAttrs(), {"agg", "map"});
+  p.printOptionalAttrDict(op->getAttrs(), {"agg", "map"});
   p << " : ";
   p.printType(op.memref().getType());
 }
@@ -473,7 +475,7 @@ void printPxaVectorReduceOp(OpAsmPrinter &p, PxaVectorReduceOp op) {
   auto mapAttr = op->getAttrOfType<AffineMapAttr>("map");
   p.printAffineMapOfSSAIds(mapAttr, op.idxs());
   p << ']';
-  p.printOptionalAttrDict(op.getAttrs(), {"agg", "map"});
+  p.printOptionalAttrDict(op->getAttrs(), {"agg", "map"});
   p << " : ";
   p.printType(op.memref().getType());
   p << ", ";

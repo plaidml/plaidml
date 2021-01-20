@@ -22,7 +22,7 @@ public:
     this->spirvVersion = spirvVersion;
   }
   void runOnOperation() {
-    auto target_env = getOperation().getAttrOfType<spirv::TargetEnvAttr>(
+    auto target_env = getOperation()->getAttrOfType<spirv::TargetEnvAttr>(
         spirv::getTargetEnvAttrName());
     if (!target_env) {
       IVLOG(3, "SPIR-V Version = " << spirvVersion);

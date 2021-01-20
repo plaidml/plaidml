@@ -195,7 +195,7 @@ void printContractionOp(OpAsmPrinter *printer, ContractionOp op) {
     }
     *printer << ']';
   }
-  printer->printOptionalAttrDict(op.getAttrs(), elidedAttrs);
+  printer->printOptionalAttrDict(op->getAttrs(), elidedAttrs);
   *printer << " : ";
   printer->printType(op.init().getType());
   *printer << ", ";

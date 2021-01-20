@@ -52,7 +52,7 @@ class IntelGenOclLegalizeSpirvPass final
 };
 
 mlir::Optional<spirv::BuiltIn> getGlobalBuiltIn(spirv::GlobalVariableOp op) {
-  mlir::StringAttr builtinAttr = op.getAttrOfType<mlir::StringAttr>(
+  mlir::StringAttr builtinAttr = op->getAttrOfType<mlir::StringAttr>(
       spirv::SPIRVDialect::getAttributeName(spirv::Decoration::BuiltIn));
   if (!builtinAttr)
     return llvm::None;

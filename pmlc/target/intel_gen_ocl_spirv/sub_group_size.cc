@@ -21,7 +21,7 @@ public:
   spirv::FuncOp getEntryPoint(spirv::ModuleOp module) {
     spirv::FuncOp func = nullptr;
     module.walk([&](spirv::FuncOp op) {
-      if (!op.getAttr(spirv::getEntryPointABIAttrName()))
+      if (!op->getAttr(spirv::getEntryPointABIAttrName()))
         return WalkResult::advance();
       func = op;
       return WalkResult::interrupt();
@@ -30,7 +30,7 @@ public:
   }
   /// Extracts local size attribute from entry point function.
   DenseIntElementsAttr getLocalSize(spirv::FuncOp func) {
-    auto entryPointAttr = func.getAttrOfType<spirv::EntryPointABIAttr>(
+    auto entryPointAttr = func->getAttrOfType<spirv::EntryPointABIAttr>(
         spirv::getEntryPointABIAttrName());
     if (!entryPointAttr)
       return {};

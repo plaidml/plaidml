@@ -29,7 +29,7 @@ public:
   spirv::FuncOp getEntryPoint(spirv::ModuleOp module) {
     spirv::FuncOp func = nullptr;
     module.walk([&](spirv::FuncOp op) {
-      if (!op.getAttr(spirv::getEntryPointABIAttrName()))
+      if (!op->getAttr(spirv::getEntryPointABIAttrName()))
         return mlir::WalkResult::advance();
       func = op;
       return mlir::WalkResult::interrupt();

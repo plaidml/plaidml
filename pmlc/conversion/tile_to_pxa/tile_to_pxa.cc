@@ -1819,7 +1819,7 @@ struct ReturnOpConversion : public OpConversionPattern<ReturnOp> {
   LogicalResult
   matchAndRewrite(ReturnOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
-    auto &block = op.getParentRegion()->front();
+    auto &block = op->getParentRegion()->front();
     auto funcOp = op->getParentOfType<FuncOp>();
     auto blockArg = funcOp.getType().getNumInputs() - op.getNumOperands();
     for (Value operand : operands) {
