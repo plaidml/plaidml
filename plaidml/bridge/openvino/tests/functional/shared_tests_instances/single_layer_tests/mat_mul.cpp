@@ -9,7 +9,6 @@
 using namespace LayerTestsDefinitions;
 
 namespace {
-/*
 const std::vector<InferenceEngine::Precision> inputPrecisions = {
     InferenceEngine::Precision::FP32,
 };
@@ -36,5 +35,4 @@ INSTANTIATE_TEST_CASE_P(smoke_MatMul, MatMulTest,
                             ::testing::Values(CommonTestUtils::DEVICE_PLAIDML),          //
                             ::testing::Values(additional_config)),                       //
                         MatMulTest::getTestCaseName);
-*/
 }  // namespace

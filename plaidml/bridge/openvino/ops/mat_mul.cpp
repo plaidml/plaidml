@@ -57,7 +57,32 @@ void registerMatMul() {
       B = op::unsqueeze(B, {0});
     }
 
-    return edsl::make_tuple(op::dot(A, B));
+    std::vector<edsl::TensorDim> A_dims(ndimsA);
+    std::vector<edsl::TensorDim> B_dims(ndimsB);
+    std::vector<edsl::TensorDim> O_dims;
+    std::vector<edsl::TensorIndex> A_idxs(ndimsA);
+    std::vector<edsl::TensorIndex> B_idxs(ndimsB);
+    std::vector<edsl::TensorIndex> O_idxs;
+
+    edsl::TensorIndex z;
+    A.bind_dims(A_dims);
+    B.bind_dims(B_dims);
+
+    A_idxs[ndimsA - 1] = z;
+    B_idxs[ndimsB - 2] = z;
+    for (size_t i = 0; i < ndimsA - 2; ++i) {
+      A_idxs[i] = B_idxs[i];
+    }
+
+    for (size_t i = 0; i < ndimsA - 1; ++i) {
+      O_dims.push_back(A_dims[i]);
+      O_idxs.push_back(A_idxs[i]);
+    }
+    O_dims.push_back(B_dims[ndimsB - 1]);
+    O_idxs.push_back(B_idxs[ndimsB - 1]);
+
+    edsl::Tensor O = edsl::Contraction(O_dims, O_idxs).sum(A(A_idxs) * B(B_idxs));
+    return edsl::make_tuple(O);
   });
 }
 
