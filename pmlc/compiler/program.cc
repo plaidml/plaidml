@@ -83,7 +83,8 @@ Program::Program(ModuleOp module)
     : context(std::make_unique<MLIRContext>()), module(module) {}
 
 Program::Program(llvm::StringRef name)
-    : Program(ModuleOp::create(UnknownLoc::get(context.get()), name)) {}
+    : context(std::make_unique<MLIRContext>()),
+      module(ModuleOp::create(UnknownLoc::get(context.get()), name)) {}
 
 std::unique_ptr<Program>
 Program::fromSource(std::unique_ptr<MLIRContext> context, StringRef source) {

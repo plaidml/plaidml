@@ -594,7 +594,7 @@ struct ProgramBuilder {
 
     pm.addPass(createCanonicalizerPass());
     pm.addPass(createCSEPass());
-    pm.addPass(tile::createMaterializePass());
+    pm.addNestedPass<FuncOp>(tile::createMaterializePass());
     pm.addPass(createCanonicalizerPass());
     pm.addPass(createCSEPass());
     auto result = pm.run(module);

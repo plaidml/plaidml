@@ -235,25 +235,26 @@ std::unique_ptr<Pass> createOpenMPWorkaroundPass() {
 }
 
 void pipelineBuilder(OpPassManager &pm) {
-  pm.addPass(layer::createInlineLayersPass());
-  pm.addPass(tile::createComputeBoundsPass());
+  OpPassManager &pmFunc = pm.nest<FuncOp>();
+  pmFunc.addPass(layer::createInlineLayersPass());
+  pmFunc.addPass(tile::createComputeBoundsPass());
   pm.addPass(tile::createSplitMainPass());
   pm.addPass(transforms::createHoistingPass());
-  pm.addPass(tile::createPadConstraintsPass());
+  pmFunc.addPass(tile::createPadConstraintsPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
   pm.addPass(pmlc::conversion::tile_to_pxa::createLowerTileToPXAPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
-  pm.addPass(layer::createInlineLayersPass());
+  pmFunc.addPass(layer::createInlineLayersPass());
 
-  pm.addPass(createXSMMStencilPass(/*numThreads=*/1, /*isBatched=*/true));
-  pm.addPass(pxa::createAffineNormalizePass());
+  pmFunc.addPass(createXSMMStencilPass(/*numThreads=*/1, /*isBatched=*/true));
+  pmFunc.addPass(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
 
-  pm.addPass(pxa::createTileAccumulatePass());
-  pm.addPass(pxa::createAffineNormalizePass(/*promote=*/false));
+  pmFunc.addPass(pxa::createTileAccumulatePass());
+  pmFunc.addPass(pxa::createAffineNormalizePass(/*promote=*/false));
   pm.addPass(createCanonicalizerPass());
 
   // Use OMP thread count
@@ -263,29 +264,29 @@ void pipelineBuilder(OpPassManager &pm) {
     maxThreads = std::min(physCores, maxThreads);
   }
 
-  pm.addPass(pxa::createCPUThreadPass(maxThreads));
+  pmFunc.addPass(pxa::createCPUThreadPass(maxThreads));
 
-  pm.addPass(pxa::createAffineNormalizePass());
+  pmFunc.addPass(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
 
-  pm.addPass(pxa::createFusionPass());
-  pm.addPass(pxa::createAffineNormalizePass());
+  pmFunc.addPass(pxa::createFusionPass());
+  pmFunc.addPass(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
 
-  pm.addPass(pxa::createMemRefDataFlowOptPass());
+  pmFunc.addPass(pxa::createMemRefDataFlowOptPass());
   pm.addPass(createCanonicalizerPass());
 
-  pm.addPass(pxa::createLocalizePass());
-  pm.addPass(pxa::createResizeTmpsPass());
+  pmFunc.addPass(pxa::createLocalizePass());
+  pmFunc.addPass(pxa::createResizeTmpsPass());
   pm.addPass(pxa::createDeallocPlacementPass());
-  pm.addPass(pxa::createAffineNormalizePass());
+  pmFunc.addPass(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
   pm.addPass(createLowerPXAToAffinePass());
 
   // Unroll affine.for loops.
-  pm.addPass(createLoopUnrollPass(
+  pmFunc.addPass(createLoopUnrollPass(
       /*unrollFactor=*/32,
       /*unrollUpToFactor=*/true));
   pm.addPass(createCanonicalizerPass());
@@ -310,7 +311,7 @@ void pipelineBuilder(OpPassManager &pm) {
 
   pm.addPass(createLowerToLLVMPass());
   pm.addPass(createTraceLinkingPass());
-  pm.addPass(createOpenMPWorkaroundPass());
+  pm.addNestedPass<LLVM::LLVMFuncOp>(createOpenMPWorkaroundPass());
 }
 
 } // namespace pmlc::target::x86
