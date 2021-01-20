@@ -111,9 +111,11 @@ LogicalResult convertSCPParallel(scf::ParallelOp op) {
   auto module = op->getParentOfType<ModuleOp>();
   if (!module.lookupSymbol(kThreadFuncName)) {
     OpBuilder subBuilder(module.getBody()->getTerminator());
-    subBuilder.create<FuncOp>(module.getLoc(), kThreadFuncName,
-                              FunctionType::get(subBuilder.getContext(), {},
-                                                ArrayRef<Type>{indexType}));
+    subBuilder
+        .create<FuncOp>(module.getLoc(), kThreadFuncName,
+                        FunctionType::get(subBuilder.getContext(), {},
+                                          ArrayRef<Type>{indexType}))
+        .setPrivate();
   }
 
   // Delete old loop + return
