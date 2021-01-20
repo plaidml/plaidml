@@ -5,6 +5,9 @@
 
 // The following command line works: --normalize-memrefs needs to be run BEFORE lowering the affine code: bazel-bin/pmlc/opt -convert-linalg-to-loops -x86-convert-pxa-to-affine --normalize-memrefs --simplify-affine-structures -lower-affine  -canonicalize -convert-scf-to-std --normalize-memrefs -x86-convert-std-to-llvm pmlc/target/x86/tests/conv_NCHW_3X3_user_layouts.mlir | bazel-bin/pmlc/jit -e baseline
 
+// The following does not work: bazel-bin/pmlc/opt -convert-linalg-to-loops -pxa-reorder-layouts="allow-reorder=true maker-user-layouts-explicit=true" -canonicalize -x86-affine-stencil-xsmm -x86-convert-pxa-to-affine --normalize-memrefs --simplify-affine-structures -lower-affine  -canonicalize -convert-scf-to-std --normalize-memrefs -x86-convert-std-to-llvm pmlc/target/x86/tests/conv_NCHW_3X3_user_layouts.mlir
+
+// The following works: bazel-bin/pmlc/opt -convert-linalg-to-loops -pxa-reorder-layouts="allow-reorder=true maker-user-layouts-explicit=true" -canonicalize -x86-affine-stencil-xsmm pmlc/target/x86/tests/conv_NCHW_3X3_user_layouts.mlir
 
 #K_map = affine_map<(K,C,R,S) -> (R, S, C, K)>
 #NCHW_to_NHWC = affine_map<(N,C,H,W) -> (N,H,W,C)>
