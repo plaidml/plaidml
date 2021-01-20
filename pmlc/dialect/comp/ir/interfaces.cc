@@ -2,7 +2,7 @@
 #include "pmlc/dialect/comp/ir/interfaces.h"
 #include "pmlc/dialect/comp/ir/types.h"
 
-#include "mlir/IR/StandardTypes.h"
+#include "mlir/IR/BuiltinTypes.h"
 
 using namespace mlir;                // NOLINT
 using namespace pmlc::dialect::comp; // NOLINT

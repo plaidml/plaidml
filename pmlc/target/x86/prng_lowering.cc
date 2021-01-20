@@ -4,7 +4,7 @@
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
-#include "mlir/IR/Module.h"
+#include "mlir/IR/BuiltinOps.h"
 
 #include "pmlc/dialect/pxa/ir/ops.h"
 
@@ -24,7 +24,7 @@ struct PrngOpConversion : public OpConversionPattern<pxa::PrngOp> {
                   ConversionPatternRewriter &rewriter) const override {
     pxa::PrngOp::Adaptor transformed(operands);
 
-    ModuleOp module = op.getParentOfType<ModuleOp>();
+    ModuleOp module = op->getParentOfType<ModuleOp>();
     Location loc = op.getLoc();
 
     auto resultUnrankedType =

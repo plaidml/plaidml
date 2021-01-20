@@ -38,8 +38,8 @@ struct MemRefDataFlowOptPass
       }
 
       if (onlyParallelNested &&
-          (!dyn_cast<AffineParallelOp>(loadOp.getParentOp()) ||
-           !dyn_cast<AffineParallelOp>(reduceOp.getParentOp()))) {
+          (!dyn_cast<AffineParallelOp>(loadOp->getParentOp()) ||
+           !dyn_cast<AffineParallelOp>(reduceOp->getParentOp()))) {
         return;
       }
 

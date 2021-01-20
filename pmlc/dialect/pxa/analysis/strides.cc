@@ -10,7 +10,7 @@
 #include <vector>
 
 #include "mlir/Dialect/Affine/IR/AffineValueMap.h"
-#include "mlir/IR/Function.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/Support/DebugStringHelper.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/FormatVariadic.h"

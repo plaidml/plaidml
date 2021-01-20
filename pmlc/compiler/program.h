@@ -7,8 +7,8 @@
 #include <unordered_map>
 #include <vector>
 
-#include "mlir/IR/Module.h"
-#include "mlir/IR/StandardTypes.h"
+#include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/BuiltinTypes.h"
 
 #include "pmlc/util/buffer.h"
 
@@ -47,7 +47,7 @@ using TargetPtr = std::shared_ptr<Target>;
 struct Program {
   std::string entry;
   std::string tileIR;
-  mlir::MLIRContext context;
+  std::unique_ptr<mlir::MLIRContext> context;
   mlir::OwningModuleRef module;
   std::vector<mlir::Type> inputs;
   std::vector<mlir::Type> outputs;
@@ -57,9 +57,12 @@ struct Program {
 
   explicit Program(llvm::StringRef name = "");
   explicit Program(mlir::ModuleOp module);
-  explicit Program(std::unique_ptr<llvm::MemoryBuffer> buffer);
+  explicit Program(std::unique_ptr<mlir::MLIRContext> context,
+                   std::unique_ptr<llvm::MemoryBuffer> buffer);
 
-  static std::unique_ptr<Program> fromSource(llvm::StringRef source);
+  static std::unique_ptr<Program>
+  fromSource(std::unique_ptr<mlir::MLIRContext> context,
+             llvm::StringRef source);
 
   void compile(mlir::StringRef targetName, bool collectPasses = false,
                mlir::StringRef dumpDir = "");

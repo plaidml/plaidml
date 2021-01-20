@@ -13,15 +13,15 @@
 #include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Dialect/GPU/Passes.h"
 #include "mlir/Dialect/GPU/Utils.h"
-#include "mlir/Dialect/SPIRV/SPIRVAttributes.h"
-#include "mlir/Dialect/SPIRV/SPIRVOps.h"
-#include "mlir/Dialect/SPIRV/Serialization.h"
-#include "mlir/Dialect/SPIRV/TargetAndABI.h"
+#include "mlir/Dialect/SPIRV/IR/SPIRVAttributes.h"
+#include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
+#include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Support/DebugStringHelper.h"
+#include "mlir/Target/SPIRV/Serialization.h"
 #include "mlir/Transforms/RegionUtils.h"
 #include "pmlc/conversion/gpu/pass_detail.h"
 #include "pmlc/dialect/comp/ir/dialect.h"
@@ -94,10 +94,10 @@ static gpu::GPUFuncOp outlineKernelFuncImpl(gpu::LaunchOp launchOp,
     kernelOperandTypes.push_back(type);
   }
   FunctionType type =
-      FunctionType::get(kernelOperandTypes, {}, launchOp.getContext());
+      FunctionType::get(launchOp.getContext(), kernelOperandTypes, {});
   auto outlinedFunc = builder.create<gpu::GPUFuncOp>(loc, kernelFnName, type);
-  outlinedFunc.setAttr(gpu::GPUDialect::getKernelFuncAttrName(),
-                       builder.getUnitAttr());
+  outlinedFunc->setAttr(gpu::GPUDialect::getKernelFuncAttrName(),
+                        builder.getUnitAttr());
   BlockAndValueMapping map;
 
   // Map the arguments corresponding to the launch parameters like blockIdx,
@@ -209,7 +209,7 @@ public:
     }
 
     // Create the kernel
-    auto kernelModule = kernelFunc.getParentOfType<gpu::GPUModuleOp>();
+    auto kernelModule = kernelFunc->getParentOfType<gpu::GPUModuleOp>();
     auto kernelSymbol = builder.getSymbolRefAttr(
         kernelModule.getName(),
         {builder.getSymbolRefAttr(kernelFunc.getName())});
@@ -297,7 +297,7 @@ public:
 
   void runOnOperation() override {
     // set spv.target_env to moduleOp
-    auto target_env = getOperation().getAttrOfType<spirv::TargetEnvAttr>(
+    auto target_env = getOperation()->getAttrOfType<spirv::TargetEnvAttr>(
         spirv::getTargetEnvAttrName());
     if (!target_env) {
       auto triple = spirv::VerCapExtAttr::get(
@@ -311,7 +311,7 @@ public:
               {spirv::Extension::SPV_KHR_storage_buffer_storage_class,
                spirv::Extension::SPV_KHR_16bit_storage}),
           &getContext());
-      getOperation().setAttr(
+      getOperation()->setAttr(
           spirv::getTargetEnvAttrName(),
           spirv::TargetEnvAttr::get(
               triple, spirv::Vendor::Unknown, spirv::DeviceType::Unknown,
@@ -337,7 +337,7 @@ public:
       auto funcWalkResult = func.walk([&](gpu::LaunchOp op) {
         llvm::SetVector<Value> operands;
         std::string kernelFnName =
-            Twine(op.getParentOfType<FuncOp>().getName(), "_kernel").str();
+            Twine(op->getParentOfType<FuncOp>().getName(), "_kernel").str();
 
         // Pull in instructions that can be sunk
         if (failed(sinkOperationsIntoLaunchOp(op)))
@@ -371,8 +371,8 @@ public:
     // If any new module was inserted in this module, annotate this module as
     // a container module.
     if (modified)
-      getOperation().setAttr(gpu::GPUDialect::getContainerModuleAttrName(),
-                             UnitAttr::get(&getContext()));
+      getOperation()->setAttr(gpu::GPUDialect::getContainerModuleAttrName(),
+                              UnitAttr::get(&getContext()));
   }
 
 private:
@@ -387,7 +387,7 @@ private:
     auto context = getOperation().getContext();
     OpBuilder builder(context);
 
-    auto entry_point_abi = kernelFunc.getAttrOfType<spirv::EntryPointABIAttr>(
+    auto entry_point_abi = kernelFunc->getAttrOfType<spirv::EntryPointABIAttr>(
         spirv::getEntryPointABIAttrName());
     if (!entry_point_abi) {
       int x = blockSize.x.getDefiningOp()
@@ -402,7 +402,7 @@ private:
       auto entryPointAbiAttr =
           mlir::spirv::getEntryPointABIAttr({x, y, z}, kernelFunc.getContext());
 
-      kernelFunc.setAttr(spirv::getEntryPointABIAttrName(), entryPointAbiAttr);
+      kernelFunc->setAttr(spirv::getEntryPointABIAttrName(), entryPointAbiAttr);
     }
 
     OperationState state(kernelFunc.getLoc(),

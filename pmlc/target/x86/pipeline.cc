@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <utility>
 
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/OpenMPToLLVM/ConvertOpenMPToLLVM.h"
@@ -12,7 +13,7 @@
 #include "mlir/Dialect/Affine/Passes.h"
 #include "mlir/Dialect/OpenMP/OpenMPDialect.h"
 #include "mlir/Dialect/StandardOps/Transforms/Passes.h"
-#include "mlir/IR/StandardTypes.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
@@ -64,8 +65,8 @@ struct LowerPXAToAffinePass
     conversion::pxa_to_affine::populatePXAToAffineConversionPatterns(patterns,
                                                                      &ctx);
 
-    if (failed(applyPartialConversion(getOperation(), target, patterns,
-                                      nullptr))) {
+    if (failed(applyPartialConversion(getOperation(), target,
+                                      std::move(patterns)))) {
       getOperation().dump();
       emitError(UnknownLoc::get(&ctx), "Error lowering pxa -> affine\n");
       signalPassFailure();
@@ -93,7 +94,7 @@ struct ConvertStandardToLLVMPass
     populateStdToLLVMConversionPatterns(typeConverter, patterns);
     conversion::stdx_to_llvm::populateStdXToLLVMConversionPatterns(
         typeConverter, patterns);
-    populateOpenMPToLLVMConversionPatterns(context, typeConverter, patterns);
+    populateOpenMPToLLVMConversionPatterns(typeConverter, patterns);
 
     LLVMConversionTarget target(*context);
     target.addDynamicallyLegalOp<omp::ParallelOp>([&](omp::ParallelOp op) {
@@ -101,7 +102,7 @@ struct ConvertStandardToLLVMPass
     });
     target.addLegalOp<omp::TerminatorOp, omp::TaskyieldOp, omp::FlushOp,
                       omp::BarrierOp, omp::TaskwaitOp>();
-    if (failed(applyPartialConversion(module, target, patterns))) {
+    if (failed(applyPartialConversion(module, target, std::move(patterns)))) {
       signalPassFailure();
     }
   }
@@ -119,12 +120,12 @@ struct OpenMPWorkaroundPass final
       llvm::SetVector<Value> values;
 
       visitUsedValuesDefinedAbove({parOp.region()}, [&](OpOperand *opOperand) {
-        auto value = opOperand->get();
+        Value value = opOperand->get();
 
-        // If it's not an LLVM type, or if it's an LLVM pointer type, we
-        // don't need or want to smuggle this value in via a struct.
-        auto llvmType = value.getType().dyn_cast<LLVM::LLVMType>();
-        if (!llvmType || llvmType.isPointerTy()) {
+        // If it's not an LLVM pointer type, we don't need or want to smuggle
+        // this value in via a struct.
+        Type llvmType = value.getType();
+        if (llvmType.isa<LLVM::LLVMPointerType>()) {
           return;
         }
 
@@ -133,24 +134,20 @@ struct OpenMPWorkaroundPass final
         values.insert(value);
       });
 
-      if (!values.size()) {
+      if (values.empty()) {
         return; // Nothing to do.
       }
 
       // Build the structure.
       builder.setInsertionPoint(parOp);
-      LLVM::LLVMType structTy;
-      {
-        SmallVector<LLVM::LLVMType, 8> types;
-        for (auto val : values) {
-          types.push_back(val.getType().cast<LLVM::LLVMType>());
-        }
-        structTy = LLVM::LLVMType::getStructTy(&getContext(), types);
+      SmallVector<Type, 8> types;
+      for (Value value : values) {
+        types.push_back(value.getType());
       }
-      auto structPtrTy = structTy.getPointerTo();
+      auto structTy = LLVM::LLVMStructType::getLiteral(&getContext(), types);
+      auto structPtrTy = LLVM::LLVMPointerType::get(structTy);
       auto numElements = builder.create<LLVM::ConstantOp>(
-          parOp.getLoc(), LLVM::LLVMType::getInt64Ty(&getContext()),
-          builder.getIndexAttr(1));
+          parOp.getLoc(), builder.getI64Type(), builder.getIndexAttr(1));
       auto structPtr = builder.create<LLVM::AllocaOp>(
           parOp.getLoc(), structPtrTy, numElements, 0);
       Value srcStructVal =

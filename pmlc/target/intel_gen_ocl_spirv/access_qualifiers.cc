@@ -3,8 +3,8 @@
 #include "pmlc/target/intel_gen_ocl_spirv/pass_detail.h"
 #include "pmlc/target/intel_gen_ocl_spirv/passes.h"
 
-#include "mlir/Dialect/SPIRV/SPIRVOps.h"
-#include "mlir/Dialect/SPIRV/TargetAndABI.h"
+#include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
+#include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/Support/LLVM.h"
 

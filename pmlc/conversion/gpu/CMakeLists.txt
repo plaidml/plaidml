@@ -9,7 +9,7 @@ pml_cc_library(
     ::passes-gen
     pmlc::util
     MLIRGPU
-    MLIRGPUToSPIRVTransforms
+    MLIRGPUToSPIRV
 )
 
 pml_tblgen_library(

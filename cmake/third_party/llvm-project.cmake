@@ -30,8 +30,8 @@ if(LOCAL_LLVM_DIR)
 else()
   FetchContent_Declare(
     llvm-project
-    URL      https://github.com/plaidml/llvm-project/archive/634a6832a2f988608b7fb6e858b444a2d7f4af62.tar.gz
-    URL_HASH SHA256=6c740b01868011d0666339071daf61408e25ae1d4b850f7438a328ee157db070
+    URL      https://github.com/plaidml/llvm-project/archive/4bd6833c6dd1952a121142cdb6ad640da4da7383.tar.gz
+    # URL_HASH SHA256=6c740b01868011d0666339071daf61408e25ae1d4b850f7438a328ee157db070
   )
   FetchContent_GetProperties(llvm-project)
   if(NOT llvm-project_POPULATED)
