@@ -70,13 +70,12 @@ class ConvertAlloc : public CompConversionBase<comp::Alloc> {
     auto loc = op->getLoc();
 
     // Get all of the sizes we need.  TODO: Latest upstream has improved this.
-    int64_t offset;
     SmallVector<Value, 4> sizes;
     SmallVector<Value, 4> strides;
     Value sizeBytes;
 
-    getMemRefDescriptorSizes(loc, memRefType, operands, rewriter, sizes,
-                             strides, sizeBytes);
+    getMemRefDescriptorSizes(loc, memRefType, {}, rewriter, sizes, strides,
+                             sizeBytes);
 
     // Do the actual allocation
     auto llvmInt8Ptr =
