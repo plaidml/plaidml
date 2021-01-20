@@ -96,7 +96,7 @@ Program::Program(std::unique_ptr<MLIRContext> context,
     : context(std::move(context)) {
   llvm::SourceMgr sourceMgr;
   sourceMgr.AddNewSourceBuffer(std::move(buffer), llvm::SMLoc());
-  module = parseSourceFile(sourceMgr, context.get());
+  module = parseSourceFile(sourceMgr, this->context.get());
 }
 
 static StringRef getDiagKindStr(DiagnosticSeverity kind) {
