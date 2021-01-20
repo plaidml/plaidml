@@ -317,50 +317,11 @@ public:
         numThreads{numThreads}, doBatch{doBatch}, stencilCostFn(costFn) {}
 };
 
-struct StencilGEMMPass : public PassWrapper<StencilGEMMPass, FunctionPass> {
-  StencilGEMMPass() { assert(false && "StencilGEMMPass must be configured"); }
-
-  StencilGEMMPass(const StencilGEMMPass &rhs) : costFn(rhs.costFn) {
-    numThreads = rhs.numThreads.getValue();
-    doBatch = rhs.doBatch.getValue();
-  }
-
-  StencilGEMMPass(unsigned numThreads_, bool doBatch_,
-                  StencilCostFunction costFn)
-      : costFn(costFn) {
-    numThreads = numThreads_;
-    doBatch = doBatch_;
-  }
-
-  void runOnFunction() final {
-    auto func = getFunction();
-    func.walk([this](AffineParallelOp op) {
-      IVLOG(3, "StencilGEMMPass - numThreads: " << numThreads.getValue());
-      IVLOG(3, "StencilGEMMPass - doBatch: " << doBatch.getValue());
-
-      StencilGEMM stencil(op, numThreads.getValue(), doBatch.getValue(),
-                          costFn);
-      stencil.DoStenciling();
-    });
-  }
-
-  StencilCostFunction costFn;
-
-  Option<unsigned> numThreads{
-      *this, "threads",
-      llvm::cl::desc("Specifies number of threads for the stencil pass")};
-
-  Option<bool> doBatch{
-      *this, "batched",
-      llvm::cl::desc("Allow strided batching over k dimension of GEMM"),
-      llvm::cl::initializer(false)};
-};
-
-std::unique_ptr<Pass> createStencilGEMMPass(unsigned numThreads, bool doBatch,
-                                            StencilCostFunction costFn) {
-  IVLOG(3, "numThreads: " << numThreads);
-  IVLOG(3, "doBatch: " << doBatch);
-  return std::make_unique<StencilGEMMPass>(numThreads, doBatch, costFn);
+LogicalResult applyStencilGEMM(AffineParallelOp op, unsigned numThreads,
+                               bool doBatch, StencilCostFunction costFn) {
+  StencilGEMM stencil(op, numThreads, doBatch, costFn);
+  stencil.DoStenciling();
+  return success();
 }
 
 } // namespace pmlc::dialect::pxa

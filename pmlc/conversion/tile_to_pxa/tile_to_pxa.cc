@@ -1881,6 +1881,7 @@ struct TraceOpConversion : public OpConversionPattern<tile::PragmaOp> {
     funcOp->setAttr("msg", msg);
     funcOp->setAttr("trace", builder.getUnitAttr());
     funcOp->setAttr("id", builder.getI64IntegerAttr(uniqueId));
+    funcOp.setPrivate();
     return SymbolRefAttr::get(symbol, context);
   }
 };
