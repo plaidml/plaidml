@@ -30,6 +30,16 @@ struct InlinerImpl : InlinerInterface {
       oldValue.replaceAllUsesWith(newValue);
     }
   }
+
+  bool isLegalToInline(Operation *op, Region *dest, bool wouldBeCloned,
+                       BlockAndValueMapping &valueMapping) const final {
+    return true;
+  }
+
+  bool isLegalToInline(Region *dest, Region *src, bool wouldBeCloned,
+                       BlockAndValueMapping &valueMapping) const final {
+    return true;
+  }
 };
 
 struct InlineLayersPass : public InlineLayersBase<InlineLayersPass> {
