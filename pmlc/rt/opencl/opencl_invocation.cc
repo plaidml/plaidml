@@ -72,56 +72,6 @@ OpenCLInvocation::~OpenCLInvocation() {
   // Need to explicitly wait for all operations to avoid unfinished events
   // when gathering profiling information.
   finish();
-  // Gather profiling information.
-  using std::chrono::nanoseconds;
-  using fp_milliseconds =
-      std::chrono::duration<double, std::chrono::milliseconds::period>;
-  // Calculate total time as difference between earliest enqueue
-  // and latest execution end.
-  cl_ulong allQueued = static_cast<cl_ulong>(-1);
-  cl_ulong allEnd = 0;
-  nanoseconds totalExecuteTime{0};
-  nanoseconds kernelExecuteTime{0};
-  nanoseconds memoryExecuteTime{0};
-  unsigned kernelsCnt = 0;
-  unsigned memoryCnt = 0;
-  for (std::unique_ptr<OpenCLEvent> &event : events) {
-    cl::Event oclEvent = event->getEvent();
-    cl_ulong queued = oclEvent.getProfilingInfo<CL_PROFILING_COMMAND_QUEUED>();
-    cl_ulong start = oclEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>();
-    cl_ulong end = oclEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>();
-
-    allQueued = std::min(allQueued, queued);
-    allEnd = std::max(allEnd, end);
-
-    nanoseconds executeTime{end - start};
-    totalExecuteTime += executeTime;
-
-    if (event->getKind() == OpenCLActionKind::Kernel) {
-      kernelExecuteTime += executeTime;
-      kernelsCnt += 1;
-      IVLOG(2, "  Kernel '" << event->getName() << "' execute time: "
-                            << fp_milliseconds(executeTime).count() << "ms");
-    } else if (event->getKind() == OpenCLActionKind::Read ||
-               event->getKind() == OpenCLActionKind::Write) {
-      memoryExecuteTime += executeTime;
-      memoryCnt += 1;
-      IVLOG(2, "  Memory " << event->getName() << " execute time: "
-                           << fp_milliseconds(executeTime).count() << "ms");
-    }
-  }
-  nanoseconds totalTime{allEnd - allQueued};
-  IVLOG(1, "Total OpenCL time: " << fp_milliseconds(totalTime).count() << "ms");
-  IVLOG(1, "Total OpenCL execute time: "
-               << fp_milliseconds(totalExecuteTime).count() << "ms");
-  IVLOG(1, "Total OpenCL kernels: " << kernelsCnt);
-  IVLOG(1, "Total OpenCL kernel execute time: "
-               << fp_milliseconds(kernelExecuteTime).count() << "ms");
-  IVLOG(1, "Total OpenCL memory transfers: " << memoryCnt);
-  IVLOG(1, "Total OpenCL memory transfer time: "
-               << fp_milliseconds(memoryExecuteTime).count() << "ms");
-
-  device->execTimeInMS = fp_milliseconds(totalExecuteTime).count();
 }
 
 OpenCLMemory *OpenCLInvocation::allocateMemory(size_t bytes) {
@@ -180,7 +130,60 @@ OpenCLInvocation::enqueueBarrier(const std::vector<OpenCLEvent *> &deps) {
 
 void OpenCLInvocation::flush() { queueUser.getOclQueue().flush(); }
 
-void OpenCLInvocation::finish() { queueUser.getOclQueue().finish(); }
+void OpenCLInvocation::finish() {
+  queueUser.getOclQueue().finish();
+  // Gather profiling information.
+  using std::chrono::nanoseconds;
+  using fp_milliseconds =
+      std::chrono::duration<double, std::chrono::milliseconds::period>;
+  // Calculate total time as difference between earliest enqueue
+  // and latest execution end.
+  cl_ulong allQueued = static_cast<cl_ulong>(-1);
+  cl_ulong allEnd = 0;
+  nanoseconds totalExecuteTime{0};
+  nanoseconds kernelExecuteTime{0};
+  nanoseconds memoryExecuteTime{0};
+  unsigned kernelsCnt = 0;
+  unsigned memoryCnt = 0;
+  for (std::unique_ptr<OpenCLEvent> &event : events) {
+    cl::Event oclEvent = event->getEvent();
+    cl_ulong queued = oclEvent.getProfilingInfo<CL_PROFILING_COMMAND_QUEUED>();
+    cl_ulong start = oclEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>();
+    cl_ulong end = oclEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>();
+
+    allQueued = std::min(allQueued, queued);
+    allEnd = std::max(allEnd, end);
+
+    nanoseconds executeTime{end - start};
+    totalExecuteTime += executeTime;
+
+    if (event->getKind() == OpenCLActionKind::Kernel) {
+      kernelExecuteTime += executeTime;
+      kernelsCnt += 1;
+      IVLOG(2, "  Kernel '" << event->getName() << "' execute time: "
+                            << fp_milliseconds(executeTime).count() << "ms");
+    } else if (event->getKind() == OpenCLActionKind::Read ||
+               event->getKind() == OpenCLActionKind::Write) {
+      memoryExecuteTime += executeTime;
+      memoryCnt += 1;
+      IVLOG(2, "  Memory " << event->getName() << " execute time: "
+                           << fp_milliseconds(executeTime).count() << "ms");
+    }
+  }
+  nanoseconds totalTime{allEnd - allQueued};
+  IVLOG(1, "Total OpenCL time: " << fp_milliseconds(totalTime).count() << "ms");
+  IVLOG(1, "Total OpenCL execute time: "
+               << fp_milliseconds(totalExecuteTime).count() << "ms");
+  IVLOG(1, "Total OpenCL kernels: " << kernelsCnt);
+  IVLOG(1, "Total OpenCL kernel execute time: "
+               << fp_milliseconds(kernelExecuteTime).count() << "ms");
+  IVLOG(1, "Total OpenCL memory transfers: " << memoryCnt);
+  IVLOG(1, "Total OpenCL memory transfer time: "
+               << fp_milliseconds(memoryExecuteTime).count() << "ms");
+
+  device->execTimeInMS = fp_milliseconds(totalExecuteTime).count();
+  events.clear();
+}
 
 OpenCLEvent *OpenCLInvocation::wrapEvent(cl::Event event, OpenCLActionKind kind,
                                          std::string name) {

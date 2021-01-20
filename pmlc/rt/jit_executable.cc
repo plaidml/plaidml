@@ -400,8 +400,6 @@ public:
     if (jitFini) {
       IVLOG(3, "Doing jit fini");
       std::vector<void *> finiPtrs;
-      std::copy(preParams.begin(), preParams.end(),
-                std::back_inserter(finiPtrs));
       finiPtrs.push_back(initPack);
       IVLOG(3, "Jit fini complete");
       free(initPack);
@@ -437,9 +435,10 @@ public:
     descriptors.clear();
     ptrs.clear();
 
-    std::copy(preParams.begin(), preParams.end(), std::back_inserter(ptrs));
     if (jitInit) {
       ptrs.push_back(initPack);
+    } else {
+      std::copy(preParams.begin(), preParams.end(), std::back_inserter(ptrs));
     }
 
     for (auto [type, buffer] : llvm::zip(program->inputs, inputBuffers)) {

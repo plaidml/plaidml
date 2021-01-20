@@ -286,6 +286,7 @@ public:
     addFunc("wait", llvmVoid, {llvmInt64}, /*isVarArg=*/true);
     addFunc("schedule_barrier", llvmInt8Ptr, {llvmInt8Ptr, llvmInt64},
             /*isVarArg=*/true);
+    addFunc("dump_profiling", llvmVoid, {llvmInt8Ptr}, /*isVarArg=*/false);
   }
 
   void runOnOperation() {
@@ -337,6 +338,7 @@ public:
         ConvertToFuncCall<comp::Submit>,                  //
         ConvertAlloc,                                     //
         ConvertToFuncCall<comp::Dealloc>,                 //
+        ConvertToFuncCall<comp::DumpProfiling>,           //
         ConvertToFuncCall<comp::ScheduleWrite, true, 3>,  //
         ConvertToFuncCall<comp::ScheduleRead, true, 3>,   //
         ConvertToFuncCall<comp::Wait, true, 0>,           //

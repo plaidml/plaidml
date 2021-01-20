@@ -155,6 +155,11 @@ void *ocl_schedule_barrier(void *invocation, uint64_t count, ...) {
       ->enqueueBarrier(dependencies);
 }
 
+void ocl_dump_profiling(void *invocation) {
+  IVLOG(2, "ocl_dump_profiling env = " << invocation);
+  return static_cast<OpenCLInvocation *>(invocation)->finish();
+}
+
 } // extern "C"
 
 void registerSymbols() {
@@ -174,6 +179,7 @@ void registerSymbols() {
   REG(ocl_schedule_read)
   REG(ocl_wait)
   REG(ocl_schedule_barrier)
+  REG(ocl_dump_profiling)
 #undef REG
 }
 
