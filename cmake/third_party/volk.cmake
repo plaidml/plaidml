@@ -1,3 +1,4 @@
+message("Fetching volk")
 FetchContent_Declare(
   volk
   URL      https://github.com/zeux/volk/archive/2638ad1b2b40f1ad402a0a6ac55b60bc51a23058.zip

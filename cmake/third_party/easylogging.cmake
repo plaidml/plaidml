@@ -1,3 +1,4 @@
+message("Fetching easylogging")
 FetchContent_Declare(
   easyloggingpp
   URL      https://github.com/amrayn/easyloggingpp/archive/v9.96.7.tar.gz

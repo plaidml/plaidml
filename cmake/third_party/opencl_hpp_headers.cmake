@@ -1,3 +1,4 @@
+message("Fetching opencl_hpp_headers")
 FetchContent_Declare(
   opencl_hpp_headers
   URL      https://github.com/KhronosGroup/OpenCL-CLHPP/archive/v2.0.12.zip
