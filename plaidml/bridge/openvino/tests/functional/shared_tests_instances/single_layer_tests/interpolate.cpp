@@ -51,7 +51,6 @@ const std::vector<ngraph::op::v4::Interpolate::NearestMode> nearestModes = {
     ngraph::op::v4::Interpolate::NearestMode::floor,
     ngraph::op::v4::Interpolate::NearestMode::round_prefer_ceil,
     ngraph::op::v4::Interpolate::NearestMode::ceil,
-    // If it is downsample and using simple mode, scales in InterpolateLayerTest::SetUp() has to be set correctly.
     ngraph::op::v4::Interpolate::NearestMode::simple,
 };
 
@@ -60,7 +59,7 @@ const std::vector<ngraph::op::v4::Interpolate::NearestMode> defaultNearestMode =
 };
 
 const std::vector<std::vector<size_t>> pads = {
-    {0, 0, 1, 1},
+    {0, 0, 1, 0},
     {0, 0, 0, 0},
 };
 
@@ -75,11 +74,12 @@ const std::vector<double> cubeCoefs = {
 };
 
 const std::vector<std::vector<int64_t>> defaultAxes = {
-    {2, 3},
+    // nGraph reference implementation does not support partial axes
+    {0, 1, 2, 3},
 };
 
 const std::vector<std::vector<float>> defaultScales = {
-    {1.33333f, 1.33333f},
+    {1.0f, 1.0f, 1.33333f, 1.33333f},
 };
 
 const auto interpolateCasesWithoutNearest = ::testing::Combine(  //
@@ -107,7 +107,7 @@ const auto interpolateCases = ::testing::Combine(   //
     ::testing::ValuesIn(defaultAxes),               //
     ::testing::ValuesIn(defaultScales)              //
 );
-/*
+
 INSTANTIATE_TEST_CASE_P(Interpolate_Basic, InterpolateLayerTest,
                         ::testing::Combine(                                              //
                             interpolateCasesWithoutNearest,                              //
@@ -133,13 +133,13 @@ INSTANTIATE_TEST_CASE_P(Interpolate_Nearest, InterpolateLayerTest,
                             ::testing::ValuesIn(targetShapes),                           //
                             ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),         //
                         InterpolateLayerTest::getTestCaseName);
-*/
+
 const std::vector<std::vector<size_t>> targetShapesTailTest = {
     {1, 4, 10, 41},  // 10 * 41 is not multipler of 4, cover tail process code path
 };
 
 const std::vector<std::vector<float>> defaultScalesTailTest = {
-    {0.33333f, 1.36666f},
+    {1.0f, 1.0f, 0.33333f, 1.36666f},
 };
 
 const auto interpolateCasesWithoutNearestTail = ::testing::Combine(  //
@@ -167,7 +167,7 @@ const auto interpolateCasesTail = ::testing::Combine(  //
     ::testing::ValuesIn(defaultAxes),                  //
     ::testing::ValuesIn(defaultScalesTailTest)         //
 );
-/*
+
 INSTANTIATE_TEST_CASE_P(Interpolate_Basic_2, InterpolateLayerTest,
                         ::testing::Combine(                                              //
                             interpolateCasesWithoutNearestTail,                          //
@@ -193,5 +193,5 @@ INSTANTIATE_TEST_CASE_P(Interpolate_Nearest_2, InterpolateLayerTest,
                             ::testing::ValuesIn(targetShapesTailTest),                   //
                             ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),         //
                         InterpolateLayerTest::getTestCaseName);
-*/
+
 }  // namespace
