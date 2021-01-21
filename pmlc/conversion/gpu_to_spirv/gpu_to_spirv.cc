@@ -210,9 +210,6 @@ public:
     MemRefType allocType = operation.getType();
     unsigned memSpace = typeConverter.getMemorySpaceForStorageClass(
         spirv::StorageClass::Function);
-    MemRefType allocType2 =
-        MemRefType::Builder(allocType).setMemorySpace(memSpace);
-    // Type spirvType = typeConverter.convertType(allocType2);
     Type spirvType = typeConverter.convertType(allocType);
     rewriter.replaceOpWithNewOp<spirv::VariableOp>(
         operation, spirvType, spirv::StorageClass::Function, nullptr);
