@@ -70,7 +70,8 @@ private:
                                                             resultUnrankedType,
                                                             stateUnrankedType},
                                              ArrayRef<Type>{});
-    rewriter.create<FuncOp>(loc, symbol, funcType, ArrayRef<NamedAttribute>{});
+    rewriter.create<FuncOp>(loc, symbol, funcType, ArrayRef<NamedAttribute>{})
+        .setPrivate();
     return SymbolRefAttr::get(symbol, context);
   }
 };
