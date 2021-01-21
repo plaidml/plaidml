@@ -178,7 +178,13 @@ LogicalResult cacheLoadAsVector(AffineParallelOp par, PxaLoadOp load,
   // Extract the right element of the vector
   Value idx = newLoadBuilder.create<AffineApplyOp>(
       loc, innerMap.getAffineMap().getSubMap({last}), innerMap.getOperands());
-  auto newLoad = newLoadBuilder.create<tensor::ExtractOp>(
+
+  if (idx.getType().isa<IndexType>()) {
+    auto indexCast = newLoadBuilder.create<IndexCastOp>(load.getLoc(), idx,
+                                                        builder.getI32Type());
+    idx = indexCast.getResult();
+  }
+  auto newLoad = newLoadBuilder.create<vector::ExtractElementOp>(
       loc, eltType, loadVec.getResult(), idx);
   load.replaceAllUsesWith(newLoad.result());
   load.erase();

@@ -132,6 +132,10 @@ static gpu::GPUFuncOp outlineKernelFuncImpl(gpu::LaunchOp launchOp,
     replacer.create<gpu::ReturnOp>(op.getLoc());
     op.erase();
   });
+  outlinedFunc.walk([](AllocOp op) {
+    auto newType = MemRefType::Builder(op.getType()).setMemorySpace(6);
+    op.memref().setType(newType);
+  });
   return outlinedFunc;
 }
 

@@ -294,7 +294,7 @@ public:
     ModuleOp module = getOperation();
 
     // Add the declarations
-    addDeclarations("ocl_", module);
+    addDeclarations(this->prefix, module);
 
     // Convert the SPIRV code to binary form
     BinaryModulesMap modulesMap;
@@ -342,7 +342,7 @@ public:
         ConvertToFuncCall<comp::ScheduleRead, true, 3>,   //
         ConvertToFuncCall<comp::Wait, true, 0>,           //
         ConvertToFuncCall<comp::ScheduleBarrier, true, 1> //
-        >(modulesMap, "ocl_", converter);
+        >(modulesMap, this->prefix, converter);
     LLVMConversionTarget target(*context);
     target.addLegalOp<ModuleOp>();
     target.addLegalOp<ModuleTerminatorOp>();

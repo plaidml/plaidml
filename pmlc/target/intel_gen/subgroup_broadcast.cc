@@ -224,16 +224,9 @@ public:
   LogicalResult devectorizeExtractMap(vector::ExtractMapOp op) {
     OpBuilder builder(op);
     Value idVal = op.ids().front();
-    // It is needed to use i32 type for extract element index. Use cast in case
-    // it comes from index
-    if (idVal.getType().isa<IndexType>()) {
-      auto indexCast =
-          builder.create<IndexCastOp>(op.getLoc(), idVal, builder.getI32Type());
-      idVal = indexCast.getResult();
-    }
 
     auto newExtractOp =
-        builder.create<tensor::ExtractOp>(op.getLoc(), op.vector(), idVal);
+        builder.create<vector::ExtractOp>(op.getLoc(), op.vector(), idVal);
     op.replaceAllUsesWith(newExtractOp.getResult());
     op.erase();
 
@@ -242,14 +235,8 @@ public:
 
   LogicalResult devectorizeInsertMap(vector::InsertMapOp op) {
     OpBuilder builder(op);
+    assert(op.ids().size() == 1);
     Value idVal = op.ids().front();
-    // It is needed to use i32 type for extract element index. Use cast in case
-    // it comes from index
-    if (idVal.getType().isa<IndexType>()) {
-      auto indexCast =
-          builder.create<IndexCastOp>(op.getLoc(), idVal, builder.getI32Type());
-      idVal = indexCast.getResult();
-    }
 
     // Assume that the user of insert_map is TransferWriteOp,
     // so the whole structure was modelled in the vectorizeMemPass
@@ -282,12 +269,14 @@ public:
     // stdx.subgroup_broadcast, otherwise it is removed
     if (!isVectorTypeValid(op.getVectorType()))
       return failure();
-    if (auto extractElementOp =
-            dyn_cast_or_null<tensor::ExtractOp>(op.source().getDefiningOp())) {
-      Value tensor = extractElementOp.tensor();
+    if (auto extractElementOp = dyn_cast_or_null<vector::ExtractElementOp>(
+            op.source().getDefiningOp())) {
+      Value vector = extractElementOp.vector();
       OpBuilder builder(op);
+      auto newIdx = builder.create<IndexCastOp>(
+          op.getLoc(), extractElementOp.position(), builder.getIndexType());
       auto newBroadcast = builder.create<dialect::stdx::SubgroupBroadcastOp>(
-          op.getLoc(), tensor.getType(), tensor, extractElementOp.indices()[0]);
+          op.getLoc(), vector.getType(), vector, newIdx);
       op.replaceAllUsesWith(newBroadcast.getResult());
       extractElementOp.replaceAllUsesWith(newBroadcast.getResult());
       extractElementOp.erase();
