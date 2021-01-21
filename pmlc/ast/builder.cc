@@ -728,8 +728,8 @@ struct ProgramBuilder {
       toRemove.insert(op);
     }
     bodyBuilder.create<layer::ReturnOp>(loc, innerResults);
-    for (Operation *op : toRemove) {
-      op->erase();
+    for (auto it = toRemove.rbegin(); it != toRemove.rend(); ++it) {
+      (*it)->erase();
     }
     SmallVector<Value, 4> tuple;
     for (OpResult result : layerOp.getResults()) {
