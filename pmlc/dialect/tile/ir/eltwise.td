@@ -33,7 +33,7 @@ def ConstantOp :
   ];
 
   let extraClassDeclaration = [{
-    mlir::Attribute getValue() { return getAttr("value"); }
+    mlir::Attribute getValue() { return (*this)->getAttr("value"); }
   }];
 
   let assemblyFormat = "`(` $value `)` attr-dict `:` type($result)";

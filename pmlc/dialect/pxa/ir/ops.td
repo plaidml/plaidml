@@ -38,7 +38,7 @@ class PxaReduceOpBase<string mnemonic, list<OpTrait> traits = []> :
     operand_range getMapOperands() { return idxs(); }
     static mlir::StringRef getMapAttrName() { return "map"; }
     mlir::AffineMapAttr getAffineMapAttr() {
-      return getAttr(getMapAttrName()).cast<mlir::AffineMapAttr>();
+      return (*this)->getAttr(getMapAttrName()).cast<mlir::AffineMapAttr>();
     }
     mlir::AtomicRMWKind getAgg() { return agg(); }
   }];
@@ -150,7 +150,7 @@ class PxaLoadOpBase<string mnemonic, list<OpTrait> traits = []> :
 
     /// Returns the affine map used to index the memref for this operation.
     mlir::AffineMapAttr getAffineMapAttr() {
-      return getAttr(getMapAttrName()).cast<mlir::AffineMapAttr>();
+      return (*this)->getAttr(getMapAttrName()).cast<mlir::AffineMapAttr>();
     }
 
     static mlir::StringRef getMapAttrName() { return "map"; }
