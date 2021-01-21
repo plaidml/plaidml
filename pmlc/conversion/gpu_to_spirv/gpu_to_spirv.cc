@@ -208,8 +208,6 @@ public:
                   ConversionPatternRewriter &rewriter) const override {
     auto &typeConverter = *getTypeConverter<SPIRVTypeConverter>();
     MemRefType allocType = operation.getType();
-    unsigned memSpace = typeConverter.getMemorySpaceForStorageClass(
-        spirv::StorageClass::Function);
     Type spirvType = typeConverter.convertType(allocType);
     rewriter.replaceOpWithNewOp<spirv::VariableOp>(
         operation, spirvType, spirv::StorageClass::Function, nullptr);
