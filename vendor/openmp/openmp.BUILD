@@ -16,6 +16,8 @@ cmake_vars_base = {
 
 cmake_vars_windows = {
     "MSVC": 1,
+    "LIBOMP_HAVE_WAITPKG_INTRINSICS": 1,
+    "LIBOMP_HAVE_IMMINTRIN_H": 1,
 }
 
 cmake_vars = select({
