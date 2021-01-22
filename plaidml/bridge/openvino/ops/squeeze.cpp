@@ -19,7 +19,7 @@ void registerSqueeze() {
   registerOp("squeeze", [](const Context& ctx) {
     IE_ASSERT(ctx.operands.size() == 2);
     auto I = ctx.operands.at(0);
-    auto axes = get_constant_vector<int>(1, ctx.layer);
+    auto axes = cast_constant_operand<int>(1, ctx.layer);
     return edsl::make_tuple(op::squeeze(I, axes));
   });
 }

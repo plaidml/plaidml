@@ -21,11 +21,11 @@ void registerStridedSlice() {
     IE_ASSERT(ctx.operands.size() <= 4);
     IE_ASSERT(ctx.operands.size() >= 3);
     auto I = ctx.operands.at(0);
-    auto starts = get_constant_vector<int64_t>(1, layer);
-    auto stops = get_constant_vector<int64_t>(2, layer);
+    auto starts = cast_constant_operand<int64_t>(1, layer);
+    auto stops = cast_constant_operand<int64_t>(2, layer);
     std::vector<int64_t> steps;
     if (ctx.operands.size() == 4) {
-      steps = get_constant_vector<int64_t>(3, layer);
+      steps = cast_constant_operand<int64_t>(3, layer);
     } else {
       steps.assign(starts.size(), 1);
     }

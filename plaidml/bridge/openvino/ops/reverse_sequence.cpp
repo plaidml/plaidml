@@ -12,17 +12,6 @@ using namespace plaidml;  // NOLINT[build/namespaces]
 using ngraph::opset1::ReverseSequence;
 
 namespace {
-
-template <typename T>
-std::vector<T> cast_constant_operand(size_t operand_idx, ngraph::Node* layer) {
-  auto* ngraph_const = ngraph::as_type<ngraph::op::Constant>(layer->get_input_node_ptr(operand_idx));
-  if (ngraph_const) {
-    return ngraph_const->cast_vector<T>();
-  } else {
-    THROW_IE_EXCEPTION << " input [1] is Unsupported inputType; ";
-  }
-}
-
 edsl::Tensor reverse_tensor(edsl::Tensor reverse_crop, int64_t seq_axis) {
   std::vector<edsl::TensorDim> dims(reverse_crop.rank());
   reverse_crop.bind_dims(dims);
