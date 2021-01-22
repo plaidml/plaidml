@@ -53,11 +53,15 @@ void registerReverseSequence() {
       auto I_slice = edsl::gather(I, batch_indices).axis(batch_axis);
       auto indices_reverse = edsl::index({edsl::TensorDim(length[i])}, 0);
       auto I_reverse = edsl::gather(I_slice, indices_reverse).axis(seq_axis);
-      auto indices_constant = edsl::index({edsl::TensorDim(shapes[seq_axis] - length[i])}, 0) + length[i];
-      auto I_constant = edsl::gather(I_slice, indices_constant).axis(seq_axis);
-      // reverse and concatenate.
       auto reverse_crop = reverse_tensor(I_reverse, seq_axis);
-      slice_pools.push_back(op::concatenate({reverse_crop, I_constant}, seq_axis));
+      if (length[i] < shapes[seq_axis]) {
+        auto indices_constant = edsl::index({edsl::TensorDim(shapes[seq_axis] - length[i])}, 0) + length[i];
+        auto I_constant = edsl::gather(I_slice, indices_constant).axis(seq_axis);
+        // reverse and concatenate.
+        slice_pools.push_back(op::concatenate({reverse_crop, I_constant}, seq_axis));
+      } else {
+        slice_pools.push_back(reverse_crop);
+      }
     }
 
     auto O = op::concatenate(slice_pools, batch_axis);
