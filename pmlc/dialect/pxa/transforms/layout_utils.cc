@@ -176,7 +176,7 @@ bool LayoutConverter::checkPxaVectorReduceOp(PxaVectorReduceOp op) {
 
 bool LayoutConverter::checkYieldOp(mlir::AffineYieldOp yieldOp,
                                    unsigned operandNum) {
-  mlir::Operation *parent = yieldOp.getParentOp();
+  mlir::Operation *parent = yieldOp->getParentOp();
   if (auto parallelOp = mlir::dyn_cast<mlir::AffineParallelOp>(parent)) {
     workQueue.push_back(parallelOp.getResult(operandNum));
     return true;
@@ -284,7 +284,7 @@ void LayoutConverter::convertYieldOp(mlir::AffineYieldOp yieldOp,
   auto newYield =
       builder.create<mlir::AffineYieldOp>(yieldOp.getLoc(), yieldOp.operands());
 
-  mlir::Operation *parent = yieldOp.getParentOp();
+  mlir::Operation *parent = yieldOp->getParentOp();
   builder.setInsertionPoint(parent);
   if (auto parallelOp = mlir::dyn_cast<mlir::AffineParallelOp>(parent)) {
     auto newTypes = newYield.getOperands().getTypes();

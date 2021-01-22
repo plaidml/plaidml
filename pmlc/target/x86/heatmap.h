@@ -7,7 +7,7 @@
 
 #include "llvm/ADT/ArrayRef.h"
 
-#include "pmlc/dialect/pxa/transforms/passes.h"
+#include "pmlc/dialect/pxa/transforms/stencil.h"
 
 namespace pmlc::target::x86 {
 

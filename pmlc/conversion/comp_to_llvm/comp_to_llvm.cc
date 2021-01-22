@@ -5,11 +5,11 @@
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
-#include "mlir/Dialect/SPIRV/SPIRVOps.h"
-#include "mlir/Dialect/SPIRV/Serialization.h"
+#include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/StandardOps/Transforms/Passes.h"
 #include "mlir/Support/LogicalResult.h"
+#include "mlir/Target/SPIRV/Serialization.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "pmlc/conversion/comp_to_llvm/pass_detail.h"
@@ -20,12 +20,9 @@
 
 namespace pmlc::conversion::comp_to_llvm {
 
-namespace comp = pmlc::dialect::comp;
-namespace gpu = mlir::gpu;
-namespace LLVM = mlir::LLVM;
-namespace spirv = mlir::spirv;
-
 using namespace mlir; // NOLINT
+
+namespace comp = pmlc::dialect::comp;
 
 namespace {
 
@@ -43,8 +40,8 @@ public:
     }
     MemRefDescriptor desc(val);
     auto ptr = desc.alignedPtr(builder, loc);
-    LLVM::LLVMType llvmInt8Ptr =
-        LLVM::LLVMType::getInt8PtrTy(builder.getContext());
+    auto llvmInt8Ptr =
+        LLVM::LLVMPointerType::get(IntegerType::get(builder.getContext(), 8));
     if (ptr.getType().cast<LLVM::LLVMPointerType>().getAddressSpace() != 0) {
       return builder.create<LLVM::AddrSpaceCastOp>(loc, llvmInt8Ptr, ptr);
     }
@@ -66,30 +63,24 @@ class ConvertAlloc : public CompConversionBase<comp::Alloc> {
   using CompConversionBase<comp::Alloc>::CompConversionBase;
 
   LogicalResult
-  matchAndRewrite(Operation *op, ArrayRef<Value> operands,
+  matchAndRewrite(comp::Alloc op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
     // Get some basic info about op
     auto memRefType = op->getResult(0).getType().cast<MemRefType>();
     auto loc = op->getLoc();
 
     // Get all of the sizes we need.  TODO: Latest upstream has improved this.
-    int64_t offset;
-    SmallVector<int64_t, 4> strides;
     SmallVector<Value, 4> sizes;
+    SmallVector<Value, 4> strides;
     Value sizeBytes;
 
-    this->getMemRefDescriptorSizes(loc, memRefType, operands, rewriter, sizes);
-    sizeBytes = this->getCumulativeSizeInBytes(loc, memRefType.getElementType(),
-                                               sizes, rewriter);
-    auto successStrides = getStridesAndOffset(memRefType, strides, offset);
-    (void)successStrides;
-    assert(succeeded(successStrides) && "unexpected non-strided memref");
-    assert(offset != MemRefType::getDynamicStrideOrOffset() &&
-           "unexpected dynamic offset");
+    getMemRefDescriptorSizes(loc, memRefType, {}, rewriter, sizes, strides,
+                             sizeBytes);
 
     // Do the actual allocation
-    LLVM::LLVMType llvmInt8Ptr = LLVM::LLVMType::getInt8PtrTy(op->getContext());
-    auto sym = this->getSym(rewriter, "alloc");
+    auto llvmInt8Ptr =
+        LLVM::LLVMPointerType::get(IntegerType::get(op->getContext(), 8));
+    auto sym = getSym(rewriter, "alloc");
     Value ptr =
         rewriter
             .create<LLVM::CallOp>(loc, TypeRange(llvmInt8Ptr), sym,
@@ -97,7 +88,7 @@ class ConvertAlloc : public CompConversionBase<comp::Alloc> {
             .getResult(0);
 
     // Cast it the right result type
-    Type elementPtrType = this->getElementPtrType(memRefType);
+    Type elementPtrType = getElementPtrType(memRefType);
     Value typedPtr;
     if (elementPtrType.cast<LLVM::LLVMPointerType>().getAddressSpace() != 0) {
       typedPtr =
@@ -107,8 +98,8 @@ class ConvertAlloc : public CompConversionBase<comp::Alloc> {
     }
 
     // Create the MemRef descriptor.
-    Value memRefDescriptor = this->createMemRefDescriptor(
-        loc, memRefType, typedPtr, typedPtr, offset, strides, sizes, rewriter);
+    Value memRefDescriptor = createMemRefDescriptor(
+        loc, memRefType, typedPtr, typedPtr, sizes, strides, rewriter);
 
     // Return the final value of the descriptor.
     rewriter.replaceOp(op, {memRefDescriptor});
@@ -122,15 +113,14 @@ struct ConvertCreateKernel : CompConversionBase<comp::CreateKernel> {
   using CompConversionBase<comp::CreateKernel>::CompConversionBase;
 
   LogicalResult
-  matchAndRewrite(Operation *baseOp, ArrayRef<Value> operands,
+  matchAndRewrite(comp::CreateKernel op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
     // Gather some basic information
-    auto op = cast<comp::CreateKernel>(baseOp);
     Location loc = op.getLoc();
     std::string binaryName = op.kernelFuncAttr().getRootReference().str();
     std::string kernelName = op.kernelFuncAttr().getLeafReference().str();
-    LLVM::LLVMType llvmKernelType =
-        LLVM::LLVMType::getInt8PtrTy(rewriter.getContext());
+    auto llvmKernelType =
+        LLVM::LLVMPointerType::get(IntegerType::get(op->getContext(), 8));
 
     // Create kernel from serialized binary.
     if (modulesMap.count(binaryName) == 0)
@@ -145,7 +135,7 @@ struct ConvertCreateKernel : CompConversionBase<comp::CreateKernel> {
         rewriter, loc, modulesMap.at(binaryName).kernelsNameMap.at(kernelName));
 
     // Call the actual function
-    auto sym = this->getSym(rewriter, "create_kernel");
+    auto sym = getSym(rewriter, "create_kernel");
     rewriter.replaceOpWithNewOp<LLVM::CallOp>(
         op, ArrayRef<Type>(llvmKernelType), sym,
         ArrayRef<Value>{operands[0], binaryPtr, binaryBytes, namePtr});
@@ -160,45 +150,45 @@ class ConvertScheduleCompute
   using CompConversionBase<comp::ScheduleCompute>::CompConversionBase;
 
   LogicalResult
-  matchAndRewrite(Operation *baseOp, ArrayRef<Value> operands,
+  matchAndRewrite(comp::ScheduleCompute op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
     // Get an adaptor to view operands as an op, and some basic info.
-    auto loc = baseOp->getLoc();
-    LLVM::LLVMType llvmInt8Ptr =
-        LLVM::LLVMType::getInt8PtrTy(baseOp->getContext());
-    auto dict = DictionaryAttr::get(baseOp->getAttrs(), baseOp->getContext());
-    comp::ScheduleComputeAdaptor op(operands, dict);
+    auto loc = op->getLoc();
+    auto llvmInt8Ptr =
+        LLVM::LLVMPointerType::get(IntegerType::get(op->getContext(), 8));
+    auto dict = DictionaryAttr::get(op->getAttrs(), op->getContext());
+    comp::ScheduleComputeAdaptor adaptor(operands, dict);
 
     // Make operand list
     SmallVector<Value, 4> newOperands;
     auto pushOperand = [&](Value val) {
-      newOperands.push_back(this->convertOperand(val, loc, rewriter));
+      newOperands.push_back(convertOperand(val, loc, rewriter));
     };
-    pushOperand(op.execEnv());
-    pushOperand(op.kernel());
-    pushOperand(op.gridSizeX());
-    pushOperand(op.gridSizeY());
-    pushOperand(op.gridSizeZ());
-    pushOperand(op.blockSizeX());
-    pushOperand(op.blockSizeY());
-    pushOperand(op.blockSizeZ());
+    pushOperand(adaptor.execEnv());
+    pushOperand(adaptor.kernel());
+    pushOperand(adaptor.gridSizeX());
+    pushOperand(adaptor.gridSizeY());
+    pushOperand(adaptor.gridSizeZ());
+    pushOperand(adaptor.blockSizeX());
+    pushOperand(adaptor.blockSizeY());
+    pushOperand(adaptor.blockSizeZ());
     Value bufferCount =
-        this->createIndexConstant(rewriter, loc, op.buffers().size());
+        createIndexConstant(rewriter, loc, adaptor.buffers().size());
     newOperands.push_back(bufferCount);
     Value eventCount =
-        this->createIndexConstant(rewriter, loc, op.depEvents().size());
+        createIndexConstant(rewriter, loc, adaptor.depEvents().size());
     newOperands.push_back(eventCount);
-    for (Value buf : op.buffers()) {
+    for (Value buf : adaptor.buffers()) {
       pushOperand(buf);
     }
-    for (Value evt : op.depEvents()) {
+    for (Value evt : adaptor.depEvents()) {
       pushOperand(evt);
     }
 
     // DO the actual call
-    auto sym = this->getSym(rewriter, "schedule_compute");
-    rewriter.replaceOpWithNewOp<LLVM::CallOp>(baseOp, TypeRange(llvmInt8Ptr),
-                                              sym, newOperands);
+    auto sym = getSym(rewriter, "schedule_compute");
+    rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, TypeRange(llvmInt8Ptr), sym,
+                                              newOperands);
     return success();
   }
 };
@@ -212,7 +202,7 @@ public:
   using CompConversionBase<Op>::CompConversionBase;
 
   LogicalResult
-  matchAndRewrite(Operation *op, ArrayRef<Value> operands,
+  matchAndRewrite(Op op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
     // Convert result types
     SmallVector<Type, 1> resultTypes;
@@ -247,24 +237,24 @@ class ConvertCompToLLVMPass
     : public ConvertCompToLLVMBase<ConvertCompToLLVMPass> {
 public:
   ConvertCompToLLVMPass() = default;
-  explicit ConvertCompToLLVMPass(const std::string &prefix) {
-    this->prefix = prefix;
+  explicit ConvertCompToLLVMPass(StringRef prefix) {
+    this->prefix = prefix.str();
   }
-  void addDeclarations(std::string prefix, ModuleOp &module) {
+  void addDeclarations(StringRef prefix, ModuleOp module) {
     Location loc = module.getLoc();
     OpBuilder builder(module.getBody()->getTerminator());
     MLIRContext *context = builder.getContext();
-    LLVM::LLVMType llvmInt8Ptr = LLVM::LLVMType::getInt8PtrTy(context);
-    LLVM::LLVMType llvmVoid = LLVM::LLVMType::getVoidTy(context);
-    LLVM::LLVMType llvmInt64 = LLVM::LLVMType::getInt64Ty(context);
+    auto llvmInt8Ptr = LLVM::LLVMPointerType::get(IntegerType::get(context, 8));
+    auto llvmVoid = LLVM::LLVMVoidType::get(context);
+    auto llvmInt64 = IntegerType::get(context, 64);
 
-    auto addFunc = [&](const char *name, LLVM::LLVMType retType,
-                       ArrayRef<LLVM::LLVMType> argTypes, bool isVarArg) {
-      std::string newName = prefix + name;
+    auto addFunc = [&](const char *name, Type retType, ArrayRef<Type> argTypes,
+                       bool isVarArg) {
+      std::string newName = prefix.str() + name;
       if (!module.lookupSymbol(name)) {
         builder.create<LLVM::LLVMFuncOp>(
             loc, newName,
-            LLVM::LLVMType::getFunctionTy(retType, argTypes, isVarArg));
+            LLVM::LLVMFunctionType::get(retType, argTypes, isVarArg));
       }
     };
 
@@ -301,10 +291,10 @@ public:
   void runOnOperation() {
     // Get the main module
     MLIRContext *context = &getContext();
-    auto module = getOperation();
+    ModuleOp module = getOperation();
 
     // Add the declarations
-    addDeclarations("ocl_", module);
+    addDeclarations(this->prefix, module);
 
     // Convert the SPIRV code to binary form
     BinaryModulesMap modulesMap;
@@ -322,23 +312,15 @@ public:
     LLVMTypeConverter converter(context, options);
 
     // Make all the comp types convert to simple pointers
-    LLVM::LLVMType llvmInt8Ptr = LLVM::LLVMType::getInt8PtrTy(context);
+    auto llvmInt8Ptr = LLVM::LLVMPointerType::get(IntegerType::get(context, 8));
     converter.addConversion(
-        [=](comp::DeviceType deviceType) -> mlir::Optional<mlir::Type> {
-          return llvmInt8Ptr;
-        });
+        [=](comp::DeviceType deviceType) { return llvmInt8Ptr; });
     converter.addConversion(
-        [=](comp::ExecEnvType execEnvType) -> mlir::Optional<mlir::Type> {
-          return llvmInt8Ptr;
-        });
+        [=](comp::ExecEnvType execEnvType) { return llvmInt8Ptr; });
     converter.addConversion(
-        [=](comp::EventType eventType) -> mlir::Optional<mlir::Type> {
-          return llvmInt8Ptr;
-        });
+        [=](comp::EventType eventType) { return llvmInt8Ptr; });
     converter.addConversion(
-        [=](comp::KernelType kernelType) -> mlir::Optional<mlir::Type> {
-          return llvmInt8Ptr;
-        });
+        [=](comp::KernelType kernelType) { return llvmInt8Ptr; });
 
     // Add the conversion patterns
     OwningRewritePatternList patterns;
@@ -360,7 +342,7 @@ public:
         ConvertToFuncCall<comp::ScheduleRead, true, 3>,   //
         ConvertToFuncCall<comp::Wait, true, 0>,           //
         ConvertToFuncCall<comp::ScheduleBarrier, true, 1> //
-        >(modulesMap, "ocl_", converter);
+        >(modulesMap, this->prefix, converter);
     LLVMConversionTarget target(*context);
     target.addLegalOp<ModuleOp>();
     target.addLegalOp<ModuleTerminatorOp>();
@@ -369,7 +351,7 @@ public:
     target.markOpRecursivelyLegal<gpu::GPUModuleOp>();
 
     // Do the actual conversion
-    if (failed(applyPartialConversion(module, target, patterns))) {
+    if (failed(applyPartialConversion(module, target, std::move(patterns)))) {
       signalPassFailure();
     }
   }
@@ -381,7 +363,7 @@ std::unique_ptr<Pass> createConvertCompToLLVMPass() {
   return std::make_unique<ConvertCompToLLVMPass>();
 }
 
-std::unique_ptr<Pass> createConvertCompToLLVMPass(const std::string &prefix) {
+std::unique_ptr<Pass> createConvertCompToLLVMPass(StringRef prefix) {
   return std::make_unique<ConvertCompToLLVMPass>(prefix);
 }
 

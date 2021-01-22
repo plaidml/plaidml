@@ -30,7 +30,7 @@ void simplifyLoadMap(OpTy op) {
   if (newMap.getAffineMap() == oldMap.getAffineMap())
     return;
   auto newMapAttr = mlir::AffineMapAttr::get(newMap.getAffineMap());
-  op.setAttr(op.getMapAttrName(), newMapAttr);
+  op->setAttr(op.getMapAttrName(), newMapAttr);
   op.indicesMutable().assign(newMap.getOperands());
 }
 
@@ -43,7 +43,7 @@ void simplifyReduceMap(OpTy op) {
   if (newMap.getAffineMap() == oldMap.getAffineMap())
     return;
   auto newMapAttr = mlir::AffineMapAttr::get(newMap.getAffineMap());
-  op.setAttr(op.getMapAttrName(), newMapAttr);
+  op->setAttr(op.getMapAttrName(), newMapAttr);
   op.idxsMutable().assign(newMap.getOperands());
 }
 

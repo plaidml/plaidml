@@ -18,8 +18,6 @@ int main(int argc, char **argv) {
     IVLOG(level, "PLAIDML_VERBOSE=" << level);
   }
 
-  mlir::enableGlobalDialectRegistry(true);
-  registerAllDialects();
   registerAllPasses();
 
   mlir::DialectRegistry registry;

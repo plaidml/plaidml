@@ -6,18 +6,16 @@
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Builders.h"
-#include "mlir/IR/StandardTypes.h"
+#include "mlir/IR/BuiltinTypes.h"
 
 namespace pmlc::conversion::comp_to_llvm {
 
-namespace LLVM = mlir::LLVM;
+using namespace mlir; // NOLINT
 
-LLVM::GlobalOp addGlobalString(mlir::OpBuilder &builder, mlir::Location loc,
-                               mlir::StringRef symbol, mlir::StringRef string) {
-  LLVM::LLVMType llvmInt8Type = LLVM::LLVMType::getInt8Ty(builder.getContext());
-  LLVM::LLVMType llvmStringType =
-      LLVM::LLVMType::getArrayTy(llvmInt8Type, string.size());
-
+LLVM::GlobalOp addGlobalString(OpBuilder &builder, Location loc,
+                               StringRef symbol, StringRef string) {
+  auto llvmStringType = LLVM::LLVMArrayType::get(
+      IntegerType::get(builder.getContext(), 8), string.size());
   LLVM::GlobalOp globalOp = builder.create<LLVM::GlobalOp>(
       loc, llvmStringType,
       /*isConstant=*/true, LLVM::Linkage::Internal, symbol,
@@ -25,24 +23,25 @@ LLVM::GlobalOp addGlobalString(mlir::OpBuilder &builder, mlir::Location loc,
   return globalOp;
 }
 
-mlir::Value getPtrToGlobalString(mlir::OpBuilder &builder, mlir::Location &loc,
-                                 mlir::LLVM::GlobalOp globalOp) {
-  LLVM::LLVMType llvmInt64Ty = LLVM::LLVMType::getInt64Ty(builder.getContext());
-  LLVM::LLVMType llvmPtrTy = LLVM::LLVMType::getInt8PtrTy(builder.getContext());
-  mlir::Value globalPtr = builder.create<LLVM::AddressOfOp>(loc, globalOp);
-  mlir::Value cst0 = builder.create<LLVM::ConstantOp>(
-      loc, llvmInt64Ty, builder.getI64IntegerAttr(0));
-  mlir::Value stringPtr = builder.create<LLVM::GEPOp>(
-      loc, llvmPtrTy, globalPtr, mlir::ArrayRef<mlir::Value>({cst0, cst0}));
+Value getPtrToGlobalString(OpBuilder &builder, Location &loc,
+                           LLVM::GlobalOp globalOp) {
+  auto llvmInt64Ty = IntegerType::get(builder.getContext(), 64);
+  auto llvmPtrTy =
+      LLVM::LLVMPointerType::get(IntegerType::get(builder.getContext(), 8));
+  Value globalPtr = builder.create<LLVM::AddressOfOp>(loc, globalOp);
+  Value cst0 = builder.create<LLVM::ConstantOp>(loc, llvmInt64Ty,
+                                                builder.getI64IntegerAttr(0));
+  Value stringPtr = builder.create<LLVM::GEPOp>(loc, llvmPtrTy, globalPtr,
+                                                ArrayRef<Value>({cst0, cst0}));
   return stringPtr;
 }
 
-void getPtrToBinaryModule(mlir::OpBuilder &builder, mlir::Location &loc,
-                          const BinaryModuleInfo &binaryInfo,
-                          mlir::Value &pointer, mlir::Value &bytes) {
+void getPtrToBinaryModule(OpBuilder &builder, Location &loc,
+                          const BinaryModuleInfo &binaryInfo, Value &pointer,
+                          Value &bytes) {
   pointer = getPtrToGlobalString(builder, loc, binaryInfo.symbol);
 
-  LLVM::LLVMType llvmInt64Ty = LLVM::LLVMType::getInt64Ty(builder.getContext());
+  auto llvmInt64Ty = IntegerType::get(builder.getContext(), 64);
   bytes = builder.create<LLVM::ConstantOp>(
       loc, llvmInt64Ty, builder.getI64IntegerAttr(binaryInfo.bytes));
 }

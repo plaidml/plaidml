@@ -29,6 +29,7 @@
     vectorize_mem.cc
   DEPS
     LLVMSupport
+    MLIRAffineTransforms
     MLIRIR
     pmlc::dialect::pxa::analysis
     pmlc::dialect::pxa::ir

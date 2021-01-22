@@ -1,3 +1,4 @@
+message("Fetching googletest")
 FetchContent_Declare(
   googletest
   URL      https://github.com/google/googletest/archive/release-1.10.0.tar.gz

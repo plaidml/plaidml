@@ -12,9 +12,9 @@
 
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
-#include "mlir/IR/Function.h"
+#include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Matchers.h"
-#include "mlir/IR/StandardTypes.h"
 #include "mlir/Support/DebugStringHelper.h"
 
 #include "pmlc/dialect/tile/ir/ops.h"
@@ -107,8 +107,8 @@ RankedTensorType getRankedTensorType(Type type) {
   if (type.isa<IndexType>()) {
     // TODO: reify this when we lower to a specific target.
     return RankedTensorType::get(
-        shape, IntegerType::get(32, IntegerType::SignednessSemantics::Signed,
-                                type.getContext()));
+        shape, IntegerType::get(type.getContext(), 32,
+                                IntegerType::SignednessSemantics::Signed));
   }
   return RankedTensorType::get(shape, type);
 }
@@ -166,7 +166,7 @@ bool ConstantValueMatcher::match(Operation *op) {
 
 Type toSignlessType(Type type) {
   if (auto integerType = type.dyn_cast<IntegerType>()) {
-    return IntegerType::get(integerType.getWidth(), type.getContext());
+    return IntegerType::get(type.getContext(), integerType.getWidth());
   }
   return type;
 }

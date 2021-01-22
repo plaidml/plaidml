@@ -23,8 +23,8 @@ gentbl(
 plaidml_cc_library(
     name = "gpu_to_spirv",
     srcs = [
-        "pass_detail.h",
         "gpu_to_spirv.cc",
+        "pass_detail.h",
     ],
     hdrs = [
         "passes.h",
@@ -32,7 +32,7 @@ plaidml_cc_library(
     deps = [
         ":gen-pass",
         "//pmlc/dialect/stdx/ir",
-        "@llvm-project//mlir:GPUToSPIRVTransforms",
+        "@llvm-project//mlir:GPUToSPIRV",
         "@llvm-project//mlir:GPUTransforms",
         "@llvm-project//mlir:SPIRVDialect",
         "@llvm-project//mlir:VectorOps",

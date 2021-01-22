@@ -4,9 +4,10 @@
 #include "mlir/Dialect/StandardOps/EDSC/Builders.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/PatternMatch.h"
-#include "mlir/IR/StandardTypes.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "pmlc/dialect/stdx/transforms/pass_detail.h"
 
@@ -114,7 +115,7 @@ LogicalResult
 TransferReadOpI1ToI32::matchAndRewrite(vector::TransferReadOp transferReadOp,
                                        PatternRewriter &rewriter) const {
   // Not convert function argument as we alloc i32 buffer for it.
-  if (!transferReadOp.memref().getDefiningOp()) {
+  if (!transferReadOp.source().getDefiningOp()) {
     return failure();
   }
 
@@ -130,12 +131,12 @@ TransferReadOpI1ToI32::matchAndRewrite(vector::TransferReadOp transferReadOp,
 
   auto destTypeVec = VectorType::get(vectorType.getNumElements(), destType);
 
-  transferReadOp.memref().setType(MemRefType::get(
-      transferReadOp.memref().getType().cast<MemRefType>().getShape(),
+  transferReadOp.source().setType(MemRefType::get(
+      transferReadOp.source().getType().cast<MemRefType>().getShape(),
       destType));
 
   auto newTransferReadOp = rewriter.create<vector::TransferReadOp>(
-      loc, destTypeVec, transferReadOp.memref(), transferReadOp.indices());
+      loc, destTypeVec, transferReadOp.source(), transferReadOp.indices());
 
   auto const0 = rewriter.create<ConstantIntOp>(loc, 0, destType);
   auto const0Op = rewriter.create<vector::BroadcastOp>(loc, destTypeVec,
@@ -201,7 +202,7 @@ LogicalResult
 TransferWriteOpI1ToI32::matchAndRewrite(vector::TransferWriteOp transferWriteOp,
                                         PatternRewriter &rewriter) const {
   // Not convert function argument as we alloc i32 buffer for it.
-  if (!transferWriteOp.memref().getDefiningOp()) {
+  if (!transferWriteOp.source().getDefiningOp()) {
     return failure();
   }
 
@@ -223,8 +224,8 @@ TransferWriteOpI1ToI32::matchAndRewrite(vector::TransferWriteOp transferWriteOp,
   auto const1Op = rewriter.create<vector::BroadcastOp>(loc, destTypeVec,
                                                        const1.getResult());
 
-  transferWriteOp.memref().setType(MemRefType::get(
-      transferWriteOp.memref().getType().cast<MemRefType>().getShape(),
+  transferWriteOp.source().setType(MemRefType::get(
+      transferWriteOp.source().getType().cast<MemRefType>().getShape(),
       destType));
 
   auto selOp =
@@ -232,7 +233,7 @@ TransferWriteOpI1ToI32::matchAndRewrite(vector::TransferWriteOp transferWriteOp,
                                 const1Op.getResult(), const0Op.getResult());
 
   rewriter.replaceOpWithNewOp<vector::TransferWriteOp>(
-      transferWriteOp, selOp.getResult(), transferWriteOp.memref(),
+      transferWriteOp, selOp.getResult(), transferWriteOp.source(),
       transferWriteOp.indices());
 
   return success();
@@ -279,11 +280,12 @@ struct I1StorageToI32Pass : public I1StorageToI32Base<I1StorageToI32Pass> {
                                 .getType()
                                 .dyn_cast_or_null<MemRefType>()) {
         if (memRefType.getElementType().isInteger(1)) {
+          OpBuilder builder(context);
+
           // shall convert this memref to int32
           auto argument = entryBlock.getArgument(i);
-          auto intType = IntegerType::get(32, context);
+          auto intType = builder.getI32Type();
           auto newMemRefType = MemRefType::get(memRefType.getShape(), intType);
-          OpBuilder builder(context);
           Location loc = entryBlock.front().getLoc();
 
           builder.setInsertionPointToStart(&entryBlock);
@@ -327,7 +329,7 @@ struct I1StorageToI32Pass : public I1StorageToI32Base<I1StorageToI32Pass> {
       }
 
     populateI1StorageToI32(context, patterns);
-    applyPatternsAndFoldGreedily(getOperation(), patterns);
+    applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }
 };
 

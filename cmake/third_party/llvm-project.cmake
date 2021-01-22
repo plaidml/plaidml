@@ -28,10 +28,11 @@ if(LOCAL_LLVM_DIR)
   set(LLVM_EXTERNAL_MLIR_SOURCE_DIR "${LLVM_SOURCE_DIR}/mlir")
   add_subdirectory(${LLVM_SOURCE_DIR}/llvm ${LLVM_BINARY_DIR} EXCLUDE_FROM_ALL)
 else()
+  message("Fetching LLVM")
   FetchContent_Declare(
     llvm-project
-    URL      https://github.com/plaidml/llvm-project/archive/634a6832a2f988608b7fb6e858b444a2d7f4af62.tar.gz
-    URL_HASH SHA256=6c740b01868011d0666339071daf61408e25ae1d4b850f7438a328ee157db070
+    URL      https://github.com/plaidml/llvm-project/archive/cd840820042447c74661b9ce0464feb0abf074fc.tar.gz
+    URL_HASH SHA256=8f86c0cb5d77eb2cfea786e2ff8608cb51e845b8b3ee56ddfcfe01b457ad1170
   )
   FetchContent_GetProperties(llvm-project)
   if(NOT llvm-project_POPULATED)

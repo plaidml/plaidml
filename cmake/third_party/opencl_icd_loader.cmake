@@ -1,3 +1,4 @@
+message("Fetching opencl_icd_loader")
 FetchContent_Declare(
   opencl_icd_loader
   URL      https://github.com/KhronosGroup/OpenCL-ICD-Loader/archive/v2020.06.16.zip

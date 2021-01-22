@@ -23,6 +23,7 @@ if(NOT InferenceEngineDeveloperPackage_FOUND)
   set(NGRAPH_ONNX_IMPORT_ENABLE OFF)
   set(TREAT_WARNING_AS_ERROR OFF)
 
+  message("Fetching openvino")
   FetchContent_Declare(
     openvino
     GIT_REPOSITORY https://github.com/plaidml/openvino.git

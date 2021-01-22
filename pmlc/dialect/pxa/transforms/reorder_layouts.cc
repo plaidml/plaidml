@@ -63,7 +63,7 @@ public:
               "Failed to change layout in-place, separate reorder not allowed");
         continue;
       }
-      mlir::ModuleOp moduleOp = func.getParentOfType<mlir::ModuleOp>();
+      mlir::ModuleOp moduleOp = func->getParentOfType<mlir::ModuleOp>();
 
       IVLOG(3, "Failed to change layout in-place, inserting reorder");
       reorderMemoryReads(createReorder, reorder, memoryDesc, moduleOp,

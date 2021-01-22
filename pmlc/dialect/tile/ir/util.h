@@ -2,9 +2,9 @@
 
 #pragma once
 
-#include "mlir/IR/Module.h"
+#include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Operation.h"
-#include "mlir/IR/StandardTypes.h"
 #include "mlir/IR/Value.h"
 
 #include "pmlc/util/enums.h"

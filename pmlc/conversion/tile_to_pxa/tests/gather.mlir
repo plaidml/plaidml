@@ -26,12 +26,12 @@ func @gather2(%arg0: tensor<3x2xf32>, %arg1: tensor<4xf32>) -> tensor<3x4xf32> {
 // CHECK: %[[FI:.*]] = fptosi %[[FF]] : f32 to i32
 // CHECK: %[[CF:.*]] = ceilf %[[IDX]] : f32
 // CHECK: %[[CI:.*]] = fptosi %[[CF]] : f32 to i32
-// CHECK: %[[CMP0:.*]] = cmpi "slt", %[[FI]], %{{.*}}: i32
-// CHECK: %[[CMP1:.*]] = cmpi "slt", %[[FI]], %{{.*}}: i32
+// CHECK: %[[CMP0:.*]] = cmpi slt, %[[FI]], %{{.*}}: i32
+// CHECK: %[[CMP1:.*]] = cmpi slt, %[[FI]], %{{.*}}: i32
 // CHECK: %{{.*}} = select %[[CMP0]],  %{{.*}}, %[[FI]] : i32
 // CHECK: %[[FLOOR:.*]] = select %[[CMP1]], %{{.*}},  %{{.*}} : i32
-// CHECK: %[[CMP2:.*]] = cmpi "slt", %[[CI]], %{{.*}}: i32
-// CHECK: %[[CMP3:.*]] = cmpi "slt", %[[CI]], %{{.*}}: i32
+// CHECK: %[[CMP2:.*]] = cmpi slt, %[[CI]], %{{.*}}: i32
+// CHECK: %[[CMP3:.*]] = cmpi slt, %[[CI]], %{{.*}}: i32
 // CHECK: %{{.*}} = select %[[CMP2]],  %{{.*}}, %[[CI]] : i32
 // CHECK: %[[CEIL:.*]] = select %[[CMP3]], %{{.*}},  %{{.*}} : i32
 // CHECK: %[[FIDX:.*]] = index_cast %[[FLOOR]] : i32 to index

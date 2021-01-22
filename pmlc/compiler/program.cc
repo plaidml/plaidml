@@ -79,19 +79,25 @@ private:
 
 } // namespace
 
+Program::Program(ModuleOp module)
+    : context(std::make_unique<MLIRContext>()), module(module) {}
+
 Program::Program(llvm::StringRef name)
-    : module(ModuleOp::create(UnknownLoc::get(&context), name)) {}
+    : context(std::make_unique<MLIRContext>()),
+      module(ModuleOp::create(UnknownLoc::get(context.get()), name)) {}
 
-Program::Program(mlir::ModuleOp module) : module(module) {}
-
-std::unique_ptr<Program> Program::fromSource(mlir::StringRef source) {
-  return std::make_unique<Program>(llvm::MemoryBuffer::getMemBuffer(source));
+std::unique_ptr<Program>
+Program::fromSource(std::unique_ptr<MLIRContext> context, StringRef source) {
+  return std::make_unique<Program>(std::move(context),
+                                   llvm::MemoryBuffer::getMemBuffer(source));
 }
 
-Program::Program(std::unique_ptr<llvm::MemoryBuffer> buffer) {
+Program::Program(std::unique_ptr<MLIRContext> context,
+                 std::unique_ptr<llvm::MemoryBuffer> buffer)
+    : context(std::move(context)) {
   llvm::SourceMgr sourceMgr;
   sourceMgr.AddNewSourceBuffer(std::move(buffer), llvm::SMLoc());
-  module = mlir::parseSourceFile(sourceMgr, &context);
+  module = parseSourceFile(sourceMgr, this->context.get());
 }
 
 static StringRef getDiagKindStr(DiagnosticSeverity kind) {
@@ -186,7 +192,7 @@ void Program::compile(StringRef targetNameAndOptions, bool collectPasses,
       SmallString<128> path(dumpDir);
       llvm::sys::path::append(
           path, llvm::formatv("{0,0+2}_{1}.mlir", pass.index(), info.name));
-      auto file = mlir::openOutputFile(path, &err);
+      auto file = openOutputFile(path, &err);
       if (!err.empty()) {
         throw std::runtime_error("Failed to dump pass: " + err);
       }

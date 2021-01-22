@@ -5,9 +5,9 @@
 #include "pmlc/target/intel_gen_ocl_spirv/pass_detail.h"
 #include "pmlc/target/intel_gen_ocl_spirv/passes.h"
 
-#include "mlir/Dialect/SPIRV/SPIRVOps.h"
-#include "mlir/Dialect/SPIRV/TargetAndABI.h"
-#include "mlir/IR/StandardTypes.h"
+#include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
+#include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -45,14 +45,14 @@ class IntelGenOclLegalizeSpirvPass final
         [](spirv::GlobalVariableOp op) { return !isI32BuiltIn(op); });
 
     spirv::ModuleOp module = getOperation();
-    if (mlir::failed(
-            applyFullConversion(module.getOperation(), target, patterns)))
+    if (mlir::failed(applyFullConversion(module.getOperation(), target,
+                                         std::move(patterns))))
       signalPassFailure();
   }
 };
 
 mlir::Optional<spirv::BuiltIn> getGlobalBuiltIn(spirv::GlobalVariableOp op) {
-  mlir::StringAttr builtinAttr = op.getAttrOfType<mlir::StringAttr>(
+  mlir::StringAttr builtinAttr = op->getAttrOfType<mlir::StringAttr>(
       spirv::SPIRVDialect::getAttributeName(spirv::Decoration::BuiltIn));
   if (!builtinAttr)
     return llvm::None;
@@ -84,7 +84,7 @@ mlir::LogicalResult BuiltInConversion::matchAndRewrite(
   // Gather address_of users for rewrite stage.
   std::vector<spirv::AddressOfOp> addressOps;
   mlir::Optional<mlir::SymbolTable::UseRange> optSymbolUses =
-      op.getSymbolUses(op.getParentOp());
+      op.getSymbolUses(op->getParentOp());
   if (!optSymbolUses.hasValue())
     return mlir::failure();
   for (mlir::SymbolTable::SymbolUse use : optSymbolUses.getValue()) {

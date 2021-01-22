@@ -258,4 +258,16 @@ private:
   llvm::SmallVector<int64_t, 8> bestTiling;
 };
 
+struct StencilCost {
+  double throughput;
+  unsigned startupCost;
+};
+
+using StencilCostFunction = std::function<StencilCost(
+    llvm::ArrayRef<int64_t>, llvm::ArrayRef<mlir::Type>)>;
+
+mlir::LogicalResult applyStencilGEMM(mlir::AffineParallelOp op,
+                                     unsigned numThreads, bool isBatched,
+                                     StencilCostFunction costFn);
+
 } // namespace pmlc::dialect::pxa
