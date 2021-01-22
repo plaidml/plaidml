@@ -322,6 +322,35 @@ LogicalResult verifyContractionOp(ContractionOp op) {
   return success();
 }
 
+LogicalResult verifyReshapeOp(ReshapeOp op) {
+  // TODO: verify
+  auto inType = op.tensor().getType().cast<RankedTensorType>();
+  auto outType = op.result().getType().cast<RankedTensorType>();
+  auto inEltType = inType.getElementType();
+  auto outEltType = outType.getElementType();
+  if (inEltType != outEltType) {
+    return op.emitOpError(
+               "reshape op must not cast, but found input element type ")
+           << inEltType << " and output element type " << outEltType;
+  }
+  auto inShape = inType.getShape();
+  int64_t inTotalSize = 1;
+  for (auto dim : inShape) {
+    inTotalSize *= dim;
+  }
+  auto outShape = outType.getShape();
+  int64_t outTotalSize = 1;
+  for (auto dim : outShape) {
+    outTotalSize *= dim;
+  }
+  if (inTotalSize != outTotalSize) {
+    return op.emitOpError("reshape op must not change the total size (product "
+                          "of dimensions) of a tensor, but found input shape ")
+           << inShape << " and output shape " << outShape;
+  }
+  return success();
+}
+
 void GatherOp::build(OpBuilder &builder, OperationState &result,
                      Type resultType, ValueRange operands, IntegerAttr axis,
                      IntegerAttr interpolationMode, IntegerAttr nearestMode,
