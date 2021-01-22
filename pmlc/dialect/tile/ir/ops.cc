@@ -323,30 +323,13 @@ LogicalResult verifyContractionOp(ContractionOp op) {
 }
 
 LogicalResult verifyReshapeOp(ReshapeOp op) {
-  // TODO: verify
   auto inType = op.tensor().getType().cast<RankedTensorType>();
   auto outType = op.result().getType().cast<RankedTensorType>();
-  auto inEltType = inType.getElementType();
-  auto outEltType = outType.getElementType();
-  if (inEltType != outEltType) {
-    return op.emitOpError(
-               "reshape op must not cast, but found input element type ")
-           << inEltType << " and output element type " << outEltType;
+  if (inType.getElementType() != outType.getElementType()) {
+    return op.emitOpError("element type mismatch");
   }
-  auto inShape = inType.getShape();
-  int64_t inTotalSize = 1;
-  for (auto dim : inShape) {
-    inTotalSize *= dim;
-  }
-  auto outShape = outType.getShape();
-  int64_t outTotalSize = 1;
-  for (auto dim : outShape) {
-    outTotalSize *= dim;
-  }
-  if (inTotalSize != outTotalSize) {
-    return op.emitOpError("reshape op must not change the total size (product "
-                          "of dimensions) of a tensor, but found input shape ")
-           << inShape << " and output shape " << outShape;
+  if (inType.getNumElements() != outType.getNumElements()) {
+    return op.emitOpError("element count mismatch");
   }
   return success();
 }
