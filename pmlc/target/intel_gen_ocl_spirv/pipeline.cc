@@ -120,8 +120,8 @@ void pipelineBuilder(OpPassManager &pm,
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
-  pm.addPass(pxa::createVectorizeMemPass());
-  pm.addPass(pmlc::dialect::pxa::createAffineNormalizePass());
+  pm.addNestedPass<FuncOp>(pxa::createVectorizeMemPass());
+  pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 

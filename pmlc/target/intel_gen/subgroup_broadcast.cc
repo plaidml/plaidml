@@ -225,8 +225,16 @@ public:
     OpBuilder builder(op);
     Value idVal = op.ids().front();
 
-    auto newExtractOp =
-        builder.create<vector::ExtractOp>(op.getLoc(), op.vector(), idVal);
+    // It is needed to use i32 type for extract element index. Use cast in case
+    // it comes from index
+    if (idVal.getType().isa<IndexType>()) {
+      auto indexCast = builder.create<IndexCastOp>(op.getLoc(), idVal,
+                                                   builder.getIntegerType(32));
+      idVal = indexCast.getResult();
+    }
+
+    auto newExtractOp = builder.create<vector::ExtractElementOp>(
+        op.getLoc(), op.vector(), idVal);
     op.replaceAllUsesWith(newExtractOp.getResult());
     op.erase();
 
@@ -237,6 +245,14 @@ public:
     OpBuilder builder(op);
     assert(op.ids().size() == 1);
     Value idVal = op.ids().front();
+
+    // It is needed to use i32 type for extract element index. Use cast in case
+    // it comes from index
+    if (idVal.getType().dyn_cast<IndexType>()) {
+      auto indexCast = builder.create<IndexCastOp>(op.getLoc(), idVal,
+                                                   builder.getIntegerType(32));
+      idVal = indexCast.getResult();
+    }
 
     // Assume that the user of insert_map is TransferWriteOp,
     // so the whole structure was modelled in the vectorizeMemPass
