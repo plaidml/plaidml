@@ -15,6 +15,17 @@ using ngraph::opset1::Reverse;
 
 namespace {
 
+// TODO: Remove and replace use with get_axis_set_from_constant_operand once upstream fixed for negatives
+template <typename T>
+std::vector<T> cast_constant_operand(size_t operand_idx, ngraph::Node* layer) {
+  auto* ngraph_const = ngraph::as_type<ngraph::op::Constant>(layer->get_input_node_ptr(operand_idx));
+  if (ngraph_const) {
+    return ngraph_const->cast_vector<T>();
+  } else {
+    THROW_IE_EXCEPTION << " input [1] is Unsupported inputType; ";
+  }
+}
+
 ngraph::AxisSet cast_constant_axis_mask(size_t operand_idx, ngraph::Node* layer) {
   auto ngraph_const =
       std::dynamic_pointer_cast<ngraph::op::Constant>(layer->input_value(operand_idx).get_node_shared_ptr());
@@ -42,7 +53,16 @@ void registerReverse() {
     auto I = ctx.operands.at(0);
     ngraph::AxisSet axes;
     if (layer->get_mode() == Reverse::Mode::INDEX) {
-      axes = get_axis_set_from_constant_operand(1, ctx.layer);
+      std::vector<int64_t> raw_axes = cast_constant_operand<int64_t>(1, ctx.layer);
+      for (auto ax : raw_axes) {
+        if (ax < 0) {
+          ax += I.rank();
+          if (ax < 0) {
+            THROW_IE_EXCEPTION << "Axis underflow in Reverse (requested axis more negative than rank of tensor)";
+          }
+        }
+        axes.emplace(ax);
+      }
     } else if (layer->get_mode() == Reverse::Mode::MASK) {
       axes = cast_constant_axis_mask(1, ctx.layer);
     }
