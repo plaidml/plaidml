@@ -182,14 +182,12 @@ INSTANTIATE_TEST_CASE_P(                 //
     params_InputShapes,                  //
     ReduceOpsLayerTest::getTestCaseName  //
 );
-/*
 INSTANTIATE_TEST_CASE_P(                 //
     Reduce_Axes,                         //
     ReduceOpsLayerTest,                  //
     params_Axes,                         //
     ReduceOpsLayerTest::getTestCaseName  //
 );
-*/
 INSTANTIATE_TEST_CASE_P(                 //
     Reduce_ReductionTypes,               //
     ReduceOpsLayerTest,                  //
