@@ -31,7 +31,7 @@ const std::vector<ngraph::helpers::SqueezeOpType> opTypes = {
     ngraph::helpers::SqueezeOpType::UNSQUEEZE,
 };
 
-INSTANTIATE_TEST_CASE_P(smoke_Basic, SqueezeUnsqueezeLayerTest,
+INSTANTIATE_TEST_CASE_P(smoke, SqueezeUnsqueezeLayerTest,
                         ::testing::Combine(                                                    //
                             ::testing::ValuesIn(CommonTestUtils::combineParams(axesVectors)),  //
                             ::testing::ValuesIn(opTypes),                                      //

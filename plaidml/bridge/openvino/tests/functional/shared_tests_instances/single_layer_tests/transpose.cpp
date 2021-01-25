@@ -35,6 +35,6 @@ const auto params = testing::Combine(                          //
     testing::Values(CommonTestUtils::DEVICE_PLAIDML)           //
 );
 
-INSTANTIATE_TEST_CASE_P(smoke_Transpose, TransposeLayerTest, params, TransposeLayerTest::getTestCaseName);
+INSTANTIATE_TEST_CASE_P(smoke, TransposeLayerTest, params, TransposeLayerTest::getTestCaseName);
 
 }  // namespace

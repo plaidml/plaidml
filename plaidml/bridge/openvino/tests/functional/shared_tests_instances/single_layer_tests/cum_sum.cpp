@@ -85,10 +85,21 @@ const auto testCasesAxis_4 = ::testing::Combine(                                
     ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)                                        //
 );
 
-INSTANTIATE_TEST_CASE_P(smoke_TestsCumSum_negative_axis, CumSumLayerTest, testCasesNegativeAxis,
+INSTANTIATE_TEST_CASE_P(TestsCumSum_negative_axis, CumSumLayerTest, testCasesNegativeAxis,
                         CumSumLayerTest::getTestCaseName);
-INSTANTIATE_TEST_CASE_P(smoke_TestsCumSum_axis_0, CumSumLayerTest, testCasesAxis_0, CumSumLayerTest::getTestCaseName);
-INSTANTIATE_TEST_CASE_P(smoke_TestsCumSum_axis_1, CumSumLayerTest, testCasesAxis_1, CumSumLayerTest::getTestCaseName);
-INSTANTIATE_TEST_CASE_P(smoke_TestsCumSum_axis_2, CumSumLayerTest, testCasesAxis_2, CumSumLayerTest::getTestCaseName);
-INSTANTIATE_TEST_CASE_P(smoke_TestsCumSum_axis_3, CumSumLayerTest, testCasesAxis_3, CumSumLayerTest::getTestCaseName);
-INSTANTIATE_TEST_CASE_P(smoke_TestsCumSum_axis_4, CumSumLayerTest, testCasesAxis_4, CumSumLayerTest::getTestCaseName);
+INSTANTIATE_TEST_CASE_P(TestsCumSum_axis_0, CumSumLayerTest, testCasesAxis_0, CumSumLayerTest::getTestCaseName);
+INSTANTIATE_TEST_CASE_P(TestsCumSum_axis_1, CumSumLayerTest, testCasesAxis_1, CumSumLayerTest::getTestCaseName);
+INSTANTIATE_TEST_CASE_P(TestsCumSum_axis_2, CumSumLayerTest, testCasesAxis_2, CumSumLayerTest::getTestCaseName);
+INSTANTIATE_TEST_CASE_P(TestsCumSum_axis_3, CumSumLayerTest, testCasesAxis_3, CumSumLayerTest::getTestCaseName);
+INSTANTIATE_TEST_CASE_P(TestsCumSum_axis_4, CumSumLayerTest, testCasesAxis_4, CumSumLayerTest::getTestCaseName);
+
+const auto smoke_args = ::testing::Combine(                     //
+    ::testing::Values(std::vector<std::size_t>({4, 3, 3, 6})),  //
+    ::testing::Values(InferenceEngine::Precision::FP32),        //
+    ::testing::Values(1),                                       //
+    ::testing::Values(false),                                   //
+    ::testing::Values(false),                                   //
+    ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)          //
+);
+
+INSTANTIATE_TEST_CASE_P(smoke, CumSumLayerTest, smoke_args, CumSumLayerTest::getTestCaseName);

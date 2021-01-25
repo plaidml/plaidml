@@ -36,7 +36,7 @@ const std::vector<ngraph::helpers::InputLayerType> inputType = {
     ngraph::helpers::InputLayerType::PARAMETER,
 };
 
-INSTANTIATE_TEST_CASE_P(smoke, MaxMinLayerTest,
+INSTANTIATE_TEST_CASE_P(MaxMin, MaxMinLayerTest,
                         ::testing::Combine(                                              //
                             ::testing::ValuesIn(inShapes),                               //
                             ::testing::ValuesIn(opType),                                 //
@@ -46,6 +46,19 @@ INSTANTIATE_TEST_CASE_P(smoke, MaxMinLayerTest,
                             ::testing::Values(InferenceEngine::Layout::ANY),             //
                             ::testing::Values(InferenceEngine::Layout::ANY),             //
                             ::testing::ValuesIn(inputType),                              //
+                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),
+                        MaxMinLayerTest::getTestCaseName);
+
+INSTANTIATE_TEST_CASE_P(smoke, MaxMinLayerTest,
+                        ::testing::Combine(                                                   //
+                            ::testing::Values(std::vector<std::vector<size_t>>({{2}, {1}})),  //
+                            ::testing::ValuesIn(opType),                                      //
+                            ::testing::Values(InferenceEngine::Precision::FP32),              //
+                            ::testing::Values(InferenceEngine::Precision::UNSPECIFIED),       //
+                            ::testing::Values(InferenceEngine::Precision::UNSPECIFIED),       //
+                            ::testing::Values(InferenceEngine::Layout::ANY),                  //
+                            ::testing::Values(InferenceEngine::Layout::ANY),                  //
+                            ::testing::ValuesIn(inputType),                                   //
                             ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),
                         MaxMinLayerTest::getTestCaseName);
 

@@ -44,4 +44,14 @@ const auto ScatterEltUpdateCases = ::testing::Combine(                          
 INSTANTIATE_TEST_CASE_P(ScatterEltsUpdate, ScatterElementsUpdateLayerTest, ScatterEltUpdateCases,
                         ScatterElementsUpdateLayerTest::getTestCaseName);
 
+INSTANTIATE_TEST_CASE_P(smoke, ScatterElementsUpdateLayerTest,
+                        ::testing::Combine(                                                                        //
+                            ::testing::ValuesIn(ScatterElementsUpdateLayerTest::combineShapes(axesShapeInShape)),  //
+                            ::testing::ValuesIn(idxValue),                                                         //
+                            ::testing::Values(InferenceEngine::Precision::FP32),                                   //
+                            ::testing::Values(InferenceEngine::Precision::I32),                                    //
+                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)                                     //
+                            ),
+                        ScatterElementsUpdateLayerTest::getTestCaseName);
+
 }  // namespace

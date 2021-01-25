@@ -147,13 +147,13 @@ INSTANTIATE_TEST_CASE_P(PriorBoxLayerFixedSizeCheck, PriorBoxLayerTest,
 INSTANTIATE_TEST_CASE_P(smoke, PriorBoxLayerTest,
                         ::testing::Combine(                                              //
                             layerSpecificParamsForSmokeTest,                             //
-                            ::testing::ValuesIn(variances),                              //
-                            ::testing::ValuesIn(scaleAllSizes),                          //
-                            ::testing::ValuesIn(useFixedSizes),                          //
-                            ::testing::ValuesIn(useFixedRatios),                         //
-                            ::testing::ValuesIn(netPrecisions),                          //
-                            ::testing::ValuesIn(layerShapes),                            //
-                            ::testing::ValuesIn(imageShapes),                            //
+                            ::testing::Values(std::vector<float>({0.1f})),               //
+                            ::testing::Values(true),                                     //
+                            ::testing::Values(true),                                     //
+                            ::testing::Values(true),                                     //
+                            ::testing::Values(InferenceEngine::Precision::FP32),         //
+                            ::testing::Values(std::vector<size_t>({2, 3})),              //
+                            ::testing::Values(std::vector<size_t>({2})),                 //
                             ::testing::Values(CommonTestUtils::DEVICE_PLAIDML),          //
                             ::testing::Values(std::map<std::string, std::string>({}))),  //
                         PriorBoxLayerTest::getTestCaseName);

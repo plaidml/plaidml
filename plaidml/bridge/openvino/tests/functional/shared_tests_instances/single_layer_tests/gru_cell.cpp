@@ -56,15 +56,15 @@ INSTANTIATE_TEST_CASE_P(GRUCellCommon, GRUCellTest,
                         GRUCellTest::getTestCaseName);
 
 INSTANTIATE_TEST_CASE_P(smoke, GRUCellTest,
-                        ::testing::Combine(                                       //
-                            ::testing::ValuesIn(should_decompose),                //
-                            ::testing::Values(3),                                 //
-                            ::testing::Values(32),                                //
-                            ::testing::Values(16),                                //
-                            ::testing::ValuesIn(activations),                     //
-                            ::testing::Values(1.0f),                              //
-                            ::testing::ValuesIn(linear_before_reset),             //
-                            ::testing::ValuesIn(netPrecisions),                   //
-                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
+                        ::testing::Combine(                                                 //
+                            ::testing::Values(true),                                        //
+                            ::testing::Values(3),                                           //
+                            ::testing::Values(32),                                          //
+                            ::testing::Values(16),                                          //
+                            ::testing::Values(std::vector<std::string>({"tanh", "relu"})),  //
+                            ::testing::Values(1.0f),                                        //
+                            ::testing::Values(true),                                        //
+                            ::testing::Values(InferenceEngine::Precision::FP32),            //
+                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),            //
                         GRUCellTest::getTestCaseName);
 }  // namespace

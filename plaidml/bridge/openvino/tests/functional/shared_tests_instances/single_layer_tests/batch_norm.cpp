@@ -39,7 +39,7 @@ const auto batchNormParams = testing::Combine(                                  
 );
 
 INSTANTIATE_TEST_CASE_P(                 //
-    smoke_BatchNorm,                     //
+    smoke,                               //
     BatchNormLayerTest,                  //
     batchNormParams,                     //
     BatchNormLayerTest::getTestCaseName  //

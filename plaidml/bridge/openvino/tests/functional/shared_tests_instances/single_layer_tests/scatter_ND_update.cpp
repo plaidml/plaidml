@@ -38,4 +38,12 @@ const auto ScatterNDUpdateCases = ::testing::Combine(                           
 INSTANTIATE_TEST_CASE_P(ScatterNDUpdate, ScatterNDUpdateLayerTest, ScatterNDUpdateCases,
                         ScatterNDUpdateLayerTest::getTestCaseName);
 
+INSTANTIATE_TEST_CASE_P(smoke, ScatterNDUpdateLayerTest,
+                        ::testing::Combine(                                                                    //
+                            ::testing::ValuesIn(ScatterNDUpdateLayerTest::combineShapes(sliceSelectInShape)),  //
+                            ::testing::Values(InferenceEngine::Precision::FP32),                               //
+                            ::testing::Values(InferenceEngine::Precision::I32),                                //
+                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)                                 //
+                            ),
+                        ScatterNDUpdateLayerTest::getTestCaseName);
 }  // namespace

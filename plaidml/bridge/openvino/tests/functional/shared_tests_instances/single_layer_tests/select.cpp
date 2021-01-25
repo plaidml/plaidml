@@ -83,3 +83,12 @@ const auto numpyCases = ::testing::Combine(                   //
 INSTANTIATE_TEST_CASE_P(TestsSelect_none, SelectLayerTest, noneCases, SelectLayerTest::getTestCaseName);
 
 INSTANTIATE_TEST_CASE_P(TestsSelect_numpy, SelectLayerTest, numpyCases, SelectLayerTest::getTestCaseName);
+
+INSTANTIATE_TEST_CASE_P(smoke, SelectLayerTest,
+                        ::testing::Combine(                                                                 //
+                            ::testing::Values(std::vector<std::vector<size_t>>({{4, 5}, {4, 5}, {4, 5}})),  //
+                            ::testing::Values(InferenceEngine::Precision::FP32),                            //
+                            ::testing::Values(ngraph::op::AutoBroadcastSpec::NONE),                         //
+                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)                              //
+                            ),
+                        SelectLayerTest::getTestCaseName);

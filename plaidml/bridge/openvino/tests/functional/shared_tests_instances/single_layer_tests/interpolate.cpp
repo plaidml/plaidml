@@ -194,4 +194,29 @@ INSTANTIATE_TEST_CASE_P(Interpolate_Nearest_2, InterpolateLayerTest,
                             ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),         //
                         InterpolateLayerTest::getTestCaseName);
 
+const auto smokeArgs = ::testing::Combine(                                                //
+    ::testing::Values(ngraph::op::v4::Interpolate::InterpolateMode::linear),              //
+    ::testing::Values(ngraph::op::v4::Interpolate::ShapeCalcMode::sizes),                 //
+    ::testing::Values(ngraph::op::v4::Interpolate::CoordinateTransformMode::half_pixel),  //
+    ::testing::Values(ngraph::op::v4::Interpolate::NearestMode::round_prefer_floor),      //
+    ::testing::Values(false),                                                             //
+    ::testing::Values(std::vector<size_t>({0, 0, 0, 0})),                                 //
+    ::testing::Values(std::vector<size_t>({0, 0, 0, 0})),                                 //
+    ::testing::Values(-0.5f),                                                             //
+    ::testing::ValuesIn(defaultAxes),                                                     //
+    ::testing::ValuesIn(defaultScales)                                                    //
+);
+
+INSTANTIATE_TEST_CASE_P(smoke, InterpolateLayerTest,
+                        ::testing::Combine(                                              //
+                            smokeArgs,                                                   //
+                            ::testing::ValuesIn(netPrecisions),                          //
+                            ::testing::Values(InferenceEngine::Precision::UNSPECIFIED),  //
+                            ::testing::Values(InferenceEngine::Precision::UNSPECIFIED),  //
+                            ::testing::Values(InferenceEngine::Layout::ANY),             //
+                            ::testing::Values(InferenceEngine::Layout::ANY),             //
+                            ::testing::ValuesIn(inShapes),                               //
+                            ::testing::ValuesIn(targetShapes),                           //
+                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),         //
+                        InterpolateLayerTest::getTestCaseName);
 }  // namespace

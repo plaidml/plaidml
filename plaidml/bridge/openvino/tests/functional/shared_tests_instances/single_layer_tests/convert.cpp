@@ -16,17 +16,10 @@ const std::vector<std::vector<size_t>> inShape = {
 };
 
 const std::vector<InferenceEngine::Precision> netPrecisions = {
-    // Precision::U8,
-    // Precision::I8,
-    // Precision::U16,
-    // Precision::I16,
-    // Precision::I32,
-    // Precision::U64,
-    // Precision::I64,
     Precision::FP32,
 };
 
-INSTANTIATE_TEST_CASE_P(smoke_NoReshape, ConvertLayerTest,
+INSTANTIATE_TEST_CASE_P(smoke, ConvertLayerTest,
                         ::testing::Combine(                                       //
                             ::testing::Values(inShape),                           //
                             ::testing::ValuesIn(netPrecisions),                   //

@@ -24,7 +24,7 @@ std::vector<ngraph::helpers::InputLayerType> secondaryInputTypes = {
 
 std::map<std::string, std::string> additional_config = {};
 
-INSTANTIATE_TEST_CASE_P(smoke_MatMul, MatMulTest,
+INSTANTIATE_TEST_CASE_P(smoke, MatMulTest,
                         ::testing::Combine(                                              //
                             ::testing::ValuesIn(shapeRelatedParams),                     //
                             ::testing::ValuesIn(inputPrecisions),                        //

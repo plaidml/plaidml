@@ -16,7 +16,7 @@ namespace {
 
 const std::vector<InferenceEngine::Precision> netPrecisions = {
     InferenceEngine::Precision::FP32,
-    //InferenceEngine::Precision::FP16,
+    // InferenceEngine::Precision::FP16,
 };
 
 const std::vector<std::vector<int64_t>> axes = {
@@ -28,7 +28,7 @@ const double alpha = 9.9e-05;
 const double beta = 2;
 const double bias = 1.0;
 const size_t size = 5;
-INSTANTIATE_TEST_CASE_P(smoke_LrnCheck, LrnLayerTest,
+INSTANTIATE_TEST_CASE_P(smoke, LrnLayerTest,
                         ::testing::Combine(                                              //
                             ::testing::Values(alpha),                                    //
                             ::testing::Values(beta),                                     //

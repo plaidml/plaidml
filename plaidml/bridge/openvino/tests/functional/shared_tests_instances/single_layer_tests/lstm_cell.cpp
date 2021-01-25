@@ -40,14 +40,14 @@ INSTANTIATE_TEST_CASE_P(LSTMCellCommon, LSTMCellTest,
                         LSTMCellTest::getTestCaseName);
 
 INSTANTIATE_TEST_CASE_P(smoke, LSTMCellTest,
-                        ::testing::Combine(                                             //
-                            ::testing::Values(true),                                    //
-                            ::testing::Values(3),                                       //
-                            ::testing::Values(64),                                      //
-                            ::testing::Values(32),                                      //
-                            ::testing::ValuesIn(activations),                           //
-                            ::testing::Values(std::numeric_limits<float>::infinity()),  //
-                            ::testing::ValuesIn(netPrecisions),                         //
-                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),        //
+                        ::testing::Combine(                                                         //
+                            ::testing::Values(true),                                                //
+                            ::testing::Values(3),                                                   //
+                            ::testing::Values(64),                                                  //
+                            ::testing::Values(32),                                                  //
+                            ::testing::Values(std::vector<std::string>({"relu", "relu", "relu"})),  //
+                            ::testing::Values(std::numeric_limits<float>::infinity()),              //
+                            ::testing::ValuesIn(netPrecisions),                                     //
+                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),                    //
                         LSTMCellTest::getTestCaseName);
 }  // namespace

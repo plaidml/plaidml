@@ -202,7 +202,7 @@ INSTANTIATE_TEST_CASE_P(                 //
     ReduceOpsLayerTest::getTestCaseName  //
 );
 
-INSTANTIATE_TEST_CASE_P(smoke_Reduce, ReduceOpsLayerWithSpecificInputTest,
+INSTANTIATE_TEST_CASE_P(smoke, ReduceOpsLayerWithSpecificInputTest,
                         testing::Combine(                                              //
                             testing::ValuesIn(decltype(axes){{0}, {1}}),               //
                             testing::Values(opTypes[1]),                               //
