@@ -35,7 +35,7 @@ plaidml_cc_library(
         "//pmlc/dialect/comp/ir",
         "//pmlc/dialect/stdx/ir",
         "//pmlc/util",
-        "@llvm-project//mlir:GPUToSPIRVTransforms",
+        "@llvm-project//mlir:GPUToSPIRV",
         "@llvm-project//mlir:GPUTransforms",
     ],
 )

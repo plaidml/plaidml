@@ -1,15 +1,15 @@
 // Copyright 2020 Intel Corporation
 
-#include "mlir/Conversion/GPUToSPIRV/ConvertGPUToSPIRV.h"
-#include "mlir/Conversion/GPUToSPIRV/ConvertGPUToSPIRVPass.h"
+#include "mlir/Conversion/GPUToSPIRV/GPUToSPIRV.h"
+#include "mlir/Conversion/GPUToSPIRV/GPUToSPIRVPass.h"
 #include "mlir/Conversion/SCFToSPIRV/SCFToSPIRV.h"
-#include "mlir/Conversion/StandardToSPIRV/ConvertStandardToSPIRV.h"
-#include "mlir/Conversion/VectorToSPIRV/ConvertVectorToSPIRV.h"
+#include "mlir/Conversion/StandardToSPIRV/StandardToSPIRV.h"
+#include "mlir/Conversion/VectorToSPIRV/VectorToSPIRV.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Dialect/SCF/SCF.h"
-#include "mlir/Dialect/SPIRV/SPIRVDialect.h"
-#include "mlir/Dialect/SPIRV/SPIRVLowering.h"
-#include "mlir/Dialect/SPIRV/SPIRVOps.h"
+#include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
+#include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
+#include "mlir/Dialect/SPIRV/Transforms/SPIRVConversion.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
 
@@ -29,14 +29,14 @@ namespace {
 /// Pass to lower to SPIRV that includes GPU, SCF, Std and Stdx dialects
 template <class T>
 struct StdxSubgroupBroadcastOpConversion final
-    : public SPIRVOpLowering<stdx::SubgroupBroadcastOp> {
-  using SPIRVOpLowering<stdx::SubgroupBroadcastOp>::SPIRVOpLowering;
+    : public OpConversionPattern<stdx::SubgroupBroadcastOp> {
+  using OpConversionPattern<stdx::SubgroupBroadcastOp>::OpConversionPattern;
 
   LogicalResult
   matchAndRewrite(stdx::SubgroupBroadcastOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
     auto stdxType = op.getResult().getType();
-    auto spirvType = typeConverter.convertType(stdxType);
+    auto spirvType = typeConverter->convertType(stdxType);
     rewriter.replaceOpWithNewOp<T>(op, spirvType, spirv::Scope::Subgroup,
                                    operands[0], operands[1]);
 
@@ -45,8 +45,9 @@ struct StdxSubgroupBroadcastOpConversion final
 };
 
 struct StdxSubgroupBlockReadINTELOpConversion
-    : public SPIRVOpLowering<stdx::SubgroupBlockReadINTELOp> {
-  using SPIRVOpLowering<stdx::SubgroupBlockReadINTELOp>::SPIRVOpLowering;
+    : public OpConversionPattern<stdx::SubgroupBlockReadINTELOp> {
+  using OpConversionPattern<
+      stdx::SubgroupBlockReadINTELOp>::OpConversionPattern;
 
   LogicalResult
   matchAndRewrite(stdx::SubgroupBlockReadINTELOp blockReadOp,
@@ -56,6 +57,7 @@ struct StdxSubgroupBlockReadINTELOpConversion
     auto loc = blockReadOp.getLoc();
     auto memrefType = blockReadOp.memref().getType().cast<MemRefType>();
     auto memrefElementType = memrefType.getElementType();
+    auto &typeConverter = *getTypeConverter<SPIRVTypeConverter>();
 
     // Check if bitcast is needed, implementation should transform to block
     // ops only for certain types supported by the HW, that is why other types
@@ -116,8 +118,9 @@ struct StdxSubgroupBlockReadINTELOpConversion
 };
 
 struct StdxSubgroupBlockWriteINTELOpConversion
-    : public SPIRVOpLowering<stdx::SubgroupBlockWriteINTELOp> {
-  using SPIRVOpLowering<stdx::SubgroupBlockWriteINTELOp>::SPIRVOpLowering;
+    : public OpConversionPattern<stdx::SubgroupBlockWriteINTELOp> {
+  using OpConversionPattern<
+      stdx::SubgroupBlockWriteINTELOp>::OpConversionPattern;
 
   LogicalResult
   matchAndRewrite(stdx::SubgroupBlockWriteINTELOp blockWriteOp,
@@ -127,6 +130,7 @@ struct StdxSubgroupBlockWriteINTELOpConversion
     auto loc = blockWriteOp.getLoc();
     auto memrefType = blockWriteOp.memref().getType().cast<MemRefType>();
     auto memrefElementType = memrefType.getElementType();
+    auto &typeConverter = *getTypeConverter<SPIRVTypeConverter>();
 
     // Check if bitcast is needed, implementation should transform to block
     // ops only for certain types supported by the HW, that is why other types
@@ -176,14 +180,14 @@ struct StdxSubgroupBlockWriteINTELOpConversion
 
 // TODO: this is only temporary, move it to proper place leter
 struct StdxTransferWriteOpConversion final
-    : public SPIRVOpLowering<vector::TransferWriteOp> {
-  using SPIRVOpLowering<vector::TransferWriteOp>::SPIRVOpLowering;
+    : public OpConversionPattern<vector::TransferWriteOp> {
+  using OpConversionPattern<vector::TransferWriteOp>::OpConversionPattern;
 
   LogicalResult
   matchAndRewrite(vector::TransferWriteOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
     IVLOG(3, " " << debugString(*op));
-    rewriter.replaceOpWithNewOp<spirv::StoreOp>(op, op.memref(), op.vector());
+    rewriter.replaceOpWithNewOp<spirv::StoreOp>(op, op.source(), op.vector());
     return success();
   }
 };
@@ -191,22 +195,20 @@ struct StdxTransferWriteOpConversion final
 // Convert all allocations within SPIRV code to function local allocations.
 // TODO: Allocations outside of threads but inside blocks should probably be
 // shared memory, but currently we never generate such allocs.
-struct AllocOpPattern final : public SPIRVOpLowering<AllocOp> {
+struct AllocOpPattern final : public OpConversionPattern<AllocOp> {
 public:
-  using SPIRVOpLowering<AllocOp>::SPIRVOpLowering;
+  using OpConversionPattern<AllocOp>::OpConversionPattern;
 
   AllocOpPattern(MLIRContext *context, SPIRVTypeConverter &typeConverter)
-      : SPIRVOpLowering<AllocOp>(context, typeConverter, /*benefit=*/1000) {}
+      : OpConversionPattern<AllocOp>(typeConverter, context, /*benefit=*/1000) {
+  }
 
   LogicalResult
   matchAndRewrite(AllocOp operation, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
+    auto &typeConverter = *getTypeConverter<SPIRVTypeConverter>();
     MemRefType allocType = operation.getType();
-    unsigned memSpace = typeConverter.getMemorySpaceForStorageClass(
-        spirv::StorageClass::Function);
-    MemRefType allocType2 =
-        MemRefType::Builder(allocType).setMemorySpace(memSpace);
-    Type spirvType = typeConverter.convertType(allocType2);
+    Type spirvType = typeConverter.convertType(allocType);
     rewriter.replaceOpWithNewOp<spirv::VariableOp>(
         operation, spirvType, spirv::StorageClass::Function, nullptr);
     return success();
@@ -214,8 +216,8 @@ public:
 };
 
 template <typename StdxOpTy, typename SpirvOpTy>
-struct UnaryOpConversion : public SPIRVOpLowering<StdxOpTy> {
-  using SPIRVOpLowering<StdxOpTy>::SPIRVOpLowering;
+struct UnaryOpConversion : public OpConversionPattern<StdxOpTy> {
+  using OpConversionPattern<StdxOpTy>::OpConversionPattern;
 
   LogicalResult
   matchAndRewrite(StdxOpTy op, ArrayRef<Value> operands,
@@ -228,8 +230,8 @@ struct UnaryOpConversion : public SPIRVOpLowering<StdxOpTy> {
 };
 
 template <typename StdxOpTy, typename SpirvOpTy>
-struct BinaryOpConversion : public SPIRVOpLowering<StdxOpTy> {
-  using SPIRVOpLowering<StdxOpTy>::SPIRVOpLowering;
+struct BinaryOpConversion : public OpConversionPattern<StdxOpTy> {
+  using OpConversionPattern<StdxOpTy>::OpConversionPattern;
 
   LogicalResult
   matchAndRewrite(StdxOpTy op, ArrayRef<Value> operands,
@@ -246,8 +248,8 @@ struct BinaryOpConversion : public SPIRVOpLowering<StdxOpTy> {
 // GLSL SPIRV -> Standard SPIRV
 // ============================================================================
 template <typename GLSLOpTy, typename NegOpTy, typename LessThanOpTy>
-struct GLSLAbsOpPattern final : public SPIRVOpLowering<GLSLOpTy> {
-  using SPIRVOpLowering<GLSLOpTy>::SPIRVOpLowering;
+struct GLSLAbsOpPattern final : public OpConversionPattern<GLSLOpTy> {
+  using OpConversionPattern<GLSLOpTy>::OpConversionPattern;
 
   mlir::LogicalResult
   matchAndRewrite(GLSLOpTy op, mlir::ArrayRef<mlir::Value> operands,
@@ -304,12 +306,12 @@ struct GPUToSPIRVCustomPass
       IVLOG(3, "GPUToSPIRVCustomPass: Using group non-uniform broadcast op");
       patterns.insert<
           StdxSubgroupBroadcastOpConversion<spirv::GroupNonUniformBroadcastOp>>(
-          context, typeConverter);
+          typeConverter, context);
     } else {
       IVLOG(3, "GPUToSPIRVCustomPass: Using group broadcast op");
       patterns
           .insert<StdxSubgroupBroadcastOpConversion<spirv::GroupBroadcastOp>>(
-              context, typeConverter);
+              typeConverter, context);
     }
     populateStdxToSPIRVPatterns(context, typeConverter, patterns);
     patterns.insert<AllocOpPattern>(context, typeConverter);
@@ -323,7 +325,8 @@ struct GPUToSPIRVCustomPass
     if (spirv::getMemoryModel(targetAttr) == spirv::MemoryModel::OpenCL)
       populateCustomStdToOCLSpirvPatterns(context, typeConverter, patterns);
 
-    if (failed(applyFullConversion(kernelModules, *target, patterns)))
+    if (failed(
+            applyFullConversion(kernelModules, *target, std::move(patterns))))
       return signalPassFailure();
   }
 };
@@ -334,7 +337,7 @@ void populateStdxToSPIRVPatterns(MLIRContext *context,
                                  OwningRewritePatternList &patterns) {
   patterns.insert<StdxSubgroupBlockReadINTELOpConversion,
                   StdxSubgroupBlockWriteINTELOpConversion,
-                  StdxTransferWriteOpConversion>(context, typeConverter);
+                  StdxTransferWriteOpConversion>(typeConverter, context);
 }
 
 void populateStdxToSPIRVGLSLPatterns(MLIRContext *context,
@@ -349,20 +352,20 @@ void populateStdxToSPIRVGLSLPatterns(MLIRContext *context,
                   UnaryOpConversion<stdx::ACosOp, spirv::GLSLAcosOp>,
                   UnaryOpConversion<stdx::ATanOp, spirv::GLSLAtanOp>,
                   BinaryOpConversion<stdx::PowOp, spirv::GLSLPowOp>>(
-      context, typeConverter);
+      typeConverter, context);
 }
 
 void populateCustomGLSLToStdSpirvPatterns(MLIRContext *context,
                                           SPIRVTypeConverter &typeConverter,
                                           OwningRewritePatternList &patterns) {
-  patterns.insert<GLSLFAbsOpPattern, GLSLSAbsOpPattern>(context, typeConverter);
+  patterns.insert<GLSLFAbsOpPattern, GLSLSAbsOpPattern>(typeConverter, context);
 }
 
 void populateCustomStdToOCLSpirvPatterns(MLIRContext *context,
                                          SPIRVTypeConverter &typeConverter,
                                          OwningRewritePatternList &patterns) {
   patterns.insert<UnaryOpConversion<mlir::ExpOp, spirv::OCLExpOp>>(
-      context, typeConverter);
+      typeConverter, context);
 }
 
 std::unique_ptr<Pass> createGPUToSPIRVCustomPass() {

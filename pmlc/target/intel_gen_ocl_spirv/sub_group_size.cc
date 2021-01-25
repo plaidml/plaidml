@@ -1,15 +1,16 @@
 // Copyright 2020, Intel Corporation
 
-#include "pmlc/target/intel_gen_ocl_spirv/pass_detail.h"
-#include "pmlc/target/intel_gen_ocl_spirv/passes.h"
-
-#include "mlir/Dialect/SPIRV/SPIRVOps.h"
-#include "mlir/Dialect/SPIRV/TargetAndABI.h"
+#include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
+#include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/Support/LLVM.h"
 
+#include "pmlc/target/intel_gen_ocl_spirv/pass_detail.h"
+#include "pmlc/target/intel_gen_ocl_spirv/passes.h"
+
 namespace pmlc::target::intel_gen_ocl_spirv {
-namespace spirv = mlir::spirv;
+
+using namespace mlir; // NOLINT
 
 namespace {
 
@@ -20,16 +21,16 @@ public:
   spirv::FuncOp getEntryPoint(spirv::ModuleOp module) {
     spirv::FuncOp func = nullptr;
     module.walk([&](spirv::FuncOp op) {
-      if (!op.getAttr(spirv::getEntryPointABIAttrName()))
-        return mlir::WalkResult::advance();
+      if (!op->getAttr(spirv::getEntryPointABIAttrName()))
+        return WalkResult::advance();
       func = op;
-      return mlir::WalkResult::interrupt();
+      return WalkResult::interrupt();
     });
     return func;
   }
   /// Extracts local size attribute from entry point function.
-  mlir::DenseIntElementsAttr getLocalSize(spirv::FuncOp func) {
-    auto entryPointAttr = func.getAttrOfType<spirv::EntryPointABIAttr>(
+  DenseIntElementsAttr getLocalSize(spirv::FuncOp func) {
+    auto entryPointAttr = func->getAttrOfType<spirv::EntryPointABIAttr>(
         spirv::getEntryPointABIAttrName());
     if (!entryPointAttr)
       return {};
@@ -41,24 +42,24 @@ public:
     spirv::FuncOp func = getEntryPoint(module);
     if (!func)
       return;
-    mlir::DenseIntElementsAttr localSize = getLocalSize(func);
+    DenseIntElementsAttr localSize = getLocalSize(func);
     if (!localSize)
       return;
-    mlir::APInt localX = *localSize.begin();
+    APInt localX = *localSize.begin();
     if (localX == 1)
       return;
     // Insert ExecutionMode at the end.
     int32_t localXi32 = static_cast<int32_t>(localX.getZExtValue());
-    auto builder = mlir::OpBuilder::atBlockTerminator(&module.getBlock());
+    auto builder = OpBuilder::atBlockTerminator(&module.getBlock());
     builder.create<spirv::ExecutionModeOp>(func.getLoc(), func,
                                            spirv::ExecutionMode::SubgroupSize,
-                                           mlir::ArrayRef<int32_t>{localXi32});
+                                           ArrayRef<int32_t>{localXi32});
   }
 };
 
 } // namespace
 
-std::unique_ptr<mlir::Pass> createSetSubgroupSizePass() {
+std::unique_ptr<Pass> createSetSubgroupSizePass() {
   return std::make_unique<IntelGenOclSetSubgroupSize>();
 }
 

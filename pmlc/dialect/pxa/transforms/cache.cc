@@ -7,6 +7,7 @@
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/IR/AffineValueMap.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 
 #include "pmlc/dialect/pxa/analysis/strides.h"
 #include "pmlc/dialect/pxa/analysis/uses.h"
@@ -177,7 +178,13 @@ LogicalResult cacheLoadAsVector(AffineParallelOp par, PxaLoadOp load,
   // Extract the right element of the vector
   Value idx = newLoadBuilder.create<AffineApplyOp>(
       loc, innerMap.getAffineMap().getSubMap({last}), innerMap.getOperands());
-  auto newLoad = newLoadBuilder.create<ExtractElementOp>(
+
+  if (idx.getType().isa<IndexType>()) {
+    auto indexCast = newLoadBuilder.create<IndexCastOp>(load.getLoc(), idx,
+                                                        builder.getI32Type());
+    idx = indexCast.getResult();
+  }
+  auto newLoad = newLoadBuilder.create<vector::ExtractElementOp>(
       loc, eltType, loadVec.getResult(), idx);
   load.replaceAllUsesWith(newLoad.result());
   load.erase();
@@ -216,7 +223,7 @@ LogicalResult cacheReduce(AffineParallelOp par, PxaReduceOp reduce) {
       IVLOG(3, "cacheReduce failed: missing yield op");
       return failure();
     }
-    out = yieldOp.getParentOp()->getResult(use.getOperandNumber());
+    out = yieldOp->getParentOp()->getResult(use.getOperandNumber());
   }
 
   // Verify final output has a single use, TODO: THis probably isn't a hard
@@ -257,7 +264,7 @@ LogicalResult cacheReduce(AffineParallelOp par, PxaReduceOp reduce) {
   while (out.getParentBlock() != par.getBody()) {
     auto &use = *out.use_begin();
     auto yieldOp = cast<AffineYieldOp>(use.getOwner());
-    out = yieldOp.getParentOp()->getResult(use.getOperandNumber());
+    out = yieldOp->getParentOp()->getResult(use.getOperandNumber());
     out.setType(newType);
   }
 
@@ -443,14 +450,14 @@ struct CachePass : public CacheBase<CachePass> {
         return;
       }
 
-      auto middle = dyn_cast<AffineParallelOp>(inner.getParentOp());
+      auto middle = dyn_cast<AffineParallelOp>(inner->getParentOp());
       if (!middle || !util::hasTag(middle, middleTag)) {
         middle.emitError("Middle loop does not have tag");
         signalPassFailure();
         return;
       }
 
-      auto outer = dyn_cast<AffineParallelOp>(middle.getParentOp());
+      auto outer = dyn_cast<AffineParallelOp>(middle->getParentOp());
       if (!outer || !util::hasTag(outer, outerTag)) {
         outer.emitError("Outer loop does not have tag");
         signalPassFailure();

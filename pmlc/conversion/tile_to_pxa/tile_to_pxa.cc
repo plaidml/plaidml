@@ -424,7 +424,7 @@ struct LogicalOp {
       }
     }
     auto attrs = ArrayRef<NamedAttribute>{};
-    Type boolType = IntegerType::get(1, rewriter.getContext());
+    Type boolType = rewriter.getI1Type();
     auto resultTypes = llvm::makeArrayRef(boolType);
     auto op = rewriter.create<OpType>(loc, resultTypes, promoted, attrs);
     return op.getOperation()->getResult(0);
@@ -1800,8 +1800,8 @@ struct FuncOpConversion : public OpConversionPattern<FuncOp> {
     // Create a new function with an updated signature.
     auto newOp = rewriter.cloneWithoutRegions(op);
     rewriter.inlineRegionBefore(op.getBody(), newOp.getBody(), newOp.end());
-    newOp.setType(FunctionType::get(result.getConvertedTypes(), resultTypes,
-                                    op.getContext()));
+    newOp.setType(FunctionType::get(op.getContext(), result.getConvertedTypes(),
+                                    resultTypes));
 
     // Tell the rewriter to convert the region signature.
     rewriter.applySignatureConversion(&newOp.getBody(), result);
@@ -1819,8 +1819,8 @@ struct ReturnOpConversion : public OpConversionPattern<ReturnOp> {
   LogicalResult
   matchAndRewrite(ReturnOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
-    auto &block = op.getParentRegion()->front();
-    auto funcOp = op.getParentOfType<FuncOp>();
+    auto &block = op->getParentRegion()->front();
+    auto funcOp = op->getParentOfType<FuncOp>();
     auto blockArg = funcOp.getType().getNumInputs() - op.getNumOperands();
     for (Value operand : operands) {
       // Find very initial allocation of memref
@@ -1857,7 +1857,7 @@ struct TraceOpConversion : public OpConversionPattern<tile::PragmaOp> {
       return failure();
     }
     tile::PragmaOpAdaptor adaptor(operands);
-    auto module = op.getParentOfType<ModuleOp>();
+    auto module = op->getParentOfType<ModuleOp>();
     auto msg = op.attrs().getNamed("msg");
     if (!msg) {
       return failure();
@@ -1875,12 +1875,13 @@ struct TraceOpConversion : public OpConversionPattern<tile::PragmaOp> {
     auto context = module.getContext();
     OpBuilder builder(context);
     builder.setInsertionPointToStart(module.getBody());
-    auto funcType = FunctionType::get({}, {}, context);
+    auto funcType = FunctionType::get(context, {}, {});
     auto funcOp = builder.create<FuncOp>(module.getLoc(), symbol, funcType,
                                          ArrayRef<NamedAttribute>{});
-    funcOp.setAttr("msg", msg);
-    funcOp.setAttr("trace", builder.getUnitAttr());
-    funcOp.setAttr("id", builder.getI64IntegerAttr(uniqueId));
+    funcOp->setAttr("msg", msg);
+    funcOp->setAttr("trace", builder.getUnitAttr());
+    funcOp->setAttr("id", builder.getI64IntegerAttr(uniqueId));
+    funcOp.setPrivate();
     return SymbolRefAttr::get(symbol, context);
   }
 };
@@ -2166,7 +2167,8 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         EltwiseOpConversion<tile::SelectOp, SelectOp>,
         EltwiseOpConversion<tile::IdentOp, FirstOperand>>(&getContext());
     // Run the conversion
-    if (failed(applyFullConversion(getOperation(), target, patterns))) {
+    if (failed(
+            applyFullConversion(getOperation(), target, std::move(patterns)))) {
       signalPassFailure();
       return;
     }

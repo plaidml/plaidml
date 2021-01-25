@@ -4,8 +4,6 @@
 
 #include "pmlc/dialect/pxa/ir/ops.h"
 
-void normalizeAffineParallel(mlir::AffineParallelOp op);
-
 namespace pmlc::dialect::pxa {
 
 // Promotes the loop body of an affine.parallel to its containing block if no

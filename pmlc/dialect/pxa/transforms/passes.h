@@ -10,14 +10,6 @@
 
 namespace pmlc::dialect::pxa {
 
-struct StencilCost {
-  double throughput;
-  unsigned startupCost;
-};
-
-using StencilCostFunction = std::function<StencilCost(
-    llvm::ArrayRef<int64_t>, llvm::ArrayRef<mlir::Type>)>;
-
 std::unique_ptr<mlir::Pass> createAffineNormalizePass();
 std::unique_ptr<mlir::Pass> createAffineNormalizePass(bool promote);
 
@@ -48,11 +40,6 @@ std::unique_ptr<mlir::Pass> createNestLoopsPass(unsigned minLoopIVs);
 
 std::unique_ptr<mlir::Pass>
 createResizeTmpsPass(bool onlyParallelNested = false);
-
-std::unique_ptr<mlir::Pass> createStencilGEMMPass();
-std::unique_ptr<mlir::Pass> createStencilGEMMPass(unsigned numThreads,
-                                                  bool doBatch,
-                                                  StencilCostFunction costFn);
 
 std::unique_ptr<mlir::Pass> createSubgroupsPass();
 

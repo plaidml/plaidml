@@ -28,7 +28,7 @@ pml_cc_library(
     MLIRAffineTransforms
     MLIRGPU
     MLIRSPIRVTransforms
-    MLIRGPUToSPIRVTransforms
+    MLIRGPUToSPIRV
     MLIRVectorToSPIRV
     MLIRGPUToVulkanTransforms
     MLIRLLVMIRTransforms

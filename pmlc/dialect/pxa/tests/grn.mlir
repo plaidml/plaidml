@@ -46,7 +46,7 @@ func @grn(%arg0: tensor<1x224x128x24xf16>) -> tensor<1x224x128x24xf16> {
 // CHECK:     %[[X5:.*]] = pxa.load %[[P1]][0, 0, 0, 0] : memref<1x1x1x1xf16>
 // CHECK:     %[[X6:.*]] = addf %[[X5]], %[[one]] : f16
 // CHECK:     %[[X7:.*]] = sqrt %[[X6]] : f16
-// CHECK:     %[[X8:.*]] = cmpf "olt", %[[X7]], %[[epsilon]] : f16
+// CHECK:     %[[X8:.*]] = cmpf olt, %[[X7]], %[[epsilon]] : f16
 // CHECK:     %[[X9:.*]] = select %[[X8]], %[[epsilon]], %[[X7]] : f16
 // CHECK:     %[[P1:.*]] = affine.parallel (%[[k:.*]]) = (0) to (24) reduce ("assign") -> (memref<1x224x128x24xf16>)
 // CHECK:       %[[X11:.*]] = pxa.load %[[in]][0, %[[i]], %[[j]], %[[k]]] : memref<1x224x128x24xf16>

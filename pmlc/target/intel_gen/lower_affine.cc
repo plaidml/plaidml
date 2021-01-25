@@ -99,7 +99,8 @@ struct IntelGenLowerAffinePass
     ConversionTarget target(getContext());
     target
         .addLegalDialect<scf::SCFDialect, StandardOpsDialect, VectorDialect>();
-    if (failed(applyPartialConversion(getFunction(), target, patterns)))
+    if (failed(
+            applyPartialConversion(getFunction(), target, std::move(patterns))))
       signalPassFailure();
   }
 };

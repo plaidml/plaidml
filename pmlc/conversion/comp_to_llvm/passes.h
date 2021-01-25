@@ -18,20 +18,15 @@ class TypeConverter;
 namespace pmlc::conversion::comp_to_llvm {
 class BinaryModulesMap;
 
-/// Creates empty BinaryModulesMap that can be filled by functions
-/// serializing modules to binary form.
-std::unique_ptr<BinaryModulesMap> getEmptyModulesMap();
-
 /// Walks operation `op` and serializes all spirv modules,
 /// inserting binary as constants into `op`s region.
 /// Fills `map` with information about serialized modules.
 /// Erases all serialized spirv modules.
-mlir::LogicalResult serializeSpirvKernels(mlir::ModuleOp &op,
+mlir::LogicalResult serializeSpirvKernels(mlir::ModuleOp op,
                                           BinaryModulesMap &map);
 
 std::unique_ptr<mlir::Pass> createConvertCompToLLVMPass();
-std::unique_ptr<mlir::Pass>
-createConvertCompToLLVMPass(const std::string &prefix);
+std::unique_ptr<mlir::Pass> createConvertCompToLLVMPass(mlir::StringRef prefix);
 
 /// Generate the code for registering conversion passes.
 #define GEN_PASS_REGISTRATION

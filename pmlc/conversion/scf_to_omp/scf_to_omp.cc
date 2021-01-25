@@ -108,12 +108,14 @@ LogicalResult convertSCPParallel(scf::ParallelOp op) {
   }
 
   // make sure the module contains a declaration for omp_get_thread_num
-  auto module = op.getParentOfType<ModuleOp>();
+  auto module = op->getParentOfType<ModuleOp>();
   if (!module.lookupSymbol(kThreadFuncName)) {
     OpBuilder subBuilder(module.getBody()->getTerminator());
-    subBuilder.create<FuncOp>(module.getLoc(), kThreadFuncName,
-                              FunctionType::get({}, ArrayRef<Type>{indexType},
-                                                subBuilder.getContext()));
+    subBuilder
+        .create<FuncOp>(module.getLoc(), kThreadFuncName,
+                        FunctionType::get(subBuilder.getContext(), {},
+                                          ArrayRef<Type>{indexType}))
+        .setPrivate();
   }
 
   // Delete old loop + return

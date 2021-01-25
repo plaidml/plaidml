@@ -50,7 +50,7 @@ void printBoxOp(OpAsmPrinter &p, BoxOp op) {
   if (attrs.empty()) {
     elidedAttrs.push_back("attrs");
   }
-  p.printOptionalAttrDict(op.getAttrs(), elidedAttrs);
+  p.printOptionalAttrDict(op->getAttrs(), elidedAttrs);
 }
 
 ParseResult parseBoxOp(OpAsmParser &parser, OperationState &result) {

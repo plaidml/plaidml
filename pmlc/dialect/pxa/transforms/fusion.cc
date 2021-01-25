@@ -2,6 +2,7 @@
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/IR/AffineValueMap.h"
+#include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Support/DebugStringHelper.h"
 
 #include "pmlc/dialect/pxa/analysis/strides.h"
@@ -117,7 +118,7 @@ struct FusionInfo {
       outer.walk([&](AllocOp alloc) { vectorizeBuffer(alloc); });
 
       // Affine normalizations
-      outer.walk(::normalizeAffineParallel);
+      outer.walk(normalizeAffineParallel);
       outer.walk(elideSingleIterationIndexes);
       outer.walk(promoteIfEmptyIVs);
     }
@@ -414,8 +415,9 @@ struct FusionInfo {
         // Check if it is inside B, if not, we don't care, check next use.
         if (!bInfo.op.getOperation()->isAncestor(user)) {
           if (singleOutput) {
-            // If the use is not inside B, we have to keep the write as an output
-            // and the other output in B after fusion. Then there would be multiple outputs
+            // If the use is not inside B, we have to keep the write as an
+            // output and the other output in B after fusion. Then there would
+            // be multiple outputs
             aInfo.op.emitRemark("Multiple outputs");
             return false;
           }
@@ -589,19 +591,19 @@ struct FusionInfo {
                                      newLowerBounds, apOp.getContext());
       auto newUpper = AffineMap::get(apOp.upperBoundsMap().getNumDims(), 0,
                                      newUpperBounds, apOp.getContext());
-      apOp.setAttr(AffineParallelOp::getLowerBoundsMapAttrName(),
-                   AffineMapAttr::get(newLower));
-      apOp.setAttr(AffineParallelOp::getUpperBoundsMapAttrName(),
-                   AffineMapAttr::get(newUpper));
-      apOp.setAttr(AffineParallelOp::getStepsAttrName(),
-                   builder.getI64ArrayAttr(newSteps));
+      apOp->setAttr(AffineParallelOp::getLowerBoundsMapAttrName(),
+                    AffineMapAttr::get(newLower));
+      apOp->setAttr(AffineParallelOp::getUpperBoundsMapAttrName(),
+                    AffineMapAttr::get(newUpper));
+      apOp->setAttr(AffineParallelOp::getStepsAttrName(),
+                    builder.getI64ArrayAttr(newSteps));
     };
     fixupLoops(aInfo.op, aToNew);
     fixupLoops(bInfo.op, bToNew);
 
     if (tiledFusion && (aInfo.needsTiling || bInfo.needsTiling)) {
       // Affine normalizations
-      apC.walk(::normalizeAffineParallel);
+      apC.walk(normalizeAffineParallel);
       apC.walk(elideSingleIterationIndexes);
       apC.walk(promoteIfEmptyIVs);
     }
@@ -703,9 +705,9 @@ struct FusionPass : public FusionBase<FusionPass> {
       func.walk([&](AffineParallelOp affineParallelOp) {
         auto opLoopNest = 0;
         auto parentOp =
-            dyn_cast<AffineParallelOp>(affineParallelOp.getParentOp());
+            dyn_cast<AffineParallelOp>(affineParallelOp->getParentOp());
         while (parentOp) {
-          parentOp = dyn_cast<AffineParallelOp>(parentOp.getParentOp());
+          parentOp = dyn_cast<AffineParallelOp>(parentOp->getParentOp());
           opLoopNest++;
         }
         if (opLoopNest >= loopDepthVal)

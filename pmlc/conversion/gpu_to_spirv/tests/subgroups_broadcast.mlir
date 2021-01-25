@@ -5,7 +5,10 @@ module attributes {gpu.container_module, spv.target_env = #spv.target_env<#spv.v
     %c3 = constant 3 : index
     %c1 = constant 1 : index
     %2 = alloc() : memref<3x3xf32>
-    "gpu.launch_func"(%c3, %c1, %c1, %c3, %c1, %c1, %2) {kernel = @bcast_kernel::@bcast_kernel} : (index, index, index, index, index, index, memref<3x3xf32>) -> ()
+    gpu.launch_func @bcast_kernel::@bcast_kernel 
+        blocks in (%c3, %c1, %c1)
+        threads in (%c3, %c1, %c1)
+        args(%2 : memref<3x3xf32>)
     return
   }
   
@@ -14,7 +17,7 @@ module attributes {gpu.container_module, spv.target_env = #spv.target_env<#spv.v
       %0 = "gpu.block_id"() {dimension = "x"} : () -> index
       %1 = "gpu.thread_id"() {dimension = "x"} : () -> index
       %c1 = constant 1 : index 
-      // CHECK: spv.GroupNonUniformBroadcast "Subgroup" %{{.*}}, %{{.*}} : f32
+      // CHECK: spv.GroupNonUniformBroadcast Subgroup %{{.*}}, %{{.*}} : f32
       %4 = load %arg0[%0, %1] : memref<3x3xf32>
       %5 = stdx.subgroup_broadcast(%4, %c1) : f32
       store %5, %arg0[%0, %1] : memref<3x3xf32>

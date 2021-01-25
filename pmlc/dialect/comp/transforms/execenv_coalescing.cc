@@ -3,7 +3,7 @@
 #include <utility>
 
 #include "mlir/IR/Block.h"
-#include "mlir/IR/Function.h"
+#include "mlir/IR/BuiltinOps.h"
 
 #include "pmlc/dialect/comp/ir/dialect.h"
 #include "pmlc/dialect/comp/transforms/pass_detail.h"

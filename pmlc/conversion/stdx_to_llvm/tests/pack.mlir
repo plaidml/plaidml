@@ -25,7 +25,7 @@ func @unpackLowering(%P: !stdx.argpack) -> (memref<20x10xf32>, index, f32) {
   return %A, %i, %f : memref<20x10xf32>, index, f32
 }
 
-func @print_memref_f32(memref<*xf32>)
+func private @print_memref_f32(memref<*xf32>)
 
 func @jitEntry() -> () {
   %in = alloc() : memref<3xf32>

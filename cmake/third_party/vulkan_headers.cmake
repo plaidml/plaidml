@@ -1,3 +1,4 @@
+message("Fetching vulkan_headers")
 FetchContent_Declare(
   vulkan_headers
   URL      https://github.com/KhronosGroup/Vulkan-Headers/archive/v1.2.132.zip

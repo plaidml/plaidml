@@ -11,9 +11,7 @@
 
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/BlockAndValueMapping.h"
-#include "mlir/IR/Function.h"
 #include "mlir/IR/Matchers.h"
-#include "mlir/IR/Module.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/DebugStringHelper.h"
 #include "mlir/Transforms/Passes.h"
@@ -474,8 +472,12 @@ struct ContractionBuilder : PolyVisitor<ContractionBuilder, AffineExpr> {
 struct ProgramBuilder {
   explicit ProgramBuilder(llvm::StringRef name)
       : program(std::make_shared<compiler::Program>(name)),
-        context(&program->context), loc(UnknownLoc::get(context)),
-        module(*program->module), builder(module) {}
+        context(program->context.get()), loc(UnknownLoc::get(context)),
+        module(*program->module), builder(module) {
+    context->getOrLoadDialect<dialect::tile::TileDialect>();
+    context->getOrLoadDialect<dialect::layer::LayerDialect>();
+    context->getOrLoadDialect<StandardOpsDialect>();
+  }
 
   std::shared_ptr<Program> build(const ProgramArguments &args) {
     std::vector<Type> inputTypes;
@@ -511,7 +513,7 @@ struct ProgramBuilder {
     }
 
     FunctionType funcType =
-        FunctionType::get(inputTypes, program->outputs, context);
+        FunctionType::get(context, inputTypes, program->outputs);
     FuncOp funcOp = FuncOp::create(loc, kEntrypoint, funcType, {});
     size_t numInputs = inputTypes.size() - program->constants.size();
     for (size_t i = 0; i < program->constants.size(); i++) {
@@ -592,7 +594,7 @@ struct ProgramBuilder {
 
     pm.addPass(createCanonicalizerPass());
     pm.addPass(createCSEPass());
-    pm.addPass(tile::createMaterializePass());
+    pm.addNestedPass<FuncOp>(tile::createMaterializePass());
     pm.addPass(createCanonicalizerPass());
     pm.addPass(createCSEPass());
     auto result = pm.run(module);
@@ -726,8 +728,8 @@ struct ProgramBuilder {
       toRemove.insert(op);
     }
     bodyBuilder.create<layer::ReturnOp>(loc, innerResults);
-    for (Operation *op : toRemove) {
-      op->erase();
+    for (auto it = toRemove.rbegin(); it != toRemove.rend(); ++it) {
+      (*it)->erase();
     }
     SmallVector<Value, 4> tuple;
     for (OpResult result : layerOp.getResults()) {
@@ -782,7 +784,7 @@ struct ProgramBuilder {
         cubeCoeff);
     return op.result();
   }
-  
+
   Value makeArgSortOp(ExprNodeIntrinsic *node, ArrayRef<Value> operands) {
     TensorShape shape = evaluator.getShape(node);
     auto i32Type = builder.getIntegerType(32, /*isSigned=*/true);
@@ -893,13 +895,6 @@ struct ProgramBuilder {
 
 std::shared_ptr<Program> buildProgram(llvm::StringRef name,
                                       const ProgramArguments &args) {
-  static std::once_flag once;
-  std::call_once(once, []() {
-    enableGlobalDialectRegistry(true);
-    registerDialect<dialect::tile::TileDialect>();
-    registerDialect<dialect::layer::LayerDialect>();
-    registerDialect<StandardOpsDialect>();
-  });
   if (name.empty()) {
     name = "module";
   }

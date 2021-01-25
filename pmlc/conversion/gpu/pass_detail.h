@@ -1,7 +1,7 @@
 #pragma once
 
 #include "mlir/Dialect/GPU/GPUDialect.h"
-#include "mlir/Dialect/SPIRV/SPIRVDialect.h"
+#include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
 #include "mlir/Pass/Pass.h"
 #include "pmlc/dialect/comp/ir/dialect.h"
 

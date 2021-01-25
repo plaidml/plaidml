@@ -1,3 +1,4 @@
+message("Fetching gflags")
 FetchContent_Declare(
   gflags
   URL      https://github.com/gflags/gflags/archive/e292e0452fcfd5a8ae055b59052fc041cbab4abf.zip

@@ -28,7 +28,7 @@ class BoundsCheckGenerator {
 private:
   BoundsCheckGenerator(LoadStoreOp op, Builder builder)
       : op(op), loc(op.getLoc()),
-        module(op.template getParentOfType<ModuleOp>()),
+        module(op->template getParentOfType<ModuleOp>()),
         i64Type(builder.getIntegerType(64)), indexType(builder.getIndexType()) {
   }
 
@@ -49,7 +49,7 @@ public:
     ArrayRef<Type> results{};
     auto funcType = builder.getFunctionType(inputs, results);
     ArrayRef<NamedAttribute> attrs{};
-    builder.create<FuncOp>(loc, symbol, funcType, attrs);
+    builder.create<FuncOp>(loc, symbol, funcType, attrs).setPrivate();
     return SymbolRefAttr::get(symbol, context);
   }
 

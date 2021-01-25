@@ -1,3 +1,4 @@
+message("Fetching xsmm")
 FetchContent_Declare(
   xsmm
   URL      https://github.com/hfp/libxsmm/archive/592d72f2902fa49fda51a4221e83f7f978936a9d.zip
