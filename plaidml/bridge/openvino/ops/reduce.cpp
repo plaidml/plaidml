@@ -21,6 +21,7 @@ void registerReduceOps() {
     auto I = ctx.operands.at(0);
     std::vector<size_t> axes = get_axis_vector_from_constant_operand(1, ctx.layer);
     auto* layer = ngraph::as_type<ngraph::opset1::ReduceLogicalAnd>(ctx.layer);
+    I = edsl::cast(I, DType::FLOAT32);
     return edsl::make_tuple(op::all(I, edsl::make_tuple(axes), layer->get_keep_dims()));
   });
 
@@ -29,6 +30,7 @@ void registerReduceOps() {
     auto I = ctx.operands.at(0);
     std::vector<size_t> axes = get_axis_vector_from_constant_operand(1, ctx.layer);
     auto* layer = ngraph::as_type<ngraph::opset1::ReduceLogicalOr>(ctx.layer);
+    I = edsl::cast(I, DType::FLOAT32);
     return edsl::make_tuple(op::any(I, edsl::make_tuple(axes), layer->get_keep_dims()));
   });
 
