@@ -247,7 +247,7 @@ def ReorderLayouts : FunctionPass<"pxa-reorder-layouts"> {
   let options = [
     Option<"allowReorder", "allow-reorder", "bool", /*default=*/"false",
            "Allow for creating separate reorder">,
-    Option<"makeUserLayoutsExplicit", "maker-user-layouts-explicit", "bool", /*default=*/"false",
+    Option<"makeUserLayoutsExplicit", "make-user-layouts-explicit", "bool", /*default=*/"false",
            "Reorder data layouts per user specifications attached to memrefs">
   ];
 }
