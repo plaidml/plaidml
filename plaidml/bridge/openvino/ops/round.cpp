@@ -24,7 +24,7 @@ void registerRound() {
     switch (roundMode) {
       case ngraph::op::v5::Round::RoundMode::HALF_TO_EVEN: {
         auto unsignedI = op::abs(I);
-        auto intPart = edsl::cast(unsignedI, DType::INT32);
+        auto intPart = edsl::floor(unsignedI);
 
         auto zero = edsl::cast(edsl::Tensor{0}, I.dtype());
         auto one = edsl::cast(edsl::Tensor{1}, I.dtype());
