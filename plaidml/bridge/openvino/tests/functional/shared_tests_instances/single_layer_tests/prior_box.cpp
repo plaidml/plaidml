@@ -30,7 +30,7 @@ const std::vector<std::vector<float>> density = {
     {2.0f, 4.0f},
 };
 const std::vector<std::vector<float>> fixedRatios = {
-    {2.0f, 4.0f},
+    {2.0f},
 };
 const std::vector<std::vector<float>> fixedSizes = {
     {2.0f, 4.0f},
