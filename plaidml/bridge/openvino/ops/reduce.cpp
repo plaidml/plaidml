@@ -21,8 +21,9 @@ void registerReduceOps() {
     auto I = ctx.operands.at(0);
     std::vector<int64_t> axes = cast_constant_operand<int64_t>(1, ctx.layer);
     auto* layer = ngraph::as_type<ngraph::opset1::ReduceLogicalAnd>(ctx.layer);
-    I = edsl::cast(I, DType::FLOAT32);
-    return edsl::make_tuple(op::all(I, edsl::make_tuple(axes), layer->get_keep_dims()));
+    auto I_i8 = edsl::cast(I, DType::UINT8);
+    auto O = op::all(I_i8, edsl::make_tuple(axes), layer->get_keep_dims());
+    return edsl::make_tuple(edsl::cast(O, I.dtype()));
   });
 
   registerOp("ReduceLogicalOr", [](const Context& ctx) {
@@ -30,8 +31,9 @@ void registerReduceOps() {
     auto I = ctx.operands.at(0);
     std::vector<int64_t> axes = cast_constant_operand<int64_t>(1, ctx.layer);
     auto* layer = ngraph::as_type<ngraph::opset1::ReduceLogicalOr>(ctx.layer);
-    I = edsl::cast(I, DType::FLOAT32);
-    return edsl::make_tuple(op::any(I, edsl::make_tuple(axes), layer->get_keep_dims()));
+    auto I_i8 = edsl::cast(I, DType::UINT8);
+    auto O = op::any(I_i8, edsl::make_tuple(axes), layer->get_keep_dims());
+    return edsl::make_tuple(edsl::cast(O, I.dtype()));
   });
 
   registerOp("ReduceMax", [](const Context& ctx) {
