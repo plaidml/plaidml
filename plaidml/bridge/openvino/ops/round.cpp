@@ -19,21 +19,21 @@ void registerRound() {
     IE_ASSERT(ctx.operands.size() == 1);
     auto I = ctx.operands.at(0);
     auto* layer = ngraph::as_type<ngraph::opset5::Round>(ctx.layer);
-    auto roundMode = layer->get_mode();
+    auto round_mode = layer->get_mode();
 
-    switch (roundMode) {
+    switch (round_mode) {
       case ngraph::op::v5::Round::RoundMode::HALF_TO_EVEN: {
-        auto unsignedI = op::abs(I);
-        auto intPart = edsl::cast(unsignedI, DType::INT32);
+        auto unsigned_I = op::abs(I);
+        auto int_part = edsl::floor(unsigned_I);
 
         auto zero = edsl::cast(edsl::Tensor{0}, I.dtype());
         auto one = edsl::cast(edsl::Tensor{1}, I.dtype());
-        auto minusOne = edsl::cast(edsl::Tensor{-1}, I.dtype());
-        auto sign = edsl::select(I >= 0, one, minusOne);
-        auto flag = edsl::select((unsignedI - intPart) == 0.5, one, zero);
-        auto offset = intPart % 2 - 1;
+        auto minus_one = edsl::cast(edsl::Tensor{-1}, I.dtype());
+        auto sign = edsl::select(I >= 0, one, minus_one);
+        auto flag = edsl::select((unsigned_I - int_part) == 0.5, one, zero);
+        auto offset = int_part % 2 - 1;
 
-        auto O = (edsl::round(unsignedI) + offset * flag) * sign;
+        auto O = (edsl::round(unsigned_I) + offset * flag) * sign;
         return edsl::make_tuple(O);
       }
       case ngraph::op::v5::Round::RoundMode::HALF_AWAY_FROM_ZERO: {
