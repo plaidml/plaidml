@@ -101,7 +101,7 @@ const auto layerSpecificParamsForSmokeTest = ::testing::Combine(  //
     ::testing::Values(std::vector<float>({315.0f})),              //
     ::testing::Values(std::vector<float>({2.0f, 3.0f})),          //
     ::testing::Values(std::vector<float>({2.0f, 4.0f})),          //
-    ::testing::Values(std::vector<float>({2.0f, 4.0f})),          //
+    ::testing::Values(std::vector<float>({2.0f})),                //
     ::testing::Values(std::vector<float>({2.0f, 4.0f})),          //
     ::testing::Values(true),                                      //
     ::testing::Values(true),                                      //
