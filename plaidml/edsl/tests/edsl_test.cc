@@ -690,7 +690,6 @@ TEST_F(CppEdsl, MnistCnn) {
   auto pool1 = MaxPooling2(conv2);
   // model.add(Flatten())
   auto flat = Flatten(pool1);
-  // EXPECT_THAT(flat.compute_shape(), Eq(TensorShape(DType::FLOAT32, {1, 12544})));
   EXPECT_THAT(flat.compute_shape(), Eq(TensorShape(DType::FLOAT32, {1, 802816})));
   // model.add(Dense(128, activation='relu'))
   auto kernel3 = Placeholder(DType::FLOAT32, {802816, 128});
