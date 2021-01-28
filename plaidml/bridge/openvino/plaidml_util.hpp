@@ -1,4 +1,4 @@
-// Copyright (C) 2020 Intel Corporation
+// Copyright (C) 2021 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 //
 
@@ -30,9 +30,8 @@ std::vector<T> cast_constant_operand(size_t operand_idx, ngraph::Node* layer) {
   if (ngraph_const) {
     return ngraph_const->cast_vector<T>();
   } else {
-    THROW_IE_EXCEPTION
-        << "Dynamic slicing not currently supported by PlaidML plugin; all of indices, offsets and default index"
-           "must be Constants.";
+    THROW_IE_EXCEPTION << "Dynamic shapes & indexing not currently supported by the PlaidML plugin; please ensure all "
+                          "inputs used for reshaping, indexing, or slicing are Constants.";
   }
 }
 

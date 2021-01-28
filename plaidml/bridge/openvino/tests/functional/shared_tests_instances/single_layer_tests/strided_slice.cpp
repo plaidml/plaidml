@@ -1,4 +1,4 @@
-// Copyright (C) 2020 Intel Corporation
+// Copyright (C) 2021 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 //
 
@@ -257,28 +257,28 @@ std::vector<StridedSliceSpecificParams> ss_only_test_cases = {
 
     /// those two case will run into segment fault, it is caused by openvino inference,
     /// which is locate in 'MakeNextStageTask' of 'ie_infer_async_request_thread_safe_default.hpp'
-//    StridedSliceSpecificParams{
-//        {10, 12},
-//        {-1, 1},
-//        {-9999, 0},
-//        {-1, 1},
-//        {0, 1},
-//        {0, 1},
-//        {0, 0},
-//        {0, 0},
-//        {0, 0},
-//    },
-//    StridedSliceSpecificParams{
-//        {5, 5, 5, 5},
-//        {-1, 0, -1, 0},
-//        {-50, 0, -60, 0},
-//        {-1, 1, -1, 1},
-//        {0, 0, 0, 0},
-//        {0, 1, 0, 1},
-//        {0, 0, 0, 0},
-//        {0, 0, 0, 0},
-//        {0, 0, 0, 0},
-//    },
+    //    StridedSliceSpecificParams{
+    //        {10, 12},
+    //        {-1, 1},
+    //        {-9999, 0},
+    //        {-1, 1},
+    //        {0, 1},
+    //        {0, 1},
+    //        {0, 0},
+    //        {0, 0},
+    //        {0, 0},
+    //    },
+    //    StridedSliceSpecificParams{
+    //        {5, 5, 5, 5},
+    //        {-1, 0, -1, 0},
+    //        {-50, 0, -60, 0},
+    //        {-1, 1, -1, 1},
+    //        {0, 0, 0, 0},
+    //        {0, 1, 0, 1},
+    //        {0, 0, 0, 0},
+    //        {0, 0, 0, 0},
+    //        {0, 0, 0, 0},
+    //    },
 };
 
 INSTANTIATE_TEST_CASE_P(smoke, StridedSliceLayerTest,
