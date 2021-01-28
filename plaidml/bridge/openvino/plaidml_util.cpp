@@ -1,10 +1,8 @@
-// Copyright (C) 2020 Intel Corporation
+// Copyright (C) 2021 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 //
 
 #include "plaidml_util.hpp"
-
-#include "ngraph/op/constant.hpp"
 
 #include "plaidml/edsl/edsl.h"
 

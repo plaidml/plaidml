@@ -7,6 +7,7 @@ if(NOT InferenceEngineDeveloperPackage_FOUND)
 endif()
 
 if(NOT InferenceEngineDeveloperPackage_FOUND)
+  set(BUILD_SHARED_LIBS ON)
   set(CI_BUILD_NUMBER "0")
   set(ENABLE_CLDNN OFF)
   set(ENABLE_CPPLINT OFF)
@@ -27,7 +28,7 @@ if(NOT InferenceEngineDeveloperPackage_FOUND)
   FetchContent_Declare(
     openvino
     GIT_REPOSITORY https://github.com/plaidml/openvino.git
-    GIT_TAG        817b43395e7dfa35146670c69e05195946431aa3
+    GIT_TAG        40da19c64763fade9733aedaf770077636e5890b
   )
   if(LOCAL_OPENVINO_DIR)
     set(openvino_SOURCE_DIR ${LOCAL_OPENVINO_DIR})

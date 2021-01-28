@@ -1,4 +1,4 @@
-// Copyright (C) 2020 Intel Corporation
+// Copyright (C) 2021 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 //
 
@@ -17,6 +17,8 @@
 using namespace InferenceEngine;
 
 namespace PlaidMLPlugin {
+
+#define IE_SET_METRIC(name, ...) [&] { IE_SET_METRIC_RETURN(name, __VA_ARGS__); }()
 
 static plaidml::Program buildProgram(const ICNNNetwork& network) {
   InputsDataMap inputsInfo;
@@ -39,15 +41,15 @@ PlaidMLExecutableNetwork::PlaidMLExecutableNetwork(const ICNNNetwork& network, c
   program_.compile();
 }
 
-void PlaidMLExecutableNetwork::GetMetric(const std::string& name, Parameter& result, ResponseDesc* resp) const {
+InferenceEngine::Parameter PlaidMLExecutableNetwork::GetMetric(const std::string& name) const {
   if (name == METRIC_KEY(SUPPORTED_METRICS)) {
     std::vector<std::string> metrics = {
         METRIC_KEY(SUPPORTED_METRICS),
         METRIC_KEY(OPTIMAL_NUMBER_OF_INFER_REQUESTS),
     };
-    result = IE_SET_METRIC(SUPPORTED_METRICS, metrics);
+    return IE_SET_METRIC(SUPPORTED_METRICS, metrics);
   } else if (name == METRIC_KEY(OPTIMAL_NUMBER_OF_INFER_REQUESTS)) {
-    result = IE_SET_METRIC(OPTIMAL_NUMBER_OF_INFER_REQUESTS, 1);
+    return IE_SET_METRIC(OPTIMAL_NUMBER_OF_INFER_REQUESTS, 1);
   } else {
     THROW_IE_EXCEPTION << "Unsupported ExecutableNetwork metric: " << name;
   }
