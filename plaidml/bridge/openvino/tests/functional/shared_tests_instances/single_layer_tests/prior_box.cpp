@@ -30,7 +30,7 @@ const std::vector<std::vector<float>> density = {
     {2.0f, 4.0f},
 };
 const std::vector<std::vector<float>> fixedRatios = {
-    {2.0f, 4.0f},
+    {2.0f},
 };
 const std::vector<std::vector<float>> fixedSizes = {
     {2.0f, 4.0f},
@@ -101,7 +101,7 @@ const auto layerSpecificParamsForSmokeTest = ::testing::Combine(  //
     ::testing::Values(std::vector<float>({315.0f})),              //
     ::testing::Values(std::vector<float>({2.0f, 3.0f})),          //
     ::testing::Values(std::vector<float>({2.0f, 4.0f})),          //
-    ::testing::Values(std::vector<float>({2.0f, 4.0f})),          //
+    ::testing::Values(std::vector<float>({2.0f})),                //
     ::testing::Values(std::vector<float>({2.0f, 4.0f})),          //
     ::testing::Values(true),                                      //
     ::testing::Values(true),                                      //
