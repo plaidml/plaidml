@@ -11,6 +11,7 @@
 
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/dialect/pxa/transforms/pass_detail.h"
+#include "pmlc/dialect/stdx/ir/ops.h"
 #include "pmlc/util/logging.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
@@ -176,8 +177,8 @@ struct VectorizeMemImpl {
         (vectorReduceOp.getAgg() != AtomicRMWKind::assign ||
          loopOp.results().size() != 1 ||
          (tileSize == loopVectorSize &&
-          loopOp.getParentOfType<AffineParallelOp>() &&
-          loopOp.getParentOfType<AffineParallelOp>().getResult(0).getType() !=
+          loopOp->getParentOfType<AffineParallelOp>() &&
+          loopOp->getParentOfType<AffineParallelOp>().getResult(0).getType() !=
               loopOp.getResult(0).getType()))) {
       return failure();
     }
@@ -278,9 +279,12 @@ struct VectorizeMemImpl {
           builder.create<SubIOp>(vectorLoad.getLoc(), blockArg, tiledBlockArg);
       const1Result = const1.getResult();
     }
+    AffineMap identityMap = AffineMap::getMultiDimIdentityMap(
+        /*numDims=*/1, vectorLoad.getContext());
     auto newExtractMapOp = builder.create<vector::ExtractMapOp>(
         vectorLoad.getLoc(), newLoadOp.getResult(),
-        tileSize != loopVectorSize ? const1Result : blockArg, tileSize);
+        tileSize != loopVectorSize ? const1Result : blockArg, tileSize,
+        identityMap);
     vectorLoad.getResult().replaceAllUsesWith(newExtractMapOp.getResult());
     vectorLoad.erase();
   }
@@ -304,11 +308,8 @@ struct VectorizeMemImpl {
         MemRefType::get(vectorType.getShape(), vectorType.getElementType());
     auto newAllocOp = builder.create<AllocOp>(loopOp.getLoc(), newMemrefType);
     auto const0 = builder.create<ConstantIndexOp>(loopOp.getLoc(), 0);
-
-    llvm::SmallVector<AffineExpr, 1> expr;
-    auto outerDim = builder.getAffineDimExpr(0);
-    expr.push_back(outerDim);
-    auto emptyMap = AffineMap::get(1, 0, expr, vectorReduce.getContext());
+    AffineMap identityMap = AffineMap::getMultiDimIdentityMap(
+        /*numDims=*/1, vectorReduce.getContext());
 
     builder.setInsertionPoint(vectorReduce);
     Value const1Result;
@@ -319,8 +320,10 @@ struct VectorizeMemImpl {
     }
 
     auto newInsertMapOp = builder.create<vector::InsertMapOp>(
-        vectorReduce.getLoc(), vectorReduce.vector(),
-        tileSize != loopVectorSize ? const1Result : blockArg, tileSize);
+        vectorReduce.getLoc(),
+        /*vector=*/vectorReduce.vector(),
+        /*dest=*/vectorReduce.memref(),
+        /*ids=*/tileSize != loopVectorSize ? const1Result : blockArg);
 
     auto results = loopOp.results();
     for (auto res : results) {
@@ -333,11 +336,11 @@ struct VectorizeMemImpl {
     }
     auto newReduceOp = builder.create<PxaVectorReduceOp>(
         vectorReduce.getLoc(), AtomicRMWKind::assign,
-        newInsertMapOp.getResult(), newAllocOp, emptyMap,
+        newInsertMapOp.getResult(), newAllocOp, identityMap,
         ValueRange{const0.getResult()});
     builder.setInsertionPointAfter(loopOp);
     auto newLoadOp = builder.create<PxaVectorLoadOp>(
-        vectorReduce.getLoc(), vectorType, newAllocOp, emptyMap,
+        vectorReduce.getLoc(), vectorType, newAllocOp, identityMap,
         ValueRange{const0.getResult()});
     auto newReduceOuterOp = builder.create<PxaVectorReduceOp>(
         vectorReduce.getLoc(), AtomicRMWKind::assign, newLoadOp.getResult(),
@@ -413,6 +416,9 @@ void getGlobalMemory(FuncOp f, std::list<Operation *> &globalAllocList) {
   }
   for (auto parallelOp : f.getOps<AffineParallelOp>()) {
     globalAllocList.push_back(parallelOp.getOperation());
+  }
+  for (auto unpackOp : f.getOps<stdx::UnpackOp>()) {
+    globalAllocList.push_back(unpackOp.getOperation());
   }
 }
 

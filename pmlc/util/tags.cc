@@ -1,7 +1,6 @@
-
 #include "pmlc/util/tags.h"
 
-#include "mlir/IR/StandardTypes.h"
+#include "mlir/IR/BuiltinTypes.h"
 
 namespace pmlc {
 
@@ -13,6 +12,7 @@ static StringRef tagDict() { return "tags"; }
 bool hasTags(mlir::Operation *op) {
   return static_cast<bool>(op->getAttrOfType<DictionaryAttr>(tagDict()));
 }
+
 void copyTags(mlir::Operation *dst, mlir::Operation *src) {
   auto dict = src->getAttrOfType<DictionaryAttr>(tagDict());
   if (dict) {
@@ -23,27 +23,25 @@ void copyTags(mlir::Operation *dst, mlir::Operation *src) {
 void clearTags(mlir::Operation *op) { op->removeAttr(tagDict()); }
 
 void clearTag(mlir::Operation *op, llvm::StringRef name) {
-  MutableDictionaryAttr dict = op->getAttrOfType<DictionaryAttr>(tagDict());
-  auto ident = Identifier::get(name, op->getContext());
-  dict.remove(ident);
+  NamedAttrList dict = op->getAttrOfType<DictionaryAttr>(tagDict());
+  dict.erase(name);
   if (dict.empty()) {
     op->removeAttr(tagDict());
   } else {
     op->setAttr(tagDict(), dict.getDictionary(op->getContext()));
   }
 }
+
 void setUnitTag(mlir::Operation *op, llvm::StringRef name) {
-  auto ident = Identifier::get(name, op->getContext());
-  MutableDictionaryAttr dict = op->getAttrOfType<DictionaryAttr>(tagDict());
-  dict.set(ident, UnitAttr::get(op->getContext()));
+  NamedAttrList dict = op->getAttrOfType<DictionaryAttr>(tagDict());
+  dict.set(name, UnitAttr::get(op->getContext()));
   op->setAttr(tagDict(), dict.getDictionary(op->getContext()));
 }
 
 void setIntegerTag(mlir::Operation *op, llvm::StringRef name, int64_t val) {
-  auto ident = Identifier::get(name, op->getContext());
-  MutableDictionaryAttr dict = op->getAttrOfType<DictionaryAttr>(tagDict());
-  auto type = IntegerType::get(64, op->getContext());
-  dict.set(ident, IntegerAttr::get(type, val));
+  NamedAttrList dict = op->getAttrOfType<DictionaryAttr>(tagDict());
+  auto type = IntegerType::get(op->getContext(), 64);
+  dict.set(name, IntegerAttr::get(type, val));
   op->setAttr(tagDict(), dict.getDictionary(op->getContext()));
 }
 

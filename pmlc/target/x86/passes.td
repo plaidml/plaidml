@@ -23,6 +23,12 @@ def TraceLinking : Pass<"x86-trace-linking", "mlir::ModuleOp"> {
 def XSMMStencil : FunctionPass<"x86-affine-stencil-xsmm"> {
   let summary = "Find a tiling for extracting 'micro' GEMMs suitable for XSMM";
   let constructor = "pmlc::target::x86::createXSMMStencilPass()";
+  let options = [
+    Option<"numThreads", "threads", "unsigned", /*default=*/"0",
+           "Number of threads">,
+    Option<"isBatched", "batched", "bool", /*default=*/"false",
+           "Enable strided batching over k dimension of GEMM">
+  ];
 }
 
 def OpenMPWorkaround : Pass<"x86-openmp-workaround", "mlir::LLVM::LLVMFuncOp"> {

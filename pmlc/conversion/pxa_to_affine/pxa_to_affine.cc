@@ -257,8 +257,8 @@ struct FuncOpConversion : public OpConversionPattern<FuncOp> {
     // Create a new function with an updated signature.
     auto newOp = rewriter.cloneWithoutRegions(op);
     rewriter.inlineRegionBefore(op.getBody(), newOp.getBody(), newOp.end());
-    newOp.setType(FunctionType::get(result.getConvertedTypes(), resultTypes,
-                                    op.getContext()));
+    newOp.setType(FunctionType::get(op.getContext(), result.getConvertedTypes(),
+                                    resultTypes));
 
     // Tell the rewriter to convert the region signature.
     rewriter.applySignatureConversion(&newOp.getBody(), result);
@@ -296,8 +296,8 @@ struct LowerPXAToAffinePass
     OwningRewritePatternList patterns;
     populatePXAToAffineConversionPatterns(patterns, &ctx);
 
-    if (failed(applyPartialConversion(getOperation(), target, patterns,
-                                      nullptr))) {
+    if (failed(applyPartialConversion(getOperation(), target,
+                                      std::move(patterns)))) {
       getOperation().dump();
       emitError(UnknownLoc::get(&ctx), "Error lowering pxa -> affine\n");
       signalPassFailure();
