@@ -18,6 +18,7 @@
 #include "ngraph/op/util/attr_types.hpp"
 #include "ngraph/shape.hpp"
 #include "ngraph/type/element_type.hpp"
+#include "ngraph/validation_util.hpp"
 
 #include "plaidml/edsl/edsl.h"
 #include "plaidml/op/op.h"
