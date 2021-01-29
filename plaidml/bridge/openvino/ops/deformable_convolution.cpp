@@ -422,7 +422,7 @@ void registerDeformableConvolution() {
                                           .add_dim(0, OFF_W);
         edsl::Tensor OFF_split_dg_w = op::slice(OFF_split_dgs[i])
                                           .add_dim(0, N)
-                                          .add_dim(2, OFF_C / DG - 2, 3)
+                                          .add_dim(2, OFF_C / DG, 3)
                                           .add_dim(0, OFF_D)
                                           .add_dim(0, OFF_H)
                                           .add_dim(0, OFF_W);
