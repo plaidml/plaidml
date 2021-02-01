@@ -56,26 +56,26 @@ size_t compute_output_size(size_t input_size, size_t filter_size, size_t stride,
   }
   THROW_IE_EXCEPTION << "Unexpected autopadding mode.";
 }
-
+// Extract values which is needed.
 edsl::Tensor extract_tensor(edsl::Tensor I, size_t rank) {
   std::vector<TensorDim> I_dims(rank * (rank + 2) + 2), O_dims(rank + 2);
   std::vector<TensorIndex> I_idxs(rank * (rank + 2) + 2), O_idxs(rank + 2);
   I.bind_dims(I_dims);
-  // Connect dimension between input and output.
+  // Set up the dimensions of output.
   for (auto i = 2; i < rank + 4; ++i) {
     O_dims[i - 2] = I_dims[i];
   }
-  // Set up batch_size and channel.
+  // Set up the indexs of batch_size and channel.
   for (auto i = 0; i < 2; ++i) {
     I_idxs[i + 2] = I_idxs[i];
   }
-  // Set up index of input.
+  // Set up the indexs of input.
   for (auto i = 2; i < rank + 4; ++i) {
     for (auto j = 1; j < rank; ++j) {
       I_idxs[j * (rank + 2) + i] = I_idxs[i];
     }
   }
-  // Connect index between input and output.
+  // Set up the indexs of output.
   for (auto i = 2; i < rank + 4; ++i) {
     O_idxs[i - 2] = I_idxs[i];
   }
@@ -88,14 +88,10 @@ void registerDeformableConvolution() {
     auto* layer = ngraph::as_type<ngraph::opset4::DeformableConvolution>(ctx.layer);
     DType precision = to_plaidml(layer->get_output_element_type(0));
     IE_ASSERT(ctx.operands.size() == 3);
-    auto* input_constant_operand = ngraph::as_type<ngraph::op::Constant>(ctx.layer->get_input_node_ptr(2));
-    if (input_constant_operand == nullptr) {
-      THROW_IE_EXCEPTION << "Filter need to be constant node.";
-    }
     auto I = ctx.operands.at(0), OFF = ctx.operands.at(1), F = ctx.operands.at(2);
     auto I_shape = I.compute_shape().sizes(), OFF_shape = OFF.compute_shape().sizes(),
          F_shape = F.compute_shape().sizes();
-    auto N = I_shape[0], CI = I_shape[1], CO = F_shape[0], OFF_C = OFF_shape[0];
+    auto N = I_shape[0], CI = I_shape[1], CO = F_shape[0], OFF_C = OFF_shape[1];
     auto G = layer->get_group(), DG = layer->get_deformable_group();
     auto rank = I.rank();
     // Get autopad_mode.
@@ -127,32 +123,18 @@ void registerDeformableConvolution() {
     for (auto dilation : layer->get_dilations()) {
       dilations.push_back(dilation);
     }
-    // Compute input_sizes.
-    std::vector<size_t> input_sizes;
-    for (auto i = 2; i < rank; ++i) {
-      input_sizes.push_back(I_shape[i]);
-    }
-    // Compute off_sizes.
-    std::vector<size_t> off_sizes;
-    for (auto i = 2; i < rank; ++i) {
-      off_sizes.push_back(OFF_shape[i]);
-    }
-    // Compute filter_sizes.
-    std::vector<size_t> filter_sizes;
-    for (auto i = 2; i < rank; ++i) {
-      filter_sizes.push_back(F_shape[i]);
-    }
     // Compute pad_before.
     std::vector<size_t> pad_befores;
     for (auto i = 0; i < rank - 2; ++i) {
-      auto pad_before = compute_padding_before(input_sizes[i], off_sizes[i], filter_sizes[i], strides[i], autopad_mode,
-                                               manual_padding[i], manual_padding[i + rank - 2], dilations[i]);
+      auto pad_before =
+          compute_padding_before(I_shape[i + 2], OFF_shape[i + 2], F_shape[i + 2], strides[i], autopad_mode,
+                                 manual_padding[i], manual_padding[i + rank - 2], dilations[i]);
       pad_befores.push_back(pad_before);
     }
     // Compute the shape of output.
     std::vector<size_t> output_sizes;
     for (auto i = 0; i < rank - 2; ++i) {
-      auto output_size = compute_output_size(input_sizes[i], filter_sizes[i], strides[i], autopad_mode,
+      auto output_size = compute_output_size(I_shape[i + 2], F_shape[i + 2], strides[i], autopad_mode,
                                              manual_padding[i], manual_padding[i + rank - 2], dilations[i]);
       output_sizes.push_back(output_size);
     }
@@ -170,6 +152,7 @@ void registerDeformableConvolution() {
     if (OFF_shape[1] != (OFF_shape.size() - 2) * DG * F_spatial_size) {
       THROW_IE_EXCEPTION << "Incorrected shape for DeformableConvolution.";
     }
+    // Compute 1D DeformableConvolution.
     if (rank == 3) {
       // Define dim of each tensor.
       auto W = I_shape[2], OFF_W = OFF_shape[2], F_W = F_shape[2];
@@ -244,7 +227,9 @@ void registerDeformableConvolution() {
                         .group_layout(plaidml::op::GroupLayout::IN_K)
                         .groups(static_cast<int>(G));
       return edsl::make_tuple(result);
-    } else if (rank == 4) {
+    }
+    // Compute 2D DeformableConvolution.
+    if (rank == 4) {
       // Define dim of each tensor.
       auto H = I_shape[2], W = I_shape[3], OFF_H = OFF_shape[2], OFF_W = OFF_shape[3], F_H = F_shape[2],
            F_W = F_shape[3];
@@ -386,7 +371,9 @@ void registerDeformableConvolution() {
                         .group_layout(plaidml::op::GroupLayout::IN_K)
                         .groups(static_cast<int>(G));
       return edsl::make_tuple(result);
-    } else if (rank == 5) {
+    }
+    // Compute 3D DeformableConvolution.
+    if (rank == 5) {
       // Define dim of each tensor.
       auto D = I_shape[2], H = I_shape[3], W = I_shape[4], OFF_D = OFF_shape[2], OFF_H = OFF_shape[3],
            OFF_W = OFF_shape[4], F_D = F_shape[2], F_H = F_shape[3], F_W = F_shape[4];
@@ -616,7 +603,7 @@ void registerDeformableConvolution() {
                         .groups(static_cast<int>(G));
       return edsl::make_tuple(result);
     } else {
-      THROW_IE_EXCEPTION << "Higher dimensions are not supported for now.";
+      THROW_IE_EXCEPTION << "Higher dimension are not supported for now.";
     }
   });
 }
