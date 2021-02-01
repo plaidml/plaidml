@@ -1,4 +1,4 @@
-// Copyright (C) 2020 Intel Corporation
+// Copyright (C) 2021 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 //
 
@@ -13,17 +13,6 @@ using namespace plaidml;          // NOLINT[build/namespaces]
 using namespace InferenceEngine;  // NOLINT[build/namespaces]
 
 namespace {
-
-template <typename T>
-std::vector<T> cast_constant_operand(size_t operand_idx, ngraph::Node* layer) {
-  auto* ngraph_const = ngraph::as_type<ngraph::op::Constant>(layer->get_input_node_ptr(operand_idx));
-  if (ngraph_const) {
-    return ngraph_const->cast_vector<T>();
-  } else {
-    THROW_IE_EXCEPTION
-        << "Dynamic coordinate is not currently supported by PlaidML plugin; all coordinate must be Constants. ";
-  }
-}
 
 edsl::Tensor crop_max_pooling(edsl::Tensor I, const std::vector<float>& coord, int64_t pooled_h, int64_t pooled_w) {
   auto x_1 = coord[0];

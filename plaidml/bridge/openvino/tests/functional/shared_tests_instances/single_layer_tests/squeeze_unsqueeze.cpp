@@ -1,4 +1,4 @@
-// Copyright (C) 2020 Intel Corporation
+// Copyright (C) 2021 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 //
 
@@ -22,18 +22,24 @@ std::map<std::vector<size_t>, std::vector<std::vector<int>>> axesVectors = {
 
 const std::vector<InferenceEngine::Precision> netPrecisions = {
     InferenceEngine::Precision::I32,
-    // TODO: Update once we're no longer getting nGraph errors from float data
     // InferenceEngine::Precision::FP32,
-    // InferenceEngine::Precision::FP16
+    // InferenceEngine::Precision::FP16,
 };
 
-const std::vector<ngraph::helpers::SqueezeOpType> opTypes = {ngraph::helpers::SqueezeOpType::SQUEEZE,
-                                                             ngraph::helpers::SqueezeOpType::UNSQUEEZE};
+const std::vector<ngraph::helpers::SqueezeOpType> opTypes = {
+    ngraph::helpers::SqueezeOpType::SQUEEZE,
+    ngraph::helpers::SqueezeOpType::UNSQUEEZE,
+};
 
 INSTANTIATE_TEST_CASE_P(smoke, SqueezeUnsqueezeLayerTest,
-                        ::testing::Combine(::testing::ValuesIn(CommonTestUtils::combineParams(axesVectors)),  //
-                                           ::testing::ValuesIn(opTypes),                                      //
-                                           ::testing::ValuesIn(netPrecisions),                                //
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),
+                        ::testing::Combine(                                                    //
+                            ::testing::ValuesIn(CommonTestUtils::combineParams(axesVectors)),  //
+                            ::testing::ValuesIn(opTypes),                                      //
+                            ::testing::ValuesIn(netPrecisions),                                //
+                            ::testing::Values(InferenceEngine::Precision::UNSPECIFIED),        //
+                            ::testing::Values(InferenceEngine::Precision::UNSPECIFIED),        //
+                            ::testing::Values(InferenceEngine::Layout::ANY),                   //
+                            ::testing::Values(InferenceEngine::Layout::ANY),                   //
+                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),
                         SqueezeUnsqueezeLayerTest::getTestCaseName);
 }  // namespace

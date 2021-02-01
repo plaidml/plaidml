@@ -114,17 +114,16 @@ void pipelineBuilder(OpPassManager &pm,
   // Data layout optimization.
   pm.addNestedPass<FuncOp>(
       createIntelGenOclReorderLayoutsPass(/*maxThreads=*/64,
-                                          /*allowReorder=*/false));
+                                          /*allowReorder=*/true));
   pm.addNestedPass<FuncOp>(pxa::createSimplifyWithConstraintsPass());
   pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
-  // TODO: uncomment this pass after llvm upstream update with dynamic vec ops
-  /*pm.addPass(pxa::createVectorizeMemPass());
-  pm.addPass(pmlc::dialect::pxa::createAffineNormalizePass());
+  pm.addNestedPass<FuncOp>(pxa::createVectorizeMemPass());
+  pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
-  pm.addPass(createCSEPass());*/
+  pm.addPass(createCSEPass());
 
   // Lower out of PXA memory semantics
   pm.addPass(pmlc::target::intel_gen::createLowerPXAToAffinePass());

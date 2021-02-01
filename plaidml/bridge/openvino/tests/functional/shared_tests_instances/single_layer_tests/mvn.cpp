@@ -1,4 +1,4 @@
-// Copyright (C) 2020 Intel Corporation
+// Copyright (C) 2021 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 //
 
@@ -7,7 +7,7 @@
 #include "common_test_utils/test_constants.hpp"
 #include "single_layer_tests/mvn.hpp"
 
-using LayerTestsDefinitions::MvnLayerTest;
+using namespace LayerTestsDefinitions;
 
 const std::vector<std::vector<size_t>> inputShapes = {
     {1, 32, 17},        //
@@ -25,30 +25,34 @@ const std::vector<std::vector<size_t>> inputShapes = {
 };
 
 const std::vector<bool> acrossChannels = {
-    true,  //
-    false  //
+    true,
+    false,
 };
 
 const std::vector<bool> normalizeVariance = {
-    true,  //
-    false  //
+    true,
+    false,
 };
 
-const std::vector<double> epsilon = {0.000000001};
+const std::vector<double> epsilon = {
+    0.000000001,
+};
 
-const auto MvnCases = ::testing::Combine(::testing::ValuesIn(inputShapes),                     //
-                                         ::testing::Values(InferenceEngine::Precision::FP32),  //
-                                         ::testing::ValuesIn(acrossChannels),                  //
-                                         ::testing::ValuesIn(normalizeVariance),               //
-                                         ::testing::ValuesIn(epsilon),                         //
-                                         ::testing::Values(CommonTestUtils::DEVICE_PLAIDML));
+const auto MvnCases = ::testing::Combine(                 //
+    ::testing::ValuesIn(inputShapes),                     //
+    ::testing::Values(InferenceEngine::Precision::FP32),  //
+    ::testing::ValuesIn(acrossChannels),                  //
+    ::testing::ValuesIn(normalizeVariance),               //
+    ::testing::ValuesIn(epsilon),                         //
+    ::testing::Values(CommonTestUtils::DEVICE_PLAIDML));
 
-const auto SmokeCases = ::testing::Combine(::testing::Values(std::vector<size_t>({3, 7, 16, 6})),  //
-                                           ::testing::Values(InferenceEngine::Precision::FP32),    //
-                                           ::testing::ValuesIn(acrossChannels),                    //
-                                           ::testing::ValuesIn(normalizeVariance),                 //
-                                           ::testing::ValuesIn(epsilon),                           //
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML));
+const auto SmokeCases = ::testing::Combine(                 //
+    ::testing::Values(std::vector<size_t>({3, 7, 16, 6})),  //
+    ::testing::Values(InferenceEngine::Precision::FP32),    //
+    ::testing::ValuesIn(acrossChannels),                    //
+    ::testing::ValuesIn(normalizeVariance),                 //
+    ::testing::ValuesIn(epsilon),                           //
+    ::testing::Values(CommonTestUtils::DEVICE_PLAIDML));
 
 INSTANTIATE_TEST_CASE_P(MVN, MvnLayerTest, MvnCases, MvnLayerTest::getTestCaseName);
 

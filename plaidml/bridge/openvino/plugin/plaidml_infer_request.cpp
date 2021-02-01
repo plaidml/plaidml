@@ -1,10 +1,8 @@
-// Copyright (C) 2020 Intel Corporation
+// Copyright (C) 2021 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 //
 
 #include "plaidml_infer_request.hpp"
-
-#include "ie_layers.h"
 
 using namespace plaidml;
 using namespace InferenceEngine;

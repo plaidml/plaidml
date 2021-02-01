@@ -1,11 +1,12 @@
-// Copyright (C) 2019 Intel Corporation
+// Copyright (C) 2021 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 //
 
 #include <vector>
 
 #include "single_layer_tests/shuffle_channels.hpp"
-using LayerTestsDefinitions::ShuffleChannelsLayerTest;
+
+using namespace LayerTestsDefinitions;
 
 namespace {
 
@@ -14,35 +15,42 @@ const std::vector<InferenceEngine::Precision> netPrecisions = {
     InferenceEngine::Precision::FP32,
 };
 
-const std::vector<std::vector<size_t>> inputShapes = {
-    // tensor order 'NCHW'
-    {5, 12, 10, 10},
-    {1, 18, 16, 16}};
+const std::vector<int> axes = {0, 1, 2, 3};
+const std::vector<int> negativeAxes = {-4, -3, -2, -1};
+const std::vector<int> groups = {1, 2, 3};
 
-const std::vector<shuffleChannelsSpecificParams> shuffleChannelOneParams = {{1, 2},  //
-                                                                            {1, 6},  //
-                                                                            {-3, 3}};
+const auto shuffleChannelsParams4D = ::testing::Combine(  //
+    ::testing::ValuesIn(axes),                            //
+    ::testing::ValuesIn(groups)                           //
+);
 
-INSTANTIATE_TEST_CASE_P(smokeChannelOne, ShuffleChannelsLayerTest,
-                        ::testing::Combine(::testing::ValuesIn(shuffleChannelOneParams),         //
-                                           ::testing::ValuesIn(netPrecisions),                   //
-                                           ::testing::ValuesIn(inputShapes),                     //
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
+const auto shuffleChannelsParamsNegativeAxis4D = ::testing::Combine(  //
+    ::testing::ValuesIn(negativeAxes),                                //
+    ::testing::ValuesIn(groups)                                       //
+);
+
+INSTANTIATE_TEST_CASE_P(smoke_ShuffleChannels4D, ShuffleChannelsLayerTest,
+                        ::testing::Combine(                                              //
+                            shuffleChannelsParams4D,                                     //
+                            ::testing::ValuesIn(netPrecisions),                          //
+                            ::testing::Values(InferenceEngine::Precision::UNSPECIFIED),  //
+                            ::testing::Values(InferenceEngine::Precision::UNSPECIFIED),  //
+                            ::testing::Values(InferenceEngine::Layout::ANY),             //
+                            ::testing::Values(InferenceEngine::Layout::ANY),             //
+                            ::testing::Values(std::vector<size_t>({6, 6, 6, 6})),        //
+                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),         //
                         ShuffleChannelsLayerTest::getTestCaseName);
 
-const std::vector<std::vector<size_t>> diffOrderInputShape = {
-    // tensor order 'NHWC'
-    {5, 10, 10, 6},
-    {1, 16, 16, 12}};
-
-const std::vector<shuffleChannelsSpecificParams> shuffleChannelThirdParams = {{3, 2},  //
-                                                                              {3, 6},  //
-                                                                              {-1, 3}};
-
-INSTANTIATE_TEST_CASE_P(smokeChannelThree, ShuffleChannelsLayerTest,
-                        ::testing::Combine(::testing::ValuesIn(shuffleChannelThirdParams),       //
-                                           ::testing::ValuesIn(netPrecisions),                   //
-                                           ::testing::ValuesIn(diffOrderInputShape),             //
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
+INSTANTIATE_TEST_CASE_P(smoke_ShuffleChannelsNegativeAxis4D, ShuffleChannelsLayerTest,
+                        ::testing::Combine(                                              //
+                            shuffleChannelsParamsNegativeAxis4D,                         //
+                            ::testing::ValuesIn(netPrecisions),                          //
+                            ::testing::Values(InferenceEngine::Precision::UNSPECIFIED),  //
+                            ::testing::Values(InferenceEngine::Precision::UNSPECIFIED),  //
+                            ::testing::Values(InferenceEngine::Layout::ANY),             //
+                            ::testing::Values(InferenceEngine::Layout::ANY),             //
+                            ::testing::Values(std::vector<size_t>({6, 6, 6, 6})),        //
+                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),         //
                         ShuffleChannelsLayerTest::getTestCaseName);
+
 }  // namespace
