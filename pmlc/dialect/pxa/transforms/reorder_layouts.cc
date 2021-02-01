@@ -82,11 +82,31 @@ public:
       tileLoopNestsToAlignWithDataMaps(parallelOp);
       simplifyMemrefMaps(parallelOp);
     }
+
+    // Erase the affine maps attached to the memrefs
+    eraseLayoutMapsFromMemRefs(func);
+
     // Cleanup
     for (auto op : toRemove)
       op->erase();
   }
 };
+
+void eraseLayoutMapsFromMemRefs(mlir::FuncOp func) {
+  for (auto allocOp : func.getOps<mlir::AllocOp>()) {
+    mlir::MemRefType oldMemType = allocOp.getType();
+
+    /*  if (oldMemType.getAffineMaps().size() > 0) */ {
+      mlir::OpBuilder builder(allocOp);
+      mlir::MemRefType newMemType =
+          mlir::MemRefType::Builder(oldMemType).setAffineMaps({});
+      mlir::Value newMemory =
+          builder.create<mlir::AllocOp>(allocOp.getLoc(), newMemType);
+      allocOp.replaceAllUsesWith(newMemory);
+      allocOp.erase();
+    }
+  }
+}
 
 bool divisorDividesTheLoops(int64_t constantValue,
                             mlir::AffineParallelOp outerParallelOp,
