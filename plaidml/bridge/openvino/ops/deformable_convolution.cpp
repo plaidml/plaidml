@@ -114,15 +114,9 @@ void registerDeformableConvolution() {
       }
     }
     // Get the strides.
-    std::vector<size_t> strides;
-    for (auto stride : layer->get_strides()) {
-      strides.push_back(stride);
-    }
+    auto strides = layer->get_strides();
     // Get the dilations.
-    std::vector<size_t> dilations;
-    for (auto dilation : layer->get_dilations()) {
-      dilations.push_back(dilation);
-    }
+    auto dilations = layer->get_dilations();
     // Compute pad_before.
     std::vector<size_t> pad_befores;
     for (auto i = 0; i < rank - 2; ++i) {
