@@ -93,10 +93,10 @@ public:
 };
 
 void eraseLayoutMapsFromMemRefs(mlir::FuncOp func) {
-  for (auto allocOp : func.getOps<mlir::AllocOp>()) {
+  func.walk([&](mlir::AllocOp allocOp) {
     mlir::MemRefType oldMemType = allocOp.getType();
 
-    /*  if (oldMemType.getAffineMaps().size() > 0) */ {
+    if (oldMemType.getAffineMaps().size() > 0) {
       mlir::OpBuilder builder(allocOp);
       mlir::MemRefType newMemType =
           mlir::MemRefType::Builder(oldMemType).setAffineMaps({});
@@ -105,7 +105,7 @@ void eraseLayoutMapsFromMemRefs(mlir::FuncOp func) {
       allocOp.replaceAllUsesWith(newMemory);
       allocOp.erase();
     }
-  }
+  });
 }
 
 bool divisorDividesTheLoops(int64_t constantValue,
