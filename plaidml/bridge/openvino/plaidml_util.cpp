@@ -4,6 +4,7 @@
 
 #include "plaidml_util.hpp"
 
+#include "ngraph/validation_util.hpp"
 #include "plaidml/edsl/edsl.h"
 
 using namespace plaidml;          // NOLINT[build/namespaces]
@@ -14,7 +15,10 @@ namespace PlaidMLPlugin {
 ngraph::AxisSet get_axis_set_from_constant_operand(size_t operand_idx, ngraph::Node* layer) {
   auto* axis_ngraph_op = ngraph::as_type<ngraph::op::Constant>(layer->get_input_node_ptr(operand_idx));
   if (axis_ngraph_op) {
-    return axis_ngraph_op->get_axis_set_val();
+    auto const_data = axis_ngraph_op->cast_vector<int64_t>();
+    auto input_rank = layer->get_input_partial_shape(0).rank();
+    auto normalized_axes = ngraph::normalize_axes(layer->get_friendly_name(), const_data, input_rank);
+    return ngraph::AxisSet{normalized_axes};
   } else {
     THROW_IE_EXCEPTION << "Dynamic axis not currently supported by PlaidML plugin";
   }
@@ -23,7 +27,10 @@ ngraph::AxisSet get_axis_set_from_constant_operand(size_t operand_idx, ngraph::N
 ngraph::AxisVector get_axis_vector_from_constant_operand(size_t operand_idx, ngraph::Node* layer) {
   auto* axis_ngraph_op = ngraph::as_type<ngraph::op::Constant>(layer->get_input_node_ptr(operand_idx));
   if (axis_ngraph_op) {
-    return axis_ngraph_op->get_axis_vector_val();
+    auto const_data = axis_ngraph_op->cast_vector<int64_t>();
+    auto input_rank = layer->get_input_partial_shape(0).rank();
+    auto normalized_axes = ngraph::normalize_axes(layer->get_friendly_name(), const_data, input_rank);
+    return ngraph::AxisVector{normalized_axes};
   } else {
     THROW_IE_EXCEPTION << "Dynamic axis not currently supported by PlaidML plugin";
   }
