@@ -9,12 +9,12 @@
 #NCHW_to_NHWC = affine_map<(N,C,H,W) -> (N,H,W,C)>
 
 
- !I_memref = type memref<1x64x56x56xf32> 
- !K_memref = type memref<64x64x3x3xf32>  
+// !I_memref = type memref<1x64x56x56xf32> 
+// !K_memref = type memref<64x64x3x3xf32>  
  !O_memref = type memref<1x56x56x64xf32> 
 
-// !I_memref = type memref<1x64x56x56xf32, #NCHW_to_NHWC>
-// !K_memref = type memref<64x64x3x3xf32, #K_map>
+ !I_memref = type memref<1x64x56x56xf32, #NCHW_to_NHWC>
+ !K_memref = type memref<64x64x3x3xf32, #K_map>
 
 
 
@@ -45,14 +45,6 @@ func @baseline() {
     %ar5 = sitofp %ar4 : i32 to f32
     affine.store %ar5, %K[%ci, %co, %kh, %kw] : !K_memref
   }
-
-  %c1 = constant 1 : index
-  %c2 = constant 2 : index
-  %c3 = constant 3 : index
-  %X = dim %I, %c2 : !I_memref
-  %Y = dim %I, %c3 : !I_memref
-  %CI = dim %I, %c1 : !I_memref
-  %CO = dim %O, %c1 : !O_memref
 
 
   affine.parallel (%x, %y, %ci, %co, %kh, %kw) = (0, 0, 0, 0, 0, 0) to (56, 56, 64, 64, 3, 3) reduce ("assign") -> (memref<1x56x56x64xf32>) { 
