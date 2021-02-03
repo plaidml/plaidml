@@ -20,7 +20,11 @@ void registerLogSoftmax() {
     auto I = ctx.operands.at(0);
     auto* layer = ngraph::as_type<ngraph::opset5::LogSoftmax>(ctx.layer);
     auto axis = layer->get_axis();
-    return edsl::make_tuple(edsl::log(op::softmax(I, axis)));
+    axis = axis < 0 ? axis + I.rank() : axis;
+
+    auto t = I - op::max(I, edsl::make_tuple(axis), true);
+    auto O = t - edsl::log(op::sum(edsl::exp(t), edsl::make_tuple(axis), true));
+    return edsl::make_tuple(O);
   });
 }
 
