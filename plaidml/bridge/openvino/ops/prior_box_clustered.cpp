@@ -1,4 +1,4 @@
-// Copyright (C) 2020 Intel Corporation
+// Copyright (C) 2021 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 //
 
@@ -31,10 +31,10 @@ void registerPriorBoxClustered() {
 
     auto input0_shape = cast_constant_operand<int64_t>(0, layer);
     auto input1_shape = cast_constant_operand<int64_t>(1, layer);
-    int64_t layer_height = static_cast<int64_t>(input0_shape[0]);
-    int64_t layer_width = static_cast<int64_t>(input0_shape[1]);
-    int64_t img_height = static_cast<int64_t>(input1_shape[0]);
-    int64_t img_width = static_cast<int64_t>(input1_shape[1]);
+    int64_t layer_height = input0_shape[0];
+    int64_t layer_width = input0_shape[1];
+    int64_t img_height = input1_shape[0];
+    int64_t img_width = input1_shape[1];
 
     float step_w = attrs.step_widths;
     float step_h = attrs.step_heights;
