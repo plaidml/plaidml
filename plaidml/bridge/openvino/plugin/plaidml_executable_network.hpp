@@ -1,4 +1,4 @@
-// Copyright (C) 2020 Intel Corporation
+// Copyright (C) 2021 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 //
 
@@ -23,8 +23,7 @@ class PlaidMLExecutableNetwork : public InferenceEngine::ExecutableNetworkThread
   InferenceEngine::InferRequestInternal::Ptr CreateInferRequestImpl(
       InferenceEngine::InputsDataMap networkInputs, InferenceEngine::OutputsDataMap networkOutputs) final;
 
-  void GetMetric(const std::string& name, InferenceEngine::Parameter& result,
-                 InferenceEngine::ResponseDesc* resp) const final;
+  InferenceEngine::Parameter GetMetric(const std::string& name) const override;
 
   void Export(const std::string& modelFileName) final;
   void Export(std::ostream& networkModel) final { ExportImpl(networkModel); }

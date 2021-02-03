@@ -1,8 +1,8 @@
 // RUN: pmlc-opt -x86-convert-std-to-llvm -x86-trace-linking \
 // RUN:     -x86-openmp-workaround %s | pmlc-jit | FileCheck %s
 
-func @print_memref_f32(memref<*xf32>)
-func @plaidml_rt_thread_num() -> index
+func private @print_memref_f32(memref<*xf32>)
+func private @plaidml_rt_thread_num() -> index
 
 func @main() {
   %num_threads = constant 4 : index
@@ -20,4 +20,3 @@ func @main() {
 }
 
 // CHECK: [42,  42,  42,  42]
-

@@ -124,7 +124,7 @@ void ContractionOp::setLowerBounds(ArrayRef<int64_t> bounds) {
   }
   auto map =
       AffineMap::get(/*dimCount=*/0, /*symbolCount=*/0, exprs, getContext());
-  setAttr(getLowerBoundsAttrName(), AffineMapAttr::get(map));
+  (*this)->setAttr(getLowerBoundsAttrName(), AffineMapAttr::get(map));
 }
 
 void ContractionOp::setUpperBounds(ArrayRef<int64_t> bounds) {
@@ -134,11 +134,11 @@ void ContractionOp::setUpperBounds(ArrayRef<int64_t> bounds) {
   }
   auto map =
       AffineMap::get(/*dimCount=*/0, /*symbolCount=*/0, exprs, getContext());
-  setAttr(getUpperBoundsAttrName(), AffineMapAttr::get(map));
+  (*this)->setAttr(getUpperBoundsAttrName(), AffineMapAttr::get(map));
 }
 
 void ContractionOp::setSink(AffineMap sink) {
-  setAttr(getSinkAttrName(), AffineMapAttr::get(sink));
+  (*this)->setAttr(getSinkAttrName(), AffineMapAttr::get(sink));
 }
 
 void ContractionOp::setSources(ArrayRef<AffineMap> srcs) {
@@ -146,14 +146,14 @@ void ContractionOp::setSources(ArrayRef<AffineMap> srcs) {
   for (auto src : srcs) {
     attrs.push_back(AffineMapAttr::get(src));
   }
-  setAttr(getSourcesAttrName(), ArrayAttr::get(attrs, getContext()));
+  (*this)->setAttr(getSourcesAttrName(), ArrayAttr::get(attrs, getContext()));
 }
 
 void ContractionOp::setConstraints(IntegerSet cons) {
   if (cons.isEmptyIntegerSet()) {
     removeAttr(getConstraintsAttrName());
   } else {
-    setAttr(getConstraintsAttrName(), IntegerSetAttr::get(cons));
+    (*this)->setAttr(getConstraintsAttrName(), IntegerSetAttr::get(cons));
   }
 }
 
@@ -195,7 +195,7 @@ void printContractionOp(OpAsmPrinter *printer, ContractionOp op) {
     }
     *printer << ']';
   }
-  printer->printOptionalAttrDict(op.getAttrs(), elidedAttrs);
+  printer->printOptionalAttrDict(op->getAttrs(), elidedAttrs);
   *printer << " : ";
   printer->printType(op.init().getType());
   *printer << ", ";

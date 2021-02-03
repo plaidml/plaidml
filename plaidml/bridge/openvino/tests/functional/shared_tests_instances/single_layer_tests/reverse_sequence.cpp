@@ -1,43 +1,51 @@
-// Copyright (C) 2019 Intel Corporation
+// Copyright (C) 2021 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include "single_layer_tests/reverse_sequence.hpp"
-
 #include <vector>
 
-using LayerTestsDefinitions::ReverseSequenceLayerTest;
+#include "common_test_utils/test_constants.hpp"
+#include "single_layer_tests/reverse_sequence.hpp"
+
+using namespace LayerTestsDefinitions;
 
 namespace {
 
 const std::vector<InferenceEngine::Precision> netPrecisions = {
-    InferenceEngine::Precision::I32,
-    InferenceEngine::Precision::FP32,
+    InferenceEngine::Precision::FP32,  //
+    InferenceEngine::Precision::FP16,  //
+    InferenceEngine::Precision::U8,    //
+    InferenceEngine::Precision::I8,    //
+    InferenceEngine::Precision::U16,   //
+    InferenceEngine::Precision::I32,   //
 };
 
-INSTANTIATE_TEST_CASE_P(ReverseSequenceLayerTest_smoke, ReverseSequenceLayerTest,
-                        ::testing::Combine(::testing::Values(0),                                   //
-                                           ::testing::Values(1),                                   //
-                                           ::testing::Values(std::vector<size_t>{2, 10, 10, 10}),  //
-                                           ::testing::Values(std::vector<size_t>{2, 1}),           //
-                                           ::testing::Values(0),                                   //
-                                           ::testing::ValuesIn(netPrecisions),                     //
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),    //
-                        ReverseSequenceLayerTest::getTestCaseName);
+const std::vector<int64_t> batchAxisIndices = {0L};
 
-const std::vector<std::vector<size_t>> seq_length = {
-    {1, 2, 3, 1},  //
-    {2, 2, 2, 2}   //
+const std::vector<int64_t> seqAxisIndices = {1L};
+
+const std::vector<std::vector<size_t>> inputShapes = {
+    {3, 10},
 };
 
-INSTANTIATE_TEST_CASE_P(ReverseSequenceLayer_test, ReverseSequenceLayerTest,
-                        ::testing::Combine(::testing::ValuesIn(std::vector<int64_t>{0, 1}),      //
-                                           ::testing::ValuesIn(std::vector<int64_t>{2, 3}),      //
-                                           ::testing::Values(std::vector<size_t>{4, 4, 4, 4}),   //
-                                           ::testing::ValuesIn(seq_length),                      //
-                                           ::testing::Values(0),                                 //
-                                           ::testing::ValuesIn(netPrecisions),                   //
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
+const std::vector<std::vector<size_t>> reversSeqLengthsVecShapes = {
+    {3},
+};
+
+const std::vector<ngraph::helpers::InputLayerType> secondaryInputTypes = {
+    ngraph::helpers::InputLayerType::CONSTANT,
+    // ngraph::helpers::InputLayerType::PARAMETER,
+};
+
+INSTANTIATE_TEST_CASE_P(smoke, ReverseSequenceLayerTest,
+                        ::testing::Combine(                                       //
+                            ::testing::ValuesIn(batchAxisIndices),                //
+                            ::testing::ValuesIn(seqAxisIndices),                  //
+                            ::testing::ValuesIn(inputShapes),                     //
+                            ::testing::ValuesIn(reversSeqLengthsVecShapes),       //
+                            ::testing::ValuesIn(secondaryInputTypes),             //
+                            ::testing::ValuesIn(netPrecisions),                   //
+                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
                         ReverseSequenceLayerTest::getTestCaseName);
 
 }  // namespace

@@ -5,10 +5,11 @@
 #include "mlir/Dialect/GPU/ParallelLoopMapper.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/IR/BlockAndValueMapping.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Matchers.h"
-#include "mlir/IR/StandardTypes.h"
 #include "mlir/Interfaces/VectorInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/DebugStringHelper.h"
@@ -53,7 +54,7 @@ public:
     OpBuilder builder(op);
     // Skip on std.extractelement as it will be removed with broadcast op
     // transformation
-    if (isa<ExtractElementOp>(op))
+    if (isa<vector::ExtractElementOp>(op))
       return success();
     // Replace operands if they are still vectorized. This can happen for
     // constant ops.
@@ -84,7 +85,8 @@ public:
 
   LogicalResult devectorizeTransferRead(vector::TransferReadOp op) {
     IVLOG(3, "Orginal Op: " << debugString(*op));
-    if (!isVectorTypeValid(op.getVectorType()) || op.indices().size() < 1)
+    VectorType vectorType = op.getVectorType();
+    if (!isVectorTypeValid(vectorType) || op.indices().size() < 1)
       return failure();
     OpBuilder builder(op);
     // Add sid to lowest index
@@ -92,8 +94,8 @@ public:
     // TODO: Current HW supports only block read\write on global mem scope.
     // This can change in the future so probably need to be better handled with
     // HW specific parameters
-    scf::ParallelOp actualBlock = loop.getParentOfType<scf::ParallelOp>();
-    bool invalidMemScope = !actualBlock.isDefinedOutsideOfLoop(op.memref());
+    scf::ParallelOp actualBlock = loop->getParentOfType<scf::ParallelOp>();
+    bool invalidMemScope = !actualBlock.isDefinedOutsideOfLoop(op.source());
 
     // TODO: Based on the HW caps we should accept these for certain data types
     // Right now we accept i16/fp16 and i32/fp32 for the block read extensions
@@ -103,17 +105,17 @@ public:
       // Case1: vector size is the multiplication of subgroup size, in this case
       // we use vector of size divided by subgroup size as output from
       // SubgroupBlockReadINTELOp
-      if (op.getVectorType().getDimSize(0) > vectorSize) {
+      if (vectorType.getDimSize(0) > vectorSize) {
         // Change vector dimension, we already checked earlier that dimsize %
         // vecsize == 0
-        auto newVectorSize = op.getVectorType().getDimSize(0) / vectorSize;
+        auto newVectorSize = vectorType.getDimSize(0) / vectorSize;
         SmallVector<int64_t, 1> newShape;
         newShape.push_back(newVectorSize);
         auto newMemrefType =
-            VectorType::get(newShape, op.getVectorType().getElementType());
+            VectorType::get(newShape, vectorType.getElementType());
         auto newBlockReadOp =
             builder.create<dialect::stdx::SubgroupBlockReadINTELOp>(
-                op.getLoc(), newMemrefType, op.memref(), idxs);
+                op.getLoc(), newMemrefType, op.source(), idxs);
 
         IVLOG(3, "Load Op: " << debugString(*newBlockReadOp));
         op.replaceAllUsesWith(newBlockReadOp.getResult());
@@ -122,7 +124,7 @@ public:
       } else {
         auto newBlockReadOp =
             builder.create<dialect::stdx::SubgroupBlockReadINTELOp>(
-                op.getLoc(), op.memref(), idxs);
+                op.getLoc(), op.source(), idxs);
         devectorizeVectorOp(newBlockReadOp.getOperation());
         op.replaceAllUsesWith(newBlockReadOp.getResult());
         IVLOG(3, "Load Op: " << debugString(*newBlockReadOp));
@@ -130,19 +132,19 @@ public:
       // Case3: Used buffer was allocated inside the kernel, no block reads
       // allowed. Check if element type of the allocated memory is vector, if so
       // then it is needed to use LoadOp with orginal indices
-    } else if (op.memref().getDefiningOp() &&
-               dyn_cast<AllocOp>(op.memref().getDefiningOp())
+    } else if (op.source().getDefiningOp() &&
+               dyn_cast<AllocOp>(op.source().getDefiningOp())
                    .getType()
                    .getElementType()
                    .isa<VectorType>() &&
-               op.getVectorType().getDimSize(0) != vectorSize) {
-      auto newLoadOp = builder.create<LoadOp>(op.getLoc(), op.memref(), idxs);
+               vectorType.getDimSize(0) != vectorSize) {
+      auto newLoadOp = builder.create<LoadOp>(op.getLoc(), op.source(), idxs);
       IVLOG(3, "Block read Op: " << debugString(*newLoadOp));
       op.replaceAllUsesWith(newLoadOp.getResult());
       // Case4: No block reads or vectors, use default devectorization
     } else {
       idxs.back() = builder.create<AddIOp>(op.getLoc(), idxs.back(), sid);
-      auto newLoadOp = builder.create<LoadOp>(op.getLoc(), op.memref(), idxs);
+      auto newLoadOp = builder.create<LoadOp>(op.getLoc(), op.source(), idxs);
       devectorizeVectorOp(newLoadOp.getOperation());
       op.replaceAllUsesWith(newLoadOp.getResult());
       IVLOG(3, "Load Op: " << debugString(*newLoadOp));
@@ -160,8 +162,8 @@ public:
     // TODO: Current HW supports only block read\write on global mem scope.
     // This can change in the future so probably need to be better handled with
     // HW specific parameters
-    scf::ParallelOp actualBlock = loop.getParentOfType<scf::ParallelOp>();
-    bool invalidMemScope = !actualBlock.isDefinedOutsideOfLoop(op.memref());
+    scf::ParallelOp actualBlock = loop->getParentOfType<scf::ParallelOp>();
+    bool invalidMemScope = !actualBlock.isDefinedOutsideOfLoop(op.source());
 
     // TODO: Based on the HW caps we should accept these for certain data types
     // Right now we accept i16/fp16 and i32/fp32 for the block read extensions
@@ -171,7 +173,7 @@ public:
         isBlockOpTypeSupported<vector::TransferWriteOp>(op)) {
       auto newBlockWriteOp =
           builder.create<dialect::stdx::SubgroupBlockWriteINTELOp>(
-              op.getLoc(), op.vector(), op.memref(), idxs);
+              op.getLoc(), op.vector(), op.source(), idxs);
       devectorizeVectorOp(newBlockWriteOp.getOperation());
       IVLOG(3, "Block Write Op: " << debugString(*newBlockWriteOp));
       op.erase();
@@ -179,7 +181,7 @@ public:
     } else {
       idxs.back() = builder.create<AddIOp>(op.getLoc(), idxs.back(), sid);
       auto newStoreOp =
-          builder.create<StoreOp>(op.getLoc(), op.vector(), op.memref(), idxs);
+          builder.create<StoreOp>(op.getLoc(), op.vector(), op.source(), idxs);
       devectorizeVectorOp(newStoreOp.getOperation());
       IVLOG(3, "Block Write Op: " << debugString(*newStoreOp));
       op.erase();
@@ -221,10 +223,11 @@ public:
 
   LogicalResult devectorizeExtractMap(vector::ExtractMapOp op) {
     OpBuilder builder(op);
-    auto idVal = op.id();
+    Value idVal = op.ids().front();
+
     // It is needed to use i32 type for extract element index. Use cast in case
     // it comes from index
-    if (op.id().getType().isa<IndexType>()) {
+    if (idVal.getType().isa<IndexType>()) {
       auto indexCast = builder.create<IndexCastOp>(op.getLoc(), idVal,
                                                    builder.getIntegerType(32));
       idVal = indexCast.getResult();
@@ -240,10 +243,12 @@ public:
 
   LogicalResult devectorizeInsertMap(vector::InsertMapOp op) {
     OpBuilder builder(op);
-    auto idVal = op.id();
+    assert(op.ids().size() == 1);
+    Value idVal = op.ids().front();
+
     // It is needed to use i32 type for extract element index. Use cast in case
     // it comes from index
-    if (op.id().getType().dyn_cast<IndexType>()) {
+    if (idVal.getType().dyn_cast<IndexType>()) {
       auto indexCast = builder.create<IndexCastOp>(op.getLoc(), idVal,
                                                    builder.getIntegerType(32));
       idVal = indexCast.getResult();
@@ -260,12 +265,12 @@ public:
     auto newVectorSize = vecType.getShape()[0] / vectorSize;
     vecType = VectorType::get({newVectorSize}, vecType.getElementType());
 
-    transferWriteOp.memref().setType(MemRefType::get({1}, vecType));
+    transferWriteOp.source().setType(MemRefType::get({1}, vecType));
 
     // Read the vector first from temporary memory, and then do an
     // element insert.
     auto newReadOp = builder.create<LoadOp>(
-        op.getLoc(), transferWriteOp.memref(), transferWriteOp.indices());
+        op.getLoc(), transferWriteOp.source(), transferWriteOp.indices());
 
     auto newInsertOp = builder.create<vector::InsertElementOp>(
         op.getLoc(), op.vector(), newReadOp.getResult(), idVal);
@@ -280,13 +285,14 @@ public:
     // stdx.subgroup_broadcast, otherwise it is removed
     if (!isVectorTypeValid(op.getVectorType()))
       return failure();
-    auto extractElementOp =
-        dyn_cast_or_null<ExtractElementOp>(op.source().getDefiningOp());
-    if (extractElementOp) {
+    if (auto extractElementOp = dyn_cast_or_null<vector::ExtractElementOp>(
+            op.source().getDefiningOp())) {
+      Value vector = extractElementOp.vector();
       OpBuilder builder(op);
+      auto newIdx = builder.create<IndexCastOp>(
+          op.getLoc(), extractElementOp.position(), builder.getIndexType());
       auto newBroadcast = builder.create<dialect::stdx::SubgroupBroadcastOp>(
-          op.getLoc(), extractElementOp.aggregate().getType(),
-          extractElementOp.aggregate(), extractElementOp.indices()[0]);
+          op.getLoc(), vector.getType(), vector, newIdx);
       op.replaceAllUsesWith(newBroadcast.getResult());
       extractElementOp.replaceAllUsesWith(newBroadcast.getResult());
       extractElementOp.erase();
@@ -299,35 +305,37 @@ public:
   }
 
   LogicalResult devectorizeOperation(Operation *op) {
-    if (auto vecReadOp = dyn_cast<vector::TransferReadOp>(op)) {
-      return devectorizeTransferRead(vecReadOp);
-    } else if (auto vecWriteOp = dyn_cast<vector::TransferWriteOp>(op)) {
-      return devectorizeTransferWrite(vecWriteOp);
-    } else if (auto vecBroadcastOp = dyn_cast<vector::BroadcastOp>(op)) {
-      return devectorizeBroadcast(vecBroadcastOp);
-    } else if (auto extractMapOp = dyn_cast<vector::ExtractMapOp>(op)) {
-      return devectorizeExtractMap(extractMapOp);
-    } else if (auto insertMapOp = dyn_cast<vector::InsertMapOp>(op)) {
-      return devectorizeInsertMap(insertMapOp);
-    } else if (auto forOp = dyn_cast<scf::ForOp>(op)) {
-      for (auto &innerOp : llvm::make_early_inc_range(forOp.getOps())) {
-        if (failed(devectorizeOperation(&innerOp))) {
-          return failure();
-        }
-      }
-      return success();
-    } else if (auto allocOp = dyn_cast<AllocOp>(op)) {
-      return devectorizeAlloc(allocOp);
-    } else {
-      return devectorizeVectorOp(op);
-    }
+    return TypeSwitch<Operation *, LogicalResult>(op)
+        .Case<vector::TransferReadOp>([this](vector::TransferReadOp op) {
+          return devectorizeTransferRead(op);
+        })
+        .Case<vector::TransferWriteOp>([this](vector::TransferWriteOp op) {
+          return devectorizeTransferWrite(op);
+        })
+        .Case<vector::BroadcastOp>(
+            [this](vector::BroadcastOp op) { return devectorizeBroadcast(op); })
+        .Case<vector::ExtractMapOp>([this](vector::ExtractMapOp op) {
+          return devectorizeExtractMap(op);
+        })
+        .Case<vector::InsertMapOp>(
+            [this](vector::InsertMapOp op) { return devectorizeInsertMap(op); })
+        .Case<scf::ForOp>([this](scf::ForOp op) {
+          for (auto &innerOp : llvm::make_early_inc_range(op.getOps())) {
+            if (failed(devectorizeOperation(&innerOp))) {
+              return failure();
+            }
+          }
+          return success();
+        })
+        .Case<AllocOp>([this](AllocOp op) { return devectorizeAlloc(op); })
+        .Default([this](Operation *op) { return devectorizeVectorOp(op); });
   }
 
   LogicalResult devectorize() {
-    mlir::Block *body = loop.getBody();
+    Block *body = loop.getBody();
 
     // Rewrite the loop with new dimension added
-    mlir::OpBuilder builder(loop);
+    OpBuilder builder(loop);
 
     // Create proper lower, upper bounds and steps for the updated
     // scf.parallel op and create the actual op
@@ -346,7 +354,7 @@ public:
 
     auto newLoop = builder.create<scf::ParallelOp>(
         loop.getLoc(), newLowerBounds, newUpperBounds, newStepsBounds);
-    mlir::Block *newBody = newLoop.getBody();
+    Block *newBody = newLoop.getBody();
 
     // Splice across interior + erase originals
     auto &oldBodyOps = body->getOperations();
@@ -393,7 +401,7 @@ struct SubgroupBroadcastPass
       int64_t subgroupSize = getIntegerTag(op, subgroupSizeTag(), 1);
       if (hasUnitTag(op, gpuThreadTag())) {
         // Make sure that gpuBlock loop is present
-        auto gpuBlockOp = op.getParentOfType<scf::ParallelOp>();
+        auto gpuBlockOp = op->getParentOfType<scf::ParallelOp>();
         if (gpuBlockOp && hasUnitTag(gpuBlockOp, gpuBlockTag())) {
           if (useBlockOps.getValue()) {
             IVLOG(3, "SubgroupBroadcastPass: Block ops enabled")
@@ -412,11 +420,11 @@ struct SubgroupBroadcastPass
 
 } // namespace
 
-std::unique_ptr<mlir::Pass> createSubgroupBroadcastPass() {
+std::unique_ptr<Pass> createSubgroupBroadcastPass() {
   return std::make_unique<SubgroupBroadcastPass>();
 }
 
-std::unique_ptr<mlir::Pass> createSubgroupBroadcastPass(bool useBlockOps) {
+std::unique_ptr<Pass> createSubgroupBroadcastPass(bool useBlockOps) {
   return std::make_unique<SubgroupBroadcastPass>(useBlockOps);
 }
 

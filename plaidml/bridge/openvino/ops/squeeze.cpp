@@ -1,4 +1,4 @@
-// Copyright (C) 2020 Intel Corporation
+// Copyright (C) 2021 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 //
 
@@ -19,10 +19,8 @@ void registerSqueeze() {
   registerOp("squeeze", [](const Context& ctx) {
     IE_ASSERT(ctx.operands.size() == 2);
     auto I = ctx.operands.at(0);
-    auto axes = get_axis_set_from_constant_operand(1, ctx.layer);
-    std::vector<int> v_axes;
-    v_axes.assign(axes.begin(), axes.end());
-    return edsl::make_tuple(op::squeeze(I, v_axes));
+    auto axes = cast_constant_operand<int>(1, ctx.layer);
+    return edsl::make_tuple(op::squeeze(I, axes));
   });
 }
 

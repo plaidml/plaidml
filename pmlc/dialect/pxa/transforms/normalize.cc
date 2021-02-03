@@ -17,9 +17,6 @@
 
 using namespace mlir; // NOLINT
 
-// TODO: fix upstream
-void normalizeAffineParallel(AffineParallelOp op);
-
 namespace pmlc::dialect::pxa {
 
 /// Promotes the loop body of an affine.parallel to its containing block if no
@@ -99,7 +96,7 @@ struct AffineNormalizePass : public AffineNormalizeBase<AffineNormalizePass> {
   AffineNormalizePass() = default;
   explicit AffineNormalizePass(bool promote) { this->promote = promote; }
   void runOnFunction() override {
-    getFunction().walk(::normalizeAffineParallel);
+    getFunction().walk(normalizeAffineParallel);
     getFunction().walk(elideSingleIterationIndexes);
     if (promote.getValue()) {
       getFunction().walk(promoteIfEmptyIVs);

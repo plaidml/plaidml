@@ -10,7 +10,8 @@
 // RUN:     -canonicalize -convert-scf-to-std -x86-convert-std-to-llvm \
 // RUN:     -x86-openmp-workaround %s | \
 // RUN:   pmlc-jit -e xsmm | FileCheck %s
-// RUN: pmlc-opt -convert-linalg-to-loops --pass-pipeline='x86-affine-stencil-xsmm{batched=true}' \
+// RUN: pmlc-opt -convert-linalg-to-loops \
+// RUN:     --pass-pipeline='func(x86-affine-stencil-xsmm{batched=true})' \
 // RUN:     -x86-convert-pxa-to-affine -lower-affine \
 // RUN:     -canonicalize -convert-scf-to-std -x86-convert-std-to-llvm \
 // RUN:     -x86-openmp-workaround %s | \
@@ -20,7 +21,7 @@
 !K_memref = type memref<1x1x7x11xf32>
 !O_memref = type memref<1x6x5x11xf32>
 
-func @print_memref_f32(memref<*xf32>)
+func private @print_memref_f32(memref<*xf32>)
 
 func @baseline() {
   %dot = constant @dot : (memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()

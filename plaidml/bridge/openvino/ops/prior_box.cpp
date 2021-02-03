@@ -1,4 +1,4 @@
-// Copyright (C) 2020 Intel Corporation
+// Copyright (C) 2021 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 //
 
@@ -401,6 +401,12 @@ void registerPriorBox() {
     IE_ASSERT(ctx.operands.size() == 2);
     const ngraph::op::PriorBoxAttrs& attrs = layer->get_attrs();
     IE_ASSERT(attrs.variance.size() == 1 || attrs.variance.size() == 4 || attrs.variance.empty());
+    // The size of fixed_ratio need to be one to create the right number of prior boxes.
+    // TODO: Once the process of density in number_of_priors() is changed, remove this.
+    if (attrs.fixed_size.size() > 0 && attrs.fixed_ratio.size() != 1) {
+      THROW_IE_EXCEPTION << "Due to number_of_priors() implementation in PriorBox, the size of fixed_ratio must be one "
+                            "when it is used";
+    }
     PriorBoxImpl pbi(ctx, attrs);
     int fixed_size_count = attrs.fixed_size.size();
     if (fixed_size_count) {

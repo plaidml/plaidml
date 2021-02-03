@@ -1,4 +1,4 @@
-// Copyright (C) 2020 Intel Corporation
+// Copyright (C) 2021 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 //
 
@@ -12,23 +12,6 @@ using namespace plaidml;          // NOLINT[build/namespaces]
 using namespace InferenceEngine;  // NOLINT[build/namespaces]
 
 namespace {
-
-template <typename T>
-std::vector<T> cast_constant_operand(size_t operand_idx, ngraph::Node* layer) {
-  auto* ngraph_const = ngraph::as_type<ngraph::op::Constant>(layer->get_input_node_ptr(operand_idx));
-  if (ngraph_const) {
-    return ngraph_const->cast_vector<T>();
-  } else {
-    THROW_IE_EXCEPTION
-        << "Dynamic slicing not currently supported by PlaidML plugin; all of indices, offsets and default index"
-           "must be Constants.";
-  }
-}
-
-}  // namespace
-
-namespace PlaidMLPlugin {
-
 edsl::InterpolationMode get_plaidml_interpolation_mode(ngraph::op::v4::Interpolate::InterpolateMode mode) {
   switch (mode) {
     case ngraph::op::v4::Interpolate::InterpolateMode::nearest:
@@ -61,28 +44,30 @@ edsl::NearestMode get_plaidml_nearest_mode(ngraph::op::v4::Interpolate::NearestM
   }
 }
 
-edsl::Tensor get_output_coordinate_transformed_indices(
-    edsl::TensorDim I_dim, int64_t O_dim_size,
-    ngraph::op::v4::Interpolate::CoordinateTransformMode coordinate_transformation_mode) {
-  edsl::TensorDim O_dim(O_dim_size);
-  auto IX = edsl::cast(edsl::index({O_dim}, 0), DType::FLOAT32);
+edsl::Tensor get_coordinate_transformed_indices(
+    int64_t I_dim, float scale, ngraph::op::v4::Interpolate::CoordinateTransformMode coordinate_transformation_mode) {
+  int64_t O_dim = floor(I_dim * scale);
+  auto IX = edsl::cast(edsl::index({edsl::TensorDim(O_dim)}, 0), DType::FLOAT32);
+  if (scale == 1.0 || (O_dim == I_dim)) {
+    return IX;
+  }
   switch (coordinate_transformation_mode) {
     case ngraph::op::v4::Interpolate::CoordinateTransformMode::tf_half_pixel_for_nn:
-      IX = (IX + 0.5) * I_dim / O_dim;
+      IX = (IX + 0.5) / scale;
       break;
     case ngraph::op::v4::Interpolate::CoordinateTransformMode::pytorch_half_pixel:
-      if (O_dim_size > 1) {
-        IX = (IX + 0.5) * I_dim / O_dim - 0.5;
+      if (O_dim > 1) {
+        IX = (IX + 0.5) / scale - 0.5;
       }
       break;
     case ngraph::op::v4::Interpolate::CoordinateTransformMode::half_pixel:
-      IX = (IX + 0.5) * I_dim / O_dim - 0.5;
+      IX = (IX + 0.5) / scale - 0.5;
       break;
     case ngraph::op::v4::Interpolate::CoordinateTransformMode::asymmetric:
-      IX = IX * I_dim / O_dim;
+      IX = IX / scale;
       break;
     case ngraph::op::v4::Interpolate::CoordinateTransformMode::align_corners:
-      if (O_dim_size > 1) {
+      if (O_dim > 1) {
         IX = IX * (I_dim - 1) / (O_dim - 1);
       }
       break;
@@ -92,35 +77,55 @@ edsl::Tensor get_output_coordinate_transformed_indices(
   }
   return IX;
 }
+}  // namespace
 
+namespace PlaidMLPlugin {
 void registerInterpolate() {
   registerOp("Interpolate", [](const Context& ctx) {
     auto* layer = ngraph::as_type<ngraph::opset4::Interpolate>(ctx.layer);
-    auto result_shape = cast_constant_operand<int64_t>(1, layer);
-    auto scales = cast_constant_operand<float>(2, layer);
-    auto mode = layer->get_attrs().mode;
-    auto nearest_mode = layer->get_attrs().nearest_mode;
-    auto cube_coeff = layer->get_attrs().cube_coeff;
-    auto coordinate_transformation_mode = layer->get_attrs().coordinate_transformation_mode;
 
-    bool is_downsample = false;
-    for (auto scale : scales) {
-      is_downsample = is_downsample || (scale < 1.0);
-    }
-
+    // Inputs
     auto I = ctx.operands.at(0);
+    auto result_shape = cast_constant_operand<int64_t>(1, layer);
+    auto default_scales = cast_constant_operand<float>(2, layer);
+    auto axes = cast_constant_operand<int64_t>(3, layer);
+
+    // Attributes
+    auto mode = layer->get_attrs().mode;
+    auto shape_calculation_mode = layer->get_attrs().shape_calculation_mode;
+    auto coordinate_transformation_mode = layer->get_attrs().coordinate_transformation_mode;
+    auto nearest_mode = layer->get_attrs().nearest_mode;
     auto pads_begin = layer->get_attrs().pads_begin;
     auto pads_end = layer->get_attrs().pads_end;
+    auto cube_coeff = layer->get_attrs().cube_coeff;
+
+    // Padding
     I = op::explicit_padding(I, {pads_begin.begin(), pads_begin.end()}, {pads_end.begin(), pads_end.end()})
             .padval(edsl::Constant(0.0));
 
-    std::vector<edsl::TensorDim> I_dims(I.rank());
-    I.bind_dims(I_dims);
+    // Calculate scales
+    auto input_shape = I.compute_shape().sizes();  // input_shape is the shape of data after padding
+    std::vector<float> scales(input_shape.size(), 1.0);
+    for (auto axis : axes) {
+      switch (shape_calculation_mode) {
+        case ngraph::op::v4::Interpolate::ShapeCalcMode::sizes:
+          scales[axis] = 1.0 * result_shape[axis] / input_shape[axis];
+          break;
+        case ngraph::op::v4::Interpolate::ShapeCalcMode::scales:
+          scales[axis] = default_scales[axis];
+          break;
+        default:
+          THROW_IE_EXCEPTION << "Unsupported Interpolate ShapeCalcMode";
+          break;
+      }
+    }
 
-    for (int i = 0; i < result_shape.size(); i++) {
-      auto IX = get_output_coordinate_transformed_indices(I_dims[i], result_shape[i], coordinate_transformation_mode);
+    // Get output by iteratively gathering axes
+    for (auto axis : axes) {
+      auto IX = get_coordinate_transformed_indices(input_shape[axis], scales[axis], coordinate_transformation_mode);
+      bool is_downsample = scales[axis] < 1 ? true : false;
       I = edsl::gather(I, IX)
-              .axis(i)
+              .axis(axis)
               .interpolationMode(get_plaidml_interpolation_mode(mode))
               .nearestMode(get_plaidml_nearest_mode(nearest_mode, is_downsample))
               .cubeCoeff(cube_coeff);

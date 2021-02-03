@@ -1,3 +1,4 @@
+message("Fetching half")
 FetchContent_Declare(
   half
   URL      https://github.com/plaidml/depot/raw/master/half-1.11.0.zip

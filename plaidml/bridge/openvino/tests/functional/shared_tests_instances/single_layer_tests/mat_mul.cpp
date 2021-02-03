@@ -1,4 +1,4 @@
-// Copyright (C) 2020 Intel Corporation
+// Copyright (C) 2021 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 //
 
@@ -6,38 +6,34 @@
 
 #include "single_layer_tests/mat_mul.hpp"
 
-using LayerTestsDefinitions::MatMulTest;
+using namespace LayerTestsDefinitions;
 
 namespace {
+const std::vector<InferenceEngine::Precision> inputPrecisions = {
+    InferenceEngine::Precision::FP32,
+};
 
-// TODO: Something very weird here
+const std::vector<ShapeRelatedParams> shapeRelatedParams = {
+    {{{1, 4, 5, 6}, false}, {{1, 4, 6, 4}, false}},
+    {{{1, 3, 4, 8}, false}, {{5, 1, 8, 2}, false}},
+};
 
-// const std::vector<InferenceEngine::Precision> inputPrecisions = {
-//         InferenceEngine::Precision::FP32
-// };
+std::vector<ngraph::helpers::InputLayerType> secondaryInputTypes = {
+    ngraph::helpers::InputLayerType::CONSTANT,
+    ngraph::helpers::InputLayerType::PARAMETER,
+};
 
-// const std::vector<std::vector<size_t>> shapesA = {
-//         {1, 4, 5, 6}
-// };
+std::map<std::string, std::string> additional_config = {};
 
-// const std::vector<std::vector<size_t>> shapesB = {
-//         {1, 4, 6, 4}
-// };
-
-// std::vector<ngraph::helpers::InputLayerType> secondaryInputTypes = {
-//         ngraph::helpers::InputLayerType::CONSTANT,
-//         ngraph::helpers::InputLayerType::PARAMETER,
-// };
-
-// INSTANTIATE_TEST_CASE_P(MatMul, MatMulTest,
-//         ::testing::Combine(
-//                 ::testing::ValuesIn(inputPrecisions),
-//                 ::testing::ValuesIn(shapesA),
-//                 ::testing::ValuesIn(shapesB),
-//                 ::testing::Values(false),
-//                 ::testing::Values(false),
-//                 ::testing::ValuesIn(secondaryInputTypes),
-//                 ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),
-//         MatMulTest::getTestCaseName);
-
+INSTANTIATE_TEST_CASE_P(smoke, MatMulTest,
+                        ::testing::Combine(                                              //
+                            ::testing::ValuesIn(shapeRelatedParams),                     //
+                            ::testing::ValuesIn(inputPrecisions),                        //
+                            ::testing::Values(InferenceEngine::Precision::UNSPECIFIED),  //
+                            ::testing::Values(InferenceEngine::Precision::UNSPECIFIED),  //
+                            ::testing::Values(InferenceEngine::Layout::ANY),             //
+                            ::testing::ValuesIn(secondaryInputTypes),                    //
+                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML),          //
+                            ::testing::Values(additional_config)),                       //
+                        MatMulTest::getTestCaseName);
 }  // namespace

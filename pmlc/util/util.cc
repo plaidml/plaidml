@@ -3,7 +3,7 @@
 #include "pmlc/util/util.h"
 
 #include "mlir/IR/Builders.h"
-#include "mlir/IR/Function.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/Support/Process.h"
 

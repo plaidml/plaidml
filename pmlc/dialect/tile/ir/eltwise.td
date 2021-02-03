@@ -17,25 +17,23 @@ def ConstantOp :
   let arguments = (ins AnyAttr:$value);
   let results = (outs EltwiseAny:$result);
 
-  let builders = [OpBuilder<
-    "mlir::OpBuilder &builder, mlir::OperationState& result, mlir::Type type, double value", [{
-      result.addAttribute("value", builder.getF64FloatAttr(value));
-      result.addTypes(RankedTensorType::get({}, type));
-    }]
-  >, OpBuilder<
-    "mlir::OpBuilder &builder, mlir::OperationState& result, mlir::Type type, int64_t value", [{
-      result.addAttribute("value", builder.getI64IntegerAttr(value));
-      result.addTypes(RankedTensorType::get({}, type));
-    }]
-  >, OpBuilder<
-    "mlir::OpBuilder &builder, mlir::OperationState& result, mlir::Type type, uint64_t value", [{
-      result.addAttribute("value", builder.getI64IntegerAttr(value));
-      result.addTypes(RankedTensorType::get({}, type));
-    }]
-  >];
+  let builders = [
+    OpBuilderDAG<(ins "mlir::Type":$type, "double":$value), [{
+      $_state.addAttribute("value", $_builder.getF64FloatAttr(value));
+      $_state.addTypes(RankedTensorType::get({}, type));
+    }]>,
+    OpBuilderDAG<(ins "mlir::Type":$type, "int64_t":$value), [{
+      $_state.addAttribute("value", $_builder.getI64IntegerAttr(value));
+      $_state.addTypes(RankedTensorType::get({}, type));
+    }]>,
+    OpBuilderDAG<(ins "mlir::Type":$type, "uint64_t":$value), [{
+      $_state.addAttribute("value", $_builder.getI64IntegerAttr(value));
+      $_state.addTypes(RankedTensorType::get({}, type));
+    }]>,
+  ];
 
   let extraClassDeclaration = [{
-    mlir::Attribute getValue() { return getAttr("value"); }
+    mlir::Attribute getValue() { return (*this)->getAttr("value"); }
   }];
 
   let assemblyFormat = "`(` $value `)` attr-dict `:` type($result)";

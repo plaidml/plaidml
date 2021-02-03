@@ -30,7 +30,8 @@ void SplitMainPass::runOnOperation() {
   }
 
   // Make function types for init, body, fini
-  auto argpackType = stdx::ArgpackType::get(&getContext());
+  MLIRContext *context = &getContext();
+  auto argpackType = stdx::ArgpackType::get(context);
   llvm::SmallVector<Type, 8> initArgs;
   llvm::SmallVector<Type, 8> bodyArgs;
   bodyArgs.push_back(argpackType);
@@ -41,10 +42,10 @@ void SplitMainPass::runOnOperation() {
       bodyArgs.push_back(main.getArgument(i).getType());
     }
   }
-  auto initFuncType = FunctionType::get(initArgs, {argpackType}, &getContext());
+  auto initFuncType = FunctionType::get(context, initArgs, {argpackType});
   auto bodyFuncType =
-      FunctionType::get(bodyArgs, main.getType().getResults(), &getContext());
-  auto finiFuncType = FunctionType::get({argpackType}, {}, &getContext());
+      FunctionType::get(context, bodyArgs, main.getType().getResults());
+  auto finiFuncType = FunctionType::get(context, {argpackType}, {});
 
   // Construct actual ops
   OpBuilder builder(main);

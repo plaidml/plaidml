@@ -45,7 +45,7 @@ Value getPrevIndirectDef(OpResult def) {
 Value getNextIndirectUse(mlir::OpOperand &use) {
   return TypeSwitch<Operation *, Value>(use.getOwner())
       .Case<AffineYieldOp>([&](auto op) {
-        return op.getParentOp()->getResult(use.getOperandNumber());
+        return op->getParentOp()->getResult(use.getOperandNumber());
       })
       .Case<layer::BoxOp>([&](auto op) {
         return op.getResult(use.getOperandNumber()); //

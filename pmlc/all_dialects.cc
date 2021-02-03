@@ -8,8 +8,9 @@
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/OpenMP/OpenMPDialect.h"
 #include "mlir/Dialect/SCF/SCF.h"
-#include "mlir/Dialect/SPIRV/SPIRVDialect.h"
+#include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/IR/Dialect.h"
 
@@ -33,6 +34,7 @@ void registerAllDialects(DialectRegistry &registry) {
                   omp::OpenMPDialect,                 //
                   spirv::SPIRVDialect,                //
                   StandardOpsDialect,                 //
+                  tensor::TensorDialect,              //
                   vector::VectorDialect,              //
                   pmlc::dialect::abi::ABIDialect,     //
                   pmlc::dialect::comp::COMPDialect,   //
@@ -41,12 +43,4 @@ void registerAllDialects(DialectRegistry &registry) {
                   pmlc::dialect::stdx::StdXDialect,   //
                   pmlc::dialect::tile::TileDialect,   //
                   pmlc::dialect::xsmm::XSMMDialect>();
-}
-
-// This function should be called before creating any MLIRContext if one expect
-// all the possible dialects to be made available to the context automatically.
-void registerAllDialects() {
-  static bool initOnce =
-      ([]() { registerAllDialects(getGlobalDialectRegistry()); }(), true);
-  (void)initOnce;
 }

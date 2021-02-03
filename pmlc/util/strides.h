@@ -6,7 +6,7 @@
 #include <ostream>
 
 #include "mlir/IR/AffineMap.h"
-#include "mlir/IR/StandardTypes.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/Support/raw_ostream.h"
 

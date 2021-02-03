@@ -14,13 +14,13 @@
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
-#include "mlir/Conversion/StandardToSPIRV/ConvertStandardToSPIRVPass.h"
+#include "mlir/Conversion/StandardToSPIRV/StandardToSPIRVPass.h"
 #include "mlir/Dialect/Affine/Passes.h"
 #include "mlir/Dialect/GPU/Passes.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
-#include "mlir/Dialect/SPIRV/Passes.h"
-#include "mlir/Dialect/SPIRV/SPIRVDialect.h"
-#include "mlir/Dialect/SPIRV/SPIRVOps.h"
+#include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
+#include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
+#include "mlir/Dialect/SPIRV/Transforms/Passes.h"
 #include "mlir/Dialect/StandardOps/Transforms/Passes.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
@@ -65,10 +65,9 @@ struct OclPipelineOptions : public PassPipelineOptions<OclPipelineOptions> {
 void pipelineBuilder(OpPassManager &pm,
                      const OclPipelineOptions &oclPipelineOptions) {
   // Bound + pad initial tile code
-  pm.addPass(layer::createInlineLayersPass());
-  pm.addPass(tile::createComputeBoundsPass());
-  pm.addPass(tile::createPadRangesPass());
-  pm.addPass(tile::createPadConstraintsPass());
+  pm.addNestedPass<FuncOp>(layer::createInlineLayersPass());
+  pm.addNestedPass<FuncOp>(tile::createComputeBoundsPass());
+  pm.addNestedPass<FuncOp>(tile::createPadConstraintsPass());
   pm.addPass(tile::createSplitMainPass());
   pm.addPass(transforms::createHoistingPass());
   pm.addPass(createCanonicalizerPass());
@@ -76,65 +75,67 @@ void pipelineBuilder(OpPassManager &pm,
 
   // Lower to PXA
   pm.addPass(conversion::tile_to_pxa::createLowerTileToPXAPass());
-  pm.addPass(pxa::createAffineNormalizePass());
+  pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
   // Do subgroup or accumulation
-  pm.addPass(pxa::createSubgroupsPass());
-  pm.addPass(pxa::createAffineNormalizePass());
+  pm.addNestedPass<FuncOp>(pxa::createSubgroupsPass());
+  pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
   // Do tiled fusion
-  pm.addPass(pxa::createFusionPass(/*memoryActivityThreshold=*/0,
-                                   /*exactlyMatch=*/false,
-                                   /*tiledFusion=*/true,
-                                   /*loopDepth=*/3));
-  pm.addPass(pxa::createAffineNormalizePass());
+  pm.addNestedPass<FuncOp>(pxa::createFusionPass(/*memoryActivityThreshold=*/0,
+                                                 /*exactlyMatch=*/false,
+                                                 /*tiledFusion=*/true,
+                                                 /*loopDepth=*/3));
+  pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
-  pm.addPass(pxa::createSimplifyArithmeticPass());
+  pm.addNestedPass<FuncOp>(pxa::createSimplifyArithmeticPass());
   pm.addPass(createCanonicalizerPass());
-  pm.addPass(pxa::createMemRefDataFlowOptPass(/*onlyParallelNested=*/true));
+  pm.addNestedPass<FuncOp>(
+      pxa::createMemRefDataFlowOptPass(/*onlyParallelNested=*/true));
   pm.addPass(createCanonicalizerPass());
   // TODO: parametrize localize pass depending on memory size and HW caps
-  pm.addPass(pxa::createLocalizePass());
-  pm.addPass(pxa::createResizeTmpsPass(/*onlyParallelNested=*/true));
-  pm.addPass(pxa::createAffineNormalizePass());
+  pm.addNestedPass<FuncOp>(pxa::createLocalizePass());
+  pm.addNestedPass<FuncOp>(
+      pxa::createResizeTmpsPass(/*onlyParallelNested=*/true));
+  pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
   // Assign GPU blocks + threads to outermost loop
-  pm.addPass(pxa::createGPUThreadPass(/*maxThreads=*/64));
-  pm.addPass(pxa::createAffineNormalizePass());
+  pm.addNestedPass<FuncOp>(pxa::createGPUThreadPass(/*maxThreads=*/64));
+  pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
   // Data layout optimization.
-  pm.addPass(createIntelGenOclReorderLayoutsPass(/*maxThreads=*/64,
-                                                 /*allowReorder=*/false));
-  pm.addPass(pxa::createSimplifyWithConstraintsPass());
-  pm.addPass(pxa::createAffineNormalizePass());
+  pm.addNestedPass<FuncOp>(
+      createIntelGenOclReorderLayoutsPass(/*maxThreads=*/64,
+                                          /*allowReorder=*/true));
+  pm.addNestedPass<FuncOp>(pxa::createSimplifyWithConstraintsPass());
+  pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
-  // TODO: uncomment this pass after llvm upstream update with dynamic vec ops
-  /*pm.addPass(pxa::createVectorizeMemPass());
-  pm.addPass(pmlc::dialect::pxa::createAffineNormalizePass());
+  pm.addNestedPass<FuncOp>(pxa::createVectorizeMemPass());
+  pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
-  pm.addPass(createCSEPass());*/
+  pm.addPass(createCSEPass());
 
   // Lower out of PXA memory semantics
   pm.addPass(pmlc::target::intel_gen::createLowerPXAToAffinePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
-  pm.addPass(createAffineLoopInvariantCodeMotionPass());
+  pm.addNestedPass<FuncOp>(createAffineLoopInvariantCodeMotionPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
   // Unroll affine.for loops.
-  pm.addPass(pmlc::dialect::affinex::createAffinexLoopUnroll(
+  pm.addNestedPass<FuncOp>(pmlc::dialect::affinex::createAffinexLoopUnroll(
       /*operationLimit =*/2048));
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
@@ -142,34 +143,39 @@ void pipelineBuilder(OpPassManager &pm,
   // Block level MemRef dataflow optimization
   // WARNING: Assumes no aliasing
   // (try disabling this pass in case of correctness errors)
-  pm.addPass(pmlc::dialect::affinex::createAffinexMemRefDataFlowOpt());
+  pm.addNestedPass<FuncOp>(
+      pmlc::dialect::affinex::createAffinexMemRefDataFlowOpt());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
-  pm.addPass(pmlc::dialect::affinex::createAffinexDeadMemRefElimination());
+  pm.addNestedPass<FuncOp>(
+      pmlc::dialect::affinex::createAffinexDeadMemRefElimination());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
   // Pack dims
-  pm.addPass(pmlc::target::intel_gen::createAffineIndexPackPass());
+  pm.addNestedPass<FuncOp>(
+      pmlc::target::intel_gen::createAffineIndexPackPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
   // Do a custom version of lower-affine which also set GPU mappings
-  pm.addPass(pmlc::target::intel_gen::createIntelGenLowerAffinePass());
+  pm.addNestedPass<FuncOp>(
+      pmlc::target::intel_gen::createIntelGenLowerAffinePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
   // Fix booleans
-  pm.addPass(stdx::createI1StorageToI32Pass());
+  pm.addNestedPass<FuncOp>(stdx::createI1StorageToI32Pass());
 
   // Devectorize
-  pm.addPass(pmlc::target::intel_gen::createSubgroupBroadcastPass(
+  pm.addNestedPass<FuncOp>(pmlc::target::intel_gen::createSubgroupBroadcastPass(
       /*useBlockOps=*/true));
   pm.addPass(createCSEPass());
 
   // Lower mapped scf.parallel's to GPU
-  pm.addPass(pmlc::target::intel_gen::createParallelLoopToGpuPass());
+  pm.addNestedPass<FuncOp>(
+      pmlc::target::intel_gen::createParallelLoopToGpuPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
@@ -185,7 +191,7 @@ void pipelineBuilder(OpPassManager &pm,
   // pm.addPass(comp::createMinimizeBufferTransfersPass());
   // pm.addPass(comp::createExecEnvCoalescingPass());
   // pm.addPass(comp::createMinimizeAllocationsPass());
-  pm.addPass(comp::createRemoveRedundantRWPass());
+  pm.addNestedPass<FuncOp>(comp::createRemoveRedundantRWPass());
   // pm.addPass(comp::createRecalculateEventDepsPass(/*safeDealloc=*/false));
 
   // GPU to SPIR-V.
@@ -201,14 +207,16 @@ void pipelineBuilder(OpPassManager &pm,
       nonUniformBroadcast));
 
   // SPIR-V passes for lowering attributes.
-  pm.addPass(createSetSubgroupSizePass());
-  pm.addPass(createSetAccessQualifiersPass());
-  pm.addPass(createLegalizeSpirvPass());
-  pm.addPass(spirv::createLowerABIAttributesPass());
-  pm.addPass(spirv::createUpdateVersionCapabilityExtensionPass());
+  pm.addNestedPass<mlir::spirv::ModuleOp>(createSetSubgroupSizePass());
+  pm.addNestedPass<mlir::spirv::ModuleOp>(createSetAccessQualifiersPass());
+  pm.addNestedPass<mlir::spirv::ModuleOp>(createLegalizeSpirvPass());
+  pm.addNestedPass<mlir::spirv::ModuleOp>(
+      spirv::createLowerABIAttributesPass());
+  pm.addNestedPass<mlir::spirv::ModuleOp>(
+      spirv::createUpdateVersionCapabilityExtensionPass());
 
   // Unbox wrapped argsort and lower remaining affine loops.
-  pm.addPass(layer::createInlineLayersPass());
+  pm.addNestedPass<FuncOp>(layer::createInlineLayersPass());
   pm.addPass(pmlc::target::intel_gen::createLowerPXAToAffinePass());
   pm.addPass(createLowerAffinePass());
   pm.addPass(createLowerToCFGPass());
