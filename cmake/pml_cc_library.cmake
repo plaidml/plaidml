@@ -201,4 +201,16 @@ function(pml_cc_library)
     # For example, foo/bar/ library 'bar' would end up as 'foo::bar'.
     add_library(${_PACKAGE_NS} ALIAS ${_NAME})
   endif()
+
+  # install(TARGETS ${_NAME}
+  #   ARCHIVE
+  #   RENAME ${_RULE_NAME}
+  #   COMPONENT ${_RULE_NAME} 
+  #   DESTINATION lib)
+
+  # foreach(HEADER ${_RULE_HDRS})
+  #   install(FILES ${HEADER}
+  #           DESTINATION include
+  #           COMPONENT ${_RULE_NAME})
+  # endforeach()
 endfunction()

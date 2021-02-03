@@ -117,6 +117,16 @@ else()
   )
 endif()
 
+set(CPACK_DEB_COMPONENT_INSTALL ON)
+set(CPACK_PACKAGING_INSTALL_PREFIX "/usr/local/lib/plaidml")
+set(CPACK_GENERATOR "DEB")
+set(CPACK_PACKAGE_NAME "PlaidML")
+set(CPACK_PACKAGE_VENDOR "Intel Corp")
+set(CPACK_PACKAGE_CONTACT "Intel")
+set(CPACK_PACKAGE_VERSION ${PLAIDML_VERSION})
+set(CPACK_COMPONENTS_ALL DEVKIT)
+set(CMAKE_INSTALL_RPATH  "${CPACK_PACKAGING_INSTALL_PREFIX}/lib")
+
 add_subdirectory(plaidml)
 add_subdirectory(pmlc)
 add_subdirectory(docs)
@@ -131,4 +141,65 @@ configure_lit_site_cfg(
   ${CMAKE_CURRENT_SOURCE_DIR}/lit.cfg.py
 )
 
-ie_cpack(BENCHMARK_APP)
+# ie_cpack(BENCHMARK_APP)
+
+
+
+
+
+# set(BIN plaidml_edsl_tests_cc_test)
+# install(
+#   TARGETS ${BIN} 
+#   DESTINATION bin 
+#   COMPONENT DEVKIT
+# )
+
+# include(GetPrerequisites)
+# set(BINARY_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/bin/${BIN}")
+# get_prerequisites(${BINARY_LOCATION} DEPENDENCIES 0 0 "" "")
+
+# foreach(DEPENDENCY_FILE ${DEPENDENCIES})
+#   install(
+#     FILES ${DEPENDENCY} 
+#     DESTINATION lib 
+#     COMPONENT DEVKIT
+#   )
+# endforeach()
+
+install(
+    TARGETS plaidml_edsl_tests_cc_test
+    DESTINATION bin
+    COMPONENT DEVKIT
+)
+
+install(
+    PROGRAMS 
+      ${LLVM_BINARY_DIR}/lib/libomp.so
+      ${LLVM_BINARY_DIR}/lib/libmlir_runner_utils.so.12git
+      /lib/x86_64-linux-gnu/libpthread.so.0     
+      /lib/x86_64-linux-gnu/libpthread-2.27.so  
+      /lib/x86_64-linux-gnu/librt.so.1  
+      /lib/x86_64-linux-gnu/librt-2.27.so
+      /lib/x86_64-linux-gnu/libdl.so.2
+      /lib/x86_64-linux-gnu/libdl-2.27.so
+      /lib/x86_64-linux-gnu/libz.so.1
+      /lib/x86_64-linux-gnu/libz.so.1.2.11
+      /lib/x86_64-linux-gnu/libtinfo.so.5
+      /lib/x86_64-linux-gnu/libtinfo.so.5.9
+      ${CMAKE_SOURCE_DIR}/.cenv/lib/libstdc++.so.6
+      ${CMAKE_SOURCE_DIR}/.cenv/lib/libstdc++.so.6.0.28
+      ${CMAKE_SOURCE_DIR}/.cenv/lib/libgcc_s.so.1
+      /lib/x86_64-linux-gnu/libm.so.6
+      /lib/x86_64-linux-gnu/libm-2.27.so
+      /lib/x86_64-linux-gnu/ld-linux-x86-64.so.2
+      /lib/x86_64-linux-gnu/ld-2.27.so
+      /lib/x86_64-linux-gnu/libc.so.6
+      /lib/x86_64-linux-gnu/libc-2.27.so
+
+    DESTINATION lib
+    COMPONENT DEVKIT
+)
+
+set_target_properties(plaidml_edsl_tests_cc_test PROPERTIES INSTALL_RPATH ${CMAKE_INSTALL_RPATH})
+
+include(CPack)
