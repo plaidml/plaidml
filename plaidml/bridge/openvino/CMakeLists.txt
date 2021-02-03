@@ -105,12 +105,13 @@ install(
     COMPONENT BENCHMARK_APP
 )
 
+file(
+    GLOB _OPENCV_IMAGE_LIBS
+    ${IE_MAIN_SOURCE_DIR}/temp/opencv_4.5.*_ubuntu*/opencv/lib/libopencv_core.so*
+    ${IE_MAIN_SOURCE_DIR}/temp/opencv_4.5.*_ubuntu*/opencv/lib/libopencv_img*.so*
+)
 install(
-    DIRECTORY ${IE_MAIN_SOURCE_DIR}/temp/opencv_4.5.0_ubuntu20/opencv/lib/
+    PROGRAMS ${_OPENCV_IMAGE_LIBS}
     DESTINATION bin/lib
     COMPONENT BENCHMARK_APP
-    USE_SOURCE_PERMISSIONS
-    FILES_MATCHING
-    PATTERN "libopencv_core.so*"
-    PATTERN "libopencv_img*.so*"
 )
