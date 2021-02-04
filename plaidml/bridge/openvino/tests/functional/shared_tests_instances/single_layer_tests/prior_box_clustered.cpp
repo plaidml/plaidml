@@ -37,7 +37,10 @@ const std::vector<float> step_heights = {
     1.5f,
 };
 
-const std::vector<float> offsets = {0.5f};
+const std::vector<float> offsets = {
+    0.0f,
+    0.5f,
+};
 
 const std::vector<std::vector<float>> variances = {
     {0.1f, 0.1f, 0.2f, 0.2f},
@@ -70,7 +73,7 @@ INSTANTIATE_TEST_CASE_P(PriorBoxClustered_Basic, PriorBoxClusteredLayerTest,
                         ::testing::Combine(                                              //
                             layerSpeficParams,                                           //
                             ::testing::ValuesIn(netPrecisions),                          //
-                            ::testing::Values(InferenceEngine::Precision::UNSPECIFIED),  //
+                            ::testing::Values(InferenceEngine::Precision::I64),          //
                             ::testing::Values(InferenceEngine::Precision::UNSPECIFIED),  //
                             ::testing::Values(InferenceEngine::Layout::ANY),             //
                             ::testing::Values(InferenceEngine::Layout::ANY),             //
@@ -94,7 +97,7 @@ INSTANTIATE_TEST_CASE_P(smoke, PriorBoxClusteredLayerTest,
                         ::testing::Combine(                                              //
                             smokeParams,                                                 //
                             ::testing::Values(InferenceEngine::Precision::FP32),         //
-                            ::testing::Values(InferenceEngine::Precision::UNSPECIFIED),  //
+                            ::testing::Values(InferenceEngine::Precision::I64),          //
                             ::testing::Values(InferenceEngine::Precision::UNSPECIFIED),  //
                             ::testing::Values(InferenceEngine::Layout::ANY),             //
                             ::testing::Values(InferenceEngine::Layout::ANY),             //

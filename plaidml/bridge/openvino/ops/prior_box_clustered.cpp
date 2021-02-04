@@ -98,7 +98,7 @@ void registerPriorBoxClustered() {
     edsl::Tensor C_out = CW_normalized * CW_mask + CH_normalized * CH_mask + BW * BW_mask + BH * BH_mask;
     if (attrs.clip) C_out = op::clip(C_out, edsl::Tensor(0.0f), edsl::Tensor(1.0f));
 
-    // Use varaince as another channel
+    // Use variance as another channel
     int channel_size = layer_height * layer_width * num_priors * 4;
     edsl::Tensor Varian;
     if (variances.size() == 1) {
