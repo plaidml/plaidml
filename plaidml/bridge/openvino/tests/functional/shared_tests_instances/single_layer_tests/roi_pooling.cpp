@@ -32,7 +32,7 @@ const std::vector<std::vector<size_t>> coordShapes = {
 };
 
 const std::vector<InferenceEngine::Precision> netPRCs = {
-    InferenceEngine::Precision::FP16,
+    //    InferenceEngine::Precision::FP16,
     InferenceEngine::Precision::FP32,
 };
 
