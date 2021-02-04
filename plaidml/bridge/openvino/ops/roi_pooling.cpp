@@ -28,7 +28,6 @@ edsl::Tensor crop_max_pooling(edsl::Tensor I, const std::vector<float>& coord, i
   float bin_size_h = roi_height / pooled_h;
   float bin_size_w = roi_width / pooled_w;
 
-  // edsl::Tensor pooled_tensor;
   auto shapes = I.compute_shape().sizes();
   std::vector<edsl::Tensor> pooled_tensor;
   for (auto i = 0; i < pooled_h; i++) {
