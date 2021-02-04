@@ -99,6 +99,7 @@ install(
         ${OUTPUT_ROOT}/bin/libplaidml.so.1
         ${OpenVINO_MAIN_SOURCE_DIR}/${BIN_FOLDER}/${CMAKE_BUILD_TYPE}/lib/libformat_reader.so
         ${IE_MAIN_SOURCE_DIR}/temp/tbb/lib/libtbb.so.2
+        ${IE_MAIN_SOURCE_DIR}/thirdparty/clDNN/common/intel_ocl_icd/6.3/linux/Release/bin/x64/libOpenCL.so.1
         ${LLVM_BINARY_DIR}/lib/libmlir_runner_utils.so.12git
         ${LLVM_BINARY_DIR}/lib/libomp.so
     DESTINATION bin/lib
