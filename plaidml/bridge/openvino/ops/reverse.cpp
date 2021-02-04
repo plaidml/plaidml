@@ -42,16 +42,11 @@ void registerReverse() {
     auto I = ctx.operands.at(0);
     ngraph::AxisSet axes;
     if (layer->get_mode() == Reverse::Mode::INDEX) {
-      std::vector<int64_t> raw_axes = cast_constant_operand<int64_t>(1, ctx.layer);
-      for (auto ax : raw_axes) {
-        if (ax < 0) {
-          ax += I.rank();
-          if (ax < 0) {
-            THROW_IE_EXCEPTION << "Axis underflow in Reverse (requested axis more negative than rank of tensor)";
-          }
-        }
-        axes.emplace(ax);
-      }
+      auto axes_tensor = ctx.operands.at(1);
+      auto axes_shape = axes_tensor.compute_shape();
+      IE_ASSERT(axes_shape.rank() == 1);
+      auto axes_count = axes_shape.sizes()[0];
+      axes = get_axis_set_from_constant_operand(1, ctx.layer, I.rank() + axes_count);
     } else if (layer->get_mode() == Reverse::Mode::MASK) {
       axes = cast_constant_axis_mask(1, ctx.layer);
     }

@@ -15,31 +15,11 @@ using namespace InferenceEngine;  // NOLINT[build/namespaces]
 
 namespace PlaidMLPlugin {
 
-namespace {
-
-// TODO: Remove and replace use with get_axis_set_from_constant_operand once upstream fixed for negatives
-ngraph::AxisSet cast_constant_operand_to_axis_set(size_t operand_idx, size_t ndims, ngraph::Node* layer) {
-  ngraph::AxisSet ret;
-  std::vector<int64_t> axis_vec = cast_constant_operand<int64_t>(1, layer);
-  for (auto ax : axis_vec) {
-    if (ax < 0) {
-      ax += ndims;
-      if (ax < 0) {
-        THROW_IE_EXCEPTION << "Axis underflow in Unsqueeze (requested axis more negative than rank of tensor)";
-      }
-    }
-    ret.emplace(ax);
-  }
-  return ret;
-}
-
-}  // namespace
-
 void registerUnsqueeze() {
   registerOp("unsqueeze", [](const Context& ctx) {
     IE_ASSERT(ctx.operands.size() == 2);
     auto I = ctx.operands.at(0);
-    auto axes = cast_constant_operand_to_axis_set(1, I.rank(), ctx.layer);
+    auto axes = get_axis_set_from_constant_operand(1, ctx.layer);
     std::vector<edsl::TensorDim> I_dims(I.rank());
     size_t new_rank = I.rank() + axes.size();
     I.bind_dims(I_dims);
