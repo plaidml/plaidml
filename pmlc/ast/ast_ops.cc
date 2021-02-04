@@ -43,6 +43,14 @@ static bool isDataTypeFloat(DataType type) {
          type == DataType::f64;
 }
 
+static bool isDataTypeInteger(DataType type) {
+  return type == DataType::i1 || type == DataType::si8 ||
+         type == DataType::ui8 || type == DataType::si16 ||
+	 type == DataType::ui16 || type == DataType::si32 ||
+	 type == DataType::ui32 || type == DataType::si64 ||
+	 type == DataType::ui64;
+}
+
 struct ArgSortOp : Intrinsic {
   TensorShapes getShapes(Evaluator *evaluator, ArrayRef<ExprNodePtr> operands,
                          ArrayRef<TensorShape> shapes) const final {
@@ -74,7 +82,8 @@ struct IndexOp : Intrinsic {
   TensorShapes getShapes(Evaluator *evaluator, ArrayRef<ExprNodePtr> operands,
                          ArrayRef<TensorShape> shapes) const final {
     if (operands.size() < 2) {
-      throw std::runtime_error("'index' requires an axis operand and at least 1 dimension");
+      throw std::runtime_error(
+          "'index' requires an axis operand and at least 1 dimension");
     }
     TensorShape ret(DataType::si32); // TODO
     for (const ExprNodePtr &operand : operands.drop_front()) {
@@ -93,7 +102,7 @@ struct GatherOp : Intrinsic {
   TensorShapes getShapes(Evaluator *evaluator, ArrayRef<ExprNodePtr> operands,
                          ArrayRef<TensorShape> shapes) const final {
     auto operands_size = operands.size();
-    if (operands_size != 6) {
+    if (operands_size != 8) {
       throw std::runtime_error("'gather' requires six arguments.");
     }
     auto tensor = shapes[0];
@@ -114,6 +123,7 @@ struct GatherOp : Intrinsic {
           "'gather' primitive expects the 'axis' argument "
           "to be a positive integer that is less than the tensor rank.");
     }
+
     auto interpolationMode = getIntegerValue(evaluator, operands[3]);
     if (!interpolationMode) {
       throw std::runtime_error(
@@ -133,13 +143,41 @@ struct GatherOp : Intrinsic {
           "to be a constant float");
     }
 
-    TensorShape shape{tensor.elementType};
-    for (auto i = 0; i < axis.getValue(); i++) {
-      shape.sizes.push_back(tensor.sizes[i]);
+    auto mode = getIntegerValue(evaluator, operands[6]);
+    if (!mode) {
+      throw std::runtime_error("'gather' primitive expects the 'mode' argument "
+                               "to be a constant integer");
+    } else if (mode.getValue() == 1) {
+      if (!isDataTypeInteger(idxs.elementType)) {
+        throw std::runtime_error(
+            "'gather' ND mode require indices elements to be integers.");
+      }
     }
-    shape.sizes.insert(shape.sizes.end(), idxs.sizes.begin(), idxs.sizes.end());
-    for (auto i = axis.getValue() + 1; i < rank; i++) {
-      shape.sizes.push_back(tensor.sizes[i]);
+
+    auto batch_dims = getIntegerValue(evaluator, operands[7]);
+    if (!batch_dims) {
+      throw std::runtime_error(
+          "'gather' primitive expects the 'batch_dims' argument "
+          "to be a constant integer");
+    }
+
+    TensorShape shape{tensor.elementType};
+    if (mode.getValue() == 0) {
+      for (auto i = 0; i < axis.getValue(); i++) {
+        shape.sizes.push_back(tensor.sizes[i]);
+      }
+      shape.sizes.insert(shape.sizes.end(), idxs.sizes.begin(),
+                         idxs.sizes.end());
+      for (auto i = axis.getValue() + 1; i < rank; i++) {
+        shape.sizes.push_back(tensor.sizes[i]);
+      }
+    } else {
+      for (size_t i = 0; i < idxs.getRank() - 1; i++) {
+        shape.sizes.push_back(idxs.sizes[i]);
+      }
+      for (auto i = idxs.sizes.back() + batch_dims.getValue(); i < rank; i++) {
+        shape.sizes.push_back(tensor.sizes[i]);
+      }
     }
     return {shape};
   }
