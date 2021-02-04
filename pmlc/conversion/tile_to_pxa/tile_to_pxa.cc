@@ -20,6 +20,7 @@
 #include "pmlc/dialect/stdx/ir/ops.h"
 #include "pmlc/dialect/tile/ir/ops.h"
 #include "pmlc/dialect/tile/transforms/padding.h"
+#include "pmlc/util/layout.h"
 #include "pmlc/util/logging.h"
 #include "pmlc/util/util.h"
 
@@ -627,7 +628,12 @@ struct BufferAllocator {
     }
 
     // Make an allocation for the output
-    memRefType = MemRefType::get(shape, elementType);
+    if (hasLayoutTag(op))
+      memRefType = updateMemRefWithLayoutMap(op->getContext(), rankedTensorType,
+                                             elementType, getLayoutTag(op));
+    else
+      memRefType = MemRefType::get(shape, elementType);
+
     resultMemRef = builder.create<AllocOp>(loc, memRefType);
     if (maybePadding) {
       auto initValue = createInit(builder, loc, elementType, maybePadding->agg);
@@ -1547,7 +1553,18 @@ struct ReshapeOpConversion : public OpConversionPattern<tile::ReshapeOp> {
     auto tensor = adaptor.tensor();
 
     TypeConverter typeConverter;
-    auto resultType = typeConverter.convertType(op.result().getType());
+    mlir::Type resultType;
+    auto memrefType = op.result().getType();
+
+    if (hasLayoutTag(op)) {
+      auto rankedTensorType = getRankedTensorType(memrefType);
+      auto elementType =
+          typeConverter.convertType(rankedTensorType.getElementType());
+      resultType = updateMemRefWithLayoutMap(op->getContext(), rankedTensorType,
+                                             elementType, getLayoutTag(op));
+    } else {
+      resultType = typeConverter.convertType(op.result().getType());
+    }
 
     rewriter.replaceOpWithNewOp<stdx::ReshapeOp>(op, resultType, tensor);
     return success();
@@ -2205,6 +2222,7 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
       signalPassFailure();
       return;
     }
+    IVLOG(1, "Func: " << debugString(*getOperation()));
   }
 };
 } // namespace
