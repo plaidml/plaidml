@@ -51,8 +51,13 @@ const std::vector<bool> clips = {
     false,
 };
 
-const std::vector<std::vector<size_t>> input_shape = {{4, 4}};
-const std::vector<std::vector<size_t>> image_shape = {{50, 50}};
+const std::vector<std::vector<size_t>> input_shape = {
+    {4, 4},
+};
+
+const std::vector<std::vector<size_t>> image_shape = {
+    {50, 50},
+};
 
 const std::vector<ngraph::helpers::InputLayerType> InputTypes = {
     ngraph::helpers::InputLayerType::CONSTANT,
