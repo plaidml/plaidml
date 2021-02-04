@@ -28,7 +28,7 @@ if(NOT InferenceEngineDeveloperPackage_FOUND)
   FetchContent_Declare(
     openvino
     GIT_REPOSITORY https://github.com/plaidml/openvino.git
-    GIT_TAG        d935ac08740b8aea48a06e02ecec5bf4d78dff20
+    GIT_TAG        2a82d330a05eb06ccde9e7e38a1535c268ad58db
   )
   if(LOCAL_OPENVINO_DIR)
     set(openvino_SOURCE_DIR ${LOCAL_OPENVINO_DIR})
