@@ -36,6 +36,7 @@ plaidml_cc_library(
         ":gen-pass",
         "//pmlc/dialect/stdx/ir",
         "//pmlc/dialect/tile/ir",
+        "//pmlc/dialect/layer/ir",
         "//pmlc/util",
         "//pmlc/util/bilp",
         "//pmlc/util/math",
