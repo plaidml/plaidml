@@ -1974,7 +1974,24 @@ struct UnpackOpConversion : public OpConversionPattern<stdx::UnpackOp> {
                   ConversionPatternRewriter &rewriter) const final {
     SmallVector<Type, 8> newResultTypes;
     TypeConverter typeConverter;
-    for (auto type : op.getResultTypes()) {
+    TypeRange resultTypes = op.getResultTypes();
+
+    // To align the result types with the pack op, use the ones
+    // directly from packOp. In case it is not found perform
+    // regular op conversion based on the stdx.unpack
+    auto moduleOp = op.getParentOfType<ModuleOp>();
+    if (moduleOp) {
+      auto initFunc = moduleOp.lookupSymbol<mlir::FuncOp>("init");
+      if (initFunc) {
+        auto packOps = initFunc.getOps<pmlc::dialect::stdx::PackOp>();
+        if (!packOps.empty()) {
+          auto packOp = *packOps.begin();
+          resultTypes = packOp.getOperandTypes();
+        }
+      }
+    }
+
+    for (auto type : resultTypes) {
       if (auto tensorType = type.dyn_cast<TensorType>()) {
         if (tensorType.getRank() == 0) {
           auto newType = typeConverter.convertType(tensorType.getElementType());
