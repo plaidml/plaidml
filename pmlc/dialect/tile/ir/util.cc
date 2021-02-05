@@ -19,6 +19,7 @@
 
 #include "pmlc/dialect/tile/ir/ops.h"
 #include "pmlc/dialect/tile/ir/types.h"
+#include "pmlc/util/layout.h"
 #include "pmlc/util/logging.h"
 
 using namespace mlir; // NOLINT
@@ -271,6 +272,37 @@ Value createIdentity(OpBuilder &builder, Location loc, Type elementType,
   }
   return builder.create<tile::ConstantOp>(loc, elementType,
                                           getUnsignedIntegerIdentity(agg));
+}
+
+MemRefType updateMemRefWithLayoutMap(MLIRContext *context,
+                                     RankedTensorType memrefType,
+                                     Type elementType, TensorLayout layout) {
+  auto rankedTensorType = pmlc::dialect::tile::getRankedTensorType(memrefType);
+  auto originalShape = rankedTensorType.getShape();
+  auto shape = llvm::to_vector<8>(originalShape);
+
+  auto outRank = rankedTensorType.getRank();
+  auto spatialNum = outRank == 4 ? 2 : 0;
+
+  SmallVector<AffineExpr, 4> dimExprs;
+  dimExprs.reserve(outRank);
+  if (layout == TensorLayout::NCX) {
+    dimExprs.push_back(mlir::getAffineDimExpr(0, context));
+    for (auto spat = 0; spat < spatialNum; spat++) {
+      dimExprs.push_back(
+          mlir::getAffineDimExpr(outRank - spatialNum + spat, context));
+    }
+    dimExprs.push_back(mlir::getAffineDimExpr(1, context));
+  } else if (layout == TensorLayout::KCX) {
+    for (auto spat = 0; spat < spatialNum; spat++) {
+      dimExprs.push_back(
+          mlir::getAffineDimExpr(outRank - spatialNum + spat, context));
+    }
+    dimExprs.push_back(mlir::getAffineDimExpr(1, context));
+    dimExprs.push_back(mlir::getAffineDimExpr(0, context));
+  }
+  auto idMap = AffineMap::get(outRank, 0, dimExprs, context);
+  return MemRefType::get(shape, elementType, {idMap});
 }
 
 } // namespace pmlc::dialect::tile

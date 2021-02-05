@@ -19,8 +19,8 @@
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/dialect/stdx/ir/ops.h"
 #include "pmlc/dialect/tile/ir/ops.h"
+#include "pmlc/dialect/tile/ir/util.h"
 #include "pmlc/dialect/tile/transforms/padding.h"
-#include "pmlc/util/layout.h"
 #include "pmlc/util/logging.h"
 #include "pmlc/util/util.h"
 
@@ -629,8 +629,8 @@ struct BufferAllocator {
 
     // Make an allocation for the output
     if (hasLayoutTag(op))
-      memRefType = updateMemRefWithLayoutMap(op->getContext(), rankedTensorType,
-                                             elementType, getLayoutTag(op));
+      memRefType = tile::updateMemRefWithLayoutMap(
+          op->getContext(), rankedTensorType, elementType, getLayoutTag(op));
     else
       memRefType = MemRefType::get(shape, elementType);
 
@@ -1560,8 +1560,8 @@ struct ReshapeOpConversion : public OpConversionPattern<tile::ReshapeOp> {
       auto rankedTensorType = getRankedTensorType(memrefType);
       auto elementType =
           typeConverter.convertType(rankedTensorType.getElementType());
-      resultType = updateMemRefWithLayoutMap(op->getContext(), rankedTensorType,
-                                             elementType, getLayoutTag(op));
+      resultType = tile::updateMemRefWithLayoutMap(
+          op->getContext(), rankedTensorType, elementType, getLayoutTag(op));
     } else {
       resultType = typeConverter.convertType(op.result().getType());
     }

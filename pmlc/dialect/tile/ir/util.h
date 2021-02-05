@@ -8,6 +8,7 @@
 #include "mlir/IR/Value.h"
 
 #include "pmlc/util/enums.h"
+#include "pmlc/util/layout.h"
 
 namespace pmlc::dialect::tile {
 
@@ -51,5 +52,10 @@ uint64_t getUnsignedIntegerIdentity(util::AggregationKind agg);
 
 mlir::Value createIdentity(mlir::OpBuilder &builder, mlir::Location loc,
                            mlir::Type elementType, util::AggregationKind agg);
+
+mlir::MemRefType updateMemRefWithLayoutMap(mlir::MLIRContext *context,
+                                           mlir::RankedTensorType memrefType,
+                                           mlir::Type elementType,
+                                           TensorLayout layout);
 
 } // namespace pmlc::dialect::tile

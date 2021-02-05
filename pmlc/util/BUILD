@@ -45,14 +45,12 @@ plaidml_cc_library(
     deps = [
         ":enums-gen",
         ":loop_with_epilog-gen",
-        "//pmlc/dialect/tile/ir", 
         "@easylogging",
         "@llvm-project//llvm:Core",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:StandardOps",
-        "@llvm-project//mlir:Affine",
     ],
 )
 

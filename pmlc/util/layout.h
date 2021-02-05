@@ -5,7 +5,6 @@
 // Copyright 2020 Intel Corporation
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Operation.h"
-#include "pmlc/dialect/tile/ir/util.h"
 #include "pmlc/util/tags.h"
 
 namespace pmlc {
@@ -35,10 +34,5 @@ inline bool hasLayoutTag(mlir::Operation *op) {
 inline TensorLayout getLayoutTag(mlir::Operation *op) {
   return static_cast<TensorLayout>(getIntegerTag(op, layoutTag(), 0));
 }
-
-mlir::MemRefType updateMemRefWithLayoutMap(mlir::MLIRContext *context,
-                                           mlir::RankedTensorType memrefType,
-                                           mlir::Type elementType,
-                                           TensorLayout layout);
 
 } // end namespace pmlc
