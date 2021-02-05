@@ -322,6 +322,18 @@ LogicalResult verifyContractionOp(ContractionOp op) {
   return success();
 }
 
+LogicalResult verifyReshapeOp(ReshapeOp op) {
+  auto inType = op.tensor().getType().cast<RankedTensorType>();
+  auto outType = op.result().getType().cast<RankedTensorType>();
+  if (inType.getElementType() != outType.getElementType()) {
+    return op.emitOpError("element type mismatch");
+  }
+  if (inType.getNumElements() != outType.getNumElements()) {
+    return op.emitOpError("element count mismatch");
+  }
+  return success();
+}
+
 void GatherOp::build(OpBuilder &builder, OperationState &result,
                      Type resultType, ValueRange operands, IntegerAttr axis,
                      IntegerAttr interpolationMode, IntegerAttr nearestMode,

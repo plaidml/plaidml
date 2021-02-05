@@ -12,11 +12,17 @@ using namespace InferenceEngine;  // NOLINT[build/namespaces]
 
 namespace PlaidMLPlugin {
 
-ngraph::AxisSet get_axis_set_from_constant_operand(size_t operand_idx, ngraph::Node* layer) {
+ngraph::AxisSet get_axis_set_from_constant_operand(size_t operand_idx, ngraph::Node* layer, size_t rank_override) {
   auto* axis_ngraph_op = ngraph::as_type<ngraph::op::Constant>(layer->get_input_node_ptr(operand_idx));
   if (axis_ngraph_op) {
     auto const_data = axis_ngraph_op->cast_vector<int64_t>();
     auto input_rank = layer->get_input_partial_shape(0).rank();
+    if (rank_override > 0) {
+      // If a programmer has specifically set the rank, use that value instead.
+      // This is for cases like unsqueeze, where axes aree given relative to a destination tensor of higher rank than
+      // the input tensor
+      input_rank = rank_override;
+    }
     auto normalized_axes = ngraph::normalize_axes(layer->get_friendly_name(), const_data, input_rank);
     return ngraph::AxisSet{normalized_axes};
   } else {
