@@ -136,7 +136,7 @@ def max_pool_2d(I):
 def flatten(X):
     X_dims = TensorDims(X.rank)
     X.bind_dims(*X_dims)
-    product = functools.reduce(lambda x, y: x * y, X_dims[1:-1])
+    product = functools.reduce(lambda x, y: x * y, X_dims[1:])
     return reshape(X, (1, product))
 
 
@@ -333,8 +333,8 @@ class TestEdsl(unittest.TestCase):
         P1 = max_pool_2d(C2)
         # model.add(Flatten())
         F = flatten(P1)
-        self.assertEqual(str(F.compute_shape()), '1x12100xf32')
-        K3 = Placeholder(plaidml.DType.FLOAT32, [12100, 128])
+        self.assertEqual(str(F.compute_shape()), '1x774400xf32')
+        K3 = Placeholder(plaidml.DType.FLOAT32, [774400, 128])
         B3 = Placeholder(plaidml.DType.FLOAT32, [128])
         D1 = relu(dot(F, K3) + B3)
         # model.add(Dense(num_classes, activation='softmax'))

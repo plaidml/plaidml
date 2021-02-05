@@ -155,6 +155,7 @@ def ReshapeOp : MaterializeOp<"reshape">,
   let assemblyFormat = [{
     $tensor attr-dict `:` functional-type($tensor, $result)
   }];
+  let verifier = [{ return verify$cppClass(*this); }];
 }
 
 def ScatterOp : MaterializeOp<"scatter"> {
