@@ -19,7 +19,7 @@ namespace {
 
 int64_t getArgPos(Operation &op, BlockArgument &arg) {
   auto argPos = 0;
-  for (auto i = 0; i < op.getOperands().size(); i++) {
+  for (size_t i = 0; i < op.getOperands().size(); i++) {
     if (op.getOperand(i) == arg) {
       argPos = i;
     }
