@@ -90,8 +90,8 @@ struct ReorderInputsPass : public ReorderInputsBase<ReorderInputsPass> {
       return;
     });
 
-    // If no BoxOp present then terminate
-    if (!layoutSet)
+    // If no BoxOp present or no framework defined then terminate
+    if (!layoutSet || framework == MLFramework::Default)
       return;
 
     // Set proper layout tags for the BoxOps
