@@ -1979,7 +1979,7 @@ struct UnpackOpConversion : public OpConversionPattern<stdx::UnpackOp> {
     // To align the result types with the pack op, use the ones
     // directly from packOp. In case it is not found perform
     // regular op conversion based on the stdx.unpack
-    auto moduleOp = op.getParentOfType<ModuleOp>();
+    auto moduleOp = op->getParentOfType<ModuleOp>();
     if (moduleOp) {
       auto initFunc = moduleOp.lookupSymbol<mlir::FuncOp>("init");
       if (initFunc) {
