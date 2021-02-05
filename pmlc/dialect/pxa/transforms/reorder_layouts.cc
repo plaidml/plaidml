@@ -538,7 +538,8 @@ static MemoryReadDesc gatherReadDesc(PxaReadOpInterface op,
 }
 
 /// Gathers information about specified write operation.
-static MemoryWriteDesc gatherWriteDesc(PxaReduceOpInterface op) {
+static MemoryWriteDesc gatherWriteDesc(PxaReduceOpInterface op,
+                                       mlir::AffineParallelOp parallelOp) {
   mlir::MemRefType memRefType = op.getMemRefType();
   mlir::ArrayRef<int64_t> shapeRef = memRefType.getShape();
   mlir::SmallVector<int64_t, 4> reduceVec(shapeRef.size(), 1);
@@ -548,7 +549,7 @@ static MemoryWriteDesc gatherWriteDesc(PxaReduceOpInterface op) {
     for (unsigned idx = 0; idx < vecShape.size(); ++idx)
       reduceVec[reduceVec.size() - vecShape.size() + idx] = vecShape[idx];
   }
-  return MemoryWriteDesc{std::move(reduceVec)};
+  return MemoryWriteDesc{op, parallelOp, std::move(reduceVec)};
 }
 
 /// Returns MemoryUsageDesc initialized with information about `memory`,
@@ -592,7 +593,7 @@ gatherGlobalMemoryDescs(mlir::FuncOp func, const ScheduleModel &model) {
       if (!parallelOp.isDefinedOutsideOfLoop(indirectDef))
         return;
       MemoryUsageDesc &memoryDesc = getOrCreateGlobalDesc(indirectDef);
-      memoryDesc.writes.emplace_back(gatherWriteDesc(reduce));
+      memoryDesc.writes.emplace_back(gatherWriteDesc(reduce, parallelOp));
       memoryDesc.parallelOp = parallelOp;
     });
   }
@@ -915,6 +916,13 @@ void reorderMemoryReads(const ReorderCreator &creator, ReorderDesc &reorderDesc,
     }
 
     // TODO: It should be fused location of all reads.
+    // Create the data copy operation after all the Writes
+    if (memoryDesc.writes.size() > 0) {
+      builder.setInsertionPointAfter(
+          memoryDesc.writes[memoryDesc.writes.size() - 1]
+              .surroundingParallelOp);
+    }
+
     mlir::Value reorderedMem = creator(loc, builder, reorderDesc, memToReorder);
     replaceMemoryLayoutForReading(reorderedMem, memToReorder, reorderDesc);
 

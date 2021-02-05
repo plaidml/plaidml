@@ -33,6 +33,10 @@ struct MemoryReadDesc {
 
 /// Structure holding information about single write operation.
 struct MemoryWriteDesc {
+  // Operation this structure describes.
+  PxaReduceOpInterface reduceOp;
+  // Surrounding parallelOp
+  mlir::AffineParallelOp surroundingParallelOp;
   // Vectorization of write operation.
   mlir::SmallVector<int64_t, 4> writeVector;
 };
