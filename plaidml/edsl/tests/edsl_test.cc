@@ -1467,6 +1467,56 @@ TEST_F(CppEdsl, Gather) {
   checkExact(program, {in1, in2}, {out});
 }
 
+TEST_F(CppEdsl, GatherND) {
+  auto A = Placeholder(DType::FLOAT32, {2, 2, 2});
+  auto B = Placeholder(DType::INT32, {2, 2});
+  auto O = gather(A, B).mode(GatherMode::ND);
+  auto program = makeProgram("gather", {A, B}, {O});
+
+  std::vector<float> in1 = {
+      -5.0f, -6.0f,  //
+      1.3f,  4.5f,   //
+
+      -7.0f, 4.0f,  //
+      5.0f,  6.0f,  //
+  };
+  std::vector<int> in2 = {
+      0, 1,  //
+      1, 0,  //
+  };
+  std::vector<float> out = {
+      1.3f, 4.5f,   //
+      -7.0f, 4.0f,  //
+  };
+  checkExact(program, {in1, in2}, {out});
+}
+
+TEST_F(CppEdsl, GatherNDWithBatchDims) {
+  auto A = Placeholder(DType::FLOAT32, {2, 3, 4});
+  auto B = Placeholder(DType::INT32, {2, 3, 1, 1});
+  auto O = gather(A, B).mode(GatherMode::ND).batchDims(2);
+  auto program = makeProgram("gather", {A, B}, {O});
+
+  std::vector<float> in1 = {
+      1,  2,  3,  4,   //
+      5,  6,  7,  8,   //
+      9,  10, 11, 12,  //
+      13, 14, 15, 16,  //
+      17, 18, 19, 20,  //
+      21, 22, 23, 24,  //
+  };
+  std::vector<int> in2 = {
+      1,  //
+      0,  //
+      2,  //
+      0,  //
+      2,  //
+      2,  //
+  };
+  std::vector<float> out = {2, 5, 11, 13, 19, 23};
+  checkExact(program, {in1, in2}, {out});
+}
+
 TEST_F(CppEdsl, InterpolatedGatherNearest) {
   auto A = Placeholder(DType::FLOAT32, {1, 6});
   auto B = Placeholder(DType::FLOAT32, {9});

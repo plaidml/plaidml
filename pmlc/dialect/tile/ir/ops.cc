@@ -337,13 +337,16 @@ LogicalResult verifyReshapeOp(ReshapeOp op) {
 void GatherOp::build(OpBuilder &builder, OperationState &result,
                      Type resultType, ValueRange operands, IntegerAttr axis,
                      IntegerAttr interpolationMode, IntegerAttr nearestMode,
-                     FloatAttr cubeCoeff) {
+                     FloatAttr cubeCoeff, IntegerAttr mode,
+                     IntegerAttr batch_dims) {
   assert(operands.size() == 2u && "mismatched number of parameters");
   result.addOperands(operands);
   result.addAttribute("axis", axis);
   result.addAttribute("interpolationMode", interpolationMode);
   result.addAttribute("nearestMode", nearestMode);
   result.addAttribute("cubeCoeff", cubeCoeff);
+  result.addAttribute("mode", mode);
+  result.addAttribute("batch_dims", batch_dims);
   result.addTypes(resultType);
 }
 
