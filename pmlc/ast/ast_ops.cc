@@ -46,9 +46,9 @@ static bool isDataTypeFloat(DataType type) {
 static bool isDataTypeInteger(DataType type) {
   return type == DataType::i1 || type == DataType::si8 ||
          type == DataType::ui8 || type == DataType::si16 ||
-	 type == DataType::ui16 || type == DataType::si32 ||
-	 type == DataType::ui32 || type == DataType::si64 ||
-	 type == DataType::ui64;
+         type == DataType::ui16 || type == DataType::si32 ||
+         type == DataType::ui32 || type == DataType::si64 ||
+         type == DataType::ui64;
 }
 
 struct ArgSortOp : Intrinsic {
@@ -103,7 +103,7 @@ struct GatherOp : Intrinsic {
                          ArrayRef<TensorShape> shapes) const final {
     auto operands_size = operands.size();
     if (operands_size != 8) {
-      throw std::runtime_error("'gather' requires six arguments.");
+      throw std::runtime_error("'gather' requires eight arguments.");
     }
     auto tensor = shapes[0];
     auto idxs = shapes[1];
@@ -123,7 +123,6 @@ struct GatherOp : Intrinsic {
           "'gather' primitive expects the 'axis' argument "
           "to be a positive integer that is less than the tensor rank.");
     }
-
     auto interpolationMode = getIntegerValue(evaluator, operands[3]);
     if (!interpolationMode) {
       throw std::runtime_error(
@@ -150,14 +149,14 @@ struct GatherOp : Intrinsic {
     } else if (mode.getValue() == 1) {
       if (!isDataTypeInteger(idxs.elementType)) {
         throw std::runtime_error(
-            "'gather' ND mode require indices elements to be integers.");
+            "'gather' ND mode requires indices elements to be integers.");
       }
     }
 
-    auto batch_dims = getIntegerValue(evaluator, operands[7]);
-    if (!batch_dims) {
+    auto batchDims = getIntegerValue(evaluator, operands[7]);
+    if (!batchDims) {
       throw std::runtime_error(
-          "'gather' primitive expects the 'batch_dims' argument "
+          "'gather' primitive expects the 'batchDims' argument "
           "to be a constant integer");
     }
 
@@ -175,7 +174,7 @@ struct GatherOp : Intrinsic {
       for (size_t i = 0; i < idxs.getRank() - 1; i++) {
         shape.sizes.push_back(idxs.sizes[i]);
       }
-      for (auto i = idxs.sizes.back() + batch_dims.getValue(); i < rank; i++) {
+      for (auto i = idxs.sizes.back() + batchDims.getValue(); i < rank; i++) {
         shape.sizes.push_back(tensor.sizes[i]);
       }
     }

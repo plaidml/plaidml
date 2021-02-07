@@ -114,7 +114,7 @@ def GatherOp : MaterializeOp<"gather"> {
     DefaultValuedAttr<NearestMode, "NearestMode::round_prefer_floor">:$nearestMode,
     DefaultValuedAttr<F64Attr, "-0.75">:$cubeCoeff,
     DefaultValuedAttr<GatherMode, "GatherMode::normal">:$mode,
-    DefaultValuedAttr<IndexAttr, "0">:$batch_dims
+    DefaultValuedAttr<IndexAttr, "0">:$batchDims
   );
   let results = (outs RankedTensorOf<[AnyScalar]>:$result);
   let assemblyFormat = [{
@@ -130,7 +130,7 @@ def GatherOp : MaterializeOp<"gather"> {
       "mlir::IntegerAttr":$nearestMode,
       "mlir::FloatAttr":$cubeCoeff,
       "mlir::IntegerAttr":$mode,
-      "mlir::IntegerAttr":$batch_dims
+      "mlir::IntegerAttr":$batchDims
     )>
   ];
 }
