@@ -4,7 +4,7 @@
 
 #include "mlir/IR/BuiltinTypes.h"
 
-namespace pmlc {
+namespace pmlc::util {
 
 using namespace llvm; // NOLINT
 using namespace mlir; // NOLINT
@@ -12,9 +12,9 @@ using namespace mlir; // NOLINT
 MLFramework getMLFramework(StringRef opName) {
   StringRef nGraphPrefix = "ng.";
   if (opName.substr(0, nGraphPrefix.size()) == nGraphPrefix) {
-    return MLFramework::NGraph;
+    return MLFramework::ngraph;
   } else {
-    return MLFramework::Default;
+    return MLFramework::none;
   }
 }
 
@@ -24,15 +24,15 @@ TensorLayout getLayoutType(MLFramework framework, StringRef opName,
   // plugins so we know they are consistent. For now use namings from OV plugin
   // Const are used to identify the primitives weights or parameters, rest is
   // considered as main flow data type
-  if (framework == MLFramework::NGraph) {
+  if (framework == MLFramework::ngraph) {
     if ((opName.find("Convolution") != StringRef::npos) && isConst) {
-      return TensorLayout::KCX;
+      return TensorLayout::kcx;
     } else {
-      return TensorLayout::NCX;
+      return TensorLayout::ncx;
     }
   }
 
-  return TensorLayout::NXC;
+  return TensorLayout::nxc;
 }
 
-} // namespace pmlc
+} // namespace pmlc::util

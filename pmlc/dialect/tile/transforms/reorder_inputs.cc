@@ -28,10 +28,10 @@ int64_t getArgPos(Operation &op, BlockArgument &arg) {
 }
 
 void performDataReordering(OpBuilder &builder, Operation *op, BlockArgument arg,
-                           MLFramework framework, bool isConst) {
+                           util::MLFramework framework) {
   // Check if op is a BoxOp, if so scan which argument is used,
   // and get its tensor type.
-  // Later on create the new contraciton op with the same sizes and additional
+  // Later on create the new contraction op with the same sizes and additional
   // layout tag. These ops would be moved to init as weights reorders in the
   // later pass.
   auto layerOp = dyn_cast<layer::BoxOp>(op);
@@ -73,7 +73,7 @@ void performDataReordering(OpBuilder &builder, Operation *op, BlockArgument arg,
       newOp.getResult(), SmallPtrSet<Operation *, 1>{newOp.getOperation()});
 
   // Add layout tag
-  setLayoutTag(newOp, getLayoutType(framework, layerOp.op(), isConst));
+  setLayoutTag(newOp, getLayoutType(framework, layerOp.op(), true));
 }
 
 struct ReorderInputsPass : public ReorderInputsBase<ReorderInputsPass> {
@@ -81,17 +81,17 @@ struct ReorderInputsPass : public ReorderInputsBase<ReorderInputsPass> {
     auto func = getFunction();
 
     auto layoutSet = false;
-    auto framework = MLFramework::Default;
+    auto framework = util::MLFramework::none;
 
     // Get Framework and check if at least one BoxOp is present
     func.walk([&](layer::BoxOp op) {
-      framework = getMLFramework(op.op());
+      framework = util::getMLFramework(op.op());
       layoutSet = true;
       return;
     });
 
     // If no BoxOp present or no framework defined then terminate
-    if (!layoutSet || framework == MLFramework::Default)
+    if (!layoutSet || framework == util::MLFramework::none)
       return;
 
     // Set proper layout tags for the BoxOps
@@ -109,9 +109,8 @@ struct ReorderInputsPass : public ReorderInputsBase<ReorderInputsPass> {
 
     for (auto &arg : func.getArguments()) {
       for (auto *op : arg.getUsers()) {
-        performDataReordering(builder, op, arg, framework,
-                              static_cast<bool>(func.getArgAttr(
-                                  arg.getArgNumber(), "tile.const")));
+        if (func.getArgAttr(arg.getArgNumber(), "tile.const"))
+          performDataReordering(builder, op, arg, framework);
       }
     }
 

@@ -19,7 +19,6 @@
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/dialect/stdx/ir/ops.h"
 #include "pmlc/dialect/tile/ir/ops.h"
-#include "pmlc/dialect/tile/ir/util.h"
 #include "pmlc/dialect/tile/transforms/padding.h"
 #include "pmlc/util/logging.h"
 #include "pmlc/util/util.h"
@@ -628,11 +627,14 @@ struct BufferAllocator {
     }
 
     // Make an allocation for the output
-    if (hasLayoutTag(op))
-      memRefType = tile::updateMemRefWithLayoutMap(
-          op->getContext(), rankedTensorType, elementType, getLayoutTag(op));
-    else
-      memRefType = MemRefType::get(shape, elementType);
+    memRefType = MemRefType::get(shape, elementType);
+
+    // Set affine map based on layout
+    if (util::hasLayoutTag(op)) {
+      auto map = util::updateMemRefWithLayoutMap(
+          op->getContext(), rankedTensorType.getRank(), util::getLayoutTag(op));
+      memRefType = MemRefType::Builder(memRefType).setAffineMaps({map});
+    }
 
     resultMemRef = builder.create<AllocOp>(loc, memRefType);
     if (maybePadding) {
@@ -1552,16 +1554,16 @@ struct ReshapeOpConversion : public OpConversionPattern<tile::ReshapeOp> {
 
     auto tensor = adaptor.tensor();
 
-    TypeConverter typeConverter;
     mlir::Type resultType;
-    auto memrefType = op.result().getType();
 
-    if (hasLayoutTag(op)) {
-      auto rankedTensorType = getRankedTensorType(memrefType);
-      auto elementType =
-          typeConverter.convertType(rankedTensorType.getElementType());
-      resultType = tile::updateMemRefWithLayoutMap(
-          op->getContext(), rankedTensorType, elementType, getLayoutTag(op));
+    TypeConverter typeConverter;
+    // Set affine map based on layout
+    if (util::hasLayoutTag(op)) {
+      auto rankedTensorType = getRankedTensorType(op.result().getType());
+      auto map = util::updateMemRefWithLayoutMap(
+          op->getContext(), rankedTensorType.getRank(), util::getLayoutTag(op));
+      resultType = MemRefType::get(rankedTensorType.getShape(),
+                                   rankedTensorType.getElementType(), {map});
     } else {
       resultType = typeConverter.convertType(op.result().getType());
     }

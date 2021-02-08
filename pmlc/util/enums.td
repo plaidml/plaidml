@@ -128,4 +128,27 @@ def MemUse : I64EnumAttr<
   let returnType = "MemUse";
 }
 
+def MLFramework : I64EnumAttr<
+    "MLFramework",
+    "Framework used",
+    [
+      I64EnumAttrCase<"none", 0>,
+      I64EnumAttrCase<"ngraph", 1>,
+    ]> {
+  let cppNamespace = "pmlc::util";
+  let returnType = "MLFramework";
+}
+
+def TensorLayout : I64EnumAttr<
+    "TensorLayout",
+    "Tensor Layout",
+    [
+      I64EnumAttrCase<"nxc", 0>,
+      I64EnumAttrCase<"ncx", 1>,
+      I64EnumAttrCase<"kcx", 2>,
+    ]> {
+  let cppNamespace = "pmlc::util";
+  let returnType = "TensorLayout";
+}
+
 #endif // __PML_UTIL_ENUMS__
