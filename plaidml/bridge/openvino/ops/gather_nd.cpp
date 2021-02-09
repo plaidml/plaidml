@@ -17,13 +17,13 @@ void registerGatherND() {
     IE_ASSERT(ctx.operands.size() == 2);
     auto I = ctx.operands.at(0);
     auto IX = ctx.operands.at(1);
-    auto batch_dims = layer->get_batch_dims();
+    auto batchDims = layer->get_batch_dims();
 
-    edsl::Tensor O = edsl::gather(I, IX).mode(edsl::GatherMode::ND).batchDims(batch_dims);
-    // Reshape leading 'batch_dims' into one by multiplying them.
+    edsl::Tensor O = edsl::gather(I, IX).mode(edsl::GatherMode::ND).batchDims(batchDims);
+    // Reshape leading 'batchDims' into one by multiplying them.
     auto shape = O.compute_shape().sizes();
     size_t firstDim = 1;
-    for (size_t i = 0; i < batch_dims; ++i) {
+    for (size_t i = 0; i < batchDims; ++i) {
       firstDim *= shape.front();
       shape.erase(shape.begin());
     }

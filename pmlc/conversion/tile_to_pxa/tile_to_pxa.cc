@@ -1142,7 +1142,7 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
 
     // Create an affine map for loading the index, using the leading counters
     size_t axis = *(op.axis().getRawData());
-    size_t batch_dims = *(op.batch_dims().getRawData());
+    size_t batchDims = *(op.batchDims().getRawData());
     auto idxShape = indices.getType().cast<MemRefType>().getShape();
     size_t idxDims = indices.getType().cast<MemRefType>().getShape().size();
     auto idxLoadMap = AffineMap::getMultiDimIdentityMap(idxDims, ctx);
@@ -1212,7 +1212,7 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
         }
         idxs.push_back(idx);
       }
-      for (size_t i = 0; i < batch_dims; ++i) {
+      for (size_t i = 0; i < batchDims; ++i) {
         srcOps.push_back(loop.getIVs()[i]);
       }
       srcOps.insert(srcOps.end(), idxs.begin(), idxs.end());
@@ -1222,7 +1222,7 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
       interpVal = rewriter.create<mlir::LoadOp>(loc, tensor, srcOps);
     } break;
     default:
-      llvm_unreachable("unrecognized scatter mode");
+      llvm_unreachable("unrecognized gather mode");
     }
 
     // Create a destination map using all of the dimensions
