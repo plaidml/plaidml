@@ -68,7 +68,10 @@ int JitRunnerMain(int argc, char **argv) {
     return EXIT_FAILURE;
   }
 
-  auto program = std::make_shared<Program>(std::move(file));
+  auto context = std::make_unique<MLIRContext>();
+  registerAllDialects(context->getDialectRegistry());
+
+  auto program = std::make_shared<Program>(std::move(context), std::move(file));
   program->entry = options.mainFuncName.getValue();
   auto executable =
       Executable::fromProgram(program, options.optDeviceID.getValue());
@@ -86,9 +89,6 @@ int main(int argc, char **argv) {
     }
     IVLOG(level, "PLAIDML_VERBOSE=" << level);
   }
-
-  mlir::enableGlobalDialectRegistry(true);
-  registerAllDialects();
 
   llvm::InitLLVM y(argc, argv);
   llvm::InitializeNativeTarget();

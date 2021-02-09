@@ -36,6 +36,7 @@ using namespace mlir; // NOLINT
 
 using util::AggregationKind;
 using util::CombinationKind;
+using util::GatherMode;
 using util::InterpolationMode;
 using util::NearestMode;
 using util::ScatterMode;
@@ -424,7 +425,7 @@ struct LogicalOp {
       }
     }
     auto attrs = ArrayRef<NamedAttribute>{};
-    Type boolType = IntegerType::get(1, rewriter.getContext());
+    Type boolType = rewriter.getI1Type();
     auto resultTypes = llvm::makeArrayRef(boolType);
     auto op = rewriter.create<OpType>(loc, resultTypes, promoted, attrs);
     return op.getOperation()->getResult(0);
@@ -1141,55 +1142,87 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
 
     // Create an affine map for loading the index, using the leading counters
     size_t axis = *(op.axis().getRawData());
+    size_t batchDims = *(op.batchDims().getRawData());
+    auto idxShape = indices.getType().cast<MemRefType>().getShape();
     size_t idxDims = indices.getType().cast<MemRefType>().getShape().size();
     auto idxLoadMap = AffineMap::getMultiDimIdentityMap(idxDims, ctx);
-    auto idxLoadOps = loop.getIVs().slice(axis, idxDims);
-
-    // Load the value from the indices array
-    Value idx =
-        rewriter.create<pxa::PxaLoadOp>(loc, indices, idxLoadMap, idxLoadOps)
-            .getResult();
 
     // Create default source map
     size_t dstDims = size.size();
     std::vector<Value> srcOps;
-    for (size_t i = 0; i < axis; ++i) {
-      srcOps.push_back(loop.getIVs()[i]);
-    }
-
-    for (size_t i = axis + idxDims - 1; i < dstDims; ++i) {
-      srcOps.push_back(loop.getIVs()[i]);
-    }
-
-    // Create std ops for 1D interpolation
     Value interpVal;
-    if (idx.getType().isa<FloatType>()) {
-      switch (op.interpolationMode()) {
-      case InterpolationMode::nearest:
-        interpVal = buildNearestInterpolationOps(
-            loc, rewriter, tensor, idx, srcOps, axis, op.nearestMode());
-        break;
-      case InterpolationMode::linear:
-        interpVal = buildLinearInterpolationOps(loc, rewriter, tensor, idx,
-                                                srcOps, axis);
-        break;
-      case InterpolationMode::cubic:
-        interpVal =
-            buildCubicInterpolationOps(loc, rewriter, tensor, idx, srcOps, axis,
-                                       op.cubeCoeffAttr().getValueAsDouble());
-        break;
-      default:
-        llvm_unreachable("Unsupported InterpolationMode");
+    switch (op.mode()) {
+    case GatherMode::normal: {
+      auto idxLoadOps = loop.getIVs().slice(axis, idxDims);
+      auto idx =
+          rewriter.create<pxa::PxaLoadOp>(loc, indices, idxLoadMap, idxLoadOps)
+              .getResult();
+      for (size_t i = 0; i < axis; ++i) {
+        srcOps.push_back(loop.getIVs()[i]);
       }
-    } else {
-      if (!idx.getType().isa<IndexType>()) {
-        auto indexType = rewriter.getIndexType();
-        // Cast from whatever integer type it has to index type
-        idx =
-            rewriter.create<mlir::IndexCastOp>(loc, idx, indexType).getResult();
+
+      for (size_t i = axis + idxDims - 1; i < dstDims; ++i) {
+        srcOps.push_back(loop.getIVs()[i]);
       }
-      srcOps.at(axis) = idx;
+
+      // Create std ops for 1D interpolation
+      if (idx.getType().isa<FloatType>()) {
+        switch (op.interpolationMode()) {
+        case InterpolationMode::nearest:
+          interpVal = buildNearestInterpolationOps(
+              loc, rewriter, tensor, idx, srcOps, axis, op.nearestMode());
+          break;
+        case InterpolationMode::linear:
+          interpVal = buildLinearInterpolationOps(loc, rewriter, tensor, idx,
+                                                  srcOps, axis);
+          break;
+        case InterpolationMode::cubic:
+          interpVal = buildCubicInterpolationOps(
+              loc, rewriter, tensor, idx, srcOps, axis,
+              op.cubeCoeffAttr().getValueAsDouble());
+          break;
+        default:
+          llvm_unreachable("Unsupported InterpolationMode");
+        }
+      } else {
+        if (!idx.getType().isa<IndexType>()) {
+          auto indexType = rewriter.getIndexType();
+          // Cast from whatever integer type it has to index type
+          idx = rewriter.create<mlir::IndexCastOp>(loc, idx, indexType)
+                    .getResult();
+        }
+        srcOps.at(axis) = idx;
+        interpVal = rewriter.create<mlir::LoadOp>(loc, tensor, srcOps);
+      }
+    } break;
+    case GatherMode::nd: {
+      std::vector<Value> idxs, combIdx(idxDims);
+      for (size_t i = 0; i < idxDims - 1; ++i) {
+        combIdx[i] = loop.getIVs()[i];
+      }
+      for (int64_t i = 0; i < idxShape[idxDims - 1]; ++i) {
+        combIdx[idxDims - 1] = rewriter.create<mlir::ConstantIndexOp>(loc, i);
+        auto idx =
+            rewriter.create<pxa::PxaLoadOp>(loc, indices, idxLoadMap, combIdx)
+                .getResult();
+        if (!idx.getType().isa<IndexType>()) {
+          auto indexType = rewriter.getIndexType();
+          idx = rewriter.create<mlir::IndexCastOp>(loc, idx, indexType)
+                    .getResult();
+        }
+        idxs.push_back(idx);
+      }
+      for (size_t i = 0; i < batchDims; ++i) {
+        srcOps.push_back(loop.getIVs()[i]);
+      }
+      srcOps.insert(srcOps.end(), idxs.begin(), idxs.end());
+      for (size_t i = idxDims - 1; i < dstDims; ++i) {
+        srcOps.push_back(loop.getIVs()[i]);
+      }
       interpVal = rewriter.create<mlir::LoadOp>(loc, tensor, srcOps);
+    } break;
+    default:
+      llvm_unreachable("unrecognized gather mode");
     }
 
     // Create a destination map using all of the dimensions
@@ -1800,8 +1833,8 @@ struct FuncOpConversion : public OpConversionPattern<FuncOp> {
     // Create a new function with an updated signature.
     auto newOp = rewriter.cloneWithoutRegions(op);
     rewriter.inlineRegionBefore(op.getBody(), newOp.getBody(), newOp.end());
-    newOp.setType(FunctionType::get(result.getConvertedTypes(), resultTypes,
-                                    op.getContext()));
+    newOp.setType(FunctionType::get(op.getContext(), result.getConvertedTypes(),
+                                    resultTypes));
 
     // Tell the rewriter to convert the region signature.
     rewriter.applySignatureConversion(&newOp.getBody(), result);
@@ -1819,8 +1852,8 @@ struct ReturnOpConversion : public OpConversionPattern<ReturnOp> {
   LogicalResult
   matchAndRewrite(ReturnOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
-    auto &block = op.getParentRegion()->front();
-    auto funcOp = op.getParentOfType<FuncOp>();
+    auto &block = op->getParentRegion()->front();
+    auto funcOp = op->getParentOfType<FuncOp>();
     auto blockArg = funcOp.getType().getNumInputs() - op.getNumOperands();
     for (Value operand : operands) {
       // Find very initial allocation of memref
@@ -1857,7 +1890,7 @@ struct TraceOpConversion : public OpConversionPattern<tile::PragmaOp> {
       return failure();
     }
     tile::PragmaOpAdaptor adaptor(operands);
-    auto module = op.getParentOfType<ModuleOp>();
+    auto module = op->getParentOfType<ModuleOp>();
     auto msg = op.attrs().getNamed("msg");
     if (!msg) {
       return failure();
@@ -1875,12 +1908,13 @@ struct TraceOpConversion : public OpConversionPattern<tile::PragmaOp> {
     auto context = module.getContext();
     OpBuilder builder(context);
     builder.setInsertionPointToStart(module.getBody());
-    auto funcType = FunctionType::get({}, {}, context);
+    auto funcType = FunctionType::get(context, {}, {});
     auto funcOp = builder.create<FuncOp>(module.getLoc(), symbol, funcType,
                                          ArrayRef<NamedAttribute>{});
-    funcOp.setAttr("msg", msg);
-    funcOp.setAttr("trace", builder.getUnitAttr());
-    funcOp.setAttr("id", builder.getI64IntegerAttr(uniqueId));
+    funcOp->setAttr("msg", msg);
+    funcOp->setAttr("trace", builder.getUnitAttr());
+    funcOp->setAttr("id", builder.getI64IntegerAttr(uniqueId));
+    funcOp.setPrivate();
     return SymbolRefAttr::get(symbol, context);
   }
 };
@@ -2166,7 +2200,8 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         EltwiseOpConversion<tile::SelectOp, SelectOp>,
         EltwiseOpConversion<tile::IdentOp, FirstOperand>>(&getContext());
     // Run the conversion
-    if (failed(applyFullConversion(getOperation(), target, patterns))) {
+    if (failed(
+            applyFullConversion(getOperation(), target, std::move(patterns)))) {
       signalPassFailure();
       return;
     }

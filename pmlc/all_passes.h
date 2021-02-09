@@ -8,7 +8,7 @@
 #include "mlir/Dialect/LLVMIR/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/SCF/Passes.h"
-#include "mlir/Dialect/SPIRV/Passes.h"
+#include "mlir/Dialect/SPIRV/Transforms/Passes.h"
 #include "mlir/Dialect/StandardOps/Transforms/Passes.h"
 #include "mlir/Transforms/Passes.h"
 
@@ -30,6 +30,7 @@
 #include "pmlc/target/intel_gen_ocl_spirv/passes.h"
 #include "pmlc/target/intel_level_zero/passes.h"
 #include "pmlc/target/x86/passes.h"
+#include "pmlc/transforms/passes.h"
 
 // This function may be called to register the MLIR passes with the
 // global registry.
@@ -84,6 +85,9 @@ inline void registerAllPasses() {
   pmlc::target::intel_gen::registerPasses();
   pmlc::target::intel_gen_ocl_spirv::registerPasses();
   pmlc::target::intel_level_zero::registerPasses();
+
+  // Transforms
+  pmlc::transforms::registerPasses();
 
   pmlc::rt::registerRuntimes();
 }

@@ -7,12 +7,14 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/AffineExpr.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
-#include "mlir/IR/StandardTypes.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
 #include "pmlc/dialect/pxa/ir/interfaces.h"
 #include "pmlc/util/enums.h"
+
+using mlir::MemRefDereferencingInterface;
 
 #define GET_OP_CLASSES
 #include "pmlc/dialect/pxa/ir/ops.h.inc"

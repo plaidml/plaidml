@@ -1,4 +1,4 @@
-// Copyright (C) 2020 Intel Corporation
+// Copyright (C) 2021 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 //
 
@@ -21,7 +21,9 @@ void registerReduceOps() {
     auto I = ctx.operands.at(0);
     std::vector<size_t> axes = get_axis_vector_from_constant_operand(1, ctx.layer);
     auto* layer = ngraph::as_type<ngraph::opset1::ReduceLogicalAnd>(ctx.layer);
-    return edsl::make_tuple(op::all(I, edsl::make_tuple(axes), layer->get_keep_dims()));
+    auto I_i8 = edsl::cast(I, DType::UINT8);
+    auto O = op::all(I_i8, edsl::make_tuple(axes), layer->get_keep_dims());
+    return edsl::make_tuple(edsl::cast(O, I.dtype()));
   });
 
   registerOp("ReduceLogicalOr", [](const Context& ctx) {
@@ -29,7 +31,9 @@ void registerReduceOps() {
     auto I = ctx.operands.at(0);
     std::vector<size_t> axes = get_axis_vector_from_constant_operand(1, ctx.layer);
     auto* layer = ngraph::as_type<ngraph::opset1::ReduceLogicalOr>(ctx.layer);
-    return edsl::make_tuple(op::any(I, edsl::make_tuple(axes), layer->get_keep_dims()));
+    auto I_i8 = edsl::cast(I, DType::UINT8);
+    auto O = op::any(I_i8, edsl::make_tuple(axes), layer->get_keep_dims());
+    return edsl::make_tuple(edsl::cast(O, I.dtype()));
   });
 
   registerOp("ReduceMax", [](const Context& ctx) {

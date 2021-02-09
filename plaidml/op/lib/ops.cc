@@ -2274,7 +2274,8 @@ Value reshape(const Value& value) {
   std::vector<TensorDim> I_dims(I.rank());
   I.bind_dims(I_dims);
 
-  TensorDim* fill_dim = nullptr;
+  size_t fill_dim = 0;
+  bool fill_dim_set = false;
 
   auto target_shape = args[1].as_tuple();
   for (size_t i = 0; i < target_shape.size(); i++) {
@@ -2291,11 +2292,12 @@ Value reshape(const Value& value) {
           break;
 
         case (AUTO_DIM_FILL):
-          if (fill_dim) {
+          if (fill_dim_set) {
             throw std::runtime_error("at most one dimension's size may be inferred");
           }
+          fill_dim_set = true;
           O_dims.emplace_back(1);
-          fill_dim = &O_dims.back();
+          fill_dim = i;
           break;
         default:
           O_dims.emplace_back(dim);
@@ -2313,7 +2315,7 @@ Value reshape(const Value& value) {
     }
   }
 
-  if (fill_dim) {
+  if (fill_dim_set) {
     TensorDim num(1);
     for (size_t i = 0; i < I_dims.size(); i++) {
       num = I_dims[i] * num;
@@ -2322,7 +2324,7 @@ Value reshape(const Value& value) {
     for (size_t i = 0; i < O_dims.size(); i++) {
       den = O_dims[i] * den;
     }
-    *fill_dim = TensorDim(num / den);
+    O_dims[fill_dim] = TensorDim(num / den);
   }
   return Value{edsl::reshape(I, O_dims)};
 }

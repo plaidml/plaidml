@@ -1,46 +1,50 @@
-// Copyright (C) 2020 Intel Corporation
+// Copyright (C) 2021 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 //
-
-#include "single_layer_tests/rnn_cell.hpp"
 
 #include <vector>
 
 #include "common_test_utils/test_constants.hpp"
+#include "single_layer_tests/rnn_cell.hpp"
 
-using LayerTestsDefinitions::RNNCellTest;
+using namespace LayerTestsDefinitions;
 
 namespace {
+std::vector<bool> should_decompose{
+    true,
+    // false,
+};
+std::vector<size_t> batch{1, 5};
+std::vector<size_t> hidden_size{1, 10};
+std::vector<size_t> input_size{1, 30};
+std::vector<std::vector<std::string>> activations = {{"relu"}, {"sigmoid"}, {"tanh"}};
+std::vector<float> clips = {0.f, 0.7f};
 std::vector<InferenceEngine::Precision> netPrecisions = {
     InferenceEngine::Precision::FP32,
+    // InferenceEngine::Precision::FP16,
 };
 
-const bool shouldDecompose = true;  // false will let all test cases fail
-const std::vector<size_t> batches = {1, 4};
-const std::vector<size_t> hiddenSizes = {128, 256};
-const std::vector<size_t> inputSizes = {16, 64};
-const std::vector<std::vector<std::string>> activations = {{"tanh"}, {"sigmoid"}, {"relu"}};
-const std::vector<float> clips = {std::numeric_limits<float>::infinity(), 1.0f};
-
-INSTANTIATE_TEST_CASE_P(RNNCell, RNNCellTest,
-                        ::testing::Combine(::testing::Values(shouldDecompose),                   //
-                                           ::testing::ValuesIn(batches),                         //
-                                           ::testing::ValuesIn(hiddenSizes),                     //
-                                           ::testing::ValuesIn(inputSizes),                      //
-                                           ::testing::ValuesIn(activations),                     //
-                                           ::testing::ValuesIn(clips),                           //
-                                           ::testing::ValuesIn(netPrecisions),                   //
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
+INSTANTIATE_TEST_CASE_P(RNNCellCommon, RNNCellTest,
+                        ::testing::Combine(                                       //
+                            ::testing::ValuesIn(should_decompose),                //
+                            ::testing::ValuesIn(batch),                           //
+                            ::testing::ValuesIn(hidden_size),                     //
+                            ::testing::ValuesIn(input_size),                      //
+                            ::testing::ValuesIn(activations),                     //
+                            ::testing::ValuesIn(clips),                           //
+                            ::testing::ValuesIn(netPrecisions),                   //
+                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
                         RNNCellTest::getTestCaseName);
 
 INSTANTIATE_TEST_CASE_P(smoke, RNNCellTest,
-                        ::testing::Combine(::testing::Values(shouldDecompose),                   //
-                                           ::testing::Values(3),                                 //
-                                           ::testing::Values(64),                                //
-                                           ::testing::Values(32),                                //
-                                           ::testing::ValuesIn(activations),                     //
-                                           ::testing::ValuesIn(clips),                           //
-                                           ::testing::ValuesIn(netPrecisions),                   //
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
+                        ::testing::Combine(                                       //
+                            ::testing::ValuesIn(should_decompose),                //
+                            ::testing::Values(3),                                 //
+                            ::testing::Values(64),                                //
+                            ::testing::Values(32),                                //
+                            ::testing::ValuesIn(activations),                     //
+                            ::testing::ValuesIn(clips),                           //
+                            ::testing::ValuesIn(netPrecisions),                   //
+                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
                         RNNCellTest::getTestCaseName);
 }  // namespace

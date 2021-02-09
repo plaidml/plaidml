@@ -1,63 +1,48 @@
-// Copyright (C) 2020 Intel Corporation
+// Copyright (C) 2021 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 //
-
-#include "single_layer_tests/roi_align.hpp"
 
 #include <vector>
 
 #include "common_test_utils/test_constants.hpp"
+#include "single_layer_tests/roi_align.hpp"
 
-using LayerTestsDefinitions::ROIAlignLayerTest;
+using namespace LayerTestsDefinitions;
 
-namespace {
-std::vector<InferenceEngine::Precision> netPrecisions = {
-    InferenceEngine::Precision::FP32,
-};
-
-const std::vector<std::vector<size_t>> inputShapes = {{6, 3, 128, 128}, {7, 256, 200, 200}};
-const std::vector<std::vector<float>> rois = {{{0.1, 0.2, 0.4, 0.3},  //
-                                               {0.3, 0.4, 0.2, 0.7},  //
-                                               {0.6, 0.5, 0.8, 0.8}}};
-const std::vector<size_t> batchIndices = {2, 3, 5};
-const std::vector<size_t> numROIs = {3};
-const std::vector<size_t> pooledHs = {6};
-const std::vector<size_t> pooledWs = {6};
-const std::vector<size_t> samplingRatios = {0};
-const std::vector<float> spatialScale = {16.0, 20.0};
-const std::vector<std::string> modes = {"avg", "max"};
-
-const auto roiAlignParams = ::testing::Combine(::testing::ValuesIn(inputShapes),     //
-                                               ::testing::Values(rois),              //
-                                               ::testing::Values(batchIndices),      //
-                                               ::testing::ValuesIn(numROIs),         //
-                                               ::testing::ValuesIn(pooledHs),        //
-                                               ::testing::ValuesIn(pooledWs),        //
-                                               ::testing::ValuesIn(samplingRatios),  //
-                                               ::testing::ValuesIn(spatialScale),    //
-                                               ::testing::ValuesIn(modes)            //
+const auto ROIAlignCases_average = ::testing::Combine(  //
+    ::testing::ValuesIn(std::vector<std::vector<size_t>>{
+        {3, 8, 16, 16},
+        {2, 1, 16, 16},
+        {2, 1, 8, 16},
+    }),                                                   //
+    ::testing::Values(std::vector<size_t>{2, 4}),         //
+    ::testing::Values(2),                                 //
+    ::testing::Values(2),                                 //
+    ::testing::ValuesIn(std::vector<float>{1, 0.625}),    //
+    ::testing::Values(2),                                 //
+    ::testing::Values("avg"),                             //
+    ::testing::Values(InferenceEngine::Precision::FP32),  //
+    ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)    //
 );
 
-INSTANTIATE_TEST_CASE_P(ROIAlign, ROIAlignLayerTest,
-                        ::testing::Combine(roiAlignParams,                                       //
-                                           ::testing::ValuesIn(netPrecisions),                   //
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
+INSTANTIATE_TEST_CASE_P(smoke_TestsROIAlign_average, ROIAlignLayerTest, ROIAlignCases_average,
                         ROIAlignLayerTest::getTestCaseName);
 
-const auto smokeRoiAlignParams = ::testing::Combine(::testing::Values(inputShapes[0]),  //
-                                                    ::testing::Values(rois),            //
-                                                    ::testing::Values(batchIndices),    //
-                                                    ::testing::Values(2),               //
-                                                    ::testing::Values(3),               //
-                                                    ::testing::Values(3),               //
-                                                    ::testing::Values(0),               //
-                                                    ::testing::Values(20.0f),           //
-                                                    ::testing::Values("max")            //
+const auto ROIAlignCases_max = ::testing::Combine(  //
+    ::testing::ValuesIn(std::vector<std::vector<size_t>>{
+        {2, 8, 20, 20},
+        {2, 1, 20, 20},
+        {2, 1, 10, 20},
+    }),                                                   //
+    ::testing::Values(std::vector<size_t>{2, 4}),         //
+    ::testing::Values(2),                                 //
+    ::testing::Values(2),                                 //
+    ::testing::ValuesIn(std::vector<float>{1, 0.625}),    //
+    ::testing::Values(2),                                 //
+    ::testing::Values("max"),                             //
+    ::testing::Values(InferenceEngine::Precision::FP32),  //
+    ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)    //
 );
 
-INSTANTIATE_TEST_CASE_P(smoke, ROIAlignLayerTest,
-                        ::testing::Combine(smokeRoiAlignParams,                                  //
-                                           ::testing::ValuesIn(netPrecisions),                   //
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
+INSTANTIATE_TEST_CASE_P(smoke_TestsROIAlign_max, ROIAlignLayerTest, ROIAlignCases_max,
                         ROIAlignLayerTest::getTestCaseName);
-}  // namespace

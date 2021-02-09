@@ -7,4 +7,4 @@ func @eltwise_add(%A: !tensor, %B: !tensor) -> !tensor {
   return %C : !tensor
 }
 
-// CHECK: llvm.call @vkRun
+// CHECK: llvm.call @vlk_schedule_compute

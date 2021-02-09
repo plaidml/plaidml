@@ -76,6 +76,7 @@ plaidml_cc_library(
         "//pmlc/dialect/xsmm",
         "//pmlc/rt:all_runtimes",
         "//pmlc/target:all_targets",
+        "//pmlc/transforms",
         "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:AffineToStandard",
         "@llvm-project//mlir:AffineTransforms",
@@ -93,14 +94,14 @@ plaidml_cc_library(
         "@llvm-project//mlir:SCFToGPUPass",
         "@llvm-project//mlir:SCFToStandard",
         "@llvm-project//mlir:SCFTransforms",
+        "@llvm-project//mlir:SPIRVConversion",
         "@llvm-project//mlir:SPIRVDialect",
-        "@llvm-project//mlir:SPIRVLowering",
         "@llvm-project//mlir:SPIRVSerialization",
         "@llvm-project//mlir:SPIRVToLLVM",
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:StandardOpsTransforms",
         "@llvm-project//mlir:StandardToLLVM",
-        "@llvm-project//mlir:StandardToSPIRVTransforms",
+        "@llvm-project//mlir:StandardToSPIRV",
         "@llvm-project//mlir:Transforms",
         "@llvm-project//mlir:VectorOps",
     ],
@@ -124,11 +125,11 @@ plaidml_cc_binary(
     deps = ["//pmlc/tools/pmlc-opt:lib"],
 )
 
-plaidml_cc_binary(
-    name = "tblgen",
-    data = [":lit_tests"],
-    deps = ["//pmlc/tools/pmlc-tblgen:lib"],
-)
+# plaidml_cc_binary(
+#     name = "tblgen",
+#     data = [":lit_tests"],
+#     deps = ["//pmlc/tools/pmlc-tblgen:lib"],
+# )
 
 plaidml_cc_binary(
     name = "translate",

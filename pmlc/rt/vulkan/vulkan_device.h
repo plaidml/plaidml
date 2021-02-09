@@ -18,10 +18,10 @@
 #include <string>
 #include <vector>
 
-#include "mlir/Dialect/SPIRV/SPIRVOps.h"
-#include "mlir/Dialect/SPIRV/Serialization.h"
-#include "mlir/IR/Module.h"
+#include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/Support/LLVM.h"
+#include "mlir/Target/SPIRV/Serialization.h"
 #include "pmlc/rt/runtime.h"
 #include "pmlc/rt/vulkan/vulkan_state.h"
 #include "llvm/Support/ToolOutputFile.h"

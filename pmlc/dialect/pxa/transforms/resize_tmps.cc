@@ -55,7 +55,7 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
     }
 
     // Resize only nested ops option
-    if (onlyParallelNested && !dyn_cast<AffineParallelOp>(op.getParentOp())) {
+    if (onlyParallelNested && !dyn_cast<AffineParallelOp>(op->getParentOp())) {
       return;
     }
 

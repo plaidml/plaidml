@@ -1,11 +1,13 @@
 // Copyright 2020 Intel Corporation
 
+#include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/StandardOps/EDSC/Builders.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/PatternMatch.h"
-#include "mlir/IR/StandardTypes.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "pmlc/dialect/stdx/transforms/pass_detail.h"
 
@@ -113,7 +115,7 @@ LogicalResult
 TransferReadOpI1ToI32::matchAndRewrite(vector::TransferReadOp transferReadOp,
                                        PatternRewriter &rewriter) const {
   // Not convert function argument as we alloc i32 buffer for it.
-  if (!transferReadOp.memref().getDefiningOp()) {
+  if (!transferReadOp.source().getDefiningOp()) {
     return failure();
   }
 
@@ -129,12 +131,12 @@ TransferReadOpI1ToI32::matchAndRewrite(vector::TransferReadOp transferReadOp,
 
   auto destTypeVec = VectorType::get(vectorType.getNumElements(), destType);
 
-  transferReadOp.memref().setType(MemRefType::get(
-      transferReadOp.memref().getType().cast<MemRefType>().getShape(),
+  transferReadOp.source().setType(MemRefType::get(
+      transferReadOp.source().getType().cast<MemRefType>().getShape(),
       destType));
 
   auto newTransferReadOp = rewriter.create<vector::TransferReadOp>(
-      loc, destTypeVec, transferReadOp.memref(), transferReadOp.indices());
+      loc, destTypeVec, transferReadOp.source(), transferReadOp.indices());
 
   auto const0 = rewriter.create<ConstantIntOp>(loc, 0, destType);
   auto const0Op = rewriter.create<vector::BroadcastOp>(loc, destTypeVec,
@@ -200,7 +202,7 @@ LogicalResult
 TransferWriteOpI1ToI32::matchAndRewrite(vector::TransferWriteOp transferWriteOp,
                                         PatternRewriter &rewriter) const {
   // Not convert function argument as we alloc i32 buffer for it.
-  if (!transferWriteOp.memref().getDefiningOp()) {
+  if (!transferWriteOp.source().getDefiningOp()) {
     return failure();
   }
 
@@ -222,8 +224,8 @@ TransferWriteOpI1ToI32::matchAndRewrite(vector::TransferWriteOp transferWriteOp,
   auto const1Op = rewriter.create<vector::BroadcastOp>(loc, destTypeVec,
                                                        const1.getResult());
 
-  transferWriteOp.memref().setType(MemRefType::get(
-      transferWriteOp.memref().getType().cast<MemRefType>().getShape(),
+  transferWriteOp.source().setType(MemRefType::get(
+      transferWriteOp.source().getType().cast<MemRefType>().getShape(),
       destType));
 
   auto selOp =
@@ -231,7 +233,7 @@ TransferWriteOpI1ToI32::matchAndRewrite(vector::TransferWriteOp transferWriteOp,
                                 const1Op.getResult(), const0Op.getResult());
 
   rewriter.replaceOpWithNewOp<vector::TransferWriteOp>(
-      transferWriteOp, selOp.getResult(), transferWriteOp.memref(),
+      transferWriteOp, selOp.getResult(), transferWriteOp.source(),
       transferWriteOp.indices());
 
   return success();
@@ -252,55 +254,18 @@ void buildLoopForMemRef(
   if (!memRefType)
     return;
 
-  mlir::edsc::ScopedContext context(builder, loc);
-  mlir::edsc::MemRefBoundsCapture mBoundsCapture(memRef);
-
+  auto indexConst0 = builder.create<ConstantOp>(loc, builder.getIndexAttr(0));
   auto indexConst1 = builder.create<ConstantOp>(loc, builder.getIndexAttr(1));
-  SmallVector<Value, 8> steps, ivs;
-  int rank = memRefType.getRank();
-  steps.reserve(rank);
-  for (int i = 0; i < rank; i++)
-    steps.push_back(indexConst1);
-
-  Block *currentBlock = builder.getInsertionBlock();
-  Block *ifBlock, *thenBlock, *continueBlock;
-
-  for (int i = 0; i < rank; i++) {
-    // Create blocks
-    auto currentPoint = builder.getInsertionPoint();
-    ifBlock = currentBlock->splitBlock(currentPoint);
-    thenBlock = ifBlock->splitBlock(ifBlock->begin());
-    continueBlock = thenBlock->splitBlock(thenBlock->begin());
-
-    // Create loop entry
-    builder.setInsertionPointToEnd(currentBlock);
-    builder.create<BranchOp>(loc, ifBlock, mBoundsCapture.lb(i));
-
-    // Check up bound
-    builder.setInsertionPointToStart(ifBlock);
-    ifBlock->addArgument(mBoundsCapture.lb(i).getType());
-    auto comparsion = builder.create<CmpIOp>(
-        loc, CmpIPredicate::slt, ifBlock->getArgument(0), mBoundsCapture.ub(i));
-    builder.create<CondBranchOp>(loc, comparsion, thenBlock, ArrayRef<Value>(),
-                                 continueBlock, ArrayRef<Value>());
-
-    // Update index with step
-    builder.setInsertionPointToStart(thenBlock);
-    auto stepped =
-        builder.create<AddIOp>(loc, ifBlock->getArgument(0), steps[i])
-            .getResult();
-    builder.create<BranchOp>(loc, ifBlock, stepped);
-
-    // Ready for next dimension
-    builder.setInsertionPointToStart(thenBlock);
-    currentBlock = thenBlock;
-    ivs.push_back(ifBlock->getArgument(0));
+  SmallVector<Value, 8> lower, upper, step;
+  auto shape = memRefType.getShape();
+  for (size_t i = 0; i < shape.size(); i++) {
+    lower.push_back(indexConst0);
+    auto indexConstUB =
+        builder.create<ConstantOp>(loc, builder.getIndexAttr(shape[i]));
+    upper.push_back(indexConstUB);
+    step.push_back(indexConst1);
   }
-
-  // Create loop body
-  if (thenBlock && bodyBuilder) {
-    bodyBuilder(builder, loc, ivs);
-  }
+  mlir::scf::buildLoopNest(builder, loc, lower, upper, step, bodyBuilder);
 }
 
 struct I1StorageToI32Pass : public I1StorageToI32Base<I1StorageToI32Pass> {
@@ -315,19 +280,16 @@ struct I1StorageToI32Pass : public I1StorageToI32Base<I1StorageToI32Pass> {
                                 .getType()
                                 .dyn_cast_or_null<MemRefType>()) {
         if (memRefType.getElementType().isInteger(1)) {
+          OpBuilder builder(context);
+
           // shall convert this memref to int32
           auto argument = entryBlock.getArgument(i);
-          auto intType = IntegerType::get(32, context);
+          auto intType = builder.getI32Type();
           auto newMemRefType = MemRefType::get(memRefType.getShape(), intType);
-          OpBuilder builder(context);
           Location loc = entryBlock.front().getLoc();
 
           builder.setInsertionPointToStart(&entryBlock);
           auto alloc = builder.create<AllocOp>(loc, newMemRefType);
-
-          // Make sure to allocate at the beginning of the block.
-          auto *parentBlock = alloc.getOperation()->getBlock();
-          alloc.getOperation()->moveBefore(&parentBlock->front());
 
           // Update old memref uses with new memref
           argument.replaceUsesWithIf(alloc,
@@ -367,7 +329,7 @@ struct I1StorageToI32Pass : public I1StorageToI32Base<I1StorageToI32Pass> {
       }
 
     populateI1StorageToI32(context, patterns);
-    applyPatternsAndFoldGreedily(getOperation(), patterns);
+    applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }
 };
 

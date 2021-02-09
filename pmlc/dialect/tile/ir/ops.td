@@ -36,19 +36,19 @@ def ContractionOp : TileOp<"contract", [
   );
   let results = (outs RankedTensorOf<[AnyScalar]>:$result);
 
-  let builders = [OpBuilder<
-    "mlir::OpBuilder &builder, "
-    "mlir::OperationState& result, "
-    "mlir::Type resultType, "
-    "mlir::Value init, "
-    "mlir::ArrayRef<mlir::Value> tensors, "
-    "util::AggregationKind agg, "
-    "util::CombinationKind combo, "
-    "mlir::AffineMap sink, "
-    "mlir::ArrayRef<mlir::AffineMap> srcs, "
-    "mlir::IntegerSet cons, "
-    "mlir::StringRef name"
-  >];
+  let builders = [
+    OpBuilderDAG<(ins 
+      "mlir::Type":$resultType,
+      "mlir::Value":$init,
+      "mlir::ArrayRef<mlir::Value>":$tensors,
+      "util::AggregationKind":$agg,
+      "util::CombinationKind":$combo,
+      "mlir::AffineMap":$sink,
+      "mlir::ArrayRef<mlir::AffineMap>":$srcs,
+      "mlir::IntegerSet":$cons,
+      "mlir::StringRef":$name
+    )>
+  ];
 
   let extraClassDeclaration = [{
     static unsigned getNumTensors(CombinationKind combo);
@@ -112,23 +112,27 @@ def GatherOp : MaterializeOp<"gather"> {
     DefaultValuedAttr<IndexAttr, "0">:$axis,
     DefaultValuedAttr<InterpolationMode, "InterpolationMode::linear">:$interpolationMode,
     DefaultValuedAttr<NearestMode, "NearestMode::round_prefer_floor">:$nearestMode,
-    DefaultValuedAttr<F64Attr, "-0.75">:$cubeCoeff
+    DefaultValuedAttr<F64Attr, "-0.75">:$cubeCoeff,
+    DefaultValuedAttr<GatherMode, "GatherMode::normal">:$mode,
+    DefaultValuedAttr<IndexAttr, "0">:$batchDims
   );
   let results = (outs RankedTensorOf<[AnyScalar]>:$result);
   let assemblyFormat = [{
     $tensor $indices attr-dict `:` functional-type(operands, $result)
   }];
 
-  let builders = [OpBuilder<
-    "mlir::OpBuilder &builder, "
-    "mlir::OperationState& result, "
-    "mlir::Type resultType, "
-    "mlir::ValueRange operands, "
-    "mlir::IntegerAttr axis, "
-    "mlir::IntegerAttr interpolationMode, "
-    "mlir::IntegerAttr nearestMode, "
-    "mlir::FloatAttr cubeCoeff"
-  >];
+  let builders = [
+    OpBuilderDAG<(ins
+      "mlir::Type":$resultType,
+      "mlir::ValueRange":$operands,
+      "mlir::IntegerAttr":$axis,
+      "mlir::IntegerAttr":$interpolationMode,
+      "mlir::IntegerAttr":$nearestMode,
+      "mlir::FloatAttr":$cubeCoeff,
+      "mlir::IntegerAttr":$mode,
+      "mlir::IntegerAttr":$batchDims
+    )>
+  ];
 }
 
 def IndexOp : SpecialOp<"index"> {
@@ -155,6 +159,7 @@ def ReshapeOp : MaterializeOp<"reshape">,
   let assemblyFormat = [{
     $tensor attr-dict `:` functional-type($tensor, $result)
   }];
+  let verifier = [{ return verify$cppClass(*this); }];
 }
 
 def ScatterOp : MaterializeOp<"scatter"> {
@@ -167,14 +172,14 @@ def ScatterOp : MaterializeOp<"scatter"> {
     DefaultValuedAttr<ScatterMode, "ScatterMode::normal">:$mode
   );
   let results = (outs RankedTensorOf<[AnyScalar]>:$result);
-  let builders = [OpBuilder<
-    "mlir::OpBuilder &builder, "
-    "mlir::OperationState& result, "
-    "mlir::Type resultType, "
-    "mlir::ValueRange operands, "
-    "mlir::IntegerAttr axis, "
-    "mlir::IntegerAttr mode"
-  >];
+  let builders = [
+    OpBuilderDAG<(ins
+      "mlir::Type":$resultType,
+      "mlir::ValueRange":$operands,
+      "mlir::IntegerAttr":$axis,
+      "mlir::IntegerAttr":$mode
+    )>
+  ];
 
   let assemblyFormat = [{
     $data $indices $updates attr-dict `:` functional-type(operands, $result)
@@ -197,18 +202,18 @@ def PragmaOp : MaterializeOp<"pragma", [
   let arguments = (ins AnyType:$tensor, StrAttr:$op, DictionaryAttr:$attrs);
   let results = (outs AnyType:$result);
 
-  let builders = [OpBuilder<
-    "mlir::OpBuilder &builder, "
-    "mlir::OperationState& result, "
-    "mlir::Value tensor, "
-    "mlir::StringRef op, "
-    "mlir::DictionaryAttr attrs", [{
-      result.addTypes(tensor.getType());
-      result.addOperands(tensor);
-      result.addAttribute("op", builder.getStringAttr(op));
-      result.addAttribute("attrs", attrs);
-    }]
-  >];
+  let builders = [
+    OpBuilderDAG<(ins
+      "mlir::Value":$tensor,
+      "mlir::StringRef":$op,
+      "mlir::DictionaryAttr":$attrs), [{
+        $_state.addTypes(tensor.getType());
+        $_state.addOperands(tensor);
+        $_state.addAttribute("op", $_builder.getStringAttr(op));
+        $_state.addAttribute("attrs", attrs);
+      }]
+    >
+  ];
 
   let assemblyFormat = "$tensor $op $attrs attr-dict `:` type($tensor)";
 }

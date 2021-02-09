@@ -1,99 +1,100 @@
-// Copyright (C) 2020 Intel Corporation
+// Copyright (C) 2021 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 //
+
+#include <tuple>
 
 #include "ngraph/opsets/opset.hpp"
 #include "ngraph/opsets/opset4.hpp"
 #include "plaidml/op/op.h"
 #include "plaidml_ops.hpp"
 #include "plaidml_util.hpp"
-#include <tuple>
 
 using namespace plaidml;          // NOLINT[build/namespaces]
 using namespace InferenceEngine;  // NOLINT[build/namespaces]
 
 namespace {
 
-template <typename T>
-std::vector<T> cast_constant_operand(size_t operand_idx, ngraph::Node* layer) {
-  auto* ngraph_const = ngraph::as_type<ngraph::op::Constant>(layer->get_input_node_ptr(operand_idx));
-  if (ngraph_const) {
-    return ngraph_const->cast_vector<T>();
-  } else {
-    THROW_IE_EXCEPTION
-        << "Dynamic coordinate is not currently supported by PlaidML plugin; all coordinate must be Constants. ";
-  }
-}
+edsl::Tensor crop_max_pooling(edsl::Tensor I, const std::vector<float>& coord, int64_t pooled_h, int64_t pooled_w,
+                              int height, int width) {
+  auto roi_w_start = coord[0];
+  auto roi_h_start = coord[1];
+  auto roi_w_end = coord[2];
+  auto roi_h_end = coord[3];
 
-edsl::Tensor crop_max_pooling(edsl::Tensor I, const std::vector<float>& coord, int64_t pooled_h, int64_t pooled_w) {
-  auto x_1 = coord[0];
-  auto y_1 = coord[1];
-  auto x_2 = coord[2];
-  auto y_2 = coord[3];
+  float roi_width = std::max(roi_w_end - roi_w_start + 1, 1.0f);
+  float roi_height = std::max(roi_h_end - roi_h_start + 1, 1.0f);
 
-  auto roi_width = std::max(x_2 - x_1, 1.0f);
-  auto roi_height = std::max(y_2 - y_1, 1.0f);
+  float bin_size_h = roi_height / pooled_h;
+  float bin_size_w = roi_width / pooled_w;
 
-  auto bin_size_h = roi_height / static_cast<float>(pooled_h);
-  auto bin_size_w = roi_width / static_cast<float>(pooled_w);
-
-  edsl::Tensor pooled_tensor;
+  auto shapes = I.compute_shape().sizes();
+  std::vector<edsl::Tensor> pooled_tensor;
   for (auto i = 0; i < pooled_h; i++) {
     for (auto j = 0; j < pooled_w; j++) {
       // enlarge bin.
-      auto start_h = std::floor(x_1 + bin_size_h * i);
-      auto start_w = std::floor(y_1 + bin_size_w * j);
-      auto end_h = std::ceil(x_1 + bin_size_h * (i + 1));
-      auto end_w = std::ceil(y_1 + bin_size_w * (j + 1));
+      int h1 = roi_h_start + std::floor(bin_size_h * i);
+      int w1 = roi_w_start + std::floor(bin_size_w * j);
+      int h2 = roi_h_start + std::ceil(bin_size_h * (i + 1));
+      int w2 = roi_w_start + std::ceil(bin_size_w * (j + 1));
 
-      auto h_tensor =
-          edsl::index({edsl::TensorDim(static_cast<int64_t>(end_h - start_h))}, 0) + static_cast<int>(start_h);
-      auto w_tensor =
-          edsl::index({edsl::TensorDim(static_cast<int64_t>(end_w - start_w))}, 0) + static_cast<int>(start_w);
+      // check border.
+      auto start_h = std::min(std::max(h1, 0), height);
+      auto start_w = std::min(std::max(w1, 0), width);
+      auto end_h = std::min(std::max(h2, 0), height);
+      auto end_w = std::min(std::max(w2, 0), width);
 
-      // crop bin from ROI.
-      auto gather_w = edsl::gather(I, w_tensor).axis(3).interpolationMode(edsl::InterpolationMode::LINEAR);
-      auto crop = static_cast<edsl::Tensor>(
-          edsl::gather(gather_w, h_tensor).axis(2).interpolationMode(edsl::InterpolationMode::LINEAR));
+      // if start equal to end, we have to guarantee that index is at least one. and they are not over the border.
+      auto slice_w_index = end_w - start_w > 0 ? end_w - start_w : 1;
+      auto slice_h_index = end_h - start_h > 0 ? end_h - start_h : 1;
+      auto h_index = start_h >= height ? height - 1 : start_h;
+      auto w_index = start_w >= width ? width - 1 : start_w;
+      auto h_tensor = edsl::index({edsl::TensorDim(slice_h_index)}, 0) + h_index;
+      auto w_tensor = edsl::index({edsl::TensorDim(slice_w_index)}, 0) + w_index;
+      auto gather_w = edsl::gather(I, w_tensor).axis(3);
+      edsl::Tensor crop = edsl::gather(gather_w, h_tensor).axis(2);
 
       // get max value from bin, then put it to pooled tensor.
       std::vector<edsl::TensorDim> dims(crop.rank());
       crop.bind_dims(dims);
       std::vector<edsl::TensorIndex> idx(crop.rank());
-      auto bin_max = edsl::Contraction()
-                         .outShape({dims[0], dims[1], edsl::TensorDim(pooled_h), edsl::TensorDim(pooled_w)})
-                         .outAccess({idx[0], idx[1], edsl::TensorIndex(i), edsl::TensorIndex(j)})
-                         .max(crop(idx));
-      pooled_tensor = (i == 0) ? bin_max : edsl::select(pooled_tensor > bin_max, pooled_tensor, bin_max);
+      edsl::Tensor bin_max =
+          edsl::Contraction().outShape({dims[0], dims[1]}).outAccess({idx[0], idx[1]}).max(crop(idx));
+      pooled_tensor.push_back(edsl::reshape(bin_max, {shapes[0], shapes[1], 1}));
     }
   }
-  return pooled_tensor;
+
+  return edsl::reshape(op::concatenate(pooled_tensor, 2), {shapes[0], shapes[1], pooled_h, pooled_w});
 }
 
-edsl::Tensor bilinear_pooling(edsl::Tensor I, const std::vector<float>& coord, int64_t pooled_h, int64_t pooled_w) {
-  auto x_1 = coord[0];
-  auto y_1 = coord[1];
-  auto x_2 = coord[2];
-  auto y_2 = coord[3];
+edsl::Tensor bilinear_pooling(edsl::Tensor I, const std::vector<float>& coord, int64_t pooled_h, int64_t pooled_w,
+                              int height, int width) {
+  auto roi_w_start = coord[0];
+  auto roi_h_start = coord[1];
+  auto roi_w_end = coord[2];
+  auto roi_h_end = coord[3];
 
-  auto roi_width = y_2 - y_1;
-  auto roi_height = x_2 - x_1;
+  float roi_width = (roi_w_end - roi_w_start) * (width - 1);
+  float roi_height = (roi_h_end - roi_h_start) * (height - 1);
 
-  auto roi_h_scale = roi_height / pooled_h;
-  auto roi_w_scale = roi_width / pooled_w;
+  float roi_h_scale = roi_height / (pooled_h - 1);
+  float roi_w_scale = roi_width / (pooled_w - 1);
 
-  auto h_tensor = edsl::cast(edsl::index({edsl::TensorDim(pooled_h)}, 0), DType::FLOAT32) * roi_h_scale + x_1;
-  auto w_tensor = edsl::cast(edsl::index({edsl::TensorDim(pooled_w)}, 0), DType::FLOAT32) * roi_w_scale + y_1;
+  // get center point of every ROI bin.
+  auto in_h = edsl::cast(edsl::index({edsl::TensorDim(pooled_h)}, 0), DType::FLOAT32) * roi_h_scale +
+              roi_h_start * (height - 1);
+  auto in_w =
+      edsl::cast(edsl::index({edsl::TensorDim(pooled_w)}, 0), DType::FLOAT32) * roi_w_scale + roi_w_start * (width - 1);
 
-  auto gather_w = edsl::gather(I, w_tensor).axis(3).interpolationMode(edsl::InterpolationMode::LINEAR);
-  auto gather_h = edsl::gather(gather_w, h_tensor).axis(2).interpolationMode(edsl::InterpolationMode::LINEAR);
-
-  return gather_h;
+  auto I_gathered_h = edsl::gather(I, in_h).axis(2);
+  return edsl::gather(I_gathered_h, in_w).axis(3);
 }
 
 }  // namespace
 
 namespace PlaidMLPlugin {
+
+const static int BOX_ELEMENT_SIZE = 5;  // NOLINT
 
 void registerROIPooling() {
   registerOp("ROIPooling", [](const Context& ctx) {
@@ -107,16 +108,12 @@ void registerROIPooling() {
     auto spatial_ratio = layer->get_spatial_scale();
     auto method = layer->get_method();
 
-    const static int BOX_ELEMENT_SIZE = 5;
     auto coords_box = cast_constant_operand<float>(1, layer);
     IE_ASSERT((coords_box.size() % BOX_ELEMENT_SIZE) == 0);
 
-    int height = 0, width = 0;
-    if (method == "bilinear") {
-      auto shapes = I.compute_shape().sizes();
-      height = shapes[2];
-      width = shapes[3];
-    }
+    auto shapes = I.compute_shape().sizes();
+    auto height = shapes[2];
+    auto width = shapes[3];
 
     std::vector<edsl::Tensor> ROI_pools;
     // 2D input tensor of shape [NUM_ROIS, 5] describing box
@@ -131,17 +128,13 @@ void registerROIPooling() {
       edsl::Tensor pooled_tensor;
       if (method == "max") {
         // translate ROI coordinates from their input normalize scale to feature map scale.
-        for (int i = 1; i < coord.size(); i++) {
+        for (int i = 0; i < coord.size(); i++) {
           coord[i] = std::round(coord[i] * spatial_ratio);
         }
-        pooled_tensor = crop_max_pooling(slice_I, coord, pooled_height, pooled_width);
+        pooled_tensor = crop_max_pooling(slice_I, coord, pooled_height, pooled_width, height, width);
       } else if (method == "bilinear") {
         // follow ngraph implementation, which doesn't use spatial_ratio in "bilinear" method.
-        coord[1] *= (width - 1);
-        coord[3] *= (width - 1);
-        coord[2] *= (height - 1);
-        coord[4] *= (height - 1);
-        pooled_tensor = bilinear_pooling(slice_I, coord, pooled_height, pooled_width);
+        pooled_tensor = bilinear_pooling(slice_I, coord, pooled_height, pooled_width, height, width);
       } else {
         THROW_IE_EXCEPTION << "ROIPooling op currently only support 'max' and 'bilinear' method;";
       }

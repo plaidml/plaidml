@@ -4,7 +4,7 @@
 
 #include <sstream>
 
-#include "mlir/IR/StandardTypes.h"
+#include "mlir/IR/BuiltinTypes.h"
 
 namespace pmlc::util {
 

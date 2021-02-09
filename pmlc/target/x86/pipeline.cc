@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <utility>
 
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/OpenMPToLLVM/ConvertOpenMPToLLVM.h"
@@ -12,7 +13,7 @@
 #include "mlir/Dialect/Affine/Passes.h"
 #include "mlir/Dialect/OpenMP/OpenMPDialect.h"
 #include "mlir/Dialect/StandardOps/Transforms/Passes.h"
-#include "mlir/IR/StandardTypes.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
@@ -25,6 +26,7 @@
 #include "pmlc/conversion/tile_to_pxa/passes.h"
 #include "pmlc/dialect/layer/transforms/passes.h"
 #include "pmlc/dialect/pxa/transforms/passes.h"
+#include "pmlc/dialect/pxa/transforms/stencil.h"
 #include "pmlc/dialect/stdx/transforms/passes.h"
 #include "pmlc/dialect/tile/transforms/passes.h"
 #include "pmlc/dialect/xsmm/ir/ops.h"
@@ -64,8 +66,8 @@ struct LowerPXAToAffinePass
     conversion::pxa_to_affine::populatePXAToAffineConversionPatterns(patterns,
                                                                      &ctx);
 
-    if (failed(applyPartialConversion(getOperation(), target, patterns,
-                                      nullptr))) {
+    if (failed(applyPartialConversion(getOperation(), target,
+                                      std::move(patterns)))) {
       getOperation().dump();
       emitError(UnknownLoc::get(&ctx), "Error lowering pxa -> affine\n");
       signalPassFailure();
@@ -93,7 +95,7 @@ struct ConvertStandardToLLVMPass
     populateStdToLLVMConversionPatterns(typeConverter, patterns);
     conversion::stdx_to_llvm::populateStdXToLLVMConversionPatterns(
         typeConverter, patterns);
-    populateOpenMPToLLVMConversionPatterns(context, typeConverter, patterns);
+    populateOpenMPToLLVMConversionPatterns(typeConverter, patterns);
 
     LLVMConversionTarget target(*context);
     target.addDynamicallyLegalOp<omp::ParallelOp>([&](omp::ParallelOp op) {
@@ -101,7 +103,7 @@ struct ConvertStandardToLLVMPass
     });
     target.addLegalOp<omp::TerminatorOp, omp::TaskyieldOp, omp::FlushOp,
                       omp::BarrierOp, omp::TaskwaitOp>();
-    if (failed(applyPartialConversion(module, target, patterns))) {
+    if (failed(applyPartialConversion(module, target, std::move(patterns)))) {
       signalPassFailure();
     }
   }
@@ -119,12 +121,12 @@ struct OpenMPWorkaroundPass final
       llvm::SetVector<Value> values;
 
       visitUsedValuesDefinedAbove({parOp.region()}, [&](OpOperand *opOperand) {
-        auto value = opOperand->get();
+        Value value = opOperand->get();
 
-        // If it's not an LLVM type, or if it's an LLVM pointer type, we
-        // don't need or want to smuggle this value in via a struct.
-        auto llvmType = value.getType().dyn_cast<LLVM::LLVMType>();
-        if (!llvmType || llvmType.isPointerTy()) {
+        // If it's not an LLVM pointer type, we don't need or want to smuggle
+        // this value in via a struct.
+        Type llvmType = value.getType();
+        if (llvmType.isa<LLVM::LLVMPointerType>()) {
           return;
         }
 
@@ -133,24 +135,20 @@ struct OpenMPWorkaroundPass final
         values.insert(value);
       });
 
-      if (!values.size()) {
+      if (values.empty()) {
         return; // Nothing to do.
       }
 
       // Build the structure.
       builder.setInsertionPoint(parOp);
-      LLVM::LLVMType structTy;
-      {
-        SmallVector<LLVM::LLVMType, 8> types;
-        for (auto val : values) {
-          types.push_back(val.getType().cast<LLVM::LLVMType>());
-        }
-        structTy = LLVM::LLVMType::getStructTy(&getContext(), types);
+      SmallVector<Type, 8> types;
+      for (Value value : values) {
+        types.push_back(value.getType());
       }
-      auto structPtrTy = structTy.getPointerTo();
+      auto structTy = LLVM::LLVMStructType::getLiteral(&getContext(), types);
+      auto structPtrTy = LLVM::LLVMPointerType::get(structTy);
       auto numElements = builder.create<LLVM::ConstantOp>(
-          parOp.getLoc(), LLVM::LLVMType::getInt64Ty(&getContext()),
-          builder.getIndexAttr(1));
+          parOp.getLoc(), builder.getI64Type(), builder.getIndexAttr(1));
       auto structPtr = builder.create<LLVM::AllocaOp>(
           parOp.getLoc(), structPtrTy, numElements, 0);
       Value srcStructVal =
@@ -195,10 +193,33 @@ static pxa::StencilCost heatmapCostTransposed(ArrayRef<int64_t> tile,
   return heatmapCost(ArrayRef<int64_t>{tile[1], tile[0], tile[2]});
 }
 
+struct XSMMStencilPass : public XSMMStencilBase<XSMMStencilPass> {
+  XSMMStencilPass() = default;
+  XSMMStencilPass(unsigned numThreads, bool isBatched) {
+    this->numThreads = numThreads;
+    this->isBatched = isBatched;
+  }
+
+  void runOnFunction() final {
+    if (!numThreads.getValue()) {
+      numThreads = std::thread::hardware_concurrency();
+    }
+    IVLOG(3, "XSMMStencilPass> numThreads: " << numThreads.getValue());
+    IVLOG(3, "XSMMStencilPass> isBatched: " << isBatched.getValue());
+    getFunction().walk([this](AffineParallelOp op) {
+      pxa::applyStencilGEMM(op, numThreads.getValue(), isBatched.getValue(),
+                            heatmapCostTransposed);
+    });
+  }
+};
+
+std::unique_ptr<Pass> createXSMMStencilPass(unsigned numThreads,
+                                            bool isBatched) {
+  return std::make_unique<XSMMStencilPass>(numThreads, isBatched);
+}
+
 std::unique_ptr<Pass> createXSMMStencilPass() {
-  auto numThreads = std::thread::hardware_concurrency();
-  return pxa::createStencilGEMMPass(numThreads, /*doBatch=*/true,
-                                    heatmapCostTransposed);
+  return std::make_unique<XSMMStencilPass>();
 }
 
 std::unique_ptr<Pass> createLowerPXAToAffinePass() {
@@ -214,26 +235,26 @@ std::unique_ptr<Pass> createOpenMPWorkaroundPass() {
 }
 
 void pipelineBuilder(OpPassManager &pm) {
-  pm.addPass(layer::createInlineLayersPass());
-  pm.addPass(tile::createComputeBoundsPass());
+  pm.addNestedPass<FuncOp>(layer::createInlineLayersPass());
+  pm.addNestedPass<FuncOp>(tile::createComputeBoundsPass());
   pm.addPass(tile::createSplitMainPass());
   pm.addPass(transforms::createHoistingPass());
-  pm.addPass(tile::createPadConstraintsPass());
+  pm.addNestedPass<FuncOp>(tile::createPadConstraintsPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
   pm.addPass(pmlc::conversion::tile_to_pxa::createLowerTileToPXAPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
-  pm.addPass(layer::createInlineLayersPass());
+  pm.addNestedPass<FuncOp>(layer::createInlineLayersPass());
 
-  pm.addPass(pxa::createStencilGEMMPass(/*numThreads=*/1, /*doBatch=*/true,
-                                        heatmapCostTransposed));
-  pm.addPass(pxa::createAffineNormalizePass());
+  pm.addNestedPass<FuncOp>(
+      createXSMMStencilPass(/*numThreads=*/1, /*isBatched=*/true));
+  pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
 
-  pm.addPass(pxa::createTileAccumulatePass());
-  pm.addPass(pxa::createAffineNormalizePass(/*promote=*/false));
+  pm.addNestedPass<FuncOp>(pxa::createTileAccumulatePass());
+  pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass(/*promote=*/false));
   pm.addPass(createCanonicalizerPass());
 
   // Use OMP thread count
@@ -243,33 +264,26 @@ void pipelineBuilder(OpPassManager &pm) {
     maxThreads = std::min(physCores, maxThreads);
   }
 
-  pm.addPass(pxa::createCPUThreadPass(maxThreads));
+  pm.addNestedPass<FuncOp>(pxa::createCPUThreadPass(maxThreads));
 
-  pm.addPass(pxa::createAffineNormalizePass());
+  pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
 
-  pm.addPass(pxa::createFusionPass());
-  pm.addPass(pxa::createAffineNormalizePass());
+  pm.addNestedPass<FuncOp>(pxa::createFusionPass());
+  pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
 
-  pm.addPass(pxa::createMemRefDataFlowOptPass());
+  pm.addNestedPass<FuncOp>(pxa::createMemRefDataFlowOptPass());
   pm.addPass(createCanonicalizerPass());
 
-  pm.addPass(pxa::createLocalizePass());
-  pm.addPass(pxa::createResizeTmpsPass());
+  pm.addNestedPass<FuncOp>(pxa::createLocalizePass());
+  pm.addNestedPass<FuncOp>(pxa::createResizeTmpsPass());
   pm.addPass(pxa::createDeallocPlacementPass());
-  pm.addPass(pxa::createAffineNormalizePass());
+  pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
   pm.addPass(createLowerPXAToAffinePass());
-
-  // Unroll affine.for loops.
-  pm.addPass(createLoopUnrollPass(
-      /*unrollFactor=*/32,
-      /*unrollUpToFactor=*/true));
-  pm.addPass(createCanonicalizerPass());
-  pm.addPass(createCSEPass());
 
   pm.addPass(createLoopInvariantCodeMotionPass());
   pm.addPass(createCanonicalizerPass());
@@ -290,7 +304,7 @@ void pipelineBuilder(OpPassManager &pm) {
 
   pm.addPass(createLowerToLLVMPass());
   pm.addPass(createTraceLinkingPass());
-  pm.addPass(createOpenMPWorkaroundPass());
+  pm.addNestedPass<LLVM::LLVMFuncOp>(createOpenMPWorkaroundPass());
 }
 
 } // namespace pmlc::target::x86

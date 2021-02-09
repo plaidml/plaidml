@@ -1,49 +1,70 @@
-// Copyright (C) 2020 Intel Corporation
+// Copyright (C) 2021 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 //
-
-#include "single_layer_tests/gru_cell.hpp"
 
 #include <vector>
 
 #include "common_test_utils/test_constants.hpp"
+#include "single_layer_tests/gru_cell.hpp"
 
-using LayerTestsDefinitions::GRUCellTest;
+using namespace LayerTestsDefinitions;
 
 namespace {
+std::vector<bool> should_decompose{
+    // false,
+    true,
+};
+std::vector<size_t> batch{5};
+std::vector<size_t> hidden_size{
+    1,
+    10,
+};
+std::vector<size_t> input_size{
+    1,
+    30,
+};
+std::vector<std::vector<std::string>> activations = {
+    {"relu", "tanh"},
+    {"tanh", "sigmoid"},
+    {"sigmoid", "tanh"},
+    {"tanh", "relu"},
+};
+std::vector<float> clips = {
+    0.0f,
+    0.7f,
+};
+std::vector<bool> linear_before_reset = {
+    true,
+    false,
+};
 std::vector<InferenceEngine::Precision> netPrecisions = {
     InferenceEngine::Precision::FP32,
+    InferenceEngine::Precision::FP16,
 };
 
-const bool shouldDecompose = true;  // false will let all test cases fail
-const std::vector<size_t> batches = {1, 4};
-const std::vector<size_t> hiddenSizes = {64, 128};
-const std::vector<size_t> inputSizes = {16, 32};
-const std::vector<std::vector<std::string>> activations = {{"sigmoid", "tanh"}, {"sigmoid", "relu"}};
-const std::vector<float> clips = {std::numeric_limits<float>::infinity(), 1.0f};
-const std::vector<bool> linearBeforeResets = {false, true};
-
-INSTANTIATE_TEST_CASE_P(GRU, GRUCellTest,
-                        ::testing::Combine(::testing::Values(shouldDecompose),                   //
-                                           ::testing::ValuesIn(batches),                         //
-                                           ::testing::ValuesIn(hiddenSizes),                     //
-                                           ::testing::ValuesIn(inputSizes),                      //
-                                           ::testing::ValuesIn(activations),                     //
-                                           ::testing::ValuesIn(clips),                           //
-                                           ::testing::ValuesIn(linearBeforeResets),              //
-                                           ::testing::ValuesIn(netPrecisions),                   //
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
+INSTANTIATE_TEST_CASE_P(GRUCellCommon, GRUCellTest,
+                        ::testing::Combine(                                       //
+                            ::testing::ValuesIn(should_decompose),                //
+                            ::testing::ValuesIn(batch),                           //
+                            ::testing::ValuesIn(hidden_size),                     //
+                            ::testing::ValuesIn(input_size),                      //
+                            ::testing::ValuesIn(activations),                     //
+                            ::testing::ValuesIn(clips),                           //
+                            ::testing::ValuesIn(linear_before_reset),             //
+                            ::testing::ValuesIn(netPrecisions),                   //
+                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
                         GRUCellTest::getTestCaseName);
 
 INSTANTIATE_TEST_CASE_P(smoke, GRUCellTest,
-                        ::testing::Combine(::testing::Values(shouldDecompose),                   //
-                                           ::testing::Values(3),                                 //
-                                           ::testing::Values(32),                                //
-                                           ::testing::Values(16),                                //
-                                           ::testing::ValuesIn(activations),                     //
-                                           ::testing::Values(1.0f),                              //
-                                           ::testing::ValuesIn(linearBeforeResets),              //
-                                           ::testing::ValuesIn(netPrecisions),                   //
-                                           ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
+                        ::testing::Combine(                                                 //
+                            ::testing::Values(true),                                        //
+                            ::testing::Values(3),                                           //
+                            ::testing::Values(32),                                          //
+                            ::testing::Values(16),                                          //
+                            ::testing::Values(std::vector<std::string>({"tanh", "relu"})),  //
+                            ::testing::Values(1.0f),                                        //
+                            ::testing::Values(true),                                        //
+                            ::testing::Values(InferenceEngine::Precision::FP32),            //
+                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),            //
                         GRUCellTest::getTestCaseName);
 }  // namespace

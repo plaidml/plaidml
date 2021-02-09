@@ -1,8 +1,9 @@
-// Copyright (C) 2020 Intel Corporation
+// Copyright (C) 2021 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 //
 
 #include "plaidml_ops.hpp"
+#include "plaidml_util.hpp"
 
 #include "ngraph/opsets/opset.hpp"
 #include "ngraph/opsets/opset1.hpp"
@@ -20,13 +21,7 @@ void registerReshape() {
     IE_ASSERT(ctx.operands.size() == 2);
     auto I = ctx.operands.at(0);
     // operands.at(1) is unused, just read the Constant instead
-    ngraph::Shape shape;
-    auto shape_ngraph_op = ngraph::as_type_ptr<ngraph::op::Constant>(layer->input_value(1).get_node_shared_ptr());
-    if (shape_ngraph_op) {
-      shape = shape_ngraph_op->get_shape_val();
-    } else {
-      THROW_IE_EXCEPTION << "Dynamic reshaping not currently supported by PlaidML plugin";
-    }
+    std::vector<int64_t> shape = cast_constant_operand<int64_t>(1, ctx.layer);
 
     auto special_zero = layer->get_special_zero();
     if (!special_zero) {
@@ -37,7 +32,7 @@ void registerReshape() {
       }
     }
 
-    return edsl::make_tuple(op::reshape(I, edsl::make_tuple<size_t>(shape)));
+    return edsl::make_tuple(op::reshape(I, edsl::make_tuple<int64_t>(shape)));
   });
 }
 

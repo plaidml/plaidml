@@ -222,10 +222,11 @@ void PxaLoadOp::build(OpBuilder &builder, OperationState &result, Value memref,
 static void printPxaLoadOp(OpAsmPrinter &p, PxaLoadOp op) {
   p << "pxa.load " << op.getMemRef() << '[';
   if (AffineMapAttr mapAttr =
-          op.getAttrOfType<AffineMapAttr>(op.getMapAttrName()))
+          op->getAttrOfType<AffineMapAttr>(op.getMapAttrName()))
     p.printAffineMapOfSSAIds(mapAttr, op.getMapOperands());
   p << ']';
-  p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{op.getMapAttrName()});
+  p.printOptionalAttrDict(op->getAttrs(),
+                          /*elidedAttrs=*/{op.getMapAttrName()});
   p << " : " << op.getMemRefType();
 }
 
@@ -276,10 +277,11 @@ void PxaVectorLoadOp::build(OpBuilder &builder, OperationState &result,
 static void printPxaVectorLoadOp(OpAsmPrinter &p, PxaVectorLoadOp op) {
   p << "pxa.vector_load " << op.getMemRef() << '[';
   if (AffineMapAttr mapAttr =
-          op.getAttrOfType<AffineMapAttr>(op.getMapAttrName()))
+          op->getAttrOfType<AffineMapAttr>(op.getMapAttrName()))
     p.printAffineMapOfSSAIds(mapAttr, op.getMapOperands());
   p << ']';
-  p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{op.getMapAttrName()});
+  p.printOptionalAttrDict(op->getAttrs(),
+                          /*elidedAttrs=*/{op.getMapAttrName()});
   p << " : " << op.getMemRefType() << ", " << op.getType();
 }
 
@@ -324,10 +326,10 @@ void printPxaReduceOp(OpAsmPrinter &p, PxaReduceOp op) {
   p << stringifyAtomicRMWKind(op.agg()) << ' ';
   p << op.val() << ", ";
   p << op.memref() << '[';
-  auto mapAttr = op.getAttrOfType<AffineMapAttr>("map");
+  auto mapAttr = op->getAttrOfType<AffineMapAttr>("map");
   p.printAffineMapOfSSAIds(mapAttr, op.idxs());
   p << ']';
-  p.printOptionalAttrDict(op.getAttrs(), {"agg", "map"});
+  p.printOptionalAttrDict(op->getAttrs(), {"agg", "map"});
   p << " : ";
   p.printType(op.memref().getType());
 }
@@ -395,8 +397,9 @@ void PxaGemmOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
 }
 
 void printPxaGemmOp(OpAsmPrinter &p, PxaGemmOp op) {
-  auto funcType = FunctionType::get({op.a().getType(), op.b().getType()},
-                                    {op.c().getType()}, op.getContext());
+  auto funcType =
+      FunctionType::get(op.getContext(), {op.a().getType(), op.b().getType()},
+                        {op.c().getType()});
   p << op.getOperation()->getName() << ' ';
   p << op.c() << '[';
   p.printAffineMapOfSSAIds(op.cAccessMapAttr(), op.getOperandsForC());
@@ -469,10 +472,10 @@ void printPxaVectorReduceOp(OpAsmPrinter &p, PxaVectorReduceOp op) {
   p << stringifyAtomicRMWKind(op.agg()) << ' ';
   p << op.vector() << ", ";
   p << op.memref() << '[';
-  auto mapAttr = op.getAttrOfType<AffineMapAttr>("map");
+  auto mapAttr = op->getAttrOfType<AffineMapAttr>("map");
   p.printAffineMapOfSSAIds(mapAttr, op.idxs());
   p << ']';
-  p.printOptionalAttrDict(op.getAttrs(), {"agg", "map"});
+  p.printOptionalAttrDict(op->getAttrs(), {"agg", "map"});
   p << " : ";
   p.printType(op.memref().getType());
   p << ", ";

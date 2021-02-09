@@ -1,15 +1,16 @@
 // Copyright 2020, Intel Corporation
 
+#include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
+#include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
+#include "mlir/Support/LLVM.h"
+
 #include "pmlc/target/intel_gen_ocl_spirv/pass_detail.h"
 #include "pmlc/target/intel_gen_ocl_spirv/passes.h"
 #include "pmlc/util/logging.h"
 
-#include "mlir/Dialect/SPIRV/SPIRVOps.h"
-#include "mlir/Dialect/SPIRV/TargetAndABI.h"
-#include "mlir/Support/LLVM.h"
-
 namespace pmlc::target::intel_gen_ocl_spirv {
-namespace spirv = mlir::spirv;
+
+using namespace mlir; // NOLINT
 
 namespace {
 
@@ -21,7 +22,7 @@ public:
     this->spirvVersion = spirvVersion;
   }
   void runOnOperation() {
-    auto target_env = getOperation().getAttrOfType<spirv::TargetEnvAttr>(
+    auto target_env = getOperation()->getAttrOfType<spirv::TargetEnvAttr>(
         spirv::getTargetEnvAttrName());
     if (!target_env) {
       IVLOG(3, "SPIR-V Version = " << spirvVersion);
@@ -41,7 +42,7 @@ public:
           mlir::ArrayRef<spirv::Extension>(
               spirv::Extension::SPV_INTEL_subgroups),
           &getContext());
-      getOperation().setAttr(
+      getOperation()->setAttr(
           spirv::getTargetEnvAttrName(),
           spirv::TargetEnvAttr::get(
               triple, spirv::Vendor::Unknown, spirv::DeviceType::Unknown,
@@ -53,11 +54,11 @@ public:
 
 } // namespace
 
-std::unique_ptr<mlir::Pass> createAddSpirvTargetPass() {
+std::unique_ptr<Pass> createAddSpirvTargetPass() {
   return std::make_unique<IntelGenOclAddSpirvTarget>();
 }
 
-std::unique_ptr<mlir::Pass> createAddSpirvTargetPass(unsigned spirvVersion) {
+std::unique_ptr<Pass> createAddSpirvTargetPass(unsigned spirvVersion) {
   return std::make_unique<IntelGenOclAddSpirvTarget>(spirvVersion);
 }
 

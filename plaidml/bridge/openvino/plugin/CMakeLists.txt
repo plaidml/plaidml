@@ -1,5 +1,7 @@
 set(TARGET_NAME "plaidmlPlugin")
 
+ie_cpack_set_library_dir()
+
 ie_add_plugin(
   NAME ${TARGET_NAME}
   DEVICE_NAME "PLAIDML"

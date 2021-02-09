@@ -61,8 +61,8 @@ func @grn(%arg0: memref<1x4x4x3xf16>) -> memref<1x4x4x3xf16> {
     %14 = sqrt %13 : f16
     %15 = pxa.reduce assign %14, %3[0, %arg1, %arg2, 0] : memref<1x4x4x1xf16>
     %16 = pxa.load %15[0, %arg1, %arg2, 0] : memref<1x4x4x1xf16>
-    // CHECK-NEXT: cmpf "olt"
-    %17 = cmpf "olt", %16, %cst : f16
+    // CHECK-NEXT: cmpf olt
+    %17 = cmpf olt, %16, %cst : f16
     %18 = pxa.reduce assign %17, %4[0, %arg1, %arg2, 0] : memref<1x4x4x1xi1>
     %19 = pxa.load %18[0, %arg1, %arg2, 0] : memref<1x4x4x1xi1>
     %20 = pxa.load %15[0, %arg1, %arg2, 0] : memref<1x4x4x1xf16>

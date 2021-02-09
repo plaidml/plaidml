@@ -3,6 +3,9 @@
 #include "pmlc/target/intel_gen/pipeline.h"
 
 #include <memory>
+#include <string>
+#include <unordered_map>
+#include <utility>
 
 #include "llvm/Support/FormatVariadic.h"
 
@@ -12,13 +15,13 @@
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
-#include "mlir/Conversion/StandardToSPIRV/ConvertStandardToSPIRVPass.h"
+#include "mlir/Conversion/StandardToSPIRV/StandardToSPIRVPass.h"
 #include "mlir/Dialect/Affine/Passes.h"
 #include "mlir/Dialect/GPU/Passes.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
-#include "mlir/Dialect/SPIRV/Passes.h"
-#include "mlir/Dialect/SPIRV/SPIRVDialect.h"
-#include "mlir/Dialect/SPIRV/SPIRVOps.h"
+#include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
+#include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
+#include "mlir/Dialect/SPIRV/Transforms/Passes.h"
 #include "mlir/Dialect/StandardOps/Transforms/Passes.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/Pass/Pass.h"
@@ -67,8 +70,8 @@ struct LowerPXAToAffinePass
     conversion::pxa_to_affine::populatePXAToAffineConversionPatterns(patterns,
                                                                      &ctx);
 
-    if (failed(applyPartialConversion(getOperation(), target, patterns,
-                                      nullptr))) {
+    if (failed(applyPartialConversion(getOperation(), target,
+                                      std::move(patterns)))) {
       getOperation().emitError("Error lowering pxa -> affine\n");
       signalPassFailure();
     }
@@ -96,7 +99,7 @@ struct ConvertStandardToLLVMPass
         typeConverter, patterns);
 
     LLVMConversionTarget target(*context);
-    if (failed(applyPartialConversion(module, target, patterns))) {
+    if (failed(applyPartialConversion(module, target, std::move(patterns)))) {
       signalPassFailure();
     }
   }
@@ -114,8 +117,10 @@ struct ParallelLoopToGpuPass
     target.addLegalDialect<gpu::GPUDialect>();
     target.addLegalDialect<scf::SCFDialect>();
     target.addLegalOp<vector::InsertElementOp>();
+    target.addLegalOp<vector::ExtractElementOp>();
     target.addIllegalOp<scf::ParallelOp>();
-    if (failed(applyPartialConversion(getOperation(), target, patterns)))
+    if (failed(applyPartialConversion(getOperation(), target,
+                                      std::move(patterns))))
       signalPassFailure();
   }
 };
@@ -209,7 +214,7 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(stdx::createI1StorageToI32Pass());
 
   // Devectorize
-  pm.addPass(createSubgroupBroadcastPass());
+  pm.addPass(createSubgroupBroadcastPass(/*useBlockOps=*/false));
   pm.addPass(createCSEPass());
 
   // Lower mapped scf.parallel's to GPU
@@ -264,7 +269,9 @@ public:
     pipelineBuilder(pm);
   }
 
-  util::BufferPtr save(compiler::Program &program) {
+  util::BufferPtr
+  save(compiler::Program &program,
+       const std::unordered_map<std::string, std::string> &config) {
     throw std::runtime_error(
         llvm::formatv("Target '{0}' does not have 'save' support.", kTargetName)
             .str());

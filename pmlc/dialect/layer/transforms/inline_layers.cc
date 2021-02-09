@@ -18,13 +18,9 @@ namespace {
 struct InlinerImpl : InlinerInterface {
   using InlinerInterface::InlinerInterface;
 
-  bool isLegalToInline(Operation *op, Region *region,
-                       BlockAndValueMapping &valueMapping) const final {
-    return true;
-  }
-
   void handleTerminator(Operation *op,
                         ArrayRef<Value> valuesToReplace) const final {
+    IVLOG(1, "handleTerminator");
     auto returnOp = cast<ReturnOp>(op);
     // Replace the values directly with the return operands.
     assert(returnOp.getNumOperands() == valuesToReplace.size());
@@ -34,6 +30,21 @@ struct InlinerImpl : InlinerInterface {
       oldValue.replaceAllUsesWith(newValue);
     }
   }
+
+  bool isLegalToInline(Operation *call, Operation *callable,
+                       bool wouldBeCloned) const final {
+    return true;
+  }
+
+  bool isLegalToInline(Region *dest, Region *src, bool wouldBeCloned,
+                       BlockAndValueMapping &valueMapping) const final {
+    return true;
+  }
+
+  bool isLegalToInline(Operation *op, Region *dest, bool wouldBeCloned,
+                       BlockAndValueMapping &valueMapping) const final {
+    return true;
+  }
 };
 
 struct InlineLayersPass : public InlineLayersBase<InlineLayersPass> {
@@ -41,10 +52,13 @@ struct InlineLayersPass : public InlineLayersBase<InlineLayersPass> {
     auto func = getFunction();
     InlinerImpl inliner(&getContext());
     func.walk([&](BoxOp op) {
-      if (failed(inlineRegion(inliner, &op.body(), op, op.operands(),
-                              op.results(), op.getLoc(),
-                              /*shouldCloneInlinedRegion=*/true))) {
-        op.emitOpError("Failed to inline layer op");
+      if (failed(inlineRegion(/*interface=*/inliner,
+                              /*src=*/&op.body(),
+                              /*inlinePoint=*/op,
+                              /*inlinedOperands=*/op.operands(),
+                              /*resultsToReplace=*/op.results(),
+                              /*inlineLoc=*/op.getLoc()))) {
+        op.emitOpError("failed to be inlined");
         signalPassFailure();
         return;
       }

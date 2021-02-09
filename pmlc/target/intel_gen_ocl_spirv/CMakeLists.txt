@@ -31,7 +31,7 @@ pml_cc_library(
     MLIRAffineToStandard
     MLIRAffineTransforms
     MLIRGPU
-    MLIRGPUToSPIRVTransforms
+    MLIRGPUToSPIRV
     MLIRLLVMIRTransforms
     MLIRSCFToGPU
     MLIRStandardOpsTransforms

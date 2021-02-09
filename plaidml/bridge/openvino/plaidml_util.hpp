@@ -1,4 +1,4 @@
-// Copyright (C) 2020 Intel Corporation
+// Copyright (C) 2021 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 //
 
@@ -14,6 +14,7 @@
 #include "ngraph/axis_vector.hpp"
 #include "ngraph/coordinate.hpp"
 #include "ngraph/node.hpp"
+#include "ngraph/op/constant.hpp"
 #include "ngraph/op/util/attr_types.hpp"
 #include "ngraph/shape.hpp"
 #include "ngraph/type/element_type.hpp"
@@ -23,7 +24,18 @@
 
 namespace PlaidMLPlugin {
 
-ngraph::AxisSet get_axis_set_from_constant_operand(size_t operand_idx, ngraph::Node* layer);
+template <typename T>
+std::vector<T> cast_constant_operand(size_t operand_idx, ngraph::Node* layer) {
+  auto* ngraph_const = ngraph::as_type<ngraph::op::Constant>(layer->get_input_node_ptr(operand_idx));
+  if (ngraph_const) {
+    return ngraph_const->cast_vector<T>();
+  } else {
+    THROW_IE_EXCEPTION << "Dynamic shapes & indexing not currently supported by the PlaidML plugin; please ensure all "
+                          "inputs used for reshaping, indexing, or slicing are Constants.";
+  }
+}
+
+ngraph::AxisSet get_axis_set_from_constant_operand(size_t operand_idx, ngraph::Node* layer, size_t rank_override = 0);
 ngraph::AxisVector get_axis_vector_from_constant_operand(size_t operand_idx, ngraph::Node* layer);
 
 plaidml::DType to_plaidml(const InferenceEngine::Precision& precision);
