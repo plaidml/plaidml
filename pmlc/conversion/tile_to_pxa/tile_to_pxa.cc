@@ -36,6 +36,7 @@ using namespace mlir; // NOLINT
 
 using util::AggregationKind;
 using util::CombinationKind;
+using util::GatherMode;
 using util::InterpolationMode;
 using util::NearestMode;
 using util::ScatterMode;
@@ -1141,55 +1142,87 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
 
     // Create an affine map for loading the index, using the leading counters
     size_t axis = *(op.axis().getRawData());
+    size_t batchDims = *(op.batchDims().getRawData());
+    auto idxShape = indices.getType().cast<MemRefType>().getShape();
     size_t idxDims = indices.getType().cast<MemRefType>().getShape().size();
     auto idxLoadMap = AffineMap::getMultiDimIdentityMap(idxDims, ctx);
-    auto idxLoadOps = loop.getIVs().slice(axis, idxDims);
-
-    // Load the value from the indices array
-    Value idx =
-        rewriter.create<pxa::PxaLoadOp>(loc, indices, idxLoadMap, idxLoadOps)
-            .getResult();
 
     // Create default source map
     size_t dstDims = size.size();
     std::vector<Value> srcOps;
-    for (size_t i = 0; i < axis; ++i) {
-      srcOps.push_back(loop.getIVs()[i]);
-    }
-
-    for (size_t i = axis + idxDims - 1; i < dstDims; ++i) {
-      srcOps.push_back(loop.getIVs()[i]);
-    }
-
-    // Create std ops for 1D interpolation
     Value interpVal;
-    if (idx.getType().isa<FloatType>()) {
-      switch (op.interpolationMode()) {
-      case InterpolationMode::nearest:
-        interpVal = buildNearestInterpolationOps(
-            loc, rewriter, tensor, idx, srcOps, axis, op.nearestMode());
-        break;
-      case InterpolationMode::linear:
-        interpVal = buildLinearInterpolationOps(loc, rewriter, tensor, idx,
-                                                srcOps, axis);
-        break;
-      case InterpolationMode::cubic:
-        interpVal =
-            buildCubicInterpolationOps(loc, rewriter, tensor, idx, srcOps, axis,
-                                       op.cubeCoeffAttr().getValueAsDouble());
-        break;
-      default:
-        llvm_unreachable("Unsupported InterpolationMode");
+    switch (op.mode()) {
+    case GatherMode::normal: {
+      auto idxLoadOps = loop.getIVs().slice(axis, idxDims);
+      auto idx =
+          rewriter.create<pxa::PxaLoadOp>(loc, indices, idxLoadMap, idxLoadOps)
+              .getResult();
+      for (size_t i = 0; i < axis; ++i) {
+        srcOps.push_back(loop.getIVs()[i]);
       }
-    } else {
-      if (!idx.getType().isa<IndexType>()) {
-        auto indexType = rewriter.getIndexType();
-        // Cast from whatever integer type it has to index type
-        idx =
-            rewriter.create<mlir::IndexCastOp>(loc, idx, indexType).getResult();
+
+      for (size_t i = axis + idxDims - 1; i < dstDims; ++i) {
+        srcOps.push_back(loop.getIVs()[i]);
       }
-      srcOps.at(axis) = idx;
+
+      // Create std ops for 1D interpolation
+      if (idx.getType().isa<FloatType>()) {
+        switch (op.interpolationMode()) {
+        case InterpolationMode::nearest:
+          interpVal = buildNearestInterpolationOps(
+              loc, rewriter, tensor, idx, srcOps, axis, op.nearestMode());
+          break;
+        case InterpolationMode::linear:
+          interpVal = buildLinearInterpolationOps(loc, rewriter, tensor, idx,
+                                                  srcOps, axis);
+          break;
+        case InterpolationMode::cubic:
+          interpVal = buildCubicInterpolationOps(
+              loc, rewriter, tensor, idx, srcOps, axis,
+              op.cubeCoeffAttr().getValueAsDouble());
+          break;
+        default:
+          llvm_unreachable("Unsupported InterpolationMode");
+        }
+      } else {
+        if (!idx.getType().isa<IndexType>()) {
+          auto indexType = rewriter.getIndexType();
+          // Cast from whatever integer type it has to index type
+          idx = rewriter.create<mlir::IndexCastOp>(loc, idx, indexType)
+                    .getResult();
+        }
+        srcOps.at(axis) = idx;
+        interpVal = rewriter.create<mlir::LoadOp>(loc, tensor, srcOps);
+      }
+    } break;
+    case GatherMode::nd: {
+      std::vector<Value> idxs, combIdx(idxDims);
+      for (size_t i = 0; i < idxDims - 1; ++i) {
+        combIdx[i] = loop.getIVs()[i];
+      }
+      for (int64_t i = 0; i < idxShape[idxDims - 1]; ++i) {
+        combIdx[idxDims - 1] = rewriter.create<mlir::ConstantIndexOp>(loc, i);
+        auto idx =
+            rewriter.create<pxa::PxaLoadOp>(loc, indices, idxLoadMap, combIdx)
+                .getResult();
+        if (!idx.getType().isa<IndexType>()) {
+          auto indexType = rewriter.getIndexType();
+          idx = rewriter.create<mlir::IndexCastOp>(loc, idx, indexType)
+                    .getResult();
+        }
+        idxs.push_back(idx);
+      }
+      for (size_t i = 0; i < batchDims; ++i) {
+        srcOps.push_back(loop.getIVs()[i]);
+      }
+      srcOps.insert(srcOps.end(), idxs.begin(), idxs.end());
+      for (size_t i = idxDims - 1; i < dstDims; ++i) {
+        srcOps.push_back(loop.getIVs()[i]);
+      }
       interpVal = rewriter.create<mlir::LoadOp>(loc, tensor, srcOps);
+    } break;
+    default:
+      llvm_unreachable("unrecognized gather mode");
     }
 
     // Create a destination map using all of the dimensions

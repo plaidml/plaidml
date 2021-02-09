@@ -112,7 +112,9 @@ def GatherOp : MaterializeOp<"gather"> {
     DefaultValuedAttr<IndexAttr, "0">:$axis,
     DefaultValuedAttr<InterpolationMode, "InterpolationMode::linear">:$interpolationMode,
     DefaultValuedAttr<NearestMode, "NearestMode::round_prefer_floor">:$nearestMode,
-    DefaultValuedAttr<F64Attr, "-0.75">:$cubeCoeff
+    DefaultValuedAttr<F64Attr, "-0.75">:$cubeCoeff,
+    DefaultValuedAttr<GatherMode, "GatherMode::normal">:$mode,
+    DefaultValuedAttr<IndexAttr, "0">:$batchDims
   );
   let results = (outs RankedTensorOf<[AnyScalar]>:$result);
   let assemblyFormat = [{
@@ -126,7 +128,9 @@ def GatherOp : MaterializeOp<"gather"> {
       "mlir::IntegerAttr":$axis,
       "mlir::IntegerAttr":$interpolationMode,
       "mlir::IntegerAttr":$nearestMode,
-      "mlir::FloatAttr":$cubeCoeff
+      "mlir::FloatAttr":$cubeCoeff,
+      "mlir::IntegerAttr":$mode,
+      "mlir::IntegerAttr":$batchDims
     )>
   ];
 }
@@ -155,6 +159,7 @@ def ReshapeOp : MaterializeOp<"reshape">,
   let assemblyFormat = [{
     $tensor attr-dict `:` functional-type($tensor, $result)
   }];
+  let verifier = [{ return verify$cppClass(*this); }];
 }
 
 def ScatterOp : MaterializeOp<"scatter"> {
