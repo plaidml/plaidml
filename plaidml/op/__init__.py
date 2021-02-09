@@ -258,6 +258,8 @@ def slice_of(x, slices):
 def softmax(x, axis=None):
     return op('softmax', [x, axis]).as_tensor()
 
+def sort(x, axis=None, direction=edsl.SortDirection.ASC):
+    return op('sort', [x, axis]).as_tensor()
 
 def spatial_padding(x, lo_pads, hi_pads, data_layout):
     return op("spatial_padding", [x, lo_pads, hi_pads, data_layout]).as_tensor()
