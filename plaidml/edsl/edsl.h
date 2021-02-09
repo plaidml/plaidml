@@ -794,6 +794,7 @@ inline Tensor acos(const Tensor& x, edsl_source_location loc = edsl_source_locat
 enum class SortDirection {
   ASC,
   DESC,
+  _LAST,
 };
 
 ///

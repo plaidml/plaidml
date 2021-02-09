@@ -51,6 +51,7 @@ Value reshape(const Value&);
 Value sigmoid(const Value&);
 Value slice(const Value&);
 Value softmax(const Value&);
+Value sort(const Value&);
 Value spatial_padding(const Value&);
 Value square(const Value&);
 Value squeeze(const Value&);
@@ -2539,6 +2540,35 @@ Value softmax(const Value& value) {
   return Value{O};
 }
 
+Value sort(const Value& value) {
+  IVLOG(1, "sort");
+  auto args = value.as_tuple();
+  if (args.size() != 3) {
+    throw std::runtime_error("sort expects 3 arguments");
+  }
+  auto I = args[0].as_tensor();
+  auto raw_axis = args[1].as_int();
+  auto direction = validate<SortDirection>(args[2].as_int());
+
+  int64_t ndims = I.rank();
+  int64_t axis = normalize_axis(raw_axis, ndims, "sort");
+
+  std::vector<TensorDim> I_dims(ndims);
+  I.bind_dims(I_dims);
+
+  std::vector<Tensor> IX_dims;
+  for (int64_t i = 0; i < ndims; ++i) {
+    if (i == axis) {
+      IX_dims.push_back(op::unsqueeze(argsort(I, axis, direction), {ndims}));
+    } else {
+      IX_dims.push_back(op::unsqueeze(edsl::index(I_dims, i), {ndims}));
+    }
+  }
+  auto IX = op::concatenate(IX_dims, -1);
+  Tensor O = edsl::gather(I, IX).mode(GatherMode::ND);
+  return Value{O};
+}
+
 Value spatial_padding(const Value& value) {
   IVLOG(1, "spatial_padding");
   auto args = value.as_tuple();
@@ -3079,6 +3109,7 @@ void RegisterOps() {
   registry->Register("sigmoid", sigmoid);
   registry->Register("slice", slice);
   registry->Register("softmax", softmax);
+  registry->Register("sort", sort);
   registry->Register("spatial_padding", spatial_padding);
   registry->Register("square", square);
   registry->Register("squeeze", squeeze);
