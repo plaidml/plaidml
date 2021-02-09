@@ -5,8 +5,8 @@
 // bazel-bin/pmlc/opt -convert-linalg-to-loops -x86-convert-pxa-to-affine --normalize-memrefs --simplify-affine-structures  -lower-affine  -canonicalize -convert-scf-to-std -x86-convert-std-to-llvm pmlc/target/x86/tests/conv_NCHW_3X3_user_layouts.mlir | bazel-bin/pmlc/jit -e baseline
 
 
-#K_map = affine_map<(K,C,R,S) -> (R, S, C, K)>
-#NCHW_to_NHWC = affine_map<(N,C,H,W) -> (N,H,W,C)>
+ #K_map = affine_map<(K,C,R,S) -> (R, S, C, K)>
+ #NCHW_to_NHWC = affine_map<(N,C,H,W) -> (N,H,W,C)>
 
 
 // !I_memref = type memref<1x64x56x56xf32> 
@@ -23,13 +23,39 @@ func @baseline() {
   %f1 = constant 1.0 : f32
   %f2 = constant 2.0 : f32
 
+  %c0 = constant 0 : index
+  %c1 = constant 1 : index
+
   %I = alloc() : !I_memref
   %K = alloc() : !K_memref
   %O = alloc() : !O_memref
 
-  //linalg.fill(%I, %f0) : !I_memref, f32
-  //linalg.fill(%K, %f0) : !K_memref, f32
+//  linalg.fill(%I, %f0) : !I_memref, f32
+//  linalg.fill(%K, %f0) : !K_memref, f32
   linalg.fill(%O, %f0) : !O_memref, f32
+
+// Initializing %I to 0
+    affine.for %arg0 = 0 to 1 {
+      affine.for %arg1 = 0 to 64 {
+        affine.for %arg2 = 0 to 56 {
+          affine.for %arg3 = 0 to 56 {
+            affine.store %f0, %I[%arg0, %arg1, %arg2, %arg3] : !I_memref
+          }
+        }
+      }
+    }
+
+// Initializing %K to 0
+    affine.for %arg0 = 0 to 64 {
+      affine.for %arg1 = 0 to 64 {
+        affine.for %arg2 = 0 to 3 {
+          affine.for %arg3 = 0 to 3 {
+            affine.store %f0, %K[%arg0, %arg1, %arg2, %arg3] : !K_memref
+          }
+        }
+      }
+    }
+
 
   affine.parallel (%x, %y, %ci) = (0, 0, 0) to (56, 56, 64)  reduce ("assign") -> !I_memref {
     %ar1 = addi %x, %y : index
