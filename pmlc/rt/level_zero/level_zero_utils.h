@@ -1,4 +1,4 @@
-// Copyright 2020 Intel Corporation
+// Copyright 2021 Intel Corporation
 #ifndef PMLC_RT_LEVEL_ZERO_LEVEL_ZERO_UTILS_H_
 #define PMLC_RT_LEVEL_ZERO_LEVEL_ZERO_UTILS_H_
 

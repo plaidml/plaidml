@@ -1,4 +1,4 @@
-// Copyright 2020 Intel Corporation
+// Copyright 2021 Intel Corporation
 
 #include <cstdarg>
 #include <vector>
@@ -179,6 +179,11 @@ void *level_zero_schedule_barrier(void *invocation, uint32_t count, ...) {
       ->enqueueBarrier(dependencies);
 }
 
+void level_zero_dump_profiling(void *invocation) {
+  IVLOG(2, "level_zero_dump_profiling env = " << invocation);
+  return static_cast<LevelZeroInvocation *>(invocation)->finish();
+}
+
 } // extern "C"
 
 void registerSymbols() {
@@ -198,6 +203,7 @@ void registerSymbols() {
   REG(level_zero_schedule_read)
   REG(level_zero_wait)
   REG(level_zero_schedule_barrier)
+  REG(level_zero_dump_profiling)
 #undef REG
 }
 

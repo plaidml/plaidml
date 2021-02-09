@@ -1,4 +1,4 @@
-// Copyright 2020, Intel Corporation
+// Copyright 2021, Intel Corporation
 #ifndef __PMLC_TARGET_INTEL_LEVEL_ZERO_PASSES__
 #define __PMLC_TARGET_INTEL_LEVEL_ZERO_PASSES__
 

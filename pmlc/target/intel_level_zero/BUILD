@@ -1,4 +1,4 @@
-# Copyright 2020, Intel Corporation
+# Copyright 2021, Intel Corporation
 
 load("//bzl:plaidml.bzl", "plaidml_cc_library")
 load("//vendor/mlir:tblgen.bzl", "gentbl")
@@ -39,17 +39,18 @@ plaidml_cc_library(
         "//pmlc/dialect/pxa/transforms",
         "//pmlc/dialect/stdx/transforms",
         "//pmlc/dialect/tile/transforms",
-        "//pmlc/transforms",
         "//pmlc/target/intel_gen",
         "//pmlc/target/intel_gen_ocl_spirv",
         "//pmlc/target/x86:prng_lowering",
+        "//pmlc/transforms",
         "@llvm-project//mlir:AffineToStandardTransforms",
         "@llvm-project//mlir:AffineTransforms",
-        "@llvm-project//mlir:GPUToSPIRVTransforms",
+        "@llvm-project//mlir:GPUToSPIRV",
         "@llvm-project//mlir:GPUToVulkanTransforms",
         "@llvm-project//mlir:GPUTransforms",
         "@llvm-project//mlir:LLVMTransforms",
         "@llvm-project//mlir:SCFToGPUPass",
+        "@llvm-project//mlir:SPIRVTransforms",
         "@llvm-project//mlir:StandardOpsTransforms",
     ],
     alwayslink = 1,

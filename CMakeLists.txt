@@ -81,7 +81,7 @@ if(PML_ENABLE_VULKAN)
   include(volk)
 endif()
 if(PML_ENABLE_LEVEL_ZERO)
-  include(LevelZero)
+  include(levelzero)
 endif()
 include(xsmm)
 

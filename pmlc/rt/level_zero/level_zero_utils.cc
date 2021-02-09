@@ -1,4 +1,4 @@
-// Copyright 2020 Intel Corporation
+// Copyright 2021 Intel Corporation
 
 #include "pmlc/rt/level_zero/level_zero_utils.h"
 #include "pmlc/util/logging.h"

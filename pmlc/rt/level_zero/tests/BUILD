@@ -1,4 +1,4 @@
-# Copyright 2020 Intel Corporation
+# Copyright 2021 Intel Corporation
 
 load("//pmlc:lit.bzl", "glob_lit_tests")
 

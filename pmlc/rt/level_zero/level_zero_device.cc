@@ -1,4 +1,4 @@
-// Copyright 2020 Intel Corporation
+// Copyright 2021 Intel Corporation
 #include "pmlc/rt/level_zero/level_zero_device.h"
 
 #include "pmlc/rt/jit_executable.h"

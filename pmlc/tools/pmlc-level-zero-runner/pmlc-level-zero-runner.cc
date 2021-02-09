@@ -12,13 +12,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "mlir/Conversion/GPUToSPIRV/ConvertGPUToSPIRVPass.h"
+#include "mlir/Conversion/GPUToSPIRV/GPUToSPIRVPass.h"
 #include "mlir/Conversion/GPUToVulkan/ConvertGPUToVulkanPass.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
-#include "mlir/Conversion/StandardToSPIRV/ConvertStandardToSPIRVPass.h"
+#include "mlir/Conversion/StandardToSPIRV/StandardToSPIRVPass.h"
 #include "mlir/Dialect/GPU/Passes.h"
-#include "mlir/Dialect/SPIRV/Passes.h"
-#include "mlir/Dialect/SPIRV/SPIRVOps.h"
+#include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
+#include "mlir/Dialect/SPIRV/Transforms/Passes.h"
 #include "mlir/ExecutionEngine/OptUtils.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
@@ -134,7 +134,10 @@ int JitRunnerMain(int argc, char **argv) {
     return EXIT_FAILURE;
   }
 
-  auto program = std::make_shared<Program>(std::move(file));
+  auto context = std::make_unique<MLIRContext>();
+  registerAllDialects(context->getDialectRegistry());
+
+  auto program = std::make_shared<Program>(std::move(context), std::move(file));
   program->entry = options.mainFuncName.getValue();
 
   runMLIRPasses(*program->module);
@@ -159,14 +162,10 @@ int main(int argc, char **argv) {
   llvm::llvm_shutdown_obj x;
   registerPassManagerCLOptions();
 
-  mlir::enableGlobalDialectRegistry(true);
-  registerAllDialects();
-
   llvm::InitLLVM y(argc, argv);
   llvm::InitializeNativeTarget();
   llvm::InitializeNativeTargetAsmPrinter();
   mlir::initializeLLVMPasses();
-  pmlc::rt::registerRuntimes();
   pmlc::rt::initRuntimes();
 
   return JitRunnerMain(argc, argv);
