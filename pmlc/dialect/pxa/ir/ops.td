@@ -3,6 +3,7 @@
 #ifndef __PML_PXA_OPS__
 #define __PML_PXA_OPS__
 
+include "mlir/Dialect/Affine/IR/AffineMemoryOpInterfaces.td"
 include "mlir/Dialect/StandardOps/IR/StandardOpsBase.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
@@ -27,7 +28,9 @@ def AnyStdScalar : AnyTypeOf<[AnyFloat, AnySignlessInteger]> {}
 
 class PxaReduceOpBase<string mnemonic, list<OpTrait> traits = []> :
     PXA_OpWithPP<mnemonic, !listconcat(traits,
-        [DeclareOpInterfaceMethods<PxaReduceOpInterface>])> {
+        [DeclareOpInterfaceMethods<PxaReduceOpInterface>,
+        DeclareOpInterfaceMethods<MemRefDereferencingInterface>, 
+        MemRefsNormalizable])> {
 
   code extraClassDeclarationBase = [{
     mlir::Value getMemRef() { return memref(); }
@@ -136,7 +139,9 @@ def PxaVectorReduceOp : PxaReduceOpBase<"vector_reduce"> {
 
 class PxaLoadOpBase<string mnemonic, list<OpTrait> traits = []> :
     PXA_OpWithPP<mnemonic, !listconcat(traits,
-        [DeclareOpInterfaceMethods<PxaReadOpInterface>])> {
+        [DeclareOpInterfaceMethods<PxaReadOpInterface>,
+        DeclareOpInterfaceMethods<MemRefDereferencingInterface>, 
+        MemRefsNormalizable])> {
   let arguments = (ins
     AnyMemRef:$memref,
     Variadic<Index>:$indices
