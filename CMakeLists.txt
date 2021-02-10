@@ -117,8 +117,10 @@ else()
   )
 endif()
 
+# Set cpackaging variables
 set(CPACK_DEB_COMPONENT_INSTALL ON)
-set(CPACK_PACKAGING_INSTALL_PREFIX "/usr/local/lib/plaidml")
+set(CPACK_PACKAGING_INSTALL_PREFIX "/opt/plaidml")
+set(CMAKE_INSTALL_PREFIX ${CPACK_PACKAGING_INSTALL_PREFIX})
 set(CPACK_GENERATOR "DEB")
 set(CPACK_PACKAGE_NAME "PlaidML")
 set(CPACK_PACKAGE_VENDOR "Intel Corp")
@@ -145,61 +147,45 @@ configure_lit_site_cfg(
 
 
 
+include(GetPrerequisites)
 
-
-# set(BIN plaidml_edsl_tests_cc_test)
-# install(
-#   TARGETS ${BIN} 
-#   DESTINATION bin 
-#   COMPONENT DEVKIT
-# )
-
-# include(GetPrerequisites)
-# set(BINARY_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/bin/${BIN}")
-# get_prerequisites(${BINARY_LOCATION} DEPENDENCIES 0 0 "" "")
-
-# foreach(DEPENDENCY_FILE ${DEPENDENCIES})
-#   install(
-#     FILES ${DEPENDENCY} 
-#     DESTINATION lib 
-#     COMPONENT DEVKIT
-#   )
-# endforeach()
-
+# Install binary target
+set(BIN plaidml_edsl_tests_cc_test)
 install(
-    TARGETS plaidml_edsl_tests_cc_test
+    TARGETS ${BIN}
     DESTINATION bin
     COMPONENT DEVKIT
 )
 
-install(
-    PROGRAMS 
-      ${LLVM_BINARY_DIR}/lib/libomp.so
-      ${LLVM_BINARY_DIR}/lib/libmlir_runner_utils.so.12git
-      /lib/x86_64-linux-gnu/libpthread.so.0     
-      /lib/x86_64-linux-gnu/libpthread-2.27.so  
-      /lib/x86_64-linux-gnu/librt.so.1  
-      /lib/x86_64-linux-gnu/librt-2.27.so
-      /lib/x86_64-linux-gnu/libdl.so.2
-      /lib/x86_64-linux-gnu/libdl-2.27.so
-      /lib/x86_64-linux-gnu/libz.so.1
-      /lib/x86_64-linux-gnu/libz.so.1.2.11
-      /lib/x86_64-linux-gnu/libtinfo.so.5
-      /lib/x86_64-linux-gnu/libtinfo.so.5.9
-      ${CMAKE_SOURCE_DIR}/.cenv/lib/libstdc++.so.6
-      ${CMAKE_SOURCE_DIR}/.cenv/lib/libstdc++.so.6.0.28
-      ${CMAKE_SOURCE_DIR}/.cenv/lib/libgcc_s.so.1
-      /lib/x86_64-linux-gnu/libm.so.6
-      /lib/x86_64-linux-gnu/libm-2.27.so
-      /lib/x86_64-linux-gnu/ld-linux-x86-64.so.2
-      /lib/x86_64-linux-gnu/ld-2.27.so
-      /lib/x86_64-linux-gnu/libc.so.6
-      /lib/x86_64-linux-gnu/libc-2.27.so
+set(BINARY_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/bin/${BIN}")
+get_prerequisites(${BINARY_LOCATION} DEPENDENCIES 0 0 "" "")
+set(SYSDEPS "")
+foreach(DEPENDENCY_FILE ${DEPENDENCIES})
+  # Install non-system dependencies
+  if(${DEPENDENCY_FILE} MATCHES "${CMAKE_CURRENT_SOURCE_DIR}/*")
+    install(
+      PROGRAMS ${DEPENDENCY_FILE}
+      DESTINATION lib
+      COMPONENT DEVKIT
+    )
+  # Add system dependencies to dependency list
+  else()
+    execute_process(COMMAND dpkg -S ${DEPENDENCY_FILE}  
+                    OUTPUT_VARIABLE DEP_PROVIDER)
+    string(REGEX REPLACE ":.*" "" DEPENDENCY ${DEP_PROVIDER})
+    if (NOT ${DEPENDENCY} IN_LIST SYSDEPS)
+      string(LENGTH "${SYSDEPS}" DEP_STR_LEN)
+      if(NOT "${DEP_STR_LEN}" EQUAL "0")
+        set(SYSDEPS "${SYSDEPS}, ")
+      endif()
+      set(SYSDEPS "${SYSDEPS}${DEPENDENCY}")
+    endif()
+  endif()
+endforeach()
 
-    DESTINATION lib
-    COMPONENT DEVKIT
-)
+set(CPACK_DEBIAN_PACKAGE_DEPENDS ${SYSDEPS})
 
-set_target_properties(plaidml_edsl_tests_cc_test PROPERTIES INSTALL_RPATH ${CMAKE_INSTALL_RPATH})
+# Add package RPath to binary target
+set_target_properties(${BIN} PROPERTIES INSTALL_RPATH "${CMAKE_INSTALL_RPATH}:\$LD_LIBRARY_PATH")
 
 include(CPack)
