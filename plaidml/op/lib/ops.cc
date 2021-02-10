@@ -51,6 +51,7 @@ Value reshape(const Value&);
 Value sigmoid(const Value&);
 Value slice(const Value&);
 Value softmax(const Value&);
+Value sort(const Value&);
 Value spatial_padding(const Value&);
 Value square(const Value&);
 Value squeeze(const Value&);
@@ -2274,7 +2275,8 @@ Value reshape(const Value& value) {
   std::vector<TensorDim> I_dims(I.rank());
   I.bind_dims(I_dims);
 
-  TensorDim* fill_dim = nullptr;
+  size_t fill_dim = 0;
+  bool fill_dim_set = false;
 
   auto target_shape = args[1].as_tuple();
   for (size_t i = 0; i < target_shape.size(); i++) {
@@ -2291,11 +2293,12 @@ Value reshape(const Value& value) {
           break;
 
         case (AUTO_DIM_FILL):
-          if (fill_dim) {
+          if (fill_dim_set) {
             throw std::runtime_error("at most one dimension's size may be inferred");
           }
+          fill_dim_set = true;
           O_dims.emplace_back(1);
-          fill_dim = &O_dims.back();
+          fill_dim = i;
           break;
         default:
           O_dims.emplace_back(dim);
@@ -2313,7 +2316,7 @@ Value reshape(const Value& value) {
     }
   }
 
-  if (fill_dim) {
+  if (fill_dim_set) {
     TensorDim num(1);
     for (size_t i = 0; i < I_dims.size(); i++) {
       num = I_dims[i] * num;
@@ -2322,7 +2325,7 @@ Value reshape(const Value& value) {
     for (size_t i = 0; i < O_dims.size(); i++) {
       den = O_dims[i] * den;
     }
-    *fill_dim = TensorDim(num / den);
+    O_dims[fill_dim] = TensorDim(num / den);
   }
   return Value{edsl::reshape(I, O_dims)};
 }
@@ -2534,6 +2537,35 @@ Value softmax(const Value& value) {
   if (transposed) {
     return transpose(make_tuple(Value{O}, Value{pattern}));
   }
+  return Value{O};
+}
+
+Value sort(const Value& value) {
+  IVLOG(1, "sort");
+  auto args = value.as_tuple();
+  if (args.size() != 3) {
+    throw std::runtime_error("sort expects 3 arguments");
+  }
+  auto I = args[0].as_tensor();
+  auto raw_axis = args[1].as_int();
+  auto direction = validate<SortDirection>(args[2].as_int());
+
+  int64_t ndims = I.rank();
+  int64_t axis = normalize_axis(raw_axis, ndims, "sort");
+
+  std::vector<TensorDim> I_dims(ndims);
+  I.bind_dims(I_dims);
+
+  std::vector<Tensor> IX_dims;
+  for (int64_t i = 0; i < ndims; ++i) {
+    if (i == axis) {
+      IX_dims.push_back(op::unsqueeze(argsort(I, axis, direction), {ndims}));
+    } else {
+      IX_dims.push_back(op::unsqueeze(edsl::index(I_dims, i), {ndims}));
+    }
+  }
+  auto IX = op::concatenate(IX_dims, -1);
+  Tensor O = edsl::gather(I, IX).mode(GatherMode::ND);
   return Value{O};
 }
 
@@ -3077,6 +3109,7 @@ void RegisterOps() {
   registry->Register("sigmoid", sigmoid);
   registry->Register("slice", slice);
   registry->Register("softmax", softmax);
+  registry->Register("sort", sort);
   registry->Register("spatial_padding", spatial_padding);
   registry->Register("square", square);
   registry->Register("squeeze", squeeze);
