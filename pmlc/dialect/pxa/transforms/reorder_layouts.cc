@@ -80,7 +80,7 @@ public:
 
     for (auto parallelOp : parallelOps) {
       tileLoopNestsToAlignWithDataMaps(parallelOp);
-      simplifyMemrefMaps(parallelOp);
+      // simplifyMemrefMaps(parallelOp);
     }
 
     // Erase the affine maps attached to the memrefs

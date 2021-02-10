@@ -6,9 +6,12 @@
 #KCRS_to_KCRSck = affine_map<(K,C,R,S) ->
             (K floordiv 16,C floordiv 16,R, S, C mod 16, K mod 16)>
 
-!I_memref = type memref<1x64x56x56xf32, #NCHW_to_NHWC16c>
-!K_memref = type memref<64x64x3x3xf32, #KCRS_to_KCRSck>
+// !I_memref = type memref<1x64x56x56xf32, #NCHW_to_NHWC16c>
+// !K_memref = type memref<64x64x3x3xf32, #KCRS_to_KCRSck>
 !O_memref = type memref<1x4x56x56x16xf32>
+
+ !I_memref = type memref<1x64x56x56xf32>
+ !K_memref = type memref<64x64x3x3xf32>
 
 
 func @baseline() {
@@ -23,8 +26,6 @@ func @baseline() {
   %K = alloc() : !K_memref
   %O = alloc() : !O_memref
 
-//  linalg.fill(%I, %f0) : !I_memref, f32
-//  linalg.fill(%K, %f0) : !K_memref, f32
   linalg.fill(%O, %f0) : !O_memref, f32
 
 // Initializing %I to 0
@@ -70,13 +71,14 @@ func @baseline() {
   }
 
 
-  affine.parallel (%x, %y, %ci, %co, %kh, %kw) = (0, 0, 0, 0, 0, 0) to (56, 56, 64, 64, 3, 3) reduce ("assign") -> (memref<1x4x56x56x16xf32>) { 
-    %0 = pxa.load %I[0, %ci, %x, %y] : !I_memref 
-    %1 = pxa.load %K[%co, %ci, %kh, %kw] : !K_memref 
-    %2 = mulf %0, %1 : f32 
+  affine.parallel (%x, %y, %ci, %co, %kh, %kw) = (0, 0, 0, 0, 0, 0) to (56, 56, 64, 64, 3, 3) reduce ("assign") -> (memref<1x4x56x56x16xf32>) {
+    %0 = pxa.load %I[0, %ci, %x, %y] : !I_memref
+    %1 = pxa.load %K[%co, %ci, %kh, %kw] : !K_memref
+    %2 = mulf %0, %1 : f32
     %3 = pxa.reduce addf %2, %O[0, %co floordiv 16, %x, %y, %co mod 16] : !O_memref
     affine.yield %3 : memref<1x4x56x56x16xf32>
-  } 
+  }
+
 
   %O_ud = memref_cast %O : !O_memref to memref<*xf32>
   call @print_memref_f32(%O_ud) : (memref<*xf32>) -> ()
