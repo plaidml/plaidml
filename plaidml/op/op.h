@@ -682,6 +682,11 @@ inline edsl::Tensor softmax(const edsl::Tensor& I, int axis) {
   return details::op("softmax", args).as_tensor();
 }
 
+inline edsl::Tensor sort(const edsl::Tensor& I, int axis, edsl::SortDirection direction = edsl::SortDirection::ASC) {
+  auto args = edsl::make_tuple(I, axis, static_cast<int>(direction));
+  return details::op("sort", args).as_tensor();
+}
+
 inline edsl::Tensor square(const edsl::Tensor& x) {  //
   return details::op("square", edsl::Value(x)).as_tensor();
 }
