@@ -5,6 +5,7 @@
 #include "mlir/Support/DebugStringHelper.h"
 #include "llvm/ADT/SetVector.h"
 
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "pmlc/dialect/layer/ir/ops.h"
 #include "pmlc/dialect/tile/ir/ops.h"
 #include "pmlc/dialect/tile/transforms/pass_detail.h"
@@ -96,8 +97,14 @@ struct ReorderInputsPass : public ReorderInputsBase<ReorderInputsPass> {
 
     // Set proper layout tags for the BoxOps
     func.walk([&](layer::BoxOp op) {
+      auto outputLayer = false;
+      for (auto *user : op->getUsers()) {
+        if (isa<mlir::ReturnOp>(user))
+          outputLayer = true;
+      }
       for (auto &innerOp : op.getBody()->getOperations()) {
-        setLayoutTag(&innerOp, getLayoutType(framework, op.op()));
+        if (!outputLayer)
+          setLayoutTag(&innerOp, getLayoutType(framework, op.op()));
       }
     });
 

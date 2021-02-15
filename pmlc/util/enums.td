@@ -146,6 +146,7 @@ def TensorLayout : I64EnumAttr<
       I64EnumAttrCase<"nxc", 0>,
       I64EnumAttrCase<"ncx", 1>,
       I64EnumAttrCase<"kcx", 2>,
+	  I64EnumAttrCase<"gkcx", 3>,
     ]> {
   let cppNamespace = "pmlc::util";
   let returnType = "TensorLayout";

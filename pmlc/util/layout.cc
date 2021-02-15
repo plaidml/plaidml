@@ -25,7 +25,9 @@ TensorLayout getLayoutType(MLFramework framework, StringRef opName,
   // Const are used to identify the primitives weights or parameters, rest is
   // considered as main flow data type
   if (framework == MLFramework::ngraph) {
-    if ((opName.find("Convolution") != StringRef::npos) && isConst) {
+    if ((opName.find("GroupConvolution") != StringRef::npos) && isConst) {
+      return TensorLayout::gkcx;
+    } else if ((opName.find("Convolution") != StringRef::npos) && isConst) {
       return TensorLayout::kcx;
     } else {
       return TensorLayout::ncx;
