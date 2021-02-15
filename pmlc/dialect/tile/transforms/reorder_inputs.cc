@@ -120,8 +120,6 @@ struct ReorderInputsPass : public ReorderInputsBase<ReorderInputsPass> {
           performDataReordering(builder, op, arg, framework);
       }
     }
-
-    IVLOG(1, "Func: " << debugString(*func));
   }
 };
 
