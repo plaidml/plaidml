@@ -35,14 +35,14 @@ This is also quite straightforward to implement in C++/Python:
 
   .. group-tab:: C++
 
-    .. literalinclude:: ../../plaidml/edsl/edsl_docs.cc
+    .. literalinclude:: ../../plaidml/edsl/examples/max_pool_1d.cc
       :language: cpp
       :start-after: for_loop_max_pool_start
       :end-before: for_loop_max_pool_end
     
   .. group-tab:: Python
 
-      .. literalinclude:: ../../plaidml/edsl/edsl_docs.py
+      .. literalinclude:: ../../plaidml/edsl/examples/max_pool_1d.py
         :start-after: for_loop_max_pool_1d_start
         :end-before: for_loop_max_pool_1d_end
 
@@ -61,7 +61,7 @@ written in the eDSL. Here is the eDSL code:
 
   .. group-tab:: Python
 
-    .. literalinclude:: ../../plaidml/edsl/edsl_docs.py
+    .. literalinclude:: ../../plaidml/edsl/examples/max_pool_1d.py
       :pyobject: max_pool_1d
 
 Notice that this code has a `constraint` added to it. 
@@ -96,14 +96,14 @@ counterexample without a constraint would be incorrect:
 
   .. group-tab:: C++
 
-    .. literalinclude:: ../../plaidml/edsl/edsl_docs.cc
+    .. literalinclude:: ../../plaidml/edsl/examples/max_pool_1d.cc
       :language: cpp
       :start-after: wrong_max_pool_start
       :end-before: wrong_max_pool_end
 
   .. group-tab:: Python
 
-    .. literalinclude:: ../../plaidml/edsl/edsl_docs.py
+    .. literalinclude:: ../../plaidml/edsl/examples/max_pool_1d.py
       :pyobject: wrong_max_pool_1d
 
 If you were to run this code, every entry of ``O`` would equal the global max of
@@ -199,7 +199,7 @@ the kernel size relative to the spatial dimension of the input:
 
   .. group-tab:: Python
 
-    .. literalinclude:: ../../plaidml/edsl/edsl_docs.py
+    .. literalinclude:: ../../plaidml/edsl/examples/conv_1d.py
       :pyobject: conv_1d
 
 
@@ -259,19 +259,19 @@ corresponds directly to the formula, and so we get:
 
   .. group-tab:: C++
 
-    .. literalinclude:: ../../plaidml/edsl/edsl_docs.cc
+    .. literalinclude:: ../../plaidml/edsl/examples/conv_2d_dilated.cc
       :language: cpp
       :start-after: conv_2d_dilated_start
       :end-before: conv_2d_dilated_end
 
   .. group-tab:: Python
 
-    .. literalinclude:: ../../plaidml/edsl/edsl_docs.py
+    .. literalinclude:: ../../plaidml/edsl/examples/conv_2d_dilated.py
       :pyobject: conv_2d_dilated
 
 Complex Convolution
 *******************
-This final example demonstrates a strided dilated padded grouped convolution.
+This example demonstrates a strided dilated padded grouped convolution.
 
 .. math::
 
@@ -314,15 +314,252 @@ coefficients, and ``P`` gives the padding offsets.
 
   .. group-tab:: C++
 
-    .. literalinclude:: ../../plaidml/edsl/edsl_docs.cc
+    .. literalinclude:: ../../plaidml/edsl/examples/complex_conv_2d.cc
       :language: cpp
       :start-after: complex_conv_start
       :end-before: complex_conv_end
 
   .. group-tab:: Python
 
-    .. literalinclude:: ../../plaidml/edsl/edsl_docs.py
+    .. literalinclude:: ../../plaidml/edsl/examples/complex_conv_2d.py
       :pyobject: complex_conv_2d
 
 
+GEMV BLAS Level 2
+*******************
+This example illustrates matrix vector operations using the generalized matrix-vector (GEMV) multiplication of the form:
 
+.. math::
+
+   \color{red}O
+   \color{default}  =
+   \color{turquoise}\alpha
+   \color{blue}A
+   \color{purple}x
+   \color{green}  +
+   \color{turquoise}  \beta
+   \color{purple}y
+
+Here :math:`\color{blue}A` is a matrix, :math:`\color{purple}x` and :math:`\color{purple}y` 
+are vectors and :math:`\color{turquoise}\alpha` and  :math:`\color{turquoise}\beta` are 
+constants. 
+
+Ignoring the constants at the moment, we can represent the matrix operation involved as:
+
+.. math::
+
+   \color{red}O[i, j]
+   \color{default} = 
+   \color{green}\sum_{i}
+   \color{green} (
+   \color{blue} A[
+   \color{default}i, j
+   \color{blue}]
+   \color{orange} *
+   {\color{purple} x[}
+   \color{default}j
+   {\color{purple}]}
+   \color{green} )
+   \color{magenta} +
+   \color{purple} y[
+   j
+   \color{purple}]
+
+This can easily be written in eDSL as follows. 
+
+.. math::
+    
+    \verb!Contraction().outShape(I,J)!
+    {\color{red}\verb!.outAccess(i,j)!}
+    {\color{green}\verb!.sum(!}
+    {\color{blue}\verb!A(!}
+    \verb!i, j!
+    {\color{blue}\verb!)!} 
+    {\color{orange}\verb!*!} 
+    {\color{purple}\verb!x(!}
+    \verb!j!
+    {\color{purple}\verb!)!}
+    {\color{green}\verb!)!}
+    {\color{magenta}\verb! + !}
+    {\color{purple}\verb!y!}
+
+.. tabs::
+
+  .. group-tab:: C++
+
+    .. literalinclude:: ../../plaidml/edsl/examples/gemv.cc
+      :language: cpp
+      :start-after: gemv_start
+      :end-before: gemv_end
+
+  .. group-tab:: Python
+
+    .. literalinclude:: ../../plaidml/edsl/examples/gemv.py
+      :pyobject: gemv
+
+Constant-vector multiplication and constant-tensor multiplication can be handled using the 
+element-wise :math:`{\color{magenta}\verb!*!}` operator in eDSL. Thus :math:`\color{turquoise}\alpha` and  
+:math:`\color{turquoise}\beta` can handled as follows. 
+
+.. math::
+
+  \begin{aligned}
+  &\color{blue}\verb!A!
+  {\color{magenta}\verb!  *  !}
+  \color{turquoise}\verb!alpha!\\
+  &\color{blue}\verb!y!
+  {\color{magenta}\verb!  *  !}
+  \color{turquoise}\verb!beta!
+  \end{aligned}
+
+.. tabs::
+
+  .. group-tab:: C++
+
+    .. literalinclude:: ../../plaidml/edsl/examples/gemv.cc
+      :language: cpp
+      :start-after: constant_gemv_start
+      :end-before: constant_gemv_end
+
+  .. group-tab:: Python
+
+    .. literalinclude:: ../../plaidml/edsl/examples/gemv.py
+      :pyobject: gemv2
+
+GEMM BLAS Level 3
+*******************
+This example illustrates matrix-matrix operations using the generalized matrix-matrix (GEMM) multiplication of the form:
+
+
+.. math::
+
+   \color{red}O
+   \color{default}  =
+   \color{turquoise} \alpha
+   \color{blue}A
+   \color{orange} *
+   \color{blue} B
+   \color{green} +
+   \color{turquoise} \beta
+   \color{blue}C
+
+
+Here :math:`\color{blue}A` is a matrix, :math:`\color{purple}x` and :math:`\color{purple}y` 
+are vectors and :math:`\color{turquoise}\alpha` and  :math:`\color{turquoise}\beta` are 
+constants. 
+
+We can represent the matrix operation involved as:
+
+.. math::
+   {\color{red}O[i, j]}
+   \color{default}  =
+   \color{green} \sum_{k} (
+   \color{turquoise} \alpha
+   \color{magenta}\cdot
+   \color{blue}A[
+   \color{default}i, k
+   \color{blue}]
+   \color{orange} *
+   \color{blue} B[
+   \color{default}k, j
+   \color{blue}] 
+   \color{green} )
+   \color{magenta} +
+   \color{turquoise} \beta
+   \color{magenta}\cdot
+   \color{blue}C[
+   \color{default}i, j
+   \color{blue}]
+
+
+This can easily be written in eDSL as follows. 
+
+.. math::
+
+    \begin{aligned}
+    &\color{blue}\verb! A!
+    \color{default}\verb! =!
+    \color{blue}\verb! A!
+    \color{magenta}\verb! *!
+    \color{turquoise}\verb! alpha! \\
+    &\color{blue}\verb! C!
+    \color{default}\verb! =!
+    \color{blue}\verb! C!
+    \color{magenta}\verb! *!
+    \color{turquoise}\verb! beta! \\
+    \verb!Contraction()!
+    &\verb!.outShape(I,J)!\\
+    &{\color{red}\verb!.outAccess(i,j)!}\\
+    &{\color{green}\verb!.sum(!}\\
+    &{\color{blue}\verb!        A(!}
+    \verb!i,k!
+    {\color{blue}\verb!)!}
+    {\color{orange}\verb!  *  !}
+    {\color{blue}\verb!B(!}
+    \verb!k,j!
+    {\color{blue}\verb!)!}\\
+    &{\color{green}\verb!     )!}\\
+    &{\color{magenta}\verb!+!}
+    {\color{blue}\verb!  C!}\\
+    \end{aligned}
+
+
+.. tabs::
+
+  .. group-tab:: C++
+
+    .. literalinclude:: ../../plaidml/edsl/examples/gemm.cc
+      :language: cpp
+      :start-after: gemm_start
+      :end-before: gemm_end
+
+  .. group-tab:: Python
+
+    .. literalinclude:: ../../plaidml/edsl/examples/gemm.py
+      :pyobject: gemm
+
+
+Quantize Float32 to Int8
+*******************
+
+This examples illustrated a basic quantize operation in eDSL. 
+
+We start with a float32 tensor and a value for the range of floating points values expected in the tensor. 
+The expected output is a quantized int8 tensor. This is accomplished using a simple technique illustrated below. 
+
+.. math::
+
+    \color{red} O
+    \color{default} \: = \:
+    \color{blue} A
+    \color{magenta} \: / \:
+    \color{turquoise} range
+    \color{magenta} \: * \:
+    \color{default} 128 
+
+Which looks exactly the same in eDSL. :math:`\color{magenta}\verb! /!` and :math:`\color{magenta}\verb! *!` are element wise operations.
+
+.. math::
+
+    \color{red}\verb! O!
+    \color{default}\verb! =!
+    \color{blue}\verb! A!
+    \color{magenta}\verb! /!
+    \color{turquoise}\verb! range!
+    \color{magenta}\verb! *!
+    \color{default}\verb! 128! 
+
+
+.. tabs::
+
+  .. group-tab:: C++
+
+    .. literalinclude:: ../../plaidml/edsl/examples/quantize.cc
+      :language: cpp
+      :start-after: quantize_float32_int8_start
+      :end-before: quantize_float32_int8_end
+
+  .. group-tab:: Python
+
+    .. literalinclude:: ../../plaidml/edsl/examples/quantize.py
+      :pyobject: quantize_float32_to_int8

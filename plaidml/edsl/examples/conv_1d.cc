@@ -1,4 +1,8 @@
 // Copyright 2020 Intel Corporation.
+// Note:
+//    This file is being used by sphinx docs to pull in code blocks.
+//    Code blocks are pulled into docs/usage/*.rst
+//    Any changes made here may upset the docs.
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>

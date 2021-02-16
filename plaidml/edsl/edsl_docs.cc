@@ -82,48 +82,6 @@ Tensor AvgMerge(const Tensor& I) {
 }
 // avg_merge_end
 
-void ForLoopMaxPool1D(float* I, float* O, int N) {
-  // for_loop_max_pool_start
-  for (int i = 0; i < N / 2; ++i) {
-    float curr_max = std::numeric_limits<float>::min();
-    for (int j = 0; j < 2; ++j) {
-      if (I[2 * i + j] > curr_max) {
-        curr_max = I[2 * i + j];
-      }
-    }
-    O[i] = curr_max;
-  }
-  // for_loop_max_pool_end
-}
-
-// wrong_max_pool_start
-Tensor WrongMaxPool1D(const Tensor& I) {
-  TensorDim N;
-  TensorIndex i, j;
-  I.bind_dims(N);
-  return Contraction().outShape(N / 2).outAccess(i).max(I(2 * i + j));
-}
-// wrong_max_pool_end
-
-Tensor ValidIndices(const Tensor& I) {
-  TensorDim N;
-  TensorIndex i, j;
-  // valid_indices_start
-  I.bind_dims(N);
-  Tensor O = Contraction().outShape(N / 2).outAccess(i).max(I(2 * i + j)).add_constraint(j < 2);
-  // valid_indices_end
-  return O;
-}
-
-// max_pool_1d_odd_start
-Tensor MaxPool1DOdd(const Tensor& I) {
-  TensorDim N;
-  TensorIndex i, j;
-  I.bind_dims(N);
-  return Contraction().outShape((N + 1) / 2).outAccess(i).max(I(2 * i + j)).add_constraint(j < 2);
-}
-// max_pool_1d_odd_end
-
 // skip_start
 Tensor Skip(const Tensor& I) {
   TensorDim M, N;
@@ -141,57 +99,6 @@ Tensor CumSum(const Tensor& I) {
   return Contraction().outShape(N).outAccess(i).sum(I(k)).add_constraint(i - k < N);
 }
 // cumsum_end
-
-// conv_2d_dilated_start
-Tensor Conv2DDilated(const Tensor& I, const Tensor& K) {
-  TensorDim N, X, Y, KX, KY, CI, CO;
-  TensorIndex n, x, y, kx, ky, ci, co;
-  I.bind_dims(N, X, Y, CI);
-  K.bind_dims(KX, KY, CI, CO);
-  return Contraction()
-      .outShape(N, X - 2 * (KX - 1), Y - 3 * (KY - 1), CO)
-      .outAccess(n, x, y, co)
-      .sum(I(n, x + 2 * kx, y + 3 * ky, ci) * K(kx, ky, ci, co));
-}
-// conv_2d_dilated_end
-
-// complex_conv_start
-Tensor ComplexConv2D(const Tensor& I, const Tensor& K,
-                     const std::vector<size_t>& s,  // stride coeffs
-                     const std::vector<size_t>& d   // dilation coeffs
-) {
-  // "same-lower" autopadding will be applied
-  TensorDim N, G, GCI, GCO;
-  std::vector<TensorDim> X(2);
-  std::vector<TensorDim> KD(2);
-  TensorIndex n, g, gci, gco;
-  std::vector<TensorIndex> x(2);
-  std::vector<TensorIndex> k(2);
-  I.bind_dims(N, X[0], X[1], G, GCI);
-  K.bind_dims(KD[0], KD[1], G, GCI, GCO);
-  // Compute output spatial dimensions
-  std::vector<TensorDim> Y(2);
-  for (size_t i = 0; i < Y.size(); ++i) {
-    Y[i] = (X[i] + s[i] - 1) / s[i];
-  }
-  // Compute the effective kernel size after dilation
-  std::vector<TensorDim> EK(2);
-  for (size_t i = 0; i < EK.size(); ++i) {
-    EK[i] = d[i] * (KD[i] - 1) + 1;
-  }
-  // Compute the padding offset
-  std::vector<TensorDim> P(2);
-  for (size_t i = 0; i < P.size(); ++i) {
-    P[i] = ((Y[i] - 1) * s[i] + EK[i] - X[i]) / 2;
-  }
-  // Compute the convolution
-  return Contraction()
-      .outShape(N, Y[0], Y[1], G, GCO)
-      .outAccess(n, x[0], x[1], g, gco)
-      .sum(I(n, s[0] * x[0] + d[0] * k[0] - P[0], s[1] * x[1] + d[1] * k[1] - P[1], g, gci) *
-           K(k[0], k[1], g, gci, gco));
-}
-// complex_conv_end
 
 // layer_start
 Tensor Layer(const Tensor& A, const Tensor& B) {
@@ -246,21 +153,6 @@ TEST_F(DocCppEdsl, AvgMerge) {
   runProgram(makeProgram("avg_merge", {I}, {AvgMerge(I)}));
 }
 
-TEST_F(DocCppEdsl, WrongMaxPool1D) {
-  auto I = Placeholder(DType::UINT64, {3});
-  makeProgram("wrong_max_pool_1d", {I}, {WrongMaxPool1D(I)});
-}
-
-TEST_F(DocCppEdsl, ValidIndices) {
-  auto I = Placeholder(DType::UINT64, {3});
-  runProgram(makeProgram("valid_indices", {I}, {ValidIndices(I)}));
-}
-
-TEST_F(DocCppEdsl, MaxPool1DOdd) {
-  auto I = Placeholder(DType::UINT64, {3});
-  runProgram(makeProgram("max_poo_1d_odd", {I}, {MaxPool1DOdd(I)}));
-}
-
 TEST_F(DocCppEdsl, Skip) {
   auto I = Placeholder(DType::UINT64, {3, 3});
   runProgram(makeProgram("skip", {I}, {Skip(I)}));
@@ -269,19 +161,6 @@ TEST_F(DocCppEdsl, Skip) {
 TEST_F(DocCppEdsl, CumSum) {
   auto I = Placeholder(DType::FLOAT32, {10}, "I");
   runProgram(makeProgram("cumsum", {I}, {CumSum(I)}));
-}
-
-TEST_F(DocCppEdsl, Conv2DDilated) {
-  auto I = Placeholder(DType::UINT64, {1, 244, 244, 1});
-  auto K = Placeholder(DType::UINT64, {3, 3, 1, 32});
-  runProgram(makeProgram("conv_2d_dilated", {I, K}, {Conv2DDilated(I, K)}));
-}
-
-TEST_F(DocCppEdsl, ComplexConv2d) {
-  auto I = Placeholder(DType::FLOAT32, {1, 224, 224, 3, 3});
-  auto K = Placeholder(DType::FLOAT32, {3, 3, 3, 3, 32});
-  auto O = ComplexConv2D(I, K, {2, 2}, {3, 3});
-  runProgram(makeProgram("complex_conv_2d", {I, K}, {O}));
 }
 
 TEST_F(DocCppEdsl, Layer) {

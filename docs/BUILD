@@ -19,6 +19,7 @@ py_binary(
         ":runfiles",
         "//plaidml/core:docs",
         "//plaidml/edsl:docs",
+        "//plaidml/edsl/examples:docs",
         "//plaidml/exec:docs",
     ],
     deps = [
