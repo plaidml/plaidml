@@ -598,9 +598,59 @@ static Value buildSimpleStore(OpBuilder &builder, Location loc, Value scalar,
   auto idMap = builder.getMultiDimIdentityMap(memRefType.getRank());
   auto storeOp = builder.create<pxa::PxaReduceOp>(loc, aggOp, scalar, memRef,
                                                   idMap, body->getArguments());
+
+  if (memRefType.getAffineMaps().size() > 0) {
+    idMap = memRefType.getAffineMaps().front();
+  }
+
   if (maybePadding)
     updateAffineMap(storeOp, *maybePadding);
   return storeOp;
+}
+
+mlir::AffineMap getBlockedLayoutMap(unsigned numDims,
+                                    mlir::MLIRContext *context) {
+  IVLOG(4, "In getBlockedLayoutMap()");
+
+  if (numDims == 4) {
+    /*
+*NHWC -> NCHW: newMap: (d0 d1 d2 d3) -> (d0 d3 d1 d2)
+NCHW -> NCHWc16: newBlockedMap: (d0 d3 d1 d2) -> (d0 d3 floordiv 16, d1, d2, d3
+mod 16)
+*/
+    mlir::SmallVector<unsigned, 4> permutationMap;
+    permutationMap.push_back(0);
+    permutationMap.push_back(3);
+    permutationMap.push_back(1);
+    permutationMap.push_back(2);
+    mlir::AffineMap newMap =
+        mlir::AffineMap::getPermutationMap(permutationMap, context);
+    IVLOG(4, "newMap: " << mlir::debugString(newMap));
+
+    int blockSize = 16;
+    mlir::SmallVector<mlir::AffineExpr, 5> expansionExprs;
+    for (unsigned idx = 0; idx < newMap.getNumResults(); ++idx) {
+      mlir::AffineExpr expr;
+      if (idx == 1) {
+        expr = newMap.getResult(idx).floorDiv(blockSize);
+      } else {
+        expr = newMap.getResult(idx);
+      }
+
+      expansionExprs.push_back(expr);
+      if (idx == newMap.getNumResults() - 1) {
+        expansionExprs.push_back(newMap.getResult(1) % blockSize);
+      }
+    }
+
+    mlir::AffineMap newBlockedMap = mlir::AffineMap::get(
+        newMap.getNumResults(), 0, expansionExprs, context);
+    IVLOG(4, "newBlockedMap: " << mlir::debugString(newBlockedMap));
+    return newBlockedMap;
+
+  } else {
+    return mlir::AffineMap::getMultiDimIdentityMap(numDims, context);
+  }
 }
 
 struct BufferAllocator {
@@ -628,12 +678,17 @@ struct BufferAllocator {
 
     // Make an allocation for the output
     memRefType = MemRefType::get(shape, elementType);
-    resultMemRef = builder.create<AllocOp>(loc, memRefType);
+    mlir::MemRefType newMemRefType =
+        mlir::MemRefType::Builder(memRefType)
+            .setAffineMaps(
+                {getBlockedLayoutMap(shape.size(), memRefType.getContext())});
+    resultMemRef = builder.create<AllocOp>(loc, newMemRefType);
+    IVLOG(4, "resultMemRef1: " << mlir::debugString(resultMemRef));
     if (maybePadding) {
       auto initValue = createInit(builder, loc, elementType, maybePadding->agg);
       auto parallel = builder.create<AffineParallelOp>(
           loc,
-          /*resultTypes=*/ArrayRef<Type>{memRefType},
+          /*resultTypes=*/ArrayRef<Type>{newMemRefType},
           /*reductions=*/ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign},
           /*ranges=*/shape);
       auto parallelBuilder = parallel.getBodyBuilder();
@@ -643,6 +698,7 @@ struct BufferAllocator {
                                      llvm::None);
       parallelBuilder.create<AffineYieldOp>(loc, ValueRange{stored});
       resultMemRef = parallel.getResult(0);
+      IVLOG(4, "resultMemRef2: " << mlir::debugString(resultMemRef));
     }
   }
 };
