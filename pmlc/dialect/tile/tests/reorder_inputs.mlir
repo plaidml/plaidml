@@ -3,7 +3,7 @@
 // CHECK-LABEL: @main
 // CHECK:   %[[reorder0:.*]] = tile.contract assign, none, %{{.*}}, %{{.*}} {lowerBounds = #map0, sink = #map1, srcs = [#map1], tags = {layout = "kcx"}
 // CHECK:   layer.box "ng.Convolution" (%{{.*}}, %{{.*}}) = (%{{.*}}, %[[reorder0]])
-// CHECK:   tile.contract add, mul, %{{.*}}, %{{.*}}, %{{.*}} {sink = #map3, srcs = [#map4, #map5], tags = {layout = "ncx"}}
+// CHECK:   tile.contract add, mul, %{{.*}}, %{{.*}}, %{{.*}} {sink = #map4, srcs = [#map5, #map6], tags = {layout = "ncx"}}
 func @main(%arg0: tensor<1x3x224x224xf32>, %arg1: tensor<64x3x7x7xf32> {tile.const = 0 : index}, %arg2: tensor<1x64x1x1xf32> {tile.const = 1 : index}) -> tensor<1x64x112x112xf32> {
   %0 = layer.box "ng.Convolution" (%arg111, %arg112) = (%arg0, %arg1) : (tensor<1x3x224x224xf32>, tensor<64x3x7x7xf32>) -> tensor<1x64x112x112xf32> {
     %cst_109 = tile.constant(0.000000e+00 : f64) : tensor<f32>
