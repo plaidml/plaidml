@@ -116,10 +116,12 @@ function(pml_cc_library)
     target_include_directories(${_NAME} SYSTEM
       PUBLIC
         "$<BUILD_INTERFACE:${PML_COMMON_INCLUDE_DIRS}>"
+        "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
     )
     target_include_directories(${_NAME}
       PUBLIC
         "$<BUILD_INTERFACE:${_RULE_INCLUDES}>"
+        "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
     )
     target_compile_options(${_NAME}
       PRIVATE
@@ -168,6 +170,7 @@ function(pml_cc_library)
     target_include_directories(${_NAME} SYSTEM
       INTERFACE
         "$<BUILD_INTERFACE:${PML_COMMON_INCLUDE_DIRS}>"
+        "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
     )
     target_compile_options(${_NAME}
       INTERFACE
@@ -202,15 +205,62 @@ function(pml_cc_library)
     add_library(${_PACKAGE_NS} ALIAS ${_NAME})
   endif()
 
-  # install(TARGETS ${_NAME}
-  #   ARCHIVE
-  #   RENAME ${_RULE_NAME}
-  #   COMPONENT ${_RULE_NAME} 
-  #   DESTINATION lib)
+  get_property(exp_list GLOBAL PROPERTY exp_list_property)
+  get_property(gen_dep_list GLOBAL PROPERTY gen_list_property)
+  if(TARGET ${_NAME} AND (${_NAME} MATCHES ".*plaidml_.*" OR ${_NAME} MATCHES ".*pmlc_.*") AND NOT ${_NAME} MATCHES ".*testenv.*" AND NOT ${_NAME} MATCHES ".*openvino.*" AND NOT ${_NAME} IN_LIST exp_list)
+    
+  install(TARGETS ${_NAME}
+    EXPORT ${PROJECT_NAME}_Targets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
-  # foreach(HEADER ${_RULE_HDRS})
-  #   install(FILES ${HEADER}
-  #           DESTINATION include
-  #           COMPONENT ${_RULE_NAME})
-  # endforeach()
+  list(APPEND exp_list "${_NAME}")
+
+  # message("Exporting ${_NAME}")
+
+  foreach(DEP ${_RULE_DEPS})
+    if(TARGET ${DEP})
+      get_target_property(_ALIASED_TARGET ${DEP} ALIASED_TARGET)
+      if(_ALIASED_TARGET)
+      # message("     Dep: ${DEP}; ${_ALIASED_TARGET}")
+      if(NOT ${_ALIASED_TARGET} IN_LIST exp_list)
+        install(TARGETS ${_ALIASED_TARGET}
+        EXPORT ${PROJECT_NAME}_Targets
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+        list(APPEND exp_list "${_ALIASED_TARGET}")
+      endif()
+      else()
+        # if(NOT ${DEP} MATCHES ".*Boost.*")
+        #   install(TARGETS ${DEP}
+        #   EXPORT LLVMExports
+        #   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        #   LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        #   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+        # endif()
+      endif()
+    else()
+    # message("     Fake Dep: ${DEP}")
+      if(${DEP} MATCHES ".*pmlc.*" AND ${DEP} MATCHES ".*gen.*" AND NOT ${DEP} IN_LIST gen_dep_list)
+        string(REPLACE "::" "_" DEP_TARGET_NAME ${DEP})
+        list(APPEND gen_dep_list "${DEP_TARGET_NAME}")
+      endif()
+    endif()
+  endforeach()
+
+  string(REPLACE ${CMAKE_SOURCE_DIR} "" HDR_INSTALL_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+  foreach(HEADER ${_RULE_HDRS})
+    if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${HEADER})
+      install(FILES ${HEADER}
+              DESTINATION "include${HDR_INSTALL_DIR}"
+              COMPONENT devkit)
+    endif()
+  endforeach()
+
+  set_property(GLOBAL PROPERTY exp_list_property "${exp_list}")
+  set_property(GLOBAL PROPERTY gen_list_property "${gen_dep_list}")
+  endif()
+
 endfunction()
