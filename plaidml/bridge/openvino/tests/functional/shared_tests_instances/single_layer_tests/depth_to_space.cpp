@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include <ngraph/opsets/opset3.hpp>
 #include <vector>
+
+#include <ngraph/opsets/opset3.hpp>
 
 #include "common_test_utils/test_constants.hpp"
 #include "single_layer_tests/depth_to_space.hpp"
@@ -14,6 +15,7 @@ using namespace ngraph::opset3;
 namespace {
 const std::vector<InferenceEngine::Precision> inputPrecisions = {
     InferenceEngine::Precision::FP32,
+    InferenceEngine::Precision::FP16,
     InferenceEngine::Precision::U8,
     InferenceEngine::Precision::I16,
 };

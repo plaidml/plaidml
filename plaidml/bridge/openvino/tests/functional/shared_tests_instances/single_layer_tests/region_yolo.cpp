@@ -49,6 +49,11 @@ const std::vector<size_t> num_regions = {
     9,
 };
 
+const std::vector<InferenceEngine::Precision> netPrecisions = {
+    InferenceEngine::Precision::FP32,
+    InferenceEngine::Precision::FP16,
+};
+
 const size_t coords = 4;
 const int start_axis = 1;
 const int end_axis = 3;
@@ -63,7 +68,7 @@ INSTANTIATE_TEST_CASE_P(TestsRegionYolov3, RegionYoloLayerTest,
                             ::testing::Values(masks[2]),                          //
                             ::testing::Values(start_axis),                        //
                             ::testing::Values(end_axis),                          //
-                            ::testing::Values(InferenceEngine::Precision::FP32),  //
+                            ::testing::ValuesIn(netPrecisions),                   //
                             ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
                         RegionYoloLayerTest::getTestCaseName);
 
@@ -77,7 +82,7 @@ INSTANTIATE_TEST_CASE_P(TestsRegionYoloMxnet, RegionYoloLayerTest,
                             ::testing::Values(masks[1]),                          //
                             ::testing::Values(start_axis),                        //
                             ::testing::Values(end_axis),                          //
-                            ::testing::Values(InferenceEngine::Precision::FP32),  //
+                            ::testing::ValuesIn(netPrecisions),                   //
                             ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
                         RegionYoloLayerTest::getTestCaseName);
 
@@ -91,7 +96,7 @@ INSTANTIATE_TEST_CASE_P(TestsRegionYoloCaffe, RegionYoloLayerTest,
                             ::testing::Values(masks[0]),                          //
                             ::testing::Values(start_axis),                        //
                             ::testing::Values(end_axis),                          //
-                            ::testing::Values(InferenceEngine::Precision::FP32),  //
+                            ::testing::ValuesIn(netPrecisions),                   //
                             ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
                         RegionYoloLayerTest::getTestCaseName);
 
@@ -105,6 +110,6 @@ INSTANTIATE_TEST_CASE_P(smoke, RegionYoloLayerTest,
                             ::testing::Values(masks[0]),                          //
                             ::testing::Values(start_axis),                        //
                             ::testing::Values(end_axis),                          //
-                            ::testing::Values(InferenceEngine::Precision::FP32),  //
+                            ::testing::ValuesIn(netPrecisions),                   //
                             ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
                         RegionYoloLayerTest::getTestCaseName);

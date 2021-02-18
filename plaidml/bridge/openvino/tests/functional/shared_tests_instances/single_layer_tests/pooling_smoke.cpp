@@ -12,9 +12,6 @@ using namespace LayerTestsDefinitions;
 
 namespace {
 // Common params
-const std::vector<InferenceEngine::Precision> inputPrecisions = {
-    InferenceEngine::Precision::FP32,
-};
 
 const std::vector<InferenceEngine::Precision> netPrecisions = {
     InferenceEngine::Precision::FP32,
@@ -26,7 +23,7 @@ const std::vector<std::vector<size_t>> kernels = {
 };
 const std::vector<std::vector<size_t>> strides = {
     {1, 1},
-    //{1, 2},
+    // {1, 2},
 };
 const std::vector<std::vector<size_t>> padBegins = {
     {0, 0},

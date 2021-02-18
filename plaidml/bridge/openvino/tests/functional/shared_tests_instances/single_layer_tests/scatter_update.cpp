@@ -13,6 +13,7 @@ namespace {
 
 const std::vector<InferenceEngine::Precision> inputPrecisions = {
     InferenceEngine::Precision::FP32,
+    InferenceEngine::Precision::FP16,
     InferenceEngine::Precision::I32,
 };
 
@@ -47,8 +48,7 @@ INSTANTIATE_TEST_CASE_P(smoke, ScatterUpdateLayerTest,
                             ::testing::ValuesIn(idxValue),                                                 //
                             ::testing::Values(InferenceEngine::Precision::FP32),                           //
                             ::testing::Values(InferenceEngine::Precision::I32),                            //
-                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)                             //
-                            ),
+                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),                           //
                         ScatterUpdateLayerTest::getTestCaseName);
 
 }  // namespace
