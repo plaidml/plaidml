@@ -24,7 +24,13 @@ std::vector<std::vector<std::string>> activations = {
 std::vector<float> clips{0.f, 0.7f};
 std::vector<InferenceEngine::Precision> netPrecisions = {
     InferenceEngine::Precision::FP32,
-    // InferenceEngine::Precision::FP16,
+    InferenceEngine::Precision::FP16,
+};
+
+// Note: For f16, skip relu/relu/relu as it creates tests that overflow 65504, the max value of FP16
+std::vector<std::vector<std::string>> f16Activations = {
+    {"relu", "sigmoid", "tanh"},       {"sigmoid", "tanh", "tanh"}, {"tanh", "relu", "sigmoid"},
+    {"sigmoid", "sigmoid", "sigmoid"}, {"tanh", "tanh", "tanh"},
 };
 
 INSTANTIATE_TEST_CASE_P(LSTMCellCommon, LSTMCellTest,
@@ -35,19 +41,31 @@ INSTANTIATE_TEST_CASE_P(LSTMCellCommon, LSTMCellTest,
                             ::testing::ValuesIn(input_size),                      //
                             ::testing::ValuesIn(activations),                     //
                             ::testing::ValuesIn(clips),                           //
-                            ::testing::ValuesIn(netPrecisions),                   //
+                            ::testing::Values(InferenceEngine::Precision::FP32),  //
+                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
+                        LSTMCellTest::getTestCaseName);
+
+INSTANTIATE_TEST_CASE_P(LSTMCellF16, LSTMCellTest,
+                        ::testing::Combine(                                       //
+                            ::testing::ValuesIn(should_decompose),                //
+                            ::testing::ValuesIn(batch),                           //
+                            ::testing::ValuesIn(hidden_size),                     //
+                            ::testing::ValuesIn(input_size),                      //
+                            ::testing::ValuesIn(f16Activations),                  //
+                            ::testing::ValuesIn(clips),                           //
+                            ::testing::Values(InferenceEngine::Precision::FP16),  //
                             ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
                         LSTMCellTest::getTestCaseName);
 
 INSTANTIATE_TEST_CASE_P(smoke, LSTMCellTest,
-                        ::testing::Combine(                                                         //
-                            ::testing::Values(true),                                                //
-                            ::testing::Values(3),                                                   //
-                            ::testing::Values(64),                                                  //
-                            ::testing::Values(32),                                                  //
-                            ::testing::Values(std::vector<std::string>({"relu", "relu", "relu"})),  //
-                            ::testing::Values(std::numeric_limits<float>::infinity()),              //
-                            ::testing::ValuesIn(netPrecisions),                                     //
-                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),                    //
+                        ::testing::Combine(                                                            //
+                            ::testing::Values(true),                                                   //
+                            ::testing::Values(3),                                                      //
+                            ::testing::Values(64),                                                     //
+                            ::testing::Values(32),                                                     //
+                            ::testing::Values(std::vector<std::string>({"relu", "sigmoid", "tanh"})),  //
+                            ::testing::Values(std::numeric_limits<float>::infinity()),                 //
+                            ::testing::ValuesIn(netPrecisions),                                        //
+                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),                       //
                         LSTMCellTest::getTestCaseName);
 }  // namespace

@@ -9,6 +9,8 @@
 
 using namespace LayerTestsDefinitions;
 
+namespace {
+
 const auto ROIAlignCases_average = ::testing::Combine(  //
     ::testing::ValuesIn(std::vector<std::vector<size_t>>{
         {3, 8, 16, 16},
@@ -46,3 +48,4 @@ const auto ROIAlignCases_max = ::testing::Combine(  //
 
 INSTANTIATE_TEST_CASE_P(smoke_TestsROIAlign_max, ROIAlignLayerTest, ROIAlignCases_max,
                         ROIAlignLayerTest::getTestCaseName);
+};  // namespace

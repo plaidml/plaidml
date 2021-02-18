@@ -47,6 +47,13 @@ batchToSpaceParamsTuple bts_only_test_cases[] = {
                             InferenceEngine::Layout::ANY,                                         //
                             InferenceEngine::Layout::ANY,                                         //
                             CommonTestUtils::DEVICE_PLAIDML),
+    batchToSpaceParamsTuple({1, 1, 3, 2, 2}, {0, 0, 1, 0, 3}, {0, 0, 2, 0, 0}, {12, 1, 2, 1, 2},  //
+                            InferenceEngine::Precision::FP16,                                     //
+                            InferenceEngine::Precision::UNSPECIFIED,                              //
+                            InferenceEngine::Precision::UNSPECIFIED,                              //
+                            InferenceEngine::Layout::ANY,                                         //
+                            InferenceEngine::Layout::ANY,                                         //
+                            CommonTestUtils::DEVICE_PLAIDML),
 };
 
 INSTANTIATE_TEST_CASE_P(                       //
