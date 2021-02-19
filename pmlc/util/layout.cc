@@ -29,6 +29,8 @@ TensorLayout getLayoutType(MLFramework framework, StringRef opName,
       return TensorLayout::gkcx;
     } else if ((opName.find("Convolution") != StringRef::npos) && isConst) {
       return TensorLayout::kcx;
+    } else if (opName.find("Reshape") != StringRef::npos) {
+      return TensorLayout::ncx;
     } else {
       return TensorLayout::ncx;
     }
