@@ -82,8 +82,8 @@ enum class LevelZeroActionKind { Barrier, Kernel, Read, Write };
 /// operation that produced it and serves for ordering operations.
 class LevelZeroEvent {
 public:
-  LevelZeroEvent(ze_event_handle_t event, LevelZeroActionKind kind,
-                 std::string name);
+  LevelZeroEvent(LevelZeroInvocation *invocation, ze_event_handle_t event,
+                 LevelZeroActionKind kind, std::string name);
 
   /// Returns LevelZero event object.
   ze_event_handle_t getEvent() const { return event; }
@@ -91,14 +91,25 @@ public:
   LevelZeroActionKind getKind() const { return kind; }
   /// Returns name of operation that this event describes.
   const std::string &getName() const { return name; }
+  /// Return timestamp that event has taken.
+  ze_kernel_timestamp_result_t getTimestamp() const { return timestamp; }
+  /// Get invocation pointer.
+  LevelZeroInvocation *getInvocation() const { return invocation; }
+
+  /// Clear event after it has been consumed ( waited ).
+  void setEvent(ze_event_handle_t e) { event = e; }
+  /// Set timestamp.
+  void setTimestamp(ze_kernel_timestamp_result_t value) { timestamp = value; }
 
   /// Blocks execution until all `events` have finished executing.
   static void wait(const std::vector<LevelZeroEvent *> &events);
 
 private:
+  LevelZeroInvocation *invocation;
   ze_event_handle_t event;
   LevelZeroActionKind kind;
   std::string name;
+  ze_kernel_timestamp_result_t timestamp;
 };
 
 // LevelZeroInvocation encapsulates a particular run of a network on a LevelZero
@@ -135,8 +146,11 @@ public:
   /// event describing status of kernel execution.
   LevelZeroEvent *enqueueKernel(LevelZeroKernel *kernel, ze_group_count_t gws,
                                 ze_group_count_t lws);
-  /// Not used now
+  /// Not used now.
   LevelZeroEvent *enqueueBarrier(const std::vector<LevelZeroEvent *> &deps);
+  /// Release ze_event_handle_t but not LevelZeroEvent as it may keep profiling
+  /// info.
+  void releaseZeEvent(ze_event_handle_t event);
   /// Forces starting execution of previosuly enqueued operations that aren't
   /// blocked by any dependencies.
   void flush();
