@@ -281,10 +281,16 @@ std::vector<StridedSliceSpecificParams> ss_only_test_cases = {
     //    },
 };
 
+const std::vector<InferenceEngine::Precision> netPrecisions = {
+    InferenceEngine::Precision::I32,
+    InferenceEngine::Precision::FP32,
+    InferenceEngine::Precision::FP16,
+};
+
 INSTANTIATE_TEST_CASE_P(smoke, StridedSliceLayerTest,
                         ::testing::Combine(                                              //
                             ::testing::ValuesIn(ss_only_test_cases),                     //
-                            ::testing::Values(InferenceEngine::Precision::FP32),         //
+                            ::testing::ValuesIn(netPrecisions),                          //
                             ::testing::Values(InferenceEngine::Precision::UNSPECIFIED),  //
                             ::testing::Values(InferenceEngine::Precision::UNSPECIFIED),  //
                             ::testing::Values(InferenceEngine::Layout::ANY),             //

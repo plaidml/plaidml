@@ -10,17 +10,10 @@
 using namespace LayerTestsDefinitions;
 using namespace ngraph::helpers;
 namespace {
-// Common params
-const std::vector<InferenceEngine::Precision> inputPrecisions = {
-    InferenceEngine::Precision::FP32
-    // TODO: Fix Issue-27390
-    // InferenceEngine::Precision::I16,
-    // InferenceEngine::Precision::U8
-};
 
 const std::vector<InferenceEngine::Precision> netPrecisions = {
     InferenceEngine::Precision::FP32,
-    // InferenceEngine::Precision::FP16,
+    InferenceEngine::Precision::FP16,
 };
 
 const std::map<ActivationTypes, std::vector<std::vector<float>>> activationTypes = {
@@ -33,21 +26,10 @@ const std::map<ActivationTypes, std::vector<std::vector<float>>> activationTypes
     {Abs, {}},
     {Clamp, {{-2.0f, 2.0f}}},
     {Negative, {}},
-    {Acos, {}},
-    {Acosh, {}},
-    {Asin, {}},
-    {Asinh, {}},
-    {Atan, {}},
-    {Atanh, {}},
     {Cos, {}},
-    {Cosh, {}},
-    {Floor, {}},
     {Sin, {}},
-    {Sinh, {}},
     {Sqrt, {}},
-    {Tan, {}},
     {Elu, {{0.1f}}},
-    {Erf, {}},
     {HardSigmoid, {{0.2f, 0.5f}}},
     {Selu, {{1.6732f, 1.0507f}}},
     {Ceiling, {}},
@@ -56,6 +38,24 @@ const std::map<ActivationTypes, std::vector<std::vector<float>>> activationTypes
     {HSwish, {}},
     {SoftPlus, {}},
     {HSigmoid, {}},
+};
+
+const std::vector<InferenceEngine::Precision> f32Precision = {
+    InferenceEngine::Precision::FP32,
+};
+
+const std::map<ActivationTypes, std::vector<std::vector<float>>> activationF32Types = {
+    {Acos, {}},
+    {Acosh, {}},
+    {Asin, {}},
+    {Asinh, {}},
+    {Atan, {}},
+    {Atanh, {}},
+    {Cosh, {}},
+    {Floor, {}},
+    {Sinh, {}},
+    {Tan, {}},
+    {Erf, {}},
     {RoundHalfToEven, {}},
     {RoundHalfAwayFromZero, {}},
 };
@@ -86,6 +86,17 @@ const auto basicCases = ::testing::Combine(                                //
     ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)                     //
 );
 
+const auto f32OnlyCases = ::testing::Combine(                                 //
+    ::testing::ValuesIn(CommonTestUtils::combineParams(activationF32Types)),  //
+    ::testing::ValuesIn(f32Precision),                                        //
+    ::testing::Values(InferenceEngine::Precision::UNSPECIFIED),               //
+    ::testing::Values(InferenceEngine::Precision::UNSPECIFIED),               //
+    ::testing::Values(InferenceEngine::Layout::ANY),                          //
+    ::testing::Values(InferenceEngine::Layout::ANY),                          //
+    ::testing::ValuesIn(CommonTestUtils::combineParams(basic)),               //
+    ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)                        //
+);
+
 const auto basicPreluCases = ::testing::Combine(                                //
     ::testing::ValuesIn(CommonTestUtils::combineParams(activationParamTypes)),  //
     ::testing::ValuesIn(netPrecisions),                                         //
@@ -101,6 +112,13 @@ INSTANTIATE_TEST_CASE_P(                  //
     smoke_Activation_Basic,               //
     ActivationLayerTest,                  //
     basicCases,                           //
+    ActivationLayerTest::getTestCaseName  //
+);
+
+INSTANTIATE_TEST_CASE_P(                  //
+    smoke_Activation_F32_Only,            //
+    ActivationLayerTest,                  //
+    f32OnlyCases,                         //
     ActivationLayerTest::getTestCaseName  //
 );
 
