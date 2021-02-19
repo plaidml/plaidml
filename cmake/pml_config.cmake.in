@@ -1,5 +1,16 @@
 @PACKAGE_INIT@
 
+get_filename_component(_IMPORT_PREFIX "${CMAKE_CURRENT_LIST_FILE}" PATH)
+get_filename_component(_IMPORT_PREFIX "${_IMPORT_PREFIX}" PATH)
+get_filename_component(_IMPORT_PREFIX "${_IMPORT_PREFIX}" PATH)
+get_filename_component(_IMPORT_PREFIX "${_IMPORT_PREFIX}" PATH)
+if(_IMPORT_PREFIX STREQUAL "/")
+  set(_IMPORT_PREFIX "")
+endif()
+
+find_package(ZLIB)
+include("${_IMPORT_PREFIX}/cmake/third_party/CPM.cmake")
+include("${_IMPORT_PREFIX}/cmake/third_party/boost.cmake")
+
 include("${CMAKE_CURRENT_LIST_DIR}/@PROJECT_NAME@Targets.cmake")
-include("${CMAKE_CURRENT_LIST_DIR}/LLVMExports.cmake")
 check_required_components("@PROJECT_NAME@")

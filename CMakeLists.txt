@@ -26,7 +26,7 @@ set(PLAIDML_VERSION 1.0.0)
 set(MAIN_BRANCH plaidml-v1)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
-include(GNUInstallDirs)
+set(LLVM_INSTALL_TOOLCHAIN_ONLY ON)
 
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
   # Support for ninja on windows
@@ -67,6 +67,7 @@ if(NOT PML_OPENVINO_BRIDGE OR InferenceEngineDeveloperPackage_FOUND)
   include(gflags)
   include(googletest)
 endif()
+include(GNUInstallDirs)
 include(half)
 include(llvm-project)
 if(PML_ENABLE_OPENCL)
@@ -119,22 +120,6 @@ else()
   )
 endif()
 
-# Set cpackaging variables
-# set(CPACK_DEB_COMPONENT_INSTALL ON)
-# set(CPACK_PACKAGING_INSTALL_PREFIX "/opt/plaidml")
-# set(CMAKE_INSTALL_PREFIX ${CPACK_PACKAGING_INSTALL_PREFIX})
-set(CPACK_GENERATOR "TGZ")
-set(CPACK_PACKAGE_NAME "PlaidML")
-set(CPACK_PACKAGE_VENDOR "Intel Corp")
-set(CPACK_PACKAGE_CONTACT "Intel")
-set(CPACK_PACKAGE_VERSION ${PLAIDML_VERSION})
-set(exp_list "")
-set(gen_dep_list "")
-set_property(GLOBAL PROPERTY exp_list_property "${exp_list}")
-set_property(GLOBAL PROPERTY gen_list_property "${gen_dep_list}")
-# set(CPACK_COMPONENTS_ALL DEVKIT)
-# set(CMAKE_INSTALL_RPATH  "${CPACK_PACKAGING_INSTALL_PREFIX}/lib")
-
 add_subdirectory(plaidml)
 add_subdirectory(pmlc)
 add_subdirectory(docs)
@@ -149,108 +134,6 @@ configure_lit_site_cfg(
   ${CMAKE_CURRENT_SOURCE_DIR}/lit.cfg.py
 )
 
-get_property(gen_dep_list GLOBAL PROPERTY gen_list_property)
-get_property(exp_list GLOBAL PROPERTY exp_list_property)
-foreach(GEN_DEP ${gen_dep_list})
-  if(NOT ${GEN_DEP} IN_LIST exp_list)
-    install(TARGETS ${GEN_DEP}
-      EXPORT ${PROJECT_NAME}_Targets
-      ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-      LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-      RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
-  endif()
-endforeach()
-
-
-set(TP_INSTALLS "half;volk;omp;vulkan_headers;opencl_headers;opencl_hpp_headers;OpenCL;xsmm;gtest;easyloggingpp")
-foreach(TP ${TP_INSTALLS})
-  get_target_property(TP_INC_DIRS ${TP} INTERFACE_INCLUDE_DIRECTORIES)
-  list(LENGTH TP_INC_DIRS VAR_LEN)
-  set(DONT_FIX "FALSE")
-  foreach(INCDIR ${TP_INC_DIRS})
-    if(${INCDIR} MATCHES ".*INSTALL_INTERFACE.*" OR ${INCDIR} MATCHES ".*NOTFOUND.*")
-      set(DONT_FIX "TRUE")
-    endif()
-  endforeach()
-  if(${DONT_FIX} MATCHES "FALSE")
-    set_target_properties(${TP} PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "$<BUILD_INTERFACE:${TP_INC_DIRS}>;$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
-  endif()
-  install(TARGETS ${TP}
-  EXPORT ${PROJECT_NAME}_Targets
-  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
-endforeach()
-
 # ie_cpack(BENCHMARK_APP)
-include(CMakePackageConfigHelpers)
-write_basic_package_version_file("${PROJECT_NAME}ConfigVersion.cmake"
-                                 VERSION ${CPACK_PACKAGE_VERSION}
-                                 COMPATIBILITY SameMajorVersion)
 
-configure_package_config_file(
-  "${PROJECT_SOURCE_DIR}/cmake/pml_config.cmake.in"
-  "${PROJECT_BINARY_DIR}/${PROJECT_NAME}Config.cmake"
-  INSTALL_DESTINATION
-  ${CMAKE_INSTALL_DATAROOTDIR}/${PROJECT_NAME}/cmake)
-
-install(EXPORT MLIRTargets
-  FILE LLVMExports.cmake
-  DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/${PROJECT_NAME}/cmake)
-
-install(EXPORT LLVMExports
-  FILE LLVMExports.cmake
-  DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/${PROJECT_NAME}/cmake)
-
-install(EXPORT ${PROJECT_NAME}_Targets
-  FILE ${PROJECT_NAME}Targets.cmake
-  NAMESPACE ${PROJECT_NAME}::
-  DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/${PROJECT_NAME}/cmake)
-
-install(FILES "${PROJECT_BINARY_DIR}/${PROJECT_NAME}Config.cmake"
-  "${PROJECT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
-  DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/${PROJECT_NAME}/cmake)
-
-
-# include(GetPrerequisites)
-
-# # Install binary target
-# set(BIN plaidml_edsl_tests_cc_test)
-# install(
-#     TARGETS ${BIN}
-#     DESTINATION bin
-#     COMPONENT DEVKIT
-# )
-
-# set(BINARY_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/bin/${BIN}")
-# get_prerequisites(${BINARY_LOCATION} DEPENDENCIES 0 0 "" "")
-# set(SYSDEPS "")
-# foreach(DEPENDENCY_FILE ${DEPENDENCIES})
-#   # Install non-system dependencies
-#   if(${DEPENDENCY_FILE} MATCHES "${CMAKE_CURRENT_SOURCE_DIR}/*")
-#     install(
-#       PROGRAMS ${DEPENDENCY_FILE}
-#       DESTINATION lib
-#       COMPONENT DEVKIT
-#     )
-#   # Add system dependencies to dependency list
-#   else()
-#     execute_process(COMMAND dpkg -S ${DEPENDENCY_FILE}  
-#                     OUTPUT_VARIABLE DEP_PROVIDER)
-#     string(REGEX REPLACE ":.*" "" DEPENDENCY ${DEP_PROVIDER})
-#     if (NOT ${DEPENDENCY} IN_LIST SYSDEPS)
-#       string(LENGTH "${SYSDEPS}" DEP_STR_LEN)
-#       if(NOT "${DEP_STR_LEN}" EQUAL "0")
-#         set(SYSDEPS "${SYSDEPS}, ")
-#       endif()
-#       set(SYSDEPS "${SYSDEPS}${DEPENDENCY}")
-#     endif()
-#   endif()
-# endforeach()
-
-# set(CPACK_DEBIAN_PACKAGE_DEPENDS ${SYSDEPS})
-
-# # Add package RPath to binary target
-# set_target_properties(${BIN} PROPERTIES INSTALL_RPATH "${CMAKE_INSTALL_RPATH}:\$LD_LIBRARY_PATH")
-
-include(CPack)
+include(pml_packaging)

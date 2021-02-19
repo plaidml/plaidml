@@ -207,7 +207,8 @@ function(pml_cc_library)
 
   get_property(exp_list GLOBAL PROPERTY exp_list_property)
   get_property(gen_dep_list GLOBAL PROPERTY gen_list_property)
-  if(TARGET ${_NAME} AND (${_NAME} MATCHES ".*plaidml_.*" OR ${_NAME} MATCHES ".*pmlc_.*") AND NOT ${_NAME} MATCHES ".*testenv.*" AND NOT ${_NAME} MATCHES ".*openvino.*" AND NOT ${_NAME} IN_LIST exp_list)
+  get_property(tp_dep_list GLOBAL PROPERTY tp_list_property)
+  if(TARGET ${_NAME} AND NOT ${_NAME} MATCHES ".*openvino.*" AND NOT ${_NAME} IN_LIST exp_list)
     
   install(TARGETS ${_NAME}
     EXPORT ${PROJECT_NAME}_Targets
@@ -233,13 +234,9 @@ function(pml_cc_library)
         list(APPEND exp_list "${_ALIASED_TARGET}")
       endif()
       else()
-        # if(NOT ${DEP} MATCHES ".*Boost.*")
-        #   install(TARGETS ${DEP}
-        #   EXPORT LLVMExports
-        #   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        #   LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        #   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
-        # endif()
+        if(NOT ${DEP} IN_LIST tp_dep_list)
+          list(APPEND tp_dep_list "${DEP}")
+        endif()
       endif()
     else()
     # message("     Fake Dep: ${DEP}")
@@ -261,6 +258,7 @@ function(pml_cc_library)
 
   set_property(GLOBAL PROPERTY exp_list_property "${exp_list}")
   set_property(GLOBAL PROPERTY gen_list_property "${gen_dep_list}")
+  set_property(GLOBAL PROPERTY tp_list_property "${tp_dep_list}")
   endif()
 
 endfunction()

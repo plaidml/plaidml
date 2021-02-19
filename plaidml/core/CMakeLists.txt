@@ -18,6 +18,7 @@ pml_cc_library(
     pmlc::ast
     pmlc::compiler
     pmlc::util
+    pmlc::target::all
     LLVMSupport
 )
 
@@ -30,6 +31,7 @@ pml_cc_library(
     pmlc::ast
     pmlc::compiler
     pmlc::util
+    pmlc::target::all
     LLVMSupport
 )
 
