@@ -89,7 +89,7 @@ std::vector<int> cast_vector(std::vector<int64_t> vec) {
 edsl::Tensor compute_deformable_convolution(edsl::Tensor I, edsl::Tensor OFF, edsl::Tensor F, std::vector<int> I_shape,
                                             std::vector<int> OFF_shape, std::vector<int> F_shape, int G, int DG,
                                             size_t rank, std::vector<size_t> strides, std::vector<size_t> dilations,
-                                            std::vector<size_t> pad_befores, plaidml::op::AutoPadMode autopad_mode) {
+                                            std::vector<size_t> pad_befores) {
   // Define dim of each tensor.
   int N = I_shape[0];
   int CI = I_shape[1];
@@ -105,50 +105,54 @@ edsl::Tensor compute_deformable_convolution(edsl::Tensor I, edsl::Tensor OFF, ed
     NEW_DIM.push_back(F_shape[i] * OFF_shape[i]);
   }
   // Set up the value of the reshape to split the dimension.
-  std::vector<int> OFF_reshape_split;
-  OFF_reshape_split.push_back(N);
-  OFF_reshape_split.push_back(DG);
-  OFF_reshape_split.insert(OFF_reshape_split.end(), F_shape.begin() + 2, F_shape.end());
-  OFF_reshape_split.push_back(rank - 2);
-  OFF_reshape_split.insert(OFF_reshape_split.end(), OFF_shape.begin() + 2, OFF_shape.end());
-  edsl::Tensor offset = op::reshape(OFF, make_tuple<int>(OFF_reshape_split));
+  // For example in 2D, after this operation, the shape of offset will be {N, DG, F_H, F_W, 2, OFF_H, OFF_W}.
+  std::vector<int> OFF_reshape_dims;
+  OFF_reshape_dims.push_back(N);
+  OFF_reshape_dims.push_back(DG);
+  OFF_reshape_dims.insert(OFF_reshape_dims.end(), F_shape.begin() + 2, F_shape.end());
+  OFF_reshape_dims.push_back(rank - 2);
+  OFF_reshape_dims.insert(OFF_reshape_dims.end(), OFF_shape.begin() + 2, OFF_shape.end());
+  edsl::Tensor offset = op::reshape(OFF, make_tuple<int>(OFF_reshape_dims));
   // Set up the value of transpose.
-  std::vector<int> OFF_transpose;
-  OFF_transpose.push_back(0);
-  OFF_transpose.push_back(1);
+  // For example in 2D, after this operation, the shape of offset will be {N, DG, OFF_H, F_H, OFF_W, F_W, 2}.
+  std::vector<int> OFF_transpose_dims;
+  OFF_transpose_dims.push_back(0);
+  OFF_transpose_dims.push_back(1);
   for (auto i = 0; i < rank - 2; ++i) {
-    OFF_transpose.push_back(rank + 1 + i);
-    OFF_transpose.push_back(2 + i);
+    OFF_transpose_dims.push_back(rank + 1 + i);
+    OFF_transpose_dims.push_back(2 + i);
   }
-  OFF_transpose.push_back(rank);
-  offset = op::transpose(offset, make_tuple<int>(OFF_transpose));
+  OFF_transpose_dims.push_back(rank);
+  offset = op::transpose(offset, make_tuple<int>(OFF_transpose_dims));
   // Set up the value of the reshape to multiply the dimension.
-  std::vector<int> OFF_reshape_concat;
-  OFF_reshape_concat.push_back(N);
-  OFF_reshape_concat.push_back(DG);
-  OFF_reshape_concat.push_back(1);
-  OFF_reshape_concat.insert(OFF_reshape_concat.end(), NEW_DIM.begin(), NEW_DIM.end());
-  OFF_reshape_concat.push_back(rank - 2);
-  offset = op::reshape(offset, make_tuple<int>(OFF_reshape_concat));
+  // For example in 2D, after this operation, the shape of offset will be {N, DG, 1, OFF_H*F_H, OFF_W*F_W, 2}.
+  std::vector<int> OFF_multiply_dims;
+  OFF_multiply_dims.push_back(N);
+  OFF_multiply_dims.push_back(DG);
+  OFF_multiply_dims.push_back(1);
+  OFF_multiply_dims.insert(OFF_multiply_dims.end(), NEW_DIM.begin(), NEW_DIM.end());
+  OFF_multiply_dims.push_back(rank - 2);
+  offset = op::reshape(offset, make_tuple<int>(OFF_multiply_dims));
   // Set up the value of the broadcast to broadcast the channel dimension.
-  std::vector<int> OFF_broadcast, OFF_bcast_axes;
-  OFF_broadcast.push_back(N);
-  OFF_broadcast.push_back(DG);
-  OFF_broadcast.push_back(CI / DG);
-  OFF_broadcast.insert(OFF_broadcast.end(), NEW_DIM.begin(), NEW_DIM.end());
-  OFF_broadcast.push_back(rank - 2);
+  // For example in 2D, after this operation, the shape of offset will be {N, DG, CI/DG, OFF_H*F_H, OFF_W*F_W, 2}.
+  std::vector<int> OFF_broadcast_dims, OFF_bcast_axes;
+  OFF_broadcast_dims.push_back(N);
+  OFF_broadcast_dims.push_back(DG);
+  OFF_broadcast_dims.push_back(CI / DG);
+  OFF_broadcast_dims.insert(OFF_broadcast_dims.end(), NEW_DIM.begin(), NEW_DIM.end());
+  OFF_broadcast_dims.push_back(rank - 2);
   for (auto i = 0; i < rank + 2; ++i) {
     OFF_bcast_axes.push_back(i);
   }
-  offset = op::broadcast(offset, OFF_broadcast, OFF_bcast_axes);
+  offset = op::broadcast(offset, OFF_broadcast_dims, OFF_bcast_axes);
   // Set up the value of the reshape to multiply the channel dimension.
+  // For example in 2D, after this operation, the shape of offset will be {N, CI, OFF_H*F_H, OFF_W*F_W, 2}.
   std::vector<int> OFF_reshape_channel;
   OFF_reshape_channel.push_back(N);
   OFF_reshape_channel.push_back(CI);
   OFF_reshape_channel.insert(OFF_reshape_channel.end(), NEW_DIM.begin(), NEW_DIM.end());
   OFF_reshape_channel.push_back(rank - 2);
-  offset = op::reshape(offset, make_tuple<int>(OFF_reshape_channel));  // the shape of offset is {N, CI, NEW_DIM,
-                                                                       // rank-2}
+  offset = op::reshape(offset, make_tuple<int>(OFF_reshape_channel));
   // Define the index of input.
   std::vector<edsl::Tensor> index_vec(rank - 2);
   for (auto i = 0; i < rank - 2; ++i) {
@@ -157,30 +161,31 @@ edsl::Tensor compute_deformable_convolution(edsl::Tensor I, edsl::Tensor OFF, ed
     edsl::Tensor index_vec_1 =
         edsl::index({edsl::TensorDim(OFF_shape[i + 2]), edsl::TensorDim(F_shape[i + 2])}, static_cast<size_t>(1));
     index_vec[i] = index_vec_0 * strides[i] + index_vec_1 * dilations[i] - pad_befores[i];
-    // Set up the value of reshape to broadcast index.
-    std::vector<int> index_reshape;
+    // Set up the value of reshape to reshape index.
+    std::vector<int> index_reshape_dims;
     for (auto j = 0; j < i + 2; ++j) {
-      index_reshape.push_back(1);
+      index_reshape_dims.push_back(1);
     }
-    index_reshape.push_back(NEW_DIM[i]);
+    index_reshape_dims.push_back(NEW_DIM[i]);
     for (auto j = 0; j < rank - 2 - i; ++j) {
-      index_reshape.push_back(1);
+      index_reshape_dims.push_back(1);
     }
-    index_vec[i] = op::reshape(index_vec[i], make_tuple<int>(index_reshape));
-    // Set up the value of broadcast.
-    std::vector<int> result_shape;
-    std::vector<int> broadcast_axes;
-    result_shape.push_back(1);
-    result_shape.push_back(1);
-    broadcast_axes.push_back(0);
-    broadcast_axes.push_back(1);
+    index_vec[i] = op::reshape(index_vec[i], make_tuple<int>(index_reshape_dims));
+    // Set up the value of broadcast to broadcast the index.
+    // For example in 2D, after this operation, the shape of index_vec[i] will be {1, 1, OFF_H*F_H, OFF_W*F_W, 1}.
+    std::vector<int> index_broadcast_dims;
+    std::vector<int> index_broadcast_axes;
+    index_broadcast_dims.push_back(1);
+    index_broadcast_dims.push_back(1);
+    index_broadcast_axes.push_back(0);
+    index_broadcast_axes.push_back(1);
     for (auto j = 0; j < rank - 2; ++j) {
-      result_shape.push_back(NEW_DIM[j]);
-      broadcast_axes.push_back(j + 2);
+      index_broadcast_dims.push_back(NEW_DIM[j]);
+      index_broadcast_axes.push_back(j + 2);
     }
-    result_shape.push_back(1);
-    broadcast_axes.push_back(rank);
-    index_vec[i] = op::broadcast(index_vec[i], result_shape, broadcast_axes);
+    index_broadcast_dims.push_back(1);
+    index_broadcast_axes.push_back(rank);
+    index_vec[i] = op::broadcast(index_vec[i], index_broadcast_dims, index_broadcast_axes);
   }
   edsl::Tensor index = op::concatenate(index_vec, -1);  // The shape of index is {1, 1, NEW_DIM, rank-2}
   // Get deformabled index.
@@ -193,19 +198,10 @@ edsl::Tensor compute_deformable_convolution(edsl::Tensor I, edsl::Tensor OFF, ed
         edsl::gather(deform_input, new_index).axis(2 - rank + i).interpolationMode(edsl::InterpolationMode::LINEAR);
   }
   deform_input = extract_tensor(deform_input, rank);
-  /*
-  // Another method with gather_nd.
-  // Get deformable input tensor.
-  edsl::Tensor deform_input = edsl::gather(I, new_index)
-                                  .mode(edsl::GatherMode::ND)
-                                  .batchDims(2)
-                                  .interpolationMode(edsl::InterpolationMode::LINEAR);
-  */
   // Set up the new strides.
-  std::vector<int> new_strides;
-  new_strides.insert(new_strides.end(), F_shape.begin() + 2, F_shape.end());
+  std::vector<int> new_strides(F_shape.begin() + 2, F_shape.end());
   // Compute DeformableConvolution.
-  autopad_mode = plaidml::op::AutoPadMode::VALID;
+  plaidml::op::AutoPadMode autopad_mode = plaidml::op::AutoPadMode::VALID;
   edsl::Tensor result = op::convolution(deform_input, F)
                             .strides(new_strides)
                             .autopad_mode(autopad_mode)
@@ -276,7 +272,7 @@ void registerDeformableConvolution() {
     }
     // Compute DeformableConvolution.
     edsl::Tensor O = compute_deformable_convolution(I, OFF, F, I_shape_cast, OFF_shape_cast, F_shape_cast, G, DG, rank,
-                                                    strides, dilations, pad_befores, autopad_mode);
+                                                    strides, dilations, pad_befores);
     return edsl::make_tuple(O);
   });
 }
