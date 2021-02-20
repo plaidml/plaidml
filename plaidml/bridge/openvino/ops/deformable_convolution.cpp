@@ -14,9 +14,10 @@ using namespace plaidml;          // NOLINT[build/namespaces]
 using namespace InferenceEngine;  // NOLINT[build/namespaces]
 using namespace edsl;
 
-namespace PlaidMLPlugin {
+namespace {
 
-// Compute pad_before and the size of output
+// Compute pad_before and the size of output.
+// it is based on (plaidml/op/lib/ops.cc.) and i change the type of the variables.
 std::pair<size_t, size_t> compute_padding_before_and_output_size(size_t input_size, size_t off_size, size_t filter_size,
                                                                  size_t stride, plaidml::op::AutoPadMode autopad_mode,
                                                                  size_t pad_before, size_t pad_end, size_t dilation) {
@@ -46,36 +47,6 @@ std::pair<size_t, size_t> compute_padding_before_and_output_size(size_t input_si
   THROW_IE_EXCEPTION << "Unexpected autopadding mode.";
 }
 
-// Extract values which are needed.
-edsl::Tensor extract_tensor(edsl::Tensor I, int rank) {
-  std::vector<TensorDim> I_dims((rank - 2) * (rank + 1) + 2), O_dims(rank);
-  std::vector<TensorIndex> I_idxs((rank - 2) * (rank + 1) + 2), O_idxs(rank);
-  I.bind_dims(I_dims);
-  // Set up the dimensions of output.
-  for (auto i = 2; i < rank + 2; ++i) {
-    O_dims[i - 2] = I_dims[i];
-  }
-  // Set up the indexs between input and output.
-  for (auto i = 2; i < rank + 2; ++i) {
-    I_idxs[i] = O_idxs[i - 2];
-  }
-  // Set up the batch_size indexs of input.
-  for (auto i = 0; i < 2; ++i) {
-    I_idxs[i] = I_idxs[i + 2];
-  }
-  for (auto i = 1; i < rank - 2; ++i) {
-    for (auto j = 0; j < rank; ++j) {
-      I_idxs[i * (rank + 1) + 2 + j] = I_idxs[(i - 1) * (rank + 1) + 2 + j];
-    }
-  }
-  // Set up the hight and width of index.
-  for (auto i = 0; i < rank - 2; ++i) {
-    I_idxs[(i + 1) * (rank + 1) + 1] = edsl::TensorIndex(i);
-  }
-  edsl::Tensor O = Contraction(O_dims, O_idxs).assign(I(I_idxs));
-  return O;
-}
-
 // Cast long int to int in vector.
 std::vector<int> cast_vector(std::vector<int64_t> vec) {
   std::vector<int> cast_vec(vec.size());
@@ -83,6 +54,39 @@ std::vector<int> cast_vector(std::vector<int64_t> vec) {
     cast_vec[i] = static_cast<int>(vec[i]);
   }
   return cast_vec;
+}
+
+// Extract values which is needed.
+edsl::Tensor extract_tensor(edsl::Tensor I, int O_rank) {
+  auto I_rank = I.rank();
+  // check I_rank == (O_rank - 2) * (O_rank + 1) + 2
+  if (I_rank != (O_rank - 2) * (O_rank + 1) + 2) {
+    THROW_IE_EXCEPTION << "The ranks between input and output are mismatch.";
+  }
+  // check O_rank > 2
+  if (O_rank < 3) {
+    THROW_IE_EXCEPTION << "The rank of output tensor is expected to be at least 3.";
+  }
+  std::vector<TensorDim> O_dims(O_rank);
+  std::vector<TensorIndex> O_idxs(O_rank);
+  std::vector<TensorDim> I_dims(I_rank);
+  I.bind_dims(I_dims);
+  for (auto i = 0; i < O_rank; ++i) {
+    O_dims[i] = I_dims[i + 2];
+  }
+  std::vector<TensorIndex> I_idxs;
+  I_idxs.push_back(O_idxs[0]);
+  I_idxs.push_back(O_idxs[1]);
+  for (auto i = 0; i < O_rank - 2; i++) {
+    I_idxs.insert(I_idxs.end(), O_idxs.begin(), O_idxs.end());
+    I_idxs.push_back(edsl::TensorIndex(i));
+  }
+  // check I_idxs.size() == I_rank
+  if (I_idxs.size() != I_rank) {
+    THROW_IE_EXCEPTION << "The rank of input tensor and the size of I_idxs are unequal.";
+  }
+  edsl::Tensor O = Contraction(O_dims, O_idxs).assign(I(I_idxs));
+  return O;
 }
 
 // Compute DeformableConvolution.
@@ -135,16 +139,16 @@ edsl::Tensor compute_deformable_convolution(edsl::Tensor I, edsl::Tensor OFF, ed
   offset = op::reshape(offset, make_tuple<int>(OFF_multiply_dims));
   // Set up the value of the broadcast to broadcast the channel dimension.
   // For example in 2D, after this operation, the shape of offset will be {N, DG, CI/DG, OFF_H*F_H, OFF_W*F_W, 2}.
-  std::vector<int> OFF_broadcast_dims, OFF_bcast_axes;
+  std::vector<int> OFF_broadcast_dims, OFF_broadcast_axes;
   OFF_broadcast_dims.push_back(N);
   OFF_broadcast_dims.push_back(DG);
   OFF_broadcast_dims.push_back(CI / DG);
   OFF_broadcast_dims.insert(OFF_broadcast_dims.end(), NEW_DIM.begin(), NEW_DIM.end());
   OFF_broadcast_dims.push_back(rank - 2);
   for (auto i = 0; i < rank + 2; ++i) {
-    OFF_bcast_axes.push_back(i);
+    OFF_broadcast_axes.push_back(i);
   }
-  offset = op::broadcast(offset, OFF_broadcast_dims, OFF_bcast_axes);
+  offset = op::broadcast(offset, OFF_broadcast_dims, OFF_broadcast_axes);
   // Set up the value of the reshape to multiply the channel dimension.
   // For example in 2D, after this operation, the shape of offset will be {N, CI, OFF_H*F_H, OFF_W*F_W, 2}.
   std::vector<int> OFF_reshape_channel;
@@ -162,35 +166,25 @@ edsl::Tensor compute_deformable_convolution(edsl::Tensor I, edsl::Tensor OFF, ed
         edsl::index({edsl::TensorDim(OFF_shape[i + 2]), edsl::TensorDim(F_shape[i + 2])}, static_cast<size_t>(1));
     index_vec[i] = index_vec_0 * strides[i] + index_vec_1 * dilations[i] - pad_befores[i];
     // Set up the value of reshape to reshape index.
-    std::vector<int> index_reshape_dims;
-    for (auto j = 0; j < i + 2; ++j) {
-      index_reshape_dims.push_back(1);
-    }
-    index_reshape_dims.push_back(NEW_DIM[i]);
-    for (auto j = 0; j < rank - 2 - i; ++j) {
-      index_reshape_dims.push_back(1);
-    }
+    std::vector<int> index_reshape_dims(rank + 1, 1);
+    index_reshape_dims[i + 2] = NEW_DIM[i];
     index_vec[i] = op::reshape(index_vec[i], make_tuple<int>(index_reshape_dims));
     // Set up the value of broadcast to broadcast the index.
     // For example in 2D, after this operation, the shape of index_vec[i] will be {1, 1, OFF_H*F_H, OFF_W*F_W, 1}.
-    std::vector<int> index_broadcast_dims;
-    std::vector<int> index_broadcast_axes;
-    index_broadcast_dims.push_back(1);
-    index_broadcast_dims.push_back(1);
-    index_broadcast_axes.push_back(0);
-    index_broadcast_axes.push_back(1);
-    for (auto j = 0; j < rank - 2; ++j) {
-      index_broadcast_dims.push_back(NEW_DIM[j]);
-      index_broadcast_axes.push_back(j + 2);
+    std::vector<int> index_broadcast_dims(rank + 1, 1);
+    for (auto j = 2; j < rank; ++j) {
+      index_broadcast_dims[j] = NEW_DIM[j - 2];
     }
-    index_broadcast_dims.push_back(1);
-    index_broadcast_axes.push_back(rank);
+    std::vector<int> index_broadcast_axes;
+    for (auto j = 0; j < rank + 1; ++j) {
+      index_broadcast_axes.push_back(j);
+    }
     index_vec[i] = op::broadcast(index_vec[i], index_broadcast_dims, index_broadcast_axes);
   }
   edsl::Tensor index = op::concatenate(index_vec, -1);  // The shape of index is {1, 1, NEW_DIM, rank-2}
-  // Get deformabled index.
+  // Get deformed index.
   edsl::Tensor new_index = offset + index;
-  // Get deformable input tensor.
+  // Get deformed input tensor.
   edsl::Tensor deform_input =
       edsl::gather(I, new_index).axis(2 - rank).interpolationMode(edsl::InterpolationMode::LINEAR);
   for (auto i = 1; i < rank - 2; ++i) {
@@ -213,6 +207,10 @@ edsl::Tensor compute_deformable_convolution(edsl::Tensor I, edsl::Tensor OFF, ed
                             .groups(G);
   return result;
 }
+
+}  // namespace
+
+namespace PlaidMLPlugin {
 
 void registerDeformableConvolution() {
   registerOp("DeformableConvolution", [](const Context& ctx) {
