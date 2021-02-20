@@ -17,7 +17,9 @@ using namespace edsl;
 namespace {
 
 // Compute pad_before and the size of output.
-// it is based on (plaidml/op/lib/ops.cc.) and i change the type of the variables.
+// This function is based on (the functon compute_padding_and_output_size() in plaidml/op/lib/ops.cc.).
+// The type of the return variable and parameters are changed from TensorDim to size_t, beacuse TensorDim can't be
+// converted to int.
 std::pair<size_t, size_t> compute_padding_before_and_output_size(size_t input_size, size_t off_size, size_t filter_size,
                                                                  size_t stride, plaidml::op::AutoPadMode autopad_mode,
                                                                  size_t pad_before, size_t pad_end, size_t dilation) {
@@ -57,13 +59,14 @@ std::vector<int> cast_vector(std::vector<int64_t> vec) {
 }
 
 // Extract values which is needed.
+// For example, in 2D,the input tensor shape is{N, CI, N, CI, H, W, 2, N, CI, H, W, 2}, and the output tensor shape
+// is{N, CI, H, W}. The elements in output tensor is a subset of the input tensor. The element at index (n,c,h,w) in
+// output tensor equals the element at// index (n, c, n, c, h, w, 0, n, c, h, w, 1) in input tensor.
 edsl::Tensor extract_tensor(edsl::Tensor I, int O_rank) {
   auto I_rank = I.rank();
-  // check I_rank == (O_rank - 2) * (O_rank + 1) + 2
   if (I_rank != (O_rank - 2) * (O_rank + 1) + 2) {
     THROW_IE_EXCEPTION << "The ranks between input and output are mismatch.";
   }
-  // check O_rank > 2
   if (O_rank < 3) {
     THROW_IE_EXCEPTION << "The rank of output tensor is expected to be at least 3.";
   }
@@ -81,7 +84,6 @@ edsl::Tensor extract_tensor(edsl::Tensor I, int O_rank) {
     I_idxs.insert(I_idxs.end(), O_idxs.begin(), O_idxs.end());
     I_idxs.push_back(edsl::TensorIndex(i));
   }
-  // check I_idxs.size() == I_rank
   if (I_idxs.size() != I_rank) {
     THROW_IE_EXCEPTION << "The rank of input tensor and the size of I_idxs are unequal.";
   }
@@ -195,10 +197,9 @@ edsl::Tensor compute_deformable_convolution(edsl::Tensor I, edsl::Tensor OFF, ed
   // Set up the new strides.
   std::vector<int> new_strides(F_shape.begin() + 2, F_shape.end());
   // Compute DeformableConvolution.
-  plaidml::op::AutoPadMode autopad_mode = plaidml::op::AutoPadMode::VALID;
   edsl::Tensor result = op::convolution(deform_input, F)
                             .strides(new_strides)
-                            .autopad_mode(autopad_mode)
+                            .autopad_mode(plaidml::op::AutoPadMode::VALID)
                             .input_layout(plaidml::op::TensorLayout::NCX)
                             .filter_layout(plaidml::op::TensorLayout::KCX)
                             .autogroup_mode(plaidml::op::AutoGroupMode::EXPLICIT)
