@@ -134,6 +134,6 @@ configure_lit_site_cfg(
   ${CMAKE_CURRENT_SOURCE_DIR}/lit.cfg.py
 )
 
-# ie_cpack(BENCHMARK_APP)
-
 include(pml_packaging)
+
+# ie_cpack(BENCHMARK_APP)
