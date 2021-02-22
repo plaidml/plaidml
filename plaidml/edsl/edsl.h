@@ -1702,7 +1702,8 @@ inline TensorVec layer(const std::string& op, const TensorVec& operands, const D
 
 inline Tensor layer(const std::string& op, const TensorVec& operands, const Dictionary& attrs,
                     const LayerBodySingleFn& fn, edsl_source_location loc = edsl_source_location::current()) {
-  return layer(op, operands, attrs, [&]() { return TensorVec{fn()}; }, loc)[0];
+  return layer(
+      op, operands, attrs, [&]() { return TensorVec{fn()}; }, loc)[0];
 }
 
 inline Tensor layer(const std::string& op, const TensorVec& operands, const LayerBodySingleFn& fn,
@@ -1711,65 +1712,99 @@ inline Tensor layer(const std::string& op, const TensorVec& operands, const Laye
 }
 
 ///
-/// wrapper edsl graph into SCF loop.
+/// for-loop required three component, loopBody, loop-carried vars(iterator), and loop bound.
 /// \param TensorVec
 /// \param loopCycle int64_t
 /// \return Tensor
 ///
 
-using loopSingefunc = std::function<Tensor()>;
-using loopMultifunc = std::function<TensorVec()>;
+class Loop {
+ public:
+  using loopSingefunc = std::function<Tensor(Tensor)>;
+  using loopMultifunc = std::function<TensorVec(Tensor)>;
 
-inline TensorVec loop(const TensorVec& loopIndex, const TensorVec& operands, const TensorVec& results,
-                      edsl_source_location loc = edsl_source_location::current()) {
-  if (operands.size() != results.size()) {
-    throw ffi_exception("iter args don't equal to init args of scf", edsl_source_location::current());
+  // pass the loop bound at the beginning.
+  Loop() : lowBound(0), highBound(1), step(1) { initIndex(); }
+  Loop(int64_t count) : lowBound(0), highBound(count), step(1) { initIndex(); }
+  Loop(int64_t lb, int64_t hb, int64_t step) : lowBound(lb), highBound(hb), step(step) { initIndex(); }
+
+  // open one loop index variable for users.
+  void initIndex() {
+    loopIndex = index({TensorDim(1)}, 0) + lowBound;
+    iterTensor.push_back(loopIndex);
+    yieldTensor.push_back(loopIndex + step);
   }
 
-  std::string op = "loop";
-  std::vector<plaidml_expr*> rawOperands;
-  rawOperands.reserve(operands.size());
-  for (Tensor operand : operands) {
-    rawOperands.push_back(operand.as_ptr());
+  Loop& setLoopBody(loopSingefunc fn) {
+    auto returnTensor = fn(loopIndex);
+    yieldTensor.push_back(returnTensor);
+    return *this;
   }
-  std::vector<plaidml_expr*> rawResults;
-  rawResults.reserve(results.size());
-  for (Tensor result : results) {
-    rawResults.push_back(result.as_ptr());
+  Loop& setLoopBody(loopMultifunc fn) {
+    auto returnTensor = fn(loopIndex);
+    yieldTensor.insert(yieldTensor.end(), returnTensor.begin(), returnTensor.end());
+    return *this;
   }
-  std::vector<plaidml_expr*> rawLoopIndex;
-  rawLoopIndex.reserve(loopIndex.size());
-  for (Tensor index : loopIndex) {
-    rawLoopIndex.push_back(index.as_ptr());
+  Loop& setIter(TensorVec iter) {
+    iterTensor.insert(iterTensor.end(), iter.begin(), iter.end());
+    return *this;
   }
 
-  Tensor array = Tensor{ffi::call<plaidml_expr*>(  //
-      loc,                                         //
-      plaidml_expr_loop,                           //
-      op.c_str(),                                  //
-      rawLoopIndex.size(),                         //
-      rawLoopIndex.data(),                         //
-      rawOperands.size(),                          //
-      rawOperands.data(),                          //
-      rawResults.size(),                           //
-      rawResults.data())};
+  TensorVec build(edsl_source_location loc = edsl_source_location::current()) const {
+    if (iterTensor.size() != yieldTensor.size()) {
+      throw ffi_exception("iter args don't equal to init args of scf", edsl_source_location::current());
+    }
 
-  TensorVec output;
-  for (auto i = 0; i < results.size(); i++) {
-    output.push_back(array.element(i));
+    std::string op = "loop";
+    std::vector<plaidml_expr*> rawOperands;
+    rawOperands.reserve(iterTensor.size());
+    for (Tensor operand : iterTensor) {
+      rawOperands.push_back(operand.as_ptr());
+    }
+    std::vector<plaidml_expr*> rawResults;
+    rawResults.reserve(yieldTensor.size());
+    for (Tensor result : yieldTensor) {
+      rawResults.push_back(result.as_ptr());
+    }
+    TensorVec loopIndex{Tensor(lowBound), Tensor(highBound), Tensor(step)};
+    std::vector<plaidml_expr*> rawLoopIndex;
+    rawLoopIndex.reserve(loopIndex.size());
+    for (Tensor index : loopIndex) {
+      rawLoopIndex.push_back(index.as_ptr());
+    }
+
+    Tensor array = Tensor{ffi::call<plaidml_expr*>(  //
+        loc,                                         //
+        plaidml_expr_loop,                           //
+        op.c_str(),                                  //
+        rawLoopIndex.size(),                         //
+        rawLoopIndex.data(),                         //
+        rawOperands.size(),                          //
+        rawOperands.data(),                          //
+        rawResults.size(),                           //
+        rawResults.data())};
+
+    TensorVec output;
+    for (auto i = 0; i < yieldTensor.size(); i++) {
+      output.push_back(array.element(i));
+    }
+    return output;
   }
-  return output;
-}
 
-inline TensorVec loop(int64_t lb, int64_t hb, int64_t step, const TensorVec& operands, const loopMultifunc& fn) {
-  TensorVec index{Tensor(lb), Tensor(hb), Tensor(step)};
-  return loop(index, operands, fn());
-}
+  operator TensorVec() {
+    auto result = build();
+    return TensorVec(result.begin() + 1, result.end());
+  }
+  operator Tensor() { return build()[1]; }
 
-inline Tensor loop(int64_t lb, int64_t hb, int64_t step, const TensorVec& operands, const loopSingefunc& fn) {
-  TensorVec index{Tensor(lb), Tensor(hb), Tensor(step)};
-  return loop(index, operands, {fn()})[0];
-}
+ private:
+  int64_t lowBound;
+  int64_t highBound;
+  int64_t step;
+  Tensor loopIndex;
+  TensorVec iterTensor;
+  TensorVec yieldTensor;
+};
 
 }  // namespace edsl
 }  // namespace plaidml
