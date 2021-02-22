@@ -15,7 +15,7 @@ func @gather1(%arg0: tensor<4xsi32>, %arg1: tensor<3x2xf32>) -> tensor<4x2xf32> 
 
 
 func @gather2(%arg0: tensor<3x2xf32>, %arg1: tensor<4xf32>) -> tensor<3x4xf32> {
-  %0 = tile.gather %arg0 %arg1 {axis = 1 : index, mode = 1 : i64} : (tensor<3x2xf32>, tensor<4xf32>) -> tensor<3x4xf32>
+  %0 = tile.gather %arg0 %arg1 {axis = 1 : index, mode = 0 : i64} : (tensor<3x2xf32>, tensor<4xf32>) -> tensor<3x4xf32>
   return %0 : tensor<3x4xf32>
 }
 

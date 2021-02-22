@@ -582,6 +582,29 @@ TEST_F(OpTest, Softmax) {
   runProgram(program);
 }
 
+TEST_F(OpTest, Sort) {
+  auto A = Placeholder(DType::FLOAT32, {5, 4}, "A");
+  auto program = makeProgram("sort", {A}, {op::sort(A, 1, SortDirection::ASC)});
+
+  std::vector<float> input = {
+      81.69, 95.74, 27.74, 43.69,  //
+      55.79, 56.79, 57.52, 5.9,    //
+      39.48, 7.11,  14.81, 66.23,  //
+      20.25, 66.05, 64.5,  71.07,  //
+      67.6,  54.42, 87.59, 80.02,  //
+  };
+
+  std::vector<float> sorted = {
+      27.74, 43.69, 81.69, 95.74,  //
+      5.9,   55.79, 56.79, 57.52,  //
+      7.11,  14.81, 39.48, 66.23,  //
+      20.25, 64.5,  66.05, 71.07,  //
+      54.42, 67.6,  80.02, 87.59,  //
+  };
+
+  checkClose(program, {input}, {sorted});
+}
+
 TEST_F(OpTest, SpatialPadding) {
   auto A = Placeholder(DType::FLOAT32, {64, 4, 32, 32}, "A");
   auto X = op::spatial_padding(A, {1, 3}, {3, 3}, op::TensorLayout::NXC);

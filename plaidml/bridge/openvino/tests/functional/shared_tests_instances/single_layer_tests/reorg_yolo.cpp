@@ -27,46 +27,51 @@ const std::vector<size_t> strides = {
     3,
 };
 
-const auto testCase_caffe_yolov2 = ::testing::Combine(    //
-    ::testing::ValuesIn(inShapes_caffe_yolov2),           //
-    ::testing::Values(strides[0]),                        //
-    ::testing::Values(InferenceEngine::Precision::FP32),  //
-    ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)    //
+const std::vector<InferenceEngine::Precision> netPrecisions = {
+    InferenceEngine::Precision::FP32,
+    InferenceEngine::Precision::FP16,
+};
+
+const auto testCase_caffe_yolov2 = ::testing::Combine(  //
+    ::testing::ValuesIn(inShapes_caffe_yolov2),         //
+    ::testing::Values(strides[0]),                      //
+    ::testing::ValuesIn(netPrecisions),                 //
+    ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)  //
 );
 
-const auto testCase_smallest = ::testing::Combine(        //
-    ::testing::Values(inShapes[0]),                       //
-    ::testing::Values(strides[0]),                        //
-    ::testing::Values(InferenceEngine::Precision::FP32),  //
-    ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)    //
+const auto testCase_smallest = ::testing::Combine(      //
+    ::testing::Values(inShapes[0]),                     //
+    ::testing::Values(strides[0]),                      //
+    ::testing::ValuesIn(netPrecisions),                 //
+    ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)  //
 );
 
-const auto testCase_stride_2 = ::testing::Combine(        //
-    ::testing::Values(inShapes[1]),                       //
-    ::testing::Values(strides[0]),                        //
-    ::testing::Values(InferenceEngine::Precision::FP32),  //
-    ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)    //
+const auto testCase_stride_2 = ::testing::Combine(      //
+    ::testing::Values(inShapes[1]),                     //
+    ::testing::Values(strides[0]),                      //
+    ::testing::ValuesIn(netPrecisions),                 //
+    ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)  //
 );
 
-const auto testCase_stride_3 = ::testing::Combine(        //
-    ::testing::Values(inShapes[2]),                       //
-    ::testing::Values(strides[1]),                        //
-    ::testing::Values(InferenceEngine::Precision::FP32),  //
-    ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)    //
+const auto testCase_stride_3 = ::testing::Combine(      //
+    ::testing::Values(inShapes[2]),                     //
+    ::testing::Values(strides[1]),                      //
+    ::testing::ValuesIn(netPrecisions),                 //
+    ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)  //
 );
 
-const auto testCase_smaller_h = ::testing::Combine(       //
-    ::testing::Values(inShapes[4]),                       //
-    ::testing::Values(strides[0]),                        //
-    ::testing::Values(InferenceEngine::Precision::FP32),  //
-    ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)    //
+const auto testCase_smaller_h = ::testing::Combine(     //
+    ::testing::Values(inShapes[4]),                     //
+    ::testing::Values(strides[0]),                      //
+    ::testing::ValuesIn(netPrecisions),                 //
+    ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)  //
 );
 
-const auto testCase_batch_2 = ::testing::Combine(         //
-    ::testing::Values(inShapes[3]),                       //
-    ::testing::Values(strides[0]),                        //
-    ::testing::Values(InferenceEngine::Precision::FP32),  //
-    ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)    //
+const auto testCase_batch_2 = ::testing::Combine(       //
+    ::testing::Values(inShapes[3]),                     //
+    ::testing::Values(strides[0]),                      //
+    ::testing::ValuesIn(netPrecisions),                 //
+    ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)  //
 );
 
 INSTANTIATE_TEST_CASE_P(TestsReorgYolo_caffe_YoloV2, ReorgYoloLayerTest, testCase_caffe_yolov2,
@@ -85,7 +90,7 @@ INSTANTIATE_TEST_CASE_P(TestsReorgYolo_batch_2, ReorgYoloLayerTest, testCase_bat
 INSTANTIATE_TEST_CASE_P(smoke, ReorgYoloLayerTest,
                         ::testing::Combine(::testing::Values(inShapes[0]),                       //
                                            ::testing::Values(strides[0]),                        //
-                                           ::testing::Values(InferenceEngine::Precision::FP32),  //
+                                           ::testing::ValuesIn(netPrecisions),                   //
                                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),  //
                         ReorgYoloLayerTest::getTestCaseName);
 

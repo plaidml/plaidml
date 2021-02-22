@@ -881,12 +881,19 @@ class NearestMode(enum.Enum):
     SIMPLE = 4
 
 
+class GatherMode(enum.Enum):
+    NORMAL = 0
+    ND = 1
+
+
 def gather(x,
            y,
            axis=0,
            interpolation_mode=InterpolationMode.LINEAR,
            nearest_mode=NearestMode.ROUND_PREFER_FLOOR,
-           cube_coeff=-0.75):
+           cube_coeff=-0.75,
+           gather_mode=GatherMode.NORMAL,
+           batch_dims=0):
     """Takes an input tensor (``x``) and a set of indices to gather over
     (``y``), and returns an output tensor that gathers the input tensor from the
     indices specified.
@@ -898,12 +905,14 @@ def gather(x,
         interpolation_mode (Enum): The type of interpolation.
         nearest_mode (Enum): The type of nearest interpolation.
         cube_coeff (float): The coefficient that controls the cubic interpolation.
+        gather_mode (Enum): The type of gather op.
+        batch_dims (int): The number of leading batch dimensions.
 
     Returns:
         Tensor: The result of the ``gather`` operation.
     """
     return intrinsic('gather', x, y, axis, interpolation_mode.value, nearest_mode.value,
-                     cube_coeff)
+                     cube_coeff, gather_mode.value, batch_dims)
 
 
 def ident(x):

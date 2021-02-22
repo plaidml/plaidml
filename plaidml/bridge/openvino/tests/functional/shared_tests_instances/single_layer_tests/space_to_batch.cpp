@@ -47,6 +47,13 @@ spaceToBatchParamsTuple stb_only_test_cases[] = {
                             InferenceEngine::Layout::ANY,                                        //
                             InferenceEngine::Layout::ANY,                                        //
                             CommonTestUtils::DEVICE_PLAIDML),                                    //
+    spaceToBatchParamsTuple({1, 1, 3, 2, 2}, {0, 0, 1, 0, 3}, {0, 0, 2, 0, 0}, {1, 1, 3, 2, 1},  //
+                            InferenceEngine::Precision::FP16,                                    //
+                            InferenceEngine::Precision::UNSPECIFIED,                             //
+                            InferenceEngine::Precision::UNSPECIFIED,                             //
+                            InferenceEngine::Layout::ANY,                                        //
+                            InferenceEngine::Layout::ANY,                                        //
+                            CommonTestUtils::DEVICE_PLAIDML),                                    //
 };
 
 INSTANTIATE_TEST_CASE_P(smoke, SpaceToBatchLayerTest, ::testing::ValuesIn(stb_only_test_cases),

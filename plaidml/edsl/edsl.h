@@ -794,6 +794,7 @@ inline Tensor acos(const Tensor& x, edsl_source_location loc = edsl_source_locat
 enum class SortDirection {
   ASC,
   DESC,
+  _LAST,
 };
 
 ///
@@ -931,6 +932,8 @@ enum class NearestMode : uint64_t {
   SIMPLE,
 };
 
+enum class GatherMode : uint64_t { NORMAL, ND };
+
 ///
 /// Gather takes an input tensor (`x`) and a set of indices to gather over (`y`), and computes an output tensor that
 /// gathers the input tensor from the indices specified.
@@ -947,6 +950,11 @@ class gather {
       axis += x_.rank();
     }
     axis_ = Tensor(axis);
+    return *this;
+  }
+
+  gather& mode(GatherMode mode) {
+    mode_ = Tensor(static_cast<uint64_t>(mode));
     return *this;
   }
 
@@ -974,11 +982,16 @@ class gather {
     return *this;
   }
 
+  gather& batchDims(int batch_dims) {
+    batch_dims_ = Tensor(batch_dims);
+    return *this;
+  }
+
   ///
   /// Construct gather.
   ///
   Tensor build(edsl_source_location loc = edsl_source_location::current()) const {
-    std::vector<Tensor> args = {x_, y_, axis_, interpolation_mode_, nearest_mode_, cube_coeff_};
+    std::vector<Tensor> args = {x_, y_, axis_, interpolation_mode_, nearest_mode_, cube_coeff_, mode_, batch_dims_};
     return intrinsicCall(loc, "gather", args);
   }
 
@@ -995,9 +1008,11 @@ class gather {
   /// cube_coeff_ controls the cubic interpolation
   ///
   Tensor axis_ = Tensor(0);
+  Tensor mode_ = Tensor(static_cast<uint64_t>(GatherMode::NORMAL));
   Tensor interpolation_mode_ = Tensor(static_cast<uint64_t>(InterpolationMode::LINEAR));
   Tensor nearest_mode_ = Tensor(static_cast<uint64_t>(NearestMode::ROUND_PREFER_FLOOR));
   Tensor cube_coeff_ = Tensor(-0.75);
+  Tensor batch_dims_ = Tensor(0);
 };
 
 ///
