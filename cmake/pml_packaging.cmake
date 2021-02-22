@@ -80,17 +80,18 @@ configure_package_config_file(
   ${CMAKE_INSTALL_DATAROOTDIR}/${PROJECT_NAME}/cmake)
 
 install(EXPORT ${PROJECT_NAME}_Targets
-  FILE ${PROJECT_NAME}Targets.cmake
-  NAMESPACE ${PROJECT_NAME}::
-  DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/${PROJECT_NAME}/cmake)
+        FILE ${PROJECT_NAME}Targets.cmake
+        NAMESPACE ${PROJECT_NAME}::
+        DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/${PROJECT_NAME}/cmake)
 
 install(FILES "${PROJECT_BINARY_DIR}/${PROJECT_NAME}Config.cmake"
-  "${PROJECT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
-  DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/${PROJECT_NAME}/cmake)
+              "${PROJECT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
+        DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/${PROJECT_NAME}/cmake)
 
+# Install cmake for Boost (Cannot figure out how to install Boost target directly)
 install(FILES "${PROJECT_SOURCE_DIR}/cmake/third_party/boost.cmake"
-"${PROJECT_SOURCE_DIR}/cmake/third_party/CPM.cmake"
-DESTINATION cmake/third_party)
+              "${PROJECT_SOURCE_DIR}/cmake/third_party/CPM.cmake"
+        DESTINATION cmake/third_party)
 
 # TODO: Install any desired standalone executables or source code for reference
 
