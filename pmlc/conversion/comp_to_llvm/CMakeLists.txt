@@ -13,6 +13,7 @@ pml_cc_library(
     pmlc::util
     MLIRLLVMIR
     MLIRSPIRV
+    MLIRSPIRVSerialization
     MLIRStandard
     MLIRIR
     MLIRPass

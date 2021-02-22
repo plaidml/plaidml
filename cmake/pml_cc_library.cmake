@@ -206,8 +206,7 @@ function(pml_cc_library)
   endif()
 
   get_property(exp_list GLOBAL PROPERTY exp_list_property)
-  get_property(gen_dep_list GLOBAL PROPERTY gen_list_property)
-  get_property(tp_dep_list GLOBAL PROPERTY tp_list_property)
+  get_property(INSTALL_TARGETS GLOBAL PROPERTY install_targets_property)
   if(TARGET ${_NAME} AND NOT ${_NAME} MATCHES ".*openvino.*" AND NOT ${_NAME} IN_LIST exp_list)
     
   install(TARGETS ${_NAME}
@@ -218,35 +217,32 @@ function(pml_cc_library)
 
   list(APPEND exp_list "${_NAME}")
 
-  # message("Exporting ${_NAME}")
-
+  # Check dependencies
   foreach(DEP ${_RULE_DEPS})
     if(TARGET ${DEP})
       get_target_property(_ALIASED_TARGET ${DEP} ALIASED_TARGET)
       if(_ALIASED_TARGET)
-      # message("     Dep: ${DEP}; ${_ALIASED_TARGET}")
-      if(NOT ${_ALIASED_TARGET} IN_LIST exp_list)
-        install(TARGETS ${_ALIASED_TARGET}
-        EXPORT ${PROJECT_NAME}_Targets
-        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
-        list(APPEND exp_list "${_ALIASED_TARGET}")
-      endif()
-      else()
-        if(NOT ${DEP} IN_LIST tp_dep_list)
-          list(APPEND tp_dep_list "${DEP}")
+        # message("     Dep: ${DEP}; ${_ALIASED_TARGET}")
+        if(NOT ${_ALIASED_TARGET} IN_LIST exp_list)
+          install(TARGETS ${_ALIASED_TARGET}
+          EXPORT ${PROJECT_NAME}_Targets
+          ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+          LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+          RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+          list(APPEND exp_list "${_ALIASED_TARGET}")
         endif()
+      elseif(NOT ${DEP} IN_LIST INSTALL_TARGETS)
+        list(APPEND INSTALL_TARGETS "${DEP}")
       endif()
-    else()
-    # message("     Fake Dep: ${DEP}")
-      if(${DEP} MATCHES ".*pmlc.*" AND ${DEP} MATCHES ".*gen.*" AND NOT ${DEP} IN_LIST gen_dep_list)
-        string(REPLACE "::" "_" DEP_TARGET_NAME ${DEP})
-        list(APPEND gen_dep_list "${DEP_TARGET_NAME}")
+    elseif(${DEP} MATCHES ".*gen.*")
+      string(REPLACE "::" "_" DEP_TARGET_NAME ${DEP})
+      if(NOT ${DEP_TARGET_NAME} IN_LIST INSTALL_TARGETS)
+        list(APPEND INSTALL_TARGETS "${DEP_TARGET_NAME}") ## RESUME HERE
       endif()
     endif()
   endforeach()
 
+  # Install header files
   string(REPLACE ${CMAKE_SOURCE_DIR} "" HDR_INSTALL_DIR ${CMAKE_CURRENT_SOURCE_DIR})
   foreach(HEADER ${_RULE_HDRS})
     if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${HEADER})
@@ -257,8 +253,7 @@ function(pml_cc_library)
   endforeach()
 
   set_property(GLOBAL PROPERTY exp_list_property "${exp_list}")
-  set_property(GLOBAL PROPERTY gen_list_property "${gen_dep_list}")
-  set_property(GLOBAL PROPERTY tp_list_property "${tp_dep_list}")
+  set_property(GLOBAL PROPERTY install_targets_property "${INSTALL_TARGETS}")
   endif()
 
 endfunction()
