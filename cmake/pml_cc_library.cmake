@@ -205,55 +205,23 @@ function(pml_cc_library)
     add_library(${_PACKAGE_NS} ALIAS ${_NAME})
   endif()
 
-  get_property(exp_list GLOBAL PROPERTY exp_list_property)
   get_property(INSTALL_TARGETS GLOBAL PROPERTY install_targets_property)
-  if(TARGET ${_NAME} AND NOT ${_NAME} MATCHES ".*openvino.*" AND NOT ${_NAME} IN_LIST exp_list)
-    
-  install(TARGETS ${_NAME}
-    EXPORT ${PROJECT_NAME}_Targets
-    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+  if(TARGET ${_NAME} AND NOT ${_NAME} MATCHES ".*openvino.*" AND NOT ${_NAME} IN_LIST INSTALL_TARGETS)
 
-  list(APPEND exp_list "${_NAME}")
+    list(APPEND INSTALL_TARGETS "${_NAME}")
 
-  # Check dependencies
-  foreach(DEP ${_RULE_DEPS})
-    if(TARGET ${DEP})
-      get_target_property(_ALIASED_TARGET ${DEP} ALIASED_TARGET)
-      if(_ALIASED_TARGET)
-        # message("     Dep: ${DEP}; ${_ALIASED_TARGET}")
-        if(NOT ${_ALIASED_TARGET} IN_LIST exp_list)
-          install(TARGETS ${_ALIASED_TARGET}
-          EXPORT ${PROJECT_NAME}_Targets
-          ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-          LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-          RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
-          list(APPEND exp_list "${_ALIASED_TARGET}")
-        endif()
-      elseif(NOT ${DEP} IN_LIST INSTALL_TARGETS)
-        list(APPEND INSTALL_TARGETS "${DEP}")
+    # Install header files
+    string(REPLACE ${CMAKE_SOURCE_DIR} "" HDR_INSTALL_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+    foreach(HEADER ${_RULE_HDRS})
+      if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${HEADER})
+        install(FILES ${HEADER}
+                DESTINATION "include${HDR_INSTALL_DIR}"
+                COMPONENT devkit)
       endif()
-    elseif(${DEP} MATCHES ".*gen.*")
-      string(REPLACE "::" "_" DEP_TARGET_NAME ${DEP})
-      if(NOT ${DEP_TARGET_NAME} IN_LIST INSTALL_TARGETS)
-        list(APPEND INSTALL_TARGETS "${DEP_TARGET_NAME}") ## RESUME HERE
-      endif()
-    endif()
-  endforeach()
+    endforeach()
 
-  # Install header files
-  string(REPLACE ${CMAKE_SOURCE_DIR} "" HDR_INSTALL_DIR ${CMAKE_CURRENT_SOURCE_DIR})
-  foreach(HEADER ${_RULE_HDRS})
-    if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${HEADER})
-      install(FILES ${HEADER}
-              DESTINATION "include${HDR_INSTALL_DIR}"
-              COMPONENT devkit)
-    endif()
-  endforeach()
+    set_property(GLOBAL PROPERTY install_targets_property "${INSTALL_TARGETS}")
 
-  set_property(GLOBAL PROPERTY exp_list_property "${exp_list}")
-  set_property(GLOBAL PROPERTY install_targets_property "${INSTALL_TARGETS}")
   endif()
 
 endfunction()

@@ -10,28 +10,37 @@ set(CPACK_PACKAGE_VERSION ${PLAIDML_VERSION})
 # Installs a list of targets, recursively installing anything listed in INTERFACE_LINK_LIBRARIES
 function(recursive_lib_install INSTALL_LIST)
   foreach(TP ${INSTALL_LIST})
-    get_property(exp_list GLOBAL PROPERTY exp_list_property)
-    if(NOT ${TP} MATCHES ".*::.*" AND TARGET ${TP} AND NOT ${TP} IN_LIST exp_list)
-
-      # Add install_interface include directory property to target
-      get_target_property(TP_INC_DIRS ${TP} INTERFACE_INCLUDE_DIRECTORIES)
-      if(TP_INC_DIRS AND NOT "${TP_INC_DIRS}" MATCHES ".*INSTALL_INTERFACE.*")
-        set_target_properties(${TP} PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "$<BUILD_INTERFACE:${TP_INC_DIRS}>;$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
+    if(TARGET ${TP})
+      # Switch to true target if necessary
+      get_target_property(_ALIASED_TARGET ${TP} ALIASED_TARGET)
+      if(_ALIASED_TARGET)
+        set(TP ${_ALIASED_TARGET})
       endif()
 
-      # Install target
-      install(TARGETS ${TP}
-      EXPORT ${PROJECT_NAME}_Targets
-      ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-      LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-      RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
-      list(APPEND exp_list "${TP}")
-      set_property(GLOBAL PROPERTY exp_list_property "${exp_list}")
+      get_property(INSTALLED_TARGETS GLOBAL PROPERTY installed_targets_property)
 
-      # Recurse through dependencies
-      get_target_property(NEXT_DEPS ${TP} INTERFACE_LINK_LIBRARIES)
-      if(NEXT_DEPS)
-        recursive_lib_install("${NEXT_DEPS}")
+      if(NOT ${TP} MATCHES ".*::.*" AND NOT ${TP} IN_LIST INSTALLED_TARGETS)
+
+        # Add install_interface include directory property to target
+        get_target_property(TP_INC_DIRS ${TP} INTERFACE_INCLUDE_DIRECTORIES)
+        if(TP_INC_DIRS AND NOT "${TP_INC_DIRS}" MATCHES ".*INSTALL_INTERFACE.*")
+          set_target_properties(${TP} PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "$<BUILD_INTERFACE:${TP_INC_DIRS}>;$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
+        endif()
+
+        # Install target
+        install(TARGETS ${TP}
+        EXPORT ${PROJECT_NAME}_Targets
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+        list(APPEND INSTALLED_TARGETS "${TP}")
+        set_property(GLOBAL PROPERTY installed_targets_property "${INSTALLED_TARGETS}")
+
+        # Recurse through dependencies
+        get_target_property(NEXT_DEPS ${TP} INTERFACE_LINK_LIBRARIES)
+        if(NEXT_DEPS)
+          recursive_lib_install("${NEXT_DEPS}")
+        endif()
       endif()
     endif()
   endforeach()
@@ -42,7 +51,7 @@ recursive_lib_install("${INSTALL_TARGETS}")
 
 
 # Install the 3rd party header files such that a copy of edsl_tests is able to run
-# It *might* be possible to automatically detect and install all 3rd party headers
+# It *might* be possible to automatically detect and install all necessary headers in recursive_lib_install
 install(DIRECTORY "${PROJECT_BINARY_DIR}/_deps/llvm-project-src/llvm/utils/unittest/googlemock/include/gmock"
         DESTINATION include)
 install(DIRECTORY "${PROJECT_BINARY_DIR}/_deps/llvm-project-src/llvm/utils/unittest/googletest/include/gtest"
