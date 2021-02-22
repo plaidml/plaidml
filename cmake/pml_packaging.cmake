@@ -2,10 +2,12 @@
 
 # Set general Cpack Variables for package description
 set(CPACK_GENERATOR "TGZ")
+set(CPACK_ARCHIVE_COMPONENT_INSTALL 1)
 set(CPACK_PACKAGE_NAME "PlaidML")
 set(CPACK_PACKAGE_VENDOR "Intel Corp")
 set(CPACK_PACKAGE_CONTACT "Intel")
 set(CPACK_PACKAGE_VERSION ${PLAIDML_VERSION})
+set(CPACK_COMPONENTS_IGNORE_GROUPS 1)
 
 # Installs a list of targets, recursively installing anything listed in INTERFACE_LINK_LIBRARIES
 function(recursive_lib_install INSTALL_LIST)
@@ -30,9 +32,8 @@ function(recursive_lib_install INSTALL_LIST)
         # Install target
         install(TARGETS ${TP}
         EXPORT ${PROJECT_NAME}_Targets
-        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+        DESTINATION lib
+        COMPONENT devkit)
         list(APPEND INSTALLED_TARGETS "${TP}")
         set_property(GLOBAL PROPERTY installed_targets_property "${INSTALLED_TARGETS}")
 
@@ -53,19 +54,26 @@ recursive_lib_install("${INSTALL_TARGETS}")
 # Install the 3rd party header files such that a copy of edsl_tests is able to run
 # It *might* be possible to automatically detect and install all necessary headers in recursive_lib_install
 install(DIRECTORY "${PROJECT_BINARY_DIR}/_deps/llvm-project-src/llvm/utils/unittest/googlemock/include/gmock"
-        DESTINATION include)
+        DESTINATION include
+        COMPONENT devkit)
 install(DIRECTORY "${PROJECT_BINARY_DIR}/_deps/llvm-project-src/llvm/utils/unittest/googletest/include/gtest"
-        DESTINATION include)
+        DESTINATION include
+        COMPONENT devkit)
 install(DIRECTORY "${PROJECT_BINARY_DIR}/_deps/half-src/include"
-        DESTINATION .)
+        DESTINATION .
+        COMPONENT devkit)
 install(DIRECTORY "${PROJECT_BINARY_DIR}/_deps/llvm-project-src/llvm/include/llvm"
-        DESTINATION include)
+        DESTINATION include
+        COMPONENT devkit)
 install(DIRECTORY "${PROJECT_BINARY_DIR}/_deps/llvm-project-src/llvm/include/llvm-c"
-        DESTINATION include)
+        DESTINATION include
+        COMPONENT devkit)
 install(DIRECTORY "${PROJECT_BINARY_DIR}/_deps/llvm-project-build/include/llvm"
-        DESTINATION include)
+        DESTINATION include
+        COMPONENT devkit)
 install(DIRECTORY "${PROJECT_BINARY_DIR}/_deps/openvino-build/inference-engine/samples/thirdparty/gflags/include/gflags"
-        DESTINATION include)
+        DESTINATION include
+        COMPONENT devkit)
 
 
 include(CMakePackageConfigHelpers)
@@ -82,17 +90,18 @@ configure_package_config_file(
 install(EXPORT ${PROJECT_NAME}_Targets
         FILE ${PROJECT_NAME}Targets.cmake
         NAMESPACE ${PROJECT_NAME}::
-        DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/${PROJECT_NAME}/cmake)
+        DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/${PROJECT_NAME}/cmake
+        COMPONENT devkit)
 
 install(FILES "${PROJECT_BINARY_DIR}/${PROJECT_NAME}Config.cmake"
               "${PROJECT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
-        DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/${PROJECT_NAME}/cmake)
+        DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/${PROJECT_NAME}/cmake
+        COMPONENT devkit)
 
 # Install cmake for Boost (Cannot figure out how to install Boost target directly)
 install(FILES "${PROJECT_SOURCE_DIR}/cmake/third_party/boost.cmake"
               "${PROJECT_SOURCE_DIR}/cmake/third_party/CPM.cmake"
-        DESTINATION cmake/third_party)
+        DESTINATION cmake/third_party
+        COMPONENT devkit)
 
 # TODO: Install any desired standalone executables or source code for reference
-
-include(CPack)

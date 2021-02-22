@@ -136,4 +136,5 @@ configure_lit_site_cfg(
 
 include(pml_packaging)
 
-# ie_cpack(BENCHMARK_APP)
+# include(CPack)
+ie_cpack(${IE_CPACK_COMPONENTS_ALL})
