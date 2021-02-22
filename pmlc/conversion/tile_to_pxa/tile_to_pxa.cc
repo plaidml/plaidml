@@ -608,6 +608,7 @@ static Value buildSimpleStore(OpBuilder &builder, Location loc, Value scalar,
   return storeOp;
 }
 
+/*
 mlir::AffineMap getBlockedLayoutMap(mlir::ArrayRef<int64_t> shape,
                                     unsigned numDims,
                                     mlir::MLIRContext *context) {
@@ -615,11 +616,12 @@ mlir::AffineMap getBlockedLayoutMap(mlir::ArrayRef<int64_t> shape,
 
   int64_t blockSize = 16;
   if (numDims == 4 && shape[3] % blockSize == 0) {
-    /*
-*NHWC -> NCHW: newMap: (d0 d1 d2 d3) -> (d0 d3 d1 d2)
-NCHW -> NCHWc16: newBlockedMap: (d0 d3 d1 d2) -> (d0 d3 floordiv 16, d1, d2, d3
-mod 16)
-*/
+    //
+// *NHWC -> NCHW: newMap: (d0 d1 d2 d3) -> (d0 d3 d1 d2)
+// NCHW -> NCHWc16: newBlockedMap: (d0 d3 d1 d2) -> (d0 d3 floordiv 16, d1, d2,
+d3
+// mod 16)
+//
     mlir::SmallVector<unsigned, 4> permutationMap;
     permutationMap.push_back(0);
     permutationMap.push_back(3);
@@ -653,6 +655,7 @@ mod 16)
     return mlir::AffineMap::getMultiDimIdentityMap(numDims, context);
   }
 }
+*/
 
 struct BufferAllocator {
   Value resultMemRef;
@@ -679,10 +682,9 @@ struct BufferAllocator {
 
     // Make an allocation for the output
     memRefType = MemRefType::get(shape, elementType);
-    mlir::MemRefType newMemRefType =
-        mlir::MemRefType::Builder(memRefType)
-            .setAffineMaps({getBlockedLayoutMap(shape, shape.size(),
-                                                memRefType.getContext())});
+    mlir::MemRefType newMemRefType = mlir::MemRefType::Builder(memRefType);
+    //          .setAffineMaps({getBlockedLayoutMap(shape, shape.size(),
+    //                                              memRefType.getContext())});
     resultMemRef = builder.create<AllocOp>(loc, newMemRefType);
     IVLOG(4, "resultMemRef1: " << mlir::debugString(resultMemRef));
     if (maybePadding) {
