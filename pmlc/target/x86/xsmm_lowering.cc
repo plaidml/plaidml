@@ -70,7 +70,7 @@ struct PxaGemmOpConversion : public OpConversionPattern<pxa::PxaGemmOp> {
         aInfo.strides[0], bInfo.strides[0], cInfo.strides[0]});
 
     int64_t numBatches = op.numBatches();
-
+    int64_t isContinuous = op.Continuous();
     if (numBatches == 1) {
       auto dispatch = rewriter.create<xsmm::GemmDispatchF32Op>(
           op.getLoc(), rewriter.getI64Type(), op.tile(), leadingDimsAttr);
@@ -79,12 +79,24 @@ struct PxaGemmOpConversion : public OpConversionPattern<pxa::PxaGemmOp> {
           op.getLoc(), ArrayRef<Type>(), dispatch, transformed.c(),
           transformed.a(), transformed.b(), indices);
     } else if (numBatches > 1) {
-      auto dispatch = rewriter.create<xsmm::BRGemmDispatchF32Op>(
-          op.getLoc(), rewriter.getI64Type(), op.tile(), leadingDimsAttr);
 
-      rewriter.create<xsmm::BRGemmInvokeF32Op>(
-          op.getLoc(), ArrayRef<Type>(), dispatch, transformed.c(),
-          transformed.a(), transformed.b(), op.numBatches(), indices);
+      if (isContinuous == 1) {
+        auto dispatch = rewriter.create<xsmm::BRGemmDispatchF32Op>(
+            op.getLoc(), rewriter.getI64Type(), op.tile(), leadingDimsAttr);
+        rewriter.create<xsmm::BRGemmInvokeF32Op>(
+            op.getLoc(), ArrayRef<Type>(), dispatch, transformed.c(),
+            transformed.a(), transformed.b(), op.numBatches(), indices);
+      } else {
+
+        IVLOG(3, "OFFSETBRGEMM: numbatches in offset based batch reduce " << numBatches);
+        auto dispatch = rewriter.create<xsmm::BRGemmOffsDispatchF32Op>(
+            op.getLoc(), rewriter.getI64Type(), op.tile(), leadingDimsAttr);
+        rewriter.create<xsmm::BRGemmOffsInvokeF32Op>(
+            op.getLoc(), ArrayRef<Type>(), dispatch, transformed.c(),
+            transformed.a(), transformed.b(), op.numBatches(), op.aOffsets(),
+            op.bOffsets(), indices);
+      }
+
     } else {
       return failure();
     }
@@ -365,7 +377,6 @@ struct XSMMBRGemmOffsDispatchF32Lowering
       callOperands.push_back(
           rewriter.create<LLVM::ConstantOp>(op->getLoc(), int32Type, attr));
     }
-
 
     rewriter.replaceOpWithNewOp<LLVM::CallOp>(
         op, int64Type, rewriter.getSymbolRefAttr(func), callOperands);
