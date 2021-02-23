@@ -61,7 +61,62 @@ private:
   unsigned numThreads;
   bool doBatch;
   StencilCostFunction stencilCostFn;
+  // Requirements for additional reduction indices
+  // that do not appear in output tensor
+  IdxStrideReqs additionalReductionIdxReqs = IdxStrideReqs{
+      [](int64_t stride) { return stride == 0; }, // output
+      [](int64_t stride) { return stride != 0; }, // input0
+      [](int64_t stride) { return stride != 0; }, // input1
+  };
 
+  bool isAdditionalReductionIndex(const BlockArgument &index,
+                                  ArrayRef<Value> tensor) {
+    for (size_t i = 0; i < tensor.size(); i++) {
+      auto strideInfo = getStrideInfo(tensor[i]);
+      auto stride = strideInfo->strides[index];
+      if (!additionalReductionIdxReqs[i](stride)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  void computeBRGemmOffsets(
+      const DenseMap<BlockArgument, SmallVector<int64_t, 8>> &offsets,
+      SmallVector<int64_t, 8> &aOffsetsArray,
+      SmallVector<int64_t, 8> &bOffsetsArray, int64_t numBatches) {
+     
+    for(size_t i = 0; i < (size_t) numBatches; i++){
+        aOffsetsArray[i] = 0;
+        bOffsetsArray[i] = 0;
+    } 
+
+    IVLOG(3, "numBatches in computeBRGEMM: " << numBatches);
+    size_t innerStride = 1;
+    
+    for (auto &i : offsets) {
+      int64_t aStride = i.second[0];
+      int64_t bStride = i.second[1];
+      int64_t indexRange = i.second[2];
+      int64_t numSteps = i.second[3];
+
+      IVLOG(3, "aStride in computeBRGEMM: " << aStride);           
+      IVLOG(3, "bStride in computeBRGEMM: " << bStride);
+      IVLOG(3, "indexRange in computeBRGEMM: " << indexRange);
+      IVLOG(3, "numSteps in computeBRGEMM: " << numSteps);
+
+      
+      for (size_t k = 0; k < (size_t) numBatches; k += ((size_t)numSteps * innerStride)) {
+        for (size_t j = 0; j < (size_t)numSteps; j++) {
+          for (size_t l = 0; l < innerStride; l++) {
+            aOffsetsArray[k + j * innerStride + l] += (j * (indexRange / numSteps) * aStride);
+            bOffsetsArray[k + j * innerStride + l] += (j * (indexRange / numSteps) * bStride);
+          }
+        }
+      }
+      innerStride *= (size_t) numSteps;
+    }
+  }
   Optional<LoadStoreOps> capture() {
     using matchers::m_Any;
     // Looking for load..load..mul..reduce..terminator
@@ -181,8 +236,8 @@ private:
         outer_idxs.try_emplace(kvp.first, getIdxRange(kvp.first));
         IVLOG(4, "And now emplaced");
       }
-      // If the index is from outside `op` this has already been logged, no need
-      // for `else` branch here
+      // If the index is from outside `op` this has already been logged, no
+      // need for `else` branch here
     }
     for (unsigned i = 0; i < getTiledIdxCount(); i++) {
       assert(getBlockArgsAsSet().count(perm.indexes[i]) &&
@@ -222,14 +277,24 @@ private:
     int64_t numBatches = 1;
     int64_t kRange = getIdxRange(perm.indexes[2]);
     IVLOG(3, "kRange: " << kRange);
+    int64_t kNumBatches = 1;
+    // Generate the GEMM op; select inputs based on permutation order
+    auto opC = cast<PxaReduceOp>(perm.values[0].getDefiningOp());
+    auto opA = cast<PxaLoadOp>(perm.values[1].getDefiningOp());
+    auto opB = cast<PxaLoadOp>(perm.values[2].getDefiningOp());
+    DenseMap<BlockArgument, SmallVector<int64_t, 8> > offsets;
+    auto bodyBuilder = op.getBodyBuilder();
+
+    auto tileAttr = bodyBuilder.getI64ArrayAttr(tileSize);
 
     // First, modify step size of all tiled indexes
     auto steps = op.getSteps();
     for (size_t i = 0; i < getBlockArgsAsSet().size(); i++) {
+      bool foundBlockArg = false;
       for (size_t j = 0; j < getTiledIdxCount(); j++) {
         if (perm.indexes[j] == op.getBody()->getArgument(i)) {
           steps[i] *= tileSize[j];
-
+          foundBlockArg = true;
           // K index (reduction dimension)
           if (doBatch && j == 2) {
             // We want to transform "regular" pxa.gemm where numBatches is 1:
@@ -250,34 +315,92 @@ private:
             // loop.
             //
             // Subsequently, kStep is set to kRange. That is, in one step, a
-            // block of C is completely computed through reduction of batches of
-            // A and B matrix multiplies.
-            numBatches = kRange / steps[i];
+            // block of C is completely computed through reduction of batches
+            // of A and B matrix multiplies.
+            kNumBatches = (kRange / steps[i]);
+            numBatches *= kNumBatches;
             steps[i] = kRange;
+            // Insert into map to be used for offset-based batch reduce with
+            // key = index and value = {stride, indexRange, numsteps}
+            //
+
+            auto aStrideInfo = getStrideInfo(opA);
+            auto aStride = aStrideInfo->strides[perm.indexes[j]];
+            auto bStrideInfo = getStrideInfo(opB);
+            auto bStride = bStrideInfo->strides[perm.indexes[j]];
+
+            auto aMemRefType = opA.getMemRef().getType().cast<MemRefType>();
+            auto aElementType = aMemRefType.getElementType();
+            aStride *= (aElementType.getIntOrFloatBitWidth()/ 8);
+
+            auto bMemRefType = opB.getMemRef().getType().cast<MemRefType>();
+            auto bElementType = bMemRefType.getElementType();
+            bStride *= (bElementType.getIntOrFloatBitWidth()/ 8);
+
+
+            offsets.insert(
+                {perm.indexes[j],
+                 SmallVector<int64_t, 8 >{aStride, bStride, kRange, kNumBatches}});
 
             IVLOG(3, "steps[" << i << "] = " << steps[i]);
-            IVLOG(3, "numBatches: " << numBatches);
           }
         }
       }
+      if (doBatch && !foundBlockArg && steps[i] == 1 &&
+          isAdditionalReductionIndex(op.getBody()->getArgument(i),
+                                     ArrayRef<Value>{opC,
+                                                     opA,
+                                                     opB})) {
+        
+        
+        auto index = op.getBody()->getArgument(i);
+        // Compute stride of this index in A and B
+
+        int64_t indexRange = getIdxRange(index);
+        auto aStrideInfo = getStrideInfo(opA);
+        auto aStride = aStrideInfo->strides[index];
+        auto aMemRefType = opA.getMemRef().getType().cast<MemRefType>();
+        auto aElementType = aMemRefType.getElementType();
+        aStride *= (aElementType.getIntOrFloatBitWidth()/ 8); 
+
+
+        auto bStrideInfo = getStrideInfo(opB);
+        auto bStride = bStrideInfo->strides[index];
+
+        auto bMemRefType = opB.getMemRef().getType().cast<MemRefType>();
+        auto bElementType = bMemRefType.getElementType();
+        bStride *= (bElementType.getIntOrFloatBitWidth()/ 8);
+ 
+
+
+
+        // Insert into map to be used for offset-based batch reduce with key =
+        // index and value = {stride, indexRange, numsteps}
+
+        offsets.insert({index, SmallVector<int64_t, 8>{aStride, bStride, indexRange,
+                                                 indexRange}});
+        foundBlockArg = true;
+        steps[i] = indexRange;
+        IVLOG(3, "steps[" << i << "] = " << steps[i]);
+        numBatches *= indexRange;
+      }
     }
     op.setSteps(steps);
+    IVLOG(3, "numBatches: " << numBatches);
 
-    // Generate the GEMM op; select inputs based on permutation order
-    auto opC = cast<PxaReduceOp>(perm.values[0].getDefiningOp());
-    auto opA = cast<PxaLoadOp>(perm.values[1].getDefiningOp());
-    auto opB = cast<PxaLoadOp>(perm.values[2].getDefiningOp());
-
-    auto bodyBuilder = op.getBodyBuilder();
-
-    auto tileAttr = bodyBuilder.getI64ArrayAttr(tileSize);
     auto numBatchesAttr = bodyBuilder.getI64IntegerAttr(numBatches);
+
+    // Iterate over offset map to generate offsets for offset-based brgemm
+    SmallVector<int64_t, 8> aOffsetsArray(numBatches, 0), bOffsetsArray(numBatches, 0);
+    computeBRGemmOffsets(offsets, aOffsetsArray, bOffsetsArray, numBatches);
 
     SmallVector<Value, 8> mapOperands;
     GemmOperand c(opC, {perm.indexes[0], perm.indexes[1]}, mapOperands);
     GemmOperand a(opA, {perm.indexes[0], perm.indexes[2]}, mapOperands);
     GemmOperand b(opB, {perm.indexes[2], perm.indexes[1]}, mapOperands);
 
+    int64_t isContinuous = (doBatch && numBatches == kNumBatches) ? 1 : 0;
+   
     auto brgemm = bodyBuilder.create<pxa::PxaGemmOp>(
         op.getLoc(), c.memref.getType(), //
         c.memref, AffineMapAttr::get(c.accessMap),
@@ -286,7 +409,11 @@ private:
         AffineMapAttr::get(a.tileMap), //
         b.memref, AffineMapAttr::get(b.accessMap),
         AffineMapAttr::get(b.tileMap), //
-        tileAttr, numBatchesAttr, mapOperands);
+        tileAttr, numBatchesAttr,
+        bodyBuilder.getI64ArrayAttr(ArrayRef<int64_t>(aOffsetsArray)),
+        bodyBuilder.getI64ArrayAttr(ArrayRef<int64_t>(bOffsetsArray)),
+        bodyBuilder.getI64IntegerAttr(isContinuous),
+        mapOperands);
 
     opC.result().replaceAllUsesWith(brgemm);
     opC.erase();

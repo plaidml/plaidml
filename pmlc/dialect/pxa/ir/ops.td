@@ -91,6 +91,9 @@ def PxaGemmOp : PXA_OpWithPP<"gemm"> {
     AffineMapAttr:$bTileMap,
     I64ArrayAttr:$tile,
     I64Attr:$numBatches,
+    I64ArrayAttr:$aOffsets,
+    I64ArrayAttr:$bOffsets,
+    I64Attr:$Continuous,
     Variadic<Index>:$mapOperands);
   let results = (outs AnyMemRef:$out);
 

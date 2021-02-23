@@ -180,7 +180,7 @@ struct SimplifyPxaGemmOp : public OpRewritePattern<PxaGemmOp> {
         op.c(), cAccessMap, op.cTileMap(), //
         op.a(), aAccessMap, op.aTileMap(), //
         op.b(), bAccessMap, op.bTileMap(), //
-        op.tile(), op.numBatches(), mapOperands);
+        op.tile(), op.numBatches(), op.aOffsets(), op.bOffsets(), op.Continuous(), mapOperands);
     return success();
   }
 };
@@ -413,7 +413,7 @@ void printPxaGemmOp(OpAsmPrinter &p, PxaGemmOp op) {
   p.printAffineMapOfSSAIds(op.bAccessMapAttr(), op.getOperandsForB());
   p << "]:";
   p.printAttribute(op.bTileMapAttr());
-  p << ", " << op.tile() << ", " << op.numBatches() << " : " << funcType;
+  p << ", " << op.tile() << ", " << op.numBatches() << ", " << op.aOffsets() << ", "<< op.bOffsets() <<", " << op.Continuous() << " : " << funcType;
 }
 
 struct GemmOperandParser {
@@ -443,8 +443,8 @@ ParseResult parsePxaGemmOp(OpAsmParser &parser, OperationState &result) {
   auto indexType = builder.getIndexType();
   auto i64Type = builder.getIntegerType(64);
   GemmOperandParser a("a"), b("b"), c("c");
-  ArrayAttr tileAttr;
-  IntegerAttr numBatchesAttr;
+  ArrayAttr tileAttr, aOffsetsAttr, bOffsetsAttr;
+  IntegerAttr numBatchesAttr, ContAttr;
   FunctionType funcType;
   return failure(
       c.parse(parser, result) || parser.parseEqual() ||
@@ -453,6 +453,15 @@ ParseResult parsePxaGemmOp(OpAsmParser &parser, OperationState &result) {
       parser.parseAttribute(tileAttr, i64Type, "tile", result.attributes) ||
       parser.parseComma() ||
       parser.parseAttribute(numBatchesAttr, i64Type, "numBatches",
+                            result.attributes) ||
+      parser.parseComma() ||
+      parser.parseAttribute(aOffsetsAttr, i64Type, "aOffsets",
+                            result.attributes) ||
+      parser.parseComma() ||
+      parser.parseAttribute(bOffsetsAttr, i64Type, "bOffsets",
+                            result.attributes) ||
+      parser.parseComma() ||
+      parser.parseAttribute(ContAttr, i64Type, "Continuous",
                             result.attributes) ||
       parser.parseColonType(funcType) ||
       parser.addTypesToList(funcType.getResults(), result.types) ||
