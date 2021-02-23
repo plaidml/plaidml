@@ -770,14 +770,14 @@ struct ProgramBuilder {
 
   Value handleLoop(ExprNodeLoop *node) {
     // take lowBound, upperBound, step from operands.
-    auto indexs = node->indexs;
-    if (indexs.size() != 3) {
+    auto indices = node->indexs;
+    if (indices.size() != 3) {
       throw std::runtime_error(
           "please check the index of loop, lbound, ubound and step");
     }
     auto indexType = builder.getIndexType();
     std::vector<Value> indexValue;
-    for (auto index : indexs) {
+    for (auto index : indices) {
       auto indexNum = builder.create<mlir::IndexCastOp>(
           loc, builder.lookupNode(index), indexType);
       indexValue.push_back(indexNum);
@@ -801,13 +801,12 @@ struct ProgramBuilder {
     }
     DenseSet<Value> resultArgSet;
     resultArgSet.insert(resultArgs.begin(), resultArgs.end());
-    // take loop-carried variables, and it's init Value
+
     AstTraversal traversal(results);
     auto scfForOp = builder.create<mlir::scf::ForOp>(
         loc, indexValue[0], indexValue[1], indexValue[2], InitArgs);
     OpBuilder bodyBuilder(scfForOp.getLoopBody());
-    llvm::SetVector<Operation *> toRemove;
-    // replace the value by loop loop-carried variables.
+
     BlockAndValueMapping mapper;
     auto rawIterArgs = scfForOp.getRegionIterArgs();
     for (auto tuple : llvm::zip(InitArgs, rawIterArgs)) {
@@ -815,29 +814,25 @@ struct ProgramBuilder {
       std::tie(outer, inner) = tuple;
       mapper.map(outer, inner);
     }
-    // choice the ops which should put to loop region.
-    std::vector<Value> affectValue(InitArgs.begin(), InitArgs.end());
-    std::set<Operation *> innerLoopValue;
-    int length = affectValue.size();
-    int start = 0;
-    while (start != length) {
-      for (auto i = start; i < length; i++) {
-        for (auto &v : affectValue[i].getUses()) {
-          auto op = v.getOwner();
-          if (innerLoopValue.count(op) || op == scfForOp.getOperation()) {
-            continue;
+    // choose the ops which should be put into loop body.
+    llvm::SetVector<Value> affectValue(InitArgs.begin(), InitArgs.end());
+    llvm::SetVector<Operation *> innerLoopValues;
+    while (!affectValue.empty()) {
+      auto uses = affectValue.back().getUses();
+      for (auto &use : uses) {
+        auto op = use.getOwner();
+        if (!innerLoopValues.contains(op) && op != scfForOp.getOperation()) {
+          for (auto result : op->getResults()) {
+            affectValue.insert(result);
           }
-          for (unsigned i = 0; i < op->getNumResults(); i++) {
-            affectValue.push_back(op->getResult(i));
-          }
-          innerLoopValue.insert(op);
+          innerLoopValues.insert(op);
         }
       }
-      start = length;
-      length = affectValue.size();
+      affectValue.pop_back();
     }
 
-    SmallVector<Value, 4> yieldValue;
+    llvm::SetVector<Operation *> toRemove;
+    SmallVector<Value, 4> yieldValues;
     for (const ExprNodePtr &node : traversal.getFlat()) {
       Value value = builder.lookupNode(node);
       // skip init value.
@@ -846,17 +841,17 @@ struct ProgramBuilder {
       }
       Operation *op = value.getDefiningOp();
       // skip duplicate op, and not inside loop op.
-      if (!op || toRemove.contains(op) || !innerLoopValue.count(op)) {
+      if (!op || toRemove.contains(op) || !innerLoopValues.contains(op)) {
         continue;
       }
       Operation *clonedOp = bodyBuilder.clone(*op, mapper);
       if (resultArgSet.count(value)) {
-        yieldValue.push_back(clonedOp->getResult(0));
+        yieldValues.push_back(clonedOp->getResult(0));
       }
       toRemove.insert(op);
     }
 
-    bodyBuilder.create<scf::YieldOp>(loc, yieldValue);
+    bodyBuilder.create<scf::YieldOp>(loc, yieldValues);
     for (Operation *op : toRemove) {
       op->erase();
     }

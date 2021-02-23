@@ -24,6 +24,7 @@ plaidml_cc_library(
         "padding.cc",
         "pass_detail.h",
         "split_main.cc",
+        "replace_scfFor_alloc.cc",
     ],
     hdrs = [
         "contraction.h",
@@ -35,6 +36,8 @@ plaidml_cc_library(
         ":gen-pass",
         "//pmlc/dialect/stdx/ir",
         "//pmlc/dialect/tile/ir",
+        "//pmlc/dialect/pxa/ir",
+        "//pmlc/dialect/pxa/analysis",
         "//pmlc/util",
         "//pmlc/util/bilp",
         "//pmlc/util/math",
