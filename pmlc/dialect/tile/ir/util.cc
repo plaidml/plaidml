@@ -69,29 +69,35 @@ unsigned typeScore(Type type) {
   if (type.isUnsignedInteger(16)) {
     return 8;
   }
-  if (type.isSignedInteger(32)) {
+  if (type.isSignlessInteger(16)) {
     return 9;
   }
+  if (type.isSignedInteger(32)) {
+    return 10;
+  }
   if (type.isUnsignedInteger(32)) {
-    return 10;
-  }
-  if (type.isSignlessInteger(32)) {
-    return 10;
-  }
-  if (type.isSignedInteger(64)) {
     return 11;
   }
-  if (type.isUnsignedInteger(64)) {
+  if (type.isSignlessInteger(32)) {
     return 12;
   }
-  if (type.isF16()) {
+  if (type.isSignedInteger(64)) {
     return 13;
   }
-  if (type.isF32()) {
+  if (type.isUnsignedInteger(64)) {
     return 14;
   }
-  if (type.isF64()) {
+  if (type.isSignlessInteger(64)) {
     return 15;
+  }
+  if (type.isF16()) {
+    return 16;
+  }
+  if (type.isF32()) {
+    return 17;
+  }
+  if (type.isF64()) {
+    return 18;
   }
   IVLOG(1, "Type: " << debugString(type));
   assert(false && "Undefined typeScore");

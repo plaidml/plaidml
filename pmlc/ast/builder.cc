@@ -771,10 +771,6 @@ struct ProgramBuilder {
   Value handleLoop(ExprNodeLoop *node) {
     // take lowBound, upperBound, step from operands.
     auto indices = node->indexs;
-    if (indices.size() != 3) {
-      throw std::runtime_error(
-          "please check the index of loop, lbound, ubound and step");
-    }
     auto indexType = builder.getIndexType();
     std::vector<Value> indexValue;
     for (auto index : indices) {
@@ -783,20 +779,15 @@ struct ProgramBuilder {
       indexValue.push_back(indexNum);
     }
 
-    auto operands = node->operands;
-    auto results = node->results;
-    if (operands.size() != results.size()) {
-      throw std::runtime_error(
-          "In scfFor op, init Iter number have to equal Iter args");
-    }
     SmallVector<Value, 8> InitArgs;
     for (const ExprNodePtr &operand : node->operands) {
       InitArgs.push_back(builder.lookupNode(operand));
     }
+    auto results = node->results;
     DenseSet<Value> InitArgSet;
     InitArgSet.insert(InitArgs.begin(), InitArgs.end());
     SmallVector<Value, 8> resultArgs;
-    for (const ExprNodePtr &result : node->results) {
+    for (const ExprNodePtr &result : results) {
       resultArgs.push_back(builder.lookupNode(result));
     }
     DenseSet<Value> resultArgSet;
