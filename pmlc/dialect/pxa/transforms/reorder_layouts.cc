@@ -463,7 +463,75 @@ void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {
         }
 
         if (tileSizesDivideLoopLengths) {
-          performTiling(parallelOp, tileSizes);
+          mlir::AffineParallelOp innerLoops =
+              performTiling(parallelOp, tileSizes);
+
+          mlir::AffineMap outerLoopLowerMap =
+              parallelOp.getLowerBoundsValueMap().getAffineMap();
+          mlir::AffineMap outerLoopUpperMap =
+              parallelOp.getUpperBoundsValueMap().getAffineMap();
+          IVLOG(4,
+                "outerLoopLowerMap: " << mlir::debugString(outerLoopLowerMap));
+          IVLOG(4,
+                "outerLoopUpperMap: " << mlir::debugString(outerLoopUpperMap));
+
+          mlir::AffineValueMap lowerBoundsMap =
+              innerLoops.getLowerBoundsValueMap();
+          mlir::AffineMap lowerMap = lowerBoundsMap.getAffineMap();
+          IVLOG(4, "lowerBoundsMap: " << mlir::debugString(lowerMap));
+
+          mlir::AffineValueMap upperBoundsMap =
+              innerLoops.getUpperBoundsValueMap();
+          mlir::AffineMap upperMap = upperBoundsMap.getAffineMap();
+          IVLOG(4, "upperBoundsMap: " << mlir::debugString(upperMap));
+
+          unsigned numTileSizes = 0;
+          // The following will set the lower bound and upper bound maps to
+          // something like the following: Lower bounds: (d0, d1, d2 floordiv
+          // 16, d3 floordiv 16, d4, d5) Upper bounds: (d0 + 1, d1 + 1, d2
+          // floordiv 16 + 1, d3 floordiv 16 + 1, d4 + 1, d5 + 1)
+          for (size_t i = 0; i < tileSizes.size(); i++) {
+            if (tileSizes[i] != 1) {
+              lowerBoundsMap.setResult(
+                  i, lowerBoundsMap.getResult(i).floorDiv(tileSizes[i]));
+              upperBoundsMap.setResult(i, lowerBoundsMap.getResult(i) + 1);
+              numTileSizes++;
+            }
+          }
+
+          lowerMap = lowerBoundsMap.getAffineMap();
+          IVLOG(4, "lowerBoundsMap: " << mlir::debugString(lowerMap));
+          upperMap = upperBoundsMap.getAffineMap();
+          IVLOG(4, "upperBoundsMap: " << mlir::debugString(upperMap));
+
+          mlir::SmallVector<mlir::AffineExpr, 6> lowerExpandedExprs;
+          mlir::SmallVector<mlir::AffineExpr, 6> upperExpandedExprs;
+          unsigned currentNumDims = lowerMap.getNumResults();
+          for (size_t i = 0; i < currentNumDims; i++) {
+            lowerExpandedExprs.push_back(lowerMap.getResult(i));
+            upperExpandedExprs.push_back(upperMap.getResult(i));
+          }
+
+          mlir::OpBuilder builder(lowerMap.getContext());
+          for (size_t i = 0; i < tileSizes.size(); i++) {
+            if (tileSizes[i] != 1) {
+              auto lowerDimIdExpr = builder.getAffineConstantExpr(0);
+              auto upperDimIdExpr = builder.getAffineConstantExpr(tileSizes[i]);
+              lowerExpandedExprs.push_back(lowerDimIdExpr);
+              upperExpandedExprs.push_back(upperDimIdExpr);
+            }
+          }
+
+          mlir::AffineMap expandedLowerMap =
+              mlir::AffineMap::get(currentNumDims + numTileSizes, 0,
+                                   lowerExpandedExprs, lowerMap.getContext());
+
+          mlir::AffineMap expandedUpperMap =
+              mlir::AffineMap::get(currentNumDims + numTileSizes, 0,
+                                   upperExpandedExprs, upperMap.getContext());
+
+          IVLOG(4, "expandedLowerMap: " << mlir::debugString(expandedLowerMap));
+          IVLOG(4, "expandedUpperMap: " << mlir::debugString(expandedUpperMap));
         }
       }
     }
