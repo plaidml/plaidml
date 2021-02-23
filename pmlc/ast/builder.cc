@@ -709,7 +709,7 @@ struct ProgramBuilder {
       std::tie(outer, inner) = tuple;
       mapper.map(outer, inner);
     }
-    llvm::SmallVector<Value, 4> innerResults;
+    llvm::SmallVector<Value, 4> innerResults(results.size());
     llvm::SetVector<Operation *> toRemove;
     for (const ExprNodePtr &node : traversal.getFlat()) {
       Value value = builder.lookupNode(node);
@@ -720,10 +720,14 @@ struct ProgramBuilder {
       }
       assert(op && "Unexpected block argument");
       Operation *clonedOp = bodyBuilder.clone(*op, mapper);
-      if (results.contains(value)) {
-        for (Value result : clonedOp->getResults()) {
-          innerResults.push_back(result);
+
+      auto iter = std::find(results.begin(), results.end(), value);
+      if (iter != results.end()) {
+        if (clonedOp->getNumResults() != 1) {
+          throw std::runtime_error("Program build failure.");
         }
+        size_t index = std::distance(results.begin(), iter);
+        innerResults[index] = clonedOp->getResult(0);
       }
       toRemove.insert(op);
     }
