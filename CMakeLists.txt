@@ -26,8 +26,6 @@ set(PLAIDML_VERSION 1.0.0)
 set(MAIN_BRANCH plaidml-v1)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
-set(LLVM_INSTALL_TOOLCHAIN_ONLY ON)
-
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
   # Support for ninja on windows
   enable_language(ASM)
@@ -134,7 +132,8 @@ configure_lit_site_cfg(
   ${CMAKE_CURRENT_SOURCE_DIR}/lit.cfg.py
 )
 
-include(pml_packaging)
-
-# include(CPack)
-ie_cpack(${IE_CPACK_COMPONENTS_ALL})
+if(BUILD_PLAIDML_DEVKIT)
+  include(pml_packaging)
+else()
+  ie_cpack(BENCHMARK_APP)
+endif()

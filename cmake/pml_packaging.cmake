@@ -8,73 +8,19 @@ set(CPACK_PACKAGE_VENDOR "Intel Corp")
 set(CPACK_PACKAGE_CONTACT "Intel")
 set(CPACK_PACKAGE_VERSION ${PLAIDML_VERSION})
 set(CPACK_COMPONENTS_IGNORE_GROUPS 1)
+set(CPACK_COMPONENTS_ALL devkit)
 
-# Installs a list of targets, recursively installing anything listed in INTERFACE_LINK_LIBRARIES
-function(recursive_lib_install INSTALL_LIST)
-  foreach(TP ${INSTALL_LIST})
-    if(TARGET ${TP})
-      # Switch to true target if necessary
-      get_target_property(_ALIASED_TARGET ${TP} ALIASED_TARGET)
-      if(_ALIASED_TARGET)
-        set(TP ${_ALIASED_TARGET})
-      endif()
+set_target_properties(mlir_runner_utils PROPERTIES INTERFACE_LINK_LIBRARIES "")
 
-      get_property(INSTALLED_TARGETS GLOBAL PROPERTY installed_targets_property)
-
-      if(NOT ${TP} MATCHES ".*::.*" AND NOT ${TP} IN_LIST INSTALLED_TARGETS)
-
-        # Add install_interface include directory property to target
-        get_target_property(TP_INC_DIRS ${TP} INTERFACE_INCLUDE_DIRECTORIES)
-        if(TP_INC_DIRS AND NOT "${TP_INC_DIRS}" MATCHES ".*INSTALL_INTERFACE.*")
-          set_target_properties(${TP} PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "$<BUILD_INTERFACE:${TP_INC_DIRS}>;$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
-        endif()
-
-        # Install target
-        install(TARGETS ${TP}
+install(TARGETS plaidml_plaidml
+                omp
+                mlir_runner_utils
         EXPORT ${PROJECT_NAME}_Targets
         DESTINATION lib
         COMPONENT devkit)
-        list(APPEND INSTALLED_TARGETS "${TP}")
-        set_property(GLOBAL PROPERTY installed_targets_property "${INSTALLED_TARGETS}")
 
-        # Recurse through dependencies
-        get_target_property(NEXT_DEPS ${TP} INTERFACE_LINK_LIBRARIES)
-        if(NEXT_DEPS)
-          recursive_lib_install("${NEXT_DEPS}")
-        endif()
-      endif()
-    endif()
-  endforeach()
-endfunction()
-
-get_property(INSTALL_TARGETS GLOBAL PROPERTY install_targets_property)
-recursive_lib_install("${INSTALL_TARGETS}")
-
-
-# Install the 3rd party header files such that a copy of edsl_tests is able to run
-# It *might* be possible to automatically detect and install all necessary headers in recursive_lib_install
-install(DIRECTORY "${PROJECT_BINARY_DIR}/_deps/llvm-project-src/llvm/utils/unittest/googlemock/include/gmock"
-        DESTINATION include
-        COMPONENT devkit)
-install(DIRECTORY "${PROJECT_BINARY_DIR}/_deps/llvm-project-src/llvm/utils/unittest/googletest/include/gtest"
-        DESTINATION include
-        COMPONENT devkit)
-install(DIRECTORY "${PROJECT_BINARY_DIR}/_deps/half-src/include"
-        DESTINATION .
-        COMPONENT devkit)
-install(DIRECTORY "${PROJECT_BINARY_DIR}/_deps/llvm-project-src/llvm/include/llvm"
-        DESTINATION include
-        COMPONENT devkit)
-install(DIRECTORY "${PROJECT_BINARY_DIR}/_deps/llvm-project-src/llvm/include/llvm-c"
-        DESTINATION include
-        COMPONENT devkit)
-install(DIRECTORY "${PROJECT_BINARY_DIR}/_deps/llvm-project-build/include/llvm"
-        DESTINATION include
-        COMPONENT devkit)
-install(DIRECTORY "${PROJECT_BINARY_DIR}/_deps/openvino-build/inference-engine/samples/thirdparty/gflags/include/gflags"
-        DESTINATION include
-        COMPONENT devkit)
-
+get_target_property(OMP_INC_DIRS omp INTERFACE_INCLUDE_DIRECTORIES)
+set_target_properties(omp PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "$<BUILD_INTERFACE:${OMP_INC_DIRS}>;$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
 
 include(CMakePackageConfigHelpers)
 write_basic_package_version_file("${PROJECT_NAME}ConfigVersion.cmake"
@@ -95,13 +41,9 @@ install(EXPORT ${PROJECT_NAME}_Targets
 
 install(FILES "${PROJECT_BINARY_DIR}/${PROJECT_NAME}Config.cmake"
               "${PROJECT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
-        DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/${PROJECT_NAME}/cmake
-        COMPONENT devkit)
-
-# Install cmake for Boost (Cannot figure out how to install Boost target directly)
-install(FILES "${PROJECT_SOURCE_DIR}/cmake/third_party/boost.cmake"
-              "${PROJECT_SOURCE_DIR}/cmake/third_party/CPM.cmake"
-        DESTINATION cmake/third_party
+        DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/cmake
         COMPONENT devkit)
 
 # TODO: Install any desired standalone executables or source code for reference
+
+include(CPack)
