@@ -721,13 +721,13 @@ struct ProgramBuilder {
       assert(op && "Unexpected block argument");
       Operation *clonedOp = bodyBuilder.clone(*op, mapper);
 
-      auto iter = std::find(results.begin(), results.end(), value);
-      if (iter != results.end()) {
-        if (clonedOp->getNumResults() != 1) {
-          throw std::runtime_error("Program build failure.");
-        }
-        size_t index = std::distance(results.begin(), iter);
-        innerResults[index] = clonedOp->getResult(0);
+      auto itLayerResults = std::find(results.begin(), results.end(), value);
+      if (itLayerResults != results.end()) {
+        auto opResults = op->getResults();
+        auto itOpResults = std::find(opResults.begin(), opResults.end(), value);
+        size_t idxOpResults = std::distance(opResults.begin(), itOpResults);
+        size_t idxLayerResults = std::distance(results.begin(), itLayerResults);
+        innerResults[idxLayerResults] = clonedOp->getResult(idxOpResults);
       }
       toRemove.insert(op);
     }

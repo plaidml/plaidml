@@ -2048,6 +2048,19 @@ TEST_F(CppEdsl, LayerMissingOperand) {
   EXPECT_ANY_THROW({ makeProgram("LayerMissingOperand", {A, B}, {O}); });
 }
 
+TEST_F(CppEdsl, LayerMultipleReturnValues) {
+  auto A = Placeholder(DType::FLOAT32, {10, 5});
+  TensorVec tuple = layer("two_output", {A}, {}, [&]() {
+    Tensor idxs = argsort(A, 0);
+    Tensor vals = gather(A, idxs);
+    TensorVec outputs = {vals, idxs};
+    return outputs;
+  });
+
+  auto program = makeProgram("LayerMultipleReturnValues", {A}, tuple);
+  runProgram(program);
+}
+
 TEST_F(CppEdsl, LayerEmbeddedConst) {
   auto A = Placeholder(DType::FLOAT32, {10, 20});
   Tensor O = layer("sum", {A}, [&]() {  //
