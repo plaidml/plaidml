@@ -522,16 +522,37 @@ void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {
             }
           }
 
-          mlir::AffineMap expandedLowerMap =
-              mlir::AffineMap::get(currentNumDims + numTileSizes, 0,
-                                   lowerExpandedExprs, lowerMap.getContext());
+          mlir::AffineMap expandedLowerMap = mlir::AffineMap::get(
+              currentNumDims, 0, lowerExpandedExprs, lowerMap.getContext());
 
-          mlir::AffineMap expandedUpperMap =
-              mlir::AffineMap::get(currentNumDims + numTileSizes, 0,
-                                   upperExpandedExprs, upperMap.getContext());
+          mlir::AffineMap expandedUpperMap = mlir::AffineMap::get(
+              currentNumDims, 0, upperExpandedExprs, upperMap.getContext());
 
           IVLOG(4, "expandedLowerMap: " << mlir::debugString(expandedLowerMap));
           IVLOG(4, "expandedUpperMap: " << mlir::debugString(expandedUpperMap));
+
+          innerLoops.setLowerBoundsMap(expandedLowerMap);
+          innerLoops.setUpperBoundsMap(expandedUpperMap);
+
+          llvm::SmallVector<int64_t, 8> steps = innerLoops.getSteps();
+          for (size_t i = 0; i < numTileSizes; i++) {
+            steps.push_back(1);
+          }
+
+          innerLoops.setSteps(steps);
+          IVLOG(4, "The steps have been set.");
+
+          int64_t numArguments = innerLoops.getBody()->getNumArguments();
+
+          for (size_t i = 0; i < numTileSizes; i++) {
+            // FIXME: Create the type in a better fashion.
+            if (numArguments > 0) {
+              mlir::Type type = innerLoops.getBody()->getArgument(0).getType();
+              mlir::BlockArgument arg =
+                  innerLoops.getBody()->insertArgument(numArguments + i, type);
+              IVLOG(4, "The new arg: " << mlir::debugString(arg));
+            }
+          }
         }
       }
     }
