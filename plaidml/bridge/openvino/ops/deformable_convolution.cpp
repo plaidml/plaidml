@@ -1,4 +1,4 @@
-// Copyright (C) 2020 Intel Corporation
+// Copyright (C) 2021 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 //
 
@@ -18,7 +18,7 @@ namespace {
 
 // Compute pad_before and the size of output.
 // This function is based on (the functon compute_padding_and_output_size() in plaidml/op/lib/ops.cc.).
-// The type of the return variable and parameters are changed from TensorDim to size_t, beacuse TensorDim can't be
+// The type of the return variable and parameters are changed from TensorDim to size_t, because TensorDim can't be
 // converted to int.
 std::pair<size_t, size_t> compute_padding_before_and_output_size(size_t input_size, size_t off_size, size_t filter_size,
                                                                  size_t stride, plaidml::op::AutoPadMode autopad_mode,
@@ -58,39 +58,6 @@ std::vector<int> cast_vector(std::vector<int64_t> vec) {
   return cast_vec;
 }
 
-// Extract values which is needed.
-// For example, in 2D,the input tensor shape is{N, CI, N, CI, H, W, 2, N, CI, H, W, 2}, and the output tensor shape
-// is{N, CI, H, W}. The elements in output tensor is a subset of the input tensor. The element at index (n,c,h,w) in
-// output tensor equals the element at// index (n, c, n, c, h, w, 0, n, c, h, w, 1) in input tensor.
-edsl::Tensor extract_tensor(edsl::Tensor I, int O_rank) {
-  auto I_rank = I.rank();
-  if (I_rank != (O_rank - 2) * (O_rank + 1) + 2) {
-    THROW_IE_EXCEPTION << "The ranks between input and output are mismatch.";
-  }
-  if (O_rank < 3) {
-    THROW_IE_EXCEPTION << "The rank of output tensor is expected to be at least 3.";
-  }
-  std::vector<TensorDim> O_dims(O_rank);
-  std::vector<TensorIndex> O_idxs(O_rank);
-  std::vector<TensorDim> I_dims(I_rank);
-  I.bind_dims(I_dims);
-  for (auto i = 0; i < O_rank; ++i) {
-    O_dims[i] = I_dims[i + 2];
-  }
-  std::vector<TensorIndex> I_idxs;
-  I_idxs.push_back(O_idxs[0]);
-  I_idxs.push_back(O_idxs[1]);
-  for (auto i = 0; i < O_rank - 2; i++) {
-    I_idxs.insert(I_idxs.end(), O_idxs.begin(), O_idxs.end());
-    I_idxs.push_back(edsl::TensorIndex(i));
-  }
-  if (I_idxs.size() != I_rank) {
-    THROW_IE_EXCEPTION << "The rank of input tensor and the size of I_idxs are unequal.";
-  }
-  edsl::Tensor O = Contraction(O_dims, O_idxs).assign(I(I_idxs));
-  return O;
-}
-
 // Compute DeformableConvolution.
 edsl::Tensor compute_deformable_convolution(edsl::Tensor I, edsl::Tensor OFF, edsl::Tensor F, std::vector<int> I_shape,
                                             std::vector<int> OFF_shape, std::vector<int> F_shape, int G, int DG,
@@ -103,7 +70,7 @@ edsl::Tensor compute_deformable_convolution(edsl::Tensor I, edsl::Tensor OFF, ed
   int OFF_C = OFF_shape[1];
   // Throw exception
   if (CI % G != 0 || CO % G != 0 || CI % DG != 0 || OFF_C % DG != 0) {
-    THROW_IE_EXCEPTION << "Incorrected shape for DeformableConvolution.";
+    THROW_IE_EXCEPTION << "Incorrect shape for DeformableConvolution.";
   }
   // Define new dimention.
   std::vector<int> NEW_DIM;
@@ -186,14 +153,61 @@ edsl::Tensor compute_deformable_convolution(edsl::Tensor I, edsl::Tensor OFF, ed
   edsl::Tensor index = op::concatenate(index_vec, -1);  // The shape of index is {1, 1, NEW_DIM, rank-2}
   // Get deformed index.
   edsl::Tensor new_index = offset + index;
-  // Get deformed input tensor.
-  edsl::Tensor deform_input =
-      edsl::gather(I, new_index).axis(2 - rank).interpolationMode(edsl::InterpolationMode::LINEAR);
-  for (auto i = 1; i < rank - 2; ++i) {
-    deform_input =
-        edsl::gather(deform_input, new_index).axis(2 - rank + i).interpolationMode(edsl::InterpolationMode::LINEAR);
+  // Get deformed input tensor with gatherND and interplate method.
+  std::vector<edsl::Tensor> new_index_vec(rank - 2);
+  std::vector<edsl::Tensor> new_index_vec_ceil(rank - 2);
+  std::vector<edsl::Tensor> new_index_vec_floor(rank - 2);
+  // Set up the value of reshape to reshape the new_index_ceil and new_index_floor tensor.
+  std::vector<int> new_index_reshape_dims;
+  new_index_reshape_dims.push_back(N);
+  new_index_reshape_dims.push_back(CI);
+  new_index_reshape_dims.insert(new_index_reshape_dims.end(), NEW_DIM.begin(), NEW_DIM.end());
+  new_index_reshape_dims.push_back(1);
+  auto index_slice = op::slice(new_index).add_dim(0, N).add_dim(0, CI);
+  for (auto i = 0; i < rank - 2; ++i) {
+    index_slice = op::slice(index_slice).add_dim(0, NEW_DIM[i]);
   }
-  deform_input = extract_tensor(deform_input, rank);
+  for (auto i = 0; i < rank - 2; ++i) {
+    new_index_vec[i] = op::slice(index_slice).add_dim(i);
+    new_index_vec_ceil[i] = edsl::ceil(new_index_vec[i]);
+    new_index_vec_floor[i] = edsl::floor(new_index_vec[i]);
+    new_index_vec_ceil[i] = op::reshape(new_index_vec_ceil[i], make_tuple<int>(new_index_reshape_dims));
+    new_index_vec_floor[i] = op::reshape(new_index_vec_floor[i], make_tuple<int>(new_index_reshape_dims));
+  }
+  // Coord_num is the number of tensor required for multi-linear interpolation.
+  int coord_num = static_cast<int>(std::pow(2.0, rank - 2));
+  std::vector<edsl::Tensor> new_index_coord_vec(coord_num);
+  std::vector<edsl::Tensor> deform_input_vec(coord_num);
+  for (auto i = 0; i < coord_num; ++i) {
+    std::vector<edsl::Tensor> concat_vec(rank - 2);
+    for (auto j = 0; j < rank - 2; ++j) {
+      int flag = (i / static_cast<int>(std::pow(2.0, rank - 2 - j - 1))) % 2;
+      if (flag == 0) {
+        concat_vec[j] = new_index_vec_floor[j];
+      } else {
+        concat_vec[j] = new_index_vec_ceil[j];
+      }
+    }
+    new_index_coord_vec[i] = op::concatenate(concat_vec, rank);
+    new_index_coord_vec[i] = edsl::cast(new_index_coord_vec[i], DType::INT32);
+    deform_input_vec[i] = edsl::gather(I, new_index_coord_vec[i]).mode(edsl::GatherMode::ND).batchDims(2);
+  }
+  // Change the shape of new_index_ceil tensor and new_index_floor tensor to original shape.
+  new_index_reshape_dims.erase(new_index_reshape_dims.end() - 1);
+  for (auto i = 0; i < rank - 2; ++i) {
+    new_index_vec_ceil[i] = op::reshape(new_index_vec_ceil[i], make_tuple<int>(new_index_reshape_dims));
+    new_index_vec_floor[i] = op::reshape(new_index_vec_floor[i], make_tuple<int>(new_index_reshape_dims));
+  }
+  // Get deformed input tensor with multi-linear interpolation.
+  auto ONE = cast(Tensor{1.0}, DType::FLOAT32);
+  for (auto i = 0; i < rank - 2; ++i) {
+    for (auto j = 0; j < static_cast<int>(std::pow(2.0, rank - 2 - i - 1)); ++j) {
+      deform_input_vec[j] = deform_input_vec[j] * (new_index_vec_ceil[i] - new_index_vec[i]) +
+                            deform_input_vec[j + static_cast<int>(std::pow(2.0, rank - 2 - i - 1))] *
+                                (ONE - new_index_vec_ceil[i] + new_index_vec[i]);
+    }
+  }
+  edsl::Tensor deform_input = deform_input_vec[0];
   // Set up the new strides.
   std::vector<int> new_strides(F_shape.begin() + 2, F_shape.end());
   // Compute DeformableConvolution.
@@ -263,11 +277,11 @@ void registerDeformableConvolution() {
     // Validate the shape of offset.
     for (auto i = 0; i < rank - 2; ++i) {
       if (output_sizes[i] != OFF_shape[i + 2]) {
-        THROW_IE_EXCEPTION << "Incorrected shape for DeformableConvolution.";
+        THROW_IE_EXCEPTION << "Incorrect shape for DeformableConvolution.";
       }
     }
     if (OFF_shape[1] != (rank - 2) * DG * F_spatial_size) {
-      THROW_IE_EXCEPTION << "Incorrected shape for DeformableConvolution.";
+      THROW_IE_EXCEPTION << "Incorrect shape for DeformableConvolution.";
     }
     // Compute DeformableConvolution.
     edsl::Tensor O = compute_deformable_convolution(I, OFF, F, I_shape_cast, OFF_shape_cast, F_shape_cast, G, DG, rank,

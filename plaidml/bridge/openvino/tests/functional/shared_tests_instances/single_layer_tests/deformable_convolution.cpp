@@ -1,4 +1,4 @@
-// Copyright (C) 2019 Intel Corporation
+// Copyright (C) 2021 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 //
 
@@ -278,14 +278,11 @@ const auto conv3DParams_SameLower = ::testing::Combine(    //
 );
 
 INSTANTIATE_TEST_CASE_P(Convolution3D_ExplicitPadding, DeformableConvolutionLayerTest,
-                        ::testing::Combine(                      //
-                            conv3DParams_ExplicitPadding,        //
-                            ::testing::ValuesIn(netPrecisions),  //
-                            // There is a fault when shape of the tensor is more than
-                            // {1,1,4,4,4}, because after triple gather, the shape of
-                            // tensor is too big.
-                            ::testing::Values(std::vector<size_t>({1, 1, 3, 3, 3})),   //
-                            ::testing::Values(std::vector<size_t>({1, 24, 4, 4, 4})),  //
+                        ::testing::Combine(                                            //
+                            conv3DParams_ExplicitPadding,                              //
+                            ::testing::ValuesIn(netPrecisions),                        //
+                            ::testing::Values(std::vector<size_t>({1, 1, 5, 5, 5})),   //
+                            ::testing::Values(std::vector<size_t>({1, 24, 6, 6, 6})),  //
                             ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),       //
                         DeformableConvolutionLayerTest::getTestCaseName);
 
