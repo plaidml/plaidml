@@ -666,6 +666,56 @@ class TestEdsl(unittest.TestCase):
         ]
         self.checkProgram(program, [input], [expected])
 
+    def test_argsort_1d_dup(self):
+        I = Placeholder(plaidml.DType.FLOAT32, [20])
+        O = argsort(I, axis=0, direction=SortDirection.ASC)
+        program = Program('argsort_1d_dup', [I], [O])
+        input = np.array([
+            81.69,
+            81.69,
+            27.74,
+            43.69,
+            55.79,
+            56.79,
+            57.52,
+            7.11,
+            39.48,
+            5.9,
+            14.81,
+            66.23,
+            20.25,
+            66.05,
+            64.5,
+            71.07,
+            67.6,
+            54.42,
+            87.59,
+            80.02,
+        ])
+        expected = [
+            9,
+            7,
+            10,
+            12,
+            2,
+            8,
+            3,
+            17,
+            4,
+            5,
+            6,
+            14,
+            13,
+            11,
+            16,
+            15,
+            19,
+            0,
+            1,
+            18,
+        ]
+        self.checkProgram(program, [input], [expected])
+
     def test_argsort_2d_axis_0(self):
         I = Placeholder(plaidml.DType.FLOAT32, [5, 4])
         O = argsort(I, axis=0, direction=SortDirection.ASC)
