@@ -152,66 +152,63 @@ edsl::Tensor compute_deformable_convolution(edsl::Tensor I, edsl::Tensor OFF, ed
   }
   edsl::Tensor index = op::concatenate(index_vec, -1);  // The shape of index is {1, 1, NEW_DIM, rank-2}
   // Get deformed index.
-  edsl::Tensor new_index = offset + index;
+  edsl::Tensor deformed_index = offset + index;
   // Get deformed input tensor with gatherND and interplate method.
-  std::vector<edsl::Tensor> new_index_vec(rank - 2);
-  std::vector<edsl::Tensor> new_index_vec_ceil(rank - 2);
-  std::vector<edsl::Tensor> new_index_vec_floor(rank - 2);
-  // Set up the value of reshape to reshape the new_index_ceil and new_index_floor tensor.
-  std::vector<int> new_index_reshape_dims;
-  new_index_reshape_dims.push_back(N);
-  new_index_reshape_dims.push_back(CI);
-  new_index_reshape_dims.insert(new_index_reshape_dims.end(), NEW_DIM.begin(), NEW_DIM.end());
-  new_index_reshape_dims.push_back(1);
-  auto index_slice = op::slice(new_index).add_dim(0, N).add_dim(0, CI);
+  std::vector<edsl::Tensor> deformed_index_vec(rank - 2);
+  std::vector<edsl::Tensor> deformed_index_vec_ceil(rank - 2);
+  std::vector<edsl::Tensor> deformed_index_vec_floor(rank - 2);
+  // Set up the value of reshape to reshape the deformed_index_ceil tensor and deformed_index_floor tensor.
+  std::vector<int> deformed_index_reshape_dims;
+  deformed_index_reshape_dims.push_back(N);
+  deformed_index_reshape_dims.push_back(CI);
+  deformed_index_reshape_dims.insert(deformed_index_reshape_dims.end(), NEW_DIM.begin(), NEW_DIM.end());
+  deformed_index_reshape_dims.push_back(1);
+  auto deformed_index_slice = op::slice(deformed_index).add_dim(0, N).add_dim(0, CI);
   for (auto i = 0; i < rank - 2; ++i) {
-    index_slice = op::slice(index_slice).add_dim(0, NEW_DIM[i]);
+    deformed_index_slice = op::slice(deformed_index_slice).add_dim(0, NEW_DIM[i]);
   }
   for (auto i = 0; i < rank - 2; ++i) {
-    new_index_vec[i] = op::slice(index_slice).add_dim(i);
-    new_index_vec_ceil[i] = edsl::ceil(new_index_vec[i]);
-    new_index_vec_floor[i] = edsl::floor(new_index_vec[i]);
-    new_index_vec_ceil[i] = op::reshape(new_index_vec_ceil[i], make_tuple<int>(new_index_reshape_dims));
-    new_index_vec_floor[i] = op::reshape(new_index_vec_floor[i], make_tuple<int>(new_index_reshape_dims));
+    deformed_index_vec[i] = op::slice(deformed_index_slice).add_dim(i);
+    deformed_index_vec_ceil[i] = edsl::ceil(deformed_index_vec[i]);
+    deformed_index_vec_floor[i] = edsl::floor(deformed_index_vec[i]);
+    deformed_index_vec_ceil[i] = op::reshape(deformed_index_vec_ceil[i], make_tuple<int>(deformed_index_reshape_dims));
+    deformed_index_vec_floor[i] =
+        op::reshape(deformed_index_vec_floor[i], make_tuple<int>(deformed_index_reshape_dims));
   }
   // Coord_num is the number of tensor required for multi-linear interpolation.
   int coord_num = static_cast<int>(std::pow(2.0, rank - 2));
-  std::vector<edsl::Tensor> new_index_coord_vec(coord_num);
-  std::vector<edsl::Tensor> deform_input_vec(coord_num);
+  std::vector<edsl::Tensor> deformed_index_coord_vec(coord_num);
+  std::vector<edsl::Tensor> deformed_input_vec(coord_num);
   for (auto i = 0; i < coord_num; ++i) {
     std::vector<edsl::Tensor> concat_vec(rank - 2);
     for (auto j = 0; j < rank - 2; ++j) {
       int flag = (i / static_cast<int>(std::pow(2.0, rank - 2 - j - 1))) % 2;
-      if (flag == 0) {
-        concat_vec[j] = new_index_vec_floor[j];
-      } else {
-        concat_vec[j] = new_index_vec_ceil[j];
-      }
+      concat_vec[j] = (flag == 0) ? deformed_index_vec_floor[j] : deformed_index_vec_ceil[j];
     }
-    new_index_coord_vec[i] = op::concatenate(concat_vec, rank);
-    new_index_coord_vec[i] = edsl::cast(new_index_coord_vec[i], DType::INT32);
-    deform_input_vec[i] = edsl::gather(I, new_index_coord_vec[i]).mode(edsl::GatherMode::ND).batchDims(2);
+    deformed_index_coord_vec[i] = op::concatenate(concat_vec, rank);
+    deformed_index_coord_vec[i] = edsl::cast(deformed_index_coord_vec[i], DType::INT32);
+    deformed_input_vec[i] = edsl::gather(I, deformed_index_coord_vec[i]).mode(edsl::GatherMode::ND).batchDims(2);
   }
-  // Change the shape of new_index_ceil tensor and new_index_floor tensor to original shape.
-  new_index_reshape_dims.erase(new_index_reshape_dims.end() - 1);
+  // Change the shape of deformed_index_ceil tensor and deformed_index_floor tensor to original shape.
+  deformed_index_reshape_dims.erase(deformed_index_reshape_dims.end() - 1);
   for (auto i = 0; i < rank - 2; ++i) {
-    new_index_vec_ceil[i] = op::reshape(new_index_vec_ceil[i], make_tuple<int>(new_index_reshape_dims));
-    new_index_vec_floor[i] = op::reshape(new_index_vec_floor[i], make_tuple<int>(new_index_reshape_dims));
+    deformed_index_vec_ceil[i] = op::reshape(deformed_index_vec_ceil[i], make_tuple<int>(deformed_index_reshape_dims));
+    deformed_index_vec_floor[i] =
+        op::reshape(deformed_index_vec_floor[i], make_tuple<int>(deformed_index_reshape_dims));
   }
   // Get deformed input tensor with multi-linear interpolation.
-  auto ONE = cast(Tensor{1.0}, DType::FLOAT32);
   for (auto i = 0; i < rank - 2; ++i) {
     for (auto j = 0; j < static_cast<int>(std::pow(2.0, rank - 2 - i - 1)); ++j) {
-      deform_input_vec[j] = deform_input_vec[j] * (new_index_vec_ceil[i] - new_index_vec[i]) +
-                            deform_input_vec[j + static_cast<int>(std::pow(2.0, rank - 2 - i - 1))] *
-                                (ONE - new_index_vec_ceil[i] + new_index_vec[i]);
+      deformed_input_vec[j] = deformed_input_vec[j] * (deformed_index_vec_ceil[i] - deformed_index_vec[i]) +
+                              deformed_input_vec[j + static_cast<int>(std::pow(2.0, rank - 2 - i - 1))] *
+                                  (1.0 - deformed_index_vec_ceil[i] + deformed_index_vec[i]);
     }
   }
-  edsl::Tensor deform_input = deform_input_vec[0];
+  edsl::Tensor deformed_input = deformed_input_vec[0];
   // Set up the new strides.
   std::vector<int> new_strides(F_shape.begin() + 2, F_shape.end());
   // Compute DeformableConvolution.
-  edsl::Tensor result = op::convolution(deform_input, F)
+  edsl::Tensor result = op::convolution(deformed_input, F)
                             .strides(new_strides)
                             .autopad_mode(plaidml::op::AutoPadMode::VALID)
                             .input_layout(plaidml::op::TensorLayout::NCX)
