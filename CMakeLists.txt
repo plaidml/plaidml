@@ -43,6 +43,7 @@ option(PML_BUILD_TESTS "Builds PML unit tests." ON)
 option(PML_OPENVINO_BRIDGE "Enable the OpenVINO plugin" ON)
 option(PML_ENABLE_OPENCL "Enable OpenCL support" ON)
 option(PML_ENABLE_VULKAN "Enable Vulkan support" ON)
+option(PML_BUILD_BENCHMARK_APP "Build the OpenVINO benchmark_app package" OFF)
 
 list(APPEND CMAKE_MODULE_PATH
   ${CMAKE_CURRENT_LIST_DIR}/cmake
@@ -132,8 +133,8 @@ configure_lit_site_cfg(
   ${CMAKE_CURRENT_SOURCE_DIR}/lit.cfg.py
 )
 
-if(BUILD_PLAIDML_DEVKIT)
-  include(pml_packaging)
-else()
+if(PML_BUILD_BENCHMARK_APP)
   ie_cpack(BENCHMARK_APP)
+else()
+  include(devkit)
 endif()

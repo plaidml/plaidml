@@ -13,17 +13,13 @@
 #include <random>
 
 #include "half.hpp"
-#include "llvm/ADT/StringRef.h"
 
 #include "plaidml/edsl/edsl.h"
 #include "plaidml/exec/exec.h"
 #include "plaidml/op/op.h"
 #include "plaidml/testenv.h"
-#include "pmlc/util/env.h"
-#include "pmlc/util/logging.h"
 
 using half_float::half;
-using llvm::StringRef;
 using ::testing::AnyOf;
 using ::testing::ContainerEq;
 using ::testing::Eq;

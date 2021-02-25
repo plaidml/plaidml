@@ -77,7 +77,7 @@ if(PML_BUILD_TESTS)
   add_subdirectory(tests/functional)
 endif()
 
-if(NOT BUILD_PLAIDML_DEVKIT)
+if(PML_BUILD_BENCHMARK_APP)
   ie_cpack_add_component(BENCHMARK_APP REQUIRED)
 
   install(
