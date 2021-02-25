@@ -75,5 +75,3 @@ install(
   DESTINATION "src"
   COMPONENT devkit
 )
-
-# TODO: Install any other source code, README, etc

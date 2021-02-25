@@ -35,6 +35,15 @@ steps:
 
       echo --- :hammer_and_wrench: ninja check-test
       ninja -C build-opt check-test
+
+      echo --- :hammer_and_wrench: devkit packaging
+      ninja -C build-opt package
+      cmake build-opt/_CPack_Packages/Linux/TGZ/PlaidML-1.0.0-Linux/devkit \
+        -B build-opt/_CPack_Packages/Linux/TGZ/PlaidML-1.0.0-Linux/devkit/build-opt \
+        -G Ninja
+      ninja -C build-opt/_CPack_Packages/Linux/TGZ/PlaidML-1.0.0-Linux/devkit/build-opt
+      ./build-opt/_CPack_Packages/Linux/TGZ/PlaidML-1.0.0-Linux/devkit/build-opt/edsl_test
+
     key: linux_x86_64_cmake
     agents:
       PLATFORM: linux_x86_64
