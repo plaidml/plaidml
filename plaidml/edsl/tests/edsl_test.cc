@@ -2062,6 +2062,32 @@ TEST_F(CppEdsl, LoopMultiIter) {
   checkExact(program, {input1, input2}, {expected1});
 }
 
+/// this case got wrong result. if we switch T and O in return, then it correct.
+//TEST_F(CppEdsl, LoopMultiReturn) {
+//  auto A = Placeholder(DType::FLOAT32, {4});
+//  auto B = Placeholder(DType::FLOAT32, {4});
+//  auto loopBody = [&](Tensor index) -> TensorVec {
+//    auto T = B + 2;
+//    auto O = A + 1;
+//    return {T, O};
+//  };
+//  TensorVec output = Loop(2).setLoopBody(loopBody).setIter({A, B});
+//  auto program = makeProgram("loop", {A, B}, output);
+//  std::vector<float> input1 = {
+//      1, 1, 1, 1  //
+//  };
+//  std::vector<float> input2 = {
+//      1, 1, 1, 1  //
+//  };
+//  std::vector<float> expected1 = {
+//      4, 4, 4, 4  //
+//  };
+//  std::vector<float> expected2 = {
+//      4, 4, 4, 4  //
+//  };
+//  checkExact(program, {input1, input2}, {expected1, expected2});
+//}
+
 TEST_F(CppEdsl, LoopWithBeforeOp) {
   auto A = Placeholder(DType::FLOAT32, {4});
   auto B = Placeholder(DType::FLOAT32, {4});
