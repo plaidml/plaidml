@@ -790,8 +790,8 @@ struct ProgramBuilder {
     for (const ExprNodePtr &result : results) {
       resultArgs.push_back(builder.lookupNode(result));
     }
-    DenseSet<Value> resultArgSet;
-    resultArgSet.insert(resultArgs.begin(), resultArgs.end());
+    SmallVector<Value> resultArgSet;
+    resultArgSet.insert(resultArgSet.begin(), resultArgs.begin(), resultArgs.end());
 
     AstTraversal traversal(results);
     auto scfForOp = builder.create<mlir::scf::ForOp>(
@@ -823,7 +823,7 @@ struct ProgramBuilder {
     }
 
     llvm::SetVector<Operation *> toRemove;
-    SmallVector<Value, 4> yieldValues;
+    SmallVector<Value, 4> yieldValues(resultArgSet.size());
     for (const ExprNodePtr &node : traversal.getFlat()) {
       Value value = builder.lookupNode(node);
       // skip init value.
@@ -836,8 +836,11 @@ struct ProgramBuilder {
         continue;
       }
       Operation *clonedOp = bodyBuilder.clone(*op, mapper);
-      if (resultArgSet.count(value)) {
-        yieldValues.push_back(clonedOp->getResult(0));
+      auto iterResult = std::find(resultArgSet.begin(), resultArgSet.end(), value);
+      if (iterResult != resultArgSet.end()) {
+        auto opResultOrder = value.dyn_cast<OpResult>().getResultNumber();
+        auto yieldValueOrder = std::distance(resultArgSet.begin(), iterResult);
+        yieldValues[yieldValueOrder] = clonedOp->getResult(opResultOrder);
       }
       toRemove.insert(op);
     }
