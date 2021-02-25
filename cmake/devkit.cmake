@@ -63,6 +63,7 @@ install(
 install(
   FILES
     "${PROJECT_SOURCE_DIR}/devkit/CMakeLists.txt"
+    "${PROJECT_SOURCE_DIR}/devkit/README.txt"
   DESTINATION "."
   COMPONENT devkit
 )
