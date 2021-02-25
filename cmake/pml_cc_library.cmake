@@ -116,12 +116,10 @@ function(pml_cc_library)
     target_include_directories(${_NAME} SYSTEM
       PUBLIC
         "$<BUILD_INTERFACE:${PML_COMMON_INCLUDE_DIRS}>"
-        "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
     )
     target_include_directories(${_NAME}
       PUBLIC
         "$<BUILD_INTERFACE:${_RULE_INCLUDES}>"
-        "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
     )
     target_compile_options(${_NAME}
       PRIVATE
@@ -170,7 +168,6 @@ function(pml_cc_library)
     target_include_directories(${_NAME} SYSTEM
       INTERFACE
         "$<BUILD_INTERFACE:${PML_COMMON_INCLUDE_DIRS}>"
-        "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
     )
     target_compile_options(${_NAME}
       INTERFACE
@@ -205,23 +202,14 @@ function(pml_cc_library)
     add_library(${_PACKAGE_NS} ALIAS ${_NAME})
   endif()
 
-  get_property(INSTALL_TARGETS GLOBAL PROPERTY install_targets_property)
-  if(TARGET ${_NAME} AND NOT ${_NAME} MATCHES ".*openvino.*" AND NOT ${_NAME} IN_LIST INSTALL_TARGETS)
-
-    list(APPEND INSTALL_TARGETS "${_NAME}")
-
-    # Install header files
-    string(REPLACE ${CMAKE_SOURCE_DIR} "" HDR_INSTALL_DIR ${CMAKE_CURRENT_SOURCE_DIR})
-    foreach(HEADER ${_RULE_HDRS})
-      if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${HEADER})
-        install(FILES ${HEADER}
-                DESTINATION "include${HDR_INSTALL_DIR}"
-                COMPONENT devkit)
-      endif()
-    endforeach()
-
-    set_property(GLOBAL PROPERTY install_targets_property "${INSTALL_TARGETS}")
-
-  endif()
+  # Install header files
+  string(REPLACE ${CMAKE_SOURCE_DIR} "" HDR_INSTALL_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+  foreach(HEADER ${_RULE_HDRS})
+    if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${HEADER})
+      install(FILES ${HEADER}
+              DESTINATION "include${HDR_INSTALL_DIR}"
+              COMPONENT devkit)
+    endif()
+  endforeach()
 
 endfunction()

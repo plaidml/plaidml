@@ -22,28 +22,42 @@ install(TARGETS plaidml_plaidml
 get_target_property(OMP_INC_DIRS omp INTERFACE_INCLUDE_DIRECTORIES)
 set_target_properties(omp PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "$<BUILD_INTERFACE:${OMP_INC_DIRS}>;$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
 
-include(CMakePackageConfigHelpers)
+include(CMakePackageConfigHelpers) 
 write_basic_package_version_file("${PROJECT_NAME}ConfigVersion.cmake"
                                  VERSION ${CPACK_PACKAGE_VERSION}
                                  COMPATIBILITY SameMajorVersion)
 
-configure_package_config_file(
-  "${PROJECT_SOURCE_DIR}/cmake/pml_config.cmake.in"
-  "${PROJECT_BINARY_DIR}/${PROJECT_NAME}Config.cmake"
-  INSTALL_DESTINATION
-  ${CMAKE_INSTALL_DATAROOTDIR}/${PROJECT_NAME}/cmake)
-
 install(EXPORT ${PROJECT_NAME}_Targets
         FILE ${PROJECT_NAME}Targets.cmake
         NAMESPACE ${PROJECT_NAME}::
-        DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/${PROJECT_NAME}/cmake
+        DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/cmake
         COMPONENT devkit)
+
+configure_package_config_file(
+        "${PROJECT_SOURCE_DIR}/cmake/packaging/pml_config.cmake.in"
+        "${PROJECT_BINARY_DIR}/${PROJECT_NAME}Config.cmake"
+        INSTALL_DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/cmake)
 
 install(FILES "${PROJECT_BINARY_DIR}/${PROJECT_NAME}Config.cmake"
               "${PROJECT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
         DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/cmake
         COMPONENT devkit)
 
-# TODO: Install any desired standalone executables or source code for reference
+install(FILES "${PROJECT_SOURCE_DIR}/cmake/third_party/CPM.cmake"
+              "${PROJECT_SOURCE_DIR}/cmake/third_party/easylogging.cmake"
+              "${PROJECT_SOURCE_DIR}/cmake/third_party/gflags.cmake"
+              "${PROJECT_SOURCE_DIR}/cmake/third_party/googletest.cmake"
+              "${PROJECT_SOURCE_DIR}/cmake/third_party/half.cmake"
+              "${PROJECT_SOURCE_DIR}/cmake/third_party/llvm-project.cmake"
+        DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/cmake/third_party
+        COMPONENT devkit)
+
+install(FILES "${PROJECT_SOURCE_DIR}/cmake/packaging/CMakeLists.txt"
+              "${PROJECT_SOURCE_DIR}/plaidml/edsl/tests/edsl_test.cc"
+              "${PROJECT_SOURCE_DIR}/pmlc/testing/gtest_main.cc"
+        DESTINATION example_project
+        COMPONENT devkit)
+
+# TODO: Install any other source code, README, etc
 
 include(CPack)
