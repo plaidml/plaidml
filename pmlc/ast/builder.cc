@@ -687,9 +687,9 @@ struct ProgramBuilder {
     for (const ExprNodePtr &operand : node->operands) {
       operands.push_back(builder.lookupNode(operand));
     }
-    llvm::SetVector<Value> results;
+    llvm::SmallVector<Value> results;
     for (const ExprNodePtr &result : node->results) {
-      results.insert(builder.lookupNode(result));
+      results.push_back(builder.lookupNode(result));
     }
     llvm::SmallVector<Type, 4> resultTypes;
     for (Value val : results) {
