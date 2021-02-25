@@ -1020,43 +1020,8 @@ struct ArgSortOpConversion : public OpConversionPattern<tile::ArgSortOp> {
       minVal = rewriter.create<LoadOp>(loc, minValVar, zeroIndex).getResult();
       // Is compVal smaller than minVal? If so, update the allocs
       Value orderPred;
-      if (elementType.isa<FloatType>()) {
-        CmpFPredicate dir{};
-        switch (op.direction()) {
-        case tile::SortDirection::asc:
-          dir = CmpFPredicate::OLT;
-          break;
-        case tile::SortDirection::desc:
-          dir = CmpFPredicate::OGT;
-          break;
-        }
-        orderPred = rewriter.create<mlir::CmpFOp>(loc, dir, compVal, minVal)
-                        .getResult();
-      } else if (elementType.isSignedInteger()) {
-        CmpIPredicate dir{};
-        switch (op.direction()) {
-        case tile::SortDirection::asc:
-          dir = CmpIPredicate::slt;
-          break;
-        case tile::SortDirection::desc:
-          dir = CmpIPredicate::sgt;
-          break;
-        }
-        orderPred = rewriter.create<mlir::CmpIOp>(loc, dir, compVal, minVal)
-                        .getResult();
-      } else {
-        CmpIPredicate dir{};
-        switch (op.direction()) {
-        case tile::SortDirection::asc:
-          dir = CmpIPredicate::ult;
-          break;
-        case tile::SortDirection::desc:
-          dir = CmpIPredicate::ugt;
-          break;
-        }
-        orderPred = rewriter.create<mlir::CmpIOp>(loc, dir, compVal, minVal)
-                        .getResult();
-      }
+      orderPred = convertCmpOp(loc, rewriter, compVal, minVal, elementType,
+                               op.direction());
 
       auto ifReorder = rewriter.create<scf::IfOp>(loc, orderPred, false);
       rewriter.setInsertionPointToStart(&ifReorder.thenRegion().front());
@@ -1075,7 +1040,7 @@ struct ArgSortOpConversion : public OpConversionPattern<tile::ArgSortOp> {
       ops[axis] = finalMinPos;
       auto finalMinIdx = rewriter.create<LoadOp>(loc, result, ops).getResult();
 
-      // Move every elements between [sortIV,finalMinPos) a step forward
+      // Move every element between [sortIV,finalMinPos) a step forward
       // and then move the minimum index to the head to keep it stable.
       auto moveLoop =
           rewriter.create<scf::ForOp>(loc, sortIV, finalMinPos, icon1);
@@ -1119,6 +1084,46 @@ struct ArgSortOpConversion : public OpConversionPattern<tile::ArgSortOp> {
     rewriter.create<layer::ReturnOp>(loc, ArrayRef<Value>{result});
     rewriter.replaceOp(op, layerOp.getResult(0));
     return success();
+  }
+
+  Value convertCmpOp(Location loc, ConversionPatternRewriter &rewriter,
+                     Value compVal, Value minVal, Type type,
+                     tile::SortDirection dir) const {
+    if (type.isa<FloatType>()) {
+      CmpFPredicate pred;
+      switch (dir) {
+      case tile::SortDirection::asc:
+        pred = CmpFPredicate::OLT;
+        break;
+      case tile::SortDirection::desc:
+        pred = CmpFPredicate::OGT;
+        break;
+      }
+      return rewriter.create<mlir::CmpFOp>(loc, pred, compVal, minVal)
+          .getResult();
+    }
+    CmpIPredicate pred;
+    if (type.isSignedInteger()) {
+      switch (dir) {
+      case tile::SortDirection::asc:
+        pred = CmpIPredicate::slt;
+        break;
+      case tile::SortDirection::desc:
+        pred = CmpIPredicate::sgt;
+        break;
+      }
+    } else {
+      switch (dir) {
+      case tile::SortDirection::asc:
+        pred = CmpIPredicate::ult;
+        break;
+      case tile::SortDirection::desc:
+        pred = CmpIPredicate::ugt;
+        break;
+      }
+    }
+    return rewriter.create<mlir::CmpIOp>(loc, pred, compVal, minVal)
+        .getResult();
   }
 };
 

@@ -2243,6 +2243,69 @@ TEST_F(CppEdsl, ArgSort1d) {
   // clang-format on
 }
 
+TEST_F(CppEdsl, ArgSort1dInt) {
+  auto I = Placeholder(DType::INT32, {20});
+  auto O = argsort(I, /*axis=*/0);
+  auto program = makeProgram("argsort", {I}, {O});
+  std::vector<int32_t> input = {
+      81, 95, 27, 43, 55, 56, 57, 5,  39, 7,   //
+      14, 67, 20, 66, 64, 71, 68, 54, 87, 80,  //
+  };
+  // indexed:
+  //    0: 81,  1: 95,  2: 27,  3: 43,  4: 55
+  //    5: 56,  6: 57,  7:  5,  8: 39,  9:  7
+  //   10: 14, 11: 67, 12: 20, 13: 66, 14: 64
+  //   15: 71, 16: 68, 17: 54, 18: 87, 19: 80
+  // sorted:
+  //    7:  5,  9:  7, 10: 14, 12: 20,  2: 27
+  //    8: 39,  3: 43, 17: 54,  4: 55,  5: 56
+  //    6: 57, 14: 64, 13: 66, 11: 67, 16: 68
+  //   15: 71, 19: 80,  0: 81, 18: 87,  1: 95
+  std::vector<int32_t> output = {
+      7, 9, 10, 12, 2, 8, 3, 17, 4, 5, 6, 14, 13, 11, 16, 15, 19, 0, 18, 1,  //
+  };
+  checkExact(program, {input}, {output});
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.ArgSort1dInt
+  // CHECK: module @argsort
+  // CHECK: func @main(%[[ARG0:.*]]: tensor<20xsi32>) -> tensor<20xsi32>
+  // CHECK: %[[X0:.*]] = tile.argsort asc %[[ARG0]][0] : (tensor<20xsi32>) -> tensor<20xsi32>
+  // CHECK: return %[[X0]] : tensor<20xsi32>
+  // clang-format on
+}
+
+TEST_F(CppEdsl, ArgSort1dDup) {
+  auto I = Placeholder(DType::FLOAT32, {20});
+  auto O = argsort(I, /*axis=*/0);
+  auto program = makeProgram("argsort", {I}, {O});
+  // Duplicate element 81.69 at position 0 and 1.
+  std::vector<float> input = {
+      81.69, 81.69, 27.74, 43.69, 55.79, 56.79, 57.52, 7.11,  39.48, 5.9,    //
+      14.81, 66.23, 20.25, 66.05, 64.5,  71.07, 67.6,  54.42, 87.59, 80.02,  //
+  };
+  // indexed:
+  //    0: 81.69,  1: 81.69,  2: 27.74,  3: 43.69,  4: 55.79
+  //    5: 56.79,  6: 57.52,  7: 7.11,   8: 39.48,  9:  5.9
+  //   10: 14.81, 11: 66.23, 12: 20.25, 13: 66.05, 14: 64.5
+  //   15: 71.07, 16: 67.6,  17: 54.42, 18: 87.59, 19: 80.02
+  // sorted:
+  //    9:  5.9,   7:  7.11, 10: 14.81, 12: 20.25,  2: 27.74
+  //    8: 39.48,  3: 43.69, 17: 54.42,  4: 55.79,  5: 56.79
+  //    6: 57.52, 14: 64.5,  13: 66.05, 11: 66.23, 16: 67.6
+  //   15: 71.07, 19: 80.02,  0: 81.69,  1: 81.69, 18: 87.59
+  std::vector<int32_t> output = {
+      9, 7, 10, 12, 2, 8, 3, 17, 4, 5, 6, 14, 13, 11, 16, 15, 19, 0, 1, 18  //
+  };
+  checkExact(program, {input}, {output});
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.ArgSort1dDup
+  // CHECK: module @argsort
+  // CHECK: func @main(%[[ARG0:.*]]: tensor<20xf32>) -> tensor<20xsi32>
+  // CHECK: %[[X0:.*]] = tile.argsort asc %[[ARG0]][0] : (tensor<20xf32>) -> tensor<20xsi32>
+  // CHECK: return %[[X0]] : tensor<20xsi32>
+  // clang-format on
+}
+
 TEST_F(CppEdsl, ArgSort2dAxis0) {
   auto I = Placeholder(DType::FLOAT32, {5, 4});
   auto O = argsort(I, /*axis=*/0);
@@ -2280,38 +2343,6 @@ TEST_F(CppEdsl, ArgSort2dAxis0) {
   // CHECK: func @main(%[[ARG0:.*]]: tensor<5x4xf32>) -> tensor<5x4xsi32>
   // CHECK:  %[[X0:.*]] = tile.argsort asc %[[ARG0]][0] : (tensor<5x4xf32>) -> tensor<5x4xsi32>
   // CHECK:  return %[[X0]] : tensor<5x4xsi32>
-  // clang-format on
-}
-
-TEST_F(CppEdsl, ArgSort1dDup) {
-  auto I = Placeholder(DType::FLOAT32, {20});
-  auto O = argsort(I, /*axis=*/0);
-  auto program = makeProgram("argsort", {I}, {O});
-  // Duplicate element 81.69 at position 0 and 1.
-  std::vector<float> input = {
-      81.69, 81.69, 27.74, 43.69, 55.79, 56.79, 57.52, 7.11,  39.48, 5.9,    //
-      14.81, 66.23, 20.25, 66.05, 64.5,  71.07, 67.6,  54.42, 87.59, 80.02,  //
-  };
-  // indexed:
-  //    0: 81.69,  1: 81.69,  2: 27.74,  3: 43.69,  4: 55.79
-  //    5: 56.79,  6: 57.52,  7: 7.11,   8: 39.48,  9:  5.9
-  //   10: 14.81, 11: 66.23, 12: 20.25, 13: 66.05, 14: 64.5
-  //   15: 71.07, 16: 67.6,  17: 54.42, 18: 87.59, 19: 80.02
-  // sorted:
-  //    9:  5.9,   7:  7.11, 10: 14.81, 12: 20.25,  2: 27.74
-  //    8: 39.48,  3: 43.69, 17: 54.42,  4: 55.79,  5: 56.79
-  //    6: 57.52, 14: 64.5,  13: 66.05, 11: 66.23, 16: 67.6
-  //   15: 71.07, 19: 80.02,  0: 81.69,  1: 81.69, 18: 87.59
-  std::vector<int32_t> output = {
-      9, 7, 10, 12, 2, 8, 3, 17, 4, 5, 6, 14, 13, 11, 16, 15, 19, 0, 1, 18  //
-  };
-  checkExact(program, {input}, {output});
-  // clang-format off
-  // CHECK-LABEL: CppEdsl.ArgSort1dDup
-  // CHECK: module @argsort
-  // CHECK: func @main(%[[ARG0:.*]]: tensor<20xf32>) -> tensor<20xsi32>
-  // CHECK: %[[X0:.*]] = tile.argsort asc %[[ARG0]][0] : (tensor<20xf32>) -> tensor<20xsi32>
-  // CHECK: return %[[X0]] : tensor<20xsi32>
   // clang-format on
 }
 
