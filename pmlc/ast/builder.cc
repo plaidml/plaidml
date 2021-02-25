@@ -723,11 +723,11 @@ struct ProgramBuilder {
 
       auto itLayerResults = std::find(results.begin(), results.end(), value);
       if (itLayerResults != results.end()) {
-        auto opResults = op->getResults();
-        auto itOpResults = std::find(opResults.begin(), opResults.end(), value);
-        size_t idxOpResults = std::distance(opResults.begin(), itOpResults);
-        size_t idxLayerResults = std::distance(results.begin(), itLayerResults);
-        innerResults[idxLayerResults] = clonedOp->getResult(idxOpResults);
+        if (auto opResultVal = value.cast<OpResult>()) {
+          auto idxLayerResults = std::distance(results.begin(), itLayerResults);
+          innerResults[idxLayerResults] =
+              clonedOp->getResult(opResultVal.getResultNumber());
+        }
       }
       toRemove.insert(op);
     }
