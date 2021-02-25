@@ -18,7 +18,7 @@ include("${PLAIDML_INSTALL_DIR}/share/cmake/third_party/half.cmake")
 # TODO: Remove LLVM dep for edsl_test
 include("${PLAIDML_INSTALL_DIR}/share/cmake/third_party/llvm-project.cmake")
 
-add_executable(edsl_test ${PLAIDML_INSTALL_DIR}/example_project/gtest_main.cc)
+add_executable(edsl_test ${PLAIDML_INSTALL_DIR}/example_project/gtest_runner.cc)
 target_link_libraries(edsl_test PlaidML::plaidml_plaidml
                                 gflags
                                 gtest

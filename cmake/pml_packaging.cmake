@@ -43,9 +43,7 @@ install(FILES "${PROJECT_BINARY_DIR}/${PROJECT_NAME}Config.cmake"
         DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/cmake
         COMPONENT devkit)
 
-install(FILES "${PROJECT_SOURCE_DIR}/cmake/third_party/CPM.cmake"
-              "${PROJECT_SOURCE_DIR}/cmake/third_party/easylogging.cmake"
-              "${PROJECT_SOURCE_DIR}/cmake/third_party/gflags.cmake"
+install(FILES "${PROJECT_SOURCE_DIR}/cmake/third_party/gflags.cmake"
               "${PROJECT_SOURCE_DIR}/cmake/third_party/googletest.cmake"
               "${PROJECT_SOURCE_DIR}/cmake/third_party/half.cmake"
               "${PROJECT_SOURCE_DIR}/cmake/third_party/llvm-project.cmake"
@@ -54,7 +52,7 @@ install(FILES "${PROJECT_SOURCE_DIR}/cmake/third_party/CPM.cmake"
 
 install(FILES "${PROJECT_SOURCE_DIR}/cmake/packaging/CMakeLists.txt"
               "${PROJECT_SOURCE_DIR}/plaidml/edsl/tests/edsl_test.cc"
-              "${PROJECT_SOURCE_DIR}/pmlc/testing/gtest_main.cc"
+              "${PROJECT_SOURCE_DIR}/cmake/packaging/gtest_runner.cc"
         DESTINATION example_project
         COMPONENT devkit)
 
