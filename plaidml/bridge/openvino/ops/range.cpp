@@ -19,6 +19,10 @@ void registerRange() {
   registerOp("Range", [](const Context& ctx) {
     auto* layer = dynamic_cast<ngraph::opset1::Range*>(ctx.layer);
     auto type = to_plaidml(layer->get_element_type());
+    if (type != plaidml::DType::INT64) {
+      // TODO: Expand type support by casting `range_data` based on `type`
+      THROW_IE_EXCEPTION << "PlaidML plugin currenlty only supports i64 for Range op";
+    }
     auto start = cast_constant_operand<int64_t>(0, layer)[0];
     auto stop = cast_constant_operand<int64_t>(1, layer)[0];
     auto step = cast_constant_operand<int64_t>(2, layer)[0];
