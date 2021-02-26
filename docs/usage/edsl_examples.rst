@@ -73,21 +73,22 @@ by ``0``.
 
   \color{red}O[i]
   \color{default}=
-  \color{green}\max_{\color{magenta}0 \leq j < 2}
+  \color{green}\max_{\color{yellowgreen}0 \leq j < 2}
   \color{blue}I[2i + j]
 
-.. math::
 
-  \begin{aligned}
-  &
-  \color{red}\verb|O(i)|
-  \color{green}\verb| >= |
-  \color{blue}\verb|I(2 * i + j)|\color{default}\verb|;|
-  \cr
-  &
-  \color{default}\verb|O.add_constraint(|
-  \color{magenta}\verb|j < 2|\color{default}\verb|);|
-  \end{aligned}
+.. math::
+  
+    \begin{aligned}
+    \verb!Contraction()!
+    &\verb!.outShape(N / 2)!\\
+    &\color{red}\verb!.outAccess(i)!\\
+    &\color{green}\verb!.max(!\\
+    &\color{blue}\; \; \; \;\verb!  I(2 * i + j)!\\
+    &\color{green}\; \; \; \; \; \; \; \; \verb!)!\\
+    &\color{yellowgreen}\verb!.add_constraint(j < 2)!
+    \end{aligned}
+
 
 Why do we need this constraint in the first place? Let's prove that a
 counterexample without a constraint would be incorrect:
@@ -211,9 +212,20 @@ depthwise, etc. For this example, we will implement a dilated 2D convolution
 with dilation rate (2, 3). Specfically, we'll implement the Keras backend
 function:
 
-.. code-block:: python
+.. tabs::
+  
+  .. group-tab:: TensorFlow
 
-  K.conv2d(x, kernel, padding='valid', dilation_rate=(2, 3))
+    .. code-block:: python
+
+      O = tf.keras.layers.Conv2D(padding='valid', dilation_rate=(2, 3), input_shape)(I)
+      
+  .. group-tab:: PyTorch
+
+    .. code-block:: python
+    
+      O = torch.nn.conv2d(in_channels, out_channels,kernel_size, dilation_rate=(2, 3))(I)
+
 
 
 The formula for this is very similar to the previous convolution; we just have
@@ -474,6 +486,7 @@ We can represent the matrix operation involved as:
 
 This can easily be written in eDSL as follows. 
 
+
 .. math::
 
     \begin{aligned}
@@ -503,6 +516,10 @@ This can easily be written in eDSL as follows.
     {\color{blue}\verb!  C!}\\
     \end{aligned}
 
+Where the contraction :math:`{\color{green}\verb!sum(...)!}`
+handles the vector multiplication :math:`\color{blue}A \color{orange}* \color{blue}B`, the element wise operation 
+:math:`{\color{magenta}\verb!+!}` handles the vector addition :math:`\color{green}(...)\color{magenta}+ \color{blue}C`.
+The constant-vector multiplication is handled by an element wise :math:`{\color{magenta}\verb!*!}` operator. 
 
 .. tabs::
 
@@ -537,7 +554,7 @@ The expected output is a quantized int8 tensor. This is accomplished using a sim
     \color{magenta} \: * \:
     \color{default} 128 
 
-Which looks exactly the same in eDSL. :math:`\color{magenta}\verb! /!` and :math:`\color{magenta}\verb! *!` are element wise operations.
+Which looks exactly the same in eDSL, :math:`\color{magenta}\verb! /!` and :math:`\color{magenta}\verb! *!` are element wise operations.
 
 .. math::
 
