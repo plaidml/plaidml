@@ -6,7 +6,7 @@
 #include "plaidml_util.hpp"
 
 #include "ngraph/opsets/opset.hpp"
-#include "ngraph/opsets/opset1.hpp"
+#include "ngraph/opsets/opset4.hpp"
 
 #include "plaidml/op/op.h"
 
@@ -16,12 +16,12 @@ using namespace InferenceEngine;  // NOLINT[build/namespaces]
 namespace PlaidMLPlugin {
 
 void registerRange() {
-  registerOp("Range", [](const Context& ctx) {
-    auto* layer = dynamic_cast<ngraph::opset1::Range*>(ctx.layer);
+  registerOp("range", [](const Context& ctx) {
+    auto* layer = dynamic_cast<ngraph::opset4::Range*>(ctx.layer);
     auto type = to_plaidml(layer->get_element_type());
     if (type != plaidml::DType::INT64) {
       // TODO: Expand type support by casting `range_data` based on `type`
-      THROW_IE_EXCEPTION << "PlaidML plugin currenlty only supports i64 for Range op";
+      THROW_IE_EXCEPTION << "PlaidML plugin currently only supports i64 for Range op";
     }
     auto start = cast_constant_operand<int64_t>(0, layer)[0];
     auto stop = cast_constant_operand<int64_t>(1, layer)[0];
