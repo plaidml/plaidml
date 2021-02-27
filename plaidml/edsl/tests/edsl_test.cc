@@ -670,7 +670,7 @@ Tensor Flatten(Tensor X) {
     return X;
   }
   TensorDim product{1};
-  for (size_t i = 1; i < X_dims.size() - 1; i++) {
+  for (size_t i = 1; i < X_dims.size(); i++) {
     product = product * X_dims[i];
   }
   return reshape(X, {TensorDim{1}, product});
@@ -690,9 +690,9 @@ TEST_F(CppEdsl, MnistCnn) {
   auto pool1 = MaxPooling2(conv2);
   // model.add(Flatten())
   auto flat = Flatten(pool1);
-  EXPECT_THAT(flat.compute_shape(), Eq(TensorShape(DType::FLOAT32, {1, 12544})));
+  EXPECT_THAT(flat.compute_shape(), Eq(TensorShape(DType::FLOAT32, {1, 802816})));
   // model.add(Dense(128, activation='relu'))
-  auto kernel3 = Placeholder(DType::FLOAT32, {12544, 128});
+  auto kernel3 = Placeholder(DType::FLOAT32, {802816, 128});
   auto bias3 = Placeholder(DType::FLOAT32, {128});
   auto dense1 = Relu(Dot(flat, kernel3) + bias3);
   const int64_t kNumClasses = 100;
@@ -716,8 +716,8 @@ TEST_F(CppEdsl, MnistCnn) {
   // CHECK: tile.cmp_lt %{{.*}}, %[[cst]] : (tensor<1x224x224x64xf32>, tensor<f32>) -> tensor<1x224x224x64xi1>
   // CHECK: tile.select %{{.*}}, %[[cst]], %{{.*}} : (tensor<1x224x224x64xi1>, tensor<f32>, tensor<1x224x224x64xf32>) -> tensor<1x224x224x64xf32>
   // CHECK: tile.contract max, none, %[[cst_0]], %{{.*}} {cons = #set{{[0-9]*}}, sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}]} : tensor<f32>, tensor<1x224x224x64xf32> -> tensor<1x112x112x64xf32>
-  // CHECK: tile.reshape %{{.*}} : (tensor<1x112x112x64xf32>) -> tensor<1x12544xf32>
-  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}, #map{{[0-9]*}}]} : tensor<f32>, tensor<1x12544xf32>, tensor<12544x128xf32> -> tensor<1x128xf32>
+  // CHECK: tile.reshape %{{.*}} : (tensor<1x112x112x64xf32>) -> tensor<1x802816xf32>
+  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}, #map{{[0-9]*}}]} : tensor<f32>, tensor<1x802816xf32>, tensor<802816x128xf32> -> tensor<1x128xf32>
   // CHECK: tile.add %{{.*}}, %{{.*}} : (tensor<1x128xf32>, tensor<128xf32>) -> tensor<1x128xf32>
   // CHECK: tile.cmp_lt %{{.*}}, %[[cst]] : (tensor<1x128xf32>, tensor<f32>) -> tensor<1x128xi1>
   // CHECK: tile.select %{{.*}}, %[[cst]], %{{.*}} : (tensor<1x128xi1>, tensor<f32>, tensor<1x128xf32>) -> tensor<1x128xf32>
@@ -1467,6 +1467,56 @@ TEST_F(CppEdsl, Gather) {
   checkExact(program, {in1, in2}, {out});
 }
 
+TEST_F(CppEdsl, GatherND) {
+  auto A = Placeholder(DType::FLOAT32, {2, 2, 2});
+  auto B = Placeholder(DType::INT32, {2, 2});
+  auto O = gather(A, B).mode(GatherMode::ND);
+  auto program = makeProgram("gather", {A, B}, {O});
+
+  std::vector<float> in1 = {
+      -5.0f, -6.0f,  //
+      1.3f,  4.5f,   //
+
+      -7.0f, 4.0f,  //
+      5.0f,  6.0f,  //
+  };
+  std::vector<int> in2 = {
+      0, 1,  //
+      1, 0,  //
+  };
+  std::vector<float> out = {
+      1.3f, 4.5f,   //
+      -7.0f, 4.0f,  //
+  };
+  checkExact(program, {in1, in2}, {out});
+}
+
+TEST_F(CppEdsl, GatherNDWithBatchDims) {
+  auto A = Placeholder(DType::FLOAT32, {2, 3, 4});
+  auto B = Placeholder(DType::INT32, {2, 3, 1, 1});
+  auto O = gather(A, B).mode(GatherMode::ND).batchDims(2);
+  auto program = makeProgram("gather", {A, B}, {O});
+
+  std::vector<float> in1 = {
+      1,  2,  3,  4,   //
+      5,  6,  7,  8,   //
+      9,  10, 11, 12,  //
+      13, 14, 15, 16,  //
+      17, 18, 19, 20,  //
+      21, 22, 23, 24,  //
+  };
+  std::vector<int> in2 = {
+      1,  //
+      0,  //
+      2,  //
+      0,  //
+      2,  //
+      2,  //
+  };
+  std::vector<float> out = {2, 5, 11, 13, 19, 23};
+  checkExact(program, {in1, in2}, {out});
+}
+
 TEST_F(CppEdsl, InterpolatedGatherNearest) {
   auto A = Placeholder(DType::FLOAT32, {1, 6});
   auto B = Placeholder(DType::FLOAT32, {9});
@@ -1996,6 +2046,29 @@ TEST_F(CppEdsl, LayerMissingOperand) {
   auto B = Placeholder(DType::FLOAT32, {10, 20});
   Tensor O = layer("sum", {A}, [&]() { return A + B; });
   EXPECT_ANY_THROW({ makeProgram("LayerMissingOperand", {A, B}, {O}); });
+}
+
+TEST_F(CppEdsl, LayerMultipleReturnValues) {
+  auto A = Placeholder(DType::FLOAT32, {10, 5});
+  TensorVec tuple = layer("two_output", {A}, {}, [&]() {
+    Tensor idxs = argsort(A, 0);
+    Tensor vals = gather(A, idxs);
+    TensorVec outputs = {vals, idxs};
+    return outputs;
+  });
+
+  auto program = makeProgram("LayerMultipleReturnValues", {A}, tuple);
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.LayerMultipleReturnValues
+  // CHECK: module @LayerMultipleReturnValues
+  // CHECK: func @main(%[[ARG0:.*]]: tensor<10x5xf32>) -> (tensor<10x5x5xf32>, tensor<10x5xsi32>) {
+  // CHECK:   %[[X0:.*]]:2 = layer.box "two_output" (%[[ARG1:.*]]) = (%[[ARG0]]) : (tensor<10x5xf32>) -> (tensor<10x5x5xf32>, tensor<10x5xsi32>) {
+  // CHECK:      %[[X1:.*]] = tile.argsort asc %[[ARG1]][{{[0-9]*}}] : (tensor<10x5xf32>) -> tensor<10x5xsi32>
+  // CHECK:      %[[X2:.*]] = tile.gather %[[ARG1]] %[[X1]] {{{.*}}} : (tensor<10x5xf32>, tensor<10x5xsi32>) -> tensor<10x5x5xf32>
+  // CHECK:      layer.return %[[X2]], %[[X1]] : tensor<10x5x5xf32>, tensor<10x5xsi32>
+  // CHECK:   return %[[X0]]#0, %[[X0]]#1 : tensor<10x5x5xf32>, tensor<10x5xsi32>
+  // clang-format on
+  runProgram(program);
 }
 
 TEST_F(CppEdsl, LayerEmbeddedConst) {

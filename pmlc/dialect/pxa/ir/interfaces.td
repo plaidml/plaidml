@@ -63,19 +63,6 @@ def PxaReadOpInterface : PxaOpInterface<"PxaReadOpInterface"> {
       }]
     >,
     InterfaceMethod<
-      /*desc=*/"Returns the AffineMapAttr associated with 'memref'.",
-      /*retTy=*/"::mlir::NamedAttribute",
-      /*methodName=*/"getAffineMapAttrForMemRef",
-      /*args=*/(ins "::mlir::Value":$memref),
-      /*methodBody=*/[{}],
-      /*defaultImplementation=*/[{
-        ConcreteOp op = ::mlir::cast<ConcreteOp>(this->getOperation());
-        assert(memref == getMemRef());
-        return {::mlir::Identifier::get(op.getMapAttrName(), op.getContext()),
-                op.getAffineMapAttr()};
-      }]
-    >,
-    InterfaceMethod<
       /*desc=*/"Returns the value read by this operation.",
       /*retTy=*/"::mlir::Value",
       /*methodName=*/"getValue",
@@ -139,19 +126,6 @@ def PxaReduceOpInterface : PxaOpInterface<"PxaReduceOpInterface"> {
       /*defaultImplementation=*/[{
         ConcreteOp op = ::mlir::cast<ConcreteOp>(this->getOperation());
         return op.getAffineMapAttr().getValue();
-      }]
-    >,
-    InterfaceMethod<
-      /*desc=*/"Returns the AffineMapAttr associated with 'memref'.",
-      /*retTy=*/"::mlir::NamedAttribute",
-      /*methodName=*/"getAffineMapAttrForMemRef",
-      /*args=*/(ins "::mlir::Value":$memref),
-      /*methodBody=*/[{}],
-      /*defaultImplementation=*/[{
-        ConcreteOp op = ::mlir::cast<ConcreteOp>(this->getOperation());
-        assert(memref == getMemRef());
-        return {::mlir::Identifier::get(op.getMapAttrName(), op.getContext()),
-                op.getAffineMapAttr()};
       }]
     >,
     InterfaceMethod<

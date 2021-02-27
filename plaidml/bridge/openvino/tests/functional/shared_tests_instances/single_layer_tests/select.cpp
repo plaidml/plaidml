@@ -15,6 +15,7 @@ const std::vector<InferenceEngine::Precision> inputPrecision = {
     InferenceEngine::Precision::I64,   //
     InferenceEngine::Precision::I32,   //
     InferenceEngine::Precision::FP32,  //
+    InferenceEngine::Precision::FP16,  //
 };
 
 const std::vector<std::vector<std::vector<size_t>>> noneShapes = {
@@ -89,6 +90,5 @@ INSTANTIATE_TEST_CASE_P(smoke, SelectLayerTest,
                             ::testing::Values(std::vector<std::vector<size_t>>({{4, 5}, {4, 5}, {4, 5}})),  //
                             ::testing::Values(InferenceEngine::Precision::FP32),                            //
                             ::testing::Values(ngraph::op::AutoBroadcastSpec::NONE),                         //
-                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)                              //
-                            ),
+                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),                            //
                         SelectLayerTest::getTestCaseName);

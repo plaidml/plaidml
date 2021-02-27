@@ -12,9 +12,8 @@ using namespace LayerTestsDefinitions;
 namespace {
 const std::vector<InferenceEngine::Precision> netPrecisions = {
     InferenceEngine::Precision::FP32,
+    InferenceEngine::Precision::FP16,
     InferenceEngine::Precision::I32,
-    InferenceEngine::Precision::U8,
-    InferenceEngine::Precision::I8,
 };
 
 const std::vector<bool> keepDims = {
@@ -53,6 +52,14 @@ const std::vector<ngraph::helpers::ReductionType> reductionTypes = {
     ngraph::helpers::ReductionType::L2,    //
 };
 
+const std::vector<ngraph::helpers::ReductionType> reductionIntTypes = {
+    ngraph::helpers::ReductionType::Min,   //
+    ngraph::helpers::ReductionType::Max,   //
+    ngraph::helpers::ReductionType::Sum,   //
+    ngraph::helpers::ReductionType::Prod,  //
+    ngraph::helpers::ReductionType::L1,    //
+};
+
 const std::vector<ngraph::helpers::ReductionType> reductionLogicalTypes = {
     ngraph::helpers::ReductionType::LogicalOr,
     ngraph::helpers::ReductionType::LogicalAnd,
@@ -88,9 +95,8 @@ const auto params_Precisions = testing::Combine(               //
     testing::Values(std::vector<int>{1, 3}),                   //
     testing::Values(opTypes[1]),                               //
     testing::ValuesIn(keepDims),                               //
-    testing::Values(ngraph::helpers::ReductionType::Sum),      //
-    testing::Values(InferenceEngine::Precision::FP32,          //
-                    InferenceEngine::Precision::I32),          //
+    testing::ValuesIn(reductionIntTypes),                      //
+    testing::ValuesIn(netPrecisions),                          //
     testing::Values(InferenceEngine::Precision::UNSPECIFIED),  //
     testing::Values(InferenceEngine::Precision::UNSPECIFIED),  //
     testing::Values(InferenceEngine::Layout::ANY),             //
