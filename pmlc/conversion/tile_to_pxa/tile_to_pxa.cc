@@ -959,7 +959,7 @@ struct ArgSortOpConversion : public OpConversionPattern<tile::ArgSortOp> {
       rewriter.setInsertionPointAfter(initLoop);
     }
 
-    // Selection sort:
+    // Stable selection sort:
     // for (int i = 0; i < n-1; i++) {
     //     int min_idx = i;
     //     for (int j = i+1; j < n; j++) {
@@ -967,7 +967,12 @@ struct ArgSortOpConversion : public OpConversionPattern<tile::ArgSortOp> {
     //             min_idx = j;
     //         }
     //     }
-    //     swap(&arr[min_idx], &arr[i]);
+    //     int min_val = arr[min_idx];
+    //     while (min_idx > i) {
+    //         arr[min_idx] = arr[min_idx - 1];
+    //         min_idx--;
+    //     }
+    //     arr[i] = min_val;
     // }
 
     // Build inner sorting loop
@@ -1015,44 +1020,8 @@ struct ArgSortOpConversion : public OpConversionPattern<tile::ArgSortOp> {
       minVal = rewriter.create<LoadOp>(loc, minValVar, zeroIndex).getResult();
       // Is compVal smaller than minVal? If so, update the allocs
       Value orderPred;
-      if (elementType.isSignedInteger()) {
-        CmpIPredicate dir{};
-        switch (op.direction()) {
-        case tile::SortDirection::asc:
-          dir = CmpIPredicate::slt;
-          break;
-        case tile::SortDirection::desc:
-          dir = CmpIPredicate::sgt;
-          break;
-        }
-        orderPred = rewriter.create<mlir::CmpIOp>(loc, dir, compVal, minVal)
-                        .getResult();
-      } else if (elementType.isUnsignedInteger()) {
-        CmpIPredicate dir{};
-        switch (op.direction()) {
-        case tile::SortDirection::asc:
-          dir = CmpIPredicate::ult;
-          break;
-        case tile::SortDirection::desc:
-          dir = CmpIPredicate::ugt;
-          break;
-        }
-        orderPred = rewriter.create<mlir::CmpIOp>(loc, dir, compVal, minVal)
-                        .getResult();
-      } else {
-        // Assume float; verifier will fail the conversion if not float
-        CmpFPredicate dir{};
-        switch (op.direction()) {
-        case tile::SortDirection::asc:
-          dir = CmpFPredicate::OLT;
-          break;
-        case tile::SortDirection::desc:
-          dir = CmpFPredicate::OGT;
-          break;
-        }
-        orderPred = rewriter.create<mlir::CmpFOp>(loc, dir, compVal, minVal)
-                        .getResult();
-      }
+      orderPred = convertCmpOp(loc, rewriter, compVal, minVal, elementType,
+                               op.direction());
 
       auto ifReorder = rewriter.create<scf::IfOp>(loc, orderPred, false);
       rewriter.setInsertionPointToStart(&ifReorder.thenRegion().front());
@@ -1066,16 +1035,27 @@ struct ArgSortOpConversion : public OpConversionPattern<tile::ArgSortOp> {
       // unsorted region, by setting the insertion point after its block.
       rewriter.setInsertionPointAfter(minLoop);
 
-      // Swap the sort position with the minimum position.
       auto finalMinPos =
           rewriter.create<LoadOp>(loc, minIdxVar, zeroIndex).getResult();
       ops[axis] = finalMinPos;
       auto finalMinIdx = rewriter.create<LoadOp>(loc, result, ops).getResult();
+
+      // Move every element between [sortIV,finalMinPos) a step forward
+      // and then move the minimum index to the head to keep it stable.
+      auto moveLoop =
+          rewriter.create<scf::ForOp>(loc, sortIV, finalMinPos, icon1);
+      auto moveIV = moveLoop.getInductionVar();
+      rewriter.setInsertionPointToStart(moveLoop.getBody());
+      moveIV = rewriter.create<SubIOp>(loc, finalMinPos, moveIV);
+      moveIV = rewriter.create<AddIOp>(loc, moveIV, sortIV);
+      auto moveNext = rewriter.create<SubIOp>(loc, moveIV, icon1);
+      ops[axis] = moveNext;
+      auto moveNextVal = rewriter.create<LoadOp>(loc, result, ops).getResult();
+      ops[axis] = moveIV;
+      rewriter.create<StoreOp>(loc, moveNextVal, result, ops);
+      rewriter.setInsertionPointAfter(moveLoop);
       ops[axis] = sortIV;
-      auto origSortIdx = rewriter.create<LoadOp>(loc, result, ops).getResult();
       rewriter.create<StoreOp>(loc, finalMinIdx, result, ops);
-      ops[axis] = finalMinPos;
-      rewriter.create<StoreOp>(loc, origSortIdx, result, ops);
 
       // The minimum remaining value is now at the end of the sorted region.
       // Advance to the next minimum in the remaining unsorted region.
@@ -1104,6 +1084,46 @@ struct ArgSortOpConversion : public OpConversionPattern<tile::ArgSortOp> {
     rewriter.create<layer::ReturnOp>(loc, ArrayRef<Value>{result});
     rewriter.replaceOp(op, layerOp.getResult(0));
     return success();
+  }
+
+  Value convertCmpOp(Location loc, ConversionPatternRewriter &rewriter,
+                     Value compVal, Value minVal, Type type,
+                     tile::SortDirection dir) const {
+    if (type.isa<FloatType>()) {
+      CmpFPredicate pred;
+      switch (dir) {
+      case tile::SortDirection::asc:
+        pred = CmpFPredicate::OLT;
+        break;
+      case tile::SortDirection::desc:
+        pred = CmpFPredicate::OGT;
+        break;
+      }
+      return rewriter.create<mlir::CmpFOp>(loc, pred, compVal, minVal)
+          .getResult();
+    }
+    CmpIPredicate pred;
+    if (type.isSignedInteger()) {
+      switch (dir) {
+      case tile::SortDirection::asc:
+        pred = CmpIPredicate::slt;
+        break;
+      case tile::SortDirection::desc:
+        pred = CmpIPredicate::sgt;
+        break;
+      }
+    } else {
+      switch (dir) {
+      case tile::SortDirection::asc:
+        pred = CmpIPredicate::ult;
+        break;
+      case tile::SortDirection::desc:
+        pred = CmpIPredicate::ugt;
+        break;
+      }
+    }
+    return rewriter.create<mlir::CmpIOp>(loc, pred, compVal, minVal)
+        .getResult();
   }
 };
 
