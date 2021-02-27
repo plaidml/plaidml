@@ -2048,6 +2048,29 @@ TEST_F(CppEdsl, LayerMissingOperand) {
   EXPECT_ANY_THROW({ makeProgram("LayerMissingOperand", {A, B}, {O}); });
 }
 
+TEST_F(CppEdsl, LayerMultipleReturnValues) {
+  auto A = Placeholder(DType::FLOAT32, {10, 5});
+  TensorVec tuple = layer("two_output", {A}, {}, [&]() {
+    Tensor idxs = argsort(A, 0);
+    Tensor vals = gather(A, idxs);
+    TensorVec outputs = {vals, idxs};
+    return outputs;
+  });
+
+  auto program = makeProgram("LayerMultipleReturnValues", {A}, tuple);
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.LayerMultipleReturnValues
+  // CHECK: module @LayerMultipleReturnValues
+  // CHECK: func @main(%[[ARG0:.*]]: tensor<10x5xf32>) -> (tensor<10x5x5xf32>, tensor<10x5xsi32>) {
+  // CHECK:   %[[X0:.*]]:2 = layer.box "two_output" (%[[ARG1:.*]]) = (%[[ARG0]]) : (tensor<10x5xf32>) -> (tensor<10x5x5xf32>, tensor<10x5xsi32>) {
+  // CHECK:      %[[X1:.*]] = tile.argsort asc %[[ARG1]][{{[0-9]*}}] : (tensor<10x5xf32>) -> tensor<10x5xsi32>
+  // CHECK:      %[[X2:.*]] = tile.gather %[[ARG1]] %[[X1]] {{{.*}}} : (tensor<10x5xf32>, tensor<10x5xsi32>) -> tensor<10x5x5xf32>
+  // CHECK:      layer.return %[[X2]], %[[X1]] : tensor<10x5x5xf32>, tensor<10x5xsi32>
+  // CHECK:   return %[[X0]]#0, %[[X0]]#1 : tensor<10x5x5xf32>, tensor<10x5xsi32>
+  // clang-format on
+  runProgram(program);
+}
+
 TEST_F(CppEdsl, LayerEmbeddedConst) {
   auto A = Placeholder(DType::FLOAT32, {10, 20});
   Tensor O = layer("sum", {A}, [&]() {  //
