@@ -90,7 +90,6 @@ public:
     auto *context = &getContext();
     patterns.insert<MemOpPattern<LoadOp>, MemOpPattern<StoreOp>>(context);
     applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
-    getOperation().dump();
   }
 };
 
