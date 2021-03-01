@@ -37,6 +37,7 @@ dependencies:
       - pystache
       - pyyaml
       - sphinxcontrib.katex
+      - sphinxcontrib.bibtex
       - sphinxcontrib-napoleon
       - sphinx_rtd_theme
       - sphinx-tabs

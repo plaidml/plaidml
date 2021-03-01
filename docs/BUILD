@@ -6,6 +6,7 @@ filegroup(
         "Doxyfile",
         "conf.py",
         "**/*.rst",
+        'refs.bib',
     ]),
     visibility = ["//visibility:public"],
 )

@@ -536,13 +536,12 @@ The constant-vector multiplication is handled by an element wise :math:`{\color{
       :pyobject: gemm
 
 
-Quantize Float32 to Int8
+Uniform 8-bit Quantization
 *******************
 
-This examples illustrated a basic quantize operation in eDSL. 
-
-We start with a float32 tensor and a value for the range of floating points values expected in the tensor. 
-The expected output is a quantized int8 tensor. This is accomplished using a simple technique illustrated below. 
+Quantization is a promising new approach used to reduce memory and compute resources required by neural network operations.
+This examples illustrates 8-bit uniform quantization operation :cite:`ob2018quantization` in eDSL. 
+The expected output is a quantized 8-bit tensor. This is accomplished using a simple technique illustrated below. 
 
 .. math::
 
@@ -550,22 +549,31 @@ The expected output is a quantized int8 tensor. This is accomplished using a sim
     \color{default} \: = \:
     \color{blue} A
     \color{magenta} \: / \:
-    \color{turquoise} range
-    \color{magenta} \: * \:
-    \color{default} 128 
+    \color{turquoise} scale
+    \color{magenta} \: + \:
+    \color{turquoise} zeropoint
 
-Which looks exactly the same in eDSL, :math:`\color{magenta}\verb! /!` and :math:`\color{magenta}\verb! *!` are element wise operations.
+Which looks exactly the same in eDSL, :math:`\color{magenta}\verb! /!` and :math:`\color{magenta}\verb! +!` are element wise operations.
+
+.. math::
+
+    \color{pink}\verb! X!
+    \color{default}\verb! =!
+    \color{blue}\verb! A!
+    \color{magenta}\verb! /!
+    \color{turquoise}\verb! scale!
 
 .. math::
 
     \color{red}\verb! O!
     \color{default}\verb! =!
-    \color{blue}\verb! A!
-    \color{magenta}\verb! /!
-    \color{turquoise}\verb! range!
-    \color{magenta}\verb! *!
-    \color{default}\verb! 128! 
+    \color{pink}\verb! X!
+    \color{magenta}\verb! +!
+    \color{turquoise}\verb! zeropoint! 
 
+
+:math:`\color{turquoise}\verb! scale!` and :math:`\color{turquoise}\verb! zeropoint!` are scaler quantities. Scale 
+is real valued (float32 here) and zeropoint is the same type as the quantized tensor (int8 here).
 
 .. tabs::
 
@@ -580,3 +588,8 @@ Which looks exactly the same in eDSL, :math:`\color{magenta}\verb! /!` and :math
 
     .. literalinclude:: ../../plaidml/edsl/examples/quantize.py
       :pyobject: quantize_float32_to_int8
+
+
+
+.. bibliography::
+   :all:

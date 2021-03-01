@@ -10,7 +10,7 @@ import plaidml
 from plaidml.edsl import *
 
 
-def quantize_float32_to_int8(A, range):
-    O = A / range * 128
+def quantize_float32_to_int8(A, scale, zeropoint):
+    O = A / scale
     O_int = cast(O, DType.INT8)
-    return O_int
+    return O_int + zeropoint

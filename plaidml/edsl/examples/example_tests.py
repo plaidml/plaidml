@@ -93,7 +93,7 @@ class TestEdslExamples(unittest.TestCase):
 
     def test_quantize(self):
         A = Placeholder(plaidml.DType.FLOAT32, [1, 7])
-        O = quantize_float32_to_int8(A, 0.5)
+        O = quantize_float32_to_int8(A, 256, 0)
         program = Program('quantize', [A], [O])
         self.runProgram(program)
 
