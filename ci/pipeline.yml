@@ -20,15 +20,15 @@ steps:
 
   - label: 'Trigger IRv10'
     trigger: IRv10
-      async: true
-      build:
-        message: "${BUILDKITE_MESSAGE}"
-        commit: "dee1beeaa5a19ae3bcb422c12d52c69e55124735"
-        env:
-          PLAIDML_COMMIT: "${BUILDKITE_COMMIT}"
-          BUILDKITE_PULL_REQUEST: "${BUILDKITE_PULL_REQUEST}"
-          BUILDKITE_PULL_REQUEST_BASE_BRANCH: "${BUILDKITE_PULL_REQUEST_BASE_BRANCH}"
-          BUILDKITE_PULL_REQUEST_REPO: "${BUILDKITE_PULL_REQUEST_REPO}"
+    async: true
+    build:
+      message: "${BUILDKITE_MESSAGE}"
+      commit: "dee1beeaa5a19ae3bcb422c12d52c69e55124735"
+      env:
+        PLAIDML_COMMIT: "${BUILDKITE_COMMIT}"
+        BUILDKITE_PULL_REQUEST: "${BUILDKITE_PULL_REQUEST}"
+        BUILDKITE_PULL_REQUEST_BASE_BRANCH: "${BUILDKITE_PULL_REQUEST_BASE_BRANCH}"
+        BUILDKITE_PULL_REQUEST_REPO: "${BUILDKITE_PULL_REQUEST_REPO}"
 
 
 # test phase
