@@ -26,8 +26,8 @@ steps:
       echo --- :hammer_and_wrench: ninja
       ninja -C build-x86_64/Release
 
-      echo --- :hammer_and_wrench: ninja check-test
-      ninja -C build-x86_64/Release check-test
+      echo --- :hammer_and_wrench: ninja check-smoke
+      ninja -C build-x86_64/Release check-smoke
 
       echo --- :hammer_and_wrench: devkit packaging
       ninja -C build-x86_64/Release package
