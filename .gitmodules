@@ -1,0 +1,4 @@
+[submodule "vendor/openvino"]
+	path = vendor/openvino
+	url = https://github.com/plaidml/openvino.git
+	branch = plaidml
