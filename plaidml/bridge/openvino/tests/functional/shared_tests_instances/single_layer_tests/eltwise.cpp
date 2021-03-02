@@ -26,10 +26,20 @@ std::vector<std::vector<std::vector<size_t>>> inShapes = {
     {{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}},
 };
 
+std::vector<std::vector<std::vector<size_t>>> smokeShapes = {
+    {{1, 2, 3, 4}},
+    {{2, 2, 2, 2}},
+    {{2, 1, 2, 1, 2, 2}},
+};
+
 std::vector<InferenceEngine::Precision> netPrecisions = {
     InferenceEngine::Precision::FP32,
-    // InferenceEngine::Precision::FP16,
-    // InferenceEngine::Precision::I32,
+    InferenceEngine::Precision::FP16,
+    InferenceEngine::Precision::I32,
+};
+
+std::vector<InferenceEngine::Precision> f32Precision = {
+    InferenceEngine::Precision::FP32,
 };
 
 std::vector<ngraph::helpers::InputLayerType> secondaryInputTypes = {
@@ -47,15 +57,18 @@ std::vector<ngraph::helpers::EltwiseTypes> eltwiseOpTypes = {
     ngraph::helpers::EltwiseTypes::MULTIPLY,      //
     ngraph::helpers::EltwiseTypes::SUBTRACT,      //
     ngraph::helpers::EltwiseTypes::DIVIDE,        //
-    ngraph::helpers::EltwiseTypes::FLOOR_MOD,     //
     ngraph::helpers::EltwiseTypes::SQUARED_DIFF,  //
-    ngraph::helpers::EltwiseTypes::POWER,         //
     ngraph::helpers::EltwiseTypes::MOD,           //
+};
+
+std::vector<ngraph::helpers::EltwiseTypes> f32OpTypes = {
+    ngraph::helpers::EltwiseTypes::FLOOR_MOD,  //
+    ngraph::helpers::EltwiseTypes::POWER,      //
 };
 
 std::map<std::string, std::string> additional_config = {};
 
-const auto multiply_params = ::testing::Combine(                 //
+const auto params = ::testing::Combine(                          //
     ::testing::ValuesIn(inShapes),                               //
     ::testing::ValuesIn(eltwiseOpTypes),                         //
     ::testing::ValuesIn(secondaryInputTypes),                    //
@@ -68,26 +81,11 @@ const auto multiply_params = ::testing::Combine(                 //
     ::testing::Values(additional_config)                         //
 );
 
-INSTANTIATE_TEST_CASE_P(Eltwise, EltwiseLayerTest, multiply_params, EltwiseLayerTest::getTestCaseName);
+INSTANTIATE_TEST_CASE_P(Eltwise, EltwiseLayerTest, params, EltwiseLayerTest::getTestCaseName);
 
-std::vector<std::vector<std::vector<size_t>>> inShapesSingleThread = {
-    {{1, 2, 3, 4}},
-    {{2, 2, 2, 2}},
-    {{2, 1, 2, 1, 2, 2}},
-};
-
-std::vector<ngraph::helpers::EltwiseTypes> eltwiseOpTypesSingleThread = {
-    ngraph::helpers::EltwiseTypes::ADD,
-    ngraph::helpers::EltwiseTypes::POWER,
-};
-
-std::map<std::string, std::string> additional_config_single_thread = {
-    {"CPU_THREADS_NUM", "1"},
-};
-
-const auto single_thread_params = ::testing::Combine(            //
-    ::testing::ValuesIn(inShapesSingleThread),                   //
-    ::testing::ValuesIn(eltwiseOpTypesSingleThread),             //
+const auto smokeParams = ::testing::Combine(                     //
+    ::testing::ValuesIn(smokeShapes),                            //
+    ::testing::ValuesIn(eltwiseOpTypes),                         //
     ::testing::ValuesIn(secondaryInputTypes),                    //
     ::testing::ValuesIn(opTypes),                                //
     ::testing::ValuesIn(netPrecisions),                          //
@@ -95,9 +93,39 @@ const auto single_thread_params = ::testing::Combine(            //
     ::testing::Values(InferenceEngine::Precision::UNSPECIFIED),  //
     ::testing::Values(InferenceEngine::Layout::ANY),             //
     ::testing::Values(CommonTestUtils::DEVICE_PLAIDML),          //
-    ::testing::Values(additional_config_single_thread)           //
+    ::testing::Values(additional_config)                         //
 );
 
-INSTANTIATE_TEST_CASE_P(smoke_SingleThread, EltwiseLayerTest, single_thread_params, EltwiseLayerTest::getTestCaseName);
+INSTANTIATE_TEST_CASE_P(smokeEltwise, EltwiseLayerTest, smokeParams, EltwiseLayerTest::getTestCaseName);
+
+const auto f32Params = ::testing::Combine(                       //
+    ::testing::ValuesIn(inShapes),                               //
+    ::testing::ValuesIn(f32OpTypes),                             //
+    ::testing::ValuesIn(secondaryInputTypes),                    //
+    ::testing::ValuesIn(opTypes),                                //
+    ::testing::ValuesIn(f32Precision),                           //
+    ::testing::Values(InferenceEngine::Precision::UNSPECIFIED),  //
+    ::testing::Values(InferenceEngine::Precision::UNSPECIFIED),  //
+    ::testing::Values(InferenceEngine::Layout::ANY),             //
+    ::testing::Values(CommonTestUtils::DEVICE_PLAIDML),          //
+    ::testing::Values(additional_config)                         //
+);
+
+INSTANTIATE_TEST_CASE_P(f32OnlyEltwise, EltwiseLayerTest, f32Params, EltwiseLayerTest::getTestCaseName);
+
+const auto smokeF32Params = ::testing::Combine(                  //
+    ::testing::ValuesIn(smokeShapes),                            //
+    ::testing::ValuesIn(f32OpTypes),                             //
+    ::testing::ValuesIn(secondaryInputTypes),                    //
+    ::testing::ValuesIn(opTypes),                                //
+    ::testing::ValuesIn(f32Precision),                           //
+    ::testing::Values(InferenceEngine::Precision::UNSPECIFIED),  //
+    ::testing::Values(InferenceEngine::Precision::UNSPECIFIED),  //
+    ::testing::Values(InferenceEngine::Layout::ANY),             //
+    ::testing::Values(CommonTestUtils::DEVICE_PLAIDML),          //
+    ::testing::Values(additional_config)                         //
+);
+
+INSTANTIATE_TEST_CASE_P(smokeF32OnlyEltwise, EltwiseLayerTest, smokeF32Params, EltwiseLayerTest::getTestCaseName);
 
 }  // namespace
