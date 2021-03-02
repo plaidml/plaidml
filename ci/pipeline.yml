@@ -37,7 +37,7 @@ steps:
     soft_fail: true
     build:
       message: "${BUILDKITE_MESSAGE}"
-      commit: "fe0679141cff310ca0662ae65223dc86b491b469"
+      commit: "f0a5477f19705a815e6f372565adbf1528f22dc3"
       env:
         PLAIDML_COMMIT: "${BUILDKITE_COMMIT}"
         BUILDKITE_PULL_REQUEST: "${BUILDKITE_PULL_REQUEST}"
