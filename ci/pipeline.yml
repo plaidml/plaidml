@@ -19,7 +19,6 @@ steps:
 {{/variants}}
   
   - label: ':hammer_and_wrench: :linux: :beer:'
-    key: linux_x86_64_cmake
     command: |
       echo --- :building_construction: configuration
       python configure --ci --temp=/tmp/$${BUILDKITE_AGENT_NAME}/plaidml
@@ -29,6 +28,9 @@ steps:
 
       echo --- :hammer_and_wrench: ninja check-test
       ninja -C build-x86_64/Release check-test
+    key: linux_x86_64_cmake
+    agents:
+      PLATFORM: linux_x86_64
 
   - label: 'IRv10 models'
     trigger: irv10
