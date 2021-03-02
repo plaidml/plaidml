@@ -182,28 +182,29 @@ class Configure:
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument('--ci', action='store_true', help='Enable CI mode')
     parser.add_argument('--skip_bazelisk',
-                        help='Skip the bazelisk configuration step?',
-                        action='store_true')
+                        action='store_true',
+                        help='Skip the bazelisk configuration step?')
     parser.add_argument('--skip_conda_env',
-                        help='Skip the conda environment creation step?',
-                        action='store_true')
+                        action='store_true',
+                        help='Skip the conda environment creation step?')
     parser.add_argument('--skip_precommit',
-                        help='Skip the precommit configuration step?',
-                        action='store_true')
+                        action='store_true',
+                        help='Skip the precommit configuration step?')
     parser.add_argument('--local_llvm', help='Configure LOCAL_LLVML_DIR', type=pathlib.Path)
     parser.add_argument('--type',
-                        help='Configures CMAKE_BUILD_TYPE',
+                        choices=['Debug', 'Release', 'RelWithDebInfo'],
                         default='Release',
-                        choices=['Debug', 'Release', 'RelWithDebInfo'])
+                        help='Configures CMAKE_BUILD_TYPE')
     parser.add_argument('--target',
-                        help='set the target',
+                        choices=['aarch64', 'x86_64'],
                         default='x86_64',
-                        choices=['aarch64', 'x86_64'])
+                        help='set the target')
     parser.add_argument('--temp',
-                        help='Configures the temporary directory for cached assets.',
                         type=pathlib.Path,
-                        default='/tmp/plaidml')
+                        default='/tmp/plaidml',
+                        help='Configures the temporary directory for cached assets.')
     args = parser.parse_args()
 
     print("Configuring PlaidML build environment")
@@ -211,23 +212,26 @@ def main():
 
     cfg = Configure()
 
-    if not cfg.is_activated():
-        if not args.skip_update:
-            cfg.configure_conda()
-        cfg.activate_conda()
-    else:
-        if not args.skip_precommit:
-            cfg.configure_precommit()
-        if not args.skip_bazelisk:
-            cfg.configure_bazelisk()
+    if args.ci:
         cfg.configure_cmake(args)
+    else:
+        if not cfg.is_activated():
+            if not args.skip_update:
+                cfg.configure_conda()
+            cfg.activate_conda()
+        else:
+            if not args.skip_precommit:
+                cfg.configure_precommit()
+            if not args.skip_bazelisk:
+                cfg.configure_bazelisk()
+            cfg.configure_cmake(args)
 
-    print()
-    print("Your build is configured.")
-    print("Use the following to run all unit tests:")
-    print()
-    print("bazelisk test //...")
-    print()
+        print()
+        print("Your build is configured.")
+        print("Use the following to run all unit tests:")
+        print()
+        print("bazelisk test //...")
+        print()
 
 
 if __name__ == '__main__':
