@@ -44,10 +44,10 @@ steps:
 
   - label: 'IRv10 models'
     trigger: irv10
-    async: true
+    async: false
     build:
       message: "${BUILDKITE_MESSAGE}"
-      commit: "f0a5477f19705a815e6f372565adbf1528f22dc3"
+      commit: "9cdb3ed3218d782115996c700b322828e9c357a6"
       env:
         PLAIDML_COMMIT: "${BUILDKITE_COMMIT}"
         BUILDKITE_PULL_REQUEST: "${BUILDKITE_PULL_REQUEST}"
