@@ -74,12 +74,28 @@ void registerExtractImagePatches() {
 
     edsl::Tensor kernel_tensor;
     switch (input_tensor.dtype()) {
+      case DType::FLOAT16:
+        // TODO: Investigate whether there's a way to create fp16 directly
+        kernel_tensor = edsl::cast(create_kernel_tensor<float>(filter_row, filter_col, input_tensor), DType::FLOAT16);
+        break;
       case DType::FLOAT32:
         kernel_tensor = create_kernel_tensor<float>(filter_row, filter_col, input_tensor);
         break;
-      case DType::INT32:
-        kernel_tensor = create_kernel_tensor<int>(filter_row, filter_col, input_tensor);
+      case DType::INT8:
+        kernel_tensor = create_kernel_tensor<int8_t>(filter_row, filter_col, input_tensor);
         break;
+      case DType::INT16:
+        kernel_tensor = create_kernel_tensor<int16_t>(filter_row, filter_col, input_tensor);
+        break;
+      case DType::INT32:
+        kernel_tensor = create_kernel_tensor<int32_t>(filter_row, filter_col, input_tensor);
+        break;
+      case DType::INT64:
+        kernel_tensor = create_kernel_tensor<int64_t>(filter_row, filter_col, input_tensor);
+        break;
+      default:
+        THROW_IE_EXCEPTION << "PlaidML does not currently support ExtractImagePatches for datatype "
+                           << to_string(input_tensor.dtype());
     }
 
     std::vector<size_t> strides;
@@ -103,7 +119,8 @@ void registerExtractImagePatches() {
                       .dilations(dilations)
                       .autopad_mode(autopad_mode)
                       .input_layout(plaidml::op::TensorLayout::NCX)
-                      .filter_layout(plaidml::op::TensorLayout::KCX);
+                      .filter_layout(plaidml::op::TensorLayout::KCX)
+                      .name(ctx.layer->get_friendly_name() + "_pml_intern_conv");
     return edsl::make_tuple(result);
   });
 }
