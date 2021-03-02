@@ -187,6 +187,7 @@ bool isConstantRhsCompatibleWithSurroundingLoops(
 
 struct MemRefSimplificationResults {
   bool newMapFormed;
+  bool error;
   mlir::SmallVector<mlir::Value, 8> resultOperands;
   mlir::AffineMap simplifiedMap;
 };
@@ -358,6 +359,141 @@ void simplifyMemrefMaps(mlir::AffineParallelOp &parallelOp) {
   });
 
   IVLOG(4, "Returning from simplifyMemrefMaps()");
+}
+
+MemRefSimplificationResults simplifyMemrefMapsInInnerLoops(
+    mlir::AffineMap &map, mlir::ValueRange mapOperands,
+    mlir::AffineParallelOp innerParallelOp,
+    mlir::DenseMap<mlir::Value, mlir::Value> &varMap) {
+  IVLOG(4, "Entered simplifyMemrefMapsInInnerLoops() CORE");
+
+  MemRefSimplificationResults results;
+  results.error = false;
+  IVLOG(4, "map: " << mlir::debugString(map));
+
+  unsigned currentNumDims = map.getNumDims();
+  unsigned newDims = 0;
+  results.newMapFormed = false;
+  mlir::SmallVector<mlir::AffineExpr, 6> simplifiedExprs;
+
+  for (unsigned i = 0; i < mapOperands.size(); i++) {
+    results.resultOperands.push_back(mapOperands[i]);
+  }
+
+  for (unsigned idx = 0; idx < map.getNumResults(); ++idx) {
+    mlir::AffineExpr expr = map.getResult(idx);
+    bool expressionAdded = false;
+
+    if (expr.getKind() == mlir::AffineExprKind::FloorDiv) {
+      auto divExpr = expr.cast<mlir::AffineBinaryOpExpr>();
+      mlir::AffineExpr lhsExpr = divExpr.getLHS();
+      mlir::AffineExpr rhsExpr = divExpr.getRHS();
+
+      if (rhsExpr.getKind() == mlir::AffineExprKind::Constant) {
+        simplifiedExprs.push_back(lhsExpr);
+        expressionAdded = true;
+        results.newMapFormed = true;
+      } else {
+        IVLOG(4, "Error: The RHS of a floordiv is NOT a constant");
+        results.error = true;
+      }
+    } else if (expr.getKind() == mlir::AffineExprKind::Mod) {
+      auto modExpr = expr.cast<mlir::AffineBinaryOpExpr>();
+      mlir::AffineExpr lhsExpr = modExpr.getLHS();
+      mlir::AffineExpr rhsExpr = modExpr.getRHS();
+
+      if (lhsExpr.getKind() == mlir::AffineExprKind::DimId &&
+          rhsExpr.getKind() == mlir::AffineExprKind::Constant) {
+        auto dimExpr = lhsExpr.cast<mlir::AffineDimExpr>();
+        unsigned pos = dimExpr.getPosition();
+
+        auto varMapIt = varMap.find(mapOperands[pos]);
+        if (varMapIt == varMap.end()) {
+          results.error = true;
+          IVLOG(4, "Error: The map operand " << idx << " NOT found in varMap");
+        } else {
+          auto newDimIdExpr = mlir::getAffineDimExpr(currentNumDims + newDims,
+                                                     map.getContext());
+          newDims++;
+
+          results.resultOperands.push_back(varMapIt->second);
+          simplifiedExprs.push_back(newDimIdExpr);
+          expressionAdded = true;
+          results.newMapFormed = true;
+        }
+      } else {
+        IVLOG(4, "Error: The RHS of a floordiv is NOT a constant");
+        results.error = true;
+      }
+    }
+
+    if (!expressionAdded) {
+      simplifiedExprs.push_back(expr);
+    }
+  }
+
+  if (results.error) {
+    results.newMapFormed = false;
+    return results;
+  }
+
+  if (results.newMapFormed) {
+    results.simplifiedMap = mlir::AffineMap::get(
+        map.getNumResults(), 0, simplifiedExprs, map.getContext());
+    IVLOG(4, "simplifiedMap: " << mlir::debugString(results.simplifiedMap));
+  }
+
+  IVLOG(4, "Returned from simplifyMemrefMapsInInnerLoops() CORE");
+
+  return results;
+}
+
+void simplifyMemrefMapsInInnerLoops(
+    mlir::AffineParallelOp &parallelOp,
+    mlir::DenseMap<mlir::Value, mlir::Value> &varMap) {
+  IVLOG(4, "Entered simplifyMemrefMapsInInnerLoops()");
+
+  parallelOp.walk([&](PxaLoadOp loadOp) {
+    IVLOG(4, "PxaLoadOp: " << loadOp);
+
+    mlir::AffineMap map = loadOp.getAffineMap();
+    IVLOG(4, "map: " << mlir::debugString(map));
+
+    mlir::OpBuilder builder(loadOp);
+    MemRefSimplificationResults results = simplifyMemrefMapsInInnerLoops(
+        map, loadOp.indices(), parallelOp, varMap);
+
+    if (results.newMapFormed) {
+      mlir::Value loadRes = builder.create<PxaLoadOp>(
+          loadOp.getLoc(), loadOp.getMemRef(), results.simplifiedMap,
+          /* loadOp.indices() */ results.resultOperands);
+      loadOp.replaceAllUsesWith(loadRes);
+      loadOp.erase();
+    }
+  });
+
+  parallelOp.walk([&](PxaReduceOp reduceOp) {
+    IVLOG(4, "PxaReduceOp: " << reduceOp);
+
+    mlir::AffineMap map = reduceOp.getAffineMap();
+    IVLOG(4, "map: " << mlir::debugString(map));
+
+    mlir::OpBuilder builder(reduceOp);
+    MemRefSimplificationResults results = simplifyMemrefMapsInInnerLoops(
+        map, reduceOp.idxs(), parallelOp, varMap);
+
+    if (results.newMapFormed) {
+      mlir::Value reduceRes = builder.create<PxaReduceOp>(
+          reduceOp.getLoc(), reduceOp.getAgg(), reduceOp.val(),
+          reduceOp.getMemRef(), results.simplifiedMap,
+          /* reduceOp.idxs() */ results.resultOperands);
+
+      reduceOp.replaceAllUsesWith(reduceRes);
+      reduceOp.erase();
+    }
+  });
+
+  IVLOG(4, "Returning from simplifyMemrefMapsInInnerLoops()");
 }
 
 void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {
@@ -543,16 +679,27 @@ void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {
           IVLOG(4, "The steps have been set.");
 
           int64_t numArguments = innerLoops.getBody()->getNumArguments();
-
-          for (size_t i = 0; i < numTileSizes; i++) {
-            // FIXME: Create the type in a better fashion.
-            if (numArguments > 0) {
-              mlir::Type type = innerLoops.getBody()->getArgument(0).getType();
-              mlir::BlockArgument arg =
-                  innerLoops.getBody()->insertArgument(numArguments + i, type);
-              IVLOG(4, "The new arg: " << mlir::debugString(arg));
+          mlir::DenseMap<mlir::Value, mlir::Value> varMap;
+          numTileSizes = 0;
+          for (size_t i = 0; i < tileSizes.size(); i++) {
+            if (tileSizes[i] != 1) {
+              // FIXME: Create the type in a better fashion.
+              if (numArguments > 0) {
+                mlir::Type type =
+                    innerLoops.getBody()->getArgument(0).getType();
+                mlir::BlockArgument arg = innerLoops.getBody()->insertArgument(
+                    numArguments + numTileSizes, type);
+                numTileSizes++;
+                varMap.insert({innerLoops.getBody()->getArgument(i), arg});
+                IVLOG(4, "The new arg: " << mlir::debugString(arg));
+              } else {
+                IVLOG(4, "Error. Exiting");
+                exit(1);
+              }
             }
           }
+
+          simplifyMemrefMapsInInnerLoops(innerLoops, varMap);
         }
       }
     }
