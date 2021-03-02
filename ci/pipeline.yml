@@ -21,7 +21,7 @@ steps:
   - label: ':hammer_and_wrench: :linux: :beer:'
     command: |
       echo --- :building_construction: configuration
-      {{python}} configure --ci --temp=/tmp/$${BUILDKITE_AGENT_NAME}/plaidml
+      python3 configure --ci --temp=/tmp/$${BUILDKITE_AGENT_NAME}/plaidml
 
       echo --- :hammer_and_wrench: ninja
       ninja -C build-x86_64/Release
