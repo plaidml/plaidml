@@ -19,7 +19,7 @@ steps:
 {{/variants}}
 
   - label: 'Trigger IRv10'
-    trigger: IRv10
+    trigger: irv10
     async: true
     build:
       message: "${BUILDKITE_MESSAGE}"
