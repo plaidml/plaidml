@@ -1,16 +1,5 @@
 include(CMakePackageConfigHelpers)
 
-# Set general cpack variables for package description
-set(CPACK_GENERATOR "TGZ")
-set(CPACK_ARCHIVE_COMPONENT_INSTALL 1)
-set(CPACK_PACKAGE_NAME "PlaidML")
-set(CPACK_PACKAGE_VENDOR "Intel Corp")
-set(CPACK_PACKAGE_CONTACT "Intel")
-set(CPACK_PACKAGE_VERSION ${PLAIDML_VERSION})
-set(CPACK_COMPONENTS_IGNORE_GROUPS 1)
-set(CPACK_COMPONENTS_ALL devkit)
-include(CPack)
-
 set_target_properties(plaidml_plaidml
   PROPERTIES
     EXPORT_NAME PlaidML

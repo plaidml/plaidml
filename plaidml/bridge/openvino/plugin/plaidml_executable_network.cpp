@@ -11,6 +11,8 @@
 #include <memory>   // NOLINT[build/include_order]
 #include <vector>   // NOLINT[build/include_order]
 
+#include <ngraph/pass/constant_folding.hpp>
+
 #include "plaidml_builder.hpp"
 #include "plaidml_infer_request.hpp"
 
@@ -27,7 +29,8 @@ static plaidml::Program buildProgram(const ICNNNetwork& network) {
   OutputsDataMap outputsInfo;
   network.getOutputsInfo(outputsInfo);
 
-  std::shared_ptr<const ngraph::Function> func = network.getFunction();
+  std::shared_ptr<ngraph::Function> func = ngraph::clone_function(*network.getFunction());
+  ngraph::pass::ConstantFolding().run_on_function(func);
   return buildProgram(func, network.getName(), inputsInfo, outputsInfo);
 }
 
