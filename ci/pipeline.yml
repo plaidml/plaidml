@@ -32,6 +32,7 @@ steps:
 
   - label: 'IRv10 models'
     trigger: irv10
+    soft_fail: true
     build:
       message: "${BUILDKITE_MESSAGE}"
       commit: "fe0679141cff310ca0662ae65223dc86b491b469"
