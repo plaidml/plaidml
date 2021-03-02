@@ -18,26 +18,37 @@ steps:
       - "bazel-testlogs/**/test.log"
 {{/variants}}
 
-  - label: ':hammer_and_wrench: :linux: :beer:'
-    command: |
-      echo --- :building_construction: cmake configuration
-      export TEMP=/tmp/$${BUILDKITE_AGENT_NAME}/$${BUILDKITE_PIPELINE_SLUG}
-      cmake \
-        -B build-opt \
-        -G Ninja \
-        -D CMAKE_BUILD_TYPE=Release \
-        -D CPM_SOURCE_CACHE=$${TEMP}/cpm \
-        -D PML_OPENVINO_BRIDGE=ON \
-        -D TEMP=$${TEMP}
+  # - label: ':hammer_and_wrench: :linux: :beer:'
+  #   command: |
+  #     echo --- :building_construction: cmake configuration
+  #     export TEMP=/tmp/$${BUILDKITE_AGENT_NAME}/$${BUILDKITE_PIPELINE_SLUG}
+  #     cmake \
+  #       -B build-opt \
+  #       -G Ninja \
+  #       -D CMAKE_BUILD_TYPE=Release \
+  #       -D CPM_SOURCE_CACHE=$${TEMP}/cpm \
+  #       -D PML_OPENVINO_BRIDGE=ON \
+  #       -D TEMP=$${TEMP}
 
-      echo --- :hammer_and_wrench: ninja
-      ninja -C build-opt
+  #     echo --- :hammer_and_wrench: ninja
+  #     ninja -C build-opt
 
-      echo --- :hammer_and_wrench: ninja check-test
-      ninja -C build-opt check-test
-    key: linux_x86_64_cmake
-    agents:
-      PLATFORM: linux_x86_64
+  #     echo --- :hammer_and_wrench: ninja check-test
+  #     ninja -C build-opt check-test
+  #   key: linux_x86_64_cmake
+  #   agents:
+  #     PLATFORM: linux_x86_64
+  - label: 'Trigger IRv10'
+    trigger: IRv10
+      async: true
+      build:
+        message: "${BUILDKITE_MESSAGE}"
+        commit: dee1beeaa5a19ae3bcb422c12d52c69e55124735
+        env:
+          PLAIDML_COMMIT: "${BUILDKITE_COMMIT}"
+          BUILDKITE_PULL_REQUEST: "${BUILDKITE_PULL_REQUEST}"
+          BUILDKITE_PULL_REQUEST_BASE_BRANCH: "${BUILDKITE_PULL_REQUEST_BASE_BRANCH}"
+          BUILDKITE_PULL_REQUEST_REPO: "${BUILDKITE_PULL_REQUEST_REPO}"
 
 
 # test phase
