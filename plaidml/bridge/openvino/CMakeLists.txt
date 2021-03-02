@@ -28,7 +28,7 @@ if(NOT InferenceEngineDeveloperPackage_FOUND)
   FetchContent_Declare(
     openvino
     GIT_REPOSITORY https://github.com/plaidml/openvino.git
-    GIT_TAG        c03f8d8b2b5f87f116a8032683f8a6e559628404
+    GIT_TAG        bf1155d44842b05be2b361f0cdca56375ca65d9c
   )
   if(LOCAL_OPENVINO_DIR)
     set(openvino_SOURCE_DIR ${LOCAL_OPENVINO_DIR})
@@ -65,6 +65,7 @@ pml_cc_library(
     ${_OPS_SRCS}
   INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}
   DEPS
+    plaidml::op::lib
     IE::inference_engine
     IE::ngraph
 )

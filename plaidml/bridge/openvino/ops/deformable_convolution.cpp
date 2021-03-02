@@ -17,40 +17,6 @@ using namespace plaidml::edsl;
 using namespace plaidml::op::lib;
 
 namespace {
-/*
-// Compute pad_before and the size of output.
-// This function is based on (the functon compute_padding_and_output_size() in plaidml/op/lib/ops.cc).
-// The type of the return variable and parameters are changed from TensorDim to size_t, because TensorDim can't be
-// converted to int.
-std::pair<size_t, size_t> compute_padding_before_and_output_size(size_t input_size, size_t off_size, size_t filter_size,
-                                                                 size_t stride, plaidml::op::AutoPadMode autopad_mode,
-                                                                 size_t pad_before, size_t pad_end, size_t dilation) {
-  size_t I_eff = input_size;
-  size_t F_eff = (dilation * (filter_size - 1)) + 1;
-  if (autopad_mode == plaidml::op::AutoPadMode::EXPLICIT) {
-    size_t output_size = ((I_eff + pad_before + pad_end - F_eff + stride) / stride);
-    std::pair<size_t, size_t> result(pad_before, output_size);
-    return result;
-  }
-  if (autopad_mode == plaidml::op::AutoPadMode::VALID) {
-    size_t output_size = ((I_eff - F_eff + stride) / stride);
-    std::pair<size_t, size_t> result(0, output_size);
-    return result;
-  }
-  if (autopad_mode == plaidml::op::AutoPadMode::SAME_LOWER || autopad_mode == plaidml::op::AutoPadMode::SAME_UPPER) {
-    size_t lower_term = (autopad_mode == plaidml::op::AutoPadMode::SAME_LOWER) ? 1 : 0;
-    size_t max = 0;
-    if (((off_size - 1) * stride + F_eff - input_size) > 0) {
-      max = (off_size - 1) * stride + F_eff - input_size;
-    }
-    pad_before = (max + lower_term) / 2;
-    size_t output_size = ((I_eff + stride - 1) / stride);
-    std::pair<size_t, size_t> result(pad_before, output_size);
-    return result;
-  }
-  THROW_IE_EXCEPTION << "Unexpected autopadding mode.";
-}
-*/
 std::vector<int> cast_vector(std::vector<int64_t> vec) {
   std::vector<int> cast_vec(vec.size());
   for (auto i = 0; i < vec.size(); ++i) {
@@ -63,7 +29,7 @@ std::vector<int> cast_vector(std::vector<int64_t> vec) {
 edsl::Tensor compute_deformable_convolution(edsl::Tensor I, edsl::Tensor OFF, edsl::Tensor F, std::vector<int> I_shape,
                                             std::vector<int> OFF_shape, std::vector<int> F_shape, int G, int DG,
                                             size_t rank, std::vector<size_t> strides, std::vector<size_t> dilations,
-                                            std::vector<size_t> pad_befores) {
+                                            std::vector<plaidml::edsl::TensorDim> pad_befores) {
   int N = I_shape[0];
   int CI = I_shape[1];
   int CO = F_shape[1];
@@ -255,15 +221,10 @@ void registerDeformableConvolution() {
     auto strides = layer->get_strides();
     auto dilations = layer->get_dilations();
     // Compute pad_before and the shape of output.
-    std::vector<size_t> pad_befores, output_sizes;
+    std::vector<TensorDim> pad_befores, output_sizes;
     for (auto i = 0; i < rank - 2; ++i) {
-      /*
-      std::pair<size_t, size_t> pad_before_and_output = compute_padding_before_and_output_size(
-          I_shape[i + 2], OFF_shape[i + 2], F_shape[i + 2], strides[i], autopad_mode, manual_padding[i],
-          manual_padding[i + rank - 2], dilations[i]);
-      */
-      std::pair<size_t, size_t> pad_before_and_output = compute_padding_and_output_size<size_t>(
-          static_cast<size_t>(I_shape[i + 2]), static_cast<size_t>(F_shape[i + 2]), static_cast<int64_t>(strides[i]),
+      std::pair<TensorDim, TensorDim> pad_before_and_output = compute_padding_and_output_size(
+          TensorDim(I_shape[i + 2]), TensorDim(F_shape[i + 2]), static_cast<int64_t>(strides[i]),
           autopad_mode, static_cast<int64_t>(manual_padding[i]), static_cast<int64_t>(manual_padding[i + rank - 2]),
           static_cast<int64_t>(dilations[i]), static_cast<int64_t>(1), false);
       pad_befores.push_back(pad_before_and_output.first);
@@ -275,11 +236,6 @@ void registerDeformableConvolution() {
       F_spatial_size *= F_shape[i + 2];
     }
     // Validate the shape of offset.
-    for (auto i = 0; i < rank - 2; ++i) {
-      if (output_sizes[i] != OFF_shape[i + 2]) {
-        THROW_IE_EXCEPTION << "Incorrect shape for DeformableConvolution.";
-      }
-    }
     if (OFF_shape[1] != (rank - 2) * DG * F_spatial_size) {
       THROW_IE_EXCEPTION << "Incorrect shape for DeformableConvolution.";
     }
