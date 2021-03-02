@@ -21,7 +21,7 @@ steps:
   - label: ':hammer_and_wrench: :linux: :beer:'
     command: |
       echo --- :building_construction: configuration
-      python configure --ci --temp=/tmp/$${BUILDKITE_AGENT_NAME}/plaidml
+      {{python}} configure --ci --temp=/tmp/$${BUILDKITE_AGENT_NAME}/plaidml
 
       echo --- :hammer_and_wrench: ninja
       ninja -C build-x86_64/Release
@@ -33,7 +33,7 @@ steps:
     trigger: irv10
     build:
       message: "${BUILDKITE_MESSAGE}"
-      commit: "364ea3c78984dc461d74cffd4451487c424b2136"
+      commit: "b553272f723a5d940d44ba83e207452da4a144c0"
       env:
         PLAIDML_COMMIT: "${BUILDKITE_COMMIT}"
         BUILDKITE_PULL_REQUEST: "${BUILDKITE_PULL_REQUEST}"
