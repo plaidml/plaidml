@@ -34,9 +34,7 @@ steps:
 
       echo --- Test devkit
       DEVKIT_DIR="build-x86_64/Release/_CPack_Packages/Linux/TGZ/PlaidML-1.0.0-Linux/devkit"
-      cmake $${DEVKIT_DIR} \
-        -B $${DEVKIT_DIR}/build \
-        -G Ninja
+      cmake -S $${DEVKIT_DIR} -B $${DEVKIT_DIR}/build -G Ninja
       ninja -C $${DEVKIT_DIR}/build
       $${DEVKIT_DIR}/build/edsl_test
 
