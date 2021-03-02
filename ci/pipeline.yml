@@ -17,12 +17,23 @@ steps:
       {{/artifacts}}
       - "bazel-testlogs/**/test.log"
 {{/variants}}
+  
+  - label: ':hammer_and_wrench: :linux: :beer:'
+    command: |
+      echo --- :building_construction: configuration
+      python configure --ci --temp=/tmp/$${BUILDKITE_AGENT_NAME}/plaidml
 
-  - label: 'Trigger IRv10'
+      echo --- :hammer_and_wrench: ninja
+      ninja -C build-x86_64/Release
+
+      echo --- :hammer_and_wrench: ninja check-test
+      ninja -C build-x86_64/Release check-test
+
+  - label: 'IRv10 models'
     trigger: irv10
     build:
       message: "${BUILDKITE_MESSAGE}"
-      commit: "e5f5c0f8e53aed53ef49a23f1732ae7127383d9a"
+      commit: "364ea3c78984dc461d74cffd4451487c424b2136"
       env:
         PLAIDML_COMMIT: "${BUILDKITE_COMMIT}"
         BUILDKITE_PULL_REQUEST: "${BUILDKITE_PULL_REQUEST}"
