@@ -8,14 +8,16 @@
 #include "ngraph/opsets/opset.hpp"
 #include "ngraph/opsets/opset4.hpp"
 
+#include "plaidml/op/lib/ops.h"
 #include "plaidml/op/op.h"
 
 using namespace plaidml;          // NOLINT[build/namespaces]
 using namespace InferenceEngine;  // NOLINT[build/namespaces]
-using namespace edsl;
+using namespace plaidml::edsl;
+using namespace plaidml::op::lib;
 
 namespace {
-
+/*
 // Compute pad_before and the size of output.
 // This function is based on (the functon compute_padding_and_output_size() in plaidml/op/lib/ops.cc).
 // The type of the return variable and parameters are changed from TensorDim to size_t, because TensorDim can't be
@@ -48,7 +50,7 @@ std::pair<size_t, size_t> compute_padding_before_and_output_size(size_t input_si
   }
   THROW_IE_EXCEPTION << "Unexpected autopadding mode.";
 }
-
+*/
 std::vector<int> cast_vector(std::vector<int64_t> vec) {
   std::vector<int> cast_vec(vec.size());
   for (auto i = 0; i < vec.size(); ++i) {
@@ -255,9 +257,15 @@ void registerDeformableConvolution() {
     // Compute pad_before and the shape of output.
     std::vector<size_t> pad_befores, output_sizes;
     for (auto i = 0; i < rank - 2; ++i) {
+      /*
       std::pair<size_t, size_t> pad_before_and_output = compute_padding_before_and_output_size(
           I_shape[i + 2], OFF_shape[i + 2], F_shape[i + 2], strides[i], autopad_mode, manual_padding[i],
           manual_padding[i + rank - 2], dilations[i]);
+      */
+      std::pair<size_t, size_t> pad_before_and_output = compute_padding_and_output_size<size_t>(
+          static_cast<size_t>(I_shape[i + 2]), static_cast<size_t>(F_shape[i + 2]), static_cast<int64_t>(strides[i]),
+          autopad_mode, static_cast<int64_t>(manual_padding[i]), static_cast<int64_t>(manual_padding[i + rank - 2]),
+          static_cast<int64_t>(dilations[i]), static_cast<int64_t>(1), false);
       pad_befores.push_back(pad_before_and_output.first);
       output_sizes.push_back(pad_before_and_output.second);
     }
