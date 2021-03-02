@@ -80,7 +80,6 @@ public:
 
     for (auto parallelOp : parallelOps) {
       tileLoopNestsToAlignWithDataMaps(parallelOp);
-      // simplifyMemrefMaps(parallelOp);
     }
 
     // Erase the affine maps attached to the memrefs
@@ -532,6 +531,8 @@ void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {
             }
           }
 
+          // TODO: Establish the conditions under which simplifying the affine
+          // expressions is OK
           simplifyMemrefMapsInInnerLoops(innerLoops, varMap);
         }
       }
