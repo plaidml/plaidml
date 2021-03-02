@@ -22,7 +22,7 @@ steps:
     trigger: irv10
     build:
       message: "${BUILDKITE_MESSAGE}"
-      commit: "f4b9c89bceae3179251da5140d070b72a6f3e392"
+      commit: "e2e41b9b5e65b9664690bb34b3c168522fb07221"
       env:
         PLAIDML_COMMIT: "${BUILDKITE_COMMIT}"
         BUILDKITE_PULL_REQUEST: "${BUILDKITE_PULL_REQUEST}"
