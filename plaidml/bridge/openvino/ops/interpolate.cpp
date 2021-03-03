@@ -83,6 +83,9 @@ namespace PlaidMLPlugin {
 void registerInterpolate() {
   registerOp("Interpolate", [](const Context& ctx) {
     auto* layer = ngraph::as_type<ngraph::opset4::Interpolate>(ctx.layer);
+    if (!layer) {
+      THROW_IE_EXCEPTION << "PlaidML plugin currently only supports the opset4 version of Interpolate";
+    }
 
     // Inputs
     auto I = ctx.operands.at(0);
