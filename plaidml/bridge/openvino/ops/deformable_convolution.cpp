@@ -177,11 +177,7 @@ edsl::Tensor compute_deformable_convolution(edsl::Tensor I, edsl::Tensor OFF, ed
                             .strides(std::vector<int>{F_shape.begin() + 2, F_shape.end()})
                             .autopad_mode(plaidml::op::AutoPadMode::VALID)
                             .input_layout(plaidml::op::TensorLayout::NCX)
-                            .filter_layout(plaidml::op::TensorLayout::KCX)
-                            .autogroup_mode(plaidml::op::AutoGroupMode::EXPLICIT)
-                            .group_layout(plaidml::op::GroupLayout::IN_C)
-                            .group_layout(plaidml::op::GroupLayout::IN_K)
-                            .groups(G);
+                            .filter_layout(plaidml::op::TensorLayout::KCX);
   return result;
 }
 
@@ -204,6 +200,9 @@ void registerDeformableConvolution() {
     std::vector<int> OFF_shape_cast = cast_vector(OFF_shape);
     std::vector<int> F_shape_cast = cast_vector(F_shape);
     int G = layer->get_group();
+    if (G != 1) {
+      THROW_IE_EXCEPTION << "Group not equal 1 isn't supported in openvino for now.";
+    }
     int DG = layer->get_deformable_group();
     auto rank = I.rank();
     auto autopad_mode = to_plaidml(layer->get_auto_pad());
@@ -224,8 +223,8 @@ void registerDeformableConvolution() {
     std::vector<TensorDim> pad_befores, output_sizes;
     for (auto i = 0; i < rank - 2; ++i) {
       std::pair<TensorDim, TensorDim> pad_before_and_output = compute_padding_and_output_size(
-          TensorDim(I_shape[i + 2]), TensorDim(F_shape[i + 2]), static_cast<int64_t>(strides[i]),
-          autopad_mode, static_cast<int64_t>(manual_padding[i]), static_cast<int64_t>(manual_padding[i + rank - 2]),
+          TensorDim(I_shape[i + 2]), TensorDim(F_shape[i + 2]), static_cast<int64_t>(strides[i]), autopad_mode,
+          static_cast<int64_t>(manual_padding[i]), static_cast<int64_t>(manual_padding[i + rank - 2]),
           static_cast<int64_t>(dilations[i]), static_cast<int64_t>(1), false);
       pad_befores.push_back(pad_before_and_output.first);
       output_sizes.push_back(pad_before_and_output.second);

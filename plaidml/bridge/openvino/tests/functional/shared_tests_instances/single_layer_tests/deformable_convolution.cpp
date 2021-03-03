@@ -177,7 +177,7 @@ const auto conv2DParams_SameLower = ::testing::Combine(  //
     ::testing::Values(ngraph::op::PadType::SAME_LOWER)   //
 );
 
-INSTANTIATE_TEST_CASE_P(Convolution2D_ExplicitPadding, DeformableConvolutionLayerTest,
+INSTANTIATE_TEST_CASE_P(smoke_Convolution2D_ExplicitPadding, DeformableConvolutionLayerTest,
                         ::testing::Combine(                                          //
                             conv2DParams_ExplicitPadding,                            //
                             ::testing::ValuesIn(netPrecisions),                      //
