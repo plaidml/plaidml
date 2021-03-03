@@ -16,7 +16,8 @@ pml_cc_library(
     plaidml::edsl
     plaidml::op::lib
     pmlc::util
-    LLVMSupport
+  COMPONENTS
+    devkit
 )
 
 pml_cc_library(
@@ -29,7 +30,6 @@ pml_cc_library(
     plaidml::edsl::obj
     plaidml::op::lib
     pmlc::util
-    LLVMSupport
 )
 
 pml_cc_test(

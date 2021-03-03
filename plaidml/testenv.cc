@@ -2,8 +2,6 @@
 
 #include "plaidml/testenv.h"
 
-#include "llvm/ADT/STLExtras.h"
-
 #include "plaidml/edsl/edsl.h"
 #include "plaidml/exec/exec.h"
 #include "plaidml/op/op.h"
@@ -57,7 +55,9 @@ static void compareClose(plaidml::Buffer buffer, const std::vector<T>& expected,
   auto data = reinterpret_cast<T*>(buffer.data());
   std::vector<T> actual(data, data + expected.size());
   ASSERT_EQ(actual.size(), expected.size());
-  for (auto [x, y] : llvm::zip(actual, expected)) {  // NOLINT[whitespace/braces]
+  for (size_t i = 0; i < actual.size(); i++) {
+    auto x = actual.at(i);
+    auto y = expected.at(i);
     if (isfinite(x) && isfinite(y)) {
       EXPECT_NEAR(x, y, (fabs(x) + fabs(y)) * tolerance);
     } else {
