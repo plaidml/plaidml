@@ -19,7 +19,10 @@ pml_cc_library(
   DEPS
     IE::inference_engine
     IE::ngraph
+    half
 )
+
+add_compile_definitions(HALF_ENABLE_CPP11_TYPE_TRAITS=1)
 
 add_subdirectory(plugin)
 if(PML_BUILD_TESTS)

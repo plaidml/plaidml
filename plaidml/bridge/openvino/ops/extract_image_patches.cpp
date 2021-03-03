@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
+#include "half.hpp"
+
 #include "plaidml_ops.hpp"
 #include "plaidml_util.hpp"
 
@@ -40,7 +42,7 @@ edsl::Tensor create_kernel_tensor(const int64_t& filter_row, const int64_t& filt
   }
 
   // build kernel Tensor buffer.
-  std::vector<T> data(kernel_sum, 0);
+  std::vector<T> data(kernel_sum, static_cast<T>(0));
   int64_t channel_index = 0;
   for (int64_t depth = 0; depth < depths; depth++) {
     auto index = depth * kernel_dims[1] * kernel_dims[2] * kernel_dims[3] +
@@ -75,8 +77,7 @@ void registerExtractImagePatches() {
     edsl::Tensor kernel_tensor;
     switch (input_tensor.dtype()) {
       case DType::FLOAT16:
-        // TODO: Investigate whether there's a way to create fp16 directly
-        kernel_tensor = edsl::cast(create_kernel_tensor<float>(filter_row, filter_col, input_tensor), DType::FLOAT16);
+        kernel_tensor = create_kernel_tensor<half_float::half>(filter_row, filter_col, input_tensor);
         break;
       case DType::FLOAT32:
         kernel_tensor = create_kernel_tensor<float>(filter_row, filter_col, input_tensor);
