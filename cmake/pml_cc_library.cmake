@@ -25,6 +25,7 @@ include(CMakeParseArguments)
 # Also in IDE, target will appear in PML folder while non PUBLIC will be in PML/internal.
 # TESTONLY: When added, this target will only be built if user passes -DPML_BUILD_TESTS=ON to CMake.
 # WHOLEARCHIVE: If set, links all symbols from "ALWAYSLINK" libraries.
+# COMPONENTS: List of components to install headers into
 #
 # Note:
 # By default, pml_cc_library will always create a library named pml_${NAME},
@@ -61,7 +62,7 @@ function(pml_cc_library)
     _RULE
     "PUBLIC;ALWAYSLINK;TESTONLY;WHOLEARCHIVE"
     "NAME;TYPE"
-    "HDRS;TEXTUAL_HDRS;SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS;INCLUDES;PROPS;PRIVATE_DEPS"
+    "HDRS;TEXTUAL_HDRS;SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS;INCLUDES;PROPS;PRIVATE_DEPS;COMPONENTS"
     ${ARGN}
   )
 
@@ -201,4 +202,15 @@ function(pml_cc_library)
     # For example, foo/bar/ library 'bar' would end up as 'foo::bar'.
     add_library(${_PACKAGE_NS} ALIAS ${_NAME})
   endif()
+
+  # Install header files
+  file(RELATIVE_PATH _HDR_INSTALL_PATH ${PROJECT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
+  foreach(_COMPONENT ${_RULE_COMPONENTS})
+    install(
+      FILES ${_RULE_HDRS}
+      DESTINATION "include/${_HDR_INSTALL_PATH}"
+      COMPONENT ${_COMPONENT}
+    )
+  endforeach()
+
 endfunction()
