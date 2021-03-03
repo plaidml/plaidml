@@ -16,6 +16,8 @@ pml_cc_library(
     pmlc::ast
     pmlc::util
     LLVMSupport
+  COMPONENTS
+    devkit
 )
 
 pml_cc_library(

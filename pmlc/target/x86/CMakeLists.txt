@@ -53,7 +53,7 @@ pml_cc_library(
 
 add_custom_command(
   OUTPUT heatmap.cc
-  COMMAND python
+  COMMAND ${PYTHON_EXECUTABLE}
     ${CMAKE_SOURCE_DIR}/tools/heatmap/heatmap.py
       ${CMAKE_CURRENT_SOURCE_DIR}/heatmap_skx_xeonplat_8180_1-7GHz_mblocked.csv.gz
       ${CMAKE_CURRENT_SOURCE_DIR}/heatmap.tpl.cc

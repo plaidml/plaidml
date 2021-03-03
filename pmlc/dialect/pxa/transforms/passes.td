@@ -51,6 +51,11 @@ def Cache : FunctionPass<"pxa-cache"> {
   ];
 }
 
+def ConvertMemOp : FunctionPass<"pxa-convert-mem-op"> {
+  let summary = "Convert standard memory operations to pxa if possible";
+  let constructor = "pmlc::dialect::pxa::createConvertMemOpPass()";
+}
+
 def Fusion : FunctionPass<"pxa-fusion"> {
   let summary = "Fuse blocks that are compatible";
   let constructor = "pmlc::dialect::pxa::createFusionPass()";

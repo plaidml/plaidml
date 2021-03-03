@@ -2,11 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include <ngraph/opsets/opset3.hpp>
+#include "single_layer_tests/scatter_elements_update.hpp"
+
 #include <vector>
 
 #include "common_test_utils/test_constants.hpp"
-#include "single_layer_tests/scatter_elements_update.hpp"
+#include "ngraph/opsets/opset3.hpp"
 
 using namespace LayerTestsDefinitions;
 using namespace ngraph::opset3;
@@ -50,8 +51,7 @@ INSTANTIATE_TEST_CASE_P(smoke, ScatterElementsUpdateLayerTest,
                             ::testing::ValuesIn(idxValue),                                                         //
                             ::testing::Values(InferenceEngine::Precision::FP32),                                   //
                             ::testing::Values(InferenceEngine::Precision::I32),                                    //
-                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)                                     //
-                            ),
+                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),
                         ScatterElementsUpdateLayerTest::getTestCaseName);
 
 }  // namespace
