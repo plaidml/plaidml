@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
+#include "half.hpp"
+
 #include "plaidml_ops.hpp"
 #include "plaidml_util.hpp"
 
@@ -27,10 +29,10 @@ edsl::Tensor create_kernel_tensor(const int64_t& filter_row, const int64_t& filt
   // build kernel Tensor dims.
   auto depths = filter_row * filter_col * input_channel;
   std::vector<int64_t> kernel_dims{
-      /*output channels*/ depths,
-      /*input channels*/ input_channel,
-      /*filter width*/ filter_row,
-      /*filter height*/ filter_col,
+      depths,         // output channels
+      input_channel,  // input channels
+      filter_row,     // filter width
+      filter_col,     // filter height
   };
 
   // kernel tensor element size.
@@ -40,7 +42,7 @@ edsl::Tensor create_kernel_tensor(const int64_t& filter_row, const int64_t& filt
   }
 
   // build kernel Tensor buffer.
-  std::vector<T> data(kernel_sum, 0);
+  std::vector<T> data(kernel_sum, static_cast<T>(0));
   int64_t channel_index = 0;
   for (int64_t depth = 0; depth < depths; depth++) {
     auto index = depth * kernel_dims[1] * kernel_dims[2] * kernel_dims[3] +
@@ -74,12 +76,27 @@ void registerExtractImagePatches() {
 
     edsl::Tensor kernel_tensor;
     switch (input_tensor.dtype()) {
+      case DType::FLOAT16:
+        kernel_tensor = create_kernel_tensor<half_float::half>(filter_row, filter_col, input_tensor);
+        break;
       case DType::FLOAT32:
         kernel_tensor = create_kernel_tensor<float>(filter_row, filter_col, input_tensor);
         break;
-      case DType::INT32:
-        kernel_tensor = create_kernel_tensor<int>(filter_row, filter_col, input_tensor);
+      case DType::INT8:
+        kernel_tensor = create_kernel_tensor<int8_t>(filter_row, filter_col, input_tensor);
         break;
+      case DType::INT16:
+        kernel_tensor = create_kernel_tensor<int16_t>(filter_row, filter_col, input_tensor);
+        break;
+      case DType::INT32:
+        kernel_tensor = create_kernel_tensor<int32_t>(filter_row, filter_col, input_tensor);
+        break;
+      case DType::INT64:
+        kernel_tensor = create_kernel_tensor<int64_t>(filter_row, filter_col, input_tensor);
+        break;
+      default:
+        THROW_IE_EXCEPTION << "PlaidML does not currently support ExtractImagePatches for datatype "
+                           << to_string(input_tensor.dtype());
     }
 
     std::vector<size_t> strides;
@@ -103,7 +120,8 @@ void registerExtractImagePatches() {
                       .dilations(dilations)
                       .autopad_mode(autopad_mode)
                       .input_layout(plaidml::op::TensorLayout::NCX)
-                      .filter_layout(plaidml::op::TensorLayout::KCX);
+                      .filter_layout(plaidml::op::TensorLayout::KCX)
+                      .name(ctx.layer->get_friendly_name() + "_pml_intern_conv");
     return edsl::make_tuple(result);
   });
 }
