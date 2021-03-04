@@ -17,7 +17,6 @@ namespace PlaidMLPlugin {
 
 void registerScatterNDUpdate() {
   registerOp("ScatterNDUpdate", [](const Context& ctx) {
-    auto* layer = ngraph::as_type<ngraph::opset4::ScatterNDUpdate>(ctx.layer);
     IE_ASSERT(ctx.operands.size() == 3);
     auto data = ctx.operands.at(0);
     auto indices = ctx.operands.at(1);
