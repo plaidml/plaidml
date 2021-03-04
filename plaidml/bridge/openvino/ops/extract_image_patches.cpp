@@ -29,10 +29,10 @@ edsl::Tensor create_kernel_tensor(const int64_t& filter_row, const int64_t& filt
   // build kernel Tensor dims.
   auto depths = filter_row * filter_col * input_channel;
   std::vector<int64_t> kernel_dims{
-      /*output channels*/ depths,
-      /*input channels*/ input_channel,
-      /*filter width*/ filter_row,
-      /*filter height*/ filter_col,
+      depths,         // output channels
+      input_channel,  // input channels
+      filter_row,     // filter width
+      filter_col,     // filter height
   };
 
   // kernel tensor element size.
