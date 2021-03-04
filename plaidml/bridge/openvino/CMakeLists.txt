@@ -1,6 +1,8 @@
 set(OUTPUT_ROOT ${CMAKE_BINARY_DIR})
 
-find_package(InferenceEngineDeveloperPackage QUIET)
+if(NOT InferenceEngineDeveloperPackage_FOUND)
+  find_package(InferenceEngineDeveloperPackage REQUIRED)
+endif()
 
 file(GLOB_RECURSE _OPS_SRCS CONFIGURE_DEPENDS "ops/*.cpp")
 

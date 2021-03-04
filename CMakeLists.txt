@@ -39,11 +39,12 @@ endif()
 # -------------------------------------------------------------------------------
 # Project component configuration
 # -------------------------------------------------------------------------------
-option(PML_BUILD_TESTS "Builds PML unit tests." ON)
-option(PML_OPENVINO_BRIDGE "Enable the OpenVINO plugin" ON)
+option(PML_BUILD_TESTS "Builds PML unit tests" ON)
 option(PML_ENABLE_OPENCL "Enable OpenCL support" ON)
 option(PML_ENABLE_VULKAN "Enable Vulkan support" ON)
+option(PML_ENABLE_DEVKIT "Enable the devkit" ON)
 option(PML_INCLUDE_LLVM "Fetch and include the llvm-project" ON)
+option(PML_OPENVINO_BRIDGE "Enable the OpenVINO plugin" ON)
 
 list(APPEND CMAKE_MODULE_PATH
   ${CMAKE_CURRENT_LIST_DIR}/cmake
@@ -62,8 +63,10 @@ endif()
 include(CPM)
 include(boost)
 include(easylogging)
-include(gflags)
-include(googletest)
+if(NOT InferenceEngineDeveloperPackage_FOUND)
+  include(gflags)
+  include(googletest)
+endif()
 include(half)
 
 if(PML_INCLUDE_LLVM)
@@ -127,10 +130,6 @@ set(CPACK_PACKAGE_VENDOR "Intel Corp")
 set(CPACK_PACKAGE_CONTACT "Intel")
 set(CPACK_PACKAGE_VERSION ${PLAIDML_VERSION})
 set(CPACK_COMPONENTS_IGNORE_GROUPS 1)
-set(CPACK_COMPONENTS_ALL
-  devkit
-  testkit
-)
 include(CPack)
 
 
@@ -148,4 +147,6 @@ configure_lit_site_cfg(
   ${CMAKE_CURRENT_SOURCE_DIR}/lit.cfg.py
 )
 
-include(devkit)
+if(PML_ENABLE_DEVKIT)
+  include(devkit)
+endif()
