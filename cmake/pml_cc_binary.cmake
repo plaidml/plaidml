@@ -126,10 +126,12 @@ function(pml_cc_binary)
   set_property(GLOBAL APPEND PROPERTY _PML_CC_BINARY_NAMES "${_NAME}")
   set_property(TARGET ${_NAME} PROPERTY DIRECT_DEPS ${_RULE_DEPS})
 
-  install(TARGETS ${_NAME}
-          RENAME ${_RULE_NAME}
-          COMPONENT ${_RULE_NAME}
-          RUNTIME DESTINATION bin)
+  install(
+    TARGETS ${_NAME}
+    RENAME ${_RULE_NAME}
+    COMPONENT ${_RULE_NAME}
+    RUNTIME DESTINATION "bin"
+  )
 endfunction()
 
 function(pml_link_whole_libs TARGET)

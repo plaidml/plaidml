@@ -687,9 +687,9 @@ struct ProgramBuilder {
     for (const ExprNodePtr &operand : node->operands) {
       operands.push_back(builder.lookupNode(operand));
     }
-    llvm::SetVector<Value> results;
+    llvm::SmallVector<Value> results;
     for (const ExprNodePtr &result : node->results) {
-      results.insert(builder.lookupNode(result));
+      results.push_back(builder.lookupNode(result));
     }
     llvm::SmallVector<Type, 4> resultTypes;
     for (Value val : results) {
@@ -709,7 +709,7 @@ struct ProgramBuilder {
       std::tie(outer, inner) = tuple;
       mapper.map(outer, inner);
     }
-    llvm::SmallVector<Value, 4> innerResults;
+    llvm::SmallVector<Value, 4> innerResults(results.size());
     llvm::SetVector<Operation *> toRemove;
     for (const ExprNodePtr &node : traversal.getFlat()) {
       Value value = builder.lookupNode(node);
@@ -720,9 +720,13 @@ struct ProgramBuilder {
       }
       assert(op && "Unexpected block argument");
       Operation *clonedOp = bodyBuilder.clone(*op, mapper);
-      if (results.contains(value)) {
-        for (Value result : clonedOp->getResults()) {
-          innerResults.push_back(result);
+
+      auto itLayerResults = std::find(results.begin(), results.end(), value);
+      if (itLayerResults != results.end()) {
+        if (auto opResultVal = value.cast<OpResult>()) {
+          auto idxLayerResults = std::distance(results.begin(), itLayerResults);
+          innerResults[idxLayerResults] =
+              clonedOp->getResult(opResultVal.getResultNumber());
         }
       }
       toRemove.insert(op);
