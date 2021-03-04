@@ -545,9 +545,8 @@ StatusOr<::plaidml::Program> PlaidMLCompiler::ProgramFromHloModule(std::unique_p
         }
         case HloOpcode::kBroadcast: {
           auto op = instr_map[operand_ids[0]];
-          std::vector<int> result_shape(begin(dims), end(dims));
-          std::vector<int> bcast_dims(begin(instruction->dimensions()), end(instruction->dimensions()));
-          op = plaidml_op::broadcast(instr_map[operand_ids[0]], result_shape, bcast_dims);
+          std::vector<int64_t> bcast_dims(begin(instruction->dimensions()), end(instruction->dimensions()));
+          op = plaidml_op::broadcast(instr_map[operand_ids[0]], dims, bcast_dims);
           instr_map.insert(std::make_pair(cur_instr_id, op));
           break;
         }
