@@ -897,6 +897,7 @@ Value convolution(const Value& value) {
   if (args.size() != 18) {
     throw std::runtime_error("Convolution op expects 18 arguments");
   }
+  IVLOG(5, "Requesting convolution with raw args: " << args);
   auto I_or_O = args[0].as_tensor();  // O if deriv_mode is DATA, else I
   auto F_or_O = args[1].as_tensor();  // O if deriv_mode is FILTER, else F
   auto strides = args[2].as_int_tuple_or_empty();
