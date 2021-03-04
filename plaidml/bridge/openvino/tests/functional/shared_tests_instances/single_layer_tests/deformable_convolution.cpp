@@ -177,7 +177,7 @@ const auto conv2DParams_SameLower = ::testing::Combine(  //
     ::testing::Values(ngraph::op::PadType::SAME_LOWER)   //
 );
 
-INSTANTIATE_TEST_CASE_P(smoke_Convolution2D_ExplicitPadding, DeformableConvolutionLayerTest,
+INSTANTIATE_TEST_CASE_P(Convolution2D_ExplicitPadding, DeformableConvolutionLayerTest,
                         ::testing::Combine(                                          //
                             conv2DParams_ExplicitPadding,                            //
                             ::testing::ValuesIn(netPrecisions),                      //
@@ -211,6 +211,15 @@ INSTANTIATE_TEST_CASE_P(Convolution2D_SameLower, DeformableConvolutionLayerTest,
                             ::testing::Values(std::vector<size_t>({1, 2, 10, 10})),   //
                             ::testing::Values(std::vector<size_t>({1, 36, 10, 10})),  //
                             ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),      //
+                        DeformableConvolutionLayerTest::getTestCaseName);
+
+INSTANTIATE_TEST_CASE_P(smoke, DeformableConvolutionLayerTest,
+                        ::testing::Combine(                                          //
+                            conv2DParams_ExplicitPadding,                            //
+                            ::testing::ValuesIn(netPrecisions),                      //
+                            ::testing::Values(std::vector<size_t>({1, 1, 10, 10})),  //
+                            ::testing::Values(std::vector<size_t>({1, 18, 9, 9})),   //
+                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),     //
                         DeformableConvolutionLayerTest::getTestCaseName);
 
 /* ============= 3D Convolution ============= */
