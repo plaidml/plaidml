@@ -12,6 +12,9 @@
 #include <vector>   // NOLINT[build/include_order]
 
 #include <ngraph/pass/constant_folding.hpp>
+#include <ngraph/pass/manager.hpp>
+#include <transformations/common_optimizations/common_optimizations.hpp>
+#include <transformations/op_conversions/convert_interpolate1_to_interpolate4.hpp>
 
 #include "plaidml_builder.hpp"
 #include "plaidml_infer_request.hpp"
@@ -30,6 +33,9 @@ static plaidml::Program buildProgram(const ICNNNetwork& network) {
   network.getOutputsInfo(outputsInfo);
 
   std::shared_ptr<ngraph::Function> func = ngraph::clone_function(*network.getFunction());
+  ngraph::pass::Manager manager;
+  manager.register_pass<ngraph::pass::ConvertInterpolate1ToInterpolate4>();
+  manager.run_passes(func);
   ngraph::pass::ConstantFolding().run_on_function(func);
   return buildProgram(func, network.getName(), inputsInfo, outputsInfo);
 }

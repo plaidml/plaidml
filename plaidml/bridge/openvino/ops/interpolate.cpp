@@ -109,13 +109,14 @@ void registerInterpolate() {
     // Calculate scales
     auto input_shape = I.compute_shape().sizes();  // input_shape is the shape of data after padding
     std::vector<float> scales(input_shape.size(), 1.0);
-    for (auto axis : axes) {
+    for (size_t axis_idx = 0; axis_idx < axes.size(); axis_idx++) {
+      auto axis = axes[axis_idx];
       switch (shape_calculation_mode) {
         case ngraph::op::v4::Interpolate::ShapeCalcMode::sizes:
-          scales[axis] = 1.0 * result_shape[axis] / input_shape[axis];
+          scales[axis] = 1.0 * result_shape[axis_idx] / input_shape[axis];
           break;
         case ngraph::op::v4::Interpolate::ShapeCalcMode::scales:
-          scales[axis] = default_scales[axis];
+          scales[axis] = default_scales[axis_idx];
           break;
         default:
           THROW_IE_EXCEPTION << "Unsupported Interpolate ShapeCalcMode";
