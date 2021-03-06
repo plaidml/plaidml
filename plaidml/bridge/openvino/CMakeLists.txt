@@ -16,9 +16,12 @@ pml_cc_library(
     plaidml_util.cpp
     ${_OPS_SRCS}
   INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}
+  DEFINES
+    HALF_ENABLE_CPP11_TYPE_TRAITS
   DEPS
     IE::inference_engine
     IE::ngraph
+    half
 )
 
 add_subdirectory(plugin)
