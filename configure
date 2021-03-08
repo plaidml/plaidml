@@ -216,7 +216,7 @@ def main():
         cfg.configure_cmake(args)
     else:
         if not cfg.is_activated():
-            if not args.skip_update:
+            if not args.skip_conda_env:
                 cfg.configure_conda()
             cfg.activate_conda()
         else:
