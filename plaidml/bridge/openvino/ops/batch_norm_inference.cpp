@@ -17,6 +17,9 @@ namespace PlaidMLPlugin {
 void registerBatchNormInference() {
   registerOp("BatchNormInference", [](const Context& ctx) {
     auto* layer = ngraph::as_type<ngraph::opset5::BatchNormInference>(ctx.layer);
+    if (!layer) {
+      THROW_IE_EXCEPTION << "PlaidML plugin currently only supports the opset5 version of BatchNormInference";
+    }
     IE_ASSERT(ctx.operands.size() == 5);
     auto I = ctx.operands.at(0);
     auto gamma = ctx.operands.at(1);

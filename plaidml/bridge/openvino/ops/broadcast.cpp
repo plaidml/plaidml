@@ -20,6 +20,9 @@ namespace PlaidMLPlugin {
 void registerBroadcast() {
   registerOp("Broadcast", [](const Context& ctx) {
     auto* layer = ngraph::as_type<ngraph::opset1::Broadcast>(ctx.layer);
+    if (!layer) {
+      THROW_IE_EXCEPTION << "PlaidML plugin currently only supports the opset1 version of Broadcast";
+    }
     IE_ASSERT(ctx.operands.size() <= 3);
     IE_ASSERT(ctx.operands.size() >= 2);
     auto I = ctx.operands.at(0);
