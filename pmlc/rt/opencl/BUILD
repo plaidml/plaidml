@@ -13,41 +13,47 @@ plaidml_cc_library(
         "opencl_invocation.cc",
         "opencl_invocation.h",
         "opencl_runtime.cc",
-        "opencl_wrappers.cc",
-        "opencl_utils.h",
         "opencl_utils.cc",
+        "opencl_utils.h",
+        "opencl_wrappers.cc",
     ],
     hdrs = ["register.h"],
+    linkstatic = 1,
     deps = [
         "//pmlc/compiler",
         "//pmlc/rt",
         "@llvm-project//mlir:Pass",
-        "@llvm-project//mlir:SPIRVLowering",
+        "@llvm-project//mlir:SPIRVConversion",
         "@llvm-project//mlir:mlir_runner_utils",
         "@opencl_hpp_headers",
-        "@opencl_icd_loader"
+        "@opencl_icd_loader",
     ],
     alwayslink = 1,
-    linkstatic = 1,
 )
 
 plaidml_cc_binary(
     name = "clprobe",
     srcs = [
         "clprobe.cc",
-        "opencl_utils.h",
         "opencl_utils.cc",
+        "opencl_utils.h",
     ],
-    deps = ["@opencl_icd_loader", "@opencl_hpp_headers"],
+    deps = [
+        "@opencl_hpp_headers",
+        "@opencl_icd_loader",
+    ],
 )
 
 cc_test(
     name = "clprobe_test",
+    size = "small",
     srcs = [
         "clprobe.cc",
-        "opencl_utils.h",
         "opencl_utils.cc",
+        "opencl_utils.h",
     ],
-    deps = ["@opencl_icd_loader", "@opencl_hpp_headers"],
-    size = "small",
+    deps = [
+        "@opencl_hpp_headers",
+        "@opencl_icd_loader",
+    ],
 )

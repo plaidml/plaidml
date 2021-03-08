@@ -12,11 +12,11 @@ filegroup(
     name = "lit_tests",
     srcs = [
         "//pmlc/conversion/comp_to_llvm/tests:all",
-        "//pmlc/conversion/gpu_to_comp/tests:all",
         "//pmlc/conversion/gpu_to_spirv/tests:all",
         "//pmlc/conversion/pxa_to_affine/tests:all",
         "//pmlc/conversion/stdx_to_llvm/tests:all",
         "//pmlc/conversion/tile_to_pxa/tests:all",
+        "//pmlc/dialect/affinex/tests:all",
         "//pmlc/dialect/comp/tests:all",
         "//pmlc/dialect/layer/tests:all",
         "//pmlc/dialect/oplib/tests:all",
@@ -27,7 +27,6 @@ filegroup(
         "//pmlc/rt/opencl/tests:all",
         "//pmlc/rt/tests:all",
         "//pmlc/rt/vulkan/tests:all",
-        "//pmlc/target/intel_gen/tests:all",
         "//pmlc/target/x86/tests:all",
     ],
     visibility = ["//visibility:public"],
@@ -60,13 +59,13 @@ plaidml_cc_library(
         ":hdrs",
         "//pmlc/conversion/comp_to_llvm",
         "//pmlc/conversion/gpu",
-        "//pmlc/conversion/gpu_to_comp",
         "//pmlc/conversion/gpu_to_spirv",
         "//pmlc/conversion/pxa_to_affine",
         "//pmlc/conversion/scf_to_omp",
         "//pmlc/conversion/stdx_to_llvm",
         "//pmlc/conversion/tile_to_pxa",
         "//pmlc/dialect/abi",
+        "//pmlc/dialect/affinex",
         "//pmlc/dialect/comp",
         "//pmlc/dialect/layer",
         "//pmlc/dialect/pxa",
@@ -75,6 +74,7 @@ plaidml_cc_library(
         "//pmlc/dialect/xsmm",
         "//pmlc/rt:all_runtimes",
         "//pmlc/target:all_targets",
+        "//pmlc/transforms",
         "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:AffineToStandard",
         "@llvm-project//mlir:AffineTransforms",
@@ -92,14 +92,14 @@ plaidml_cc_library(
         "@llvm-project//mlir:SCFToGPUPass",
         "@llvm-project//mlir:SCFToStandard",
         "@llvm-project//mlir:SCFTransforms",
+        "@llvm-project//mlir:SPIRVConversion",
         "@llvm-project//mlir:SPIRVDialect",
-        "@llvm-project//mlir:SPIRVLowering",
         "@llvm-project//mlir:SPIRVSerialization",
         "@llvm-project//mlir:SPIRVToLLVM",
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:StandardOpsTransforms",
         "@llvm-project//mlir:StandardToLLVM",
-        "@llvm-project//mlir:StandardToSPIRVTransforms",
+        "@llvm-project//mlir:StandardToSPIRV",
         "@llvm-project//mlir:Transforms",
         "@llvm-project//mlir:VectorOps",
     ],
@@ -123,11 +123,11 @@ plaidml_cc_binary(
     deps = ["//pmlc/tools/pmlc-opt:lib"],
 )
 
-plaidml_cc_binary(
-    name = "tblgen",
-    data = [":lit_tests"],
-    deps = ["//pmlc/tools/pmlc-tblgen:lib"],
-)
+# plaidml_cc_binary(
+#     name = "tblgen",
+#     data = [":lit_tests"],
+#     deps = ["//pmlc/tools/pmlc-tblgen:lib"],
+# )
 
 plaidml_cc_binary(
     name = "translate",

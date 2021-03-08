@@ -10,8 +10,8 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Support/FormatVariadic.h"
 
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OperationSupport.h"
-#include "mlir/IR/StandardTypes.h"
 
 #include "pmlc/util/logging.h"
 

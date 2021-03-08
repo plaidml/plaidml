@@ -3,6 +3,7 @@
 #ifndef __PML_PXA_OPS__
 #define __PML_PXA_OPS__
 
+include "mlir/Dialect/Affine/IR/AffineMemoryOpInterfaces.td"
 include "mlir/Dialect/StandardOps/IR/StandardOpsBase.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
@@ -27,7 +28,9 @@ def AnyStdScalar : AnyTypeOf<[AnyFloat, AnySignlessInteger]> {}
 
 class PxaReduceOpBase<string mnemonic, list<OpTrait> traits = []> :
     PXA_OpWithPP<mnemonic, !listconcat(traits,
-        [DeclareOpInterfaceMethods<PxaReduceOpInterface>])> {
+        [DeclareOpInterfaceMethods<PxaReduceOpInterface>,
+        DeclareOpInterfaceMethods<MemRefDereferencingInterface>, 
+        MemRefsNormalizable])> {
 
   code extraClassDeclarationBase = [{
     mlir::Value getMemRef() { return memref(); }
@@ -38,7 +41,7 @@ class PxaReduceOpBase<string mnemonic, list<OpTrait> traits = []> :
     operand_range getMapOperands() { return idxs(); }
     static mlir::StringRef getMapAttrName() { return "map"; }
     mlir::AffineMapAttr getAffineMapAttr() {
-      return getAttr(getMapAttrName()).cast<mlir::AffineMapAttr>();
+      return (*this)->getAttr(getMapAttrName()).cast<mlir::AffineMapAttr>();
     }
     mlir::AtomicRMWKind getAgg() { return agg(); }
   }];
@@ -58,12 +61,17 @@ def PxaReduceOp : PxaReduceOpBase<"reduce"> {
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 
-  let builders = [OpBuilder<
-    "mlir::OpBuilder& builder, mlir::OperationState& result, mlir::AtomicRMWKind agg,"
-    "mlir::Value val, mlir::Value mem, mlir::AffineMap map, mlir::ValueRange idxs", [{
-      build(builder, result, mem.getType(), agg, val, mem, map, idxs);
-    }]
-  >];
+  let builders = [
+    OpBuilderDAG<(ins
+      "mlir::AtomicRMWKind":$agg,
+      "mlir::Value":$val,
+      "mlir::Value":$mem,
+      "mlir::AffineMap":$map,
+      "mlir::ValueRange":$idxs
+    ), [{
+      build($_builder, $_state, mem.getType(), agg, val, mem, map, idxs);
+    }]>
+  ];
 
   let extraClassDeclaration =  extraClassDeclarationBase # [{
     mlir::Value getValueToStore() { return val(); }
@@ -109,12 +117,17 @@ def PxaVectorReduceOp : PxaReduceOpBase<"vector_reduce"> {
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 
-  let builders = [OpBuilder<
-    "mlir::OpBuilder& builder, mlir::OperationState& result, mlir::AtomicRMWKind agg,"
-    "mlir::Value vector, mlir::Value mem, mlir::AffineMap map, mlir::ValueRange idxs", [{
-      build(builder, result, mem.getType(), agg, vector, mem, map, idxs);
-    }]
-  >];
+  let builders = [
+    OpBuilderDAG<(ins
+      "mlir::AtomicRMWKind":$agg,
+      "mlir::Value":$vector,
+      "mlir::Value":$mem,
+      "mlir::AffineMap":$map,
+      "mlir::ValueRange":$idxs
+    ), [{
+      build($_builder, $_state, mem.getType(), agg, vector, mem, map, idxs);
+    }]>
+  ];
 
   let extraClassDeclaration = extraClassDeclarationBase # [{
     mlir::Value getValueToStore() { return vector(); }
@@ -126,7 +139,9 @@ def PxaVectorReduceOp : PxaReduceOpBase<"vector_reduce"> {
 
 class PxaLoadOpBase<string mnemonic, list<OpTrait> traits = []> :
     PXA_OpWithPP<mnemonic, !listconcat(traits,
-        [DeclareOpInterfaceMethods<PxaReadOpInterface>])> {
+        [DeclareOpInterfaceMethods<PxaReadOpInterface>,
+        DeclareOpInterfaceMethods<MemRefDereferencingInterface>, 
+        MemRefsNormalizable])> {
   let arguments = (ins
     AnyMemRef:$memref,
     Variadic<Index>:$indices
@@ -140,7 +155,7 @@ class PxaLoadOpBase<string mnemonic, list<OpTrait> traits = []> :
 
     /// Returns the affine map used to index the memref for this operation.
     mlir::AffineMapAttr getAffineMapAttr() {
-      return getAttr(getMapAttrName()).cast<mlir::AffineMapAttr>();
+      return (*this)->getAttr(getMapAttrName()).cast<mlir::AffineMapAttr>();
     }
 
     static mlir::StringRef getMapAttrName() { return "map"; }
@@ -174,14 +189,21 @@ def PxaLoadOp : PxaLoadOpBase<"load", [NoSideEffect]> {
 
   let builders = [
     /// Builds an affine load op with the specified map and operands.
-    OpBuilder<"mlir::OpBuilder &builder, mlir::OperationState &result, mlir::AffineMap map, "
-                      "mlir::ValueRange operands">,
+    OpBuilderDAG<(ins
+      "mlir::AffineMap":$map,
+      "mlir::ValueRange":$operands
+    )>,
     /// Builds an affine load op with an identity map and operands.
-    OpBuilder<"mlir::OpBuilder &builder, mlir::OperationState &result, mlir::Value memref, "
-                      "mlir::ValueRange indices = {}">,
+    OpBuilderDAG<(ins
+      "mlir::Value":$memref,
+      CArg<"mlir::ValueRange", "{}">:$indices
+    )>,
     /// Builds an affine load op with the specified map and its operands.
-    OpBuilder<"mlir::OpBuilder &builder, mlir::OperationState &result, mlir::Value memref, "
-                      "mlir::AffineMap map, mlir::ValueRange mapOperands">
+    OpBuilderDAG<(ins
+      "mlir::Value":$memref,
+      "mlir::AffineMap":$map,
+      "mlir::ValueRange":$mapOperands
+    )>
   ];
 
   let extraClassDeclaration = extraClassDeclarationBase;
@@ -232,9 +254,13 @@ def PxaVectorLoadOp : PxaLoadOpBase<"vector_load"> {
 
   let results = (outs AnyVector:$result);
 
-  let builders = [OpBuilder<
-    "mlir::OpBuilder &builder, mlir::OperationState &result, mlir::VectorType type,"
-    "mlir::Value memref, mlir::AffineMap map, mlir::ValueRange mapOperands">
+  let builders = [
+    OpBuilderDAG<(ins
+      "mlir::VectorType":$type,
+      "mlir::Value":$memref,
+      "mlir::AffineMap":$map,
+      "mlir::ValueRange":$mapOperands
+    )>
   ];
 
   let extraClassDeclaration = extraClassDeclarationBase # [{

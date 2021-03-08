@@ -3,11 +3,11 @@
 #pragma once
 
 #include "mlir/IR/AffineMap.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/IntegerSet.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OpImplementation.h"
-#include "mlir/IR/StandardTypes.h"
 #include "mlir/Interfaces/ControlFlowInterfaces.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
@@ -17,6 +17,8 @@
 
 #include "pmlc/dialect/tile/ir/interfaces.h.inc"
 
+#include "pmlc/dialect/tile/ir/enums.h.inc"
+
 namespace pmlc::dialect::tile {
 
 using mlir::IntegerSet;
@@ -25,6 +27,7 @@ using util::AggregationKind;
 using util::CombinationKind;
 using util::InterpolationMode;
 using util::NearestMode;
+using util::GatherMode;
 using util::ScatterMode;
 
 } // namespace pmlc::dialect::tile

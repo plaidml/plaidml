@@ -1,7 +1,7 @@
 pml_cc_library(
   NAME gpu
   HDRS
-    lowering.h
+    passes.h
   SRCS
     kernel_outlining.cc
     gather_gpu_launch_funcs.cc
@@ -9,7 +9,7 @@ pml_cc_library(
     ::passes-gen
     pmlc::util
     MLIRGPU
-    MLIRGPUToSPIRVTransforms
+    MLIRGPUToSPIRV
 )
 
 pml_tblgen_library(

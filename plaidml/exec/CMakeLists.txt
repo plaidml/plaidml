@@ -14,6 +14,8 @@ pml_cc_library(
     pmlc::compiler
     pmlc::rt
     pmlc::util
+  COMPONENTS
+    devkit
 )
 
 pml_cc_library(

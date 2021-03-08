@@ -10,14 +10,6 @@
 
 namespace pmlc::dialect::pxa {
 
-struct StencilCost {
-  double throughput;
-  unsigned startupCost;
-};
-
-using StencilCostFunction = std::function<StencilCost(
-    llvm::ArrayRef<int64_t>, llvm::ArrayRef<mlir::Type>)>;
-
 std::unique_ptr<mlir::Pass> createAffineNormalizePass();
 std::unique_ptr<mlir::Pass> createAffineNormalizePass(bool promote);
 
@@ -25,7 +17,9 @@ std::unique_ptr<mlir::Pass> createAutoTileExamplePass();
 
 std::unique_ptr<mlir::Pass> createDeallocPlacementPass();
 
-std::unique_ptr<mlir::Pass> createCachePass();
+std::unique_ptr<mlir::Pass> createCachePass(bool wholeBlock = false);
+
+std::unique_ptr<mlir::Pass> createConvertMemOpPass();
 
 std::unique_ptr<mlir::Pass> createCPUThreadPass();
 std::unique_ptr<mlir::Pass> createCPUThreadPass(unsigned threads);
@@ -49,11 +43,6 @@ std::unique_ptr<mlir::Pass> createNestLoopsPass(unsigned minLoopIVs);
 std::unique_ptr<mlir::Pass>
 createResizeTmpsPass(bool onlyParallelNested = false);
 
-std::unique_ptr<mlir::Pass> createStencilGEMMPass();
-std::unique_ptr<mlir::Pass> createStencilGEMMPass(unsigned numThreads,
-                                                  bool doBatch,
-                                                  StencilCostFunction costFn);
-
 std::unique_ptr<mlir::Pass> createSubgroupsPass();
 
 std::unique_ptr<mlir::Pass> createTestStrideInfoPass();
@@ -68,6 +57,8 @@ std::unique_ptr<mlir::Pass> createVectorizePass();
 
 std::unique_ptr<mlir::Pass> createVectorizePass(mlir::StringRef strategy,
                                                 unsigned vectorWidth = 8);
+
+std::unique_ptr<mlir::Pass> createSimplifyArithmeticPass();
 
 std::unique_ptr<mlir::Pass> createSimplifyWithConstraintsPass();
 

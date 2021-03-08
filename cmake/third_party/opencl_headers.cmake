@@ -1,3 +1,4 @@
+message("Fetching opencl_headers")
 FetchContent_Declare(
   opencl_headers
   URL      https://github.com/KhronosGroup/OpenCL-Headers/archive/v2020.06.16.zip

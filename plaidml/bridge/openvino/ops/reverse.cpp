@@ -1,4 +1,4 @@
-// Copyright (C) 2020 Intel Corporation
+// Copyright (C) 2021 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 //
 
@@ -42,7 +42,11 @@ void registerReverse() {
     auto I = ctx.operands.at(0);
     ngraph::AxisSet axes;
     if (layer->get_mode() == Reverse::Mode::INDEX) {
-      axes = get_axis_set_from_constant_operand(1, ctx.layer);
+      auto axes_tensor = ctx.operands.at(1);
+      auto axes_shape = axes_tensor.compute_shape();
+      IE_ASSERT(axes_shape.rank() == 1);
+      auto axes_count = axes_shape.sizes()[0];
+      axes = get_axis_set_from_constant_operand(1, ctx.layer, I.rank() + axes_count);
     } else if (layer->get_mode() == Reverse::Mode::MASK) {
       axes = cast_constant_axis_mask(1, ctx.layer);
     }

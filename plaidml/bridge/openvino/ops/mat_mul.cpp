@@ -1,4 +1,4 @@
-// Copyright (C) 2020 Intel Corporation
+// Copyright (C) 2021 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 //
 
@@ -53,11 +53,47 @@ void registerMatMul() {
     while (A.rank() < B.rank()) {
       A = op::unsqueeze(A, {0});
     }
+    ndimsA = A.rank();
     while (B.rank() < A.rank()) {
       B = op::unsqueeze(B, {0});
     }
+    ndimsB = B.rank();
 
-    return edsl::make_tuple(op::dot(A, B));
+    auto shapeA = A.compute_shape().sizes();
+    auto shapeB = B.compute_shape().sizes();
+
+    std::vector<edsl::TensorDim> A_dims(ndimsA);
+    std::vector<edsl::TensorDim> B_dims(ndimsB);
+    std::vector<edsl::TensorDim> O_dims;
+    std::vector<edsl::TensorIndex> A_idxs(ndimsA);
+    std::vector<edsl::TensorIndex> B_idxs(ndimsB);
+    std::vector<edsl::TensorIndex> O_idxs;
+
+    edsl::TensorIndex z;
+    A_idxs[ndimsA - 1] = z;
+    B_idxs[ndimsB - 2] = z;
+
+    for (size_t i = 0; i < ndimsA - 2; ++i) {
+      if (shapeA[i] < shapeB[i]) {
+        A = op::repeat(A).count(shapeB[i]).axis(i);
+      } else if (shapeB[i] < shapeA[i]) {
+        B = op::repeat(B).count(shapeA[i]).axis(i);
+      }
+      A_idxs[i] = B_idxs[i];
+    }
+
+    A.bind_dims(A_dims);
+    B.bind_dims(B_dims);
+
+    for (size_t i = 0; i < ndimsA - 1; ++i) {
+      O_dims.push_back(A_dims[i]);
+      O_idxs.push_back(A_idxs[i]);
+    }
+    O_dims.push_back(B_dims[ndimsB - 1]);
+    O_idxs.push_back(B_idxs[ndimsB - 1]);
+
+    edsl::Tensor O = edsl::Contraction(O_dims, O_idxs).sum(A(A_idxs) * B(B_idxs));
+    return edsl::make_tuple(O);
   });
 }
 

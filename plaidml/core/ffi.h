@@ -150,10 +150,9 @@ typedef enum {
   PLAIDML_DATA_UINT32 = 10,
   PLAIDML_DATA_INT64 = 11,
   PLAIDML_DATA_UINT64 = 12,
-  PLAIDML_DATA_BFLOAT16 = 13,
-  PLAIDML_DATA_FLOAT16 = 14,
-  PLAIDML_DATA_FLOAT32 = 15,
-  PLAIDML_DATA_FLOAT64 = 16,
+  PLAIDML_DATA_FLOAT16 = 13,
+  PLAIDML_DATA_FLOAT32 = 14,
+  PLAIDML_DATA_FLOAT64 = 15,
 } plaidml_datatype;
 
 void plaidml_shape_free(  //
@@ -262,7 +261,10 @@ void plaidml_program_compile(  //
 
 plaidml_buffer* plaidml_program_save(  //
     plaidml_error* err,                //
-    plaidml_program* program);
+    plaidml_program* program,          //
+    size_t nkvps,                      //
+    const char** keys,                 //
+    const char** values);
 
 #ifdef __cplusplus
 }  // extern "C"

@@ -44,6 +44,7 @@ cl::Event OpenCLKernel::enqueue(cl::CommandQueue queue, cl::NDRange gws,
   cl::Event result;
   queue.enqueueNDRangeKernel(kernel, /*offset=*/cl::NDRange(), gws, lws,
                              &dependencies, &result);
+  dependencies.clear();
   return result;
 }
 
@@ -52,6 +53,11 @@ OpenCLEvent::OpenCLEvent(cl::Event event, OpenCLActionKind kind,
     : event(event), kind(kind), name(std::move(name)) {}
 
 void OpenCLEvent::wait(const std::vector<OpenCLEvent *> &events) {
+  if (events.size() == 0) {
+    // Really you would imageine OpenCL should handle this side cse internally,
+    // but it throws, so we just handle it here
+    return;
+  }
   std::vector<cl::Event> oclEvents;
   std::transform(events.begin(), events.end(), std::back_inserter(oclEvents),
                  [](const OpenCLEvent *event) { return event->getEvent(); });
@@ -66,6 +72,66 @@ OpenCLInvocation::~OpenCLInvocation() {
   // Need to explicitly wait for all operations to avoid unfinished events
   // when gathering profiling information.
   finish();
+}
+
+OpenCLMemory *OpenCLInvocation::allocateMemory(size_t bytes) {
+  cl::Buffer buffer(device->getOclContext(), CL_MEM_READ_WRITE, bytes, nullptr);
+  return new OpenCLMemory(buffer, bytes);
+}
+
+void OpenCLInvocation::deallocateMemory(OpenCLMemory *memory) { delete memory; }
+
+OpenCLEvent *
+OpenCLInvocation::enqueueRead(OpenCLMemory *src, void *dst,
+                              const std::vector<OpenCLEvent *> &deps) {
+  std::vector<cl::Event> dependencies;
+  std::transform(deps.begin(), deps.end(), std::back_inserter(dependencies),
+                 [](const OpenCLEvent *event) { return event->getEvent(); });
+  cl::Event event =
+      src->enqueueRead(queueUser.getOclQueue(), dst, dependencies);
+  return wrapEvent(event, OpenCLActionKind::Read, "read");
+}
+
+OpenCLEvent *
+OpenCLInvocation::enqueueWrite(OpenCLMemory *dst, void *src,
+                               const std::vector<OpenCLEvent *> &deps) {
+  std::vector<cl::Event> dependencies;
+  std::transform(deps.begin(), deps.end(), std::back_inserter(dependencies),
+                 [](const OpenCLEvent *event) { return event->getEvent(); });
+  cl::Event event =
+      dst->enqueueWrite(queueUser.getOclQueue(), src, dependencies);
+  return wrapEvent(event, OpenCLActionKind::Write, "write");
+}
+
+OpenCLKernel *OpenCLInvocation::createKernelFromIL(char *data, size_t bytes,
+                                                   const char *name) {
+  std::vector<char> source(data, data + bytes);
+  cl::Program program(device->getOclContext(), source, /*build=*/true);
+  return new OpenCLKernel(program, name);
+}
+
+OpenCLEvent *OpenCLInvocation::enqueueKernel(OpenCLKernel *kernel,
+                                             cl::NDRange gws, cl::NDRange lws) {
+  cl::Event event = kernel->enqueue(queueUser.getOclQueue(), gws, lws);
+  OpenCLEvent *result =
+      wrapEvent(event, OpenCLActionKind::Kernel, kernel->getName());
+  return result;
+}
+
+OpenCLEvent *
+OpenCLInvocation::enqueueBarrier(const std::vector<OpenCLEvent *> &deps) {
+  cl::Event result;
+  std::vector<cl::Event> dependencies;
+  std::transform(deps.begin(), deps.end(), std::back_inserter(dependencies),
+                 [](const OpenCLEvent *event) { return event->getEvent(); });
+  queueUser.getOclQueue().enqueueBarrierWithWaitList(&dependencies, &result);
+  return wrapEvent(result, OpenCLActionKind::Barrier, "barrier");
+}
+
+void OpenCLInvocation::flush() { queueUser.getOclQueue().flush(); }
+
+void OpenCLInvocation::finish() {
+  queueUser.getOclQueue().finish();
   // Gather profiling information.
   using std::chrono::nanoseconds;
   using fp_milliseconds =
@@ -116,66 +182,8 @@ OpenCLInvocation::~OpenCLInvocation() {
                << fp_milliseconds(memoryExecuteTime).count() << "ms");
 
   device->execTimeInMS = fp_milliseconds(totalExecuteTime).count();
+  events.clear();
 }
-
-OpenCLMemory *OpenCLInvocation::allocateMemory(size_t bytes) {
-  cl::Buffer buffer(device->getOclContext(), CL_MEM_READ_WRITE, bytes, nullptr);
-  return new OpenCLMemory(buffer, bytes);
-}
-
-void OpenCLInvocation::deallocateMemory(OpenCLMemory *memory) { delete memory; }
-
-OpenCLEvent *
-OpenCLInvocation::enqueueRead(OpenCLMemory *src, void *dst,
-                              const std::vector<OpenCLEvent *> &deps) {
-  std::vector<cl::Event> dependencies;
-  std::transform(deps.begin(), deps.end(), std::back_inserter(dependencies),
-                 [](const OpenCLEvent *event) { return event->getEvent(); });
-  cl::Event event =
-      src->enqueueRead(queueUser.getOclQueue(), dst, dependencies);
-  return wrapEvent(event, OpenCLActionKind::Read, "read");
-}
-
-OpenCLEvent *
-OpenCLInvocation::enqueueWrite(OpenCLMemory *dst, void *src,
-                               const std::vector<OpenCLEvent *> &deps) {
-  std::vector<cl::Event> dependencies;
-  std::transform(deps.begin(), deps.end(), std::back_inserter(dependencies),
-                 [](const OpenCLEvent *event) { return event->getEvent(); });
-  cl::Event event =
-      dst->enqueueWrite(queueUser.getOclQueue(), src, dependencies);
-  return wrapEvent(event, OpenCLActionKind::Write, "write");
-}
-
-OpenCLKernel *OpenCLInvocation::createKernelFromIL(char *data, size_t bytes,
-                                                   const char *name) {
-  std::vector<char> source(data, data + bytes);
-  cl::Program program(device->getOclContext(), source, /*build=*/true);
-  return new OpenCLKernel(program, name);
-}
-
-OpenCLEvent *OpenCLInvocation::enqueueKernel(OpenCLKernel *kernel,
-                                             cl::NDRange gws, cl::NDRange lws) {
-  cl::Event event = kernel->enqueue(queueUser.getOclQueue(), gws, lws);
-  OpenCLEvent *result =
-      wrapEvent(event, OpenCLActionKind::Kernel, kernel->getName());
-  delete kernel;
-  return result;
-}
-
-OpenCLEvent *
-OpenCLInvocation::enqueueBarrier(const std::vector<OpenCLEvent *> &deps) {
-  cl::Event result;
-  std::vector<cl::Event> dependencies;
-  std::transform(deps.begin(), deps.end(), std::back_inserter(dependencies),
-                 [](const OpenCLEvent *event) { return event->getEvent(); });
-  queueUser.getOclQueue().enqueueBarrierWithWaitList(&dependencies, &result);
-  return wrapEvent(result, OpenCLActionKind::Barrier, "barrier");
-}
-
-void OpenCLInvocation::flush() { queueUser.getOclQueue().flush(); }
-
-void OpenCLInvocation::finish() { queueUser.getOclQueue().finish(); }
 
 OpenCLEvent *OpenCLInvocation::wrapEvent(cl::Event event, OpenCLActionKind kind,
                                          std::string name) {

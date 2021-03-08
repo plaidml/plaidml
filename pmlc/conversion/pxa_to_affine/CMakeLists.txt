@@ -6,6 +6,7 @@ pml_cc_library(
     pxa_to_affine.cc
   DEPS
     ::passes-gen
+    pmlc::dialect::pxa::ir
     pmlc::dialect::tile::ir
     pmlc::dialect::stdx::ir
     pmlc::util

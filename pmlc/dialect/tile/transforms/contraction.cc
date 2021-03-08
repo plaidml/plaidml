@@ -151,7 +151,7 @@ BoundsAndConstraints Constraints::ComputeBounds() {
 static IndexPoly MakePoly(ContractionOp op, AffineExpr expr) {
   IVLOG(4, "MakePoly: " << debugString(expr));
   if (auto dimExpr = expr.dyn_cast<AffineDimExpr>()) {
-    auto idxNames = op.getAttrOfType<ArrayAttr>("idxs");
+    auto idxNames = op->getAttrOfType<ArrayAttr>("idxs");
     if (idxNames) {
       auto attr = idxNames.getValue()[dimExpr.getPosition()];
       auto name = attr.cast<StringAttr>().getValue();

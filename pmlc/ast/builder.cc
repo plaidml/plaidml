@@ -11,9 +11,7 @@
 
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/BlockAndValueMapping.h"
-#include "mlir/IR/Function.h"
 #include "mlir/IR/Matchers.h"
-#include "mlir/IR/Module.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/DebugStringHelper.h"
 #include "mlir/Transforms/Passes.h"
@@ -474,8 +472,12 @@ struct ContractionBuilder : PolyVisitor<ContractionBuilder, AffineExpr> {
 struct ProgramBuilder {
   explicit ProgramBuilder(llvm::StringRef name)
       : program(std::make_shared<compiler::Program>(name)),
-        context(&program->context), loc(UnknownLoc::get(context)),
-        module(*program->module), builder(module) {}
+        context(program->context.get()), loc(UnknownLoc::get(context)),
+        module(*program->module), builder(module) {
+    context->getOrLoadDialect<dialect::tile::TileDialect>();
+    context->getOrLoadDialect<dialect::layer::LayerDialect>();
+    context->getOrLoadDialect<StandardOpsDialect>();
+  }
 
   std::shared_ptr<Program> build(const ProgramArguments &args) {
     std::vector<Type> inputTypes;
@@ -511,7 +513,7 @@ struct ProgramBuilder {
     }
 
     FunctionType funcType =
-        FunctionType::get(inputTypes, program->outputs, context);
+        FunctionType::get(context, inputTypes, program->outputs);
     FuncOp funcOp = FuncOp::create(loc, kEntrypoint, funcType, {});
     size_t numInputs = inputTypes.size() - program->constants.size();
     for (size_t i = 0; i < program->constants.size(); i++) {
@@ -592,7 +594,7 @@ struct ProgramBuilder {
 
     pm.addPass(createCanonicalizerPass());
     pm.addPass(createCSEPass());
-    pm.addPass(tile::createMaterializePass());
+    pm.addNestedPass<FuncOp>(tile::createMaterializePass());
     pm.addPass(createCanonicalizerPass());
     pm.addPass(createCSEPass());
     auto result = pm.run(module);
@@ -662,6 +664,7 @@ struct ProgramBuilder {
     using IntrinsicBuilder = std::function<Value()>;
     auto intrinsicBuilder =
         llvm::StringSwitch<IntrinsicBuilder>(node->op)
+            .Case("argsort", [&]() { return makeArgSortOp(node, operands); })
             .Case("index", [&]() { return makeIndexOp(node, operands); })
             .Case("prng", [&]() { return makePrngOp(node, operands); })
             .Case("reshape", [&]() { return makeReshapeOp(node, operands); })
@@ -684,9 +687,9 @@ struct ProgramBuilder {
     for (const ExprNodePtr &operand : node->operands) {
       operands.push_back(builder.lookupNode(operand));
     }
-    llvm::SetVector<Value> results;
+    llvm::SmallVector<Value> results;
     for (const ExprNodePtr &result : node->results) {
-      results.insert(builder.lookupNode(result));
+      results.push_back(builder.lookupNode(result));
     }
     llvm::SmallVector<Type, 4> resultTypes;
     for (Value val : results) {
@@ -706,7 +709,7 @@ struct ProgramBuilder {
       std::tie(outer, inner) = tuple;
       mapper.map(outer, inner);
     }
-    llvm::SmallVector<Value, 4> innerResults;
+    llvm::SmallVector<Value, 4> innerResults(results.size());
     llvm::SetVector<Operation *> toRemove;
     for (const ExprNodePtr &node : traversal.getFlat()) {
       Value value = builder.lookupNode(node);
@@ -717,16 +720,20 @@ struct ProgramBuilder {
       }
       assert(op && "Unexpected block argument");
       Operation *clonedOp = bodyBuilder.clone(*op, mapper);
-      if (results.contains(value)) {
-        for (Value result : clonedOp->getResults()) {
-          innerResults.push_back(result);
+
+      auto itLayerResults = std::find(results.begin(), results.end(), value);
+      if (itLayerResults != results.end()) {
+        if (auto opResultVal = value.cast<OpResult>()) {
+          auto idxLayerResults = std::distance(results.begin(), itLayerResults);
+          innerResults[idxLayerResults] =
+              clonedOp->getResult(opResultVal.getResultNumber());
         }
       }
       toRemove.insert(op);
     }
     bodyBuilder.create<layer::ReturnOp>(loc, innerResults);
-    for (Operation *op : toRemove) {
-      op->erase();
+    for (auto it = toRemove.rbegin(); it != toRemove.rend(); ++it) {
+      (*it)->erase();
     }
     SmallVector<Value, 4> tuple;
     for (OpResult result : layerOp.getResults()) {
@@ -756,6 +763,8 @@ struct ProgramBuilder {
     IntegerAttr interpolationMode;
     IntegerAttr nearestMode;
     FloatAttr cubeCoeff;
+    IntegerAttr mode;
+    IntegerAttr batchDims;
     if (!matchPattern(operands[2], m_Constant(&axis))) {
       throw std::runtime_error("'gather' primitive expects the 'axis' argument "
                                "to be a constant integer");
@@ -775,10 +784,42 @@ struct ProgramBuilder {
           "'gather' primitive expects the 'cubeCoeff' argument "
           "to be a constant float");
     }
+    if (!matchPattern(operands[6], m_Constant(&mode))) {
+      throw std::runtime_error("'gather' primitive expects the 'mode' argument "
+                               "to be a constant integer");
+    }
+    if (!matchPattern(operands[7], m_Constant(&batchDims))) {
+      throw std::runtime_error(
+          "'gather' primitive expects the 'batchDims' argument "
+          "to be a constant integer");
+    }
     auto op = builder.create<tile::GatherOp>(
         loc, resultType, operands.take_front(2),
         builder.getIndexAttr(axis.getInt()), interpolationMode, nearestMode,
-        cubeCoeff);
+        cubeCoeff, mode, builder.getIndexAttr(batchDims.getInt()));
+    return op.result();
+  }
+
+  Value makeArgSortOp(ExprNodeIntrinsic *node, ArrayRef<Value> operands) {
+    TensorShape shape = evaluator.getShape(node);
+    auto i32Type = builder.getIntegerType(32, /*isSigned=*/true);
+    RankedTensorType resultType = RankedTensorType::get(shape.sizes, i32Type);
+    Value tensor = operands[0];
+    Value axis = operands[1];
+    Value direction = operands[2];
+    IntegerAttr axisAttr;
+    if (!matchPattern(axis, m_Constant(&axisAttr))) {
+      throw std::runtime_error(
+          "'argsort' requires operand #2 to be a constant integer.");
+    }
+    IntegerAttr directionAttr;
+    if (!matchPattern(direction, m_Constant(&directionAttr))) {
+      throw std::runtime_error(
+          "'argsort' requires operand #3 to be a constant integer.");
+    }
+    IntegerAttr axisIndexAttr = builder.getIndexAttr(axisAttr.getInt());
+    auto op = builder.create<tile::ArgSortOp>(loc, resultType, tensor,
+                                              axisIndexAttr, directionAttr);
     return op.result();
   }
 
@@ -869,13 +910,6 @@ struct ProgramBuilder {
 
 std::shared_ptr<Program> buildProgram(llvm::StringRef name,
                                       const ProgramArguments &args) {
-  static std::once_flag once;
-  std::call_once(once, []() {
-    enableGlobalDialectRegistry(true);
-    registerDialect<dialect::tile::TileDialect>();
-    registerDialect<dialect::layer::LayerDialect>();
-    registerDialect<StandardOpsDialect>();
-  });
   if (name.empty()) {
     name = "module";
   }

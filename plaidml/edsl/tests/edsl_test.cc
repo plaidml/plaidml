@@ -13,18 +13,23 @@
 #include <random>
 
 #include "half.hpp"
-#include "llvm/ADT/StringRef.h"
 
 #include "plaidml/edsl/edsl.h"
 #include "plaidml/exec/exec.h"
+#include "plaidml/op/op.h"
 #include "plaidml/testenv.h"
-#include "pmlc/util/env.h"
-#include "pmlc/util/logging.h"
 
 using half_float::half;
-using llvm::StringRef;
+using ::testing::AnyOf;
 using ::testing::ContainerEq;
 using ::testing::Eq;
+using ::testing::HasSubstr;
+
+#if __has_include(<source_location>) || __has_include(<experimental/source_location>)
+#define EXPECT_ERROR_LINE(errmsg, eline) EXPECT_THAT(errmsg, HasSubstr(std::to_string(eline)))
+#else
+#define EXPECT_ERROR_LINE(errmsg, eline) EXPECT_THAT(errmsg, HasSubstr(":0"));
+#endif
 
 namespace plaidml::edsl {
 
@@ -486,8 +491,8 @@ TEST_F(CppEdsl, DoubleDot) {
   // CHECK: module @double_dot
   // CHECK: -> tensor<10x40xf32> {
   // CHECK: %[[cst:.*]] = tile.constant(0.000000e+00 : f64) : tensor<f32>
-  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : tensor<f32>, tensor<10x20xf32>, tensor<20x30xf32> -> tensor<10x30xf32>
-  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : tensor<f32>, tensor<10x30xf32>, tensor<30x40xf32> -> tensor<10x40xf32>
+  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}, #map{{[0-9]*}}]} : tensor<f32>, tensor<10x20xf32>, tensor<20x30xf32> -> tensor<10x30xf32>
+  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}, #map{{[0-9]*}}]} : tensor<f32>, tensor<10x30xf32>, tensor<30x40xf32> -> tensor<10x40xf32>
   // CHECK: return %{{.*}} : tensor<10x40xf32>
   // clang-format on
   runProgram(program);
@@ -593,20 +598,20 @@ TEST_F(CppEdsl, MnistMlp) {
   // CHECK: module @mnist_mlp
   // CHECK-DAG: %[[cst:.*]] = tile.constant(0.000000e+00 : f64) : tensor<f32>
   // CHECK-DAG: %[[cst0:.*]] = tile.constant(0xFFF0000000000000 : f64) : tensor<f32>
-  // CHECK: %[[X0:.*]] = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : tensor<f32>, tensor<1x784xf32>, tensor<784x512xf32> -> tensor<1x512xf32>
+  // CHECK: %[[X0:.*]] = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}, #map{{[0-9]*}}]} : tensor<f32>, tensor<1x784xf32>, tensor<784x512xf32> -> tensor<1x512xf32>
   // CHECK: %[[X1:.*]] = tile.add %{{.*}}, %{{.*}} : (tensor<1x512xf32>, tensor<512xf32>) -> tensor<1x512xf32>
   // CHECK: %[[X2:.*]] = tile.cmp_lt %{{.*}}, %[[cst]] : (tensor<1x512xf32>, tensor<f32>) -> tensor<1x512xi1>
   // CHECK: %[[X3:.*]] = tile.select %{{.*}}, %[[cst]], %{{.*}} : (tensor<1x512xi1>, tensor<f32>, tensor<1x512xf32>) -> tensor<1x512xf32>
-  // CHECK: %[[X4:.*]] = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : tensor<f32>, tensor<1x512xf32>, tensor<512x512xf32> -> tensor<1x512xf32>
+  // CHECK: %[[X4:.*]] = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}, #map{{[0-9]*}}]} : tensor<f32>, tensor<1x512xf32>, tensor<512x512xf32> -> tensor<1x512xf32>
   // CHECK: %[[X5:.*]] = tile.add %{{.*}}, %{{.*}} : (tensor<1x512xf32>, tensor<512xf32>) -> tensor<1x512xf32>
   // CHECK: %[[X6:.*]] = tile.cmp_lt %{{.*}}, %[[cst]] : (tensor<1x512xf32>, tensor<f32>) -> tensor<1x512xi1>
   // CHECK: %[[X7:.*]] = tile.select %{{.*}}, %[[cst]], %{{.*}} : (tensor<1x512xi1>, tensor<f32>, tensor<1x512xf32>) -> tensor<1x512xf32>
-  // CHECK: %[[X8:.*]] = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : tensor<f32>, tensor<1x512xf32>, tensor<512x10xf32> -> tensor<1x10xf32>
+  // CHECK: %[[X8:.*]] = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}, #map{{[0-9]*}}]} : tensor<f32>, tensor<1x512xf32>, tensor<512x10xf32> -> tensor<1x10xf32>
   // CHECK: %[[X9:.*]] = tile.add %{{.*}}, %{{.*}} : (tensor<1x10xf32>, tensor<10xf32>) -> tensor<1x10xf32>
-  // CHECK: %[[X10:.*]] = tile.contract max, none, %[[cst0]], %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}]} : tensor<f32>, tensor<1x10xf32> -> tensor<1x1xf32>
+  // CHECK: %[[X10:.*]] = tile.contract max, none, %[[cst0]], %{{.*}} {sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}]} : tensor<f32>, tensor<1x10xf32> -> tensor<1x1xf32>
   // CHECK: %[[X11:.*]] = tile.sub %{{.*}}, %{{.*}} : (tensor<1x10xf32>, tensor<1x1xf32>) -> tensor<1x10xf32>
   // CHECK: %[[X12:.*]] = tile.exp %{{.*}} : (tensor<1x10xf32>) -> tensor<1x10xf32>
-  // CHECK: %[[X13:.*]] = tile.contract add, none, %[[cst]], %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}]} : tensor<f32>, tensor<1x10xf32> -> tensor<1x1xf32>
+  // CHECK: %[[X13:.*]] = tile.contract add, none, %[[cst]], %{{.*}} {sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}]} : tensor<f32>, tensor<1x10xf32> -> tensor<1x1xf32>
   // CHECK: %[[X14:.*]] = tile.div %{{.*}}, %{{.*}} : (tensor<1x10xf32>, tensor<1x1xf32>) -> tensor<1x10xf32>
   // CHECK: return %{{.*}} : tensor<1x10xf32>
   // clang-format on
@@ -636,7 +641,7 @@ TEST_F(CppEdsl, Convolution) {
   // CHECK-LABEL: CppEdsl.Convolution
   // CHECK: module @convolution
   // CHECK: %[[cst:.*]] = tile.constant(0.000000e+00 : f64) : tensor<f32>
-  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : tensor<f32>, tensor<1x56x56x64xf32>, tensor<3x3x64x64xf32> -> tensor<1x56x56x64xf32>
+  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}, #map{{[0-9]*}}]} : tensor<f32>, tensor<1x56x56x64xf32>, tensor<3x3x64x64xf32> -> tensor<1x56x56x64xf32>
   // CHECK: return %{{.*}} : tensor<1x56x56x64xf32>
   // clang-format on
   runProgram(program);
@@ -661,7 +666,7 @@ Tensor Flatten(Tensor X) {
     return X;
   }
   TensorDim product{1};
-  for (size_t i = 1; i < X_dims.size() - 1; i++) {
+  for (size_t i = 1; i < X_dims.size(); i++) {
     product = product * X_dims[i];
   }
   return reshape(X, {TensorDim{1}, product});
@@ -681,9 +686,9 @@ TEST_F(CppEdsl, MnistCnn) {
   auto pool1 = MaxPooling2(conv2);
   // model.add(Flatten())
   auto flat = Flatten(pool1);
-  EXPECT_THAT(flat.compute_shape(), Eq(TensorShape(DType::FLOAT32, {1, 12544})));
+  EXPECT_THAT(flat.compute_shape(), Eq(TensorShape(DType::FLOAT32, {1, 802816})));
   // model.add(Dense(128, activation='relu'))
-  auto kernel3 = Placeholder(DType::FLOAT32, {12544, 128});
+  auto kernel3 = Placeholder(DType::FLOAT32, {802816, 128});
   auto bias3 = Placeholder(DType::FLOAT32, {128});
   auto dense1 = Relu(Dot(flat, kernel3) + bias3);
   const int64_t kNumClasses = 100;
@@ -698,26 +703,26 @@ TEST_F(CppEdsl, MnistCnn) {
   // CHECK: module @mnist_cnn
   // CHECK-DAG: %[[cst:.*]] = tile.constant(0.000000e+00 : f64) : tensor<f32>
   // CHECK-DAG: %[[cst_0:.*]] = tile.constant(0xFFF0000000000000 : f64) : tensor<f32>
-  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : tensor<f32>, tensor<1x224x224x1xf32>, tensor<3x3x1x32xf32> -> tensor<1x224x224x32xf32>
+  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}, #map{{[0-9]*}}]} : tensor<f32>, tensor<1x224x224x1xf32>, tensor<3x3x1x32xf32> -> tensor<1x224x224x32xf32>
   // CHECK: tile.add %{{.*}}, %{{.*}} : (tensor<1x224x224x32xf32>, tensor<32xf32>) -> tensor<1x224x224x32xf32>
   // CHECK: tile.cmp_lt %{{.*}}, %[[cst]] : (tensor<1x224x224x32xf32>, tensor<f32>) -> tensor<1x224x224x32xi1>
   // CHECK: tile.select %{{.*}}, %[[cst]], %{{.*}} : (tensor<1x224x224x32xi1>, tensor<f32>, tensor<1x224x224x32xf32>) -> tensor<1x224x224x32xf32>
-  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : tensor<f32>, tensor<1x224x224x32xf32>, tensor<3x3x32x64xf32> -> tensor<1x224x224x64xf32>
+  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}, #map{{[0-9]*}}]} : tensor<f32>, tensor<1x224x224x32xf32>, tensor<3x3x32x64xf32> -> tensor<1x224x224x64xf32>
   // CHECK: tile.add %{{.*}}, %{{.*}} : (tensor<1x224x224x64xf32>, tensor<64xf32>) -> tensor<1x224x224x64xf32>
   // CHECK: tile.cmp_lt %{{.*}}, %[[cst]] : (tensor<1x224x224x64xf32>, tensor<f32>) -> tensor<1x224x224x64xi1>
   // CHECK: tile.select %{{.*}}, %[[cst]], %{{.*}} : (tensor<1x224x224x64xi1>, tensor<f32>, tensor<1x224x224x64xf32>) -> tensor<1x224x224x64xf32>
-  // CHECK: tile.contract max, none, %[[cst_0]], %{{.*}} {cons = #set{{[0-9]+}}, sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}]} : tensor<f32>, tensor<1x224x224x64xf32> -> tensor<1x112x112x64xf32>
-  // CHECK: tile.reshape %{{.*}} : (tensor<1x112x112x64xf32>) -> tensor<1x12544xf32>
-  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : tensor<f32>, tensor<1x12544xf32>, tensor<12544x128xf32> -> tensor<1x128xf32>
+  // CHECK: tile.contract max, none, %[[cst_0]], %{{.*}} {cons = #set{{[0-9]*}}, sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}]} : tensor<f32>, tensor<1x224x224x64xf32> -> tensor<1x112x112x64xf32>
+  // CHECK: tile.reshape %{{.*}} : (tensor<1x112x112x64xf32>) -> tensor<1x802816xf32>
+  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}, #map{{[0-9]*}}]} : tensor<f32>, tensor<1x802816xf32>, tensor<802816x128xf32> -> tensor<1x128xf32>
   // CHECK: tile.add %{{.*}}, %{{.*}} : (tensor<1x128xf32>, tensor<128xf32>) -> tensor<1x128xf32>
   // CHECK: tile.cmp_lt %{{.*}}, %[[cst]] : (tensor<1x128xf32>, tensor<f32>) -> tensor<1x128xi1>
   // CHECK: tile.select %{{.*}}, %[[cst]], %{{.*}} : (tensor<1x128xi1>, tensor<f32>, tensor<1x128xf32>) -> tensor<1x128xf32>
-  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : tensor<f32>, tensor<1x128xf32>, tensor<128x100xf32> -> tensor<1x100xf32>
+  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}, #map{{[0-9]*}}]} : tensor<f32>, tensor<1x128xf32>, tensor<128x100xf32> -> tensor<1x100xf32>
   // CHECK: tile.add %{{.*}}, %{{.*}} : (tensor<1x100xf32>, tensor<100xf32>) -> tensor<1x100xf32>
-  // CHECK: tile.contract max, none,  %[[cst_0]], %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}]} : tensor<f32>, tensor<1x100xf32> -> tensor<1x1xf32>
+  // CHECK: tile.contract max, none,  %[[cst_0]], %{{.*}} {sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}]} : tensor<f32>, tensor<1x100xf32> -> tensor<1x1xf32>
   // CHECK: tile.sub %{{.*}}, %{{.*}} : (tensor<1x100xf32>, tensor<1x1xf32>) -> tensor<1x100xf32>
   // CHECK: tile.exp %{{.*}} : (tensor<1x100xf32>) -> tensor<1x100xf32>
-  // CHECK: tile.contract add, none, %[[cst]], %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}]} : tensor<f32>, tensor<1x100xf32> -> tensor<1x1xf32>
+  // CHECK: tile.contract add, none, %[[cst]], %{{.*}} {sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}]} : tensor<f32>, tensor<1x100xf32> -> tensor<1x1xf32>
   // CHECK: tile.div %{{.*}}, %{{.*}} : (tensor<1x100xf32>, tensor<1x1xf32>) -> tensor<1x100xf32>
   // CHECK: return %{{.*}} : tensor<1x100xf32>
   // clang-format on
@@ -799,7 +804,7 @@ TEST_F(CppEdsl, RepeatElements) {
   // CHECK-LABEL: CppEdsl.RepeatElements
   // CHECK: module @repeat_elts
   // CHECK: %[[cst:.*]] = tile.constant(0.000000e+00 : f64) : tensor<f32>
-  // CHECK: tile.contract assign, none, %[[cst]], %{{.*}} {cons = #set{{[0-9]+}}, sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}]} : tensor<f32>, tensor<10x10x10xf32> -> tensor<10x30x10xf32>
+  // CHECK: tile.contract assign, none, %[[cst]], %{{.*}} {cons = #set{{[0-9]*}}, sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}]} : tensor<f32>, tensor<10x10x10xf32> -> tensor<10x30x10xf32>
   // CHECK: return %{{.*}} : tensor<10x30x10xf32>
   // clang-format on
   runProgram(program);
@@ -816,7 +821,7 @@ TEST_F(CppEdsl, UseDefault) {
   // clang-format off
   // CHECK-LABEL: CppEdsl.UseDefault
   // CHECK: module @use_default
-  // CHECK: tile.contract assign, none, %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}]} : tensor<1x7x10x10xf32>, tensor<1x10x10xf32> -> tensor<1x7x10x10xf32>
+  // CHECK: tile.contract assign, none, %{{.*}}, %{{.*}} {sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}]} : tensor<1x7x10x10xf32>, tensor<1x10x10xf32> -> tensor<1x7x10x10xf32>
   // CHECK: return %{{.*}} : tensor<1x7x10x10xf32>
   // clang-format on
   runProgram(program);
@@ -851,7 +856,7 @@ TEST_F(CppEdsl, GlobalMin) {
   // CHECK: module @global_min
   // CHECK: %[[cst:.*]] = tile.constant(0xFFF0000000000000 : f64) : tensor<f32>
   // CHECK: tile.neg %{{.*}} : (tensor<10x10x10xf32>) -> tensor<10x10x10xf32>
-  // CHECK: tile.contract max, none, %[[cst]], %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}]} : tensor<f32>, tensor<10x10x10xf32> -> tensor<f32>
+  // CHECK: tile.contract max, none, %[[cst]], %{{.*}} {sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}]} : tensor<f32>, tensor<10x10x10xf32> -> tensor<f32>
   // CHECK: tile.neg %{{.*}} : (tensor<f32>) -> tensor<f32>
   // CHECK: return %{{.*}} : tensor<f32>
   // clang-format on
@@ -869,7 +874,7 @@ TEST_F(CppEdsl, CumSum) {
   // CHECK-LABEL: CppEdsl.CumSum
   // CHECK: module @cumsum
   // CHECK: %[[cst:.*]] = tile.constant(0.000000e+00 : f64) : tensor<f32>
-  // CHECK: tile.contract add, none, %[[cst]], %{{.*}} {cons = #set{{[0-9]+}}, sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}]} : tensor<f32>, tensor<10xf32> -> tensor<10xf32>
+  // CHECK: tile.contract add, none, %[[cst]], %{{.*}} {cons = #set{{[0-9]*}}, sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}]} : tensor<f32>, tensor<10xf32> -> tensor<10xf32>
   // CHECK: return %{{.*}} : tensor<10xf32>
   // clang-format on
   runProgram(program);
@@ -920,7 +925,7 @@ TEST_F(CppEdsl, ComplexConv2d) {
   // CHECK-LABEL: CppEdsl.ComplexConv2d
   // CHECK: module @complex_conv_2d
   // CHECK: %[[cst:.*]] = tile.constant(0.000000e+00 : f64) : tensor<f32>
-  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : tensor<f32>, tensor<1x224x224x3x3xf32>, tensor<3x3x3x3x32xf32> -> tensor<1x112x112x3x32xf32>
+  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}, #map{{[0-9]*}}]} : tensor<f32>, tensor<1x224x224x3x3xf32>, tensor<3x3x3x3x32xf32> -> tensor<1x112x112x3x32xf32>
   // CHECK: return %{{.*}} : tensor<1x112x112x3x32xf32>
   // clang-format on
   runProgram(program);
@@ -1023,7 +1028,7 @@ TEST_F(CppEdsl, DefractLong) {
   // CHECK-LABEL: CppEdsl.DefractLong
   // CHECK: module @defract_long
   // CHECK: %[[cst:.*]] = tile.constant(0.000000e+00 : f64) : tensor<f32>
-  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : tensor<f32>, tensor<1x3x3x1xf32>, tensor<1x3x3x1xf32> -> tensor<1x5x5x1xf32>
+  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}, #map{{[0-9]*}}]} : tensor<f32>, tensor<1x3x3x1xf32>, tensor<1x3x3x1xf32> -> tensor<1x5x5x1xf32>
   // CHECK: return %{{.*}} : tensor<1x5x5x1xf32>
   // clang-format on
   runProgram(program);
@@ -1038,8 +1043,8 @@ TEST_F(CppEdsl, DupOut) {
   // clang-format off
   // CHECK: module @dup_out
   // CHECK: %[[cst:.*]] = tile.constant(0.000000e+00 : f64) : tensor<f32>
-  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : tensor<f32>, tensor<10x20xf32>, tensor<20x30xf32> -> tensor<10x30xf32>
-  // CHECK: %[[out:.*]] = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : tensor<f32>, tensor<10x30xf32>, tensor<30x40xf32> -> tensor<10x40xf32>
+  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}, #map{{[0-9]*}}]} : tensor<f32>, tensor<10x20xf32>, tensor<20x30xf32> -> tensor<10x30xf32>
+  // CHECK: %[[out:.*]] = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}, #map{{[0-9]*}}]} : tensor<f32>, tensor<10x30xf32>, tensor<30x40xf32> -> tensor<10x40xf32>
   // CHECK: %[[i2:.*]] = tile.ident %[[out]] : (tensor<10x40xf32>) -> tensor<10x40xf32>
   // CHECK: %[[i3:.*]] = tile.ident %[[out]] : (tensor<10x40xf32>) -> tensor<10x40xf32>
   // CHECK: return %[[out]], %[[i2]], %[[i3]] : tensor<10x40xf32>, tensor<10x40xf32>, tensor<10x40xf32>
@@ -1152,7 +1157,7 @@ TEST_F(CppEdsl, ConvI8) {
   // CHECK-LABEL: CppEdsl.ConvI8
   // CHECK: module @convolution
   // CHECK: %[[cst:.*]] = tile.constant(0 : i64) : tensor<si8>
-  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]+}}, srcs = [#map{{[0-9]+}}, #map{{[0-9]+}}]} : tensor<si8>, tensor<1x224x224x3xsi8>, tensor<3x3x3x32xsi8> -> tensor<1x224x224x32xsi8>
+  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}, #map{{[0-9]*}}]} : tensor<si8>, tensor<1x224x224x3xsi8>, tensor<3x3x3x32xsi8> -> tensor<1x224x224x32xsi8>
   // CHECK: return %{{.*}} : tensor<1x224x224x32xsi8>
   // clang-format on
   runProgram(program);
@@ -1458,6 +1463,56 @@ TEST_F(CppEdsl, Gather) {
   checkExact(program, {in1, in2}, {out});
 }
 
+TEST_F(CppEdsl, GatherND) {
+  auto A = Placeholder(DType::FLOAT32, {2, 2, 2});
+  auto B = Placeholder(DType::INT32, {2, 2});
+  auto O = gather(A, B).mode(GatherMode::ND);
+  auto program = makeProgram("gather", {A, B}, {O});
+
+  std::vector<float> in1 = {
+      -5.0f, -6.0f,  //
+      1.3f,  4.5f,   //
+
+      -7.0f, 4.0f,  //
+      5.0f,  6.0f,  //
+  };
+  std::vector<int> in2 = {
+      0, 1,  //
+      1, 0,  //
+  };
+  std::vector<float> out = {
+      1.3f, 4.5f,   //
+      -7.0f, 4.0f,  //
+  };
+  checkExact(program, {in1, in2}, {out});
+}
+
+TEST_F(CppEdsl, GatherNDWithBatchDims) {
+  auto A = Placeholder(DType::FLOAT32, {2, 3, 4});
+  auto B = Placeholder(DType::INT32, {2, 3, 1, 1});
+  auto O = gather(A, B).mode(GatherMode::ND).batchDims(2);
+  auto program = makeProgram("gather", {A, B}, {O});
+
+  std::vector<float> in1 = {
+      1,  2,  3,  4,   //
+      5,  6,  7,  8,   //
+      9,  10, 11, 12,  //
+      13, 14, 15, 16,  //
+      17, 18, 19, 20,  //
+      21, 22, 23, 24,  //
+  };
+  std::vector<int> in2 = {
+      1,  //
+      0,  //
+      2,  //
+      0,  //
+      2,  //
+      2,  //
+  };
+  std::vector<float> out = {2, 5, 11, 13, 19, 23};
+  checkExact(program, {in1, in2}, {out});
+}
+
 TEST_F(CppEdsl, InterpolatedGatherNearest) {
   auto A = Placeholder(DType::FLOAT32, {1, 6});
   auto B = Placeholder(DType::FLOAT32, {9});
@@ -1665,8 +1720,7 @@ TEST_F(CppEdsl, Scatter1D) {
   auto O = scatter(D, I, U);
   auto program = makeProgram("scatter", {D, I, U}, {O});
 
-  // Don't bother initializing 'data' in default mode. Only shape of the data is needed.
-  std::vector<float> data;
+  std::vector<float> data = {0, 0, 0, 0, 0, 0, 0, 0};
   std::vector<int32_t> indices = {4, 3, 1, 7};
   std::vector<float> updates = {9, 10, 11, 12};
   std::vector<float> expected = {0, 11, 0, 10, 9, 0, 0, 12};
@@ -1680,8 +1734,12 @@ TEST_F(CppEdsl, Scatter3D) {
   auto O = scatter(D, I, U);
   auto program = makeProgram("scatter", {D, I, U}, {O});
 
-  // Don't bother initializing 'data' in default mode. Only shape of the data is needed.
-  std::vector<float> data;
+  std::vector<float> data = {
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  //
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  //
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  //
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0   //
+  };
   std::vector<int32_t> indices = {0, 2};
   std::vector<float> updates = {
       5, 5, 5, 5, 6, 6, 6, 6,  //
@@ -1705,8 +1763,7 @@ TEST_F(CppEdsl, ScatterDup1D) {
   auto O = scatter(D, I, U);
   auto program = makeProgram("scatter", {D, I, U}, {O});
 
-  // Don't bother initializing 'data' in default mode. Only shape of the data is needed.
-  std::vector<float> data;
+  std::vector<float> data = {0, 0, 0, 0, 0, 0, 0, 0};
   // Duplicate indices.
   std::vector<int32_t> indices = {4, 3, 3, 7};
   std::vector<float> updates = {9, 10, 11, 12};
@@ -1721,8 +1778,12 @@ TEST_F(CppEdsl, ScatterDup3D) {
   auto O = scatter(D, I, U);
   auto program = makeProgram("scatter", {D, I, U}, {O});
 
-  // Don't bother initializing 'data' in default mode. Only shape of the data is needed.
-  std::vector<float> data;
+  std::vector<float> data = {
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  //
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  //
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  //
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0   //
+  };
   // Duplicate indices.
   std::vector<int32_t> indices = {2, 2};
   std::vector<float> updates = {
@@ -1983,6 +2044,29 @@ TEST_F(CppEdsl, LayerMissingOperand) {
   EXPECT_ANY_THROW({ makeProgram("LayerMissingOperand", {A, B}, {O}); });
 }
 
+TEST_F(CppEdsl, LayerMultipleReturnValues) {
+  auto A = Placeholder(DType::FLOAT32, {10, 5});
+  TensorVec tuple = layer("two_output", {A}, {}, [&]() {
+    Tensor idxs = argsort(A, 0);
+    Tensor vals = gather(A, idxs);
+    TensorVec outputs = {vals, idxs};
+    return outputs;
+  });
+
+  auto program = makeProgram("LayerMultipleReturnValues", {A}, tuple);
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.LayerMultipleReturnValues
+  // CHECK: module @LayerMultipleReturnValues
+  // CHECK: func @main(%[[ARG0:.*]]: tensor<10x5xf32>) -> (tensor<10x5x5xf32>, tensor<10x5xsi32>) {
+  // CHECK:   %[[X0:.*]]:2 = layer.box "two_output" (%[[ARG1:.*]]) = (%[[ARG0]]) : (tensor<10x5xf32>) -> (tensor<10x5x5xf32>, tensor<10x5xsi32>) {
+  // CHECK:      %[[X1:.*]] = tile.argsort asc %[[ARG1]][{{[0-9]*}}] : (tensor<10x5xf32>) -> tensor<10x5xsi32>
+  // CHECK:      %[[X2:.*]] = tile.gather %[[ARG1]] %[[X1]] {{{.*}}} : (tensor<10x5xf32>, tensor<10x5xsi32>) -> tensor<10x5x5xf32>
+  // CHECK:      layer.return %[[X2]], %[[X1]] : tensor<10x5x5xf32>, tensor<10x5xsi32>
+  // CHECK:   return %[[X0]]#0, %[[X0]]#1 : tensor<10x5x5xf32>, tensor<10x5xsi32>
+  // clang-format on
+  runProgram(program);
+}
+
 TEST_F(CppEdsl, LayerEmbeddedConst) {
   auto A = Placeholder(DType::FLOAT32, {10, 20});
   Tensor O = layer("sum", {A}, [&]() {  //
@@ -2022,6 +2106,22 @@ TEST_F(CppEdsl, LayerUnusedOperand) {
   // CHECK:   return %[[X0]] : tensor<10x20xf32>
   // clang-format on
   runProgram(program);
+}
+
+TEST_F(CppEdsl, BadDataType) {
+  EXPECT_ANY_THROW({ auto A = Placeholder(DType::INVALID, {10, 20}); });
+}
+
+TEST_F(CppEdsl, IndexOp) {
+  EXPECT_ANY_THROW({ index({}, 0); });  // Must specify at least one dimension
+
+  TensorDim X0, X1;
+  EXPECT_ANY_THROW({ index({X0}, 0); });  // Must bind X0 to some Tensor
+
+  auto I = Placeholder(DType::FLOAT32, {10, 3});
+  I.bind_dims(X0, X1);
+  Tensor O = index({X0}, 1);
+  auto program = makeProgram("IndexOp", {}, {O});
 }
 
 TEST_F(CppEdsl, LayerMulti) {
@@ -2075,6 +2175,369 @@ TEST_F(CppEdsl, LayerException) {
   // CHECK:   return %[[X0]] : tensor<10x20xf32>
   // clang-format on
   runProgram(program);
+}
+
+TEST_F(CppEdsl, BindBadDims) {
+  std::string errmsg;
+  int eline;
+  try {
+    auto X = Placeholder(DType::FLOAT32, {10, 10});
+    auto Y = Placeholder(DType::FLOAT32, {12, 10});
+    TensorDim I, J, K;
+    TensorIndex i, j, k;
+    X.bind_dims({I, K});
+    // clang-format off
+    eline = __LINE__; Y.bind_dims({K, J});
+    // clang-format on
+  } catch (const std::exception& e) {
+    errmsg = e.what();
+  }
+  EXPECT_ERROR_LINE(errmsg, eline);
+}
+
+#if !defined(_WIN32)
+TEST_F(CppEdsl, EltwiseMismatch) {
+  std::string errmsg;
+  int eline;
+  try {
+    auto X = Placeholder(DType::FLOAT32, {10, 10});
+    auto Y = Placeholder(DType::FLOAT32, {12, 10});
+    // clang-format off
+    eline = __LINE__; auto O = X + Y;
+    // clang-format on
+  } catch (const std::exception& e) {
+    errmsg = e.what();
+  }
+  EXPECT_ERROR_LINE(errmsg, eline);
+}
+#endif
+
+#if !defined(_WIN32)
+TEST_F(CppEdsl, OpOperators) {
+  std::string errmsg;
+  int eline;
+  try {
+    auto X = Placeholder(DType::FLOAT32, {10, 10});
+    auto Y = Placeholder(DType::FLOAT32, {12, 12});
+    auto RX = plaidml::op::relu(X);
+    auto RY = plaidml::op::relu(Y);
+    // clang-format off
+    eline = __LINE__; auto O = RX + RY;
+    // clang-format on
+  } catch (const std::exception& e) {
+    errmsg = e.what();
+  }
+  EXPECT_ERROR_LINE(errmsg, eline);
+}
+#endif
+
+TEST_F(CppEdsl, ArgSort1d) {
+  auto I = Placeholder(DType::FLOAT32, {20});
+  auto O = argsort(I, /*axis=*/0);
+  auto program = makeProgram("argsort", {I}, {O});
+  std::vector<float> input = {
+      81.69, 95.74, 27.74, 43.69, 55.79, 56.79, 57.52, 5.9,   39.48, 7.11,   //
+      14.81, 66.23, 20.25, 66.05, 64.5,  71.07, 67.6,  54.42, 87.59, 80.02,  //
+  };
+  // indexed:
+  //    0: 81.69,  1: 95.74,  2: 27.74,  3: 43.69,  4: 55.79
+  //    5: 56.79,  6: 57.52,  7:  5.9,   8: 39.48,  9:  7.11
+  //   10: 14.81, 11: 66.23, 12: 20.25, 13: 66.05, 14: 64.5
+  //   15: 71.07, 16: 67.6,  17: 54.42, 18: 87.59, 19: 80.02
+  // sorted:
+  //    7:  5.9,   9:  7.11, 10: 14.81, 12: 20.25,  2: 27.74
+  //    8: 39.48,  3: 43.69, 17: 54.42,  4: 55.79,  5: 56.79
+  //    6: 57.52, 14: 64.5,  13: 66.05, 11: 66.23, 16: 67.6
+  //   15: 71.07, 19: 80.02,  0: 81.69,  18: 87.59, 1: 95.74
+  std::vector<int32_t> output = {
+      7, 9, 10, 12, 2, 8, 3, 17, 4, 5, 6, 14, 13, 11, 16, 15, 19, 0, 18, 1,  //
+  };
+  checkExact(program, {input}, {output});
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.ArgSort1d
+  // CHECK: module @argsort
+  // CHECK: func @main(%[[ARG0:.*]]: tensor<20xf32>) -> tensor<20xsi32>
+  // CHECK: %[[X0:.*]] = tile.argsort asc %[[ARG0]][0] : (tensor<20xf32>) -> tensor<20xsi32>
+  // CHECK: return %[[X0]] : tensor<20xsi32>
+  // clang-format on
+}
+
+TEST_F(CppEdsl, ArgSort1dInt) {
+  auto I = Placeholder(DType::INT32, {20});
+  auto O = argsort(I, /*axis=*/0);
+  auto program = makeProgram("argsort", {I}, {O});
+  std::vector<int32_t> input = {
+      81, 95, 27, 43, 55, 56, 57, 5,  39, 7,   //
+      14, 67, 20, 66, 64, 71, 68, 54, 87, 80,  //
+  };
+  // indexed:
+  //    0: 81,  1: 95,  2: 27,  3: 43,  4: 55
+  //    5: 56,  6: 57,  7:  5,  8: 39,  9:  7
+  //   10: 14, 11: 67, 12: 20, 13: 66, 14: 64
+  //   15: 71, 16: 68, 17: 54, 18: 87, 19: 80
+  // sorted:
+  //    7:  5,  9:  7, 10: 14, 12: 20,  2: 27
+  //    8: 39,  3: 43, 17: 54,  4: 55,  5: 56
+  //    6: 57, 14: 64, 13: 66, 11: 67, 16: 68
+  //   15: 71, 19: 80,  0: 81, 18: 87,  1: 95
+  std::vector<int32_t> output = {
+      7, 9, 10, 12, 2, 8, 3, 17, 4, 5, 6, 14, 13, 11, 16, 15, 19, 0, 18, 1,  //
+  };
+  checkExact(program, {input}, {output});
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.ArgSort1dInt
+  // CHECK: module @argsort
+  // CHECK: func @main(%[[ARG0:.*]]: tensor<20xsi32>) -> tensor<20xsi32>
+  // CHECK: %[[X0:.*]] = tile.argsort asc %[[ARG0]][0] : (tensor<20xsi32>) -> tensor<20xsi32>
+  // CHECK: return %[[X0]] : tensor<20xsi32>
+  // clang-format on
+}
+
+TEST_F(CppEdsl, ArgSort1dDup) {
+  auto I = Placeholder(DType::FLOAT32, {20});
+  auto O = argsort(I, /*axis=*/0);
+  auto program = makeProgram("argsort", {I}, {O});
+  // Duplicate element 81.69 at position 0 and 1.
+  std::vector<float> input = {
+      81.69, 81.69, 27.74, 43.69, 55.79, 56.79, 57.52, 7.11,  39.48, 5.9,    //
+      14.81, 66.23, 20.25, 66.05, 64.5,  71.07, 67.6,  54.42, 87.59, 80.02,  //
+  };
+  // indexed:
+  //    0: 81.69,  1: 81.69,  2: 27.74,  3: 43.69,  4: 55.79
+  //    5: 56.79,  6: 57.52,  7: 7.11,   8: 39.48,  9:  5.9
+  //   10: 14.81, 11: 66.23, 12: 20.25, 13: 66.05, 14: 64.5
+  //   15: 71.07, 16: 67.6,  17: 54.42, 18: 87.59, 19: 80.02
+  // sorted:
+  //    9:  5.9,   7:  7.11, 10: 14.81, 12: 20.25,  2: 27.74
+  //    8: 39.48,  3: 43.69, 17: 54.42,  4: 55.79,  5: 56.79
+  //    6: 57.52, 14: 64.5,  13: 66.05, 11: 66.23, 16: 67.6
+  //   15: 71.07, 19: 80.02,  0: 81.69,  1: 81.69, 18: 87.59
+  std::vector<int32_t> output = {
+      9, 7, 10, 12, 2, 8, 3, 17, 4, 5, 6, 14, 13, 11, 16, 15, 19, 0, 1, 18  //
+  };
+  checkExact(program, {input}, {output});
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.ArgSort1dDup
+  // CHECK: module @argsort
+  // CHECK: func @main(%[[ARG0:.*]]: tensor<20xf32>) -> tensor<20xsi32>
+  // CHECK: %[[X0:.*]] = tile.argsort asc %[[ARG0]][0] : (tensor<20xf32>) -> tensor<20xsi32>
+  // CHECK: return %[[X0]] : tensor<20xsi32>
+  // clang-format on
+}
+
+TEST_F(CppEdsl, ArgSort2dAxis0) {
+  auto I = Placeholder(DType::FLOAT32, {5, 4});
+  auto O = argsort(I, /*axis=*/0);
+  auto program = makeProgram("argsort", {I}, {O});
+  std::vector<float> input = {
+      81.69, 95.74, 27.74, 43.69,  //
+      55.79, 56.79, 57.52, 5.9,    //
+      39.48, 7.11,  14.81, 66.23,  //
+      20.25, 66.05, 64.5,  71.07,  //
+      67.6,  54.42, 87.59, 80.02,  //
+  };
+  // assign indices along axis 0, columnwise:
+  //  0: 81.69   0: 95.74   0: 27.74   0: 43.69
+  //  1: 55.79   1: 56.79   1: 57.52   1:  5.9
+  //  2: 39.48   2:  7.11   2: 14.81   2: 66.23
+  //  3: 20.25   3: 66.05   3: 64.5    3: 71.07
+  //  4: 67.6    4: 54.42   4: 87.59   4: 80.02
+  // sort each column:
+  //  3: 20.25   2:  7.11   2: 14.81   1:  5.9
+  //  2: 39.48   4: 54.42   0: 27.74   0: 43.69
+  //  1: 55.79   1: 56.79   1: 57.52   2: 66.23
+  //  4: 67.6    3: 66.05   3: 64.5    3: 71.07
+  //  0: 81.69   0: 95.74   4: 87.59   4: 80.02
+  std::vector<int32_t> output = {
+      3, 2, 2, 1,  //
+      2, 4, 0, 0,  //
+      1, 1, 1, 2,  //
+      4, 3, 3, 3,  //
+      0, 0, 4, 4,  //
+  };
+  checkExact(program, {input}, {output});
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.ArgSort2dAxis0
+  // CHECK: module @argsort
+  // CHECK: func @main(%[[ARG0:.*]]: tensor<5x4xf32>) -> tensor<5x4xsi32>
+  // CHECK:  %[[X0:.*]] = tile.argsort asc %[[ARG0]][0] : (tensor<5x4xf32>) -> tensor<5x4xsi32>
+  // CHECK:  return %[[X0]] : tensor<5x4xsi32>
+  // clang-format on
+}
+
+TEST_F(CppEdsl, ArgSort2dAxis1) {
+  auto I = Placeholder(DType::FLOAT32, {5, 4});
+  auto O = argsort(I, /*axis=*/1);
+  auto program = makeProgram("argsort", {I}, {O});
+  std::vector<float> input = {
+      81.69, 95.74, 27.74, 43.69,  //
+      55.79, 56.79, 57.52, 5.9,    //
+      39.48, 7.11,  14.81, 66.23,  //
+      20.25, 66.05, 64.5,  71.07,  //
+      67.6,  54.42, 87.59, 80.02,  //
+  };
+  // assign indices along axis 1, row-wise:
+  //  0: 81.69   1: 95.74   2: 27.74   3: 43.69
+  //  0: 55.79   1: 56.79   2: 57.52   3:  5.9
+  //  0: 39.48   1:  7.11   2: 14.81   3: 66.23
+  //  0: 20.25   1: 66.05   2: 64.5    3: 71.07
+  //  0: 67.6    1: 54.42   2: 87.59   3: 80.02
+  // sort each row:
+  //  2: 27.74   3: 43.69   0: 81.69   1: 95.74
+  //  3:  5.9    0: 55.79   1: 56.79   2: 57.52
+  //  1:  7.11   2: 14.81   0: 39.48   3: 66.23
+  //  0: 20.25   2: 64.5    1: 66.05   3: 71.07
+  //  1: 54.42   0: 67.6    3: 80.02   2: 87.59
+  std::vector<int32_t> output = {
+      2, 3, 0, 1,  //
+      3, 0, 1, 2,  //
+      1, 2, 0, 3,  //
+      0, 2, 1, 3,  //
+      1, 0, 3, 2,  //
+  };
+  checkExact(program, {input}, {output});
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.ArgSort2dAxis1
+  // CHECK: module @argsort
+  // CHECK: func @main(%[[ARG0:.*]]: tensor<5x4xf32>) -> tensor<5x4xsi32>
+  // CHECK:  %[[X0:.*]] = tile.argsort asc %[[ARG0]][1] : (tensor<5x4xf32>) -> tensor<5x4xsi32>
+  // CHECK:  return %[[X0]] : tensor<5x4xsi32>
+  // clang-format on
+}
+
+TEST_F(CppEdsl, ArgSort3dAxis0Asc) {
+  auto I = Placeholder(DType::FLOAT32, {3, 4, 5});
+  auto O = argsort(I, /*axis=*/0, SortDirection::ASC);
+  auto program = makeProgram("argsort", {I}, {O});
+  std::vector<float> input = {
+      0.508, 0.001, 0.833, 0.186, 0.960,  //
+      0.405, 0.621, 0.183, 0.769, 0.331,  //
+      0.726, 0.678, 0.027, 0.789, 0.544,  //
+      0.151, 0.453, 0.512, 0.513, 0.451,  //
+      //
+      0.875, 0.089, 0.909, 0.353, 0.829,  //
+      0.238, 0.511, 0.619, 0.214, 0.818,  //
+      0.085, 0.713, 0.649, 0.373, 0.654,  //
+      0.615, 0.865, 0.268, 0.713, 0.171,  //
+      //
+      0.218, 0.272, 0.702, 0.621, 0.224,  //
+      0.236, 0.746, 0.508, 0.189, 0.503,  //
+      0.177, 0.096, 0.466, 0.228, 0.759,  //
+      0.771, 0.567, 0.594, 0.211, 0.183,  //
+  };
+  std::vector<int32_t> output = {
+      2, 0, 2, 0, 2,  //
+      2, 1, 0, 2, 0,  //
+      1, 2, 0, 2, 0,  //
+      0, 0, 1, 2, 1,  //
+      //
+      0, 1, 0, 1, 1,  //
+      1, 0, 2, 1, 2,  //
+      2, 0, 2, 1, 1,  //
+      1, 2, 0, 0, 2,  //
+      //
+      1, 2, 1, 2, 0,  //
+      0, 2, 1, 0, 1,  //
+      0, 1, 1, 0, 2,  //
+      2, 1, 2, 1, 0,  //
+  };
+  checkExact(program, {input}, {output});
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.ArgSort3dAxis0Asc
+  // CHECK: module @argsort
+  // CHECK: func @main(%[[ARG0:.*]]: tensor<3x4x5xf32>) -> tensor<3x4x5xsi32>
+  // CHECK:  %[[X0:.*]] = tile.argsort asc %[[ARG0]][0] : (tensor<3x4x5xf32>) -> tensor<3x4x5xsi32>
+  // CHECK:  return %[[X0]] : tensor<3x4x5xsi32>
+  // clang-format on
+}
+
+TEST_F(CppEdsl, ArgSort3dAxis2Desc) {
+  auto I = Placeholder(DType::FLOAT32, {3, 4, 5});
+  auto O = argsort(I, /*axis=*/2, SortDirection::DESC);
+  auto program = makeProgram("argsort", {I}, {O});
+  std::vector<float> input = {
+      0.508, 0.001, 0.833, 0.186, 0.960,  //
+      0.405, 0.621, 0.183, 0.769, 0.331,  //
+      0.726, 0.678, 0.027, 0.789, 0.544,  //
+      0.151, 0.453, 0.512, 0.513, 0.451,  //
+      //
+      0.875, 0.089, 0.909, 0.353, 0.829,  //
+      0.238, 0.511, 0.619, 0.214, 0.818,  //
+      0.085, 0.713, 0.649, 0.373, 0.654,  //
+      0.615, 0.865, 0.268, 0.713, 0.171,  //
+      //
+      0.218, 0.272, 0.702, 0.621, 0.224,  //
+      0.236, 0.746, 0.508, 0.189, 0.503,  //
+      0.177, 0.096, 0.466, 0.228, 0.759,  //
+      0.771, 0.567, 0.594, 0.211, 0.183,  //
+  };
+  // indexed:
+  //  0:0.508, 1:0.001, 2:0.833, 3:0.186, 4:0.960, //
+  //  0:0.405, 1:0.621, 2:0.183, 3:0.769, 4:0.331, //
+  //  0:0.726, 1:0.678, 2:0.027, 3:0.789, 4:0.544, //
+  //  0:0.151, 1:0.453, 2:0.512, 3:0.513, 4:0.451, //
+  //
+  //  0:0.875, 1:0.089, 2:0.909, 3:0.353, 4:0.829, //
+  //  0:0.238, 1:0.511, 2:0.619, 3:0.214, 4:0.818, //
+  //  0:0.085, 1:0.713, 2:0.649, 3:0.373, 4:0.654, //
+  //  0:0.615, 1:0.865, 2:0.268, 3:0.713, 4:0.171, //
+  //
+  //  0:0.218, 1:0.272, 2:0.702, 3:0.621, 4:0.224, //
+  //  0:0.236, 1:0.746, 2:0.508, 3:0.189, 4:0.503, //
+  //  0:0.177, 1:0.096, 2:0.466, 3:0.228, 4:0.759, //
+  //  0:0.771, 1:0.567, 2:0.594, 3:0.211, 4:0.183, //
+  std::vector<int32_t> output = {
+      4, 2, 0, 3, 1,  //
+      3, 1, 0, 4, 2,  //
+      3, 0, 1, 4, 2,  //
+      3, 2, 1, 4, 0,  //
+      //
+      2, 0, 4, 3, 1,  //
+      4, 2, 1, 0, 3,  //
+      1, 4, 2, 3, 0,  //
+      1, 3, 0, 2, 4,  //
+      //
+      2, 3, 1, 4, 0,  //
+      1, 2, 4, 0, 3,  //
+      4, 2, 3, 0, 1,  //
+      0, 2, 1, 3, 4,  //
+  };
+  checkExact(program, {input}, {output});
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.ArgSort3dAxis2Desc
+  // CHECK: module @argsort
+  // CHECK: func @main(%[[ARG0:.*]]: tensor<3x4x5xf32>) -> tensor<3x4x5xsi32>
+  // CHECK:  %[[X0:.*]] = tile.argsort desc %[[ARG0]][2] : (tensor<3x4x5xf32>) -> tensor<3x4x5xsi32>
+  // CHECK:  return %[[X0]] : tensor<3x4x5xsi32>
+  // clang-format on
+}
+
+TEST_F(CppEdsl, ArgSort3dAxisNeg2Asc) {
+  auto I = Placeholder(DType::FLOAT32, {2, 2, 2});
+  auto O = argsort(I, /*axis=*/-2, SortDirection::ASC);
+  auto program = makeProgram("argsort", {I}, {O});
+  std::vector<float> input = {
+      1, 2,  //
+      3, 4,  //
+      //
+      5, 6,  //
+      7, 8,  //
+  };
+  std::vector<int32_t> output = {
+      0, 0,  //
+      1, 1,  //
+      //
+      0, 0,  //
+      1, 1,  //
+  };
+  checkExact(program, {input}, {output});
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.ArgSort3dAxisNeg2Asc
+  // CHECK: module @argsort
+  // CHECK: func @main(%[[ARG0:.*]]: tensor<2x2x2xf32>) -> tensor<2x2x2xsi32>
+  // CHECK:   %[[X0:.*]] = tile.argsort asc %[[ARG0]][-2] : (tensor<2x2x2xf32>) -> tensor<2x2x2xsi32>
+  // CHECK:   return %[[X0]] : tensor<2x2x2xsi32>
+  // clang-format on
 }
 
 }  // namespace

@@ -9,12 +9,14 @@ plaidml_cc_library(
     srcs = [
         "affine_expr.cc",
         "affine_constraints.cc",
+        "memref_access.cc",
         "strides.cc",
         "uses.cc",
     ],
     hdrs = [
         "affine_expr.h",
         "affine_constraints.h",
+        "memref_access.h",
         "strides.h",
         "uses.h",
     ],

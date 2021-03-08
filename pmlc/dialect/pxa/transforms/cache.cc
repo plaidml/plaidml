@@ -7,6 +7,7 @@
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/IR/AffineValueMap.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 
 #include "pmlc/dialect/pxa/analysis/strides.h"
 #include "pmlc/dialect/pxa/analysis/uses.h"
@@ -41,7 +42,7 @@ static AffineParallelOp createCopyLoop(OpBuilder &builder,               //
                                        ArrayRef<int64_t> size,           //
                                        Value srcMemRef, Value dstMemRef, //
                                        ArrayRef<StrideInfo> srcOffset,   //
-                                       ArrayRef<StrideInfo> dstOffset,
+                                       ArrayRef<StrideInfo> dstOffset,   //
                                        AtomicRMWKind agg) {
   assert(size.size() == srcOffset.size());
   assert(size.size() == dstOffset.size());
@@ -69,10 +70,12 @@ static AffineParallelOp createCopyLoop(OpBuilder &builder,               //
 }
 
 static Value allocateLocalCache(OpBuilder &builder, Value memref, Location loc,
-                                const RelativeAccessPattern &rap) {
+                                const RelativeAccessPattern &rap,
+                                bool wholeBlock = false) {
   auto originalType = memref.getType().cast<MemRefType>();
   auto elementType = originalType.getElementType();
-  auto memRefType = MemRefType::get(rap.innerCount, elementType);
+  auto memRefType = MemRefType::get(
+      wholeBlock ? rap.wholeInnerCount : rap.innerCount, elementType);
   auto alloc = builder.create<AllocOp>(loc, memRefType);
   alloc.getOperation()->setAttr("cache", builder.getUnitAttr());
   return alloc;
@@ -175,7 +178,13 @@ LogicalResult cacheLoadAsVector(AffineParallelOp par, PxaLoadOp load,
   // Extract the right element of the vector
   Value idx = newLoadBuilder.create<AffineApplyOp>(
       loc, innerMap.getAffineMap().getSubMap({last}), innerMap.getOperands());
-  auto newLoad = newLoadBuilder.create<ExtractElementOp>(
+
+  if (idx.getType().isa<IndexType>()) {
+    auto indexCast = newLoadBuilder.create<IndexCastOp>(load.getLoc(), idx,
+                                                        builder.getI32Type());
+    idx = indexCast.getResult();
+  }
+  auto newLoad = newLoadBuilder.create<vector::ExtractElementOp>(
       loc, eltType, loadVec.getResult(), idx);
   load.replaceAllUsesWith(newLoad.result());
   load.erase();
@@ -214,7 +223,7 @@ LogicalResult cacheReduce(AffineParallelOp par, PxaReduceOp reduce) {
       IVLOG(3, "cacheReduce failed: missing yield op");
       return failure();
     }
-    out = yieldOp.getParentOp()->getResult(use.getOperandNumber());
+    out = yieldOp->getParentOp()->getResult(use.getOperandNumber());
   }
 
   // Verify final output has a single use, TODO: THis probably isn't a hard
@@ -255,7 +264,7 @@ LogicalResult cacheReduce(AffineParallelOp par, PxaReduceOp reduce) {
   while (out.getParentBlock() != par.getBody()) {
     auto &use = *out.use_begin();
     auto yieldOp = cast<AffineYieldOp>(use.getOwner());
-    out = yieldOp.getParentOp()->getResult(use.getOperandNumber());
+    out = yieldOp->getParentOp()->getResult(use.getOperandNumber());
     out.setType(newType);
   }
 
@@ -391,13 +400,15 @@ void CachePlan::execute() {
     auto builder = OpBuilder::atBlockBegin(entry.band.getBody());
     SmallVector<StrideInfo, 4> zeroOffset(entry.rap.innerCount.size());
 
-    entry.cache = allocateLocalCache(builder, memref, loc, entry.rap);
+    entry.cache =
+        allocateLocalCache(builder, memref, loc, entry.rap, wholeBlock);
     if (isInitialized(memref)) {
       // copy global -> local
       entry.copyInto = true;
-      auto copyLoop = createCopyLoop(builder, loc, entry.rap.innerCount, memref,
-                                     entry.cache, entry.rap.outer, zeroOffset,
-                                     AtomicRMWKind::assign);
+      auto copyLoop = createCopyLoop(
+          builder, loc,
+          wholeBlock ? entry.rap.wholeInnerCount : entry.rap.innerCount, memref,
+          entry.cache, entry.rap.outer, zeroOffset, AtomicRMWKind::assign);
       copyLoop.getOperation()->setAttr("cache_in", builder.getUnitAttr());
       entry.cache = copyLoop.getResult(0);
     }
@@ -429,6 +440,8 @@ void CachePlan::execute() {
 }
 
 struct CachePass : public CacheBase<CachePass> {
+  explicit CachePass(bool wholeBlock) { this->wholeBlock = wholeBlock; }
+
   void runOnFunction() final {
     auto func = getFunction();
 
@@ -437,21 +450,21 @@ struct CachePass : public CacheBase<CachePass> {
         return;
       }
 
-      auto middle = dyn_cast<AffineParallelOp>(inner.getParentOp());
+      auto middle = dyn_cast<AffineParallelOp>(inner->getParentOp());
       if (!middle || !util::hasTag(middle, middleTag)) {
         middle.emitError("Middle loop does not have tag");
         signalPassFailure();
         return;
       }
 
-      auto outer = dyn_cast<AffineParallelOp>(middle.getParentOp());
+      auto outer = dyn_cast<AffineParallelOp>(middle->getParentOp());
       if (!outer || !util::hasTag(outer, outerTag)) {
         outer.emitError("Outer loop does not have tag");
         signalPassFailure();
         return;
       }
 
-      CachePlan plan(outer, middle);
+      CachePlan plan(outer, middle, wholeBlock);
       inner.walk([&](PxaLoadOp load) { plan.addLoad(load); });
       inner.walk([&](PxaReduceOp reduce) { plan.addReduce(reduce); });
       plan.execute();
@@ -459,8 +472,8 @@ struct CachePass : public CacheBase<CachePass> {
   }
 };
 
-std::unique_ptr<mlir::Pass> createCachePass() {
-  return std::make_unique<CachePass>();
+std::unique_ptr<mlir::Pass> createCachePass(bool wholeBlock) {
+  return std::make_unique<CachePass>(wholeBlock);
 }
 
 } // namespace pmlc::dialect::pxa

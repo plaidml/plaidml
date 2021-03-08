@@ -35,7 +35,7 @@ dependencies:
       - pybuildkite==0.0.6
       - pygments
       - pystache
-      - pyyaml
+      - pyyaml==5.3.1
       - sphinxcontrib.katex
       - sphinxcontrib.bibtex
       - sphinxcontrib-napoleon

@@ -6,6 +6,7 @@
   SRCS
     autotile.cc
     cache.cc
+    convert_mem_op.cc
     cpu_thread.cc
     dataflow_opt.cc
     dealloc_placement.cc
@@ -17,6 +18,7 @@
     normalize.cc
     reorder_layouts.cc
     resize_tmps.cc
+    simplify_arithmetic.cc
     simplify_with_constraints.cc
     stencil_gemm.cc
     stencil.cc
@@ -28,6 +30,7 @@
     vectorize_mem.cc
   DEPS
     LLVMSupport
+    MLIRAffineTransforms
     MLIRIR
     pmlc::dialect::pxa::analysis
     pmlc::dialect::pxa::ir

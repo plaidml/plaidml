@@ -25,6 +25,7 @@ plaidml_cc_library(
     srcs = [
         "autotile.cc",
         "cache.cc",
+        "convert_mem_op.cc",
         "cpu_thread.cc",
         "dataflow_opt.cc",
         "dealloc_placement.cc",
@@ -37,6 +38,7 @@ plaidml_cc_library(
         "pass_detail.h",
         "reorder_layouts.cc",
         "resize_tmps.cc",
+        "simplify_arithmetic.cc",
         "simplify_with_constraints.cc",
         "stencil.cc",
         "stencil_gemm.cc",

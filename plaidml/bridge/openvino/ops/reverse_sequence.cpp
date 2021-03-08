@@ -1,4 +1,4 @@
-// Copyright (C) 2020 Intel Corporation
+// Copyright (C) 2021 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 //
 
@@ -12,17 +12,6 @@ using namespace plaidml;  // NOLINT[build/namespaces]
 using ngraph::opset1::ReverseSequence;
 
 namespace {
-
-template <typename T>
-std::vector<T> cast_constant_operand(size_t operand_idx, ngraph::Node* layer) {
-  auto* ngraph_const = ngraph::as_type<ngraph::op::Constant>(layer->get_input_node_ptr(operand_idx));
-  if (ngraph_const) {
-    return ngraph_const->cast_vector<T>();
-  } else {
-    THROW_IE_EXCEPTION << " input [1] is Unsupported inputType; ";
-  }
-}
-
 edsl::Tensor reverse_tensor(edsl::Tensor reverse_crop, int64_t seq_axis) {
   std::vector<edsl::TensorDim> dims(reverse_crop.rank());
   reverse_crop.bind_dims(dims);
@@ -53,11 +42,15 @@ void registerReverseSequence() {
       auto I_slice = edsl::gather(I, batch_indices).axis(batch_axis);
       auto indices_reverse = edsl::index({edsl::TensorDim(length[i])}, 0);
       auto I_reverse = edsl::gather(I_slice, indices_reverse).axis(seq_axis);
-      auto indices_constant = edsl::index({edsl::TensorDim(shapes[seq_axis] - length[i])}, 0) + length[i];
-      auto I_constant = edsl::gather(I_slice, indices_constant).axis(seq_axis);
-      // reverse and concatenate.
       auto reverse_crop = reverse_tensor(I_reverse, seq_axis);
-      slice_pools.push_back(op::concatenate({reverse_crop, I_constant}, seq_axis));
+      if (length[i] < shapes[seq_axis]) {
+        auto indices_constant = edsl::index({edsl::TensorDim(shapes[seq_axis] - length[i])}, 0) + length[i];
+        auto I_constant = edsl::gather(I_slice, indices_constant).axis(seq_axis);
+        // reverse and concatenate.
+        slice_pools.push_back(op::concatenate({reverse_crop, I_constant}, seq_axis));
+      } else {
+        slice_pools.push_back(reverse_crop);
+      }
     }
 
     auto O = op::concatenate(slice_pools, batch_axis);

@@ -11,7 +11,7 @@ func @relu(%arg0: tensor<10x20xf32>) -> tensor<10x20xf32> {
 // CHECK: alloc
 // CHECK: affine.parallel
 // CHECK: pxa.load
-// CHECK: cmpf "olt"
+// CHECK: cmpf olt
 // CHECK: pxa.reduce assign
 // CHECK: affine.parallel
 // CHECK: pxa.load

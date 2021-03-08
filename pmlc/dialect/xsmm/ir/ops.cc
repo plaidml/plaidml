@@ -41,8 +41,9 @@ GemmInvokeF32Op::operand_range GemmInvokeF32Op::getOperandsForC() {
 }
 
 void printGemmInvokeF32Op(OpAsmPrinter &p, GemmInvokeF32Op op) {
-  auto funcType = FunctionType::get({op.a().getType(), op.b().getType()},
-                                    {op.c().getType()}, op.getContext());
+  auto funcType =
+      FunctionType::get(op.getContext(), {op.a().getType(), op.b().getType()},
+                        {op.c().getType()});
   p << op.getOperation()->getName() << ' ';
   p << op.ptr() << ", ";
   p << op.c() << '[';

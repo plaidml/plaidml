@@ -5,7 +5,7 @@
 
 include(CMakeParseArguments)
 
-set(MLIR_TABLEGEN_EXE mlir-tblgen)
+get_directory_property(MLIR_TABLEGEN_EXE DIRECTORY ${MLIR_SOURCE_DIR} DEFINITION MLIR_TABLEGEN_EXE)
 
 # pml_tblgen_library()
 #

@@ -12,9 +12,9 @@
 
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
-#include "mlir/IR/Function.h"
+#include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Matchers.h"
-#include "mlir/IR/StandardTypes.h"
 #include "mlir/Support/DebugStringHelper.h"
 
 #include "pmlc/dialect/tile/ir/ops.h"
@@ -38,7 +38,6 @@ using llvm::SmallVector;
 // I64EnumAttrCase<"u32",     7>,
 // I64EnumAttrCase<"i64",     8>,
 // I64EnumAttrCase<"u64",     9>,
-// I64EnumAttrCase<"bf16",   10>,
 // I64EnumAttrCase<"f16",    11>,
 // I64EnumAttrCase<"f32",    12>,
 // I64EnumAttrCase<"f64",    13>,
@@ -82,17 +81,14 @@ unsigned typeScore(Type type) {
   if (type.isUnsignedInteger(64)) {
     return 12;
   }
-  if (type.isBF16()) {
+  if (type.isF16()) {
     return 13;
   }
-  if (type.isF16()) {
+  if (type.isF32()) {
     return 14;
   }
-  if (type.isF32()) {
-    return 15;
-  }
   if (type.isF64()) {
-    return 16;
+    return 15;
   }
   IVLOG(1, "Type: " << debugString(type));
   assert(false && "Undefined typeScore");
@@ -111,8 +107,8 @@ RankedTensorType getRankedTensorType(Type type) {
   if (type.isa<IndexType>()) {
     // TODO: reify this when we lower to a specific target.
     return RankedTensorType::get(
-        shape, IntegerType::get(32, IntegerType::SignednessSemantics::Signed,
-                                type.getContext()));
+        shape, IntegerType::get(type.getContext(), 32,
+                                IntegerType::SignednessSemantics::Signed));
   }
   return RankedTensorType::get(shape, type);
 }
@@ -170,7 +166,7 @@ bool ConstantValueMatcher::match(Operation *op) {
 
 Type toSignlessType(Type type) {
   if (auto integerType = type.dyn_cast<IntegerType>()) {
-    return IntegerType::get(integerType.getWidth(), type.getContext());
+    return IntegerType::get(type.getContext(), integerType.getWidth());
   }
   return type;
 }

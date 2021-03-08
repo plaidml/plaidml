@@ -10,7 +10,7 @@
 #include <vector>
 
 #include "mlir/Dialect/Affine/IR/AffineValueMap.h"
-#include "mlir/IR/Function.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/Support/DebugStringHelper.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -516,6 +516,7 @@ computeRelativeAccess(Operation *op, BlockArgumentBoundaryFn fn) {
       return None;
     }
     ret.innerRanges.push_back(range);
+    ret.wholeInnerCount.push_back(range.maxVal - range.minVal + 1);
     ret.innerCount.push_back(range.count());
   }
   return ret;

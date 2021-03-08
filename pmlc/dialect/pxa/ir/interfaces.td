@@ -63,19 +63,6 @@ def PxaReadOpInterface : PxaOpInterface<"PxaReadOpInterface"> {
       }]
     >,
     InterfaceMethod<
-      /*desc=*/"Returns the AffineMapAttr associated with 'memref'.",
-      /*retTy=*/"::mlir::NamedAttribute",
-      /*methodName=*/"getAffineMapAttrForMemRef",
-      /*args=*/(ins "::mlir::Value":$memref),
-      /*methodBody=*/[{}],
-      /*defaultImplementation=*/[{
-        ConcreteOp op = ::mlir::cast<ConcreteOp>(this->getOperation());
-        assert(memref == getMemRef());
-        return {::mlir::Identifier::get(op.getMapAttrName(), op.getContext()),
-                op.getAffineMapAttr()};
-      }]
-    >,
-    InterfaceMethod<
       /*desc=*/"Returns the value read by this operation.",
       /*retTy=*/"::mlir::Value",
       /*methodName=*/"getValue",
@@ -142,19 +129,6 @@ def PxaReduceOpInterface : PxaOpInterface<"PxaReduceOpInterface"> {
       }]
     >,
     InterfaceMethod<
-      /*desc=*/"Returns the AffineMapAttr associated with 'memref'.",
-      /*retTy=*/"::mlir::NamedAttribute",
-      /*methodName=*/"getAffineMapAttrForMemRef",
-      /*args=*/(ins "::mlir::Value":$memref),
-      /*methodBody=*/[{}],
-      /*defaultImplementation=*/[{
-        ConcreteOp op = ::mlir::cast<ConcreteOp>(this->getOperation());
-        assert(memref == getMemRef());
-        return {::mlir::Identifier::get(op.getMapAttrName(), op.getContext()),
-                op.getAffineMapAttr()};
-      }]
-    >,
-    InterfaceMethod<
       /*desc=*/"Returns the value to store.",
       /*retTy=*/"::mlir::Value",
       /*methodName=*/"getValueToStore",
@@ -174,6 +148,28 @@ def PxaReduceOpInterface : PxaOpInterface<"PxaReduceOpInterface"> {
       /*defaultImplementation=*/[{
         ConcreteOp op = ::mlir::cast<ConcreteOp>(this->getOperation());
         return op.getAgg();
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/"Returns the idxs.",
+      /*retTy=*/"::mlir::ValueRange",
+      /*methodName=*/"getIdxs",
+      /*args=*/(ins),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        ConcreteOp op = ::mlir::cast<ConcreteOp>(this->getOperation());
+        return op.idxs();
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/"Returns the result value.",
+      /*retTy=*/"::mlir::Value",
+      /*methodName=*/"getReduceResult",
+      /*args=*/(ins),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        ConcreteOp op = ::mlir::cast<ConcreteOp>(this->getOperation());
+        return op.result();
       }]
     >,
   ];

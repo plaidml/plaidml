@@ -39,9 +39,37 @@ static llvm::Optional<double> getFloatValue(Evaluator *evaluator,
 }
 
 static bool isDataTypeFloat(DataType type) {
-  return type == DataType::bf16 || type == DataType::f16 ||
-         type == DataType::f32 || type == DataType::f64;
+  return type == DataType::f16 || type == DataType::f32 ||
+         type == DataType::f64;
 }
+
+static bool isDataTypeInteger(DataType type) {
+  return type == DataType::i1 || type == DataType::si8 ||
+         type == DataType::ui8 || type == DataType::si16 ||
+         type == DataType::ui16 || type == DataType::si32 ||
+         type == DataType::ui32 || type == DataType::si64 ||
+         type == DataType::ui64;
+}
+
+struct ArgSortOp : Intrinsic {
+  TensorShapes getShapes(Evaluator *evaluator, ArrayRef<ExprNodePtr> operands,
+                         ArrayRef<TensorShape> shapes) const final {
+    if (operands.size() != 3) {
+      throw std::runtime_error("'argsort' requires 3 arguments.");
+    }
+    auto axis = getIntegerValue(evaluator, operands[1]);
+    if (!axis) {
+      throw std::runtime_error(
+          "'argsort' requires operand #2 to be an integer.");
+    }
+    auto direction = getIntegerValue(evaluator, operands[2]);
+    if (!direction) {
+      throw std::runtime_error(
+          "'argsort' requires operand #3 to be an integer.");
+    }
+    return {TensorShape(DataType::si32, shapes[0].sizes)};
+  }
+};
 
 struct BooleanOp : Intrinsic {
   TensorShapes getShapes(Evaluator *evaluator, ArrayRef<ExprNodePtr> operands,
@@ -53,8 +81,9 @@ struct BooleanOp : Intrinsic {
 struct IndexOp : Intrinsic {
   TensorShapes getShapes(Evaluator *evaluator, ArrayRef<ExprNodePtr> operands,
                          ArrayRef<TensorShape> shapes) const final {
-    if (operands.size() < 1) {
-      throw std::runtime_error("'index' requires at least one operand.");
+    if (operands.size() < 2) {
+      throw std::runtime_error(
+          "'index' requires an axis operand and at least 1 dimension");
     }
     TensorShape ret(DataType::si32); // TODO
     for (const ExprNodePtr &operand : operands.drop_front()) {
@@ -73,8 +102,8 @@ struct GatherOp : Intrinsic {
   TensorShapes getShapes(Evaluator *evaluator, ArrayRef<ExprNodePtr> operands,
                          ArrayRef<TensorShape> shapes) const final {
     auto operands_size = operands.size();
-    if (operands_size != 6) {
-      throw std::runtime_error("'gather' requires six arguments.");
+    if (operands_size != 8) {
+      throw std::runtime_error("'gather' requires eight arguments.");
     }
     auto tensor = shapes[0];
     auto idxs = shapes[1];
@@ -113,13 +142,41 @@ struct GatherOp : Intrinsic {
           "to be a constant float");
     }
 
-    TensorShape shape{tensor.elementType};
-    for (auto i = 0; i < axis.getValue(); i++) {
-      shape.sizes.push_back(tensor.sizes[i]);
+    auto mode = getIntegerValue(evaluator, operands[6]);
+    if (!mode) {
+      throw std::runtime_error("'gather' primitive expects the 'mode' argument "
+                               "to be a constant integer");
+    } else if (mode.getValue() == 1) {
+      if (!isDataTypeInteger(idxs.elementType)) {
+        throw std::runtime_error(
+            "'gather' ND mode requires indices elements to be integers.");
+      }
     }
-    shape.sizes.insert(shape.sizes.end(), idxs.sizes.begin(), idxs.sizes.end());
-    for (auto i = axis.getValue() + 1; i < rank; i++) {
-      shape.sizes.push_back(tensor.sizes[i]);
+
+    auto batchDims = getIntegerValue(evaluator, operands[7]);
+    if (!batchDims) {
+      throw std::runtime_error(
+          "'gather' primitive expects the 'batchDims' argument "
+          "to be a constant integer");
+    }
+
+    TensorShape shape{tensor.elementType};
+    if (mode.getValue() == 0) {
+      for (auto i = 0; i < axis.getValue(); i++) {
+        shape.sizes.push_back(tensor.sizes[i]);
+      }
+      shape.sizes.insert(shape.sizes.end(), idxs.sizes.begin(),
+                         idxs.sizes.end());
+      for (auto i = axis.getValue() + 1; i < rank; i++) {
+        shape.sizes.push_back(tensor.sizes[i]);
+      }
+    } else {
+      for (size_t i = 0; i < idxs.getRank() - 1; i++) {
+        shape.sizes.push_back(idxs.sizes[i]);
+      }
+      for (auto i = idxs.sizes.back() + batchDims.getValue(); i < rank; i++) {
+        shape.sizes.push_back(tensor.sizes[i]);
+      }
     }
     return {shape};
   }
@@ -235,6 +292,7 @@ struct ShapeOp : Intrinsic {
 
 void registerOps() {
   auto registry = IntrinsicRegistry::Instance();
+  registry->add("argsort", std::make_unique<ArgSortOp>());
   registry->add("cmp_eq", std::make_unique<BooleanOp>());
   registry->add("cmp_ge", std::make_unique<BooleanOp>());
   registry->add("cmp_gt", std::make_unique<BooleanOp>());

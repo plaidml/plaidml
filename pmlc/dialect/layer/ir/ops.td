@@ -27,14 +27,14 @@ def BoxOp : LayerOp<"box", [IsolatedFromAbove]> {
   let regions = (region SizedRegion<1>:$body);
 
   let skipDefaultBuilders = 1;
-  let builders = [OpBuilder<
-    "mlir::OpBuilder &builder, "
-    "mlir::OperationState& result, "
-    "mlir::StringRef op, "
-    "mlir::ArrayRef<mlir::Value> operands, "
-    "mlir::ArrayRef<mlir::Type> resultTypes, "
-    "mlir::DictionaryAttr attrs"
-  >];
+  let builders = [
+    OpBuilderDAG<(ins
+      "mlir::StringRef":$op,
+      "mlir::ArrayRef<mlir::Value>":$operands,
+      "mlir::ArrayRef<mlir::Type>":$resultTypes,
+      "mlir::DictionaryAttr":$attrs
+    )>
+  ];
 
   let extraClassDeclaration = [{
     mlir::Block *getBody();

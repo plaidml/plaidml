@@ -4,6 +4,7 @@
 #include <utility>
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/Pass/Pass.h"
@@ -12,6 +13,7 @@
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "pmlc/conversion/tile_to_pxa/pass_detail.h"
+#include "pmlc/dialect/layer/ir/ops.h"
 #include "pmlc/dialect/pxa/analysis/strides.h"
 #include "pmlc/dialect/pxa/analysis/uses.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
@@ -26,6 +28,7 @@
 namespace pmlc::conversion::tile_to_pxa {
 
 namespace tile = dialect::tile;
+namespace layer = dialect::layer;
 namespace pxa = dialect::pxa;
 namespace stdx = dialect::stdx;
 
@@ -33,6 +36,7 @@ using namespace mlir; // NOLINT
 
 using util::AggregationKind;
 using util::CombinationKind;
+using util::GatherMode;
 using util::InterpolationMode;
 using util::NearestMode;
 using util::ScatterMode;
@@ -44,6 +48,7 @@ struct TypeConverter : public mlir::TypeConverter {
     addConversion([](FunctionType type) { return type; });
     addConversion([](FloatType type) { return type; });
     addConversion([](IntegerType type) { return tile::toSignlessType(type); });
+    addConversion([](IndexType type) { return type; });
     addConversion([](MemRefType type) { return type; });
     addConversion([](stdx::ArgpackType type) { return type; });
     addConversion([this](RankedTensorType type) {
@@ -58,6 +63,8 @@ struct TypeConverter : public mlir::TypeConverter {
 static Type getElementType(Type type) {
   if (auto tensorType = type.dyn_cast<TensorType>()) {
     return tensorType.getElementType();
+  } else if (auto memRefType = type.dyn_cast<MemRefType>()) {
+    return memRefType.getElementType();
   }
   return type;
 }
@@ -418,7 +425,7 @@ struct LogicalOp {
       }
     }
     auto attrs = ArrayRef<NamedAttribute>{};
-    Type boolType = IntegerType::get(1, rewriter.getContext());
+    Type boolType = rewriter.getI1Type();
     auto resultTypes = llvm::makeArrayRef(boolType);
     auto op = rewriter.create<OpType>(loc, resultTypes, promoted, attrs);
     return op.getOperation()->getResult(0);
@@ -856,6 +863,270 @@ struct ContractionOpConversion
   }
 };
 
+struct ArgSortOpConversion : public OpConversionPattern<tile::ArgSortOp> {
+  using OpConversionPattern<tile::ArgSortOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(tile::ArgSortOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
+    IVLOG(3, "ArgSortOpConversion::matchAndRewrite");
+    tile::ArgSortOpAdaptor adaptor(operands);
+    auto loc = op.getLoc();
+    auto i32Type = rewriter.getI32Type();
+    auto indexType = rewriter.getIndexType();
+
+    // Axis represents one of the tensor dimensions.
+    int64_t axisAttr = op.axis().getSExtValue();
+
+    // Special case value -1 indicates the last axis.
+    Value tensor = adaptor.tensor();
+    auto shape = tensor.getType().cast<MemRefType>().getShape();
+    size_t tensorDims = shape.size();
+    if (axisAttr < 0) {
+      axisAttr += static_cast<int64_t>(tensorDims);
+    }
+    size_t axis = static_cast<size_t>(axisAttr);
+    if (axisAttr < 0 || axis >= tensorDims) {
+      return failure();
+    }
+    auto elementType = tensor.getType().cast<MemRefType>().getElementType();
+
+    // Allocate an output tensor to contain the sorted argument indices.
+    auto resultType = MemRefType::get(shape, i32Type);
+    Value result = rewriter.create<AllocOp>(loc, resultType).getResult();
+
+    llvm::SmallVector<Type, 4> resultTypes;
+    resultTypes.push_back(resultType);
+    llvm::SmallVector<NamedAttribute, 4> attrs;
+    llvm::SmallVector<Value, 2> layerInputs{result, tensor};
+    auto layerOp =
+        rewriter.create<layer::BoxOp>(loc, "argsort", layerInputs, resultTypes,
+                                      rewriter.getDictionaryAttr(attrs));
+    rewriter.setInsertionPointToStart(&layerOp.body().front());
+
+    // Inside the box, the output tensor comes from the first argument,
+    // and the input data tensor comes from the next. Outputs must come
+    // first in the layer.box operands list.
+    result = layerOp.body().getArguments()[0];
+    tensor = layerOp.body().getArguments()[1];
+
+    auto icon0 =
+        rewriter.create<ConstantOp>(loc, rewriter.getIndexAttr(0)).getResult();
+    auto icon1 =
+        rewriter.create<ConstantOp>(loc, rewriter.getIndexAttr(1)).getResult();
+
+    // Create a loop nest over all the dimensions, including the one we are
+    // sorting on. We will use a single iteration for the sort axis, since the
+    // body of the nest will contain the sorting loop, but we will keep the
+    //  number of IVs equal to the tensor rank to simplify accounting.
+    SmallVector<Value, 4> ops;
+    for (size_t i = 0; i < tensorDims; ++i) {
+      if (i == axis) {
+        ops.push_back(icon0);
+        continue;
+      }
+      auto limit =
+          rewriter.create<ConstantOp>(loc, rewriter.getIndexAttr(shape[i]))
+              .getResult();
+      auto loop = rewriter.create<scf::ForOp>(loc, icon0, limit, icon1);
+      ops.push_back(loop.getInductionVar());
+      rewriter.setInsertionPointToStart(loop.getBody());
+    }
+
+    auto iconN =
+        rewriter.create<ConstantOp>(loc, rewriter.getIndexAttr(shape[axis]))
+            .getResult();
+
+    // For loads and stores from the minIdxVar and minValVar, we'll need a
+    // single, zero-value index, because that's the only way to create a memref
+    SmallVector<Value, 1> zeroIndex;
+    zeroIndex.push_back(icon0);
+
+    // Initialize result tensor using index values in ascending order
+    {
+      auto initLoop = rewriter.create<scf::ForOp>(loc, icon0, iconN, icon1);
+      auto initIV = initLoop.getInductionVar();
+      rewriter.setInsertionPointToStart(initLoop.getBody());
+      // The induction var is the index value across the sort axis.
+      // Write the value of the index to its position in the sorted output.
+      // This will be our initial argument index into the source tensor.
+      // Combine the index value with the loop dimension indexes to create the
+      // destination affine map.
+      auto indexVal =
+          rewriter.create<IndexCastOp>(loc, initIV, i32Type).getResult();
+      ops[axis] = initIV;
+      rewriter.create<StoreOp>(loc, indexVal, result, ops);
+      rewriter.setInsertionPointAfter(initLoop);
+    }
+
+    // Stable selection sort:
+    // for (int i = 0; i < n-1; i++) {
+    //     int min_idx = i;
+    //     for (int j = i+1; j < n; j++) {
+    //         if (arr[j] < arr[min_idx]) {
+    //             min_idx = j;
+    //         }
+    //     }
+    //     int min_val = arr[min_idx];
+    //     while (min_idx > i) {
+    //         arr[min_idx] = arr[min_idx - 1];
+    //         min_idx--;
+    //     }
+    //     arr[i] = min_val;
+    // }
+
+    // Build inner sorting loop
+    if (shape[axis] > 1) {
+      auto sortUB = rewriter.create<ConstantOp>(
+          loc, rewriter.getIndexAttr(shape[axis] - 1));
+      auto sortLoop = rewriter.create<scf::ForOp>(loc, icon0, sortUB, icon1);
+      auto sortIV = sortLoop.getInductionVar();
+      rewriter.setInsertionPointToStart(sortLoop.getBody());
+
+      // Get the value associated with the current minimum index position.
+      // create a MemRefType which is a single-element index
+      MemRefType minIdxVarType = MemRefType::get({1}, indexType);
+      auto minIdxVar = rewriter.create<AllocaOp>(loc, minIdxVarType);
+      rewriter.create<StoreOp>(loc, sortIV, minIdxVar, zeroIndex);
+
+      ops[axis] = sortIV;
+      auto minValIdxInt = rewriter.create<LoadOp>(loc, result, ops).getResult();
+      auto minValIdx =
+          rewriter.create<IndexCastOp>(loc, minValIdxInt, indexType)
+              .getResult();
+      ops[axis] = minValIdx;
+      Value minVal = rewriter.create<LoadOp>(loc, tensor, ops).getResult();
+      MemRefType minValVarType = MemRefType::get({1}, elementType);
+      auto minValVar = rewriter.create<AllocaOp>(loc, minValVarType);
+      rewriter.create<StoreOp>(loc, minVal, minValVar, zeroIndex);
+
+      // Iterate over the remaining elements, looking for a smaller value.
+      auto minLB = rewriter.create<AddIOp>(loc, sortIV, icon1);
+      auto minLoop = rewriter.create<scf::ForOp>(loc, minLB, iconN, icon1);
+      auto minIV = minLoop.getInductionVar();
+      rewriter.setInsertionPointToStart(minLoop.getBody());
+
+      // Get the comparison value for the search iterator position.
+      ops[axis] = minIV;
+      auto compValIdxInt =
+          rewriter.create<LoadOp>(loc, result, ops).getResult();
+      auto compValIdx =
+          rewriter.create<IndexCastOp>(loc, compValIdxInt, indexType)
+              .getResult();
+      ops[axis] = compValIdx;
+      Value compVal = rewriter.create<LoadOp>(loc, tensor, ops).getResult();
+
+      // What is the current minimum value, stored in the min val var?
+      minVal = rewriter.create<LoadOp>(loc, minValVar, zeroIndex).getResult();
+      // Is compVal smaller than minVal? If so, update the allocs
+      Value orderPred;
+      orderPred = convertCmpOp(loc, rewriter, compVal, minVal, elementType,
+                               op.direction());
+
+      auto ifReorder = rewriter.create<scf::IfOp>(loc, orderPred, false);
+      rewriter.setInsertionPointToStart(&ifReorder.thenRegion().front());
+      // store minIV -> minIdxVar
+      rewriter.create<StoreOp>(loc, minIV, minIdxVar, zeroIndex);
+      // store compVal -> minValVar
+      rewriter.create<StoreOp>(loc, compVal, minValVar, zeroIndex);
+      // End the conditional block. We would set the insertion point after
+      // the ifReorder block, except that we are about to...
+      // End the inner sort loop, which found the smallest value in the
+      // unsorted region, by setting the insertion point after its block.
+      rewriter.setInsertionPointAfter(minLoop);
+
+      auto finalMinPos =
+          rewriter.create<LoadOp>(loc, minIdxVar, zeroIndex).getResult();
+      ops[axis] = finalMinPos;
+      auto finalMinIdx = rewriter.create<LoadOp>(loc, result, ops).getResult();
+
+      // Move every element between [sortIV,finalMinPos) a step forward
+      // and then move the minimum index to the head to keep it stable.
+      auto moveLoop =
+          rewriter.create<scf::ForOp>(loc, sortIV, finalMinPos, icon1);
+      auto moveIV = moveLoop.getInductionVar();
+      rewriter.setInsertionPointToStart(moveLoop.getBody());
+      moveIV = rewriter.create<SubIOp>(loc, finalMinPos, moveIV);
+      moveIV = rewriter.create<AddIOp>(loc, moveIV, sortIV);
+      auto moveNext = rewriter.create<SubIOp>(loc, moveIV, icon1);
+      ops[axis] = moveNext;
+      auto moveNextVal = rewriter.create<LoadOp>(loc, result, ops).getResult();
+      ops[axis] = moveIV;
+      rewriter.create<StoreOp>(loc, moveNextVal, result, ops);
+      rewriter.setInsertionPointAfter(moveLoop);
+      ops[axis] = sortIV;
+      rewriter.create<StoreOp>(loc, finalMinIdx, result, ops);
+
+      // The minimum remaining value is now at the end of the sorted region.
+      // Advance to the next minimum in the remaining unsorted region.
+      rewriter.setInsertionPointAfter(sortLoop);
+    }
+
+    // for future reference, when N is a power of 2
+    // bitonic sort:
+    // for (int k = 2; k <= N; k = 2 * k) {
+    //   for (int j = k >> 1; j > 0; j = j >> 1) {
+    //     for (int i = 0; i < N; i++) {
+    //       int ixj = i ^ j;
+    //       if (ixj > i) {
+    //         if ((i & k) == 0 && a[i] > a[ixj]) {
+    //           swap(a[i], a[ixj]);
+    //         }
+    //         if ((i & k) != 0 && a[i] < a[ixj]) {
+    //           swap(a[i], a[ixj]);
+    //         }
+    //       }
+    //     }
+    //   }
+    // }
+
+    rewriter.setInsertionPointToEnd(&layerOp.body().back());
+    rewriter.create<layer::ReturnOp>(loc, ArrayRef<Value>{result});
+    rewriter.replaceOp(op, layerOp.getResult(0));
+    return success();
+  }
+
+  Value convertCmpOp(Location loc, ConversionPatternRewriter &rewriter,
+                     Value compVal, Value minVal, Type type,
+                     tile::SortDirection dir) const {
+    if (type.isa<FloatType>()) {
+      CmpFPredicate pred;
+      switch (dir) {
+      case tile::SortDirection::asc:
+        pred = CmpFPredicate::OLT;
+        break;
+      case tile::SortDirection::desc:
+        pred = CmpFPredicate::OGT;
+        break;
+      }
+      return rewriter.create<mlir::CmpFOp>(loc, pred, compVal, minVal)
+          .getResult();
+    }
+    CmpIPredicate pred;
+    if (type.isSignedInteger()) {
+      switch (dir) {
+      case tile::SortDirection::asc:
+        pred = CmpIPredicate::slt;
+        break;
+      case tile::SortDirection::desc:
+        pred = CmpIPredicate::sgt;
+        break;
+      }
+    } else {
+      switch (dir) {
+      case tile::SortDirection::asc:
+        pred = CmpIPredicate::ult;
+        break;
+      case tile::SortDirection::desc:
+        pred = CmpIPredicate::ugt;
+        break;
+      }
+    }
+    return rewriter.create<mlir::CmpIOp>(loc, pred, compVal, minVal)
+        .getResult();
+  }
+};
+
 struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
   using OpConversionPattern<tile::GatherOp>::OpConversionPattern;
 
@@ -891,55 +1162,87 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
 
     // Create an affine map for loading the index, using the leading counters
     size_t axis = *(op.axis().getRawData());
+    size_t batchDims = *(op.batchDims().getRawData());
+    auto idxShape = indices.getType().cast<MemRefType>().getShape();
     size_t idxDims = indices.getType().cast<MemRefType>().getShape().size();
     auto idxLoadMap = AffineMap::getMultiDimIdentityMap(idxDims, ctx);
-    auto idxLoadOps = loop.getIVs().slice(axis, idxDims);
-
-    // Load the value from the indices array
-    Value idx =
-        rewriter.create<pxa::PxaLoadOp>(loc, indices, idxLoadMap, idxLoadOps)
-            .getResult();
 
     // Create default source map
     size_t dstDims = size.size();
     std::vector<Value> srcOps;
-    for (size_t i = 0; i < axis; ++i) {
-      srcOps.push_back(loop.getIVs()[i]);
-    }
-
-    for (size_t i = axis + idxDims - 1; i < dstDims; ++i) {
-      srcOps.push_back(loop.getIVs()[i]);
-    }
-
-    // Create std ops for 1D interpolation
     Value interpVal;
-    if (idx.getType().isa<FloatType>()) {
-      switch (op.interpolationMode()) {
-      case InterpolationMode::nearest:
-        interpVal = buildNearestInterpolationOps(
-            loc, rewriter, tensor, idx, srcOps, axis, op.nearestMode());
-        break;
-      case InterpolationMode::linear:
-        interpVal = buildLinearInterpolationOps(loc, rewriter, tensor, idx,
-                                                srcOps, axis);
-        break;
-      case InterpolationMode::cubic:
-        interpVal =
-            buildCubicInterpolationOps(loc, rewriter, tensor, idx, srcOps, axis,
-                                       op.cubeCoeffAttr().getValueAsDouble());
-        break;
-      default:
-        llvm_unreachable("Unsupported InterpolationMode");
+    switch (op.mode()) {
+    case GatherMode::normal: {
+      auto idxLoadOps = loop.getIVs().slice(axis, idxDims);
+      auto idx =
+          rewriter.create<pxa::PxaLoadOp>(loc, indices, idxLoadMap, idxLoadOps)
+              .getResult();
+      for (size_t i = 0; i < axis; ++i) {
+        srcOps.push_back(loop.getIVs()[i]);
       }
-    } else {
-      if (!idx.getType().isa<IndexType>()) {
-        auto indexType = rewriter.getIndexType();
-        // Cast from whatever integer type it has to index type
-        idx =
-            rewriter.create<mlir::IndexCastOp>(loc, idx, indexType).getResult();
+
+      for (size_t i = axis + idxDims - 1; i < dstDims; ++i) {
+        srcOps.push_back(loop.getIVs()[i]);
       }
-      srcOps.at(axis) = idx;
+
+      // Create std ops for 1D interpolation
+      if (idx.getType().isa<FloatType>()) {
+        switch (op.interpolationMode()) {
+        case InterpolationMode::nearest:
+          interpVal = buildNearestInterpolationOps(
+              loc, rewriter, tensor, idx, srcOps, axis, op.nearestMode());
+          break;
+        case InterpolationMode::linear:
+          interpVal = buildLinearInterpolationOps(loc, rewriter, tensor, idx,
+                                                  srcOps, axis);
+          break;
+        case InterpolationMode::cubic:
+          interpVal = buildCubicInterpolationOps(
+              loc, rewriter, tensor, idx, srcOps, axis,
+              op.cubeCoeffAttr().getValueAsDouble());
+          break;
+        default:
+          llvm_unreachable("Unsupported InterpolationMode");
+        }
+      } else {
+        if (!idx.getType().isa<IndexType>()) {
+          auto indexType = rewriter.getIndexType();
+          // Cast from whatever integer type it has to index type
+          idx = rewriter.create<mlir::IndexCastOp>(loc, idx, indexType)
+                    .getResult();
+        }
+        srcOps.at(axis) = idx;
+        interpVal = rewriter.create<mlir::LoadOp>(loc, tensor, srcOps);
+      }
+    } break;
+    case GatherMode::nd: {
+      std::vector<Value> idxs, combIdx(idxDims);
+      for (size_t i = 0; i < idxDims - 1; ++i) {
+        combIdx[i] = loop.getIVs()[i];
+      }
+      for (int64_t i = 0; i < idxShape[idxDims - 1]; ++i) {
+        combIdx[idxDims - 1] = rewriter.create<mlir::ConstantIndexOp>(loc, i);
+        auto idx =
+            rewriter.create<pxa::PxaLoadOp>(loc, indices, idxLoadMap, combIdx)
+                .getResult();
+        if (!idx.getType().isa<IndexType>()) {
+          auto indexType = rewriter.getIndexType();
+          idx = rewriter.create<mlir::IndexCastOp>(loc, idx, indexType)
+                    .getResult();
+        }
+        idxs.push_back(idx);
+      }
+      for (size_t i = 0; i < batchDims; ++i) {
+        srcOps.push_back(loop.getIVs()[i]);
+      }
+      srcOps.insert(srcOps.end(), idxs.begin(), idxs.end());
+      for (size_t i = idxDims - 1; i < dstDims; ++i) {
+        srcOps.push_back(loop.getIVs()[i]);
+      }
       interpVal = rewriter.create<mlir::LoadOp>(loc, tensor, srcOps);
+    } break;
+    default:
+      llvm_unreachable("unrecognized gather mode");
     }
 
     // Create a destination map using all of the dimensions
@@ -1337,22 +1640,20 @@ struct ScatterOpConversion : public OpConversionPattern<tile::ScatterOp> {
     auto resultMemRef =
         rewriter.create<AllocOp>(loc, resultMemRefType).getResult();
 
-    if (op.mode() != ScatterMode::normal) {
-      auto dataShape = data.getType().cast<MemRefType>().getShape();
-      auto copyLoop = rewriter.create<AffineParallelOp>(
-          loc, ArrayRef<Type>{data.getType()},
-          ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign}, dataShape);
-      rewriter.setInsertionPointToStart(copyLoop.getBody());
-      size_t dataDims = dataShape.size();
-      auto dataLoadMap = AffineMap::getMultiDimIdentityMap(dataDims, ctx);
-      auto loadData = rewriter.create<pxa::PxaLoadOp>(loc, data, dataLoadMap,
-                                                      copyLoop.getIVs());
-      auto stored = buildSimpleStore(rewriter, loc, loadData, resultMemRef,
-                                     tile::getPaddingInfo(op));
+    auto dataShape = data.getType().cast<MemRefType>().getShape();
+    auto copyLoop = rewriter.create<AffineParallelOp>(
+        loc, ArrayRef<Type>{data.getType()},
+        ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign}, dataShape);
+    rewriter.setInsertionPointToStart(copyLoop.getBody());
+    size_t dataDims = dataShape.size();
+    auto dataLoadMap = AffineMap::getMultiDimIdentityMap(dataDims, ctx);
+    auto loadData = rewriter.create<pxa::PxaLoadOp>(loc, data, dataLoadMap,
+                                                    copyLoop.getIVs());
+    auto stored = buildSimpleStore(rewriter, loc, loadData, resultMemRef,
+                                   tile::getPaddingInfo(op));
 
-      rewriter.create<AffineYieldOp>(loc, ArrayRef<Value>{stored});
-      rewriter.setInsertionPointAfter(copyLoop);
-    }
+    rewriter.create<AffineYieldOp>(loc, ArrayRef<Value>{stored});
+    rewriter.setInsertionPointAfter(copyLoop);
 
     // Get the shape of the update tensor and create a parallel loop over its
     // indexes; we will load each value from the updates, load its destination
@@ -1552,8 +1853,8 @@ struct FuncOpConversion : public OpConversionPattern<FuncOp> {
     // Create a new function with an updated signature.
     auto newOp = rewriter.cloneWithoutRegions(op);
     rewriter.inlineRegionBefore(op.getBody(), newOp.getBody(), newOp.end());
-    newOp.setType(FunctionType::get(result.getConvertedTypes(), resultTypes,
-                                    op.getContext()));
+    newOp.setType(FunctionType::get(op.getContext(), result.getConvertedTypes(),
+                                    resultTypes));
 
     // Tell the rewriter to convert the region signature.
     rewriter.applySignatureConversion(&newOp.getBody(), result);
@@ -1571,8 +1872,8 @@ struct ReturnOpConversion : public OpConversionPattern<ReturnOp> {
   LogicalResult
   matchAndRewrite(ReturnOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
-    auto &block = op.getParentRegion()->front();
-    auto funcOp = op.getParentOfType<FuncOp>();
+    auto &block = op->getParentRegion()->front();
+    auto funcOp = op->getParentOfType<FuncOp>();
     auto blockArg = funcOp.getType().getNumInputs() - op.getNumOperands();
     for (Value operand : operands) {
       // Find very initial allocation of memref
@@ -1609,7 +1910,7 @@ struct TraceOpConversion : public OpConversionPattern<tile::PragmaOp> {
       return failure();
     }
     tile::PragmaOpAdaptor adaptor(operands);
-    auto module = op.getParentOfType<ModuleOp>();
+    auto module = op->getParentOfType<ModuleOp>();
     auto msg = op.attrs().getNamed("msg");
     if (!msg) {
       return failure();
@@ -1627,12 +1928,13 @@ struct TraceOpConversion : public OpConversionPattern<tile::PragmaOp> {
     auto context = module.getContext();
     OpBuilder builder(context);
     builder.setInsertionPointToStart(module.getBody());
-    auto funcType = FunctionType::get({}, {}, context);
+    auto funcType = FunctionType::get(context, {}, {});
     auto funcOp = builder.create<FuncOp>(module.getLoc(), symbol, funcType,
                                          ArrayRef<NamedAttribute>{});
-    funcOp.setAttr("msg", msg);
-    funcOp.setAttr("trace", builder.getUnitAttr());
-    funcOp.setAttr("id", builder.getI64IntegerAttr(uniqueId));
+    funcOp->setAttr("msg", msg);
+    funcOp->setAttr("trace", builder.getUnitAttr());
+    funcOp->setAttr("id", builder.getI64IntegerAttr(uniqueId));
+    funcOp.setPrivate();
     return SymbolRefAttr::get(symbol, context);
   }
 };
@@ -1692,6 +1994,30 @@ struct UnpackOpConversion : public OpConversionPattern<stdx::UnpackOp> {
   }
 };
 
+struct ScfForOpConversion : public OpConversionPattern<scf::ForOp> {
+  using OpConversionPattern<scf::ForOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(scf::ForOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const final {
+    scf::ForOpAdaptor oldFor(operands);
+    auto &oldBodyOps = op.getBody()->getOperations();
+    auto newOp = rewriter.create<scf::ForOp>(op.getLoc(), oldFor.lowerBound(),
+                                             oldFor.upperBound(), oldFor.step(),
+                                             oldFor.initArgs());
+    auto &newBodyOps = newOp.getBody()->getOperations();
+    newBodyOps.splice(std::prev(newBodyOps.end()), oldBodyOps,
+                      oldBodyOps.begin(), oldBodyOps.end());
+    auto oldArgs = op.getBody()->getArguments();
+    auto newArgs = newOp.getBody()->getArguments();
+    for (unsigned i = 0; i < oldArgs.size(); ++i) {
+      oldArgs[i].replaceAllUsesWith(newArgs[i]);
+    }
+    rewriter.replaceOp(op, newOp.results());
+    return success();
+  }
+};
+
 struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
   void runOnOperation() final {
     // Inject tile.ident ops for each return operand that needs it.
@@ -1718,8 +2044,11 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
     TypeConverter converter;
     target.addLegalDialect<mlir::AffineDialect>();
     target.addLegalDialect<mlir::StandardOpsDialect>();
+    target.addLegalDialect<mlir::scf::SCFDialect>();
+    target.addLegalDialect<dialect::layer::LayerDialect>();
     target.addLegalDialect<dialect::pxa::PXADialect>();
     target.addLegalDialect<dialect::stdx::StdXDialect>();
+    target.addLegalOp<scf::ForOp, scf::YieldOp, scf::IfOp>();
     target.addLegalOp<mlir::ModuleOp, mlir::ModuleTerminatorOp, ReturnOp>();
     target.addDynamicallyLegalOp<FuncOp>(
         [&](FuncOp op) { return converter.isSignatureLegal(op.getType()); });
@@ -1731,6 +2060,8 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
     target.addDynamicallyLegalOp<stdx::UnpackOp>([&](stdx::UnpackOp op) {
       return converter.isLegal(op.getResultTypes());
     });
+    target.addDynamicallyLegalOp<scf::ForOp>(
+        [&](scf::ForOp op) { return converter.isLegal(op.getResultTypes()); });
 
     // Setup rewrite patterns
     using CmpIntLtOp =
@@ -1743,6 +2074,7 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         CmpIntInequalityOp<CmpIPredicate::sge, CmpIPredicate::uge>;
     OwningRewritePatternList patterns;
     patterns.insert<
+        ArgSortOpConversion,  //
         CastOpConversion,     //
         ConstantOpConversion, //
         FuncOpConversion,     //
@@ -1757,6 +2089,7 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         TraceOpConversion,    //
         PackOpConversion,     //
         UnpackOpConversion,   //
+        ScfForOpConversion,   //
         ContractionOpConversion<CombinationKind::none, FirstOperand>,
         ContractionOpConversion<CombinationKind::add, StdOp<mlir::AddFOp>,
                                 ResultIs<EltwiseFloat>>,
@@ -1887,7 +2220,8 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         EltwiseOpConversion<tile::SelectOp, SelectOp>,
         EltwiseOpConversion<tile::IdentOp, FirstOperand>>(&getContext());
     // Run the conversion
-    if (failed(applyFullConversion(getOperation(), target, patterns))) {
+    if (failed(
+            applyFullConversion(getOperation(), target, std::move(patterns)))) {
       signalPassFailure();
       return;
     }

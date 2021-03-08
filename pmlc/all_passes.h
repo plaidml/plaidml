@@ -8,18 +8,18 @@
 #include "mlir/Dialect/LLVMIR/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/SCF/Passes.h"
-#include "mlir/Dialect/SPIRV/Passes.h"
+#include "mlir/Dialect/SPIRV/Transforms/Passes.h"
 #include "mlir/Dialect/StandardOps/Transforms/Passes.h"
 #include "mlir/Transforms/Passes.h"
 
 #include "pmlc/conversion/comp_to_llvm/passes.h"
-#include "pmlc/conversion/gpu/lowering.h"
-#include "pmlc/conversion/gpu_to_comp/passes.h"
+#include "pmlc/conversion/gpu/passes.h"
 #include "pmlc/conversion/gpu_to_spirv/passes.h"
 #include "pmlc/conversion/pxa_to_affine/passes.h"
 #include "pmlc/conversion/scf_to_omp/passes.h"
 #include "pmlc/conversion/stdx_to_llvm/passes.h"
 #include "pmlc/conversion/tile_to_pxa/passes.h"
+#include "pmlc/dialect/affinex/transforms/passes.h"
 #include "pmlc/dialect/comp/transforms/passes.h"
 #include "pmlc/dialect/layer/transforms/passes.h"
 #include "pmlc/dialect/pxa/transforms/passes.h"
@@ -29,6 +29,7 @@
 #include "pmlc/target/intel_gen/passes.h"
 #include "pmlc/target/intel_gen_ocl_spirv/passes.h"
 #include "pmlc/target/x86/passes.h"
+#include "pmlc/transforms/passes.h"
 
 // This function may be called to register the MLIR passes with the
 // global registry.
@@ -68,10 +69,10 @@ inline void registerAllPasses() {
   pmlc::conversion::stdx_to_llvm::registerPasses();
   pmlc::conversion::tile_to_pxa::registerPasses();
   pmlc::conversion::gpu_to_spirv::registerPasses();
-  pmlc::conversion::gpu_to_comp::registerPasses();
   pmlc::conversion::gpu::registerPasses();
 
   // Dialect passes
+  pmlc::dialect::affinex::registerPasses();
   pmlc::dialect::comp::registerPasses();
   pmlc::dialect::layer::registerPasses();
   pmlc::dialect::pxa::registerPasses();
@@ -82,6 +83,9 @@ inline void registerAllPasses() {
   pmlc::target::x86::registerPasses();
   pmlc::target::intel_gen::registerPasses();
   pmlc::target::intel_gen_ocl_spirv::registerPasses();
+
+  // Transforms
+  pmlc::transforms::registerPasses();
 
   pmlc::rt::registerRuntimes();
 }

@@ -45,7 +45,15 @@ def Cache : FunctionPass<"pxa-cache"> {
     Option<"innerTag", "inner-tag", "std::string",
            /*default=*/"\"inner\"",
            "Inner loop tag">,
+    Option<"wholeBlock", "whole-block", "bool",
+           /*default=*/"false",
+           "Whether cache the whole memory block">
   ];
+}
+
+def ConvertMemOp : FunctionPass<"pxa-convert-mem-op"> {
+  let summary = "Convert standard memory operations to pxa if possible";
+  let constructor = "pmlc::dialect::pxa::createConvertMemOpPass()";
 }
 
 def Fusion : FunctionPass<"pxa-fusion"> {
@@ -161,6 +169,11 @@ def Vectorize : FunctionPass<"pxa-vectorize"> {
     Option<"vectorWidth", "width", "unsigned", /*default=*/"8",
            "Vector register size in elements">
   ];
+}
+
+def SimplifyArithmetic : FunctionPass<"pxa-simplify-arithmetic"> {
+  let summary = "Simplifies arithmetic";
+  let constructor = "pmlc::dialect::pxa::createSimplifyArithmeticPass()";
 }
 
 def SimplifyWithConstraints : FunctionPass<"pxa-simplify-with-constraints"> {

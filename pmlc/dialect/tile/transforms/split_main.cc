@@ -6,6 +6,7 @@
 #include "pmlc/dialect/stdx/ir/ops.h"
 #include "pmlc/dialect/tile/ir/ops.h"
 #include "pmlc/dialect/tile/transforms/pass_detail.h"
+#include "pmlc/util/logging.h"
 
 using namespace mlir;                // NOLINT
 using namespace pmlc::dialect::stdx; // NOLINT
@@ -24,12 +25,13 @@ void SplitMainPass::runOnOperation() {
   // Find main
   FuncOp main = op.lookupSymbol<FuncOp>("main");
   if (!main) {
-    signalPassFailure();
+    IVLOG(1, "Split-main: no main function.");
     return;
   }
 
   // Make function types for init, body, fini
-  auto argpackType = stdx::ArgpackType::get(&getContext());
+  MLIRContext *context = &getContext();
+  auto argpackType = stdx::ArgpackType::get(context);
   llvm::SmallVector<Type, 8> initArgs;
   llvm::SmallVector<Type, 8> bodyArgs;
   bodyArgs.push_back(argpackType);
@@ -40,10 +42,10 @@ void SplitMainPass::runOnOperation() {
       bodyArgs.push_back(main.getArgument(i).getType());
     }
   }
-  auto initFuncType = FunctionType::get(initArgs, {argpackType}, &getContext());
+  auto initFuncType = FunctionType::get(context, initArgs, {argpackType});
   auto bodyFuncType =
-      FunctionType::get(bodyArgs, main.getType().getResults(), &getContext());
-  auto finiFuncType = FunctionType::get({argpackType}, {}, &getContext());
+      FunctionType::get(context, bodyArgs, main.getType().getResults());
+  auto finiFuncType = FunctionType::get(context, {argpackType}, {});
 
   // Construct actual ops
   OpBuilder builder(main);

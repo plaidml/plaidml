@@ -8,7 +8,7 @@ pml_cc_library(
     ::passes-gen
     pmlc::dialect::stdx::ir
     pmlc::util
-    MLIRGPUToSPIRVTransforms
+    MLIRGPUToSPIRV
     MLIRGPU
     MLIRSPIRV
     MLIRVectorToSPIRV

@@ -20,6 +20,10 @@ namespace pmlc::dialect::tile {
 
 using llvm::SmallVector;
 
+LogicalResult ArgSortOp::materializeOperands(OpBuilder &builder) {
+  return tile::materializeOperands(builder, getOperation());
+}
+
 LogicalResult ContractionOp::materializeOperands(OpBuilder &builder) {
   Operation *op = getOperation();
   if (combo() == CombinationKind::cond) {
@@ -120,7 +124,7 @@ void ContractionOp::setLowerBounds(ArrayRef<int64_t> bounds) {
   }
   auto map =
       AffineMap::get(/*dimCount=*/0, /*symbolCount=*/0, exprs, getContext());
-  setAttr(getLowerBoundsAttrName(), AffineMapAttr::get(map));
+  (*this)->setAttr(getLowerBoundsAttrName(), AffineMapAttr::get(map));
 }
 
 void ContractionOp::setUpperBounds(ArrayRef<int64_t> bounds) {
@@ -130,11 +134,11 @@ void ContractionOp::setUpperBounds(ArrayRef<int64_t> bounds) {
   }
   auto map =
       AffineMap::get(/*dimCount=*/0, /*symbolCount=*/0, exprs, getContext());
-  setAttr(getUpperBoundsAttrName(), AffineMapAttr::get(map));
+  (*this)->setAttr(getUpperBoundsAttrName(), AffineMapAttr::get(map));
 }
 
 void ContractionOp::setSink(AffineMap sink) {
-  setAttr(getSinkAttrName(), AffineMapAttr::get(sink));
+  (*this)->setAttr(getSinkAttrName(), AffineMapAttr::get(sink));
 }
 
 void ContractionOp::setSources(ArrayRef<AffineMap> srcs) {
@@ -142,14 +146,14 @@ void ContractionOp::setSources(ArrayRef<AffineMap> srcs) {
   for (auto src : srcs) {
     attrs.push_back(AffineMapAttr::get(src));
   }
-  setAttr(getSourcesAttrName(), ArrayAttr::get(attrs, getContext()));
+  (*this)->setAttr(getSourcesAttrName(), ArrayAttr::get(attrs, getContext()));
 }
 
 void ContractionOp::setConstraints(IntegerSet cons) {
   if (cons.isEmptyIntegerSet()) {
     removeAttr(getConstraintsAttrName());
   } else {
-    setAttr(getConstraintsAttrName(), IntegerSetAttr::get(cons));
+    (*this)->setAttr(getConstraintsAttrName(), IntegerSetAttr::get(cons));
   }
 }
 
@@ -191,7 +195,7 @@ void printContractionOp(OpAsmPrinter *printer, ContractionOp op) {
     }
     *printer << ']';
   }
-  printer->printOptionalAttrDict(op.getAttrs(), elidedAttrs);
+  printer->printOptionalAttrDict(op->getAttrs(), elidedAttrs);
   *printer << " : ";
   printer->printType(op.init().getType());
   *printer << ", ";
@@ -318,16 +322,31 @@ LogicalResult verifyContractionOp(ContractionOp op) {
   return success();
 }
 
+LogicalResult verifyReshapeOp(ReshapeOp op) {
+  auto inType = op.tensor().getType().cast<RankedTensorType>();
+  auto outType = op.result().getType().cast<RankedTensorType>();
+  if (inType.getElementType() != outType.getElementType()) {
+    return op.emitOpError("element type mismatch");
+  }
+  if (inType.getNumElements() != outType.getNumElements()) {
+    return op.emitOpError("element count mismatch");
+  }
+  return success();
+}
+
 void GatherOp::build(OpBuilder &builder, OperationState &result,
                      Type resultType, ValueRange operands, IntegerAttr axis,
                      IntegerAttr interpolationMode, IntegerAttr nearestMode,
-                     FloatAttr cubeCoeff) {
+                     FloatAttr cubeCoeff, IntegerAttr mode,
+                     IntegerAttr batchDims) {
   assert(operands.size() == 2u && "mismatched number of parameters");
   result.addOperands(operands);
   result.addAttribute("axis", axis);
   result.addAttribute("interpolationMode", interpolationMode);
   result.addAttribute("nearestMode", nearestMode);
   result.addAttribute("cubeCoeff", cubeCoeff);
+  result.addAttribute("mode", mode);
+  result.addAttribute("batchDims", batchDims);
   result.addTypes(resultType);
 }
 
@@ -342,6 +361,8 @@ void ScatterOp::build(OpBuilder &builder, OperationState &result,
 }
 
 } // namespace pmlc::dialect::tile
+
+#include "pmlc/dialect/tile/ir/enums.cc.inc"
 
 #define GET_OP_CLASSES
 #include "pmlc/dialect/tile/ir/ops.cc.inc"

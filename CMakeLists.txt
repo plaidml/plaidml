@@ -61,10 +61,8 @@ endif()
 include(CPM)
 include(boost)
 include(easylogging)
-if(NOT PML_OPENVINO_BRIDGE OR InferenceEngineDeveloperPackage_FOUND)
-  include(gflags)
-  include(googletest)
-endif()
+include(gflags)
+include(googletest)
 include(half)
 include(llvm-project)
 if(PML_ENABLE_OPENCL)
@@ -117,8 +115,24 @@ else()
   )
 endif()
 
+# Set general cpack variables for package description
+set(CPACK_GENERATOR "TGZ")
+set(CPACK_ARCHIVE_COMPONENT_INSTALL 1)
+set(CPACK_PACKAGE_NAME "PlaidML")
+set(CPACK_PACKAGE_VENDOR "Intel Corp")
+set(CPACK_PACKAGE_CONTACT "Intel")
+set(CPACK_PACKAGE_VERSION ${PLAIDML_VERSION})
+set(CPACK_COMPONENTS_IGNORE_GROUPS 1)
+set(CPACK_COMPONENTS_ALL
+  devkit
+  testkit
+)
+include(CPack)
+
+
 add_subdirectory(plaidml)
 add_subdirectory(pmlc)
+add_subdirectory(docs)
 
 # Note: this must be called after all libraries have been declared.
 pml_complete_binary_link_options()
@@ -129,3 +143,5 @@ configure_lit_site_cfg(
   MAIN_CONFIG
   ${CMAKE_CURRENT_SOURCE_DIR}/lit.cfg.py
 )
+
+include(devkit)

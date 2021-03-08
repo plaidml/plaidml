@@ -1,4 +1,4 @@
-// Copyright (C) 2020 Intel Corporation
+// Copyright (C) 2021 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 //
 
@@ -20,10 +20,10 @@ class Engine : public InferenceEngine::InferencePluginInternal {
   void GetVersion(const InferenceEngine::Version*& versionInfo) noexcept;
 
   InferenceEngine::ExecutableNetworkInternal::Ptr LoadExeNetworkImpl(
-      const InferenceEngine::ICNNNetwork& network, const std::map<std::string, std::string>& config) override;
+      const InferenceEngine::CNNNetwork& network, const std::map<std::string, std::string>& config) override;
 
-  void QueryNetwork(const InferenceEngine::ICNNNetwork& network, const std::map<std::string, std::string>& config,
-                    InferenceEngine::QueryNetworkResult& res) const override;
+  InferenceEngine::QueryNetworkResult QueryNetwork(const InferenceEngine::CNNNetwork& network,
+                                                   const std::map<std::string, std::string>& config) const override;
 
   void SetConfig(const std::map<std::string, std::string>& config) override;
 
