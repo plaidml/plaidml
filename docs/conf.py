@@ -56,6 +56,8 @@ extensions = [
 
 bibtex_bibfiles = ['./refs.bib']
 
+bibtex_default_style = 'plain'
+
 autodoc_mock_imports = [
     'plaidml.core._version',
     'plaidml.ffi',

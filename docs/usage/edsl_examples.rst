@@ -504,14 +504,14 @@ This can easily be written in eDSL as follows.
     &\verb!.outShape(I,J)!\\
     &{\color{red}\verb!.outAccess(i,j)!}\\
     &{\color{green}\verb!.sum(!}\\
-    &{\color{blue}\verb!        A(!}
+    &{\color{blue}\verb!     A(!}
     \verb!i,k!
     {\color{blue}\verb!)!}
     {\color{orange}\verb!  *  !}
     {\color{blue}\verb!B(!}
     \verb!k,j!
     {\color{blue}\verb!)!}\\
-    &{\color{green}\verb!     )!}\\
+    &{\color{green}\verb! )!}\\
     &{\color{magenta}\verb!+!}
     {\color{blue}\verb!  C!}\\
     \end{aligned}
@@ -540,7 +540,7 @@ Uniform 8-bit Quantization
 *******************
 
 Quantization is a promising new approach used to reduce memory and compute resources required by neural network operations.
-This examples illustrates 8-bit uniform quantization operation :cite:`ob2018quantization` in eDSL. 
+This example illustrates 8-bit uniform quantization operation :cite:`jacob2018quantization`:cite:`jain2020efficient`  in eDSL. 
 The expected output is a quantized 8-bit tensor. This is accomplished using a simple technique illustrated below. 
 
 .. math::
@@ -588,7 +588,6 @@ is real valued (float32 here) and zeropoint is the same type as the quantized te
 
     .. literalinclude:: ../../plaidml/edsl/examples/quantize.py
       :pyobject: quantize_float32_to_int8
-
 
 
 .. bibliography::

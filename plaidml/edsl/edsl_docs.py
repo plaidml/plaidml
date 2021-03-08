@@ -37,8 +37,8 @@ def matmul(A, B):
 def global_min(I):
     i, j, k = TensorIndexes(3)
     Neg = -I
-    O = Contraction().max(Neg[i, j, k])
-    return -O
+    O = -Contraction().max(Neg[i, j, k])
+    return O
 
 
 def avg(I):
