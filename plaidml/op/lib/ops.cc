@@ -353,7 +353,7 @@ std::pair<TensorDim, TensorDim> compute_padding_and_output_size(  //
     bool use_ceil_for_output_shape) {
   // Effective input and filter sizes are the sizes after dilations are
   // accounted for. So a 4x3 filter dilated by (3, 2) has an effective filter
-  // size of 11 and 5 for its 2 spatial dims
+  // size of 10 and 5 for its 2 spatial dims
 
   auto I_eff = (data_dilation * (input_size - 1)) + 1;  // Effective Input Size
   auto F_eff = (dilation * (filter_size - 1)) + 1;      // Effective Filter Size

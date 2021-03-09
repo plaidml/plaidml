@@ -37,15 +37,4 @@ class OperationRegistry {
 
 void RegisterOps();
 
-std::pair<edsl::TensorDim, edsl::TensorDim> compute_padding_and_output_size(  //
-    const edsl::TensorDim& input_size,                                        //
-    const edsl::TensorDim& filter_size,                                       //
-    int64_t stride,                                                           //
-    AutoPadMode autopad_mode,                                                 //
-    int64_t pad_lo,                                                           //
-    int64_t pad_hi,                                                           //
-    int64_t dilation,                                                         //
-    int64_t data_dilation,                                                    //
-    bool use_ceil_for_output_shape);
-
 }  // namespace plaidml::op::lib

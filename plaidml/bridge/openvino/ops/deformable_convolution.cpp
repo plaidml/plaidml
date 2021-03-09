@@ -8,15 +8,51 @@
 #include "ngraph/opsets/opset.hpp"
 #include "ngraph/opsets/opset4.hpp"
 
-#include "plaidml/op/lib/ops.h"
 #include "plaidml/op/op.h"
 
-using namespace plaidml;           // NOLINT[build/namespaces]
-using namespace InferenceEngine;   // NOLINT[build/namespaces]
-using namespace plaidml::edsl;     // NOLINT[build/namespaces]
-using namespace plaidml::op::lib;  // NOLINT[build/namespaces]
+using namespace plaidml;          // NOLINT[build/namespaces]
+using namespace InferenceEngine;  // NOLINT[build/namespaces]
+using namespace plaidml::edsl;    // NOLINT[build/namespaces]
 
 namespace {
+
+// This function can be replaced by the same function in plaidml/op/lib/ops.cc in the future.
+std::pair<TensorDim, TensorDim> compute_padding_and_output_size(  //
+    const TensorDim& input_size,                                  //
+    const TensorDim& filter_size,                                 //
+    int64_t stride,                                               //
+    plaidml::op::AutoPadMode autopad_mode,                        //
+    int64_t pad_lo,                                               //
+    int64_t pad_hi,                                               //
+    int64_t dilation,                                             //
+    int64_t data_dilation,                                        //
+    bool use_ceil_for_output_shape) {
+  // Effective input and filter sizes are the sizes after dilations are
+  // accounted for. So a 4x3 filter dilated by (3, 2) has an effective filter
+  // size of 10 and 5 for its 2 spatial dims
+
+  auto I_eff = (data_dilation * (input_size - 1)) + 1;  // Effective Input Size
+  auto F_eff = (dilation * (filter_size - 1)) + 1;      // Effective Filter Size
+  int64_t ceil_term =
+      use_ceil_for_output_shape ? stride - 1 : 0;  // TODO: Will need to confirm that this is the intended behavior
+  if (autopad_mode == plaidml::op::AutoPadMode::EXPLICIT) {
+    TensorDim pad_before(pad_lo);
+    TensorDim output_size((I_eff + pad_lo + pad_hi - F_eff + stride + ceil_term) / stride);
+    return std::pair<TensorDim, TensorDim>(pad_before, output_size);
+  }
+  if (autopad_mode == plaidml::op::AutoPadMode::VALID) {
+    TensorDim pad_before(0);
+    TensorDim output_size((I_eff - F_eff + stride + ceil_term) / stride);
+    return std::pair<TensorDim, TensorDim>(pad_before, output_size);
+  }
+  if (autopad_mode == plaidml::op::AutoPadMode::SAME_LOWER || autopad_mode == plaidml::op::AutoPadMode::SAME_UPPER) {
+    TensorDim output_size((I_eff + stride - 1 + ceil_term) / stride);
+    int64_t lower_term = (autopad_mode == plaidml::op::AutoPadMode::SAME_LOWER) ? 1 : 0;
+    TensorDim pad_before((max(0, (output_size - 1) * stride + F_eff - I_eff) + lower_term) / 2);
+    return std::pair<TensorDim, TensorDim>(pad_before, output_size);
+  }
+  THROW_IE_EXCEPTION << "Unexpected autopadding mode.";
+}
 
 edsl::Tensor compute_deformable_convolution(edsl::Tensor I,                  //
                                             edsl::Tensor OFF,                //
