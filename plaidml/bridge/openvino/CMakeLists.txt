@@ -19,7 +19,6 @@ pml_cc_library(
   DEFINES
     HALF_ENABLE_CPP11_TYPE_TRAITS
   DEPS
-    plaidml::op::lib
     IE::inference_engine
     IE::ngraph
     half

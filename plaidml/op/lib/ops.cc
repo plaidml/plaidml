@@ -339,8 +339,6 @@ size_t normalize_axis(int64_t axis, size_t ndims, std::string op_name = "") {
   return axis;
 }
 
-}  // namespace
-
 std::pair<TensorDim, TensorDim> compute_padding_and_output_size(  //
     const TensorDim& input_size,                                  //
     const TensorDim& filter_size,                                 //
@@ -430,6 +428,8 @@ std::vector<int64_t>* extend_manual_padding(std::vector<int64_t>* pads, size_t r
   }
   return pads;
 }
+
+}  // namespace
 
 Value abs(const Value& value) {
   IVLOG(1, "abs");

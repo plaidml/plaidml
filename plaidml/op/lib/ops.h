@@ -6,7 +6,6 @@
 #include <unordered_map>
 
 #include "plaidml/edsl/edsl.h"
-#include "plaidml/op/op.h"
 
 namespace plaidml::op::lib {
 
