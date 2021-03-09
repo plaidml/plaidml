@@ -55,4 +55,6 @@ pml_cc_library(
     gmock
     gtest
     half
+  COMPONENTS
+    devkit
 )

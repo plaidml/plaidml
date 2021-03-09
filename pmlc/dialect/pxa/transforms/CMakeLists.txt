@@ -6,6 +6,7 @@
   SRCS
     autotile.cc
     cache.cc
+    convert_mem_op.cc
     cpu_thread.cc
     dataflow_opt.cc
     dealloc_placement.cc
