@@ -24,6 +24,7 @@
 #include "pmlc/dialect/pxa/analysis/affine_constraints.h"
 #include "pmlc/dialect/pxa/analysis/uses.h"
 #include "pmlc/dialect/pxa/ir/interfaces.h"
+#include "pmlc/dialect/pxa/ir/matchers.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/dialect/pxa/transforms/layout_utils.h"
 #include "pmlc/dialect/pxa/transforms/pass_detail.h"
@@ -31,6 +32,7 @@
 #include "pmlc/dialect/pxa/transforms/tile.h"
 #include "pmlc/dialect/stdx/ir/ops.h"
 #include "pmlc/util/logging.h"
+#include "pmlc/util/matchers.h"
 #include "pmlc/util/tags.h"
 
 namespace pmlc::dialect::pxa {
@@ -45,6 +47,7 @@ public:
 
   void runOnFunction() {
     mlir::FuncOp func = getFunction();
+    recognizeConvsAndInsertBlockedDataLayouts(func);
     mlir::DenseMap<mlir::Value, MemoryUsageDesc> globalMemory =
         gatherGlobalMemoryDescs(func, naiveScheduleModel);
     llvm::SmallSet<mlir::AffineParallelOp, 4> parallelOps;
@@ -90,6 +93,47 @@ public:
       op->erase();
   }
 };
+
+void recognizeConvsAndInsertBlockedDataLayouts(mlir::FuncOp func) {
+  IVLOG(4, "Looking for Conv2ds");
+  func.walk([&](mlir::AffineParallelOp parallelOp) {
+    size_t numLoopsInConv2d = 7;
+    IVLOG(4, "parallelOp.getSteps().size(): " << parallelOp.getSteps().size());
+    if (parallelOp.getSteps().size() == numLoopsInConv2d) {
+      IVLOG(4, "Found parallel loops that have " << numLoopsInConv2d);
+      using mlir::matchers::m_Any;
+      mlir::Value load1, load2, reduce;
+      mlir::Operation *yield = parallelOp.getBody()->getTerminator();
+      if (matchPattern(
+              yield,
+              mlir::m_Op<mlir::AffineYieldOp>(m_Capture(
+                  &reduce,
+                  m_PxaReduceOp(mlir::AtomicRMWKind::addf,
+                                mlir::m_Op<mlir::MulFOp>(
+                                    m_Capture(&load1, mlir::m_Op<PxaLoadOp>()),
+                                    m_Capture(&load2, mlir::m_Op<PxaLoadOp>())),
+                                m_Any()))))) {
+        IVLOG(4, "Conv2d found");
+        // Output - Input = %arg114 (the output channel)
+        // Output - filter = %arg111, %arg112, %arg113 (NHW)
+        /*
+                        if (auto loadOp1 = mlir::dyn_cast<PxaLoadOp>(&load1)) {
+                                      IVLOG(4, "loadOp1 is a PxaLoadOp");
+        }
+
+                        if (auto loadOp2 = mlir::dyn_cast<PxaLoadOp>(&load2)) {
+                                      IVLOG(4, "loadOp2 is a PxaLoadOp");
+        }
+
+                        if (auto reduceOp =
+        mlir::dyn_cast<PxaReduceOp>(&reduce)) { IVLOG(4, "loadOp2 is a
+        PxaReduceOp");
+        }
+              */
+      }
+    }
+  });
+}
 
 void eraseLayoutMapsFromMemRefs(mlir::FuncOp func) {
   func.walk([&](mlir::AllocOp allocOp) {
