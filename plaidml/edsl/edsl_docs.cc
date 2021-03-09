@@ -46,8 +46,8 @@ Tensor MatMul(const Tensor& A, const Tensor& B) {
 Tensor GlobalMin(const Tensor& I) {
   TensorIndex i, j, k;
   auto Neg = -I;
-  Tensor O_Neg = Contraction().max(Neg(i, j, k));
-  return -O_Neg;
+  Tensor O = -Tensor(Contraction().max(Neg(i, j, k)));
+  return O;
 }
 // global_min_end
 
