@@ -17,27 +17,42 @@ steps:
       {{/artifacts}}
       - "bazel-testlogs/**/test.log"
 {{/variants}}
-
+  
   - label: ':hammer_and_wrench: :linux: :beer:'
     command: |
-      echo --- :building_construction: cmake configuration
-      export TEMP=/tmp/$${BUILDKITE_AGENT_NAME}/$${BUILDKITE_PIPELINE_SLUG}
-      cmake \
-        -B build-opt \
-        -G Ninja \
-        -D CMAKE_BUILD_TYPE=Release \
-        -D CPM_SOURCE_CACHE=$${TEMP}/cpm \
-        -D PML_OPENVINO_BRIDGE=ON \
-        -D TEMP=$${TEMP}
+      echo --- :building_construction: configuration
+      python configure --ci --temp=/tmp/$${BUILDKITE_AGENT_NAME}/plaidml
 
       echo --- :hammer_and_wrench: ninja
-      ninja -C build-opt
+      ninja -C build-x86_64/Release
 
-      echo --- :hammer_and_wrench: ninja check-test
-      ninja -C build-opt check-test
+      echo --- :hammer_and_wrench: ninja check-smoke
+      ninja -C build-x86_64/Release check-smoke
+
+      echo --- :hammer_and_wrench: devkit packaging
+      ninja -C build-x86_64/Release package
+
+      echo --- Test devkit
+      DEVKIT_DIR="build-x86_64/Release/_CPack_Packages/Linux/TGZ/PlaidML-1.0.0-Linux/devkit"
+      cmake -S $${DEVKIT_DIR} -B $${DEVKIT_DIR}/build -G Ninja
+      ninja -C $${DEVKIT_DIR}/build
+      $${DEVKIT_DIR}/build/edsl_test
+
     key: linux_x86_64_cmake
     agents:
       PLATFORM: linux_x86_64
+
+  - label: 'IRv10 models'
+    trigger: irv10
+    async: false
+    build:
+      message: "${BUILDKITE_MESSAGE}"
+      commit: "9cdb3ed3218d782115996c700b322828e9c357a6"
+      env:
+        PLAIDML_COMMIT: "${BUILDKITE_COMMIT}"
+        BUILDKITE_PULL_REQUEST: "${BUILDKITE_PULL_REQUEST}"
+        BUILDKITE_PULL_REQUEST_BASE_BRANCH: "${BUILDKITE_PULL_REQUEST_BASE_BRANCH}"
+        BUILDKITE_PULL_REQUEST_REPO: "${BUILDKITE_PULL_REQUEST_REPO}"
 
 
 # test phase

@@ -18,7 +18,8 @@ pml_cc_library(
     pmlc::ast
     pmlc::compiler
     pmlc::util
-    LLVMSupport
+  COMPONENTS
+    devkit
 )
 
 pml_cc_library(
@@ -30,7 +31,6 @@ pml_cc_library(
     pmlc::ast
     pmlc::compiler
     pmlc::util
-    LLVMSupport
 )
 
 configure_file(version.in.cc version.cc)
