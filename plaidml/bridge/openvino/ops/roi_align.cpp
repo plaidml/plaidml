@@ -75,13 +75,9 @@ edsl::Tensor get_roi(edsl::Tensor batch, std::vector<float>& coords, int roi_ind
         for (auto iw : IX_ws) {
           auto batch_gathered_w = edsl::gather(batch, ih.first).axis(2);
           edsl::Tensor roi_corner = edsl::gather(batch_gathered_w, iw.first).axis(3);
-
           auto shape = roi_corner.compute_shape().sizes();
-          std::vector<int> shape_int(shape.begin(), shape.end());
-          roi_corner = roi_corner * op::broadcast(ih.second, shape_int, {2}) * op::broadcast(iw.second, shape_int, {3});
-
-          shape_int.push_back(1);
-          roi_corner = op::reshape(roi_corner, edsl::make_tuple(shape_int));
+          roi_corner = roi_corner * op::broadcast(ih.second, shape, {2}) * op::broadcast(iw.second, shape, {3});
+          roi_corner = op::unsqueeze(roi_corner, {-1});
           roi_corners.push_back(roi_corner);
         }
       }

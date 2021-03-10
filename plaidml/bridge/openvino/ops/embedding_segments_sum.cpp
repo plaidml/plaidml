@@ -53,9 +53,7 @@ void registerEmbeddingSegmentsSum() {
     edsl::Tensor scatter_in_shape = edsl::Contraction(O_dims, O_idxs).assign(I(I_idxs));
     auto zero = cast(edsl::Tensor{0}, I_gathered.dtype());
     auto scatter_shape_vec = scatter_in_shape.compute_shape().sizes();
-    std::vector<int> scatter_shape(begin(scatter_shape_vec), end(scatter_shape_vec));
-    std::vector<int> target_axes = {};
-    auto I_scatter_init = op::broadcast(zero, scatter_shape, target_axes);
+    auto I_scatter_init = op::broadcast(zero, scatter_shape_vec, {});
 
     if (with_weights) {
       std::vector<int64_t> unsqueeze_axes;
@@ -74,8 +72,7 @@ void registerEmbeddingSegmentsSum() {
       edsl::Tensor default_slice = edsl::Contraction(O_dims, O_idxs).assign(I(I_idxs));
       edsl::Tensor I_default = op::repeat(default_slice).count(num_segments).axis(0);
       auto slice_shape = I_gathered.compute_shape().sizes();
-      std::vector<int> target_shape(begin(slice_shape), end(slice_shape));
-      auto I_zero_slice = op::broadcast(zero, target_shape, target_axes);
+      auto I_zero_slice = op::broadcast(zero, slice_shape, {});
       edsl::Tensor I_default_slice =
           edsl::scatter(I_default, segment_ids, I_zero_slice).mode(edsl::ScatterMode::UPDATE_SLICE);
       scattered = scattered + I_default_slice;
