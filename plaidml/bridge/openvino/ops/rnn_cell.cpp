@@ -23,9 +23,7 @@ void registerRnnCell() {
     auto Ri = ctx.operands.at(3);    // recurrence weight tensor [hidden_size, input_size]
     auto Bi = ctx.operands.at(4);    // bias tensor [hidden_size]
 
-    auto input_size = Xt.compute_shape().sizes().back();
     auto* layer = ngraph::as_type<ngraph::opset4::RNNCell>(ctx.layer);
-    auto hidden_size = layer->get_hidden_size();
 
     auto activations = layer->get_activations();
     auto activation = activations.at(0);
