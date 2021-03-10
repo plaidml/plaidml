@@ -75,6 +75,7 @@ plaidml_cc_test(
 py_test(
     name = "py_docs",
     size = "small",
+    timeout = "moderate",
     srcs = ["edsl_docs.py"],
     main = "edsl_docs.py",
     deps = [
