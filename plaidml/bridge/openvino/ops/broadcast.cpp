@@ -48,8 +48,8 @@ void registerBroadcast() {
         THROW_IE_EXCEPTION << "Unrecognized broadcast type";
     }
 
-    std::vector<int> int_target_shape(target_shape.begin(), target_shape.end());
-    std::vector<int> int_axes_mapping(axes_mapping.begin(), axes_mapping.end());
+    std::vector<int64_t> int_target_shape(target_shape.begin(), target_shape.end());
+    std::vector<int64_t> int_axes_mapping(axes_mapping.begin(), axes_mapping.end());
     return edsl::make_tuple(op::broadcast(I, int_target_shape, int_axes_mapping));
   });
 }

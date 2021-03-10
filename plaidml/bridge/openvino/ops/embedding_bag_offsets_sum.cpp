@@ -67,9 +67,7 @@ void registerEmbeddingBagOffsetsSum() {
         if (default_index == -1) {
           auto zero = cast(edsl::Tensor{0}, slices[0].dtype());
           auto slice_shape = slices[0].compute_shape().sizes();
-          std::vector<int> target_shape(begin(slice_shape), end(slice_shape));
-          std::vector<int> target_axes = {};
-          Os.push_back(op::broadcast(zero, target_shape, target_axes));
+          Os.push_back(op::broadcast(zero, slice_shape, {}));
         } else {
           O_idxs[0] = I_idxs[0] - default_index;
           Os.push_back(edsl::Contraction(O_dims, O_idxs).sum(I(I_idxs)));
