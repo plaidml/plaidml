@@ -171,7 +171,7 @@ struct PxaGemmOpConversion : public OpConversionPattern<pxa::PxaGemmOp> {
       bStrides.emplace_back(bInfo.strides[0] * bElemSize);
       // Skip 1st index which is j.
       for (size_t i = 2; i < bInfo.strides.size(); i++) {
-        bStrides.emplace_back(bInfo.strides[i] * aElemSize);
+        bStrides.emplace_back(bInfo.strides[i] * bElemSize);
       }
 
       // Push the step size (tile size) for k
@@ -520,7 +520,6 @@ struct XSMMBRGemmOffsInvokeF32Lowering
   matchAndRewrite(xsmm::BRGemmOffsInvokeF32Op op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
     xsmm::BRGemmOffsInvokeF32Op::Adaptor transformed(operands);
-
     auto aType = op.a().getType().cast<MemRefType>();
     auto bType = op.b().getType().cast<MemRefType>();
     auto cType = op.c().getType().cast<MemRefType>();
@@ -538,13 +537,12 @@ struct XSMMBRGemmOffsInvokeF32Lowering
     auto cIndices = transformed.indices().slice(0, cType.getRank());
     auto cPtr = getStridedElementPtr(op->getLoc(), cType, transformed.c(),
                                      cIndices, rewriter);
-
     IntegerType int64Type = rewriter.getI64Type();
 
     auto numBatches = rewriter.getI64IntegerAttr(op.numBatches());
+    
     auto numBatchesValue =
         rewriter.create<LLVM::ConstantOp>(op->getLoc(), int64Type, numBatches);
-
     SmallVector<Value, 8> aOffsets;
 
     for (auto attr : op.aOffsets().getValue()) {
@@ -558,14 +556,44 @@ struct XSMMBRGemmOffsInvokeF32Lowering
           rewriter.create<LLVM::ConstantOp>(op->getLoc(), int64Type, attr));
     }
 
-    auto longPtrType = LLVM::LLVMPointerType::get(int64Type);
 
+
+    llvm::StringRef kMalloc = "malloc";
+    auto module = op->getParentOfType<ModuleOp>(); 
+    auto mallocFunc = module.lookupSymbol<LLVM::LLVMFuncOp>(kMalloc);
+     
+    if(!mallocFunc){
+        
+      OpBuilder builder(module.getBodyRegion());
+
+      mallocFunc =  builder.create<LLVM::LLVMFuncOp>(
+       builder.getUnknownLoc(),kMalloc,
+       LLVM::LLVMFunctionType::get(LLVM::LLVMPointerType::get(IntegerType::get(module->getContext(), 8)), getIndexType()));
+    }
+
+    auto aOffsMallocPtr =  
+       rewriter.create<LLVM::CallOp>(op->getLoc(),getVoidPtrType(), rewriter.getSymbolRefAttr(mallocFunc),
+                             ArrayRef<Value>{rewriter.create<LLVM::MulOp>(op->getLoc(), numBatchesValue, getSizeInBytes(op->getLoc(),int64Type, rewriter))}); 
+    auto longPtrType = LLVM::LLVMPointerType::get(rewriter.getI64Type());
+    auto bOffsMallocPtr =
+       rewriter.create<LLVM::CallOp>(op->getLoc(),getVoidPtrType(), rewriter.getSymbolRefAttr(mallocFunc),
+                             ArrayRef<Value>{rewriter.create<LLVM::MulOp>(op->getLoc(), numBatchesValue, getSizeInBytes(op->getLoc(),int64Type, rewriter))});
+    auto aOffsetsPtr = rewriter.create<LLVM::BitcastOp>(op->getLoc(), longPtrType, aOffsMallocPtr.getResult(0));
+    auto bOffsetsPtr = rewriter.create<LLVM::BitcastOp>(op->getLoc(), longPtrType, bOffsMallocPtr.getResult(0));
+ 
+
+    
+
+    /* 
+    auto longPtrType = LLVM::LLVMPointerType::get(int64Type);
     auto aOffsetsPtr = rewriter.create<LLVM::AllocaOp>(
         op->getLoc(), longPtrType, numBatchesValue, 0);
 
     auto bOffsetsPtr = rewriter.create<LLVM::AllocaOp>(
         op->getLoc(), longPtrType, numBatchesValue, 0);
-
+    */
+    
+    
     for (int i = 0; i < numBatches.getInt(); i++) {
       auto offsetIndex = rewriter.create<LLVM::ConstantOp>(
           op->getLoc(), int64Type, rewriter.getIndexAttr(i));
@@ -583,13 +611,29 @@ struct XSMMBRGemmOffsInvokeF32Lowering
       rewriter.create<LLVM::StoreOp>(op->getLoc(), aOffset, aStore);
       rewriter.create<LLVM::StoreOp>(op->getLoc(), bOffset, bStore);
     }
-
     auto func = getOrInsertFunc(op, rewriter);
     rewriter.create<LLVM::CallOp>(
         op->getLoc(), ArrayRef<Type>(), rewriter.getSymbolRefAttr(func),
         ArrayRef<Value>{transformed.ptr(), aPtr, bPtr, cPtr, numBatchesValue,
                         aOffsetsPtr, bOffsetsPtr});
 
+
+    llvm::StringRef kFree = "free";
+    auto freeFunc = module.lookupSymbol<LLVM::LLVMFuncOp>(kFree);
+ 
+    if(!freeFunc){
+ 
+      OpBuilder builder(module.getBodyRegion()); 
+ 
+      freeFunc =  builder.create<LLVM::LLVMFuncOp>(
+       builder.getUnknownLoc(),kFree,
+       LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(module->getContext()), LLVM::LLVMPointerType::get(IntegerType::get(module->getContext(), 8))));
+    }
+
+
+    rewriter.create<LLVM::CallOp>(op->getLoc(), freeFunc, aOffsMallocPtr.getResult(0));
+    rewriter.create<LLVM::CallOp>(op->getLoc(), freeFunc, bOffsMallocPtr.getResult(0));
+    
     rewriter.eraseOp(op);
 
     return success();
