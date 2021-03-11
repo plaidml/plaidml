@@ -20,19 +20,7 @@ namespace PlaidMLPlugin {
 
 namespace {
 
-class NodeProgramBuilder {
- public:
-  NodeProgramBuilder(const std::shared_ptr<ngraph::Node>& node);
-
-  plaidml::Program build();
-
- private:
-  std::shared_ptr<ngraph::Node> _node;
-};
-
-NodeProgramBuilder::NodeProgramBuilder(const std::shared_ptr<ngraph::Node>& node) : _node(node) {}
-
-plaidml::Program NodeProgramBuilder::build() {
+plaidml::Program nodeProgramBuilder(const std::shared_ptr<ngraph::Node>& _node) {
   IE_ASSERT(_node);  // PlaidML requires that the nGraph-based API be used
 
   plaidml::edsl::TensorVec edsl_inputs;
@@ -272,20 +260,20 @@ void ProgramBuilder::handleOp(const std::shared_ptr<ngraph::Node>& node) {
 
 }  // namespace
 
+static std::once_flag once;
+
 plaidml::Program buildProgram(const std::shared_ptr<const ngraph::Function>& func, const std::string& netName,
                               const InferenceEngine::InputsDataMap& inputsInfo,
                               const InferenceEngine::OutputsDataMap& outputsInfo) {
-  static std::once_flag once;
   std::call_once(once, []() { registerOps(); });
   plaidml::init();
   return ProgramBuilder(func, netName, inputsInfo, outputsInfo).build();
 }
 
 plaidml::Program buildNodeProgram(const std::shared_ptr<ngraph::Node>& node) {
-  static std::once_flag once;
   std::call_once(once, []() { registerOps(); });
   plaidml::init();
-  return NodeProgramBuilder(node).build();
+  return nodeProgramBuilder(node);
 }
 
 }  // namespace PlaidMLPlugin
