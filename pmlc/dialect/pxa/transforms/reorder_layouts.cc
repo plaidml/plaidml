@@ -94,6 +94,29 @@ public:
   }
 };
 
+bool isPresent(llvm::SmallVector<mlir::Value, 4> resultOperands,
+               mlir::Value arg) {
+  for (size_t i = 0; i < resultOperands.size(); i++) {
+    if (resultOperands[i] == arg) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+int intersectTwoSets(llvm::SmallVector<mlir::Value, 4> vec1,
+                     llvm::SmallVector<mlir::Value, 4> vec2) {
+  int common = 0;
+  for (auto val : vec1) {
+    if (isPresent(vec2, val)) {
+      common++;
+    }
+  }
+
+  return common;
+}
+
 void recognizeConvsAndInsertBlockedDataLayouts(mlir::FuncOp func) {
   IVLOG(4, "Looking for Conv2ds");
   func.walk([&](mlir::AffineParallelOp parallelOp) {
@@ -126,26 +149,26 @@ void recognizeConvsAndInsertBlockedDataLayouts(mlir::FuncOp func) {
         auto reduceOp = mlir::dyn_cast<PxaReduceOp>(reduce.getDefiningOp());
 
         if (loadOp1 && loadOp2 && reduceOp) {
-          // mlir::ValueRange loadOp1Operands = loadOp1.indices();
-          // mlir::ValueRange loadOp2Operands = loadOp2.indices();
-          // mlir::ValueRange reduceOperands = reduceOp.idxs();
           llvm::SmallVector<mlir::Value, 4> loadOp1Operands =
               getResultOperands(loadOp1.getAffineMap(), loadOp1.indices());
+
+          llvm::SmallVector<mlir::Value, 4> loadOp2Operands =
+              getResultOperands(loadOp2.getAffineMap(), loadOp2.indices());
+
+          llvm::SmallVector<mlir::Value, 4> reduceOperands =
+              getResultOperands(reduceOp.getAffineMap(), reduceOp.idxs());
+
+          int loadOp1ReduceCommon =
+              intersectTwoSets(loadOp1Operands, reduceOperands);
+          int loadOp2ReduceCommon =
+              intersectTwoSets(loadOp2Operands, reduceOperands);
+
+          IVLOG(4, "loadOp1ReduceCommon: " << loadOp1ReduceCommon);
+          IVLOG(4, "loadOp2ReduceCommon: " << loadOp2ReduceCommon);
         }
       }
     }
   });
-}
-
-bool isPresent(llvm::SmallVector<mlir::Value, 4> resultOperands,
-               mlir::Value arg) {
-  for (size_t i = 0; i < resultOperands.size(); i++) {
-    if (resultOperands[i] == arg) {
-      return true;
-    }
-  }
-
-  return false;
 }
 
 llvm::SmallVector<mlir::Value, 4>
