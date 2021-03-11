@@ -35,7 +35,8 @@ void registerConvolution() {
                       .dilations(dilations)
                       .autopad_mode(autopad_mode)
                       .input_layout(plaidml::op::TensorLayout::NCX)
-                      .filter_layout(plaidml::op::TensorLayout::KCX);
+                      .filter_layout(plaidml::op::TensorLayout::KCX)
+                      .name(ctx.layer->get_friendly_name());
     if (autopad_mode == plaidml::op::AutoPadMode::EXPLICIT) {
       std::vector<int> padding;
       for (auto pad : layer->get_pads_begin()) {

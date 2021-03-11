@@ -20,6 +20,9 @@ namespace PlaidMLPlugin {
 void registerBroadcast() {
   registerOp("Broadcast", [](const Context& ctx) {
     auto* layer = ngraph::as_type<ngraph::opset1::Broadcast>(ctx.layer);
+    if (!layer) {
+      THROW_IE_EXCEPTION << "PlaidML plugin currently only supports the opset1 version of Broadcast";
+    }
     IE_ASSERT(ctx.operands.size() <= 3);
     IE_ASSERT(ctx.operands.size() >= 2);
     auto I = ctx.operands.at(0);
@@ -45,8 +48,8 @@ void registerBroadcast() {
         THROW_IE_EXCEPTION << "Unrecognized broadcast type";
     }
 
-    std::vector<int> int_target_shape(target_shape.begin(), target_shape.end());
-    std::vector<int> int_axes_mapping(axes_mapping.begin(), axes_mapping.end());
+    std::vector<int64_t> int_target_shape(target_shape.begin(), target_shape.end());
+    std::vector<int64_t> int_axes_mapping(axes_mapping.begin(), axes_mapping.end());
     return edsl::make_tuple(op::broadcast(I, int_target_shape, int_axes_mapping));
   });
 }
