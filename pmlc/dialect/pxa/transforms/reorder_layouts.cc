@@ -116,23 +116,94 @@ void recognizeConvsAndInsertBlockedDataLayouts(mlir::FuncOp func) {
         IVLOG(4, "Conv2d found");
         // Output - Input = %arg114 (the output channel)
         // Output - filter = %arg111, %arg112, %arg113 (NHW)
-        /*
-                        if (auto loadOp1 = mlir::dyn_cast<PxaLoadOp>(&load1)) {
-                                      IVLOG(4, "loadOp1 is a PxaLoadOp");
-        }
 
-                        if (auto loadOp2 = mlir::dyn_cast<PxaLoadOp>(&load2)) {
-                                      IVLOG(4, "loadOp2 is a PxaLoadOp");
-        }
+        IVLOG(4, "load1: " << mlir::debugString(load1));
+        IVLOG(4, "load2: " << mlir::debugString(load2));
+        IVLOG(4, "reduce: " << mlir::debugString(reduce));
 
-                        if (auto reduceOp =
-        mlir::dyn_cast<PxaReduceOp>(&reduce)) { IVLOG(4, "loadOp2 is a
-        PxaReduceOp");
+        auto loadOp1 = mlir::dyn_cast<PxaLoadOp>(load1.getDefiningOp());
+        auto loadOp2 = mlir::dyn_cast<PxaLoadOp>(load2.getDefiningOp());
+        auto reduceOp = mlir::dyn_cast<PxaReduceOp>(reduce.getDefiningOp());
+
+        if (loadOp1 && loadOp2 && reduceOp) {
+          // mlir::ValueRange loadOp1Operands = loadOp1.indices();
+          // mlir::ValueRange loadOp2Operands = loadOp2.indices();
+          // mlir::ValueRange reduceOperands = reduceOp.idxs();
+          llvm::SmallVector<mlir::Value, 4> loadOp1Operands =
+              getResultOperands(loadOp1.getAffineMap(), loadOp1.indices());
         }
-              */
       }
     }
   });
+}
+
+bool isPresent(llvm::SmallVector<mlir::Value, 4> resultOperands,
+               mlir::Value arg) {
+  for (size_t i = 0; i < resultOperands.size(); i++) {
+    if (resultOperands[i] == arg) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+llvm::SmallVector<mlir::Value, 4>
+getResultOperands(mlir::AffineMap map, mlir::ValueRange mapOperands) {
+  llvm::SmallVector<mlir::Value, 4> resultOperands;
+
+  for (unsigned idx = 0; idx < map.getNumResults(); ++idx) {
+    mlir::AffineExpr expr = map.getResult(idx);
+
+    if (expr.getKind() == mlir::AffineExprKind::DimId) {
+      auto dimExpr = expr.cast<mlir::AffineDimExpr>();
+      unsigned pos = dimExpr.getPosition();
+      IVLOG(4, "pos: " << pos);
+      mlir::Value arg = mapOperands[pos];
+      IVLOG(4, "arg: " << mlir::debugString(arg));
+      if (!isPresent(resultOperands, arg)) {
+        resultOperands.push_back(arg);
+      }
+    } else if (expr.getKind() == mlir::AffineExprKind::Add) {
+      auto addExpr = expr.cast<mlir::AffineBinaryOpExpr>();
+      mlir::AffineExpr lhsExpr = addExpr.getLHS();
+      mlir::AffineExpr rhsExpr = addExpr.getRHS();
+
+      if (lhsExpr.getKind() == mlir::AffineExprKind::DimId) {
+        auto dimExpr = lhsExpr.cast<mlir::AffineDimExpr>();
+        unsigned pos = dimExpr.getPosition();
+        auto arg = mapOperands[pos];
+        if (!isPresent(resultOperands, arg)) {
+          resultOperands.push_back(arg);
+        }
+
+      } else if (lhsExpr.getKind() == mlir::AffineExprKind::Constant) {
+      } else {
+        IVLOG(4, "Unhandled expression. Quitting");
+        exit(1);
+      }
+
+      if (rhsExpr.getKind() == mlir::AffineExprKind::DimId) {
+        auto dimExpr = rhsExpr.cast<mlir::AffineDimExpr>();
+        unsigned pos = dimExpr.getPosition();
+        auto arg = mapOperands[pos];
+        if (!isPresent(resultOperands, arg)) {
+          resultOperands.push_back(arg);
+        }
+
+      } else if (rhsExpr.getKind() == mlir::AffineExprKind::Constant) {
+      } else {
+        IVLOG(4, "Unhandled expression. Quitting");
+        exit(1);
+      }
+    } else if (expr.getKind() == mlir::AffineExprKind::Constant) {
+    } else {
+      IVLOG(4, "Unhandled expression. Quitting");
+      exit(1);
+    }
+  }
+
+  return resultOperands;
 }
 
 void eraseLayoutMapsFromMemRefs(mlir::FuncOp func) {

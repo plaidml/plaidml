@@ -10,6 +10,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/SmallSet.h"
 
 #include "pmlc/dialect/pxa/ir/interfaces.h"
 #include "pmlc/dialect/pxa/transforms/layout_utils.h"
@@ -133,6 +134,8 @@ void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp);
 void simplifyMemrefMaps(mlir::AffineParallelOp &parallelOp);
 void eraseLayoutMapsFromMemRefs(mlir::FuncOp func);
 void recognizeConvsAndInsertBlockedDataLayouts(mlir::FuncOp func);
+llvm::SmallVector<mlir::Value, 4>
+getResultOperands(mlir::AffineMap map, mlir::ValueRange mapOperands);
 
 // ============================================================================
 // Helper affine map transformations
