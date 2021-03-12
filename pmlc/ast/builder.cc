@@ -2,6 +2,7 @@
 
 #include "pmlc/ast/builder.h"
 
+#include <algorithm>
 #include <limits>
 #include <mutex>
 #include <stack>
@@ -773,7 +774,6 @@ struct ProgramBuilder {
   }
 
   Value handleLoop(ExprNodeLoop *node) {
-    // take lowBound, upperBound, step from operands.
     auto indices = node->indexs;
     auto indexType = builder.getIndexType();
     std::vector<Value> indexValue;
@@ -783,74 +783,72 @@ struct ProgramBuilder {
       indexValue.push_back(indexNum);
     }
 
-    SmallVector<Value, 8> InitArgs;
+    SmallVector<Value> iterGlobal;
     for (const ExprNodePtr &operand : node->operands) {
-      InitArgs.push_back(builder.lookupNode(operand));
+      iterGlobal.push_back(builder.lookupNode(operand));
     }
-    auto results = node->results;
-    DenseSet<Value> InitArgSet;
-    InitArgSet.insert(InitArgs.begin(), InitArgs.end());
-    SmallVector<Value, 8> resultArgs;
-    for (const ExprNodePtr &result : results) {
-      resultArgs.push_back(builder.lookupNode(result));
-    }
-    SmallVector<Value> resultArgSet;
-    resultArgSet.insert(resultArgSet.begin(), resultArgs.begin(), resultArgs.end());
 
-    AstTraversal traversal(results);
     auto scfForOp = builder.create<mlir::scf::ForOp>(
-        loc, indexValue[0], indexValue[1], indexValue[2], InitArgs);
+        loc, indexValue[0], indexValue[1], indexValue[2], iterGlobal);
     OpBuilder bodyBuilder(scfForOp.getLoopBody());
 
     BlockAndValueMapping mapper;
-    auto rawIterArgs = scfForOp.getRegionIterArgs();
-    for (auto tuple : llvm::zip(InitArgs, rawIterArgs)) {
+    auto iterLocal = scfForOp.getRegionIterArgs();
+    for (auto tuple : llvm::zip(iterGlobal, iterLocal)) {
       Value outer, inner;
       std::tie(outer, inner) = tuple;
       mapper.map(outer, inner);
     }
-    // choose the ops which should be put into loop body.
-    llvm::SetVector<Value> affectValue(InitArgs.begin(), InitArgs.end());
-    llvm::SetVector<Operation *> innerLoopValues;
-    while (!affectValue.empty()) {
-      auto uses = affectValue.back().getUses();
+
+    // Find all ops that should be put into loop body
+    llvm::SetVector<Operation *> bodyOpSet;
+    std::vector<Value> valueStack(iterGlobal.begin(), iterGlobal.end());
+    while (!valueStack.empty()) {
+      auto uses = valueStack.back().getUses();
       for (auto &use : uses) {
         auto op = use.getOwner();
-        if (!innerLoopValues.contains(op) && op != scfForOp.getOperation()) {
+        if (op != scfForOp.getOperation()) {
           for (auto result : op->getResults()) {
-            affectValue.insert(result);
+            valueStack.insert(valueStack.begin(), result);
           }
-          innerLoopValues.insert(op);
+          bodyOpSet.insert(op);
         }
       }
-      affectValue.pop_back();
+      valueStack.pop_back();
     }
 
+    // Sort the operations in loop body as the original order in outside block
+    struct opComparator {
+      inline bool operator()(Operation *op1, Operation *op2) {
+        return op1->isBeforeInBlock(op2);
+      }
+    };
+    auto bodyOpVec = bodyOpSet.takeVector();
+    std::sort(bodyOpVec.begin(), bodyOpVec.end(), opComparator());
+
+    SmallVector<Value> resultVals;
+    for (const ExprNodePtr &result : node->results) {
+      resultVals.push_back(builder.lookupNode(result));
+    }
     llvm::SetVector<Operation *> toRemove;
-    SmallVector<Value, 4> yieldValues(resultArgSet.size());
-    for (const ExprNodePtr &node : traversal.getFlat()) {
-      Value value = builder.lookupNode(node);
-      // skip init value.
-      if (InitArgSet.count(value)) {
-        continue;
-      }
-      Operation *op = value.getDefiningOp();
-      // skip duplicate op, and not inside loop op.
-      if (!op || toRemove.contains(op) || !innerLoopValues.contains(op)) {
-        continue;
-      }
+    SmallVector<Value, 4> yieldValues(resultVals.size());
+    for (auto op : bodyOpVec) {
       Operation *clonedOp = bodyBuilder.clone(*op, mapper);
-      auto iterResult = std::find(resultArgSet.begin(), resultArgSet.end(), value);
-      if (iterResult != resultArgSet.end()) {
-        auto opResultOrder = value.dyn_cast<OpResult>().getResultNumber();
-        auto yieldValueOrder = std::distance(resultArgSet.begin(), iterResult);
-        yieldValues[yieldValueOrder] = clonedOp->getResult(opResultOrder);
+      op->replaceAllUsesWith(clonedOp);
+      for (auto value : op->getResults()) {
+        auto iterResult =
+            std::find(resultVals.begin(), resultVals.end(), value);
+        if (iterResult != resultVals.end()) {
+          auto opResultOrder = value.dyn_cast<OpResult>().getResultNumber();
+          auto yieldValueOrder = std::distance(resultVals.begin(), iterResult);
+          yieldValues[yieldValueOrder] = clonedOp->getResult(opResultOrder);
+        }
       }
       toRemove.insert(op);
     }
 
     bodyBuilder.create<scf::YieldOp>(loc, yieldValues);
-    for (Operation *op : toRemove) {
+    for (auto op : toRemove) {
       op->erase();
     }
     SmallVector<Value, 4> tuple;
