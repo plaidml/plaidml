@@ -11,7 +11,6 @@
 #include <utility>
 #include <vector>
 
-#include "ngraph/function.hpp"
 #include "ngraph/opsets/opset1.hpp"
 
 #include "plaidml_ops.hpp"
@@ -20,6 +19,38 @@
 namespace PlaidMLPlugin {
 
 namespace {
+
+plaidml::Program nodeProgramBuilder(const std::shared_ptr<ngraph::Node>& _node) {
+  IE_ASSERT(_node);  // PlaidML requires that the nGraph-based API be used
+
+  plaidml::edsl::TensorVec edsl_inputs;
+  plaidml::edsl::TensorVec edsl_outputs;
+
+  Context ctx{_node.get()};
+
+  for (const auto& input : _node->inputs()) {
+    std::vector<int64_t> dims{input.get_shape().begin(), input.get_shape().end()};
+    auto type = to_plaidml(input.get_element_type());
+    auto tensor = plaidml::edsl::Placeholder(type, dims, input.get_tensor().get_name());
+    edsl_inputs.push_back(tensor);
+    ctx.operands.push_back(tensor);
+  }
+
+  const Op op = OpsRegistry::instance()->resolve(_node->description());
+  if (!op) {
+    THROW_IE_EXCEPTION << "Unsupported operation: " << _node->description();
+  }
+
+  auto value = op(ctx);
+  auto tuple = value.as_tuple();
+  IE_ASSERT(tuple.size() == _node->get_output_size());
+  for (unsigned i = 0; i < tuple.size(); i++) {
+    auto tensor = tuple.at(i).as_tensor();
+    edsl_outputs.push_back(tensor);
+  }
+
+  return plaidml::edsl::buildProgram(_node->get_name(), edsl_inputs, edsl_outputs);
+}
 
 class ProgramBuilder {
  public:
@@ -229,13 +260,20 @@ void ProgramBuilder::handleOp(const std::shared_ptr<ngraph::Node>& node) {
 
 }  // namespace
 
+static std::once_flag once;
+
 plaidml::Program buildProgram(const std::shared_ptr<const ngraph::Function>& func, const std::string& netName,
                               const InferenceEngine::InputsDataMap& inputsInfo,
                               const InferenceEngine::OutputsDataMap& outputsInfo) {
-  static std::once_flag once;
   std::call_once(once, []() { registerOps(); });
   plaidml::init();
   return ProgramBuilder(func, netName, inputsInfo, outputsInfo).build();
+}
+
+plaidml::Program buildNodeProgram(const std::shared_ptr<ngraph::Node>& node) {
+  std::call_once(once, []() { registerOps(); });
+  plaidml::init();
+  return nodeProgramBuilder(node);
 }
 
 }  // namespace PlaidMLPlugin
