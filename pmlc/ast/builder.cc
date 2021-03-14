@@ -614,6 +614,7 @@ struct ProgramBuilder {
     pm.addNestedPass<FuncOp>(tile::createMaterializePass());
     pm.addPass(createCanonicalizerPass());
     pm.addPass(createCSEPass());
+
     auto result = pm.run(module);
 
     program->tileIR = debugString(module);
@@ -775,23 +776,18 @@ struct ProgramBuilder {
 
   Value handleLoop(ExprNodeLoop *node) {
     auto indices = node->indexs;
-    auto indexType = builder.getIndexType();
     std::vector<Value> indexValue;
     for (auto index : indices) {
-      auto indexNum = builder.create<mlir::IndexCastOp>(
-          loc, builder.lookupNode(index), indexType);
-      indexValue.push_back(indexNum);
+      indexValue.push_back(builder.lookupNode(index));
     }
-
     SmallVector<Value> iterGlobal;
     for (const ExprNodePtr &operand : node->operands) {
       iterGlobal.push_back(builder.lookupNode(operand));
     }
-
-    auto scfForOp = builder.create<mlir::scf::ForOp>(
+    auto scfForOp = builder.create<tile::LoopOp>(
         loc, indexValue[0], indexValue[1], indexValue[2], iterGlobal);
     OpBuilder bodyBuilder(scfForOp.getLoopBody());
-
+    // Set a mapping of global and local Values for loop iterators
     BlockAndValueMapping mapper;
     auto iterLocal = scfForOp.getRegionIterArgs();
     for (auto tuple : llvm::zip(iterGlobal, iterLocal)) {
@@ -799,8 +795,7 @@ struct ProgramBuilder {
       std::tie(outer, inner) = tuple;
       mapper.map(outer, inner);
     }
-
-    // Find all ops that should be put into loop body
+    // Find all ops that belong to loop body
     llvm::SetVector<Operation *> bodyOpSet;
     std::vector<Value> valueStack(iterGlobal.begin(), iterGlobal.end());
     while (!valueStack.empty()) {
@@ -816,7 +811,6 @@ struct ProgramBuilder {
       }
       valueStack.pop_back();
     }
-
     // Sort the operations in loop body as the original order in outside block
     struct opComparator {
       inline bool operator()(Operation *op1, Operation *op2) {
@@ -825,7 +819,7 @@ struct ProgramBuilder {
     };
     auto bodyOpVec = bodyOpSet.takeVector();
     std::sort(bodyOpVec.begin(), bodyOpVec.end(), opComparator());
-
+    // Move loop body ops into scf_forOp body region
     SmallVector<Value> resultVals;
     for (const ExprNodePtr &result : node->results) {
       resultVals.push_back(builder.lookupNode(result));
@@ -836,18 +830,16 @@ struct ProgramBuilder {
       Operation *clonedOp = bodyBuilder.clone(*op, mapper);
       op->replaceAllUsesWith(clonedOp);
       for (auto value : op->getResults()) {
-        auto iterResult =
-            std::find(resultVals.begin(), resultVals.end(), value);
-        if (iterResult != resultVals.end()) {
+        auto it = std::find(resultVals.begin(), resultVals.end(), value);
+        if (it != resultVals.end()) {
           auto opResultOrder = value.dyn_cast<OpResult>().getResultNumber();
-          auto yieldValueOrder = std::distance(resultVals.begin(), iterResult);
+          auto yieldValueOrder = std::distance(resultVals.begin(), it);
           yieldValues[yieldValueOrder] = clonedOp->getResult(opResultOrder);
         }
       }
       toRemove.insert(op);
     }
-
-    bodyBuilder.create<scf::YieldOp>(loc, yieldValues);
+    bodyBuilder.create<tile::YieldOp>(loc, yieldValues);
     for (auto op : toRemove) {
       op->erase();
     }

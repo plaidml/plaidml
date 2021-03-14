@@ -1725,7 +1725,15 @@ class LoopBuilder {
   using loopMultifunc = std::function<TensorVec(Tensor, TensorVec)>;
 
   // pass the loop bound at the beginning.
-  explicit LoopBuilder(int64_t count) : lowBound(0), highBound(count), step(1) { initIndex(); }
+  explicit LoopBuilder(int64_t count) : lowBound(0), step(1) {
+    initIndex();
+    highBoundTensor = Tensor(count);
+  }
+
+  explicit LoopBuilder(Tensor& count) : lowBound(0), step(1) {
+    initIndex();
+    highBoundTensor = ident(count);
+  }
 
   // open one loop index variable for users.
   void initIndex() {
@@ -1763,13 +1771,14 @@ class LoopBuilder {
     for (Tensor result : yieldTensor) {
       rawResults.push_back(result.as_ptr());
     }
-    TensorVec loopIndex{Tensor(lowBound), Tensor(highBound), Tensor(step)};
+
+    TensorVec loopIndex{Tensor(lowBound), highBoundTensor, Tensor(step)};
+
     std::vector<plaidml_expr*> rawLoopIndex;
     rawLoopIndex.reserve(loopIndex.size());
     for (Tensor index : loopIndex) {
       rawLoopIndex.push_back(index.as_ptr());
     }
-
     Tensor array = Tensor{ffi::call<plaidml_expr*>(  //
         loc,                                         //
         plaidml_expr_loop,                           //
@@ -1801,7 +1810,7 @@ class LoopBuilder {
 
  private:
   int64_t lowBound;
-  int64_t highBound;
+  Tensor highBoundTensor;
   int64_t step;
   Tensor loopIndex;
   TensorVec iterTensor;

@@ -1877,7 +1877,7 @@ struct ReturnOpConversion : public OpConversionPattern<ReturnOp> {
     auto blockArg = funcOp.getType().getNumInputs() - op.getNumOperands();
     for (Value operand : operands) {
       // Find very initial allocation of memref
-      if (dyn_cast<scf::ForOp>(operand.getDefiningOp())){
+      if (dyn_cast<scf::ForOp>(operand.getDefiningOp())) {
         continue;
       }
       auto def = pxa::getIndirectDef(operand);
@@ -1997,16 +1997,57 @@ struct UnpackOpConversion : public OpConversionPattern<stdx::UnpackOp> {
   }
 };
 
-struct ScfForOpConversion : public OpConversionPattern<scf::ForOp> {
-  using OpConversionPattern<scf::ForOp>::OpConversionPattern;
+struct LoopOpConversion : public OpConversionPattern<tile::LoopOp> {
+  using OpConversionPattern<tile::LoopOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(scf::ForOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const final {
-    scf::ForOpAdaptor oldFor(operands);
+  matchAndRewrite(tile::LoopOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto loc = op.getLoc();
+    tile::LoopOpAdaptor oldFor(operands);
     auto &oldBodyOps = op.getBody()->getOperations();
-    auto newOp = rewriter.create<scf::ForOp>(op.getLoc(), oldFor.lowerBound(),
-                                             oldFor.upperBound(), oldFor.step(),
+    auto indexType = rewriter.getIndexType();
+    int int_lb = 0;
+    auto def_lb = oldFor.lowerBound().getDefiningOp();
+    if (auto cstOp = dyn_cast<mlir::ConstantOp>(def_lb)) {
+      if (mlir::IntegerAttr iatt = cstOp.value().cast<mlir::IntegerAttr>()) {
+        int_lb = iatt.getInt();
+      }
+    }
+
+    Value ub;
+    auto def_ub = oldFor.upperBound().getDefiningOp();
+    if (auto cstOp = dyn_cast<mlir::ConstantOp>(def_ub)) {
+      if (mlir::IntegerAttr iatt = cstOp.value().cast<mlir::IntegerAttr>()) {
+        int int_ub = 0;
+        int_ub = iatt.getInt();
+        ub = rewriter.create<mlir::ConstantOp>(
+            loc, indexType, rewriter.getIntegerAttr(indexType, int_ub));
+      }
+    } else {
+      std::vector<Value> srcOps;
+      auto zero = rewriter.create<mlir::ConstantOp>(
+          loc, indexType, rewriter.getIntegerAttr(indexType, 0));
+      srcOps.push_back(zero);
+      auto interpVal =
+          rewriter.create<mlir::LoadOp>(loc, def_ub->getResult(0), srcOps);
+      ub = rewriter.create<mlir::IndexCastOp>(loc, interpVal, indexType);
+    }
+
+    int int_step = 0;
+    auto def_step = oldFor.step().getDefiningOp();
+    if (auto cstOp = dyn_cast<mlir::ConstantOp>(def_step)) {
+      if (mlir::IntegerAttr iatt = cstOp.value().cast<mlir::IntegerAttr>()) {
+        int_step = iatt.getInt();
+      }
+    }
+
+    auto lb = rewriter.create<mlir::ConstantOp>(
+        loc, indexType, rewriter.getIntegerAttr(indexType, int_lb));
+    auto step = rewriter.create<mlir::ConstantOp>(
+        loc, indexType, rewriter.getIntegerAttr(indexType, int_step));
+
+    auto newOp = rewriter.create<scf::ForOp>(op.getLoc(), lb, ub, step,
                                              oldFor.initArgs());
     auto &newBodyOps = newOp.getBody()->getOperations();
     newBodyOps.splice(std::prev(newBodyOps.end()), oldBodyOps,
@@ -2021,6 +2062,20 @@ struct ScfForOpConversion : public OpConversionPattern<scf::ForOp> {
   }
 };
 
+struct YieldOpConversion : public OpConversionPattern<tile::YieldOp> {
+  using OpConversionPattern<tile::YieldOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(tile::YieldOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto loc = op.getLoc();
+    auto scfForOp = rewriter.create<mlir::scf::YieldOp>(loc, operands);
+    op->replaceAllUsesWith(scfForOp);
+    op.erase();
+    return success();
+  }
+};
+
 struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
   void runOnOperation() final {
     // Inject tile.ident ops for each return operand that needs it.
@@ -2030,7 +2085,7 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
       for (OpOperand &operand : op.getOperation()->getOpOperands()) {
         Value value = operand.get();
         bool needsIdent =                                  //
-            value.isa<BlockArgument>() ||                  // Block arguemnt
+            value.isa<BlockArgument>() ||                  // Block argument
             matchPattern(value, m_Constant()) ||           // Constant op
             matchPattern(value, m_Op<stdx::UnpackOp>()) || // Direct from unpack
             matchPattern(value, m_Op<tile::ReshapeOp>());  // Reshape op
@@ -2047,7 +2102,6 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
     TypeConverter converter;
     target.addLegalDialect<mlir::AffineDialect>();
     target.addLegalDialect<mlir::StandardOpsDialect>();
-    target.addLegalDialect<mlir::scf::SCFDialect>();
     target.addLegalDialect<dialect::layer::LayerDialect>();
     target.addLegalDialect<dialect::pxa::PXADialect>();
     target.addLegalDialect<dialect::stdx::StdXDialect>();
@@ -2092,7 +2146,8 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         TraceOpConversion,    //
         PackOpConversion,     //
         UnpackOpConversion,   //
-        ScfForOpConversion,   //
+        LoopOpConversion,     //
+        YieldOpConversion,    //
         ContractionOpConversion<CombinationKind::none, FirstOperand>,
         ContractionOpConversion<CombinationKind::add, StdOp<mlir::AddFOp>,
                                 ResultIs<EltwiseFloat>>,

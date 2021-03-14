@@ -2004,34 +2004,39 @@ TEST_F(CppEdsl, Lens) {
 }
 
 TEST_F(CppEdsl, Loop) {
-  auto A1 = Placeholder(DType::INT32, {4});
+  auto A = Placeholder(DType::INT32, {4});
   auto A2 = Placeholder(DType::INT32, {4});
-  TensorVec O = Loop(5, {A1})(Tensor index, TensorVec args) {
-    TensorVec O2 = Loop(3, {args[0]})(Tensor index, TensorVec args2) {
-      args2[0] = args2[0] + 8;
+  auto IX = Placeholder(DType::INT32, {1});
+
+  TensorVec O1 = Loop(IX, {A})(Tensor index1, TensorVec args1) {
+    TensorVec O2 = Loop(3, {args1[0]})(Tensor index2, TensorVec args2) {
+      args2[0] = args2[0] + A2;
       return args2;
     };
-    args[0] = args[0] + O2[0];
-    return args;
+    args1[0] = args1[0] + O2[0];
+    return args1;
   };
 
-  TensorVec O3 = Loop(3, {O[0]})(Tensor index, TensorVec args3) {
-    args3[0] = args3[0] + A2;
+  TensorVec O3 = Loop(IX, {O1[0]})(Tensor index3, TensorVec args3) {
+    args3[0] = args3[0] + 13;
     return args3;
   };
 
-  auto program = makeProgram("loop", {A1, A2}, {O3[0]});
+  auto program = makeProgram("loop", {A, A2, IX}, {O3[0]});
   std::vector<int> input = {
       1, 1, 1, 1  //
   };
   std::vector<int> input2 = {
-      2, 2, 2, 2  //
+      7, 7, 7, 7  //
+  };
+  std::vector<int> ix = {
+      5,  //
   };
   std::vector<int> expected = {
-      782, 782, 782, 782  //
+      748, 748, 748, 748  //
   };
-  checkExact(program, {input, input2}, {expected});
-}
+  checkExact(program, {input, input2, ix}, {expected});
+}  // namespace
 
 /*
 TEST_F(CppEdsl, LoopConstantBuffer) {
