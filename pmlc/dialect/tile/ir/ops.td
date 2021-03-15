@@ -298,7 +298,7 @@ def LoopOp : LoopBaseOp<"loop",
                                  mlir::SmallVectorImpl<int64_t> &countPerRegion);
   }];
 
-  let hasCanonicalizer = 0;
+  let hasCanonicalizer = 1;
 }
 
 def YieldOp : LoopBaseOp<"yield", [NoSideEffect, ReturnLike, Terminator,

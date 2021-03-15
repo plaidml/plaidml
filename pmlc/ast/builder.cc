@@ -614,7 +614,6 @@ struct ProgramBuilder {
     pm.addNestedPass<FuncOp>(tile::createMaterializePass());
     pm.addPass(createCanonicalizerPass());
     pm.addPass(createCSEPass());
-
     auto result = pm.run(module);
 
     program->tileIR = debugString(module);

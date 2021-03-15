@@ -2036,7 +2036,7 @@ TEST_F(CppEdsl, Loop) {
       748, 748, 748, 748  //
   };
   checkExact(program, {input, input2, ix}, {expected});
-}  // namespace
+}
 
 /*
 TEST_F(CppEdsl, LoopConstantBuffer) {
