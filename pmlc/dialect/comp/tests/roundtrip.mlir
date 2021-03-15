@@ -1,4 +1,4 @@
-// RUN: pmlc-opt --allow-unregistered-dialect --split-input-file %s | pmlc-opt | FileCheck %s
+// RUN: pmlc-opt --split-input-file %s | pmlc-opt | FileCheck %s
 
 func @runtime_number_vk(%arg0 : !comp.device) {
   // CHECK-LABEL: func @runtime_number_vk

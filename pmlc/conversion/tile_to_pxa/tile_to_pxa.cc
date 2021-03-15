@@ -2043,12 +2043,13 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
     // Set up target (i.e. what is legal)
     ConversionTarget target(getContext());
     TypeConverter converter;
-    target.addLegalDialect<mlir::AffineDialect>();
-    target.addLegalDialect<mlir::StandardOpsDialect>();
-    target.addLegalDialect<mlir::scf::SCFDialect>();
-    target.addLegalDialect<dialect::layer::LayerDialect>();
-    target.addLegalDialect<dialect::pxa::PXADialect>();
-    target.addLegalDialect<dialect::stdx::StdXDialect>();
+    target.addLegalDialect<mlir::AffineDialect,          //
+                           mlir::math::MathDialect,      //
+                           mlir::scf::SCFDialect,        //
+                           mlir::StandardOpsDialect,     //
+                           dialect::layer::LayerDialect, //
+                           dialect::pxa::PXADialect,     //
+                           dialect::stdx::StdXDialect>();
     target.addLegalOp<scf::ForOp, scf::YieldOp, scf::IfOp>();
     target.addLegalOp<mlir::ModuleOp, mlir::ModuleTerminatorOp, ReturnOp>();
     target.addDynamicallyLegalOp<FuncOp>(
