@@ -1,4 +1,5 @@
 // Copyright 2020 Intel Corporation
+
 #include "pmlc/dialect/comp/ir/types.h"
 
 #include <string>
@@ -17,11 +18,9 @@ bool RuntimeType::classof(Type type) {
 }
 
 bool ExecEnvType::supportsMemorySpace(Attribute requestedSpace) const {
-  bool memSpaceSupported = false;
-  for (Attribute execEnvSpace : getMemorySpaces()) {
-    memSpaceSupported |= execEnvSpace == requestedSpace;
-  }
-  return memSpaceSupported;
+  return llvm::any_of(getMemorySpaces(), [&](Attribute execEnvSpace) {
+    return execEnvSpace == requestedSpace;
+  });
 }
 
 EventType ExecEnvType::getEventType() const {
@@ -97,17 +96,9 @@ static Type parseEventType(DialectAsmParser &parser) {
 }
 
 static void printExecEnvType(ExecEnvType type, DialectAsmPrinter &printer) {
-  printer << "execenv<";
-  printer << runtimeToString(type.getRuntime());
-  printer << ":" << type.getTag() << ",(";
-  bool first = true;
-  for (auto &memSpace : type.getMemorySpaces()) {
-    if (!first)
-      printer << ",";
-    printer << memSpace;
-    first = false;
-  }
-  printer << ")>";
+  ArrayAttr array = ArrayAttr::get(type.getContext(), type.getMemorySpaces());
+  printer << "execenv<" << runtimeToString(type.getRuntime()) << ":"
+          << type.getTag() << ", " << array << ">";
 }
 
 static Type parseExecEnvType(DialectAsmParser &parser) {
@@ -119,14 +110,12 @@ static Type parseExecEnvType(DialectAsmParser &parser) {
       parser.parseColon() ||                 //
       parser.parseInteger(tag) ||            //
       parser.parseComma() ||                 //
-      parser.parseLParen() ||                //
       parser.parseAttribute(memorySpaces) || //
-      parser.parseRParen() ||                //
       parser.parseGreater())
     return Type();
 
   MLIRContext *context = parser.getBuilder().getContext();
-  return ExecEnvType::get(context, runtime, tag, memorySpaces);
+  return ExecEnvType::get(context, runtime, tag, memorySpaces.getValue());
 }
 
 static void printKernelType(KernelType type, DialectAsmPrinter &printer) {

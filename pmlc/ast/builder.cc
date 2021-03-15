@@ -9,6 +9,7 @@
 #include <unordered_set>
 #include <vector>
 
+#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Matchers.h"
@@ -476,6 +477,7 @@ struct ProgramBuilder {
         module(*program->module), builder(module) {
     context->getOrLoadDialect<dialect::tile::TileDialect>();
     context->getOrLoadDialect<dialect::layer::LayerDialect>();
+    context->getOrLoadDialect<math::MathDialect>();
     context->getOrLoadDialect<StandardOpsDialect>();
   }
 
