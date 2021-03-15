@@ -2008,21 +2008,21 @@ TEST_F(CppEdsl, Loop) {
   auto A2 = Placeholder(DType::INT32, {4});
   auto IX = Placeholder(DType::INT32, {1});
 
-  TensorVec O1 = Loop(IX, {A})(Tensor index1, TensorVec args1) {
-    TensorVec O2 = Loop(3, {args1[0]})(Tensor index2, TensorVec args2) {
-      args2[0] = args2[0] + A2;
-      return args2;
+  TensorVec O_outer = Loop(IX, {A})(TensorVec args_outer) {
+    TensorVec O_inner = Loop(3, {args_outer[0]})(TensorVec args_inner) {
+      args_inner[0] = args_inner[0] + A2;
+      return args_inner;
     };
-    args1[0] = args1[0] + O2[0];
-    return args1;
+    args_outer[0] = args_outer[0] + O_inner[0];
+    return args_outer;
   };
 
-  TensorVec O3 = Loop(IX, {O1[0]})(Tensor index3, TensorVec args3) {
-    args3[0] = args3[0] + 13;
-    return args3;
+  TensorVec O = Loop(IX, {O_outer[0]})(TensorVec args) {
+    args[0] = args[0] + 13;
+    return args;
   };
 
-  auto program = makeProgram("loop", {A, A2, IX}, {O3[0]});
+  auto program = makeProgram("loop", {A, A2, IX}, {O[0]});
   std::vector<int> input = {
       1, 1, 1, 1  //
   };

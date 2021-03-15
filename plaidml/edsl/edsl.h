@@ -1722,28 +1722,15 @@ inline Tensor layer(const std::string& op, const TensorVec& operands, const Laye
 
 class LoopBuilder {
  public:
-  using loopMultifunc = std::function<TensorVec(Tensor, TensorVec)>;
+  using loopMultifunc = std::function<TensorVec(TensorVec)>;
 
   // pass the loop bound at the beginning.
-  explicit LoopBuilder(int64_t count) : lowBound(0), step(1) {
-    initIndex();
-    highBoundTensor = Tensor(count);
-  }
+  explicit LoopBuilder(int64_t count) : lowBound(0), step(1) { highBoundTensor = Tensor(count); }
 
-  explicit LoopBuilder(Tensor& count) : lowBound(0), step(1) {
-    initIndex();
-    highBoundTensor = ident(count);
-  }
-
-  // open one loop index variable for users.
-  void initIndex() {
-    loopIndex = index({TensorDim(1)}, 0) + lowBound;
-    iterTensor.push_back(loopIndex);
-    yieldTensor.push_back(loopIndex + step);
-  }
+  explicit LoopBuilder(Tensor& count) : lowBound(0), step(1) { highBoundTensor = ident(count); }
 
   LoopBuilder& setLoopBody(loopMultifunc fn) {
-    auto returnTensor = fn(loopIndex, {iterTensor.begin() + 1, iterTensor.end()});
+    auto returnTensor = fn({iterTensor.begin(), iterTensor.end()});
     yieldTensor.insert(yieldTensor.end(), returnTensor.begin(), returnTensor.end());
     return *this;
   }
@@ -1799,9 +1786,9 @@ class LoopBuilder {
 
   operator TensorVec() {
     auto result = build();
-    return TensorVec(result.begin() + 1, result.end());
+    return TensorVec(result.begin(), result.end());
   }
-  operator Tensor() { return build()[1]; }
+  operator Tensor() { return build()[0]; }
 
   template <typename TLambda>
   LoopBuilder& operator&(TLambda fn) {
@@ -1812,7 +1799,6 @@ class LoopBuilder {
   int64_t lowBound;
   Tensor highBoundTensor;
   int64_t step;
-  Tensor loopIndex;
   TensorVec iterTensor;
   TensorVec yieldTensor;
 };
