@@ -11,13 +11,14 @@ pml_cc_library(
     pmlc::conversion::stdx_to_llvm
     pmlc::dialect::comp::ir
     pmlc::util
+    MLIRIR
     MLIRLLVMIR
+    MLIRMathTransforms
+    MLIRPass
+    MLIRTransforms
     MLIRSPIRV
     MLIRSPIRVSerialization
     MLIRStandard
-    MLIRIR
-    MLIRPass
-    MLIRTransforms
     MLIRStandardOpsTransforms
     MLIRSupport
 )

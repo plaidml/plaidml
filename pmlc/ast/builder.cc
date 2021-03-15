@@ -812,14 +812,21 @@ struct ProgramBuilder {
       throw std::runtime_error(
           "'argsort' requires operand #2 to be a constant integer.");
     }
-    IntegerAttr directionAttr;
-    if (!matchPattern(direction, m_Constant(&directionAttr))) {
+    IntegerAttr dirIntAttr;
+    if (!matchPattern(direction, m_Constant(&dirIntAttr))) {
       throw std::runtime_error(
           "'argsort' requires operand #3 to be a constant integer.");
     }
+    Optional<tile::SortDirection> dir =
+        tile::symbolizeSortDirection(dirIntAttr.getInt());
+    if (!dir) {
+      throw std::runtime_error(
+          "'argsort' requires operand #3 to be a valid SortDirection.");
+    }
+    auto dirAttr = tile::SortDirectionAttr::get(context, *dir);
     IntegerAttr axisIndexAttr = builder.getIndexAttr(axisAttr.getInt());
     auto op = builder.create<tile::ArgSortOp>(loc, resultType, tensor,
-                                              axisIndexAttr, directionAttr);
+                                              axisIndexAttr, dirAttr);
     return op.result();
   }
 

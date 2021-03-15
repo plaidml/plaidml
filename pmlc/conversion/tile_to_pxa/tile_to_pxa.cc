@@ -4,6 +4,7 @@
 #include <utility>
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Matchers.h"
@@ -1935,7 +1936,7 @@ struct TraceOpConversion : public OpConversionPattern<tile::PragmaOp> {
     funcOp->setAttr("trace", builder.getUnitAttr());
     funcOp->setAttr("id", builder.getI64IntegerAttr(uniqueId));
     funcOp.setPrivate();
-    return SymbolRefAttr::get(symbol, context);
+    return SymbolRefAttr::get(context, symbol);
   }
 };
 
@@ -2111,14 +2112,14 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         ContractionOpConversion<CombinationKind::cond,
                                 CondOp<CmpIntOp<CmpIPredicate::eq>>,
                                 AnyComparandIs<EltwiseInteger>>,
-        EltwiseOpConversion<tile::ExpOp, StdOp<mlir::ExpOp>>,
-        EltwiseOpConversion<tile::LogOp, StdOp<mlir::LogOp>,
+        EltwiseOpConversion<tile::ExpOp, StdOp<math::ExpOp>>,
+        EltwiseOpConversion<tile::LogOp, StdOp<math::LogOp>,
                             ResultIs<EltwiseFloat>>,
         EltwiseOpConversion<tile::PowOp, StdOp<stdx::PowOp>,
                             ResultIs<EltwiseFloat>>,
         EltwiseOpConversion<tile::ErfOp, StdOp<stdx::ErfOp>,
                             OperandsAre<EltwiseFloat>>,
-        EltwiseOpConversion<tile::CosOp, StdOp<mlir::CosOp>,
+        EltwiseOpConversion<tile::CosOp, StdOp<math::CosOp>,
                             ResultIs<EltwiseFloat>>,
         EltwiseOpConversion<tile::TanOp, StdOp<stdx::TanOp>,
                             OperandsAre<EltwiseFloat>>,
@@ -2126,9 +2127,9 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
                             OperandsAre<EltwiseFloat>>,
         EltwiseOpConversion<tile::CosHOp, StdOp<stdx::CosHOp>,
                             OperandsAre<EltwiseFloat>>,
-        EltwiseOpConversion<tile::SinOp, StdOp<mlir::SinOp>,
+        EltwiseOpConversion<tile::SinOp, StdOp<math::SinOp>,
                             ResultIs<EltwiseFloat>>,
-        EltwiseOpConversion<tile::TanHOp, StdOp<mlir::TanhOp>,
+        EltwiseOpConversion<tile::TanHOp, StdOp<math::TanhOp>,
                             ResultIs<EltwiseFloat>>,
         EltwiseOpConversion<tile::ACosOp, StdOp<stdx::ACosOp>,
                             OperandsAre<EltwiseFloat>>,
@@ -2169,7 +2170,7 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
                             ResultIs<EltwiseSigned>>,
         EltwiseOpConversion<tile::DivOp, StdOp<mlir::UnsignedDivIOp>,
                             ResultIs<EltwiseUnsigned>>,
-        EltwiseOpConversion<tile::SqrtOp, StdOp<mlir::SqrtOp>>,
+        EltwiseOpConversion<tile::SqrtOp, StdOp<math::SqrtOp>>,
         EltwiseOpConversion<tile::ModOp, StdOp<mlir::RemFOp>,
                             ResultIs<EltwiseFloat>>,
         EltwiseOpConversion<tile::ModOp, StdOp<mlir::SignedRemIOp>,

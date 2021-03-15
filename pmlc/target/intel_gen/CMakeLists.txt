@@ -27,14 +27,15 @@ pml_cc_library(
     MLIRAffineToStandard
     MLIRAffineTransforms
     MLIRGPU
-    MLIRSPIRVTransforms
     MLIRGPUToSPIRV
-    MLIRVectorToSPIRV
     MLIRGPUToVulkanTransforms
     MLIRLLVMIRTransforms
+    MLIRMathTransforms
     MLIRSCFToGPU
     MLIRSPIRVTransforms
+    MLIRSPIRVTransforms
     MLIRStandardOpsTransforms
+    MLIRVectorToSPIRV
 )
 
 pml_tblgen_library(

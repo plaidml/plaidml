@@ -129,7 +129,7 @@ def SubgroupBlockReadINTELOp : StdX_Op<"subgroup_block_read_intel", [NoSideEffec
   let results = (outs SubgroupBlockReadOutputType:$result);
 
   let builders = [
-    OpBuilderDAG<(ins
+    OpBuilder<(ins
       "mlir::Value":$memref,
       CArg<"mlir::ValueRange", "{}">:$indices
     )>
@@ -157,7 +157,7 @@ def SubgroupBlockWriteINTELOp : StdX_Op<"subgroup_block_write_intel", [NoSideEff
                        Variadic<Index>:$indices);
 
   let builders = [
-    OpBuilderDAG<(ins "mlir::Value":$valueToStore, "mlir::Value":$memref)>
+    OpBuilder<(ins "mlir::Value":$valueToStore, "mlir::Value":$memref)>
   ];
 
   let extraClassDeclaration = [{

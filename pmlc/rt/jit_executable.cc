@@ -32,7 +32,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/DebugStringHelper.h"
-#include "mlir/Target/LLVMIR.h"
+#include "mlir/Target/LLVMIR/Export.h"
 #include "mlir/Transforms/Passes.h"
 
 #include "pmlc/rt/device_id.h"
@@ -116,7 +116,7 @@ public:
     auto shape = type.getShape();
     auto memRefType = MemRefType::get(shape, type.getElementType());
     SmallVector<int64_t, 8> strides;
-    getStridesAndOffset(memRefType, strides, base->offset);
+    (void)getStridesAndOffset(memRefType, strides, base->offset);
     for (unsigned i = 0; i < rank; i++) {
       base->sizesAndStrides[i] = shape[i];
       base->sizesAndStrides[i + rank] = strides[i];
