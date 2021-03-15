@@ -114,6 +114,11 @@ mlir::Optional<ReorderDesc>
 optimizeLayoutForReads(MemoryUsageDesc &desc,
                        bool makeUserLayoutsExplicit = false);
 
+mlir::Optional<ReorderDesc> optimizeLayoutForReads(
+    MemoryUsageDesc &desc,
+    mlir::DenseMap<mlir::Value, mlir::AffineMap> &memLayoutMaps,
+    bool makeUserLayoutsExplicit = false);
+
 /// Type of function that is expected to create reordering operation
 /// from "srcMemory" to layout described by "reorderDesc".
 /// See: `createReorder` in `pmlc/dialect/pxa/transforms/layout_utils.h`.
@@ -133,7 +138,9 @@ void reorderMemoryReads(const ReorderCreator &creator, ReorderDesc &reorderDesc,
 void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp);
 void simplifyMemrefMaps(mlir::AffineParallelOp &parallelOp);
 void eraseLayoutMapsFromMemRefs(mlir::FuncOp func);
-void recognizeConvsAndInsertBlockedDataLayouts(mlir::FuncOp func);
+void recognizeConvsAndInsertBlockedDataLayouts(
+    mlir::FuncOp func,
+    mlir::DenseMap<mlir::Value, mlir::AffineMap> &memLayoutMaps);
 llvm::SmallVector<mlir::Value, 4>
 getResultOperands(mlir::AffineMap map, mlir::ValueRange mapOperands);
 

@@ -47,7 +47,11 @@ public:
 
   void runOnFunction() {
     mlir::FuncOp func = getFunction();
-    recognizeConvsAndInsertBlockedDataLayouts(func);
+    mlir::DenseMap<mlir::Value, mlir::AffineMap> memLayoutMaps;
+    recognizeConvsAndInsertBlockedDataLayouts(func, memLayoutMaps);
+    IVLOG(4, "Size of memLayoutMaps after Convolutions are recognized: "
+                 << memLayoutMaps.size());
+
     mlir::DenseMap<mlir::Value, MemoryUsageDesc> globalMemory =
         gatherGlobalMemoryDescs(func, naiveScheduleModel);
     llvm::SmallSet<mlir::AffineParallelOp, 4> parallelOps;
@@ -56,8 +60,8 @@ public:
     for (auto &valueDesc : globalMemory) {
       MemoryUsageDesc &memoryDesc = valueDesc.second;
       IVLOG(3, "Optimizing layout for " << mlir::debugString(memoryDesc.value));
-      mlir::Optional<ReorderDesc> optReorder =
-          optimizeLayoutForReads(memoryDesc, makeUserLayoutsExplicit);
+      mlir::Optional<ReorderDesc> optReorder = optimizeLayoutForReads(
+          memoryDesc, memLayoutMaps, makeUserLayoutsExplicit);
       if (!optReorder.hasValue()) {
         IVLOG(3, "Could not select more optimal layout");
         continue;
@@ -117,7 +121,59 @@ int intersectTwoSets(llvm::SmallVector<mlir::Value, 4> vec1,
   return common;
 }
 
-void recognizeConvsAndInsertBlockedDataLayouts(mlir::FuncOp func) {
+void createBlockedLayoutForInputTensor(
+    PxaLoadOp loadOp,
+    mlir::DenseMap<mlir::Value, mlir::AffineMap> &memLayoutMaps) {
+  mlir::Value indirectDef = getIndirectDef(loadOp.getMemRef());
+  IVLOG(4, "indirectDef: " << mlir::debugString(indirectDef));
+
+  auto srcMemType = loadOp.getMemRef().getType().cast<mlir::MemRefType>();
+  mlir::ArrayRef<int64_t> shape = srcMemType.getShape();
+  mlir::AffineMap map = loadOp.getAffineMap();
+  mlir::MLIRContext *context = map.getContext();
+
+  int64_t blockSize = 16;
+  if (shape[3] % blockSize == 0) {
+    //
+    // *NHWC -> NCHW: newMap: (d0 d1 d2 d3) -> (d0 d3 d1 d2)
+    // NCHW -> NCHWc16: newBlockedMap: (d0 d3 d1 d2) -> (d0 d3 floordiv 16, d1,
+    // d2,d3 mod 16)
+    //
+    mlir::SmallVector<unsigned, 4> permutationMap;
+    permutationMap.push_back(0);
+    permutationMap.push_back(3);
+    permutationMap.push_back(1);
+    permutationMap.push_back(2);
+    mlir::AffineMap newMap =
+        mlir::AffineMap::getPermutationMap(permutationMap, context);
+    IVLOG(4, "newMap: " << mlir::debugString(newMap));
+
+    mlir::SmallVector<mlir::AffineExpr, 5> expansionExprs;
+    for (unsigned idx = 0; idx < newMap.getNumResults(); ++idx) {
+      mlir::AffineExpr expr;
+      if (idx == 1) {
+        expr = newMap.getResult(idx).floorDiv(blockSize);
+      } else {
+        expr = newMap.getResult(idx);
+      }
+
+      expansionExprs.push_back(expr);
+      if (idx == newMap.getNumResults() - 1) {
+        expansionExprs.push_back(newMap.getResult(1) % blockSize);
+      }
+    }
+
+    mlir::AffineMap newBlockedMap = mlir::AffineMap::get(
+        newMap.getNumResults(), 0, expansionExprs, context);
+    IVLOG(4, "newBlockedMap: " << mlir::debugString(newBlockedMap));
+
+    memLayoutMaps.insert({loadOp.getMemRef(), newBlockedMap});
+  }
+}
+
+void recognizeConvsAndInsertBlockedDataLayouts(
+    mlir::FuncOp func,
+    mlir::DenseMap<mlir::Value, mlir::AffineMap> &memLayoutMaps) {
   IVLOG(4, "Looking for Conv2ds");
   func.walk([&](mlir::AffineParallelOp parallelOp) {
     size_t numLoopsInConv2d = 7;
@@ -148,7 +204,15 @@ void recognizeConvsAndInsertBlockedDataLayouts(mlir::FuncOp func) {
         auto loadOp2 = mlir::dyn_cast<PxaLoadOp>(load2.getDefiningOp());
         auto reduceOp = mlir::dyn_cast<PxaReduceOp>(reduce.getDefiningOp());
 
-        if (loadOp1 && loadOp2 && reduceOp) {
+        unsigned expectedDimSizeOfTensors = 4;
+
+        if (loadOp1 && loadOp2 && reduceOp &&
+            loadOp1.getAffineMap().getNumResults() ==
+                expectedDimSizeOfTensors &&
+            loadOp2.getAffineMap().getNumResults() ==
+                expectedDimSizeOfTensors &&
+            reduceOp.getAffineMap().getNumResults() ==
+                expectedDimSizeOfTensors) {
           llvm::SmallVector<mlir::Value, 4> loadOp1Operands =
               getResultOperands(loadOp1.getAffineMap(), loadOp1.indices());
 
@@ -165,6 +229,20 @@ void recognizeConvsAndInsertBlockedDataLayouts(mlir::FuncOp func) {
 
           IVLOG(4, "loadOp1ReduceCommon: " << loadOp1ReduceCommon);
           IVLOG(4, "loadOp2ReduceCommon: " << loadOp2ReduceCommon);
+
+          int inputTensorCommon = 3, filterTensorCommon = 1;
+          PxaLoadOp input, filter;
+          if (loadOp1ReduceCommon == inputTensorCommon &&
+              loadOp2ReduceCommon == filterTensorCommon) {
+            input = loadOp1;
+            filter = loadOp2;
+          } else if (loadOp2ReduceCommon == inputTensorCommon &&
+                     loadOp1ReduceCommon == filterTensorCommon) {
+            input = loadOp2;
+            filter = loadOp1;
+          }
+
+          createBlockedLayoutForInputTensor(input, memLayoutMaps);
         }
       }
     }
@@ -920,8 +998,9 @@ applyMapOnConstantArray(mlir::AffineMap map, mlir::ArrayRef<int64_t> &input,
   }
 }
 
-mlir::Optional<ReorderDesc>
-chooseUserProvidedTargetLayout(MemoryUsageDesc &memoryDesc) {
+mlir::Optional<ReorderDesc> chooseUserProvidedTargetLayout(
+    MemoryUsageDesc &memoryDesc,
+    mlir::DenseMap<mlir::Value, mlir::AffineMap> &memLayoutMaps) {
   IVLOG(3, "In chooseUserProvidedTargetLayout()\n");
 
   mlir::Optional<ReorderDesc> selectedReorder = llvm::None;
@@ -935,10 +1014,28 @@ chooseUserProvidedTargetLayout(MemoryUsageDesc &memoryDesc) {
 
     mlir::MemRefType memrefType = readOp.getMemRefType();
 
-    if (memrefType.getAffineMaps().size() > 0) {
-      mlir::AffineMap layoutMap = memrefType.getAffineMaps().front();
-      IVLOG(3, "layoutMap: " << mlir::debugString(layoutMap));
+    bool layoutSet = false;
+    mlir::AffineMap layoutMap;
 
+    // First we check if a layout is set with the memref itself
+    if (memrefType.getAffineMaps().size() > 0) {
+      layoutMap = memrefType.getAffineMaps().front();
+      IVLOG(3, "layoutMap: " << mlir::debugString(layoutMap));
+      layoutSet = true;
+    }
+
+    // Then we check if a layout is set by any of the pattern recognizers
+    // such as convolution recognizers
+    if (!layoutSet) {
+      auto memLayoutMapsIt = memLayoutMaps.find(readMem);
+      if (memLayoutMapsIt != memLayoutMaps.end()) {
+        layoutMap = memLayoutMapsIt->second;
+        layoutSet = true;
+        IVLOG(4, "layoutMap for conv2d: " << mlir::debugString(layoutMap));
+      }
+    }
+
+    if (layoutSet) {
       mlir::ArrayRef<int64_t> tensorShape = memrefType.getShape();
       IVLOG(3, "Extant shape: ");
 
@@ -974,10 +1071,19 @@ void printSmallVector(mlir::ArrayRef<int64_t> vec) {
 mlir::Optional<ReorderDesc>
 optimizeLayoutForReads(MemoryUsageDesc &memoryDesc,
                        bool makeUserLayoutsExplicit) {
+  mlir::DenseMap<mlir::Value, mlir::AffineMap> memLayoutMaps;
+  return optimizeLayoutForReads(memoryDesc, memLayoutMaps,
+                                makeUserLayoutsExplicit);
+}
+
+mlir::Optional<ReorderDesc> optimizeLayoutForReads(
+    MemoryUsageDesc &memoryDesc,
+    mlir::DenseMap<mlir::Value, mlir::AffineMap> &memLayoutMaps,
+    bool makeUserLayoutsExplicit) {
   mlir::Optional<ReorderDesc> selectedReorder = llvm::None;
 
   if (makeUserLayoutsExplicit) {
-    selectedReorder = chooseUserProvidedTargetLayout(memoryDesc);
+    selectedReorder = chooseUserProvidedTargetLayout(memoryDesc, memLayoutMaps);
   }
 
   if (!selectedReorder.hasValue()) {
