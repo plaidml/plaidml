@@ -2008,8 +2008,8 @@ TEST_F(CppEdsl, Loop) {
   auto A2 = Placeholder(DType::INT32, {4});
   auto IX = Placeholder(DType::INT32, {1});
 
-  TensorVec O_outer = Loop(IX, {A})(TensorVec args_outer) {
-    TensorVec O_inner = Loop(3, {args_outer[0]})(TensorVec args_inner) {
+  TensorVec O_outer = PLAIDML_EDSL_LOOP(IX, {A})(TensorVec args_outer) {
+    TensorVec O_inner = PLAIDML_EDSL_LOOP(3, {args_outer[0]})(TensorVec args_inner) {
       args_inner[0] = args_inner[0] + A2;
       return args_inner;
     };
@@ -2017,7 +2017,7 @@ TEST_F(CppEdsl, Loop) {
     return args_outer;
   };
 
-  TensorVec O = Loop(IX, {O_outer[0]})(TensorVec args) {
+  TensorVec O = PLAIDML_EDSL_LOOP(IX, {O_outer[0]})(TensorVec args) {
     args[0] = args[0] + 13;
     return args;
   };

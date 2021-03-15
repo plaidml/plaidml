@@ -1718,16 +1718,16 @@ inline Tensor layer(const std::string& op, const TensorVec& operands, const Laye
 /// \return Tensor
 ///
 
-#define Loop(x, ...) LoopBuilder(x).setIter(__VA_ARGS__)& [=]
+#define PLAIDML_EDSL_LOOP(x, ...) LoopBuilder(x).setIter(__VA_ARGS__)& [=]
 
 class LoopBuilder {
  public:
   using loopMultifunc = std::function<TensorVec(TensorVec)>;
 
   // pass the loop bound at the beginning.
-  explicit LoopBuilder(int64_t count) : lowBound(0), step(1) { highBoundTensor = Tensor(count); }
+  explicit LoopBuilder(int64_t count) { maxTripCount = Tensor(count); }
 
-  explicit LoopBuilder(Tensor& count) : lowBound(0), step(1) { highBoundTensor = ident(count); }
+  explicit LoopBuilder(Tensor count) { maxTripCount = ident(count); }
 
   LoopBuilder& setLoopBody(loopMultifunc fn) {
     auto returnTensor = fn({iterTensor.begin(), iterTensor.end()});
@@ -1759,7 +1759,7 @@ class LoopBuilder {
       rawResults.push_back(result.as_ptr());
     }
 
-    TensorVec loopIndex{Tensor(lowBound), highBoundTensor, Tensor(step)};
+    TensorVec loopIndex{Tensor(0), maxTripCount, Tensor(1)};
 
     std::vector<plaidml_expr*> rawLoopIndex;
     rawLoopIndex.reserve(loopIndex.size());
@@ -1796,9 +1796,7 @@ class LoopBuilder {
   }
 
  private:
-  int64_t lowBound;
-  Tensor highBoundTensor;
-  int64_t step;
+  Tensor maxTripCount;
   TensorVec iterTensor;
   TensorVec yieldTensor;
 };
