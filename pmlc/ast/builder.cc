@@ -10,7 +10,6 @@
 #include <unordered_set>
 #include <vector>
 
-#include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Matchers.h"
@@ -491,7 +490,6 @@ struct ProgramBuilder {
     context->getOrLoadDialect<dialect::tile::TileDialect>();
     context->getOrLoadDialect<dialect::layer::LayerDialect>();
     context->getOrLoadDialect<StandardOpsDialect>();
-    context->getOrLoadDialect<mlir::scf::SCFDialect>();
   }
 
   std::shared_ptr<Program> build(const ProgramArguments &args) {

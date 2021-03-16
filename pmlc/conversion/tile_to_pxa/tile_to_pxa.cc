@@ -1877,9 +1877,6 @@ struct ReturnOpConversion : public OpConversionPattern<ReturnOp> {
     auto blockArg = funcOp.getType().getNumInputs() - op.getNumOperands();
     for (Value operand : operands) {
       // Find very initial allocation of memref
-      if (dyn_cast<scf::ForOp>(operand.getDefiningOp())) {
-        continue;
-      }
       auto def = pxa::getIndirectDef(operand);
       def.replaceAllUsesWith(block.getArgument(blockArg++));
     }

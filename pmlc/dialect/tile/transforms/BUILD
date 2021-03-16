@@ -24,7 +24,6 @@ plaidml_cc_library(
         "padding.cc",
         "pass_detail.h",
         "split_main.cc",
-        "replace_scfFor_alloc.cc",
     ],
     hdrs = [
         "contraction.h",

@@ -2037,7 +2037,7 @@ TEST_F(CppEdsl, Loop) {
   };
   checkExact(program, {input, input2, ix}, {expected});
 }
-
+/*
 TEST_F(CppEdsl, LoopConstantBuffer) {
   auto A = Placeholder(DType::FLOAT32, {4});
 
@@ -2056,7 +2056,7 @@ TEST_F(CppEdsl, LoopConstantBuffer) {
   };
   checkExact(program, {input}, {expected});
 }
-/*
+
 TEST_F(CppEdsl, LoopMultiIter) {
   auto A = Placeholder(DType::FLOAT32, {4});
   auto B = Placeholder(DType::FLOAT32, {4});

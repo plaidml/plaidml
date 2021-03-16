@@ -36,11 +36,6 @@ def PadConstraints : FunctionPass<"tile-pad-constraints"> {
   let constructor = "pmlc::dialect::tile::createPadConstraintsPass()";
 }
 
-def ScfForReplace : FunctionPass<"tile-scf-replaceArgument"> {
-  let summary = "replace the alloc inside scf by function argument";
-  let constructor = "pmlc::dialect::tile::createScfForReplacePass()";
-}
-
 def SplitMain :  Pass<"tile-split-main", "mlir::ModuleOp"> {
   let summary = "Split main into init/main/fini";
   let constructor = "pmlc::dialect::tile::createSplitMainPass()";
