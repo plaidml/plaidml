@@ -162,6 +162,20 @@ std::vector<Tensor> NMS(Tensor BOXES, Tensor SCORES, int32_t max_output_boxes_pe
 
     SCORES_RESULT = edsl::gather(SCORES_RESULT, INDEXES).axis(0);
     BOXES_RESULT = edsl::gather(BOXES_RESULT, INDEXES).axis(0);
+  } else {
+    // Put all -1 to the end, we now just have -1 at end of each class
+    edsl::TensorDim dst(num_results * 3);
+    auto INDEX = edsl::index({dst}, 0);
+    auto MAX = cast(Tensor{dst}, DType::INT32);
+    SCORES_RESULT = edsl::reshape(SCORES_RESULT, {dst});
+    BOXES_RESULT = edsl::reshape(BOXES_RESULT, {dst});
+    Tensor NEG1_THRES = edsl::cast(Tensor(-1), thres_type);
+    auto INDEX2 = edsl::select(SCORES_RESULT != NEG1_THRES, INDEX, MAX);
+    auto INDEX3 = edsl::argsort(edsl::cast(INDEX2, DType::FLOAT32), 0);
+    SCORES_RESULT = edsl::gather(SCORES_RESULT, INDEX3).axis(0);
+    BOXES_RESULT = edsl::gather(BOXES_RESULT, INDEX3).axis(0);
+    SCORES_RESULT = edsl::reshape(SCORES_RESULT, {num_results, 3});
+    BOXES_RESULT = edsl::reshape(BOXES_RESULT, {num_results, 3});
   }
 
   return {BOXES_RESULT, SCORES_RESULT, VALID_OUTPUTS};
