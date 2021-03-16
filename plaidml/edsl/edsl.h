@@ -1720,42 +1720,49 @@ inline Tensor layer(const std::string& op, const TensorVec& operands, const Laye
 
 #define PLAIDML_EDSL_LOOP(x, ...) LoopBuilder(x).setIter(__VA_ARGS__)& [=]
 
+using LoopSingleFn = std::function<Tensor(Tensor)>;
+using LoopMultiFn = std::function<TensorVec(TensorVec)>;
+
 class LoopBuilder {
  public:
-  using loopMultifunc = std::function<TensorVec(TensorVec)>;
-
-  // pass the loop bound at the beginning.
   explicit LoopBuilder(int64_t count) { maxTripCount = Tensor(count); }
-
   explicit LoopBuilder(Tensor count) { maxTripCount = ident(count); }
 
-  LoopBuilder& setLoopBody(loopMultifunc fn) {
-    auto returnTensor = fn({iterTensor.begin(), iterTensor.end()});
-    yieldTensor.insert(yieldTensor.end(), returnTensor.begin(), returnTensor.end());
+  LoopBuilder& setLoopBody(LoopMultiFn fn) {
+    results = fn(iterArgs);
+    return *this;
+  }
+
+  LoopBuilder& setLoopBody(LoopSingleFn fn) {
+    Tensor out = fn(iterArgs[0]);
+    results.push_back(out);
     return *this;
   }
 
   LoopBuilder& setIter(TensorVec iter) {
-    for (auto it : iter) {
-      iterTensor.push_back(ident(it));
-    }
+    iterArgs = iter;
+    return *this;
+  }
+
+  LoopBuilder& setIter(Tensor iter) {
+    iterArgs.push_back(iter);
     return *this;
   }
 
   TensorVec build(edsl_source_location loc = edsl_source_location::current()) const {
-    if (iterTensor.size() != yieldTensor.size()) {
+    if (iterArgs.size() != results.size()) {
       throw ffi_exception("iter args don't equal to init args of scf", edsl_source_location::current());
     }
 
     std::string op = "loop";
     std::vector<plaidml_expr*> rawOperands;
-    rawOperands.reserve(iterTensor.size());
-    for (Tensor operand : iterTensor) {
+    rawOperands.reserve(iterArgs.size());
+    for (Tensor operand : iterArgs) {
       rawOperands.push_back(operand.as_ptr());
     }
     std::vector<plaidml_expr*> rawResults;
-    rawResults.reserve(yieldTensor.size());
-    for (Tensor result : yieldTensor) {
+    rawResults.reserve(results.size());
+    for (Tensor result : results) {
       rawResults.push_back(result.as_ptr());
     }
 
@@ -1778,7 +1785,7 @@ class LoopBuilder {
         rawResults.data())};
 
     TensorVec output;
-    for (size_t i = 0; i < yieldTensor.size(); i++) {
+    for (size_t i = 0; i < results.size(); i++) {
       output.push_back(array.element(i));
     }
     return output;
@@ -1797,8 +1804,8 @@ class LoopBuilder {
 
  private:
   Tensor maxTripCount;
-  TensorVec iterTensor;
-  TensorVec yieldTensor;
+  TensorVec iterArgs;
+  TensorVec results;
 };
 
 }  // namespace edsl

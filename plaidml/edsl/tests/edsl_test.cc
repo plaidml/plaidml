@@ -2038,15 +2038,15 @@ TEST_F(CppEdsl, Loop) {
   checkExact(program, {input, input2, ix}, {expected});
 }
 
-/*
 TEST_F(CppEdsl, LoopConstantBuffer) {
   auto A = Placeholder(DType::FLOAT32, {4});
-  auto loopBody = [&](Tensor index) {
+
+  Tensor O = PLAIDML_EDSL_LOOP(5, A)(Tensor arg) {
     std::vector<float> test{1, 1, 1, 1};
     auto B = Constant(makeBuffer(DType::FLOAT32, {4}, test), "test");
-    return A + B;
+    arg = arg + B;
+    return arg;
   };
-  Tensor O = Loop(3, 8, 1).setIter({A}).setLoopBody(loopBody);
   auto program = makeProgram("loop", {A}, {O});
   std::vector<float> input = {
       1, 1, 1, 1  //
@@ -2056,7 +2056,7 @@ TEST_F(CppEdsl, LoopConstantBuffer) {
   };
   checkExact(program, {input}, {expected});
 }
-
+/*
 TEST_F(CppEdsl, LoopMultiIter) {
   auto A = Placeholder(DType::FLOAT32, {4});
   auto B = Placeholder(DType::FLOAT32, {4});
