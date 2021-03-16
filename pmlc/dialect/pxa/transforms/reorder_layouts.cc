@@ -68,8 +68,14 @@ public:
       }
       ReorderDesc &reorder = optReorder.getValue();
       IVLOG(3, "Optimized layout: " << mlir::debugString(reorder.reorderMap));
-      if (mlir::succeeded(convertMemoryLayout(memoryDesc.value, reorder)))
+      if (mlir::succeeded(convertMemoryLayout(memoryDesc.value, reorder))) {
+        if (memoryDesc.parallelOp.hasValue()) {
+          parallelOps.insert(memoryDesc.parallelOp.getValue());
+        }
+
         continue;
+      }
+
       if (!allowReorder) {
         IVLOG(3,
               "Failed to change layout in-place, separate reorder not allowed");
@@ -170,6 +176,57 @@ void createBlockedLayoutForInputTensor(
     memLayoutMaps.insert({loadOp.getMemRef(), newBlockedMap});
   }
 }
+void createBlockedLayoutForFilterTensor(
+    PxaLoadOp loadOp,
+    mlir::DenseMap<mlir::Value, mlir::AffineMap> &memLayoutMaps) {
+  mlir::Value indirectDef = getIndirectDef(loadOp.getMemRef());
+  IVLOG(4, "indirectDef for filter: " << mlir::debugString(indirectDef));
+
+  auto srcMemType = loadOp.getMemRef().getType().cast<mlir::MemRefType>();
+  mlir::ArrayRef<int64_t> shape = srcMemType.getShape();
+  mlir::AffineMap map = loadOp.getAffineMap();
+  mlir::MLIRContext *context = map.getContext();
+
+  int64_t blockSize = 16;
+  if (shape[2] % blockSize == 0 && shape[3] % blockSize == 0) {
+    // RSCK -> C floordiv 16, K floordiv 16, R, S, C mod 16, K mod 16
+    // RSCK -> CKRS (d0 d1 d2 d3) -> (d2 d3 d0 d1)
+    // CKRS -> C floordiv 16, K floordiv 16, R, S, C mod 16, K mod 16
+    // (d2 d3 d0 d1) -> (d2 floordiv 16, d3 floordiv 16, d0, d1, d2 mod 16, d3
+    // mod 16)
+
+    mlir::SmallVector<unsigned, 4> permutationMap;
+    permutationMap.push_back(2);
+    permutationMap.push_back(3);
+    permutationMap.push_back(0);
+    permutationMap.push_back(1);
+    mlir::AffineMap newMap =
+        mlir::AffineMap::getPermutationMap(permutationMap, context);
+    IVLOG(4, "newMap: " << mlir::debugString(newMap));
+
+    mlir::SmallVector<mlir::AffineExpr, 6> expansionExprs;
+    for (unsigned idx = 0; idx < newMap.getNumResults(); ++idx) {
+      mlir::AffineExpr expr;
+      if (idx == 0 || idx == 1) {
+        expr = newMap.getResult(idx).floorDiv(blockSize);
+      } else {
+        expr = newMap.getResult(idx);
+      }
+
+      expansionExprs.push_back(expr);
+      if (idx == newMap.getNumResults() - 1) {
+        expansionExprs.push_back(newMap.getResult(0) % blockSize);
+        expansionExprs.push_back(newMap.getResult(1) % blockSize);
+      }
+    }
+
+    mlir::AffineMap newBlockedMap = mlir::AffineMap::get(
+        newMap.getNumResults(), 0, expansionExprs, context);
+    IVLOG(4, "newBlockedMap: " << mlir::debugString(newBlockedMap));
+
+    memLayoutMaps.insert({loadOp.getMemRef(), newBlockedMap});
+  }
+}
 
 void recognizeConvsAndInsertBlockedDataLayouts(
     mlir::FuncOp func,
@@ -252,6 +309,7 @@ void recognizeConvsAndInsertBlockedDataLayouts(
           }
 
           createBlockedLayoutForInputTensor(input, memLayoutMaps);
+          createBlockedLayoutForFilterTensor(filter, memLayoutMaps);
         }
       }
     }
