@@ -141,8 +141,8 @@ void eraseLayoutMapsFromMemRefs(mlir::FuncOp func);
 void recognizeConvsAndInsertBlockedDataLayouts(
     mlir::FuncOp func,
     mlir::DenseMap<mlir::Value, mlir::AffineMap> &memLayoutMaps);
-llvm::SmallVector<mlir::Value, 4>
-getResultOperands(mlir::AffineMap map, mlir::ValueRange mapOperands);
+bool getResultOperands(mlir::AffineMap map, mlir::ValueRange mapOperands,
+                       llvm::SmallVector<mlir::Value, 4> &);
 
 // ============================================================================
 // Helper affine map transformations

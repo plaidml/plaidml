@@ -213,14 +213,23 @@ void recognizeConvsAndInsertBlockedDataLayouts(
                 expectedDimSizeOfTensors &&
             reduceOp.getAffineMap().getNumResults() ==
                 expectedDimSizeOfTensors) {
-          llvm::SmallVector<mlir::Value, 4> loadOp1Operands =
-              getResultOperands(loadOp1.getAffineMap(), loadOp1.indices());
+          llvm::SmallVector<mlir::Value, 4> loadOp1Operands;
+          if (!getResultOperands(loadOp1.getAffineMap(), loadOp1.indices(),
+                                 loadOp1Operands)) {
+            return;
+          }
 
-          llvm::SmallVector<mlir::Value, 4> loadOp2Operands =
-              getResultOperands(loadOp2.getAffineMap(), loadOp2.indices());
+          llvm::SmallVector<mlir::Value, 4> loadOp2Operands;
+          if (!getResultOperands(loadOp2.getAffineMap(), loadOp2.indices(),
+                                 loadOp2Operands)) {
+            return;
+          }
 
-          llvm::SmallVector<mlir::Value, 4> reduceOperands =
-              getResultOperands(reduceOp.getAffineMap(), reduceOp.idxs());
+          llvm::SmallVector<mlir::Value, 4> reduceOperands;
+          if (!getResultOperands(reduceOp.getAffineMap(), reduceOp.idxs(),
+                                 reduceOperands)) {
+            return;
+          }
 
           int loadOp1ReduceCommon =
               intersectTwoSets(loadOp1Operands, reduceOperands);
@@ -249,10 +258,8 @@ void recognizeConvsAndInsertBlockedDataLayouts(
   });
 }
 
-llvm::SmallVector<mlir::Value, 4>
-getResultOperands(mlir::AffineMap map, mlir::ValueRange mapOperands) {
-  llvm::SmallVector<mlir::Value, 4> resultOperands;
-
+bool getResultOperands(mlir::AffineMap map, mlir::ValueRange mapOperands,
+                       llvm::SmallVector<mlir::Value, 4> &resultOperands) {
   for (unsigned idx = 0; idx < map.getNumResults(); ++idx) {
     mlir::AffineExpr expr = map.getResult(idx);
 
@@ -265,7 +272,8 @@ getResultOperands(mlir::AffineMap map, mlir::ValueRange mapOperands) {
       if (!isPresent(resultOperands, arg)) {
         resultOperands.push_back(arg);
       }
-    } else if (expr.getKind() == mlir::AffineExprKind::Add) {
+    } else if (expr.getKind() == mlir::AffineExprKind::Add ||
+               expr.getKind() == mlir::AffineExprKind::Mul) {
       auto addExpr = expr.cast<mlir::AffineBinaryOpExpr>();
       mlir::AffineExpr lhsExpr = addExpr.getLHS();
       mlir::AffineExpr rhsExpr = addExpr.getRHS();
@@ -280,8 +288,9 @@ getResultOperands(mlir::AffineMap map, mlir::ValueRange mapOperands) {
 
       } else if (lhsExpr.getKind() == mlir::AffineExprKind::Constant) {
       } else {
-        IVLOG(4, "Unhandled expression. Quitting");
-        exit(1);
+        IVLOG(4, "Unhandled expression 1. Quitting "
+                     << mlir::debugString(lhsExpr));
+        return false;
       }
 
       if (rhsExpr.getKind() == mlir::AffineExprKind::DimId) {
@@ -294,17 +303,18 @@ getResultOperands(mlir::AffineMap map, mlir::ValueRange mapOperands) {
 
       } else if (rhsExpr.getKind() == mlir::AffineExprKind::Constant) {
       } else {
-        IVLOG(4, "Unhandled expression. Quitting");
-        exit(1);
+        IVLOG(4, "Unhandled expression 2. Quitting "
+                     << mlir::debugString(rhsExpr));
+        return false;
       }
     } else if (expr.getKind() == mlir::AffineExprKind::Constant) {
     } else {
-      IVLOG(4, "Unhandled expression. Quitting");
-      exit(1);
+      IVLOG(4, "Unhandled expression 3. Quitting " << mlir::debugString(expr));
+      return false;
     }
   }
 
-  return resultOperands;
+  return true;
 }
 
 void eraseLayoutMapsFromMemRefs(mlir::FuncOp func) {
