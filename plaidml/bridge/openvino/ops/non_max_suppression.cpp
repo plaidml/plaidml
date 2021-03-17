@@ -121,8 +121,12 @@ std::vector<Tensor> NMS(Tensor BOXES, Tensor SCORES, int32_t max_output_boxes_pe
       // Select box
       for (int k = 0; k < num_boxes_per_class; k++) {
         // Select the box with largest score
-        Tensor CANDIDATE_INDEX = edsl::reshape(op::argmax(NEW_SCORES, edsl::Value(2)), {edsl::TensorDim(1)});  // 1*ui32
-        Tensor SCORE = edsl::reshape(edsl::gather(NEW_SCORES, CANDIDATE_INDEX).axis(2), {1, 1, 1});            // 1*1*1
+        // Tensor CANDIDATE_INDEX = edsl::reshape(op::argmax(NEW_SCORES, edsl::Value(2)), {edsl::TensorDim(1)});  //
+        // 1*ui32 Tensor SCORE = edsl::reshape(edsl::gather(NEW_SCORES, CANDIDATE_INDEX).axis(2), {1, 1, 1}); // 1*1*1
+        // The boxes may have same score
+        Tensor CANDIDATE_INDEX = op::slice(edsl::argsort(NEW_SCORES, 2, edsl::SortDirection::DESC)).add_dims({0, 0, 0});
+        CANDIDATE_INDEX = edsl::reshape(CANDIDATE_INDEX, {edsl::TensorDim(1)});
+        Tensor SCORE = edsl::reshape(op::max(NEW_SCORES, edsl::Value(2)), {1, 1, 1});
         Tensor CURRENT_NODE = edsl::select(SCORE > 0.0f, NODE, edsl::cast(INVALID_NODE, box_output_type));
 
         // Update count of selected box
@@ -170,7 +174,7 @@ std::vector<Tensor> NMS(Tensor BOXES, Tensor SCORES, int32_t max_output_boxes_pe
     // Sort across batch
     Tensor SCORES_SLICE = op::slice(SCORES_RESULT).add_dim(0, num_results).add_dim(2, 3);
     SCORES_SLICE = edsl::reshape(SCORES_SLICE, {edsl::TensorDim(num_results)});
-    Tensor INDEXES = argsort(SCORES_SLICE, 0, edsl::SortDirection::DESC);
+    Tensor INDEXES = edsl::argsort(SCORES_SLICE, 0, edsl::SortDirection::DESC);
 
     SCORES_RESULT = edsl::gather(SCORES_RESULT, INDEXES).axis(0);
     BOXES_RESULT = edsl::gather(BOXES_RESULT, INDEXES).axis(0);
