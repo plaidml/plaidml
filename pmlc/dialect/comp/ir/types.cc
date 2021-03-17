@@ -18,6 +18,14 @@ bool RuntimeType::classof(Type type) {
 }
 
 bool ExecEnvType::supportsMemorySpace(Attribute requestedSpace) const {
+  if (!requestedSpace) {
+    return llvm::any_of(getMemorySpaces(), [&](Attribute execEnvSpace) {
+      if (auto intAttr = execEnvSpace.dyn_cast<IntegerAttr>()) {
+        return intAttr.getInt() == 0;
+      }
+      return false;
+    });
+  }
   return llvm::any_of(getMemorySpaces(), [&](Attribute execEnvSpace) {
     return execEnvSpace == requestedSpace;
   });

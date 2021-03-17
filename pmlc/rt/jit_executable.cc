@@ -8,6 +8,8 @@
 #include <utility>
 #include <vector>
 
+#include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
+#include "mlir/Target/LLVMIR/Dialect/OpenMP/OpenMPToLLVMIRTranslation.h"
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
 #include "llvm/ExecutionEngine/GenericValue.h"
 #include "llvm/ExecutionEngine/JITLink/JITLinkMemoryManager.h"
@@ -330,6 +332,8 @@ public:
       initializeLLVMPasses();
       llvm::sys::DynamicLibrary::LoadLibraryPermanently(nullptr);
     });
+    registerLLVMDialectTranslation(*program->context);
+    registerOpenMPDialectTranslation(*program->context);
 
     EngineKind kind = EngineKind::OrcJIT;
     auto jit = pmlc::util::getEnvVar("LLVM_JIT");

@@ -89,8 +89,8 @@ module attributes {gpu.container_module} {
   // CHECK-NOT: spv.module
   // CHECK-NOT: gpu.module
   spv.module Physical64 OpenCL requires #spv.vce<v1.0, [Addresses, Kernel], []> {
-    spv.globalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
-    spv.globalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
+    spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
+    spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
     spv.func @zero(%arg0: !spv.ptr<!spv.struct<(!spv.array<256 x f32, stride=4> [0])>, CrossWorkgroup>) "None" attributes {
       spv.entry_point_abi = {local_size = dense<[32, 1, 1]> : vector<3xi32>},
       workgroup_attributions = 0 : i64
@@ -146,8 +146,8 @@ module attributes {gpu.container_module} {
   // CHECK-NOT: spv.module
   // CHECK-NOT: gpu.module
   spv.module Physical64 OpenCL requires #spv.vce<v1.0, [Addresses, Kernel], []> {
-    spv.globalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
-    spv.globalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
+    spv.GlobalVariable @__builtin_var_LocalInvocationId__ built_in("LocalInvocationId") : !spv.ptr<vector<3xi32>, Input>
+    spv.GlobalVariable @__builtin_var_WorkgroupId__ built_in("WorkgroupId") : !spv.ptr<vector<3xi32>, Input>
     spv.func @zero(%arg0: !spv.ptr<!spv.struct<(!spv.array<256 x f16, stride=4> [0])>, CrossWorkgroup>) "None" attributes {
       spv.entry_point_abi = {local_size = dense<[32, 1, 1]> : vector<3xi32>},
       workgroup_attributions = 0 : i64
