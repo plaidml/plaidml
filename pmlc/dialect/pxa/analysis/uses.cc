@@ -2,8 +2,8 @@
 
 #include "pmlc/dialect/pxa/analysis/uses.h"
 
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/SCF/SCF.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "llvm/ADT/TypeSwitch.h"
 
 #include "pmlc/dialect/layer/ir/ops.h"

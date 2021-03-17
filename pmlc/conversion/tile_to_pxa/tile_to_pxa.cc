@@ -1994,6 +1994,29 @@ struct UnpackOpConversion : public OpConversionPattern<stdx::UnpackOp> {
   }
 };
 
+struct ScfForOpConversion : public OpConversionPattern<scf::ForOp> {
+  using OpConversionPattern<scf::ForOp>::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(scf::ForOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const final {
+    scf::ForOpAdaptor oldFor(operands);
+    auto &oldBodyOps = op.getBody()->getOperations();
+    auto newOp = rewriter.create<scf::ForOp>(op.getLoc(), oldFor.lowerBound(),
+                                             oldFor.upperBound(), oldFor.step(),
+                                             oldFor.initArgs());
+    auto &newBodyOps = newOp.getBody()->getOperations();
+    newBodyOps.splice(std::prev(newBodyOps.end()), oldBodyOps,
+                      oldBodyOps.begin(), oldBodyOps.end());
+    auto oldArgs = op.getBody()->getArguments();
+    auto newArgs = newOp.getBody()->getArguments();
+    for (unsigned i = 0; i < oldArgs.size(); ++i) {
+      oldArgs[i].replaceAllUsesWith(newArgs[i]);
+    }
+    rewriter.replaceOp(op, newOp.results());
+    return success();
+  }
+};
+
 struct LoopOpConversion : public OpConversionPattern<tile::LoopOp> {
   using OpConversionPattern<tile::LoopOp>::OpConversionPattern;
 
@@ -2099,6 +2122,7 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
     TypeConverter converter;
     target.addLegalDialect<mlir::AffineDialect>();
     target.addLegalDialect<mlir::StandardOpsDialect>();
+    target.addLegalDialect<mlir::scf::SCFDialect>();
     target.addLegalDialect<dialect::layer::LayerDialect>();
     target.addLegalDialect<dialect::pxa::PXADialect>();
     target.addLegalDialect<dialect::stdx::StdXDialect>();
@@ -2143,6 +2167,7 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         TraceOpConversion,    //
         PackOpConversion,     //
         UnpackOpConversion,   //
+        ScfForOpConversion,   //
         LoopOpConversion,     //
         YieldOpConversion,    //
         ContractionOpConversion<CombinationKind::none, FirstOperand>,
