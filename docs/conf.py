@@ -51,7 +51,12 @@ extensions = [
     'sphinx.ext.autosectionlabel',
     'sphinx.ext.napoleon',
     'sphinxcontrib.katex',
+    'sphinxcontrib.bibtex',
 ]
+
+bibtex_bibfiles = ['./refs.bib']
+
+bibtex_default_style = 'plain'
 
 autodoc_mock_imports = [
     'plaidml.core._version',
