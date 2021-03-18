@@ -6,13 +6,15 @@
 // RUN:     -canonicalize -convert-scf-to-std -x86-convert-std-to-llvm \
 // RUN:     -x86-openmp-workaround %s | \
 // RUN:   pmlc-jit -e tiled | FileCheck %s
-// RUN: pmlc-opt -convert-linalg-to-loops -x86-convert-pxa-to-affine -lower-affine \
+// RUN: pmlc-opt -convert-linalg-to-loops -x86-convert-pxa-to-affine \
+// RUN:     -buffer-loop-hoisting -buffer-deallocation -lower-affine \
 // RUN:     -canonicalize -convert-scf-to-std -x86-convert-std-to-llvm \
 // RUN:     -x86-openmp-workaround %s | \
 // RUN:   pmlc-jit -e xsmm | FileCheck %s
 // RUN: pmlc-opt -convert-linalg-to-loops \
 // RUN:     --pass-pipeline='func(x86-affine-stencil-xsmm{batched=true})' \
-// RUN:     -x86-convert-pxa-to-affine -lower-affine \
+// RUN:     -x86-convert-pxa-to-affine \
+// RUN:     -buffer-loop-hoisting -buffer-deallocation -lower-affine \
 // RUN:     -canonicalize -convert-scf-to-std -x86-convert-std-to-llvm \
 // RUN:     -x86-openmp-workaround %s | \
 // RUN:   pmlc-jit -e baseline | FileCheck %s
@@ -276,11 +278,13 @@ func @conv2_xsmm(%I: !I_memref, %K: !K_memref, %O: !O_memref) {
   %CI = dim %I, %c3 : !I_memref
   %CO = dim %O, %c3 : !O_memref
   %ptr = xsmm.brgemm.offs.dispatch.f32 [2, 11, 1], [35, 11, 55]
-
- 
+  %0 = xsmm.brgemm.offs.alloc.f32 7
+  %1 = xsmm.brgemm.offs.alloc.f32 7
   affine.parallel (%x, %y) = (0, 0) to (%X, %Y) step (2, 1) {
-    xsmm.brgemm.offs.invoke.f32 %ptr, %O[%c0, %x, %y, %c0] = %I[%c0, %x, %y, %c0], %K[%c0, %c0, %c0, %c0],  7, [0,4,8,12,16,20,24], [0,44,88,132,176,220,264] : (!I_memref, !K_memref) -> !O_memref
+    xsmm.brgemm.offs.invoke.f32 %ptr, %O[%c0, %x, %y, %c0] = %I[%c0, %x, %y, %c0], %K[%c0, %c0, %c0, %c0], 7, %0,[0,4,8,12,16,20,24], %1, [0,44,88,132,176,220,264] : (!I_memref, !K_memref) -> !O_memref
   }
+  xsmm.brgemm.offs.dealloc.f32 %0  
+  xsmm.brgemm.offs.dealloc.f32 %1  
   return
 
 

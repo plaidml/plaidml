@@ -1,6 +1,6 @@
-// RUN: pmlc-opt -tile-compute-bounds -convert-tile-to-pxa  --pass-pipeline='func(x86-affine-stencil-xsmm{threads=1 batched=true})'  -x86-convert-pxa-to-affine -lower-affine \
-// RUN:     -canonicalize -convert-scf-to-std -x86-convert-std-to-llvm \
-// RUN:     -x86-openmp-workaround %s 
+// RUN: pmlc-opt -tile-compute-bounds -convert-tile-to-pxa  --pass-pipeline='func(x86-affine-stencil-xsmm{threads=1 batched=true})'  -x86-convert-pxa-to-affine \
+// RUN:     -buffer-loop-hoisting -buffer-deallocation -loop-invariant-code-motion \
+// RUN:     -canonicalize -split-input-file %s | FileCheck %s
 
 
 
@@ -14,7 +14,28 @@
 
 func @pad_contraction(%A: tensor<1x16x16x16xf32>, %B: tensor<3x3x16x16xf32>, %C: tensor<1x14x14x16xf32>) -> tensor<1x14x14x16xf32> {
   %c0 = tile.constant(0.0 : f64) : tensor<1x14x14x16xf32>
+  // CHECK: affine.for
+  // CHECK: affine.for
+  // CHECK: affine.for
+  // CHECK: affine.for
   %0 = tile.contract add, mul, %c0, %A, %B {srcs=[#conv1dcenter, #second], sink=#first}
     : tensor<1x14x14x16xf32>, tensor<1x16x16x16xf32>, tensor<3x3x16x16xf32> -> tensor<1x14x14x16xf32>
+  // CHECK: xsmm.brgemm.offs.alloc.f32 9
+  // CHECK: xsmm.brgemm.offs.alloc.f32 9
+  // CHECK: xsmm.brgemm.offs.dispatch.f32 [14, 16, 16], [256, 16, 224]
+  // CHECK: affine.for  
+  // CHECK: affine.for
+  // CHECK: affine.for
+  // CHECK: affine.for
+  // CHECK: affine.for
+  // CHECK: affine.for
+  // CHECK: affine.for  
+  // CHECK: xsmm.brgemm.offs.invoke.f32
+  // CHECK: xsmm.brgemm.offs.dealloc.f32
+  // CHECK: xsmm.brgemm.offs.dealloc.f32  
+
   return %0 : tensor<1x14x14x16xf32>
 }
+
+
+

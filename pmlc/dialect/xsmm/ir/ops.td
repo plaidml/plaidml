@@ -80,7 +80,27 @@ def XSMM_BRGemmOffsDispatchF32Op : XSMM_Op<"brgemm.offs.dispatch.f32", [NoSideEf
   let parser =  ?;
   let assemblyFormat = "$tile `,` $tileld attr-dict";
 }
- 
+
+
+def XSMM_BRGemmOffsAllocF32Op : XSMM_Op<"brgemm.offs.alloc.f32"> {
+  let summary = "Alloc offset array for offset based brgemm in LIBXMM";
+  let arguments = (ins I64Attr:$numBatches);
+  let results = (outs Res<I64, "the allocated offset pointer", [MemAlloc]>:$offsetsPtr);
+  let printer = ?;
+  let parser =  ?;
+  let assemblyFormat = "$numBatches attr-dict";
+}
+
+def XSMM_BRGemmOffsDeallocF32Op : XSMM_Op<"brgemm.offs.dealloc.f32"> { 
+  let summary = "Dealloc offset array for offset based brgemm in LIBXMM";
+  let arguments = (ins Arg<I64, "the offset pointer to free", [MemFree]>:$offsetsPtr); 
+  let printer = ?;
+  let parser =  ?;
+  let assemblyFormat = "$offsetsPtr attr-dict"; 
+}
+
+
+
 def XSMM_BRGemmOffsInvokeF32Op : XSMM_Op<"brgemm.offs.invoke.f32"> {
   let summary = "invoke a previously queried LIBXSMM kernel";
   let arguments = (ins I64:$ptr,
@@ -88,7 +108,9 @@ def XSMM_BRGemmOffsInvokeF32Op : XSMM_Op<"brgemm.offs.invoke.f32"> {
     Arg<F32MemRef, "the A memref to load from", [MemRead]>:$a,
     Arg<F32MemRef, "the B memref to load from", [MemRead]>:$b,
     I64Attr:$numBatches,
+    Arg<I64,"", [MemWrite]>:$aOffsetsPtr,  
     I64ArrayAttr:$aOffsets,
+    Arg<I64,"", [MemWrite]>:$bOffsetsPtr,  
     I64ArrayAttr:$bOffsets,
     Variadic<Index>:$indices);
  

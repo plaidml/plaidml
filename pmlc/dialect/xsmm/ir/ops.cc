@@ -94,7 +94,7 @@ ParseResult parseBRGemmOffsInvokeF32Op(OpAsmParser &parser,
   ArrayAttr aOffs, bOffs;
   IntegerAttr numBatchesAttr;
   FunctionType funcType;
-  OpAsmParser::OperandType ptr;
+  OpAsmParser::OperandType ptr, aOffsPtr, bOffsPtr;
  
   return failure(
  
@@ -109,14 +109,18 @@ ParseResult parseBRGemmOffsInvokeF32Op(OpAsmParser &parser,
       parser.parseAttribute(numBatchesAttr, i64Type, "numBatches",
                             result.attributes) ||
       parser.parseComma() ||
+      parser.parseOperand(aOffsPtr) || parser.parseComma() ||
       parser.parseAttribute(aOffs, i64Type, "aOffsets", result.attributes) ||
       parser.parseComma() ||
+      parser.parseOperand(bOffsPtr) || parser.parseComma() ||
       parser.parseAttribute(bOffs, i64Type, "bOffsets", result.attributes) ||
       parser.parseColonType(funcType) ||
       parser.resolveOperand(ptr, i64Type, result.operands) ||
       parser.resolveOperand(c.memref, funcType.getResult(0), result.operands) ||
       parser.resolveOperand(a.memref, funcType.getInput(0), result.operands) ||
       parser.resolveOperand(b.memref, funcType.getInput(1), result.operands) ||
+      parser.resolveOperand(aOffsPtr, i64Type, result.operands) ||
+      parser.resolveOperand(bOffsPtr, i64Type, result.operands) ||
       parser.resolveOperands(c.indices, indexType, result.operands) ||
       parser.resolveOperands(a.indices, indexType, result.operands) ||
       parser.resolveOperands(b.indices, indexType, result.operands));

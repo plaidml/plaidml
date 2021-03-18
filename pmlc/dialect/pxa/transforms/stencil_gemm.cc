@@ -254,8 +254,6 @@ private:
     auto opA = cast<PxaLoadOp>(perm.values[1].getDefiningOp());
     auto opB = cast<PxaLoadOp>(perm.values[2].getDefiningOp());
 
-
-
     // First, modify step size of all tiled indexes
     auto steps = op.getSteps();
     for (size_t i = 0; i < getBlockArgsAsSet().size(); i++) {
@@ -295,7 +293,10 @@ private:
           }
         }
       }
+
+      // Check for additional reduction indices with a range greater than 1
       if (doBatch && !foundBlockArg && steps[i] == 1 &&
+          getIdxRange(op.getBody()->getArgument(i)) > 1 &&
           isAdditionalReductionIndex(op.getBody()->getArgument(i),
                                      ArrayRef<Value>{opC, opA, opB})) {
         auto index = op.getBody()->getArgument(i);
@@ -310,6 +311,10 @@ private:
       }
     }
     op.setSteps(steps);
+
+    // The numbatches array's first element corresponds to the 'k'
+    // index of GEMM. The other reduction indices follow 'k'.
+
     numBatchesArr.insert(numBatchesArr.begin(), numBatches);
 
     auto bodyBuilder = op.getBodyBuilder();

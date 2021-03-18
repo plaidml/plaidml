@@ -68,12 +68,19 @@ struct PxaGemmOpConversion : public OpConversionPattern<pxa::PxaGemmOp> {
            "argument dimension mismatch for offset based BRGEMM");
 
     IVLOG(3, "numBatches in computeBRGEMM: " << numBatches);
+
+    // variable to record the memory stride of the current index
+    // within the offset array
     size_t innerStride = 1;
 
     for (size_t i = 0; i < numSteps.size(); i++) {
+      // memory stride for array a
       int64_t aStride = aStrides[i];
+      // memory stride for array b
       int64_t bStride = bStrides[i];
+      // the iteration range of this index
       int64_t indexRange = stepSizes[i] * numSteps[i];
+      // the number of batches for this index
       int64_t nSteps = numSteps[i];
 
       IVLOG(3, "aStride in computeBRGEMM: " << aStride);
@@ -92,6 +99,7 @@ struct PxaGemmOpConversion : public OpConversionPattern<pxa::PxaGemmOp> {
           }
         }
       }
+      // update inner memory stride for next index
       innerStride *= (size_t)nSteps;
     }
   }
@@ -123,10 +131,10 @@ struct PxaGemmOpConversion : public OpConversionPattern<pxa::PxaGemmOp> {
     for (auto i : numBatches.getValue()) {
       numBatchesArr.emplace_back(i.cast<IntegerAttr>().getInt());
     }
-
+    // If numbatches only consists of 'k' index call xsmm gemm or xsmm brgemm
     if (numBatchesArr.size() == 1) {
       int numBatches = numBatchesArr[0];
-
+      // If value of numbatches is 1 call xsmm gemm
       if (numBatches == 1) {
 
         auto dispatch = rewriter.create<xsmm::GemmDispatchF32Op>(
@@ -135,6 +143,8 @@ struct PxaGemmOpConversion : public OpConversionPattern<pxa::PxaGemmOp> {
         rewriter.create<xsmm::GemmInvokeF32Op>(
             op.getLoc(), ArrayRef<Type>(), dispatch, transformed.c(),
             transformed.a(), transformed.b(), indices);
+
+        // Else call batch reduce gemm when number of batches is greater than 1.
       } else if (numBatches > 1) {
 
         auto numBatchesAttr = rewriter.getI64IntegerAttr(numBatches);
@@ -146,6 +156,8 @@ struct PxaGemmOpConversion : public OpConversionPattern<pxa::PxaGemmOp> {
             transformed.a(), transformed.b(), numBatchesAttr, indices);
       }
     } else if (numBatchesArr.size() > 1) {
+      // There are additional reduction indices
+      // call offset based batch reduce gemm
 
       // offsets for index k in matrix multiply and
       // additional reduction indices, stepSizes are the tilesizes for each
@@ -188,16 +200,31 @@ struct PxaGemmOpConversion : public OpConversionPattern<pxa::PxaGemmOp> {
         numSteps *= numBatchesArr[i];
       }
 
-      computeBRGemmOffsets(numBatchesArr, stepSizes, aStrides, bStrides, aOffsets,
-                           bOffsets);
+      // Computation of offset table
+      computeBRGemmOffsets(numBatchesArr, stepSizes, aStrides, bStrides,
+                           aOffsets, bOffsets);
       auto dispatch = rewriter.create<xsmm::BRGemmOffsDispatchF32Op>(
           op.getLoc(), rewriter.getI64Type(), op.tile(), leadingDimsAttr);
+
+      // Allocation ops for offset table
+      auto aOffsetsPtr = rewriter.create<xsmm::BRGemmOffsAllocF32Op>(
+          op.getLoc(), rewriter.getI64Type(),
+          rewriter.getI64IntegerAttr(numSteps));
+
+      auto bOffsetsPtr = rewriter.create<xsmm::BRGemmOffsAllocF32Op>(
+          op.getLoc(), rewriter.getI64Type(),
+          rewriter.getI64IntegerAttr(numSteps));
+
       rewriter.create<xsmm::BRGemmOffsInvokeF32Op>(
           op.getLoc(), ArrayRef<Type>(), dispatch, transformed.c(),
           transformed.a(), transformed.b(),
-          rewriter.getI64IntegerAttr(numSteps),
-          rewriter.getI64ArrayAttr(ArrayRef<int64_t>(aOffsets)),
+          rewriter.getI64IntegerAttr(numSteps), aOffsetsPtr,
+          rewriter.getI64ArrayAttr(ArrayRef<int64_t>(aOffsets)), bOffsetsPtr,
           rewriter.getI64ArrayAttr(ArrayRef<int64_t>(bOffsets)), indices);
+
+      // Deallocation ops for offset table
+      rewriter.create<xsmm::BRGemmOffsDeallocF32Op>(op.getLoc(), aOffsetsPtr);
+      rewriter.create<xsmm::BRGemmOffsDeallocF32Op>(op.getLoc(), bOffsetsPtr);
 
     } else
       return failure();
@@ -511,6 +538,91 @@ struct XSMMBRGemmOffsDispatchF32Lowering
   }
 };
 
+struct XSMMBRGemmOffsAllocF32Lowering
+    : public ConvertOpToLLVMPattern<xsmm::BRGemmOffsAllocF32Op> {
+  using ConvertOpToLLVMPattern<
+      xsmm::BRGemmOffsAllocF32Op>::ConvertOpToLLVMPattern;
+
+  LogicalResult
+  matchAndRewrite(xsmm::BRGemmOffsAllocF32Op op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
+
+    llvm::StringRef kMalloc = "malloc";
+    auto module = op->getParentOfType<ModuleOp>();
+    auto mallocFunc = module.lookupSymbol<LLVM::LLVMFuncOp>(kMalloc);
+    auto numBatches = rewriter.getI64IntegerAttr(op.numBatches());
+
+    auto numBatchesValue = rewriter.create<LLVM::ConstantOp>(
+        op->getLoc(), rewriter.getI64Type(), numBatches);
+
+    if (!mallocFunc) {
+
+      OpBuilder builder(module.getBodyRegion());
+
+      mallocFunc = builder.create<LLVM::LLVMFuncOp>(
+          builder.getUnknownLoc(), kMalloc,
+          LLVM::LLVMFunctionType::get(
+              LLVM::LLVMPointerType::get(
+                  IntegerType::get(module->getContext(), 8)),
+              getIndexType()));
+    }
+
+    auto offsMallocPtr = rewriter.create<LLVM::CallOp>(
+        op->getLoc(), getVoidPtrType(), rewriter.getSymbolRefAttr(mallocFunc),
+        ArrayRef<Value>{rewriter.create<LLVM::MulOp>(
+            op->getLoc(), numBatchesValue,
+            getSizeInBytes(op->getLoc(), rewriter.getI64Type(), rewriter))});
+
+    rewriter.replaceOpWithNewOp<LLVM::PtrToIntOp>(op, rewriter.getI64Type(),
+                                                  offsMallocPtr.getResult(0));
+    return success();
+  }
+};
+
+struct XSMMBRGemmOffsDeallocF32Lowering
+    : public ConvertOpToLLVMPattern<xsmm::BRGemmOffsDeallocF32Op> {
+  using ConvertOpToLLVMPattern<
+      xsmm::BRGemmOffsDeallocF32Op>::ConvertOpToLLVMPattern;
+
+  LogicalResult
+  matchAndRewrite(xsmm::BRGemmOffsDeallocF32Op op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
+
+    xsmm::BRGemmOffsDeallocF32Op::Adaptor transformed(operands);
+    auto module = op->getParentOfType<ModuleOp>();
+
+    llvm::StringRef kFree = "free";
+    auto freeFunc = module.lookupSymbol<LLVM::LLVMFuncOp>(kFree);
+    auto offsetsInt = transformed.offsetsPtr();
+    auto longPtrType = LLVM::LLVMPointerType::get(rewriter.getI64Type());
+    auto offsetsIntToPtr = rewriter.create<LLVM::IntToPtrOp>(
+        op->getLoc(), longPtrType, offsetsInt);
+
+    if (!freeFunc) {
+
+      OpBuilder builder(module.getBodyRegion());
+
+      freeFunc = builder.create<LLVM::LLVMFuncOp>(
+          builder.getUnknownLoc(), kFree,
+          LLVM::LLVMFunctionType::get(
+              LLVM::LLVMVoidType::get(module->getContext()),
+              LLVM::LLVMPointerType::get(
+                  IntegerType::get(module->getContext(), 8))));
+    }
+
+    auto offsetsPtr = rewriter.create<LLVM::BitcastOp>(
+        op->getLoc(),
+        LLVM::LLVMPointerType::get(IntegerType::get(module->getContext(), 8)),
+        offsetsIntToPtr.getResult());
+    rewriter.create<LLVM::CallOp>(op->getLoc(), freeFunc,
+                                  offsetsPtr.getResult());
+
+    rewriter.eraseOp(op);
+
+    return success();
+  }
+};
+
 struct XSMMBRGemmOffsInvokeF32Lowering
     : public ConvertOpToLLVMPattern<xsmm::BRGemmOffsInvokeF32Op> {
   using ConvertOpToLLVMPattern<
@@ -540,7 +652,7 @@ struct XSMMBRGemmOffsInvokeF32Lowering
     IntegerType int64Type = rewriter.getI64Type();
 
     auto numBatches = rewriter.getI64IntegerAttr(op.numBatches());
-    
+
     auto numBatchesValue =
         rewriter.create<LLVM::ConstantOp>(op->getLoc(), int64Type, numBatches);
     SmallVector<Value, 8> aOffsets;
@@ -556,44 +668,15 @@ struct XSMMBRGemmOffsInvokeF32Lowering
           rewriter.create<LLVM::ConstantOp>(op->getLoc(), int64Type, attr));
     }
 
-
-
-    llvm::StringRef kMalloc = "malloc";
-    auto module = op->getParentOfType<ModuleOp>(); 
-    auto mallocFunc = module.lookupSymbol<LLVM::LLVMFuncOp>(kMalloc);
-     
-    if(!mallocFunc){
-        
-      OpBuilder builder(module.getBodyRegion());
-
-      mallocFunc =  builder.create<LLVM::LLVMFuncOp>(
-       builder.getUnknownLoc(),kMalloc,
-       LLVM::LLVMFunctionType::get(LLVM::LLVMPointerType::get(IntegerType::get(module->getContext(), 8)), getIndexType()));
-    }
-
-    auto aOffsMallocPtr =  
-       rewriter.create<LLVM::CallOp>(op->getLoc(),getVoidPtrType(), rewriter.getSymbolRefAttr(mallocFunc),
-                             ArrayRef<Value>{rewriter.create<LLVM::MulOp>(op->getLoc(), numBatchesValue, getSizeInBytes(op->getLoc(),int64Type, rewriter))}); 
     auto longPtrType = LLVM::LLVMPointerType::get(rewriter.getI64Type());
-    auto bOffsMallocPtr =
-       rewriter.create<LLVM::CallOp>(op->getLoc(),getVoidPtrType(), rewriter.getSymbolRefAttr(mallocFunc),
-                             ArrayRef<Value>{rewriter.create<LLVM::MulOp>(op->getLoc(), numBatchesValue, getSizeInBytes(op->getLoc(),int64Type, rewriter))});
-    auto aOffsetsPtr = rewriter.create<LLVM::BitcastOp>(op->getLoc(), longPtrType, aOffsMallocPtr.getResult(0));
-    auto bOffsetsPtr = rewriter.create<LLVM::BitcastOp>(op->getLoc(), longPtrType, bOffsMallocPtr.getResult(0));
- 
 
-    
+    auto aOffsetsPtr = rewriter.create<LLVM::IntToPtrOp>(
+        op->getLoc(), longPtrType, transformed.aOffsetsPtr());
 
-    /* 
-    auto longPtrType = LLVM::LLVMPointerType::get(int64Type);
-    auto aOffsetsPtr = rewriter.create<LLVM::AllocaOp>(
-        op->getLoc(), longPtrType, numBatchesValue, 0);
+    auto bOffsetsPtr = rewriter.create<LLVM::IntToPtrOp>(
+        op->getLoc(), longPtrType, transformed.bOffsetsPtr());
 
-    auto bOffsetsPtr = rewriter.create<LLVM::AllocaOp>(
-        op->getLoc(), longPtrType, numBatchesValue, 0);
-    */
-    
-    
+
     for (int i = 0; i < numBatches.getInt(); i++) {
       auto offsetIndex = rewriter.create<LLVM::ConstantOp>(
           op->getLoc(), int64Type, rewriter.getIndexAttr(i));
@@ -616,24 +699,6 @@ struct XSMMBRGemmOffsInvokeF32Lowering
         op->getLoc(), ArrayRef<Type>(), rewriter.getSymbolRefAttr(func),
         ArrayRef<Value>{transformed.ptr(), aPtr, bPtr, cPtr, numBatchesValue,
                         aOffsetsPtr, bOffsetsPtr});
-
-
-    llvm::StringRef kFree = "free";
-    auto freeFunc = module.lookupSymbol<LLVM::LLVMFuncOp>(kFree);
- 
-    if(!freeFunc){
- 
-      OpBuilder builder(module.getBodyRegion()); 
- 
-      freeFunc =  builder.create<LLVM::LLVMFuncOp>(
-       builder.getUnknownLoc(),kFree,
-       LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(module->getContext()), LLVM::LLVMPointerType::get(IntegerType::get(module->getContext(), 8))));
-    }
-
-
-    rewriter.create<LLVM::CallOp>(op->getLoc(), freeFunc, aOffsMallocPtr.getResult(0));
-    rewriter.create<LLVM::CallOp>(op->getLoc(), freeFunc, bOffsMallocPtr.getResult(0));
-    
     rewriter.eraseOp(op);
 
     return success();
@@ -675,9 +740,11 @@ void populatePXAGemmToXSMMConversionPatterns(OwningRewritePatternList &patterns,
 
 void populateXSMMToLLVMConversionPatterns(LLVMTypeConverter &converter,
                                           OwningRewritePatternList &patterns) {
-  patterns.insert<XSMMGemmDispatchF32Lowering, XSMMGemmInvokeF32Lowering,
-                  XSMMBRGemmDispatchF32Lowering, XSMMBRGemmInvokeF32Lowering,
-                  XSMMBRGemmOffsDispatchF32Lowering,
-                  XSMMBRGemmOffsInvokeF32Lowering>(converter);
+  patterns
+      .insert<XSMMGemmDispatchF32Lowering, XSMMGemmInvokeF32Lowering,
+              XSMMBRGemmDispatchF32Lowering, XSMMBRGemmInvokeF32Lowering,
+              XSMMBRGemmOffsDispatchF32Lowering, XSMMBRGemmOffsAllocF32Lowering,
+              XSMMBRGemmOffsDeallocF32Lowering,
+              XSMMBRGemmOffsInvokeF32Lowering>(converter);
 }
 } // namespace pmlc::target::x86
