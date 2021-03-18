@@ -117,12 +117,17 @@ enum class PadMode {
 struct Integers {
   Integers(const std::vector<int>& elts)  // NOLINT[runtime/explicit]
       : value(edsl::make_tuple(elts)) {}
+  Integers(const std::vector<int64_t>& elts) {  // NOLINT[runtime/explicit]
+    value = edsl::make_tuple(elts);
+  }
   Integers(const std::vector<size_t>& elts) {  // NOLINT[runtime/explicit]
     std::vector<int64_t> casted(elts.begin(), elts.end());
     value = edsl::make_tuple(casted);
   }
   Integers(const std::initializer_list<int>& elts)  // NOLINT[runtime/explicit]
       : Integers(std::vector<int>(elts)) {}
+  Integers(const std::initializer_list<int64_t>& elts)  // NOLINT[runtime/explicit]
+      : Integers(std::vector<int64_t>(elts)) {}
   Integers(const std::initializer_list<size_t>& elts)  // NOLINT[runtime/explicit]
       : Integers(std::vector<size_t>(elts)) {}
 
@@ -154,8 +159,8 @@ inline edsl::Tensor binary_crossentropy(const edsl::Tensor& I, const edsl::Tenso
   return details::op("binary_crossentropy", args).as_tensor();
 }
 
-inline edsl::Tensor broadcast(const edsl::Tensor& I, const std::vector<int>& result_shape,
-                              const std::vector<int>& bcast_axes) {
+inline edsl::Tensor broadcast(const edsl::Tensor& I, const std::vector<int64_t>& result_shape,
+                              const std::vector<int64_t>& bcast_axes) {
   auto args = edsl::make_tuple(I, edsl::make_tuple(result_shape), edsl::make_tuple(bcast_axes));
   return details::op("broadcast", args).as_tensor();
 }

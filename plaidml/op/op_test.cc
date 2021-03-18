@@ -51,8 +51,8 @@ TEST_F(OpTest, BinaryCrossentropy) {
 
 TEST_F(OpTest, BroadcastNoOp) {
   auto A = Placeholder(DType::FLOAT32, {3});
-  std::vector<int> rshape = {3};
-  std::vector<int> bdims = {0};
+  std::vector<int64_t> rshape = {3};
+  std::vector<int64_t> bdims = {0};
   auto C = op::broadcast(A, rshape, bdims);
   auto program = makeProgram("broadcast_nop", {A}, {C});
 
@@ -62,8 +62,8 @@ TEST_F(OpTest, BroadcastNoOp) {
 
 TEST_F(OpTest, BroadcastScalar) {
   auto A = Placeholder(DType::FLOAT32, {});
-  std::vector<int> rshape = {3, 4};
-  std::vector<int> bdims = {};
+  std::vector<int64_t> rshape = {3, 4};
+  std::vector<int64_t> bdims = {};
   auto C = op::broadcast(A, rshape, bdims);
   auto program = makeProgram("broadcast_scalar", {A}, {C});
 
@@ -76,8 +76,8 @@ TEST_F(OpTest, BroadcastScalar) {
 
 TEST_F(OpTest, BroadcastNoOpLarge) {
   auto A = Placeholder(DType::FLOAT32, {3, 4});
-  std::vector<int> rshape = {3, 4};
-  std::vector<int> bdims = {0, 1};
+  std::vector<int64_t> rshape = {3, 4};
+  std::vector<int64_t> bdims = {0, 1};
   auto C = op::broadcast(A, rshape, bdims);
   auto program = makeProgram("broadcast_nop_large", {A}, {C});
 
@@ -89,8 +89,8 @@ TEST_F(OpTest, BroadcastNoOpLarge) {
 
 TEST_F(OpTest, BroadcastNumpy) {
   auto A = Placeholder(DType::FLOAT32, {1, 3, 3});
-  std::vector<int> rshape = {1, 4, 3, 3};
-  std::vector<int> bdims = {0, 2, 3};
+  std::vector<int64_t> rshape = {1, 4, 3, 3};
+  std::vector<int64_t> bdims = {0, 2, 3};
   auto C = op::broadcast(A, rshape, bdims);
   auto program = makeProgram("broadcast_numpy", {A}, {C});
 
@@ -114,8 +114,8 @@ TEST_F(OpTest, BroadcastNumpy) {
 
 TEST_F(OpTest, BroadcastNumpy2) {
   auto A = Placeholder(DType::FLOAT32, {3, 1});
-  std::vector<int> rshape = {3, 4};
-  std::vector<int> bdims = {0, 1};
+  std::vector<int64_t> rshape = {3, 4};
+  std::vector<int64_t> bdims = {0, 1};
   auto C = op::broadcast(A, rshape, bdims);
   auto program = makeProgram("broadcast_numpy_2", {A}, {C});
 
@@ -128,8 +128,8 @@ TEST_F(OpTest, BroadcastNumpy2) {
 
 TEST_F(OpTest, BroadcastNumpy3) {
   auto A = Placeholder(DType::FLOAT32, {3});
-  std::vector<int> rshape = {4, 3};
-  std::vector<int> bdims = {1};
+  std::vector<int64_t> rshape = {4, 3};
+  std::vector<int64_t> bdims = {1};
   auto C = op::broadcast(A, rshape, bdims);
   auto program = makeProgram("broadcast_numpy_3", {A}, {C});
 
@@ -143,8 +143,8 @@ TEST_F(OpTest, BroadcastNumpy3) {
 
 TEST_F(OpTest, BroadcastNonNumpy) {
   auto A = Placeholder(DType::FLOAT32, {3});
-  std::vector<int> rshape = {3, 4};
-  std::vector<int> bdims = {0};
+  std::vector<int64_t> rshape = {3, 4};
+  std::vector<int64_t> bdims = {0};
   auto C = op::broadcast(A, rshape, bdims);
   auto program = makeProgram("broadcast_non_numpy", {A}, {C});
 
@@ -157,8 +157,8 @@ TEST_F(OpTest, BroadcastNonNumpy) {
 
 TEST_F(OpTest, Broadcast) {
   auto I = Placeholder(DType::FLOAT32, {1, 224, 224}, "I");
-  std::vector<int> result_shape = {1, 224, 224, 3};
-  std::vector<int> bcast_axes = {0, 1, 2};
+  std::vector<int64_t> result_shape = {1, 224, 224, 3};
+  std::vector<int64_t> bcast_axes = {0, 1, 2};
   auto program = makeProgram("broadcast", {I}, {op::broadcast(I, result_shape, bcast_axes)});
   runProgram(program);
 }

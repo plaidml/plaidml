@@ -18,7 +18,6 @@ namespace PlaidMLPlugin {
 
 void registerEmbeddingBagPackedSum() {
   registerOp("EmbeddingBagPackedSum", [](const Context& ctx) {
-    auto* layer = ngraph::as_type<ngraph::opset4::EmbeddingBagPackedSum>(ctx.layer);
     IE_ASSERT(ctx.operands.size() == 2 || ctx.operands.size() == 3);
     auto I = ctx.operands.at(0);
     auto indices = ctx.operands.at(1);
