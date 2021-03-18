@@ -4,7 +4,7 @@
 #NCHW_to_NHWC16c = affine_map<(N,C,H,W) ->
             (N,C floordiv 16, H,W,C mod 16)>
 #KCRS_to_KCRSck = affine_map<(K,C,R,S) ->
-            (K floordiv 16,C floordiv 16,R, S, C mod 16, K mod 16)>
+            (C floordiv 16,K floordiv 16,R, S, C mod 16, K mod 16)>
 
  !I_memref = type memref<1x64x56x56xf32, #NCHW_to_NHWC16c>
  !K_memref = type memref<64x64x3x3xf32, #KCRS_to_KCRSck>
