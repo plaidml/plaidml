@@ -69,10 +69,11 @@ public:
       ReorderDesc &reorder = optReorder.getValue();
       IVLOG(3, "Optimized layout: " << mlir::debugString(reorder.reorderMap));
       if (mlir::succeeded(convertMemoryLayout(memoryDesc.value, reorder))) {
-        if (memoryDesc.parallelOp.hasValue()) {
-          parallelOps.insert(memoryDesc.parallelOp.getValue());
-        }
-
+        /*
+          if (memoryDesc.parallelOp.hasValue()) {
+            parallelOps.insert(memoryDesc.parallelOp.getValue());
+          }
+        */
         continue;
       }
 
