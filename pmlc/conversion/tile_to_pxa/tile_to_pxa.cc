@@ -1996,6 +1996,7 @@ struct UnpackOpConversion : public OpConversionPattern<stdx::UnpackOp> {
 
 struct ScfForOpConversion : public OpConversionPattern<scf::ForOp> {
   using OpConversionPattern<scf::ForOp>::OpConversionPattern;
+
   LogicalResult
   matchAndRewrite(scf::ForOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {

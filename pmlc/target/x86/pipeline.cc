@@ -11,6 +11,7 @@
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
 #include "mlir/Dialect/Affine/Passes.h"
+#include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/OpenMP/OpenMPDialect.h"
 #include "mlir/Dialect/StandardOps/Transforms/Passes.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -244,7 +245,6 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(createCSEPass());
 
   pm.addPass(pmlc::conversion::tile_to_pxa::createLowerTileToPXAPass());
-  // pm.addNestedPass<FuncOp>(tile::createScfForReplacePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
   pm.addNestedPass<FuncOp>(layer::createInlineLayersPass());
@@ -279,12 +279,16 @@ void pipelineBuilder(OpPassManager &pm) {
 
   pm.addNestedPass<FuncOp>(pxa::createLocalizePass());
   pm.addNestedPass<FuncOp>(pxa::createResizeTmpsPass());
-  pm.addPass(pxa::createDeallocPlacementPass());
   pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
   pm.addPass(createLowerPXAToAffinePass());
+
+  pm.addNestedPass<FuncOp>(createBufferDeallocationPass());
+  pm.addNestedPass<FuncOp>(createConvertLinalgToLoopsPass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
 
   pm.addPass(createLoopInvariantCodeMotionPass());
   pm.addPass(createCanonicalizerPass());
