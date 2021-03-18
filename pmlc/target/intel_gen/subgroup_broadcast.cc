@@ -125,7 +125,8 @@ public:
         auto newBlockReadOp =
             builder.create<dialect::stdx::SubgroupBlockReadINTELOp>(
                 op.getLoc(), op.source(), idxs);
-        devectorizeVectorOp(newBlockReadOp.getOperation());
+        if (failed(devectorizeVectorOp(newBlockReadOp.getOperation())))
+          return failure();
         op.replaceAllUsesWith(newBlockReadOp.getResult());
         IVLOG(3, "Load Op: " << debugString(*newBlockReadOp));
       }
@@ -145,7 +146,8 @@ public:
     } else {
       idxs.back() = builder.create<AddIOp>(op.getLoc(), idxs.back(), sid);
       auto newLoadOp = builder.create<LoadOp>(op.getLoc(), op.source(), idxs);
-      devectorizeVectorOp(newLoadOp.getOperation());
+      if (failed(devectorizeVectorOp(newLoadOp.getOperation())))
+        return failure();
       op.replaceAllUsesWith(newLoadOp.getResult());
       IVLOG(3, "Load Op: " << debugString(*newLoadOp));
     }
@@ -174,7 +176,8 @@ public:
       auto newBlockWriteOp =
           builder.create<dialect::stdx::SubgroupBlockWriteINTELOp>(
               op.getLoc(), op.vector(), op.source(), idxs);
-      devectorizeVectorOp(newBlockWriteOp.getOperation());
+      if (failed(devectorizeVectorOp(newBlockWriteOp.getOperation())))
+        return failure();
       IVLOG(3, "Block Write Op: " << debugString(*newBlockWriteOp));
       op.erase();
       // Case2: No block writes or vectors, use default devectorization
@@ -182,7 +185,8 @@ public:
       idxs.back() = builder.create<AddIOp>(op.getLoc(), idxs.back(), sid);
       auto newStoreOp =
           builder.create<StoreOp>(op.getLoc(), op.vector(), op.source(), idxs);
-      devectorizeVectorOp(newStoreOp.getOperation());
+      if (failed(devectorizeVectorOp(newStoreOp.getOperation())))
+        return failure();
       IVLOG(3, "Block Write Op: " << debugString(*newStoreOp));
       op.erase();
     }
@@ -383,7 +387,8 @@ public:
           proc, builder.getDimIdentityMap(), builder.getDimIdentityMap()));
       proc = static_cast<gpu::Processor>(static_cast<int>(proc) + 1);
     }
-    setMappingAttr(newLoop, mappings);
+    if (failed(setMappingAttr(newLoop, mappings)))
+      return failure();
     loop.erase();
     return success();
   }

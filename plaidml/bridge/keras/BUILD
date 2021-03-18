@@ -71,6 +71,9 @@ py_test(
 py_test(
     name = "trivial_model_test",
     srcs = ["trivial_model_test.py"],
-    tags = ["keras"],
+    tags = [
+        "keras",
+        "manual",
+    ],
     deps = [":keras"],
 )

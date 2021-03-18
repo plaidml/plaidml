@@ -208,8 +208,9 @@ struct XSMMStencilPass : public XSMMStencilBase<XSMMStencilPass> {
     IVLOG(3, "XSMMStencilPass> numThreads: " << numThreads.getValue());
     IVLOG(3, "XSMMStencilPass> isBatched: " << isBatched.getValue());
     getFunction().walk([this](AffineParallelOp op) {
-      pxa::applyStencilGEMM(op, numThreads.getValue(), isBatched.getValue(),
-                            heatmapCostTransposed);
+      // TODO: check LogicalResult
+      (void)pxa::applyStencilGEMM(op, numThreads.getValue(),
+                                  isBatched.getValue(), heatmapCostTransposed);
     });
   }
 };
