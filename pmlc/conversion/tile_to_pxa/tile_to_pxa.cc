@@ -1946,7 +1946,6 @@ struct PackOpConversion : public OpConversionPattern<stdx::PackOp> {
   LogicalResult
   matchAndRewrite(stdx::PackOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
-    IVLOG(1, "PackOpConversion");
     auto argpackType = stdx::ArgpackType::get(op.getContext());
     // Some 0-dim tensors convert to 0-dim memrefs, and some convert to actual
     // scalars. To make the type mapping exact, we always convert 0-dim memrefs
@@ -1954,8 +1953,6 @@ struct PackOpConversion : public OpConversionPattern<stdx::PackOp> {
     SmallVector<Value, 8> scalarizedOperands;
     for (auto val : operands) {
       // Handle cases that require a load.
-      Type type = val.getType();
-      IVLOG(1, "  " << debugString(type));
       if (auto memrefType = val.getType().dyn_cast<MemRefType>()) {
         if (memrefType.getRank() == 0) {
           auto loadOp =
@@ -2060,10 +2057,6 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
     target.addDynamicallyLegalOp<ReturnOp>(
         [&](ReturnOp op) { return converter.isLegal(op); });
     target.addDynamicallyLegalOp<stdx::PackOp>([&](stdx::PackOp op) {
-      IVLOG(1, "PackOp types:");
-      for (Type type : op.getOperandTypes()) {
-        IVLOG(1, "  " << debugString(type));
-      }
       return converter.isLegal(op.getOperandTypes());
     });
     target.addDynamicallyLegalOp<stdx::UnpackOp>([&](stdx::UnpackOp op) {

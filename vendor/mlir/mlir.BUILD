@@ -124,11 +124,7 @@ gentbl(
     ],
     tblgen = ":mlir-tblgen",
     td_file = "include/mlir/IR/BuiltinLocationAttributes.td",
-    td_srcs = [
-        "include/mlir/IR/BuiltinLocationAttributes.td",
-        "include/mlir/IR/BuiltinDialect.td",
-        ":OpBaseTdFiles",
-    ],
+    deps = [":BuiltinDialectTdFiles"],
 )
 
 gentbl(
