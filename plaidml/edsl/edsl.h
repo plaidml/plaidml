@@ -11,6 +11,8 @@
 #include <utility>
 #include <vector>
 
+#include <iostream>
+
 #include "plaidml/core/core.h"
 #include "plaidml/edsl/ffi.h"
 
@@ -1718,46 +1720,52 @@ inline Tensor layer(const std::string& op, const TensorVec& operands, const Laye
 /// \return Tensor
 ///
 
-#define PLAIDML_EDSL_LOOP(x, ...) LoopBuilder(x).setIter(__VA_ARGS__)& [=]
+#define PLAIDML_EDSL_LOOP(x, ...) LoopBuilder(x).initIterArgs(__VA_ARGS__)& [=]
 
 using LoopSingleFn = std::function<Tensor(Tensor)>;
 using LoopMultiFn = std::function<TensorVec(TensorVec)>;
 
 class LoopBuilder {
  public:
-  explicit LoopBuilder(int64_t count) { maxTripCount = Tensor(count); }
-  explicit LoopBuilder(Tensor count) { maxTripCount = ident(count); }
+  explicit LoopBuilder(int64_t count) { operands.push_back(index({TensorDim(1)}, 0) + count); }
+  explicit LoopBuilder(Tensor count) { operands.push_back(ident(count)); }
 
-  LoopBuilder& setLoopBody(LoopMultiFn fn) {
-    results = fn(iterArgs);
+  LoopBuilder& setLoopBody(LoopMultiFn fn, edsl_source_location loc = edsl_source_location::current()) {
+    if (operands.size() < 2) {
+      throw ffi_exception("Loop expects at least one iteration argument.", loc);
+    }
+    results = fn({operands.begin() + 1, operands.end()});
     return *this;
   }
 
-  LoopBuilder& setLoopBody(LoopSingleFn fn) {
-    Tensor out = fn(iterArgs[0]);
+  LoopBuilder& setLoopBody(LoopSingleFn fn, edsl_source_location loc = edsl_source_location::current()) {
+    if (operands.size() < 2) {
+      throw ffi_exception("Loop expects at least one iteration argument.", loc);
+    }
+    Tensor out = fn(operands[1]);
     results.push_back(out);
     return *this;
   }
 
-  LoopBuilder& setIter(TensorVec iter) {
-    iterArgs = iter;
+  LoopBuilder& initIterArgs(TensorVec args) {
+    operands.insert(operands.end(), args.begin(), args.end());
     return *this;
   }
 
-  LoopBuilder& setIter(Tensor iter) {
-    iterArgs.push_back(iter);
+  LoopBuilder& initIterArgs(Tensor iter) {
+    operands.push_back(iter);
     return *this;
   }
 
   TensorVec build(edsl_source_location loc = edsl_source_location::current()) const {
-    if (iterArgs.size() != results.size()) {
-      throw ffi_exception("iter args don't equal to init args of scf", edsl_source_location::current());
+    if (operands.size() - 1 != results.size()) {
+      throw ffi_exception("Loop expects the same number of iteration args and results ", loc);
     }
 
     std::string op = "loop";
     std::vector<plaidml_expr*> rawOperands;
-    rawOperands.reserve(iterArgs.size());
-    for (Tensor operand : iterArgs) {
+    rawOperands.reserve(operands.size());
+    for (Tensor operand : operands) {
       rawOperands.push_back(operand.as_ptr());
     }
     std::vector<plaidml_expr*> rawResults;
@@ -1766,19 +1774,10 @@ class LoopBuilder {
       rawResults.push_back(result.as_ptr());
     }
 
-    TensorVec loopIndex{Tensor(0), maxTripCount, Tensor(1)};
-
-    std::vector<plaidml_expr*> rawLoopIndex;
-    rawLoopIndex.reserve(loopIndex.size());
-    for (Tensor index : loopIndex) {
-      rawLoopIndex.push_back(index.as_ptr());
-    }
     Tensor array = Tensor{ffi::call<plaidml_expr*>(  //
         loc,                                         //
         plaidml_expr_loop,                           //
         op.c_str(),                                  //
-        rawLoopIndex.size(),                         //
-        rawLoopIndex.data(),                         //
         rawOperands.size(),                          //
         rawOperands.data(),                          //
         rawResults.size(),                           //
@@ -1803,8 +1802,7 @@ class LoopBuilder {
   }
 
  private:
-  Tensor maxTripCount;
-  TensorVec iterArgs;
+  TensorVec operands;
   TensorVec results;
 };
 

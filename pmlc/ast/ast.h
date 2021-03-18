@@ -235,12 +235,10 @@ struct ExprNodeLoop : NodeBase<ExprNodeLoop, ExprNode> {
   using Base = NodeBase<ExprNodeLoop, ExprNode>;
 
   std::string op;
-  std::vector<ExprNodePtr> indexs;
   std::vector<ExprNodePtr> operands;
   std::vector<ExprNodePtr> results;
 
-  ExprNodeLoop(llvm::StringRef op, llvm::ArrayRef<ExprNodePtr> indexs,
-               llvm::ArrayRef<ExprNodePtr> operands,
+  ExprNodeLoop(llvm::StringRef op, llvm::ArrayRef<ExprNodePtr> operands,
                llvm::ArrayRef<ExprNodePtr> results);
   std::string str() const final;
 };

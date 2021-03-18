@@ -234,13 +234,10 @@ private:
           }
         })
         .Case<ExprNodeLoop>([&](ExprNodeLoop *expr) {
-          for (const ExprNodePtr &node : llvm::reverse(expr->operands)) {
-            push(node);
-          }
           for (const ExprNodePtr &node : llvm::reverse(expr->results)) {
             push(node);
           }
-          for (const ExprNodePtr &node : llvm::reverse(expr->indexs)) {
+          for (const ExprNodePtr &node : llvm::reverse(expr->operands)) {
             push(node);
           }
         })
@@ -771,17 +768,15 @@ struct ProgramBuilder {
   }
 
   Value handleLoop(ExprNodeLoop *node) {
-    auto indices = node->indexs;
-    std::vector<Value> indexValue;
-    for (auto index : indices) {
-      indexValue.push_back(builder.lookupNode(index));
-    }
+    auto &operands = node->operands;
+    auto maxTripCount = builder.lookupNode(operands[0]);
+
     SmallVector<Value> iterGlobal;
-    for (const ExprNodePtr &operand : node->operands) {
-      iterGlobal.push_back(builder.lookupNode(operand));
+    for (size_t i = 1; i < operands.size(); i++) {
+      iterGlobal.push_back(builder.lookupNode(operands[i]));
     }
-    auto scfForOp = builder.create<tile::LoopOp>(
-        loc, indexValue[0], indexValue[1], indexValue[2], iterGlobal);
+
+    auto scfForOp = builder.create<tile::LoopOp>(loc, maxTripCount, iterGlobal);
     OpBuilder bodyBuilder(scfForOp.getLoopBody());
     // Set a mapping of global and local Values for loop iterators
     BlockAndValueMapping mapper;
@@ -995,7 +990,7 @@ struct ProgramBuilder {
   ModuleOp module;
   OpBuilder builder;
   Evaluator evaluator;
-};
+}; // namespace
 
 } // namespace
 

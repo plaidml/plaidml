@@ -233,24 +233,20 @@ class LoopBaseOp<string mnemonic, list<OpTrait> traits = []> :
   let verifier = [{ return pmlc::dialect::tile::verify(*this); }];
 }
 
-
 def LoopOp : LoopBaseOp<"loop",
       [DeclareOpInterfaceMethods<LoopLikeOpInterface>,
        DeclareOpInterfaceMethods<RegionBranchOpInterface>,
        SingleBlockImplicitTerminator<"tile::YieldOp">,
        RecursiveSideEffects]> {
   let summary = "tile loop operation";
-  let arguments = (ins RankedTensorOf<[AnyScalar]>:$lowerBound,
-                       RankedTensorOf<[AnyScalar]>:$upperBound,
-                       RankedTensorOf<[AnyScalar]>:$step,
+  let arguments = (ins RankedTensorOf<[SI32]>:$maxTripCount,
                        Variadic<AnyType>:$initArgs);
   let results = (outs Variadic<AnyType>:$results);
   let regions = (region SizedRegion<1>:$region);
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilderDAG<(ins "mlir::Value":$lowerBound, "mlir::Value":$upperBound, "mlir::Value":$step,
-      CArg<"mlir::ValueRange", "llvm::None">:$iterArgs,
+    OpBuilderDAG<(ins "mlir::Value":$step, CArg<"mlir::ValueRange", "llvm::None">:$iterArgs,
       CArg<"mlir::function_ref<void(mlir::OpBuilder &, mlir::Location, mlir::Value, mlir::ValueRange)>",
            "nullptr">)>
   ];
@@ -259,24 +255,21 @@ def LoopOp : LoopBaseOp<"loop",
     using BodyBuilderFn =
         mlir::function_ref<void(mlir::OpBuilder &, mlir::Location, mlir::Value, mlir::ValueRange)>;
 
-    mlir::Value getInductionVar() { return getBody()->getArgument(0); }
     mlir::Block::BlockArgListType getRegionIterArgs() {
-      return getBody()->getArguments().drop_front();
+      return getBody()->getArguments();
     }
     Operation::operand_range getIterOperands() {
       return getOperands().drop_front(getNumControlOperands());
     }
 
-    void setLowerBound(mlir::Value bound) { getOperation()->setOperand(0, bound); }
-    void setUpperBound(mlir::Value bound) { getOperation()->setOperand(1, bound); }
-    void setStep(mlir::Value step) { getOperation()->setOperand(2, step); }
+    void setUpperBound(mlir::Value bound) { getOperation()->setOperand(0, bound); }
 
     /// Number of region arguments for loop-carried values
     unsigned getNumRegionIterArgs() {
-      return getBody()->getNumArguments() - 1;
+      return getBody()->getNumArguments();
     }
-    /// Number of operands controlling the loop: lb, ub, step
-    unsigned getNumControlOperands() { return 3; }
+    /// Number of operands controlling the loop: maxTripCount
+    unsigned getNumControlOperands() { return 1; }
     /// Does the operation hold operands for loop-carried values
     bool hasIterOperands() {
       return getOperation()->getNumOperands() > getNumControlOperands();

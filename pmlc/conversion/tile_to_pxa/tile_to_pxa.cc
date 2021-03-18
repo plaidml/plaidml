@@ -2025,58 +2025,26 @@ struct LoopOpConversion : public OpConversionPattern<tile::LoopOp> {
   matchAndRewrite(tile::LoopOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
     auto loc = op.getLoc();
-    tile::LoopOpAdaptor oldFor(operands);
+    tile::LoopOpAdaptor oldLoop(operands);
     auto &oldBodyOps = op.getBody()->getOperations();
     auto indexType = rewriter.getIndexType();
-    int int_lb = 0;
-    auto def_lb = oldFor.lowerBound().getDefiningOp();
-    if (auto cstOp = dyn_cast<mlir::ConstantOp>(def_lb)) {
-      if (mlir::IntegerAttr iatt = cstOp.value().cast<mlir::IntegerAttr>()) {
-        int_lb = iatt.getInt();
-      }
-    }
-
-    Value ub;
-    auto def_ub = oldFor.upperBound().getDefiningOp();
-    if (auto cstOp = dyn_cast<mlir::ConstantOp>(def_ub)) {
-      if (mlir::IntegerAttr iatt = cstOp.value().cast<mlir::IntegerAttr>()) {
-        int int_ub = 0;
-        int_ub = iatt.getInt();
-        ub = rewriter.create<mlir::ConstantOp>(
-            loc, indexType, rewriter.getIntegerAttr(indexType, int_ub));
-      }
-    } else {
-      std::vector<Value> srcOps;
-      auto zero = rewriter.create<mlir::ConstantOp>(
-          loc, indexType, rewriter.getIntegerAttr(indexType, 0));
-      srcOps.push_back(zero);
-      auto interpVal =
-          rewriter.create<mlir::LoadOp>(loc, def_ub->getResult(0), srcOps);
-      ub = rewriter.create<mlir::IndexCastOp>(loc, interpVal, indexType);
-    }
-
-    int int_step = 0;
-    auto def_step = oldFor.step().getDefiningOp();
-    if (auto cstOp = dyn_cast<mlir::ConstantOp>(def_step)) {
-      if (mlir::IntegerAttr iatt = cstOp.value().cast<mlir::IntegerAttr>()) {
-        int_step = iatt.getInt();
-      }
-    }
-
-    auto lb = rewriter.create<mlir::ConstantOp>(
-        loc, indexType, rewriter.getIntegerAttr(indexType, int_lb));
-    auto step = rewriter.create<mlir::ConstantOp>(
-        loc, indexType, rewriter.getIntegerAttr(indexType, int_step));
-
-    auto newOp = rewriter.create<scf::ForOp>(op.getLoc(), lb, ub, step,
-                                             oldFor.initArgs());
+    auto zero = rewriter.create<mlir::ConstantOp>(
+        loc, indexType, rewriter.getIntegerAttr(indexType, 0));
+    auto one = rewriter.create<mlir::ConstantOp>(
+        loc, indexType, rewriter.getIntegerAttr(indexType, 1));
+    auto maxTripCount = rewriter.create<mlir::LoadOp>(
+        loc, oldLoop.maxTripCount(), std::vector<Value>{zero});
+    auto maxTripCountIdx =
+        rewriter.create<mlir::IndexCastOp>(loc, maxTripCount, indexType);
+    auto newOp = rewriter.create<scf::ForOp>(op.getLoc(), zero, maxTripCountIdx,
+                                             one, oldLoop.initArgs());
     auto &newBodyOps = newOp.getBody()->getOperations();
     newBodyOps.splice(std::prev(newBodyOps.end()), oldBodyOps,
                       oldBodyOps.begin(), oldBodyOps.end());
     auto oldArgs = op.getBody()->getArguments();
     auto newArgs = newOp.getBody()->getArguments();
     for (unsigned i = 0; i < oldArgs.size(); ++i) {
-      oldArgs[i].replaceAllUsesWith(newArgs[i]);
+      oldArgs[i].replaceAllUsesWith(newArgs[i + 1]);
     }
     rewriter.replaceOp(op, newOp.results());
     return success();
@@ -2090,8 +2058,8 @@ struct YieldOpConversion : public OpConversionPattern<tile::YieldOp> {
   matchAndRewrite(tile::YieldOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
     auto loc = op.getLoc();
-    auto scfForOp = rewriter.create<mlir::scf::YieldOp>(loc, operands);
-    op->replaceAllUsesWith(scfForOp);
+    auto scfYieldOp = rewriter.create<mlir::scf::YieldOp>(loc, operands);
+    op->replaceAllUsesWith(scfYieldOp);
     op.erase();
     return success();
   }

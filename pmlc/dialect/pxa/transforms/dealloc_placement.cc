@@ -63,14 +63,14 @@ struct DeallocPlacementPass
       placeDealloc(alloc.getResult(), alloc, alloc.getOperation()->getBlock(),
                    -1, onPack);
     });
-    // Place deallcation for the loop (scf.for) arguments
-    fn.walk([&](scf::ForOp forOp) {
-      auto args = forOp.getRegionIterArgs();
-      for (unsigned i = 0; i < args.size(); ++i) {
-        placeDealloc(cast<Value>(args[i]), &forOp.getBody()->front(),
-                     forOp.getBody(), i, onPack);
-      }
-    });
+    //    // Place deallcation for the loop (scf.for) arguments
+    //    fn.walk([&](scf::ForOp forOp) {
+    //      auto args = forOp.getRegionIterArgs();
+    //      for (unsigned i = 0; i < args.size(); ++i) {
+    //        placeDealloc(cast<Value>(args[i]), &forOp.getBody()->front(),
+    //                     forOp.getBody(), i, onPack);
+    //      }
+    //    });
   }
 
   // This function dealloc ref if possible, which is the allocated memory

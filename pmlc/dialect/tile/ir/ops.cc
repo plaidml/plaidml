@@ -367,23 +367,13 @@ void ScatterOp::build(OpBuilder &builder, OperationState &result,
 //===----------------------------------------------------------------------===//
 
 static LogicalResult verify(LoopOp op) {
-  if (auto cst = op.step().getDefiningOp<mlir::ConstantIndexOp>())
-    if (cst.getValue() <= 0)
-      return op.emitOpError("constant step operand must be positive");
-
   // Check that the body defines as single block argument for the induction
   // variable.
-  auto *body = op.getBody();
-  if (!body->getArgument(0).getType().isIndex())
-    return op.emitOpError(
-        "expected body first argument to be an index argument for "
-        "the induction variable");
-
   auto opNumResults = op.getNumResults();
   if (opNumResults == 0)
     return success();
-  // If ForOp defines values, check that the number and types of
-  // the defined values match ForOp initial iter operands and backedge
+  // If LoopOp defines values, check that the number and types of
+  // the defined values match LoopOp initial iter operands and backedge
   // basic block arguments.
   if (op.getNumIterOperands() != opNumResults)
     return op.emitOpError(
@@ -430,8 +420,7 @@ static void printInitializationList(OpAsmPrinter &p,
 }
 
 static void print(OpAsmPrinter &p, LoopOp op) {
-  p << op.getOperationName() << " " << op.getInductionVar() << " = "
-    << op.lowerBound() << " to " << op.upperBound() << " step " << op.step();
+  p << op.getOperationName() << " " << op.maxTripCount();
 
   printInitializationList(p, op.getRegionIterArgs(), op.getIterOperands(),
                           " iter_args");
@@ -445,25 +434,16 @@ static void print(OpAsmPrinter &p, LoopOp op) {
 
 static ParseResult parseLoopOp(OpAsmParser &parser, OperationState &result) {
   auto &builder = parser.getBuilder();
-  OpAsmParser::OperandType inductionVariable, lb, ub, step;
-  // Parse the induction variable followed by '='.
-  if (parser.parseRegionArgument(inductionVariable) || parser.parseEqual())
+  OpAsmParser::OperandType maxTripCount;
+  auto tensorType = RankedTensorType::get(ArrayRef<int64_t>{1},
+                                          builder.getIntegerType(32, true));
+  if (parser.parseOperand(maxTripCount) ||
+      parser.resolveOperand(maxTripCount, tensorType, result.operands)) {
     return failure();
-
-  // Parse loop bounds.
-  Type indexType = builder.getIndexType();
-  if (parser.parseOperand(lb) ||
-      parser.resolveOperand(lb, indexType, result.operands) ||
-      parser.parseKeyword("to") || parser.parseOperand(ub) ||
-      parser.resolveOperand(ub, indexType, result.operands) ||
-      parser.parseKeyword("step") || parser.parseOperand(step) ||
-      parser.resolveOperand(step, indexType, result.operands))
-    return failure();
-
+  }
   // Parse the optional initial iteration arguments.
   SmallVector<OpAsmParser::OperandType, 4> regionArgs, operands;
   SmallVector<Type, 4> argTypes;
-  regionArgs.push_back(inductionVariable);
 
   if (succeeded(parser.parseOptionalKeyword("iter_args"))) {
     // Parse assignment list and results type list.
@@ -476,18 +456,18 @@ static ParseResult parseLoopOp(OpAsmParser &parser, OperationState &result) {
                                 std::get<1>(operand_type), result.operands))
         return failure();
   }
-  // Induction variable.
-  argTypes.push_back(indexType);
+  argTypes.push_back(tensorType);
   // Loop carried variables
   argTypes.append(result.types.begin(), result.types.end());
   // Parse the body region.
   Region *body = result.addRegion();
-  if (regionArgs.size() != argTypes.size())
+  if (regionArgs.size() != argTypes.size() - 1)
     return parser.emitError(
         parser.getNameLoc(),
         "mismatch in number of loop-carried values and defined values");
 
-  if (parser.parseRegion(*body, regionArgs, argTypes))
+  if (parser.parseRegion(*body, regionArgs,
+                         {argTypes.begin() + 1, argTypes.end()}))
     return failure();
 
   LoopOp::ensureTerminator(*body, builder, result.location);
@@ -498,17 +478,16 @@ static ParseResult parseLoopOp(OpAsmParser &parser, OperationState &result) {
 
   return success();
 }
-void LoopOp::build(OpBuilder &builder, OperationState &result, Value lb,
-                   Value ub, Value step, ValueRange iterArgs,
+void LoopOp::build(OpBuilder &builder, OperationState &result,
+                   Value maxTripCount, ValueRange iterArgs,
                    BodyBuilderFn bodyBuilder) {
-  result.addOperands({lb, ub, step});
+  result.addOperands(maxTripCount);
   result.addOperands(iterArgs);
   for (Value v : iterArgs)
     result.addTypes(v.getType());
   Region *bodyRegion = result.addRegion();
   bodyRegion->push_back(new Block);
   Block &bodyBlock = bodyRegion->front();
-  bodyBlock.addArgument(builder.getIndexType());
   for (Value v : iterArgs)
     bodyBlock.addArgument(v.getType());
 
@@ -520,7 +499,7 @@ void LoopOp::build(OpBuilder &builder, OperationState &result, Value lb,
   } else if (bodyBuilder) {
     OpBuilder::InsertionGuard guard(builder);
     builder.setInsertionPointToStart(&bodyBlock);
-    bodyBuilder(builder, result.location, bodyBlock.getArgument(0),
+    bodyBuilder(builder, result.location, {},
                 bodyBlock.getArguments().drop_front());
   }
 }
@@ -546,7 +525,7 @@ LoopOp getForInductionVarOwner(Value val) {
 }
 
 /// Return operands used when entering the region at 'index'. These operands
-/// correspond to the loop iterator operands, i.e., those exclusing the
+/// correspond to the loop iterator operands, i.e., those excluding the
 /// induction variable. LoopOp only has one region, so 0 is the only valid value
 /// for `index`.
 OperandRange LoopOp::getSuccessorEntryOperands(unsigned index) {
@@ -565,7 +544,7 @@ OperandRange LoopOp::getSuccessorEntryOperands(unsigned index) {
 void LoopOp::getSuccessorRegions(Optional<unsigned> index,
                                  ArrayRef<Attribute> operands,
                                  SmallVectorImpl<RegionSuccessor> &regions) {
-  // If the predecessor is the ForOp, branch into the body using the iterator
+  // If the predecessor is the LoopOp, branch into the body using the iterator
   // arguments.
   if (!index.hasValue()) {
     regions.push_back(RegionSuccessor(&getLoopBody(), getRegionIterArgs()));
@@ -583,19 +562,15 @@ void LoopOp::getNumRegionInvocations(ArrayRef<Attribute> operands,
   assert(countPerRegion.empty());
   countPerRegion.resize(1);
 
-  auto lb = operands[0].dyn_cast_or_null<IntegerAttr>();
-  auto ub = operands[1].dyn_cast_or_null<IntegerAttr>();
-  auto step = operands[2].dyn_cast_or_null<IntegerAttr>();
+  auto maxTripCount = operands[0].dyn_cast_or_null<IntegerAttr>();
 
   // Loop bounds are not known statically.
-  if (!lb || !ub || !step || step.getValue().getSExtValue() == 0) {
+  if (!maxTripCount) {
     countPerRegion[0] = -1;
     return;
   }
 
-  countPerRegion[0] =
-      ceilDiv(ub.getValue().getSExtValue() - lb.getValue().getSExtValue(),
-              step.getValue().getSExtValue());
+  countPerRegion[0] = ceilDiv(maxTripCount.getValue().getSExtValue(), 1);
 }
 
 /// Replaces the given op with the contents of the given single-block region,
@@ -612,19 +587,19 @@ static void replaceOpWithRegion(PatternRewriter &rewriter, Operation *op,
 }
 
 namespace {
-// Fold away ForOp iter arguments that are also yielded by the op.
-// These arguments must be defined outside of the ForOp region and can just be
+// Fold away LoopOp iter arguments that are also yielded by the op.
+// These arguments must be defined outside of the LoopOp region and can just be
 // forwarded after simplifying the op inits, yields and returns.
 //
 // The implementation uses `mergeBlockBefore` to steal the content of the
-// original ForOp and avoid cloning.
+// original LoopOp and avoid cloning.
 struct LoopOpIterArgsFolder : public OpRewritePattern<LoopOp> {
   using OpRewritePattern<LoopOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(LoopOp forOp,
+  LogicalResult matchAndRewrite(LoopOp loopOp,
                                 PatternRewriter &rewriter) const final {
     bool canonicalize = false;
-    Block &block = forOp.region().front();
+    Block &block = loopOp.region().front();
     auto yieldOp = cast<YieldOp>(block.getTerminator());
 
     // An internal flat vector of block transfer
@@ -636,14 +611,14 @@ struct LoopOpIterArgsFolder : public OpRewritePattern<LoopOp> {
     keepMask.reserve(yieldOp.getNumOperands());
     SmallVector<Value, 4> newBlockTransferArgs, newIterArgs, newYieldValues,
         newResultValues;
-    newBlockTransferArgs.reserve(1 + forOp.getNumIterOperands());
+    newBlockTransferArgs.reserve(loopOp.getNumIterOperands());
     newBlockTransferArgs.push_back(Value()); // iv placeholder with null value
-    newIterArgs.reserve(forOp.getNumIterOperands());
+    newIterArgs.reserve(loopOp.getNumIterOperands());
     newYieldValues.reserve(yieldOp.getNumOperands());
-    newResultValues.reserve(forOp.getNumResults());
-    for (auto it : llvm::zip(forOp.getIterOperands(),   // iter from outside
-                             forOp.getRegionIterArgs(), // iter inside region
-                             yieldOp.getOperands())     // iter yield
+    newResultValues.reserve(loopOp.getNumResults());
+    for (auto it : llvm::zip(loopOp.getIterOperands(),   // iter from outside
+                             loopOp.getRegionIterArgs(), // iter inside region
+                             yieldOp.getOperands())      // iter yield
     ) {
       // Forwarded is `true` when the region `iter` argument is yielded.
       bool forwarded = (std::get<1>(it) == std::get<2>(it));
@@ -663,37 +638,36 @@ struct LoopOpIterArgsFolder : public OpRewritePattern<LoopOp> {
     if (!canonicalize)
       return failure();
 
-    LoopOp newForOp =
-        rewriter.create<LoopOp>(forOp.getLoc(), forOp.lowerBound(),
-                                forOp.upperBound(), forOp.step(), newIterArgs);
-    Block &newBlock = newForOp.region().front();
+    LoopOp newLoopOp = rewriter.create<LoopOp>(
+        loopOp.getLoc(), loopOp.maxTripCount(), newIterArgs);
+    Block &newBlock = newLoopOp.region().front();
 
     // Replace the null placeholders with newly constructed values.
     newBlockTransferArgs[0] = newBlock.getArgument(0); // iv
     for (unsigned idx = 0, collapsedIdx = 0, e = newResultValues.size();
          idx != e; ++idx) {
-      Value &blockTransferArg = newBlockTransferArgs[1 + idx];
+      Value &blockTransferArg = newBlockTransferArgs[idx];
       Value &newResultVal = newResultValues[idx];
       assert((blockTransferArg && newResultVal) ||
              (!blockTransferArg && !newResultVal));
       if (!blockTransferArg) {
-        blockTransferArg = newForOp.getRegionIterArgs()[collapsedIdx];
-        newResultVal = newForOp.getResult(collapsedIdx++);
+        blockTransferArg = newLoopOp.getRegionIterArgs()[collapsedIdx];
+        newResultVal = newLoopOp.getResult(collapsedIdx++);
       }
     }
 
-    Block &oldBlock = forOp.region().front();
+    Block &oldBlock = loopOp.region().front();
     assert(oldBlock.getNumArguments() == newBlockTransferArgs.size() &&
            "unexpected argument size mismatch");
 
-    // No results case: the scf::ForOp builder already created a zero
-    // reult terminator. Merge before this terminator and just get rid of the
+    // No results case: the tile::loopOp builder already created a zero
+    // result terminator. Merge before this terminator and just get rid of the
     // original terminator that has been merged in.
     if (newIterArgs.empty()) {
       auto newYieldOp = cast<YieldOp>(newBlock.getTerminator());
       rewriter.mergeBlockBefore(&oldBlock, newYieldOp, newBlockTransferArgs);
       rewriter.eraseOp(newBlock.getTerminator()->getPrevNode());
-      rewriter.replaceOp(forOp, newResultValues);
+      rewriter.replaceOp(loopOp, newResultValues);
       return success();
     }
 
@@ -713,7 +687,7 @@ struct LoopOpIterArgsFolder : public OpRewritePattern<LoopOp> {
     auto mergedYieldOp = cast<YieldOp>(newBlock.getTerminator());
     cloneFilteredTerminator(mergedYieldOp);
     rewriter.eraseOp(mergedYieldOp);
-    rewriter.replaceOp(forOp, newResultValues);
+    rewriter.replaceOp(loopOp, newResultValues);
     return success();
   }
 };
@@ -725,37 +699,23 @@ struct SimplifyTrivialLoops : public OpRewritePattern<LoopOp> {
 
   LogicalResult matchAndRewrite(LoopOp op,
                                 PatternRewriter &rewriter) const override {
-    // If the upper bound is the same as the lower bound, the loop does not
-    // iterate, just remove it.
-    if (op.lowerBound() == op.upperBound()) {
-      rewriter.replaceOp(op, op.getIterOperands());
-      return success();
-    }
-
-    auto lb = op.lowerBound().getDefiningOp<ConstantOp>();
-    auto ub = op.upperBound().getDefiningOp<ConstantOp>();
-    if (!lb || !ub)
+    auto maxTripCount = op.maxTripCount().getDefiningOp<ConstantOp>();
+    if (!maxTripCount)
       return failure();
 
     // If the loop is known to have 0 iterations, remove it.
-    llvm::APInt lbValue = lb.getValue().cast<IntegerAttr>().getValue();
-    llvm::APInt ubValue = ub.getValue().cast<IntegerAttr>().getValue();
-    if (lbValue.sge(ubValue)) {
+    llvm::APInt maxTripCountValue =
+        maxTripCount.getValue().cast<IntegerAttr>().getValue();
+    if (maxTripCountValue == 0) {
       rewriter.replaceOp(op, op.getIterOperands());
       return success();
     }
 
-    auto step = op.step().getDefiningOp<ConstantOp>();
-    if (!step)
-      return failure();
-
     // If the loop is known to have 1 iteration, inline its body and remove the
     // loop.
-    llvm::APInt stepValue = lb.getValue().cast<IntegerAttr>().getValue();
-    if ((lbValue + stepValue).sge(ubValue)) {
+    if (maxTripCountValue == 1) {
       SmallVector<Value, 4> blockArgs;
-      blockArgs.reserve(op.getNumIterOperands() + 1);
-      blockArgs.push_back(op.lowerBound());
+      blockArgs.reserve(op.getNumIterOperands());
       llvm::append_range(blockArgs, op.getIterOperands());
       replaceOpWithRegion(rewriter, op, op.getLoopBody(), blockArgs);
       return success();
