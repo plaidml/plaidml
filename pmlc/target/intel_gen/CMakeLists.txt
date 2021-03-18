@@ -33,7 +33,6 @@ pml_cc_library(
     MLIRMathTransforms
     MLIRSCFToGPU
     MLIRSPIRVTransforms
-    MLIRSPIRVTransforms
     MLIRStandardOpsTransforms
     MLIRVectorToSPIRV
 )

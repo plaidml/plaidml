@@ -4047,7 +4047,10 @@ cc_library(
 cc_binary(
     name = "mlir-cpu-runner",
     srcs = ["tools/mlir-cpu-runner/mlir-cpu-runner.cpp"],
-    linkopts = ["-ldl"],
+    linkopts = select({
+        "@bazel_tools//src/conditions:windows": [],
+        "//conditions:default": ["-ldl"],
+    }),
     deps = [
         ":AllToLLVMIRTranslations",
         ":ExecutionEngineUtils",
@@ -4273,10 +4276,7 @@ cc_binary(
     srcs = [
         "tools/mlir-linalg-ods-gen/mlir-linalg-ods-yaml-gen.cpp",
     ],
-    linkopts = [
-        "-lm",
-        "-lpthread",
-    ],
+    linkopts = LINKOPTS,  # (PlaidML)
     deps = [
         ":IR",
         ":Parser",
