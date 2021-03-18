@@ -41,7 +41,7 @@ OpFoldResult CastOp::fold(ArrayRef<Attribute> operands) {
 OpFoldResult AddOp::fold(ArrayRef<Attribute> operands) {
   /// add(x, 0) -> x
   if (matchPattern(rhs(), m_Zero())) {
-    return lhs();
+    return operands[0];
   }
   return constFoldBinaryOp(operands, [](double a, double b) { return a + b; });
 }
@@ -54,11 +54,11 @@ OpFoldResult DivOp::fold(ArrayRef<Attribute> operands) {
   }
   // div(x, 1) -> x
   if (matchPattern(rhs(), m_One())) {
-    return lhs();
+    return operands[0];
   }
   // div(0, x) -> 0
   if (matchPattern(lhs(), m_Zero())) {
-    return lhs();
+    return operands[0];
   }
   return constFoldBinaryOp(operands, [](double a, double b) { return a / b; });
 }
@@ -67,12 +67,12 @@ OpFoldResult MulOp::fold(ArrayRef<Attribute> operands) {
   // mul(x, 0) -> 0
   if (matchPattern(rhs(), m_Zero())) {
     if (result().getType() == rhs().getType()) {
-      return rhs();
+      return operands[1];
     }
   }
   // mul(x, 1) -> x
   if (matchPattern(rhs(), m_One())) {
-    return lhs();
+    return operands[0];
   }
   return constFoldBinaryOp(operands, [](double a, double b) { return a * b; });
 }
@@ -80,7 +80,7 @@ OpFoldResult MulOp::fold(ArrayRef<Attribute> operands) {
 OpFoldResult SubOp::fold(ArrayRef<Attribute> operands) {
   // sub(x, 0) -> x
   if (matchPattern(rhs(), m_Zero())) {
-    return lhs();
+    return operands[0];
   }
   return constFoldBinaryOp(operands, [](double a, double b) { return a - b; });
 }
