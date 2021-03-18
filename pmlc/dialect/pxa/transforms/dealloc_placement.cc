@@ -19,7 +19,6 @@ struct DeallocPlacementPass
   void runOnOperation() final {
     // Get the module
     ModuleOp op = getOperation();
-    // op.dump();
     // Run all functions.  This could almost be a function pass, but init + fini
     // interact, which breaks the independence requirements
     op.walk([&](FuncOp fn) {
@@ -54,7 +53,6 @@ struct DeallocPlacementPass
             });
       }
     });
-    // op.dump();
   }
 
   template <typename Callback>
