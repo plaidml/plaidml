@@ -63,7 +63,7 @@ struct DeallocPlacementPass
       placeDealloc(alloc.getResult(), alloc, alloc.getOperation()->getBlock(),
                    -1, onPack);
     });
-    //    // Place deallcation for the loop (scf.for) arguments
+    // Place deallcation for the loop (scf.for) arguments
     //    fn.walk([&](scf::ForOp forOp) {
     //      auto args = forOp.getRegionIterArgs();
     //      for (unsigned i = 0; i < args.size(); ++i) {

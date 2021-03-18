@@ -990,7 +990,7 @@ struct ProgramBuilder {
   ModuleOp module;
   OpBuilder builder;
   Evaluator evaluator;
-}; // namespace
+};
 
 } // namespace
 

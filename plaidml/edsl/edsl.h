@@ -11,8 +11,6 @@
 #include <utility>
 #include <vector>
 
-#include <iostream>
-
 #include "plaidml/core/core.h"
 #include "plaidml/edsl/ffi.h"
 
