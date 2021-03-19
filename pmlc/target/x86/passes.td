@@ -20,11 +20,6 @@ def TraceLinking : Pass<"x86-trace-linking", "mlir::ModuleOp"> {
   let constructor = "pmlc::target::x86::createTraceLinkingPass()";
 }
 
-def CustomBufferDeallocation : Pass<"x86-buffer-deallocation", "mlir::ModuleOp"> {
-  let summary = "Custom buffer deallocation pass";
-  let constructor = "pmlc::target::x86::createCustomBufferDeallocationPass()";
-}
-
 def XSMMStencil : FunctionPass<"x86-affine-stencil-xsmm"> {
   let summary = "Find a tiling for extracting 'micro' GEMMs suitable for XSMM";
   let constructor = "pmlc::target::x86::createXSMMStencilPass()";

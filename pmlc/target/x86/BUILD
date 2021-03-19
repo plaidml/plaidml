@@ -32,7 +32,6 @@ plaidml_cc_library(
         "utils.cc",
         "utils.h",
         "xsmm_lowering.cc",
-        "buffer_deallocation.cc",
         ":heatmap",
     ],
     hdrs = [
@@ -58,7 +57,6 @@ plaidml_cc_library(
         "@llvm-project//mlir:AffineToStandardTransforms",
         "@llvm-project//mlir:AffineTransforms",
         "@llvm-project//mlir:LLVMTransforms",
-        "@llvm-project//mlir:LinalgTransforms",
         "@llvm-project//mlir:OpenMPToLLVM",
         "@llvm-project//mlir:SCFToStandard",
         "@llvm-project//mlir:StandardOpsTransforms",

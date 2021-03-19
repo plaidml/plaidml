@@ -2039,7 +2039,7 @@ TEST_F(CppEdsl, LoopMultipleIterators) {
   auto C = Placeholder(DType::INT32, {4});
   TensorVec results = PLAIDML_EDSL_LOOP(5, {A, B, C})(TensorVec args) {
     for (size_t i = 0; i < args.size(); i++) {
-      args[i] = args[i] + i + 1;
+      args[i] = args[i] + Tensor(i) + 1;
     }
     return args;
   };
