@@ -2043,15 +2043,12 @@ TEST_F(CppEdsl, LoopMultipleIterators) {
     }
     return args;
   };
-  Tensor O(0);
-  for (size_t i = 0; i < results.size(); i++) {
-    O = O + results[i];
-  }
-  auto program = makeProgram("loop", {A, B, C}, {O});
+
+  auto program = makeProgram("loop", {A, B, C}, results);
   // clang-format off
   // CHECK-LABEL: CppEdsl.LoopMultipleIterators
   // CHECK: module @loop
-  // CHECK: func @main(%[[arg0:.*]]: tensor<4xsi32>, %[[arg1:.*]]: tensor<4xsi32>, %[[arg2:.*]]: tensor<4xsi32>) -> tensor<4xsi32>
+  // CHECK: func @main(%[[arg0:.*]]: tensor<4xsi32>, %[[arg1:.*]]: tensor<4xsi32>, %[[arg2:.*]]: tensor<4xsi32>) -> (tensor<4xsi32>, tensor<4xsi32>, tensor<4xsi32>)
   // CHECK:   %{{.*}} = tile.constant(5 : i64) : tensor<si32>
   // CHECK:   %{{.*}} = tile.constant(2 : i64) : tensor<si32>
   // CHECK:   %{{.*}} = tile.constant(1 : i64) : tensor<si32>
@@ -2064,26 +2061,28 @@ TEST_F(CppEdsl, LoopMultipleIterators) {
   // CHECK:     %[[X3:.*]] = tile.add %[[arg5]], %{{.*}} : (tensor<4xsi32>, tensor<si32>) -> tensor<4xsi32>
   // CHECK:     %[[X4:.*]] = tile.add %[[X3]], %{{.*}} : (tensor<4xsi32>, tensor<si32>) -> tensor<4xsi32>
   // CHECK:     tile.yield %[[X0]], %[[X2]], %[[X4]] : tensor<4xsi32>, tensor<4xsi32>, tensor<4xsi32>
-  // CHECK:  %[[X5:.*]] = tile.add %[[RES]]#0, %[[RES]]#1 : (tensor<4xsi32>, tensor<4xsi32>) -> tensor<4xsi32>
-  // CHECK:  %[[RET:.*]] = tile.add %[[X5]], %[[RES]]#2 : (tensor<4xsi32>, tensor<4xsi32>) -> tensor<4xsi32>
-  // CHECK:   return %[[RET]] : tensor<4xsi32>
+  // CHECK:   return %[[RES]]#0, %[[RES]]#1, %[[RES]]#2 : tensor<4xsi32>, tensor<4xsi32>, tensor<4xsi32>
   // clang-format on
   std::vector<int> inputA = {
       1, 1, 1, 1  //
   };
-
   std::vector<int> inputB = {
       1, 2, 3, 4  //
   };
-
   std::vector<int> inputC = {
       -3, -2, 1, 0  //
   };
 
-  std::vector<int> expected = {
-      29, 31, 35, 35  //
+  std::vector<int> expectedA = {
+      6, 6, 6, 6  //
   };
-  checkExact(program, {inputA, inputB, inputC}, {expected});
+  std::vector<int> expectedB = {
+      11, 12, 13, 14  //
+  };
+  std::vector<int> expectedC = {
+      12, 13, 16, 15  //
+  };
+  checkExact(program, {inputA, inputB, inputC}, {expectedA, expectedB, expectedC});
 }
 
 TEST_F(CppEdsl, LoopBuilder) {
@@ -2095,12 +2094,11 @@ TEST_F(CppEdsl, LoopBuilder) {
     return args;
   };
   TensorVec output = LoopBuilder(3).initIterArgs({A, B}).setLoopBody(loopBody);
-  auto O = output[0] + output[1];
-  auto program = makeProgram("loop", {A, B}, {O});
+  auto program = makeProgram("loop", {A, B}, output);
   // clang-format off
   // CHECK-LABEL: CppEdsl.LoopBuilder
   // CHECK: module @loop
-  // CHECK: func @main(%[[arg0:.*]]: tensor<4xf32>, %[[arg1:.*]]: tensor<4xf32>) -> tensor<4xf32>
+  // CHECK: func @main(%[[arg0:.*]]: tensor<4xf32>, %[[arg1:.*]]: tensor<4xf32>) -> (tensor<4xf32>, tensor<4xf32>)
   // CHECK:   %{{.*}} = tile.constant(3 : i64) : tensor<si32>
   // CHECK:   %{{.*}} = tile.constant(1.000000e+00 : f64) : tensor<f32>
   // CHECK:   %{{.*}} = tile.constant(3.000000e+00 : f64) : tensor<f32>
@@ -2110,8 +2108,7 @@ TEST_F(CppEdsl, LoopBuilder) {
   // CHECK:     %[[Y0:.*]] = tile.add %[[arg3]], %{{.*}} : (tensor<4xf32>, tensor<f32>) -> tensor<4xf32>
   // CHECK:     %[[Y1:.*]] = tile.add %[[Y0]], %{{.*}}: (tensor<4xf32>, tensor<f32>) -> tensor<4xf32>
   // CHECK:     tile.yield %[[Y0]], %[[Y1]] : tensor<4xf32>, tensor<4xf32>
-  // CHECK:   %[[RET:.*]] = tile.add %[[RES]]#0, %[[RES]]#1 : (tensor<4xf32>, tensor<4xf32>) -> tensor<4xf32>
-  // CHECK:   return %[[RET]] : tensor<4xf32>
+  // CHECK:   return %[[RES]]#0, %[[RES]]#1 : (tensor<4xf32>, tensor<4xf32>) -> tensor<4xf32>
   // clang-format on
   std::vector<float> input1 = {
       1, 1, 1, 1  //
@@ -2119,10 +2116,13 @@ TEST_F(CppEdsl, LoopBuilder) {
   std::vector<float> input2 = {
       0, 0, 0, 0  //
   };
-  std::vector<float> expected = {
-      21, 21, 21, 21  //
+  std::vector<float> expected1 = {
+      9, 9, 9, 9  //
   };
-  checkExact(program, {input1, input2}, {expected});
+  std::vector<float> expected2 = {
+      12, 12, 12, 12  //
+  };
+  checkExact(program, {input1, input2}, {expected1, expected2});
 }
 
 TEST_F(CppEdsl, LoopNested) {
@@ -2138,11 +2138,11 @@ TEST_F(CppEdsl, LoopNested) {
     args_outer[0] = args_outer[0] + O_inner[0];
     return args_outer;
   };
-  TensorVec O = PLAIDML_EDSL_LOOP(3, {O_outer[0]})(TensorVec args) {
+  Tensor O = PLAIDML_EDSL_LOOP(3, {O_outer[0]})(TensorVec args) {
     args[0] = args[0] + B;
     return args;
   };
-  auto program = makeProgram("loop", {A, B, IX}, {O[0]});
+  auto program = makeProgram("loop", {A, B, IX}, {O});
   // clang-format off
   // CHECK-LABEL: CppEdsl.LoopNested
   // CHECK: module @loop

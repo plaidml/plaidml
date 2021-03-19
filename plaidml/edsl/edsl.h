@@ -1711,13 +1711,6 @@ inline Tensor layer(const std::string& op, const TensorVec& operands, const Laye
   return layer(op, operands, {}, fn, loc);
 }
 
-///
-/// for-loop required three component, loopBody, loop-carried vars(iterator), and loop bound.
-/// \param TensorVec
-/// \param loopCycle int64_t
-/// \return Tensor
-///
-
 #define PLAIDML_EDSL_LOOP(x, ...) LoopBuilder(x).initIterArgs(__VA_ARGS__)& [=]
 
 using LoopSingleFn = std::function<Tensor(Tensor)>;

@@ -2014,6 +2014,9 @@ struct ScfForOpConversion : public OpConversionPattern<scf::ForOp> {
       oldArgs[i].replaceAllUsesWith(newArgs[i]);
     }
     rewriter.replaceOp(op, newOp.results());
+    for (auto result : op.results()) {
+      result.replaceAllUsesWith(newOp.getResult(result.getResultNumber()));
+    }
     return success();
   }
 };

@@ -262,7 +262,7 @@ def LoopOp : LoopBaseOp<"loop",
       return getOperands().drop_front(getNumControlOperands());
     }
 
-    void setUpperBound(mlir::Value bound) { getOperation()->setOperand(0, bound); }
+    void setMaxTripCount(mlir::Value bound) { getOperation()->setOperand(0, bound); }
 
     /// Number of region arguments for loop-carried values
     unsigned getNumRegionIterArgs() {

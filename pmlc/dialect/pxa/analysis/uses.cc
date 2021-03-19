@@ -52,9 +52,6 @@ Value getNextIndirectUse(mlir::OpOperand &use) {
       .Case<AffineYieldOp>([&](auto op) {
         return op->getParentOp()->getResult(use.getOperandNumber());
       })
-      .Case<scf::YieldOp>([&](auto op) {
-        return op->getParentOp()->getResult(use.getOperandNumber());
-      })
       .Case<layer::BoxOp>([&](auto op) {
         return op.getResult(use.getOperandNumber()); //
       })

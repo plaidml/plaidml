@@ -26,6 +26,8 @@ std::unique_ptr<mlir::Pass> createXSMMStencilPass();
 
 std::unique_ptr<mlir::Pass> createOpenMPWorkaroundPass();
 
+std::unique_ptr<mlir::Pass> createCustomBufferDeallocationPass();
+
 void populatePXAGemmToXSMMConversionPatterns(
     mlir::OwningRewritePatternList &patterns, mlir::MLIRContext *ctx);
 
