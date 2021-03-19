@@ -279,13 +279,14 @@ void pipelineBuilder(OpPassManager &pm) {
 
   pm.addNestedPass<FuncOp>(pxa::createLocalizePass());
   pm.addNestedPass<FuncOp>(pxa::createResizeTmpsPass());
+  // pm.addPass(pxa::createDeallocPlacementPass());
   pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
   pm.addPass(createLowerPXAToAffinePass());
-  pm.addPass(createCustomBufferDeallocationPass());
-  pm.addNestedPass<FuncOp>(createConvertLinalgToLoopsPass());
+  // pm.addPass(createCustomBufferDeallocationPass());
+  // pm.addNestedPass<FuncOp>(createConvertLinalgToLoopsPass());
 
   pm.addPass(createLoopInvariantCodeMotionPass());
   pm.addPass(createCanonicalizerPass());

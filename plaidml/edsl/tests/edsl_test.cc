@@ -2108,7 +2108,7 @@ TEST_F(CppEdsl, LoopBuilder) {
   // CHECK:     %[[Y0:.*]] = tile.add %[[arg3]], %{{.*}} : (tensor<4xf32>, tensor<f32>) -> tensor<4xf32>
   // CHECK:     %[[Y1:.*]] = tile.add %[[Y0]], %{{.*}}: (tensor<4xf32>, tensor<f32>) -> tensor<4xf32>
   // CHECK:     tile.yield %[[Y0]], %[[Y1]] : tensor<4xf32>, tensor<4xf32>
-  // CHECK:   return %[[RES]]#0, %[[RES]]#1 : (tensor<4xf32>, tensor<4xf32>) -> tensor<4xf32>
+  // CHECK: return %[[RES]]#0, %[[RES]]#1 : tensor<4xf32>, tensor<4xf32>
   // clang-format on
   std::vector<float> input1 = {
       1, 1, 1, 1  //
