@@ -15,12 +15,12 @@ pml_cc_library(
     MLIRLLVMIR
     MLIRMathTransforms
     MLIRPass
-    MLIRTransforms
     MLIRSPIRV
     MLIRSPIRVSerialization
     MLIRStandard
     MLIRStandardOpsTransforms
     MLIRSupport
+    MLIRTransforms
 )
 
 pml_tblgen_library(

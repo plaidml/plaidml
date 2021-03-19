@@ -39,9 +39,8 @@ OpFoldResult CastOp::fold(ArrayRef<Attribute> operands) {
 }
 
 static OpFoldResult safeFold(Attribute attr, Value val) {
-  if (attr) {
+  if (attr)
     return attr;
-  }
   return val;
 }
 
