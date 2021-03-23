@@ -99,66 +99,61 @@ std::vector<Tensor> NMS(Tensor BOXES, Tensor SCORES, int32_t max_output_boxes_pe
 
   int num_boxes_per_class = std::min(num_boxes, max_output_boxes_per_class);
 
-  for (int i = 0; i < num_batches; i++) {
-    Tensor IOU_CURRENT_BATCH =
-        op::slice(IOU).add_dim(i, i + 1).add_dim(0, num_boxes).add_dim(0, num_boxes);  // 1* num_boxes * num_boxes
-    for (int j = 0; j < num_classes; j++) {
-      Tensor SCORES_CLASS =
-          op::slice(SCORES).add_dim(i, i + 1).add_dim(j, j + 1).add_dim(0, num_boxes);  // 1 * 1 * num_boxes
-      Tensor NEW_SCORES = edsl::select(SCORES_CLASS > cast(SCORE_THRESHOLD, box_input_type), SCORES_CLASS,
-                                       ZERO);  // remove unused value
+  auto INDEX_B = edsl::index({edsl::TensorDim(num_batches), edsl::TensorDim(num_classes), edsl::TensorDim(1)}, 0);
+  auto INDEX_C = edsl::index({edsl::TensorDim(num_batches), edsl::TensorDim(num_classes), edsl::TensorDim(1)}, 1);
+  auto INDEX_BC = edsl::cast(op::concatenate({INDEX_B, INDEX_C}, 2), box_output_type);  // num_batch * num_class * 2
 
-      std::vector<float> node_index = {static_cast<float>(i), static_cast<float>(j)};
-      Buffer buffer_node(NODE_SHAPE);
-      buffer_node.copy_from(node_index.data());
-      std::string node_name = "NODE";
-      Tensor NODE =
-          edsl::cast(edsl::Constant(buffer_node, node_name + std::to_string(i) + std::to_string(j)), box_output_type);
+  Tensor NEW_SCORES =
+      edsl::select(SCORES > cast(SCORE_THRESHOLD, box_input_type), SCORES, ZERO);  // num_batch * num_class * num_box
 
-      // Select box
-      for (int k = 0; k < num_boxes_per_class; k++) {
-        // Select the box with largest score
-        // The boxes may have same score
-        Tensor CANDIDATE_INDEX =
-            edsl::gather(edsl::argsort(NEW_SCORES, 2, edsl::SortDirection::DESC), ZERO_INT).axis(2);
-        CANDIDATE_INDEX = edsl::reshape(CANDIDATE_INDEX, {edsl::TensorDim(1)});
-        Tensor SCORE = edsl::reshape(op::max(NEW_SCORES, edsl::Value(2)), {1, 1, 1});
-        Tensor CURRENT_NODE = edsl::select(SCORE > 0.0f, NODE, edsl::cast(INVALID_NODE, box_output_type));
+  // Select box
+  for (int k = 0; k < num_boxes_per_class; k++) {
+    // Select the box with largest score
+    // The boxes may have same score
+    Tensor CANDIDATE_INDEX = edsl::gather(edsl::argsort(NEW_SCORES, 2, edsl::SortDirection::DESC), ZERO_INT).axis(2);
+    Tensor SCORE = edsl::reshape(op::max(NEW_SCORES, edsl::Value(2)), {num_batches, num_classes, 1});
+    Tensor CURRENT_NODE = edsl::select(SCORE > 0.0f, INDEX_BC,
+                                       edsl::cast(INVALID_NODE, box_output_type));  // num_batches * num_classes * 2
 
-        // Update count of selected box
-        Tensor VALID = edsl::select(SCORE != 0.0f, ONE, ZERO);
-        VALID_OUTPUTS = VALID_OUTPUTS + VALID;
+    // Update count of selected box
+    Tensor VALID = op::sum(edsl::select(SCORE != 0.0f, ONE, ZERO));  // num_batches* num_classes * 1 --> 1
+    VALID_OUTPUTS = VALID_OUTPUTS + VALID;
 
-        // Add selected box to scores
-        scores.push_back(edsl::cast(CURRENT_NODE, thres_type));
-        SCORE = edsl::select(SCORE > 0.0f, SCORE, NEG1);
-        scores.push_back(edsl::cast(SCORE, thres_type));
+    // Add selected box to scores
+    scores.push_back(edsl::cast(CURRENT_NODE, thres_type));
+    SCORE = edsl::select(SCORE > 0.0f, SCORE, NEG1);
+    scores.push_back(edsl::cast(SCORE, thres_type));
 
-        // Set scores of current box and boxes which have IOU larger than threshold to zero
-        // The scores can be same, use scatter to update current node
-        NEW_SCORES = edsl::scatter(edsl::reshape(NEW_SCORES, {edsl::TensorDim(num_boxes)}),
-                                   edsl::cast(CANDIDATE_INDEX, DType::INT32), ZERO)
-                         .mode(edsl::ScatterMode::UPDATE_ELT);
-        NEW_SCORES = edsl::reshape(NEW_SCORES, {edsl::TensorDim(1), edsl::TensorDim(1), edsl::TensorDim(num_boxes)});
-        Tensor IOU_CANDIDATE = edsl::gather(IOU_CURRENT_BATCH, CANDIDATE_INDEX).axis(1);  // 1*1*num_boxes
-        // use >= to include suppose_hard_suppresion case
-        NEW_SCORES =
-            edsl::select(IOU_CANDIDATE >= cast(IOU_THRESHOLD, box_input_type), ZERO, NEW_SCORES);  // 1*1*num_boxes
-        // NEW_SCORES = edsl::select(IOU_CANDIDATE == 1.0f, ZERO, NEW_SCORES);  // This shall replace scatter
+    // Set scores of current box and boxes which have IOU larger than threshold to zero
+    // The scores can be same, use scatter to update current node
+    Tensor NEW_SCORES_UPDATE =
+        edsl::scatter(NEW_SCORES,
+                      edsl::reshape(edsl::cast(CANDIDATE_INDEX, DType::INT32),
+                                    {edsl::TensorDim(num_batches), edsl::TensorDim(num_classes), edsl::TensorDim(1)}),
+                      op::broadcast(ZERO, {num_batches, num_classes, 1}, {0}))
+            .axis(2)
+            .mode(edsl::ScatterMode::UPDATE_ELT);  // 1 * num_classes * num_boxes
+    NEW_SCORES = edsl::reshape(
+        NEW_SCORES_UPDATE, {edsl::TensorDim(num_batches), edsl::TensorDim(num_classes), edsl::TensorDim(num_boxes)});
 
-        // Add selected box to boxes
-        Tensor BOX_INDEX =
-            edsl::select(SCORE > 0.0f, edsl::cast(CANDIDATE_INDEX, box_output_type), edsl::cast(NEG1, box_output_type));
-        boxes.push_back(CURRENT_NODE);
-        boxes.push_back(edsl::reshape(BOX_INDEX, {1, 1, 1}));
+    Tensor IOU_CANDIDATE = edsl::gather(IOU, CANDIDATE_INDEX)
+                               .mode(edsl::GatherMode::ND)
+                               .batchDims(1);  // num_batches*num_classes*num_boxes
+    // use >= to include suppose_hard_suppresion case
+    NEW_SCORES = edsl::select(IOU_CANDIDATE >= cast(IOU_THRESHOLD, box_input_type), ZERO, NEW_SCORES);  // 1*1*num_boxes
+    // NEW_SCORES = edsl::select(IOU_CANDIDATE == 1.0f, ZERO, NEW_SCORES);  // This shall replace scatter
 
-        // update scores for current class
-        Tensor SCALE = edsl::exp(IOU_CANDIDATE * IOU_CANDIDATE * edsl::cast(WEIGHT, box_input_type));
-        NEW_SCORES = NEW_SCORES * SCALE;
-        NEW_SCORES = edsl::select(NEW_SCORES > edsl::cast(SCORE_THRESHOLD, box_input_type), NEW_SCORES,
-                                  ZERO);  // remove unused value
-      }
-    }
+    // Add selected box to boxes
+    Tensor BOX_INDEX =
+        edsl::select(SCORE > 0.0f, edsl::cast(CANDIDATE_INDEX, box_output_type), edsl::cast(NEG1, box_output_type));
+    boxes.push_back(CURRENT_NODE);
+    boxes.push_back(edsl::reshape(BOX_INDEX, {num_batches, num_classes, 1}));
+
+    // update scores for current class
+    Tensor SCALE = edsl::exp(IOU_CANDIDATE * IOU_CANDIDATE * edsl::cast(WEIGHT, box_input_type));
+    NEW_SCORES = NEW_SCORES * SCALE;
+    NEW_SCORES = edsl::select(NEW_SCORES > edsl::cast(SCORE_THRESHOLD, box_input_type), NEW_SCORES,
+                              ZERO);  // remove unused value
   }
 
   VALID_OUTPUTS = edsl::cast(VALID_OUTPUTS, box_output_type);
