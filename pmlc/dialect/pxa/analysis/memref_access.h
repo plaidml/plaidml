@@ -16,7 +16,7 @@ struct MemRefAccess {
     getAccessMap(op.getAffineMap(), op.getMapOperands(), &accessMap);
   }
 
-  explicit MemRefAccess(PxaReduceOpInterface op) {
+  explicit MemRefAccess(PxaWriteOpInterface op) {
     getAccessMap(op.getAffineMap(), op.getMapOperands(), &accessMap);
   }
 

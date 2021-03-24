@@ -75,7 +75,7 @@ def PxaReadOpInterface : PxaOpInterface<"PxaReadOpInterface"> {
   ];
 }
 
-def PxaReduceOpInterface : PxaOpInterface<"PxaReduceOpInterface"> {
+def PxaWriteOpInterface : PxaOpInterface<"PxaWriteOpInterface"> {
   let description = [{
       Interface to query characteristics of write-like ops with affine
       restrictions.
@@ -164,7 +164,7 @@ def PxaReduceOpInterface : PxaOpInterface<"PxaReduceOpInterface"> {
     InterfaceMethod<
       /*desc=*/"Returns the result value.",
       /*retTy=*/"::mlir::Value",
-      /*methodName=*/"getReduceResult",
+      /*methodName=*/"getStoreResult",
       /*args=*/(ins),
       /*methodBody=*/[{}],
       /*defaultImplementation=*/[{

@@ -49,7 +49,7 @@ bool checkIfZero(ConstantOp constantVal) {
   return true;
 }
 
-void replaceAssignLoadAdd(PxaReduceOpInterface &reduceOp) {
+void replaceAssignLoadAdd(PxaWriteOpInterface &reduceOp) {
   // Consider only addf and addi kinds
   if (reduceOp.getAgg() != AtomicRMWKind::addf &&
       reduceOp.getAgg() != AtomicRMWKind::addi)
@@ -60,7 +60,7 @@ void replaceAssignLoadAdd(PxaReduceOpInterface &reduceOp) {
     return;
 
   // The memref operand needs to come from reduce op assign
-  auto reduceAssignOp = dyn_cast<PxaReduceOpInterface>(memRefOp);
+  auto reduceAssignOp = dyn_cast<PxaWriteOpInterface>(memRefOp);
   if (!reduceAssignOp || reduceAssignOp.getAgg() != AtomicRMWKind::assign)
     return;
 
@@ -90,7 +90,7 @@ void replaceAssignLoadAdd(PxaReduceOpInterface &reduceOp) {
 
   // Make sure that reduce assign result is used only by the reduce add
   // Also check if the memref is not modified by any other operation
-  if (!reduceAssignOp.getReduceResult().getUseList()->hasOneUse() ||
+  if (!reduceAssignOp.getStoreResult().getUseList()->hasOneUse() ||
       !reduceAssignOp.getMemRef().getUseList()->hasOneUse())
     return;
 
@@ -105,13 +105,13 @@ void replaceAssignLoadAdd(PxaReduceOpInterface &reduceOp) {
         reduceOp.getLoc(), AtomicRMWKind::assign, reduceOp.getValueToStore(),
         reduceAssignOp.getMemRef(), reduceOp.getAffineMap(),
         reduceOp.getIdxs());
-    reduceOp.getReduceResult().replaceAllUsesWith(newReduceOp.getResult());
+    reduceOp.getStoreResult().replaceAllUsesWith(newReduceOp.getResult());
   } else {
     auto newReduceOp = builder.create<PxaReduceOp>(
         reduceOp.getLoc(), AtomicRMWKind::assign, reduceOp.getValueToStore(),
         reduceAssignOp.getMemRef(), reduceOp.getAffineMap(),
         reduceOp.getIdxs());
-    reduceOp.getReduceResult().replaceAllUsesWith(newReduceOp.getResult());
+    reduceOp.getStoreResult().replaceAllUsesWith(newReduceOp.getResult());
   }
 
   // Remove redundant ops
@@ -124,7 +124,7 @@ struct SimplifyArithmeticPass
   void runOnFunction() final {
     FuncOp f = getFunction();
     f.walk(
-        [&](PxaReduceOpInterface reduceOp) { replaceAssignLoadAdd(reduceOp); });
+        [&](PxaWriteOpInterface reduceOp) { replaceAssignLoadAdd(reduceOp); });
   }
 };
 

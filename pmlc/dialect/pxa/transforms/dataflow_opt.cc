@@ -32,7 +32,7 @@ struct MemRefDataFlowOptPass
         return;
       }
 
-      auto reduceOp = dyn_cast_or_null<PxaReduceOpInterface>(defOp);
+      auto reduceOp = dyn_cast_or_null<PxaWriteOpInterface>(defOp);
       if (!reduceOp || reduceOp.getAgg() != AtomicRMWKind::assign) {
         return;
       }

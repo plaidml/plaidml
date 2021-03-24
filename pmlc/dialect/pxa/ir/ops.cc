@@ -165,11 +165,14 @@ struct SimplifyAffineOp : public OpRewritePattern<AffineOpTy> {
 
   LogicalResult matchAndRewrite(AffineOpTy affineOp,
                                 PatternRewriter &rewriter) const override {
-    static_assert(std::is_same<AffineOpTy, PxaReduceOp>::value ||
-                      std::is_same<AffineOpTy, PxaVectorReduceOp>::value ||
-                      std::is_same<AffineOpTy, PxaLoadOp>::value ||
-                      std::is_same<AffineOpTy, PxaVectorLoadOp>::value,
-                  "affine reduce/vector_reduce or load op expected");
+    static_assert(
+        std::is_same<AffineOpTy, PxaReduceOp>::value ||
+            std::is_same<AffineOpTy, PxaVectorReduceOp>::value ||
+            std::is_same<AffineOpTy, PxaStoreOp>::value ||
+            std::is_same<AffineOpTy, PxaVectorStoreOp>::value ||
+            std::is_same<AffineOpTy, PxaLoadOp>::value ||
+            std::is_same<AffineOpTy, PxaVectorLoadOp>::value,
+        "affine reduce/vector_reduce, store/vector_store or load op expected");
     auto map = affineOp.getAffineMap();
     AffineMap oldMap = map;
     auto oldOperands = affineOp.getMapOperands();
@@ -202,12 +205,21 @@ void SimplifyAffineOp<PxaReduceOp>::replaceAffineOp(
 }
 
 template <>
+void SimplifyAffineOp<PxaStoreOp>::replaceAffineOp(
+    PatternRewriter &rewriter, PxaStoreOp op, AffineMap map,
+    ArrayRef<Value> mapOperands) const {
+  rewriter.replaceOpWithNewOp<PxaStoreOp>(op, op.getMemRefType(), op.val(),
+                                          op.memref(), map, mapOperands);
+}
+
+template <>
 void SimplifyAffineOp<PxaVectorLoadOp>::replaceAffineOp(
     PatternRewriter &rewriter, PxaVectorLoadOp op, AffineMap map,
     ArrayRef<Value> mapOperands) const {
   rewriter.replaceOpWithNewOp<PxaVectorLoadOp>(
       op, op.getVectorType(), op.getMemRef(), map, mapOperands);
 }
+
 template <>
 void SimplifyAffineOp<PxaVectorReduceOp>::replaceAffineOp(
     PatternRewriter &rewriter, PxaVectorReduceOp op, AffineMap map,
@@ -215,6 +227,14 @@ void SimplifyAffineOp<PxaVectorReduceOp>::replaceAffineOp(
   rewriter.replaceOpWithNewOp<PxaVectorReduceOp>(op, op.getMemRefType(),
                                                  op.agg(), op.vector(),
                                                  op.memref(), map, mapOperands);
+}
+
+template <>
+void SimplifyAffineOp<PxaVectorStoreOp>::replaceAffineOp(
+    PatternRewriter &rewriter, PxaVectorStoreOp op, AffineMap map,
+    ArrayRef<Value> mapOperands) const {
+  rewriter.replaceOpWithNewOp<PxaVectorStoreOp>(
+      op, op.getMemRefType(), op.vector(), op.memref(), map, mapOperands);
 }
 
 /// This is a common class used for patterns of the form
@@ -232,16 +252,16 @@ static LogicalResult foldMemRefCast(Operation *op) {
   return success(folded);
 }
 
-/// Fold reduce operations with no uses. Reduce has side effects on the heap,
-/// but can still be deleted if it has zero uses.
-template <typename ReduceOp>
-struct SimplifyDeadReduce : public OpRewritePattern<ReduceOp> {
-  using OpRewritePattern<ReduceOp>::OpRewritePattern;
+/// Fold write operations with no uses. ReduceOp and StoreOp have side effects
+/// on the heap, but can still be deleted if it has zero uses.
+template <typename WriteOp>
+struct SimplifyDeadWrite : public OpRewritePattern<WriteOp> {
+  using OpRewritePattern<WriteOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(ReduceOp reduce,
+  LogicalResult matchAndRewrite(WriteOp write,
                                 PatternRewriter &rewriter) const override {
-    if (reduce.use_empty()) {
-      rewriter.eraseOp(reduce);
+    if (write.use_empty()) {
+      rewriter.eraseOp(write);
       return success();
     }
     return failure();
@@ -464,11 +484,59 @@ void PxaReduceOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
                                               MLIRContext *context) {
   results.insert<                    //
       SimplifyAffineOp<PxaReduceOp>, //
-      SimplifyDeadReduce<PxaReduceOp>>(context);
+      SimplifyDeadWrite<PxaReduceOp>>(context);
 }
 
 OpFoldResult PxaReduceOp::fold(ArrayRef<Attribute> cstOperands) {
   /// reduce(memrefcast) -> reduce
+  if (succeeded(foldMemRefCast(*this)))
+    return getResult();
+  return {};
+}
+
+// ---- PxaStoreOp ----
+
+void printPxaStoreOp(OpAsmPrinter &p, PxaStoreOp op) {
+  p << op.getOperation()->getName() << ' ';
+  p << op.val() << ", ";
+  p << op.memref() << '[';
+  auto mapAttr = op->getAttrOfType<AffineMapAttr>(op.getMapAttrName());
+  p.printAffineMapOfSSAIds(mapAttr, op.idxs());
+  p << ']';
+  p.printOptionalAttrDict(op->getAttrs(),
+                          /*elidedAttrs=*/{op.getMapAttrName()});
+  p << " : ";
+  p.printType(op.memref().getType());
+}
+
+// <operation> ::= `pxa.store` ssa-use `,` ssa-use `[` ssa-use-list `]`
+//                 attribute-dict? `:` type
+ParseResult parsePxaStoreOp(OpAsmParser &parser, OperationState &result) {
+  auto indexTy = parser.getBuilder().getIndexType();
+  MemRefType type;
+  AffineMapAttr mapAttr;
+  OpAsmParser::OperandType val, out;
+  SmallVector<OpAsmParser::OperandType, 4> idxs;
+  return failure(
+      parser.parseOperand(val) || parser.parseComma() ||
+      parser.parseOperand(out) ||
+      parser.parseAffineMapOfSSAIds(idxs, mapAttr, "map", result.attributes) ||
+      parser.parseOptionalAttrDict(result.attributes) ||
+      parser.parseColonType(type) || parser.addTypeToList(type, result.types) ||
+      parser.resolveOperand(val, type.getElementType(), result.operands) ||
+      parser.resolveOperand(out, type, result.operands) ||
+      parser.resolveOperands(idxs, indexTy, result.operands));
+}
+
+void PxaStoreOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                             MLIRContext *context) {
+  results.insert<                   //
+      SimplifyAffineOp<PxaStoreOp>, //
+      SimplifyDeadWrite<PxaStoreOp>>(context);
+}
+
+OpFoldResult PxaStoreOp::fold(ArrayRef<Attribute> cstOperands) {
+  /// store(memrefcast) -> store
   if (succeeded(foldMemRefCast(*this)))
     return getResult();
   return {};
@@ -617,11 +685,62 @@ ParseResult parsePxaVectorReduceOp(OpAsmParser &parser,
 void PxaVectorReduceOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
   results.insert<SimplifyAffineOp<PxaVectorReduceOp>,
-                 SimplifyDeadReduce<PxaVectorReduceOp>>(context);
+                 SimplifyDeadWrite<PxaVectorReduceOp>>(context);
 }
 
 OpFoldResult PxaVectorReduceOp::fold(ArrayRef<Attribute> cstOperands) {
   /// vectorReduce(memrefcast) -> vectorReduce
+  if (succeeded(foldMemRefCast(*this)))
+    return getResult();
+  return {};
+}
+
+// ---- PxaVectorStoreOp ----
+
+void printPxaVectorStoreOp(OpAsmPrinter &p, PxaVectorStoreOp op) {
+  p << op.getOperation()->getName() << ' ';
+  p << op.vector() << ", ";
+  p << op.memref() << '[';
+  auto mapAttr = op->getAttrOfType<AffineMapAttr>(op.getMapAttrName());
+  p.printAffineMapOfSSAIds(mapAttr, op.idxs());
+  p << ']';
+  p.printOptionalAttrDict(op->getAttrs(), {op.getMapAttrName()});
+  p << " : ";
+  p.printType(op.memref().getType());
+  p << ", ";
+  p.printType(op.vector().getType());
+}
+
+// <operation> ::= `pxa.vector_store` ssa-use `,` ssa-use `[`
+// ssa-use-list `]` attribute-dict? `:` type
+ParseResult parsePxaVectorStoreOp(OpAsmParser &parser, OperationState &result) {
+  auto indexTy = parser.getBuilder().getIndexType();
+  MemRefType memrefType;
+  VectorType vectorType;
+  AffineMapAttr mapAttr;
+  OpAsmParser::OperandType val, out;
+  SmallVector<OpAsmParser::OperandType, 4> idxs;
+  return failure(
+      parser.parseOperand(val) || parser.parseComma() ||
+      parser.parseOperand(out) ||
+      parser.parseAffineMapOfSSAIds(idxs, mapAttr, "map", result.attributes) ||
+      parser.parseOptionalAttrDict(result.attributes) ||
+      parser.parseColonType(memrefType) ||
+      parser.addTypeToList(memrefType, result.types) || parser.parseComma() ||
+      parser.parseType(vectorType) ||
+      parser.resolveOperand(val, vectorType, result.operands) ||
+      parser.resolveOperand(out, memrefType, result.operands) ||
+      parser.resolveOperands(idxs, indexTy, result.operands));
+}
+
+void PxaVectorStoreOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<SimplifyAffineOp<PxaVectorStoreOp>,
+                 SimplifyDeadWrite<PxaVectorStoreOp>>(context);
+}
+
+OpFoldResult PxaVectorStoreOp::fold(ArrayRef<Attribute> cstOperands) {
+  /// vectorStore(memrefcast) -> vectorStore
   if (succeeded(foldMemRefCast(*this)))
     return getResult();
   return {};

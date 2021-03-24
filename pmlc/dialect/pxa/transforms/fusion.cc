@@ -23,8 +23,8 @@ namespace pmlc::dialect::pxa {
 
 namespace {
 
-using WriteRead = std::pair<PxaReduceOpInterface, PxaReadOpInterface>;
-using WriteWrite = std::pair<PxaReduceOpInterface, PxaReduceOpInterface>;
+using WriteRead = std::pair<PxaWriteOpInterface, PxaReadOpInterface>;
+using WriteWrite = std::pair<PxaWriteOpInterface, PxaWriteOpInterface>;
 
 struct FusionInfo {
   struct AffineParallelInfo {
@@ -70,10 +70,10 @@ struct FusionInfo {
         singleOutput(singleOutput), reverseFusion(false) {}
 
   // Helper method to find the original source write of a state update.
-  static PxaReduceOpInterface findSourceWrite(Value val) {
+  static PxaWriteOpInterface findSourceWrite(Value val) {
     auto opRes = val.dyn_cast<OpResult>();
     auto owner = opRes.getOwner();
-    if (isa<PxaReduceOpInterface>(owner)) {
+    if (isa<PxaWriteOpInterface>(owner)) {
       return owner;
     }
     if (auto op = dyn_cast<AffineParallelOp>(owner)) {
@@ -433,7 +433,7 @@ struct FusionInfo {
         // bail.
         if (isa<PxaReadOpInterface>(user)) {
           readAfterWrites.emplace_back(write, user);
-        } else if (isa<PxaReduceOpInterface>(user)) {
+        } else if (isa<PxaWriteOpInterface>(user)) {
           writeAfterWrites.emplace_back(write, user);
         } else {
           user->emitRemark("Op is not a load or reduce");

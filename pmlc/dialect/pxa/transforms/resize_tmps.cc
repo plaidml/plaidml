@@ -88,7 +88,7 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
               "Users of Alloc ops have different vector/scalar sizes");
           return;
         }
-      } else if (auto rop = dyn_cast<PxaReduceOpInterface>(use.getOwner())) {
+      } else if (auto rop = dyn_cast<PxaWriteOpInterface>(use.getOwner())) {
         maybeStrides =
             computeStrideInfo(rop.getAffineMap(), rop.getMapOperands());
         // Get vector size value. For scalar ops vec size is set to 1.
@@ -217,7 +217,7 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
     // Now do the actual changes.  Note, we don't bother erasing the original
     // instructions, but they get cleaned up via canonicalization
     for (Operation *op : ops) {
-      if (auto rop = dyn_cast<PxaReduceOpInterface>(op)) {
+      if (auto rop = dyn_cast<PxaWriteOpInterface>(op)) {
         // TODO: This probably should move into some sort of utility transform,
         // but I need another example or two to generalize from
         auto vm = computeInnerValueMap(rop.getAffineMap(), rop.getMapOperands(),

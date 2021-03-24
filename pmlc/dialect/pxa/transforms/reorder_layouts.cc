@@ -144,7 +144,7 @@ static MemoryReadDesc gatherReadDesc(PxaReadOpInterface op,
 }
 
 /// Gathers information about specified write operation.
-static MemoryWriteDesc gatherWriteDesc(PxaReduceOpInterface op) {
+static MemoryWriteDesc gatherWriteDesc(PxaWriteOpInterface op) {
   mlir::MemRefType memRefType = op.getMemRefType();
   mlir::ArrayRef<int64_t> shapeRef = memRefType.getShape();
   mlir::SmallVector<int64_t, 4> reduceVec(shapeRef.size(), 1);
@@ -191,7 +191,7 @@ gatherGlobalMemoryDescs(mlir::FuncOp func, const ScheduleModel &model) {
       MemoryUsageDesc &memoryDesc = getOrCreateGlobalDesc(indirectDef);
       memoryDesc.reads.emplace_back(gatherReadDesc(read, model));
     });
-    parallelOp.walk([&](PxaReduceOpInterface reduce) {
+    parallelOp.walk([&](PxaWriteOpInterface reduce) {
       mlir::Value indirectDef = getIndirectDef(reduce.getMemRef());
       // Skip memory local to `affine.parallel`.
       if (!parallelOp.isDefinedOutsideOfLoop(indirectDef))
