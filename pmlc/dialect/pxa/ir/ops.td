@@ -273,6 +273,49 @@ def PxaVectorLoadOp : PxaLoadOpBase<"vector_load"> {
   let hasFolder = 1;
 }
 
+class PxaStoreOpBase<string mnemonic, list<OpTrait> traits = []> :
+    PXA_OpWithPP<mnemonic, !listconcat(traits, [MemRefsNormalizable])> {
+
+  code extraClassDeclarationBase = [{
+    mlir::Value getValueToStore() { return value(); }
+    unsigned getValueOperandIndex() { return 0; }
+    void setValueToStore(mlir::Value value) { setOperand(getValueOperandIndex(), value); }
+
+    mlir::Value getMemRef() { return memref(); }
+    unsigned getMemRefOperandIndex() { return 1; }
+    void setMemRef(mlir::Value value) { setOperand(getMemRefOperandIndex(), value); }
+    mlir::MemRefType getMemRefType() { return memref().getType().cast<mlir::MemRefType>(); } 
+  }];
+}
+
+def PxaStoreOp : PxaStoreOpBase<"store"> {
+  let summary = "PXA non-affine store operation";
+
+  let arguments = (ins
+      AnyTypeOf<[AnySignlessInteger, AnyFloat, AnyVector]>:$value,
+      MemRefOf<[AnySignlessInteger, AnyFloat]>:$memref,
+      Variadic<Index>:$indices);
+  let results = (outs MemRefOf<[AnySignlessInteger, AnyFloat]>:$result);
+
+  let assemblyFormat = [{
+    $value `,` $memref `[` $indices `]` attr-dict `:` `(` type($value) `,`
+    type($memref) `)` `->` type($result)
+  }];
+
+  let hasCanonicalizer = 1;
+  let hasFolder = 1;
+
+  let builders = [
+    OpBuilder<(ins
+      "mlir::Value":$val,
+      "mlir::Value":$mem,
+      "mlir::ValueRange":$idxs
+    ), [{
+      build($_builder, $_state, mem.getType(), val, mem, idxs);
+    }]>
+  ];
+}
+
 // def AffineGreyboxOp : PXA_OpWithPP<"greybox", [
 //     AttrSizedOperandSegments,
 //     IsolatedFromAbove]> {
