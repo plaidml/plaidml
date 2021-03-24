@@ -273,22 +273,7 @@ def PxaVectorLoadOp : PxaLoadOpBase<"vector_load"> {
   let hasFolder = 1;
 }
 
-class PxaStoreOpBase<string mnemonic, list<OpTrait> traits = []> :
-    PXA_OpWithPP<mnemonic, !listconcat(traits, [MemRefsNormalizable])> {
-
-  code extraClassDeclarationBase = [{
-    mlir::Value getValueToStore() { return value(); }
-    unsigned getValueOperandIndex() { return 0; }
-    void setValueToStore(mlir::Value value) { setOperand(getValueOperandIndex(), value); }
-
-    mlir::Value getMemRef() { return memref(); }
-    unsigned getMemRefOperandIndex() { return 1; }
-    void setMemRef(mlir::Value value) { setOperand(getMemRefOperandIndex(), value); }
-    mlir::MemRefType getMemRefType() { return memref().getType().cast<mlir::MemRefType>(); } 
-  }];
-}
-
-def PxaStoreOp : PxaStoreOpBase<"store"> {
+def PxaStoreOp : PXA_OpWithPP<"store", [MemRefsNormalizable]> {
   let summary = "PXA non-affine store operation";
 
   let arguments = (ins
