@@ -277,13 +277,14 @@ def PxaStoreOp : PXA_OpWithPP<"store", [MemRefsNormalizable]> {
   let summary = "PXA non-affine store operation";
 
   let arguments = (ins
+      AtomicRMWKindAttr:$agg,
       AnyTypeOf<[AnySignlessInteger, AnyFloat, AnyVector]>:$value,
       MemRefOf<[AnySignlessInteger, AnyFloat]>:$memref,
       Variadic<Index>:$indices);
   let results = (outs MemRefOf<[AnySignlessInteger, AnyFloat]>:$result);
 
   let assemblyFormat = [{
-    $value `,` $memref `[` $indices `]` attr-dict `:` `(` type($value) `,`
+    $agg $value `,` $memref `[` $indices `]` attr-dict `:` `(` type($value) `,`
     type($memref) `)` `->` type($result)
   }];
 
@@ -292,11 +293,12 @@ def PxaStoreOp : PXA_OpWithPP<"store", [MemRefsNormalizable]> {
 
   let builders = [
     OpBuilder<(ins
+      "mlir::AtomicRMWKind":$agg,
       "mlir::Value":$val,
       "mlir::Value":$mem,
       "mlir::ValueRange":$idxs
     ), [{
-      build($_builder, $_state, mem.getType(), val, mem, idxs);
+      build($_builder, $_state, mem.getType(), agg, val, mem, idxs);
     }]>
   ];
 }
