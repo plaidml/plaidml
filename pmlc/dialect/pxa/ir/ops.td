@@ -20,11 +20,11 @@ class PXA_Op<string mnemonic, list<OpTrait> traits = []>
 
 class PXA_OpWithPP<string mnemonic, list<OpTrait> traits = []>
     : PXA_Op<mnemonic, traits> {
-  let printer = [ { print$cppClass(p, *this); } ];
-  let parser = [ { return parse$cppClass(parser, result); } ];
+  let printer = [{ print$cppClass(p, *this); }];
+  let parser = [{ return parse$cppClass(parser, result); }];
 }
 
-def AnyStdScalar : AnyTypeOf<[ AnyFloat, AnySignlessInteger ]> {
+def AnyStdScalar : AnyTypeOf<[AnyFloat, AnySignlessInteger]> {
 }
 
 class PxaReduceOpBase<string mnemonic, list<OpTrait> traits = []>
@@ -69,16 +69,16 @@ def PxaReduceOp : PxaReduceOpBase<"reduce"> {
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 
-  let builders = [ OpBuilder<(ins "mlir::AtomicRMWKind"
-                              : $agg, "mlir::Value"
-                              : $val, "mlir::Value"
-                              : $mem, "mlir::AffineMap"
-                              : $map, "mlir::ValueRange"
-                              : $idxs),
-                             [ {
-                               build($_builder, $_state, mem.getType(), agg,
-                                     val, mem, map, idxs);
-                             } ]> ];
+  let builders = [OpBuilder<(ins "mlir::AtomicRMWKind"
+                             : $agg, "mlir::Value"
+                             : $val, "mlir::Value"
+                             : $mem, "mlir::AffineMap"
+                             : $map, "mlir::ValueRange"
+                             : $idxs),
+                            [{
+                              build($_builder, $_state, mem.getType(), agg, val,
+                                    mem, map, idxs);
+                            }]>];
 
   let extraClassDeclaration =  extraClassDeclarationBase # [{
     mlir::Value getValueToStore() { return val();
@@ -104,11 +104,11 @@ def PxaGemmOp : PXA_OpWithPP<"gemm"> {
 
   let hasCanonicalizer = 1;
 
-  let extraClassDeclaration = [ {
+  let extraClassDeclaration = [{
     operand_range getOperandsForA();
     operand_range getOperandsForB();
     operand_range getOperandsForC();
-  } ];
+  }];
 }
 
 def PxaVectorReduceOp : PxaReduceOpBase<"vector_reduce"> {
@@ -125,16 +125,16 @@ def PxaVectorReduceOp : PxaReduceOpBase<"vector_reduce"> {
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 
-  let builders = [ OpBuilder<(ins "mlir::AtomicRMWKind"
-                              : $agg, "mlir::Value"
-                              : $vector, "mlir::Value"
-                              : $mem, "mlir::AffineMap"
-                              : $map, "mlir::ValueRange"
-                              : $idxs),
-                             [ {
-                               build($_builder, $_state, mem.getType(), agg,
-                                     vector, mem, map, idxs);
-                             } ]> ];
+  let builders = [OpBuilder<(ins "mlir::AtomicRMWKind"
+                             : $agg, "mlir::Value"
+                             : $vector, "mlir::Value"
+                             : $mem, "mlir::AffineMap"
+                             : $map, "mlir::ValueRange"
+                             : $idxs),
+                            [{
+                              build($_builder, $_state, mem.getType(), agg,
+                                    vector, mem, map, idxs);
+                            }]>];
 
   let extraClassDeclaration = extraClassDeclarationBase # [{
     mlir::Value getValueToStore() { return vector();
@@ -171,9 +171,9 @@ static mlir::StringRef getMapAttrName() { return "map"; }
 }];
 }
 
-def PxaLoadOp : PxaLoadOpBase<"load", [ NoSideEffect ]> {
+def PxaLoadOp : PxaLoadOpBase<"load", [NoSideEffect]> {
   let summary = "affine load operation";
-  let description = [ {
+  let description = [{
     The "affine.load" op reads an element from a memref, where the index
     for each memref dimension is an affine expression of loop induction
     variables and symbols. The output of 'affine.load' is a new value with the
@@ -192,7 +192,7 @@ def PxaLoadOp : PxaLoadOpBase<"load", [ NoSideEffect ]> {
     ```mlir
     %1 = affine.load %0[%i0 + symbol(%n), %i1 + symbol(%m)] : memref<100x100xf32>
     ```
-  } ];
+  }];
 
   let results = (outs AnyType : $result);
 
@@ -223,7 +223,7 @@ def PxaLoadOp : PxaLoadOpBase<"load", [ NoSideEffect ]> {
 
 def PxaVectorLoadOp : PxaLoadOpBase<"vector_load"> {
   let summary = "affine vector load operation";
-  let description = [ {
+  let description = [{
     The "affine.vector_load" is the vector counterpart of
     [affine.load](#affineload-operation). It reads a slice from a
     [MemRef](../LangRef.md#memref-type), supplied as its first operand,
@@ -259,15 +259,15 @@ def PxaVectorLoadOp : PxaLoadOpBase<"vector_load"> {
     * Add support for strided vector loads.
     * Consider adding a permutation map to permute the slice that is read from memory
     (see [vector.transfer_read](../Vector/#vectortransfer_read-vectortransferreadop)).
-  } ];
+  }];
 
   let results = (outs AnyVector : $result);
 
-  let builders = [ OpBuilder<(ins "mlir::VectorType"
-                              : $type, "mlir::Value"
-                              : $memref, "mlir::AffineMap"
-                              : $map, "mlir::ValueRange"
-                              : $mapOperands)> ];
+  let builders = [OpBuilder<(ins "mlir::VectorType"
+                             : $type, "mlir::Value"
+                             : $memref, "mlir::AffineMap"
+                             : $map, "mlir::ValueRange"
+                             : $mapOperands)>];
 
   let extraClassDeclaration = extraClassDeclarationBase # [{
     mlir::VectorType getVectorType() {
@@ -319,15 +319,15 @@ def PxaStoreOp : PxaStoreOpBase<"store"> {
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 
-  let builders = [ OpBuilder<(ins "mlir::Value"
-                              : $val, "mlir::Value"
-                              : $mem, "mlir::AffineMap"
-                              : $map, "mlir::ValueRange"
-                              : $idxs),
-                             [ {
-                               build($_builder, $_state, mem.getType(), val,
-                                     mem, map, idxs);
-                             } ]> ];
+  let builders = [OpBuilder<(ins "mlir::Value"
+                             : $val, "mlir::Value"
+                             : $mem, "mlir::AffineMap"
+                             : $map, "mlir::ValueRange"
+                             : $idxs),
+                            [{
+                              build($_builder, $_state, mem.getType(), val, mem,
+                                    map, idxs);
+                            }]>];
 
   let extraClassDeclaration =  extraClassDeclarationBase # [{
     mlir::Value getValueToStore() { return val();
@@ -348,15 +348,15 @@ def PxaVectorStoreOp : PxaStoreOpBase<"vector_store"> {
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 
-  let builders = [ OpBuilder<(ins "mlir::Value"
-                              : $vector, "mlir::Value"
-                              : $mem, "mlir::AffineMap"
-                              : $map, "mlir::ValueRange"
-                              : $idxs),
-                             [ {
-                               build($_builder, $_state, mem.getType(), vector,
-                                     mem, map, idxs);
-                             } ]> ];
+  let builders = [OpBuilder<(ins "mlir::Value"
+                             : $vector, "mlir::Value"
+                             : $mem, "mlir::AffineMap"
+                             : $map, "mlir::ValueRange"
+                             : $idxs),
+                            [{
+                              build($_builder, $_state, mem.getType(), vector,
+                                    mem, map, idxs);
+                            }]>];
 
   let extraClassDeclaration = extraClassDeclarationBase # [{
     mlir::Value getValueToStore() { return vector();
