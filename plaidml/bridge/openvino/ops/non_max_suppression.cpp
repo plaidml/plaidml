@@ -32,54 +32,109 @@ std::vector<Tensor> NMS(Tensor BOXES, Tensor SCORES, int32_t max_output_boxes_pe
   Tensor ONE_INT = edsl::cast(ONE, DType::INT32);
   Tensor TWO = edsl::reshape(op::slice(PIECE).add_dims({2}), {edsl::TensorDim(1)});
   Tensor TWO_INT = edsl::cast(TWO, DType::INT32);
-  Tensor THREE = edsl::reshape(op::slice(PIECE).add_dims({3}), {edsl::TensorDim(1)});
-  Tensor THREE_INT = edsl::cast(THREE, DType::INT32);
   Tensor NEG1 = -ONE;
   Tensor NEG1_INT = edsl::cast(NEG1, DType::INT32);
 
   std::vector<Tensor> boxes;
   std::vector<Tensor> scores;
   Tensor VALID_OUTPUTS = ZERO;
+  Tensor IOU_AREAI;
+  Tensor IOU_INTERSECTION_AREA_YGAP;
+  Tensor IOU_INTERSECTION_AREA_XGAP;
 
-  Tensor BOXES_Y1;
-  Tensor BOXES_X1;
-  Tensor BOXES_Y2;
-  Tensor BOXES_X2;
   if (center_point_box) {
-    Tensor BOXES_XCENTER = edsl::gather(BOXES, ZERO_INT).axis(2);
-    Tensor BOXES_YCENTER = edsl::gather(BOXES, ONE_INT).axis(2);
-    Tensor BOXES_WIDTH_HALF = edsl::gather(BOXES, TWO_INT).axis(2);
-    BOXES_WIDTH_HALF = BOXES_WIDTH_HALF / 2.0f;
-    Tensor BOXES_HEIGHT_HALF = edsl::gather(BOXES, THREE_INT).axis(2);
-    BOXES_HEIGHT_HALF = BOXES_HEIGHT_HALF / 2.0f;
-    BOXES_X1 = BOXES_XCENTER - BOXES_WIDTH_HALF;
-    BOXES_X2 = BOXES_XCENTER + BOXES_WIDTH_HALF;
-    BOXES_Y1 = BOXES_YCENTER - BOXES_HEIGHT_HALF;
-    BOXES_Y2 = BOXES_YCENTER + BOXES_HEIGHT_HALF;
+    TensorShape shape_mask(DType::FLOAT32, {1, 1, 4});
+    std::vector<float> mask_y1 = {0, 1, 0, -0.5};
+    Buffer buffer_mask_y1(shape_mask);
+    buffer_mask_y1.copy_from(mask_y1.data());
+    Tensor MASK_Y1 = edsl::cast(edsl::Constant(buffer_mask_y1, "mask_y1"), box_input_type);
+
+    std::vector<float> mask_x1 = {1, 0, -0.5, 0};
+    Buffer buffer_mask_x1(shape_mask);
+    buffer_mask_x1.copy_from(mask_x1.data());
+    Tensor MASK_X1 = edsl::cast(edsl::Constant(buffer_mask_x1, "mask_x1"), box_input_type);
+
+    std::vector<float> mask_y2 = {0, 1, 0, 0.5};
+    Buffer buffer_mask_y2(shape_mask);
+    buffer_mask_y2.copy_from(mask_y2.data());
+    Tensor MASK_Y2 = edsl::cast(edsl::Constant(buffer_mask_y2, "mask_y2"), box_input_type);
+
+    std::vector<float> mask_x2 = {1, 0, 0.5, 0};
+    Buffer buffer_mask_x2(shape_mask);
+    buffer_mask_x2.copy_from(mask_x2.data());
+    Tensor MASK_X2 = edsl::cast(edsl::Constant(buffer_mask_x2, "mask_x2"), box_input_type);
+
+    std::vector<float> mask_w = {0, 0, 1, 0};
+    Buffer buffer_mask_w(shape_mask);
+    buffer_mask_w.copy_from(mask_w.data());
+    Tensor MASK_W = edsl::cast(edsl::Constant(buffer_mask_w, "mask_w"), box_input_type);
+
+    std::vector<float> mask_h = {0, 0, 0, 1};
+    Buffer buffer_mask_h(shape_mask);
+    buffer_mask_h.copy_from(mask_h.data());
+    Tensor MASK_H = edsl::cast(edsl::Constant(buffer_mask_h, "mask_h"), box_input_type);
+
+    IOU_AREAI = op::sum(BOXES * MASK_W, edsl::Value(2)) * op::sum(BOXES * MASK_H, edsl::Value(2));
+    Tensor BOXES_Y1 = op::sum(BOXES * MASK_Y1, edsl::Value(2));
+    Tensor BOXES_X1 = op::sum(BOXES * MASK_X1, edsl::Value(2));
+    Tensor BOXES_Y2 = op::sum(BOXES * MASK_Y2, edsl::Value(2));
+    Tensor BOXES_X2 = op::sum(BOXES * MASK_X2, edsl::Value(2));
+
+    Tensor IOU_INTERSECTION_YMIN = op::maximum(op::unsqueeze(BOXES_Y1, {-1}), op::unsqueeze(BOXES_Y1, {-2}));
+    Tensor IOU_INTERSECTION_XMIN = op::maximum(op::unsqueeze(BOXES_X1, {-1}), op::unsqueeze(BOXES_X1, {-2}));
+    Tensor IOU_INTERSECTION_YMAX = op::minimum(op::unsqueeze(BOXES_Y2, {-1}), op::unsqueeze(BOXES_Y2, {-2}));
+    Tensor IOU_INTERSECTION_XMAX = op::minimum(op::unsqueeze(BOXES_X2, {-1}), op::unsqueeze(BOXES_X2, {-2}));
+    IOU_INTERSECTION_AREA_YGAP = IOU_INTERSECTION_YMAX - IOU_INTERSECTION_YMIN;
+    IOU_INTERSECTION_AREA_XGAP = IOU_INTERSECTION_XMAX - IOU_INTERSECTION_XMIN;
   } else {
-    BOXES_Y1 = edsl::gather(BOXES, ZERO_INT).axis(2);
-    BOXES_X1 = edsl::gather(BOXES, ONE_INT).axis(2);
-    BOXES_Y2 = edsl::gather(BOXES, TWO_INT).axis(2);
-    BOXES_X2 = edsl::gather(BOXES, THREE_INT).axis(2);
+    TensorShape shape_mask(DType::FLOAT32, {1, 1, 4});
+    std::vector<float> area_mask_y = {-1, 0, 1, 0};
+    Buffer buffer_area_y(shape_mask);
+    buffer_area_y.copy_from(area_mask_y.data());
+    Tensor AREA_MASK_Y = edsl::cast(edsl::Constant(buffer_area_y, "area_mask_y"), box_input_type);
+
+    std::vector<float> area_mask_x = {0, -1, 0, 1};
+    Buffer buffer_area_x(shape_mask);
+    buffer_area_x.copy_from(area_mask_x.data());
+    Tensor AREA_MASK_X = edsl::cast(edsl::Constant(buffer_area_x, "area_mask_x"), box_input_type);
+
+    TensorShape shape_mask_is(DType::FLOAT32, {1, 1, 1, 4});
+    std::vector<float> intersection_mask_ymin = {1, 0, 0, 0};
+    Buffer buffer_intersection_mask_ymin(shape_mask_is);
+    buffer_intersection_mask_ymin.copy_from(intersection_mask_ymin.data());
+    Tensor INTERSECTION_MASK_YMIN =
+        edsl::cast(edsl::Constant(buffer_intersection_mask_ymin, "intersection_mask_ymin"), box_input_type);
+
+    std::vector<float> intersection_mask_xmin = {0, 1, 0, 0};
+    Buffer buffer_intersection_mask_xmin(shape_mask_is);
+    buffer_intersection_mask_xmin.copy_from(intersection_mask_xmin.data());
+    Tensor INTERSECTION_MASK_XMIN =
+        edsl::cast(edsl::Constant(buffer_intersection_mask_xmin, "intersection_mask_xmin"), box_input_type);
+
+    std::vector<float> intersection_mask_ymax = {0, 0, 1, 0};
+    Buffer buffer_intersection_mask_ymax(shape_mask_is);
+    buffer_intersection_mask_ymax.copy_from(intersection_mask_ymax.data());
+    Tensor INTERSECTION_MASK_YMAX =
+        edsl::cast(edsl::Constant(buffer_intersection_mask_ymax, "intersection_mask_ymax"), box_input_type);
+
+    std::vector<float> intersection_mask_xmax = {0, 0, 0, 1};
+    Buffer buffer_intersection_mask_xmax(shape_mask_is);
+    buffer_intersection_mask_xmax.copy_from(intersection_mask_xmax.data());
+    Tensor INTERSECTION_MASK_XMAX =
+        edsl::cast(edsl::Constant(buffer_intersection_mask_xmax, "intersection_mask_xmax"), box_input_type);
+
+    IOU_AREAI = op::sum(BOXES * AREA_MASK_Y, edsl::Value(2)) * op::sum(BOXES * AREA_MASK_X, edsl::Value(2));
+    Tensor BOXES_A = edsl::reshape(
+        BOXES, {edsl::TensorDim(num_batches), edsl::TensorDim(1), edsl::TensorDim(num_boxes), edsl::TensorDim(4)});
+    Tensor BOXES_B = edsl::reshape(
+        BOXES, {edsl::TensorDim(num_batches), edsl::TensorDim(num_boxes), edsl::TensorDim(1), edsl::TensorDim(4)});
+    Tensor IOU_INTERSECTION_MAX = op::maximum(BOXES_A, BOXES_B);
+    Tensor IOU_INTERSECTION_MIN = op::minimum(BOXES_A, BOXES_B);
+    IOU_INTERSECTION_AREA_YGAP = op::sum(IOU_INTERSECTION_MIN * INTERSECTION_MASK_YMAX, edsl::Value(-1)) -
+                                 op::sum(IOU_INTERSECTION_MAX * INTERSECTION_MASK_YMIN, edsl::Value(-1));
+    IOU_INTERSECTION_AREA_XGAP = op::sum(IOU_INTERSECTION_MIN * INTERSECTION_MASK_XMAX, edsl::Value(-1)) -
+                                 op::sum(IOU_INTERSECTION_MAX * INTERSECTION_MASK_XMIN, edsl::Value(-1));
   }
-
-  BOXES_Y1 = edsl::reshape(BOXES_Y1, {num_batches, num_boxes});
-  BOXES_X1 = edsl::reshape(BOXES_X1, {num_batches, num_boxes});
-  BOXES_Y2 = edsl::reshape(BOXES_Y2, {num_batches, num_boxes});
-  BOXES_X2 = edsl::reshape(BOXES_X2, {num_batches, num_boxes});
-
-  Tensor IOU_AREAI = (BOXES_Y2 - BOXES_Y1) * (BOXES_X2 - BOXES_X1);  // num_batches * num_boxes, 1*5
-  Tensor IOU_INTERSECTION_YMIN =
-      op::maximum(edsl::reshape(BOXES_Y1, {num_batches, num_boxes, 1}),
-                  edsl::reshape(BOXES_Y1, {num_batches, 1, num_boxes}));  // shall be num_batch * num_box * num_box
-  Tensor IOU_INTERSECTION_XMIN = op::maximum(edsl::reshape(BOXES_X1, {num_batches, num_boxes, 1}),
-                                             edsl::reshape(BOXES_X1, {num_batches, 1, num_boxes}));
-  Tensor IOU_INTERSECTION_YMAX = op::minimum(edsl::reshape(BOXES_Y2, {num_batches, num_boxes, 1}),
-                                             edsl::reshape(BOXES_Y2, {num_batches, 1, num_boxes}));
-  Tensor IOU_INTERSECTION_XMAX = op::minimum(edsl::reshape(BOXES_X2, {num_batches, num_boxes, 1}),
-                                             edsl::reshape(BOXES_X2, {num_batches, 1, num_boxes}));
-  Tensor IOU_INTERSECTION_AREA_YGAP = IOU_INTERSECTION_YMAX - IOU_INTERSECTION_YMIN;
-  Tensor IOU_INTERSECTION_AREA_XGAP = IOU_INTERSECTION_XMAX - IOU_INTERSECTION_XMIN;
   Tensor IOU_INTERSECTION_AREA = edsl::select(IOU_INTERSECTION_AREA_YGAP > 0.0f, IOU_INTERSECTION_AREA_YGAP, ZERO) *
                                  edsl::select(IOU_INTERSECTION_AREA_XGAP > 0.0f, IOU_INTERSECTION_AREA_XGAP, ZERO);
 
@@ -111,7 +166,9 @@ std::vector<Tensor> NMS(Tensor BOXES, Tensor SCORES, int32_t max_output_boxes_pe
     // Select the box with largest score
     // The boxes may have same score
     Tensor CANDIDATE_INDEX = edsl::gather(edsl::argsort(NEW_SCORES, 2, edsl::SortDirection::DESC), ZERO_INT).axis(2);
-    Tensor SCORE = edsl::reshape(op::max(NEW_SCORES, edsl::Value(2)), {num_batches, num_classes, 1});
+    // Tensor SCORE = edsl::reshape(op::max(NEW_SCORES, edsl::Value(2)), {num_batches, num_classes, 1});
+    Tensor SCORE =
+        edsl::gather(NEW_SCORES, op::unsqueeze(CANDIDATE_INDEX, {-1})).mode(edsl::GatherMode::ND).batchDims(2);
     Tensor CURRENT_NODE = edsl::select(SCORE > 0.0f, INDEX_BC,
                                        edsl::cast(INVALID_NODE, box_output_type));  // num_batches * num_classes * 2
 
