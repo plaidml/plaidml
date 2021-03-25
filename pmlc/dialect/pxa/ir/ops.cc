@@ -232,16 +232,16 @@ static LogicalResult foldMemRefCast(Operation *op) {
   return success(folded);
 }
 
-/// Fold reduce operations with no uses. Reduce has side effects on the heap,
-/// but can still be deleted if it has zero uses.
-template <typename ReduceOp>
-struct SimplifyDeadReduce : public OpRewritePattern<ReduceOp> {
-  using OpRewritePattern<ReduceOp>::OpRewritePattern;
+/// Fold reduce/store operations with no uses. Reduce/store have side effects
+/// on the heap, but can still be deleted if it has zero uses.
+template <typename WriteOp>
+struct SimplifyDeadWrite : public OpRewritePattern<WriteOp> {
+  using OpRewritePattern<WriteOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(ReduceOp reduce,
+  LogicalResult matchAndRewrite(WriteOp write,
                                 PatternRewriter &rewriter) const override {
-    if (reduce.use_empty()) {
-      rewriter.eraseOp(reduce);
+    if (write.use_empty()) {
+      rewriter.eraseOp(write);
       return success();
     }
     return failure();
@@ -464,7 +464,7 @@ void PxaReduceOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
                                               MLIRContext *context) {
   results.insert<                    //
       SimplifyAffineOp<PxaReduceOp>, //
-      SimplifyDeadReduce<PxaReduceOp>>(context);
+      SimplifyDeadWrite<PxaReduceOp>>(context);
 }
 
 OpFoldResult PxaReduceOp::fold(ArrayRef<Attribute> cstOperands) {
@@ -617,11 +617,25 @@ ParseResult parsePxaVectorReduceOp(OpAsmParser &parser,
 void PxaVectorReduceOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
   results.insert<SimplifyAffineOp<PxaVectorReduceOp>,
-                 SimplifyDeadReduce<PxaVectorReduceOp>>(context);
+                 SimplifyDeadWrite<PxaVectorReduceOp>>(context);
 }
 
 OpFoldResult PxaVectorReduceOp::fold(ArrayRef<Attribute> cstOperands) {
   /// vectorReduce(memrefcast) -> vectorReduce
+  if (succeeded(foldMemRefCast(*this)))
+    return getResult();
+  return {};
+}
+
+// ---- PxaStoreOp ----
+
+void PxaStoreOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                             MLIRContext *context) {
+  results.insert<SimplifyDeadWrite<PxaStoreOp>>(context);
+}
+
+OpFoldResult PxaStoreOp::fold(ArrayRef<Attribute> cstOperands) {
+  /// store(memrefcast) -> store
   if (succeeded(foldMemRefCast(*this)))
     return getResult();
   return {};
