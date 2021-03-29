@@ -125,6 +125,37 @@ private:
     return success();
   }
 
+  template <typename OpTy>
+  void devectorizeOp(OpTy op) {
+    OpBuilder builder(op);
+    auto loc = op.getLoc();
+    mlir::Value operand = op.getOperand();
+    auto vectorType = operand.getType().cast<VectorType>();
+    auto memrefType =
+        MemRefType::get(vectorType.getShape(), vectorType.getElementType());
+    auto vecMem = builder.create<AllocOp>(loc, memrefType);
+    SmallVector<Value, 8> vectorIvs{builder.create<ConstantIndexOp>(loc, 0)};
+    builder.create<vector::TransferWriteOp>(loc, operand, vecMem, vectorIvs);
+
+    auto parallelOp = builder.create<AffineParallelOp>(
+        loc, ArrayRef<Type>{}, ArrayRef<AtomicRMWKind>{},
+        AffineMap::getConstantMap(0, op.getContext()), ValueRange(),
+        AffineMap::getConstantMap(vectorWidth, op.getContext()), ValueRange(),
+        ArrayRef<int64_t>{1});
+    auto parallelBody = parallelOp.getBody();
+    builder.setInsertionPointToStart(parallelBody);
+
+    auto elementIvs = parallelBody->getArguments();
+    auto element = builder.create<LoadOp>(loc, vecMem, elementIvs);
+    auto expResult = builder.create<OpTy>(loc, element).getResult();
+    builder.create<AffineStoreOp>(loc, expResult, vecMem, elementIvs);
+
+    builder.setInsertionPointAfter(parallelOp);
+    auto newOp = builder.create<vector::TransferReadOp>(loc, vectorType, vecMem,
+                                                        vectorIvs);
+    op.replaceAllUsesWith(newOp.getOperation());
+  }
+
   LogicalResult tryVectorizeScalarOp(Operation *op) {
     if (op->getNumRegions() != 0) {
       return op->emitRemark("Vectorize op: Failed, interior loops");
@@ -244,6 +275,15 @@ public:
         .Default([&](Operation *op) { vectorizeScalarOp(op); });
   }
 
+  void devectorizeOperation(Operation *op) {
+    TypeSwitch<Operation *>(op)
+        .Case<math::ExpOp>([&](auto op) { devectorizeOp<math::ExpOp>(op); })
+        .Case<math::TanhOp>([&](auto op) { devectorizeOp<math::TanhOp>(op); })
+        .Case<ExpOp>([&](auto op) { devectorizeOp<ExpOp>(op); })
+        .Case<TanhOp>([&](auto op) { devectorizeOp<TanhOp>(op); })
+        .Default([&](Operation *op) {});
+  }
+
   LogicalResult isLegal() {
     auto ranges = loop.getConstantRanges();
     if (!ranges) {
@@ -282,6 +322,9 @@ public:
     auto steps = loop.getSteps();
     for (auto &op : llvm::make_early_inc_range(body->getOperations())) {
       vectorizeOperation(&op);
+    }
+    for (auto &op : llvm::make_early_inc_range(body->getOperations())) {
+      devectorizeOperation(&op);
     }
     auto argNum = index.getArgNumber();
     steps[argNum] *= vectorWidth;
@@ -390,7 +433,7 @@ std::unique_ptr<mlir::Pass> createVectorizePass(StringRef strategy,
 
 // TODO: Maybe move this to a generic utility somewhere
 template <typename OpTy, typename... Args>
-static OpTy replaceOp(Operation *op, Args &&... args) {
+static OpTy replaceOp(Operation *op, Args &&...args) {
   OpBuilder builder(op);
   auto newOp = builder.create<OpTy>(op->getLoc(), std::forward<Args>(args)...);
   op->getResult(0).replaceAllUsesWith(newOp.getResult());
