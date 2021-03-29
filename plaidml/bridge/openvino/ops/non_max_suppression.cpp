@@ -16,19 +16,28 @@ namespace PlaidMLPlugin {
 
 class nms {
  public:
-  explicit nms(edsl::Tensor BOXES, edsl::Tensor SCORES, int32_t max_output_boxes_per_class, edsl::Tensor IOU_THRESHOLD,
-               edsl::Tensor SCORE_THRESHOLD, edsl::Tensor SOFT_NMS_SIGMA)
-      : BOXES_(BOXES),
-        SCORES_(SCORES),
-        max_output_boxes_per_class_(max_output_boxes_per_class),
-        IOU_THRESHOLD_(IOU_THRESHOLD),
-        SCORE_THRESHOLD_(SCORE_THRESHOLD),
-        SOFT_NMS_SIGMA_(SOFT_NMS_SIGMA),
+  explicit nms(edsl::Tensor Boxes, edsl::Tensor Scores, edsl::Tensor IOU_threshold, edsl::Tensor Score_threshold)
+      : Boxes_(Boxes),
+        Scores_(Scores),
+        max_output_boxes_per_class_(0),
+        IOU_threshold_(IOU_threshold),
+        Score_threshold_(Score_threshold),
+        soft_nms_sigma_(0.0f),
         center_point_box_(false),
         sort_result_descending_(false),
         box_input_type_(DType::FLOAT32),
         box_output_type_(DType::INT32),
         thres_type_(DType::FLOAT32) {}
+
+  nms& max_output_boxes_per_class(int max_output_boxes_per_class) {
+    max_output_boxes_per_class_ = max_output_boxes_per_class;
+    return *this;
+  }
+
+  nms& soft_nms_sigma(float soft_nms_sigma) {
+    soft_nms_sigma_ = soft_nms_sigma;
+    return *this;
+  }
 
   nms& center_point_box(bool center_point_box) {
     center_point_box_ = center_point_box;
@@ -58,12 +67,12 @@ class nms {
   std::vector<edsl::Tensor> build();
 
  private:
-  edsl::Tensor BOXES_;
-  edsl::Tensor SCORES_;
-  int32_t max_output_boxes_per_class_;
-  edsl::Tensor IOU_THRESHOLD_;
-  edsl::Tensor SCORE_THRESHOLD_;
-  edsl::Tensor SOFT_NMS_SIGMA_;
+  edsl::Tensor Boxes_;
+  edsl::Tensor Scores_;
+  int max_output_boxes_per_class_;
+  edsl::Tensor IOU_threshold_;
+  edsl::Tensor Score_threshold_;
+  float soft_nms_sigma_;
   bool center_point_box_;
   bool sort_result_descending_;
   DType box_input_type_;
@@ -72,164 +81,169 @@ class nms {
 };
 
 std::vector<edsl::Tensor> nms::build() {
-  std::vector<int64_t> boxes_shape = BOXES_.compute_shape().sizes();
-  std::vector<int64_t> scores_shape = SCORES_.compute_shape().sizes();
+  std::vector<int64_t> boxes_shape = Boxes_.compute_shape().sizes();
+  std::vector<int64_t> scores_shape = Scores_.compute_shape().sizes();
   int num_batches = boxes_shape[0];
   int num_boxes = boxes_shape[1];
   int num_classes = scores_shape[1];
 
   // Used for gather and select
-  edsl::Tensor ZERO = edsl::cast(edsl::index({edsl::TensorDim(1)}, 0), box_input_type_);
-  edsl::Tensor ZERO_INT = edsl::cast(ZERO, DType::INT32);
-  edsl::Tensor ONE = ZERO + 1;
-  edsl::Tensor ONE_INT = ZERO_INT + 1;
-  edsl::Tensor NEG1 = -ONE;
-  edsl::Tensor NEG1_O = edsl::cast(NEG1, box_output_type_);
+  edsl::Tensor Zero = edsl::cast(edsl::index({edsl::TensorDim(1)}, 0), box_input_type_);
+  edsl::Tensor Zero_int = edsl::cast(Zero, DType::INT32);
+  edsl::Tensor One = Zero + 1;
+  edsl::Tensor One_int = Zero_int + 1;
+  edsl::Tensor NEG1 = -One;
+  edsl::Tensor Neg1_o = edsl::cast(NEG1, box_output_type_);
 
   std::vector<edsl::Tensor> boxes;
   std::vector<edsl::Tensor> scores;
-  edsl::Tensor VALID_OUTPUTS = ZERO;
+  edsl::Tensor Valid_outputs = Zero;
 
-  edsl::Tensor BOXES_Y1;
-  edsl::Tensor BOXES_X1;
-  edsl::Tensor BOXES_Y2;
-  edsl::Tensor BOXES_X2;
+  edsl::Tensor Boxes_y1;
+  edsl::Tensor Boxes_x1;
+  edsl::Tensor Boxes_y2;
+  edsl::Tensor Boxes_x2;
   if (center_point_box_) {
-    edsl::Tensor BOXES_XCENTER = edsl::gather(BOXES_, ZERO_INT).axis(2);
-    edsl::Tensor BOXES_YCENTER = edsl::gather(BOXES_, ONE_INT).axis(2);
-    edsl::Tensor BOXES_WIDTH_HALF = edsl::gather(BOXES_, ONE_INT + 1).axis(2);
-    BOXES_WIDTH_HALF = BOXES_WIDTH_HALF / 2.0f;
-    edsl::Tensor BOXES_HEIGHT_HALF = edsl::gather(BOXES_, ONE_INT + 2).axis(2);
-    BOXES_HEIGHT_HALF = BOXES_HEIGHT_HALF / 2.0f;
-    BOXES_X1 = BOXES_XCENTER - BOXES_WIDTH_HALF;
-    BOXES_X2 = BOXES_XCENTER + BOXES_WIDTH_HALF;
-    BOXES_Y1 = BOXES_YCENTER - BOXES_HEIGHT_HALF;
-    BOXES_Y2 = BOXES_YCENTER + BOXES_HEIGHT_HALF;
+    edsl::Tensor Boxes_xcenter = edsl::gather(Boxes_, Zero_int).axis(2);
+    edsl::Tensor Boxes_ycenter = edsl::gather(Boxes_, One_int).axis(2);
+    edsl::Tensor Boxes_width_half = edsl::gather(Boxes_, One_int + 1).axis(2);
+    Boxes_width_half = Boxes_width_half / 2.0f;
+    edsl::Tensor Boxes_height_half = edsl::gather(Boxes_, One_int + 2).axis(2);
+    Boxes_height_half = Boxes_height_half / 2.0f;
+    Boxes_x1 = Boxes_xcenter - Boxes_width_half;
+    Boxes_x2 = Boxes_xcenter + Boxes_width_half;
+    Boxes_y1 = Boxes_ycenter - Boxes_height_half;
+    Boxes_y2 = Boxes_ycenter + Boxes_height_half;
   } else {
-    BOXES_Y1 = edsl::gather(BOXES_, ZERO_INT).axis(2);
-    BOXES_X1 = edsl::gather(BOXES_, ONE_INT).axis(2);
-    BOXES_Y2 = edsl::gather(BOXES_, ONE_INT + 1).axis(2);
-    BOXES_X2 = edsl::gather(BOXES_, ONE_INT + 2).axis(2);
+    Boxes_y1 = edsl::gather(Boxes_, Zero_int).axis(2);
+    Boxes_x1 = edsl::gather(Boxes_, One_int).axis(2);
+    Boxes_y2 = edsl::gather(Boxes_, One_int + 1).axis(2);
+    Boxes_x2 = edsl::gather(Boxes_, One_int + 2).axis(2);
   }
 
-  BOXES_Y1 = edsl::reshape(BOXES_Y1, {num_batches, num_boxes});
-  BOXES_X1 = edsl::reshape(BOXES_X1, {num_batches, num_boxes});
-  BOXES_Y2 = edsl::reshape(BOXES_Y2, {num_batches, num_boxes});
-  BOXES_X2 = edsl::reshape(BOXES_X2, {num_batches, num_boxes});
+  Boxes_y1 = edsl::reshape(Boxes_y1, {num_batches, num_boxes});
+  Boxes_x1 = edsl::reshape(Boxes_x1, {num_batches, num_boxes});
+  Boxes_y2 = edsl::reshape(Boxes_y2, {num_batches, num_boxes});
+  Boxes_x2 = edsl::reshape(Boxes_x2, {num_batches, num_boxes});
 
-  edsl::Tensor IOU_AREAI = (BOXES_Y2 - BOXES_Y1) * (BOXES_X2 - BOXES_X1);
-  edsl::Tensor IOU_INTERSECTION_YMIN = op::maximum(edsl::reshape(BOXES_Y1, {num_batches, num_boxes, 1}),
-                                                   edsl::reshape(BOXES_Y1, {num_batches, 1, num_boxes}));
-  edsl::Tensor IOU_INTERSECTION_XMIN = op::maximum(edsl::reshape(BOXES_X1, {num_batches, num_boxes, 1}),
-                                                   edsl::reshape(BOXES_X1, {num_batches, 1, num_boxes}));
-  edsl::Tensor IOU_INTERSECTION_YMAX = op::minimum(edsl::reshape(BOXES_Y2, {num_batches, num_boxes, 1}),
-                                                   edsl::reshape(BOXES_Y2, {num_batches, 1, num_boxes}));
-  edsl::Tensor IOU_INTERSECTION_XMAX = op::minimum(edsl::reshape(BOXES_X2, {num_batches, num_boxes, 1}),
-                                                   edsl::reshape(BOXES_X2, {num_batches, 1, num_boxes}));
-  edsl::Tensor IOU_INTERSECTION_AREA_YGAP = IOU_INTERSECTION_YMAX - IOU_INTERSECTION_YMIN;
-  edsl::Tensor IOU_INTERSECTION_AREA_XGAP = IOU_INTERSECTION_XMAX - IOU_INTERSECTION_XMIN;
-  edsl::Tensor IOU_INTERSECTION_AREA =
-      edsl::select(IOU_INTERSECTION_AREA_YGAP > 0.0f, IOU_INTERSECTION_AREA_YGAP, ZERO) *
-      edsl::select(IOU_INTERSECTION_AREA_XGAP > 0.0f, IOU_INTERSECTION_AREA_XGAP, ZERO);
+  edsl::Tensor IOU_Areai = (Boxes_y2 - Boxes_y1) * (Boxes_x2 - Boxes_x1);
+  edsl::Tensor IOU_intersection_ymin = op::maximum(edsl::reshape(Boxes_y1, {num_batches, num_boxes, 1}),
+                                                   edsl::reshape(Boxes_y1, {num_batches, 1, num_boxes}));
+  edsl::Tensor IOU_intersection_xmin = op::maximum(edsl::reshape(Boxes_x1, {num_batches, num_boxes, 1}),
+                                                   edsl::reshape(Boxes_x1, {num_batches, 1, num_boxes}));
+  edsl::Tensor IOU_intersection_ymax = op::minimum(edsl::reshape(Boxes_y2, {num_batches, num_boxes, 1}),
+                                                   edsl::reshape(Boxes_y2, {num_batches, 1, num_boxes}));
+  edsl::Tensor IOU_intersection_xmax = op::minimum(edsl::reshape(Boxes_x2, {num_batches, num_boxes, 1}),
+                                                   edsl::reshape(Boxes_x2, {num_batches, 1, num_boxes}));
+  edsl::Tensor IOU_intersection_area_ygap = IOU_intersection_ymax - IOU_intersection_ymin;
+  edsl::Tensor IOU_intersection_area_xgap = IOU_intersection_xmax - IOU_intersection_xmin;
+  edsl::Tensor IOU_intersection_area =
+      edsl::select(IOU_intersection_area_ygap > 0.0f, IOU_intersection_area_ygap, Zero) *
+      edsl::select(IOU_intersection_area_xgap > 0.0f, IOU_intersection_area_xgap, Zero);
 
-  edsl::Tensor IOU_DENOMINATOR =
-      op::unsqueeze(IOU_AREAI, {-1}) + op::unsqueeze(IOU_AREAI, {-2}) - IOU_INTERSECTION_AREA;
+  edsl::Tensor IOU_denominator =
+      op::unsqueeze(IOU_Areai, {-1}) + op::unsqueeze(IOU_Areai, {-2}) - IOU_intersection_area;
 
-  edsl::Tensor IOU_DENOMINATOR_ZEROED = edsl::select(IOU_DENOMINATOR <= 0.0f, ZERO, 1.0f / IOU_DENOMINATOR);
-  edsl::Tensor IOU = IOU_INTERSECTION_AREA * IOU_DENOMINATOR_ZEROED;
+  edsl::Tensor IOU_denominator_zeroed = edsl::select(IOU_denominator <= 0.0f, Zero, 1.0f / IOU_denominator);
+  edsl::Tensor IOU = IOU_intersection_area * IOU_denominator_zeroed;
 
-  edsl::Tensor WEIGHT = edsl::cast(
-      edsl::select(SOFT_NMS_SIGMA_ != 0.0f, -0.5f / SOFT_NMS_SIGMA_, edsl::cast(ZERO, thres_type_)), box_input_type_);
+  float weight = 0.0f;
+  if (soft_nms_sigma_ != 0) {
+    weight = -0.5 / soft_nms_sigma_;
+  }
 
-  TensorShape NODE_SHAPE(DType::FLOAT32, {1, 1, 2});
+  TensorShape Node_shape(DType::FLOAT32, {1, 1, 2});
 
   std::vector<float> invalid_node_index = {-1, -1};
-  Buffer buffer_invalid_node(NODE_SHAPE);
+  Buffer buffer_invalid_node(Node_shape);
   buffer_invalid_node.copy_from(invalid_node_index.data());
-  auto INVALID_NODE = edsl::cast(edsl::Constant(buffer_invalid_node, "INVALID_NODE"), box_output_type_);
+  auto Invalid_node = edsl::cast(edsl::Constant(buffer_invalid_node, "Invalid_node"), box_output_type_);
 
-  int num_boxes_per_class = std::min(num_boxes, max_output_boxes_per_class_);
+  int num_boxes_per_class = num_boxes;
+  if (max_output_boxes_per_class_ != 0) {
+    num_boxes_per_class = std::min(num_boxes, max_output_boxes_per_class_);
+  }
 
-  auto INDEX_B = edsl::index({edsl::TensorDim(num_batches), edsl::TensorDim(num_classes), edsl::TensorDim(1)}, 0);
-  auto INDEX_C = edsl::index({edsl::TensorDim(num_batches), edsl::TensorDim(num_classes), edsl::TensorDim(1)}, 1);
-  auto INDEX_BC = edsl::cast(op::concatenate({INDEX_B, INDEX_C}, 2), box_output_type_);
+  auto Index_b = edsl::index({edsl::TensorDim(num_batches), edsl::TensorDim(num_classes), edsl::TensorDim(1)}, 0);
+  auto Index_c = edsl::index({edsl::TensorDim(num_batches), edsl::TensorDim(num_classes), edsl::TensorDim(1)}, 1);
+  auto Index_bc = edsl::cast(op::concatenate({Index_b, Index_c}, 2), box_output_type_);
 
-  edsl::Tensor SCORE_THRESHOLD_I = edsl::cast(SCORE_THRESHOLD_, box_input_type_);
-  edsl::Tensor IOU_THRESHOLD_I = edsl::cast(IOU_THRESHOLD_, box_input_type_);
-  edsl::Tensor ZERO_SCATTER = op::broadcast(ZERO, {num_batches, num_classes, 1}, {0});
-  edsl::Tensor NEW_SCORES = edsl::select(SCORES_ > SCORE_THRESHOLD_I, SCORES_, ZERO);
+  edsl::Tensor Score_threshold_I = edsl::cast(Score_threshold_, box_input_type_);
+  edsl::Tensor IOU_threshold_I = edsl::cast(IOU_threshold_, box_input_type_);
+  edsl::Tensor Zero_scatter = op::broadcast(Zero, {num_batches, num_classes, 1}, {0});
+  edsl::Tensor New_scores = edsl::select(Scores_ > Score_threshold_I, Scores_, Zero);
 
   // Select box
   for (int k = 0; k < num_boxes_per_class; k++) {
     // Select the box with largest score
-    edsl::Tensor CANDIDATE_INDEX =
-        edsl::gather(edsl::argsort(NEW_SCORES, 2, edsl::SortDirection::DESC), ZERO_INT).axis(2);
-    edsl::Tensor SCORE = edsl::reshape(op::max(NEW_SCORES, edsl::Value(2)), {num_batches, num_classes, 1});
-    edsl::Tensor CURRENT_NODE = edsl::select(SCORE > 0.0f, INDEX_BC, INVALID_NODE);
+    edsl::Tensor Candidate_index =
+        edsl::gather(edsl::argsort(New_scores, 2, edsl::SortDirection::DESC), Zero_int).axis(2);
+    edsl::Tensor SCORE = edsl::reshape(op::max(New_scores, edsl::Value(2)), {num_batches, num_classes, 1});
+    edsl::Tensor Current_node = edsl::select(SCORE > 0.0f, Index_bc, Invalid_node);
 
     // Update count of selected box
-    edsl::Tensor VALID = op::sum(edsl::select(SCORE != 0.0f, ONE, ZERO));
-    VALID_OUTPUTS = VALID_OUTPUTS + VALID;
+    edsl::Tensor Valid = op::sum(edsl::select(SCORE != 0.0f, One, Zero));
+    Valid_outputs = Valid_outputs + Valid;
 
     // Add selected box to scores
-    scores.push_back(edsl::cast(CURRENT_NODE, thres_type_));
+    scores.push_back(edsl::cast(Current_node, thres_type_));
     SCORE = edsl::select(SCORE > 0.0f, SCORE, NEG1);
     scores.push_back(edsl::cast(SCORE, thres_type_));
 
     // Set scores of current box and boxes which have IOU larger than threshold to zero
     // The scores can be same, use scatter to update current node
-    edsl::Tensor NEW_SCORES_UPDATE =
-        edsl::scatter(NEW_SCORES, CANDIDATE_INDEX, ZERO_SCATTER).axis(2).mode(edsl::ScatterMode::UPDATE_ELT);
-    NEW_SCORES = edsl::reshape(NEW_SCORES_UPDATE, {num_batches, num_classes, num_boxes});
+    edsl::Tensor New_scores_update =
+        edsl::scatter(New_scores, Candidate_index, Zero_scatter).axis(2).mode(edsl::ScatterMode::UPDATE_ELT);
+    New_scores = edsl::reshape(New_scores_update, {num_batches, num_classes, num_boxes});
 
-    edsl::Tensor IOU_CANDIDATE = edsl::gather(IOU, CANDIDATE_INDEX).mode(edsl::GatherMode::ND).batchDims(1);
+    edsl::Tensor IOU_candidate = edsl::gather(IOU, Candidate_index).mode(edsl::GatherMode::ND).batchDims(1);
     // use >= to include suppose_hard_suppresion case
-    NEW_SCORES = edsl::select(IOU_CANDIDATE >= IOU_THRESHOLD_I, ZERO, NEW_SCORES);
+    New_scores = edsl::select(IOU_candidate >= IOU_threshold_I, Zero, New_scores);
 
     // Add selected box to boxes
-    edsl::Tensor BOX_INDEX = edsl::select(SCORE > 0.0f, edsl::cast(CANDIDATE_INDEX, box_output_type_), NEG1_O);
-    boxes.push_back(CURRENT_NODE);
-    boxes.push_back(edsl::reshape(BOX_INDEX, {num_batches, num_classes, 1}));
+    edsl::Tensor Box_index = edsl::select(SCORE > 0.0f, edsl::cast(Candidate_index, box_output_type_), Neg1_o);
+    boxes.push_back(Current_node);
+    boxes.push_back(edsl::reshape(Box_index, {num_batches, num_classes, 1}));
 
     // update scores for current class
-    edsl::Tensor SCALE = edsl::exp(IOU_CANDIDATE * IOU_CANDIDATE * WEIGHT);
-    NEW_SCORES = NEW_SCORES * SCALE;
-    NEW_SCORES = edsl::select(NEW_SCORES > SCORE_THRESHOLD_I, NEW_SCORES, ZERO);
+    edsl::Tensor Scale = edsl::exp(IOU_candidate * IOU_candidate * weight);
+    New_scores = New_scores * Scale;
+    New_scores = edsl::select(New_scores > Score_threshold_I, New_scores, Zero);
   }
 
-  VALID_OUTPUTS = edsl::cast(VALID_OUTPUTS, box_output_type_);
+  Valid_outputs = edsl::cast(Valid_outputs, box_output_type_);
 
   int num_results = num_batches * num_classes * num_boxes_per_class;
   // concatenate scores
-  edsl::Tensor SCORES_RESULT = edsl::reshape(op::concatenate(scores, 2), {num_results, 3});
+  edsl::Tensor Scores_result = edsl::reshape(op::concatenate(scores, 2), {num_results, 3});
   // concatenate boxes
-  edsl::Tensor BOXES_RESULT = edsl::reshape(op::concatenate(boxes, 2), {num_results, 3});
+  edsl::Tensor Boxes_result = edsl::reshape(op::concatenate(boxes, 2), {num_results, 3});
 
   if (sort_result_descending_) {
     // Sort across batch
-    edsl::Tensor SCORES_SLICE = edsl::gather(SCORES_RESULT, ONE_INT + 1).axis(1);
-    SCORES_SLICE = edsl::reshape(SCORES_SLICE, {edsl::TensorDim(num_results)});
-    edsl::Tensor INDEXES = edsl::argsort(SCORES_SLICE, 0, edsl::SortDirection::DESC);
+    edsl::Tensor Scores_slice = edsl::gather(Scores_result, One_int + 1).axis(1);
+    Scores_slice = edsl::reshape(Scores_slice, {edsl::TensorDim(num_results)});
+    edsl::Tensor Indexes = edsl::argsort(Scores_slice, 0, edsl::SortDirection::DESC);
 
-    SCORES_RESULT = edsl::gather(SCORES_RESULT, INDEXES).axis(0);
-    BOXES_RESULT = edsl::gather(BOXES_RESULT, INDEXES).axis(0);
+    Scores_result = edsl::gather(Scores_result, Indexes).axis(0);
+    Boxes_result = edsl::gather(Boxes_result, Indexes).axis(0);
   } else {
     // Put all -1 to the end, we now just have -1 at end of each class
     edsl::TensorDim dst(num_results * 3);
-    auto INDEX = edsl::index({dst}, 0);
-    auto MAX = edsl::cast(edsl::Tensor{dst}, DType::INT32);
-    SCORES_RESULT = edsl::reshape(SCORES_RESULT, {dst});
-    BOXES_RESULT = edsl::reshape(BOXES_RESULT, {dst});
-    edsl::Tensor NEG1_THRES = edsl::cast(edsl::Tensor(-1), thres_type_);
-    auto INDEX2 = edsl::select(SCORES_RESULT != NEG1_THRES, INDEX, MAX);
-    auto INDEX3 = edsl::argsort(edsl::cast(INDEX2, DType::FLOAT32), 0);
-    SCORES_RESULT = edsl::gather(SCORES_RESULT, INDEX3).axis(0);
-    BOXES_RESULT = edsl::gather(BOXES_RESULT, INDEX3).axis(0);
-    SCORES_RESULT = edsl::reshape(SCORES_RESULT, {num_results, 3});
-    BOXES_RESULT = edsl::reshape(BOXES_RESULT, {num_results, 3});
+    auto Index = edsl::index({dst}, 0);
+    auto Max = edsl::cast(edsl::Tensor{dst}, DType::INT32);
+    Scores_result = edsl::reshape(Scores_result, {dst});
+    Boxes_result = edsl::reshape(Boxes_result, {dst});
+    edsl::Tensor Neg1_thres = edsl::cast(edsl::Tensor(-1), thres_type_);
+    auto Index2 = edsl::select(Scores_result != Neg1_thres, Index, Max);
+    auto Index3 = edsl::argsort(edsl::cast(Index2, DType::FLOAT32), 0);
+    Scores_result = edsl::gather(Scores_result, Index3).axis(0);
+    Boxes_result = edsl::gather(Boxes_result, Index3).axis(0);
+    Scores_result = edsl::reshape(Scores_result, {num_results, 3});
+    Boxes_result = edsl::reshape(Boxes_result, {num_results, 3});
   }
 
-  return {BOXES_RESULT, SCORES_RESULT, VALID_OUTPUTS};
+  return {Boxes_result, Scores_result, Valid_outputs};
 }
 
 void registerNonMaxSuppression() {
@@ -237,36 +251,31 @@ void registerNonMaxSuppression() {
     auto* layer = ngraph::as_type<NonMaxSuppression>(ctx.layer);
     // OPSET5 provides multiple templates, follow setup() choice now.
     IE_ASSERT(ctx.operands.size() == 6);
-    auto BOXES = ctx.operands.at(0);
-    auto SCORES = ctx.operands.at(1);
-    auto MAX_OUTPUT_BOXES_PER_CLASS = ctx.operands.at(2);
-    auto IOU_THRESHOLD = ctx.operands.at(3);
-    auto SCORE_THRESHOLD = ctx.operands.at(4);
-    auto SOFT_NMS_SIGMA = ctx.operands.at(5);
+    auto Boxes = ctx.operands.at(0);
+    auto Scores = ctx.operands.at(1);
+    int32_t max_output_boxes_per_class = layer->max_boxes_output_from_input();
+    auto IOU_threshold = ctx.operands.at(3);
+    auto Score_threshold = ctx.operands.at(4);
+    float soft_nms_sigma = layer->soft_nms_sigma_from_input();
     bool center_point_box =
         layer->get_box_encoding() == ngraph::op::v5::NonMaxSuppression::BoxEncodingType::CENTER ? true : false;
     bool sort_result_descending = layer->get_sort_result_descending();
-
-    auto* max_output_boxes_per_class_op = ngraph::as_type<ngraph::op::Constant>(ctx.layer->get_input_node_ptr(2));
-    if (max_output_boxes_per_class_op == nullptr) {
-      THROW_IE_EXCEPTION << "Dynamic output size for non_max_suppression not supported by PlaidML plugin now";
-    }
-    int32_t max_output_boxes_per_class = max_output_boxes_per_class_op->get_vector<int>()[0];
 
     DType box_input_type = to_plaidml(layer->get_input_element_type(0));
     DType box_output_type = to_plaidml(layer->get_output_type());
     DType thres_type = to_plaidml(layer->get_input_element_type(3));
 
-    std::vector<edsl::Tensor> OUTPUTS =
-        nms(BOXES, SCORES, max_output_boxes_per_class, IOU_THRESHOLD, SCORE_THRESHOLD, SOFT_NMS_SIGMA)
-            .center_point_box(center_point_box)
-            .sort_result_descending(sort_result_descending)
-            .box_input_type(box_input_type)
-            .box_output_type(box_output_type)
-            .thres_type(thres_type)
-            .build();
+    std::vector<edsl::Tensor> Outputs = nms(Boxes, Scores, IOU_threshold, Score_threshold)
+                                            .max_output_boxes_per_class(max_output_boxes_per_class)
+                                            .soft_nms_sigma(soft_nms_sigma)
+                                            .center_point_box(center_point_box)
+                                            .sort_result_descending(sort_result_descending)
+                                            .box_input_type(box_input_type)
+                                            .box_output_type(box_output_type)
+                                            .thres_type(thres_type)
+                                            .build();
 
-    return edsl::make_tuple(OUTPUTS);
+    return edsl::make_tuple(Outputs);
   });
 }
 
