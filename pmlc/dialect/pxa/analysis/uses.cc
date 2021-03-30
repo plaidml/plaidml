@@ -36,6 +36,7 @@ Value getPrevIndirectDef(OpResult def) {
         return Value();
       })
       .Case<PxaReduceOp>([&](auto op) { return op.memref(); })
+      .Case<PxaStoreOp>([&](auto op) { return op.memref(); })
       .Case<PxaVectorReduceOp>([&](auto op) { return op.memref(); })
       .Case<PxaGemmOp>([&](auto op) { return op.c(); })
       .Case<stdx::ReshapeOp>([&](auto op) { return op.tensor(); })
