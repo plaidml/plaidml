@@ -1981,13 +1981,14 @@ Tensor compute_iou(Tensor Boxes, bool center_point_box) {
                                  select(IOU_intersection_area_xgap > 0.0f, IOU_intersection_area_xgap, Zero);
   // Compute IOU of box pair
   Tensor IOU_denominator = op::unsqueeze(IOU_areai, {-1}) + op::unsqueeze(IOU_areai, {-2}) - IOU_intersection_area;
-  edsl::Tensor IOU_denominator_zeroed = edsl::select(IOU_denominator <= 0.0f, Zero, 1.0f / IOU_denominator);
-  edsl::Tensor IOU = IOU_intersection_area * IOU_denominator_zeroed;
+  edsl::Tensor IOU_denominator_reciprocal = edsl::select(IOU_denominator <= 0.0f, Zero, 1.0f / IOU_denominator);
+  edsl::Tensor IOU = IOU_intersection_area * IOU_denominator_reciprocal;
   return IOU;
 }
 
 }  // namespace
 
+// Non-maximum suppression
 Value nms(const Value& value) {
   IVLOG(1, "nms");
   auto args = value.as_tuple();

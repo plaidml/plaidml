@@ -19,6 +19,12 @@ void registerNonMaxSuppression() {
     auto* layer = ngraph::as_type<NonMaxSuppression>(ctx.layer);
     // OPSET5 provides multiple templates, follow setup() choice now.
     IE_ASSERT(ctx.operands.size() == 6);
+    if (ngraph::as_type<ngraph::op::Constant>(layer->get_input_node_ptr(2)) == nullptr) {
+      THROW_IE_EXCEPTION << "Dynamic max_output_boxes_per_class of NMS not currentlly supported by PlaidML plugin";
+    }
+    if (ngraph::as_type<ngraph::op::Constant>(layer->get_input_node_ptr(5)) == nullptr) {
+      THROW_IE_EXCEPTION << "Dynamic soft_nms_sigma of NMS not currentlly supported by PlaidML plugin";
+    }
     auto Boxes = ctx.operands.at(0);
     auto Scores = ctx.operands.at(1);
     int max_output_boxes_per_class = layer->max_boxes_output_from_input();
