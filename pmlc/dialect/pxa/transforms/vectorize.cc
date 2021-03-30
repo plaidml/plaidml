@@ -138,7 +138,7 @@ private:
     builder.create<vector::TransferWriteOp>(loc, operand, vecMem, vectorIvs);
 
     auto parallelOp = builder.create<AffineParallelOp>(
-        loc, ArrayRef<Type>{}, ArrayRef<AtomicRMWKind>{},
+        loc, ArrayRef<Type>{}, ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign},
         AffineMap::getConstantMap(0, op.getContext()), ValueRange(),
         AffineMap::getConstantMap(vectorWidth, op.getContext()), ValueRange(),
         ArrayRef<int64_t>{1});
@@ -146,14 +146,14 @@ private:
     builder.setInsertionPointToStart(parallelBody);
 
     auto elementIvs = parallelBody->getArguments();
-    auto element = builder.create<LoadOp>(loc, vecMem, elementIvs);
-    auto expResult = builder.create<OpTy>(loc, element).getResult();
-    builder.create<AffineStoreOp>(loc, expResult, vecMem, elementIvs);
-
+    auto element = builder.create<AffineLoadOp>(loc, vecMem, elementIvs);
+    auto optyOp = builder.create<OpTy>(loc, element);
+    builder.create<AffineStoreOp>(loc, optyOp.getResult(), vecMem, elementIvs);
+    //    builder.create<AffineYieldOp>(loc, ValueRange(optyOp.getResult()));
     builder.setInsertionPointAfter(parallelOp);
-    auto newOp = builder.create<vector::TransferReadOp>(loc, vectorType, vecMem,
-                                                        vectorIvs);
-    op.replaceAllUsesWith(newOp.getOperation());
+    auto vectorOp = builder.create<vector::TransferReadOp>(loc, vectorType,
+                                                           vecMem, vectorIvs);
+    op.replaceAllUsesWith(vectorOp.getOperation());
   }
 
   LogicalResult tryVectorizeScalarOp(Operation *op) {
@@ -272,16 +272,8 @@ public:
     TypeSwitch<Operation *>(op)
         .Case<PxaLoadOp>([&](auto op) { vectorizeLoadOp(op); })
         .Case<PxaReduceOp>([&](auto op) { vectorizeReduceOp(op); })
-        .Default([&](Operation *op) { vectorizeScalarOp(op); });
-  }
-
-  void devectorizeOperation(Operation *op) {
-    TypeSwitch<Operation *>(op)
-        .Case<math::ExpOp>([&](auto op) { devectorizeOp<math::ExpOp>(op); })
-        .Case<math::TanhOp>([&](auto op) { devectorizeOp<math::TanhOp>(op); })
         .Case<ExpOp>([&](auto op) { devectorizeOp<ExpOp>(op); })
-        .Case<TanhOp>([&](auto op) { devectorizeOp<TanhOp>(op); })
-        .Default([&](Operation *op) {});
+        .Default([&](Operation *op) { vectorizeScalarOp(op); });
   }
 
   LogicalResult isLegal() {
@@ -321,10 +313,8 @@ public:
     Block *body = loop.getBody();
     auto steps = loop.getSteps();
     for (auto &op : llvm::make_early_inc_range(body->getOperations())) {
+      op.dump();
       vectorizeOperation(&op);
-    }
-    for (auto &op : llvm::make_early_inc_range(body->getOperations())) {
-      devectorizeOperation(&op);
     }
     auto argNum = index.getArgNumber();
     steps[argNum] *= vectorWidth;
@@ -391,7 +381,7 @@ LogicalResult vectorizeRecursive(AffineParallelOp band, unsigned vectorWidth) {
 }
 
 using StrategyFn =
-    std::function<LogicalResult(AffineParallelOp op, unsigned vectorWidth)>;
+std::function<LogicalResult(AffineParallelOp op, unsigned vectorWidth)>;
 
 static llvm::StringMap<StrategyFn> strategies{
     {kVectorizeStrategy_Simple, vectorizeOverIVs},
