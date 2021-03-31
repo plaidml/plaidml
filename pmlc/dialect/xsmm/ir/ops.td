@@ -108,9 +108,7 @@ def XSMM_BRGemmOffsInvokeF32Op : XSMM_Op<"brgemm.offs.invoke.f32"> {
     Arg<F32MemRef, "the A memref to load from", [MemRead]>:$a,
     Arg<F32MemRef, "the B memref to load from", [MemRead]>:$b,
     I64Attr:$numBatches,
-    Arg<I64,"", [MemWrite]>:$aOffsetsPtr,  
     I64ArrayAttr:$aOffsets,
-    Arg<I64,"", [MemWrite]>:$bOffsetsPtr,  
     I64ArrayAttr:$bOffsets,
     Variadic<Index>:$indices);
  

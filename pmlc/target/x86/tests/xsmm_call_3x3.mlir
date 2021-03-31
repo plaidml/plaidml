@@ -166,11 +166,11 @@ func @pad_contraction(%arg0: memref<1x16x16x16xf32>, %arg1: memref<3x3x16x16xf32
                   %3 = addi %arg7, %arg4 : index
                   %4 = addi %arg8, %arg5 : index
                   %5 = xsmm.brgemm.offs.dispatch.f32 [14, 16, 16], [256, 16, 224]
-                  %6 = xsmm.brgemm.offs.alloc.f32 9
-                  %7 = xsmm.brgemm.offs.alloc.f32 9
-                  "xsmm.brgemm.offs.invoke.f32"(%5, %arg2, %arg0, %arg1, %6, %7, %arg3, %arg4, %arg5, %arg6, %arg3, %3, %4, %arg9, %arg7, %arg8, %arg9, %arg6) {aOffsets = [0, 1024, 2048, 64, 1088, 2112, 128, 1152, 2176], bOffsets = [0, 3072, 6144, 1024, 4096, 7168, 2048, 5120, 8192], numBatches = 9 : i64} : (i64, memref<1x14x14x16xf32>, memref<1x16x16x16xf32>, memref<3x3x16x16xf32>, i64, i64, index, index, index, index, index, index, index, index, index, index, index, index) -> ()
-                  xsmm.brgemm.offs.dealloc.f32 %6
-                  xsmm.brgemm.offs.dealloc.f32 %7
+                  //%6 = xsmm.brgemm.offs.alloc.f32 9
+                  //%7 = xsmm.brgemm.offs.alloc.f32 9
+                  "xsmm.brgemm.offs.invoke.f32"(%5, %arg2, %arg0, %arg1, %arg3, %arg4, %arg5, %arg6, %arg3, %3, %4, %arg9, %arg7, %arg8, %arg9, %arg6) {aOffsets = [0, 1024, 2048, 64, 1088, 2112, 128, 1152, 2176], bOffsets = [0, 3072, 6144, 1024, 4096, 7168, 2048, 5120, 8192], numBatches = 9 : i64} : (i64, memref<1x14x14x16xf32>, memref<1x16x16x16xf32>, memref<3x3x16x16xf32>, index, index, index, index, index, index, index, index, index, index, index, index) -> ()
+                  //xsmm.brgemm.offs.dealloc.f32 %6
+                  //xsmm.brgemm.offs.dealloc.f32 %7
                 }
               }
             }

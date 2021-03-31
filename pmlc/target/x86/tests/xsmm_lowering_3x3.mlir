@@ -20,8 +20,6 @@ func @pad_contraction(%A: tensor<1x16x16x16xf32>, %B: tensor<3x3x16x16xf32>, %C:
   // CHECK: affine.for
   %0 = tile.contract add, mul, %c0, %A, %B {srcs=[#conv1dcenter, #second], sink=#first}
     : tensor<1x14x14x16xf32>, tensor<1x16x16x16xf32>, tensor<3x3x16x16xf32> -> tensor<1x14x14x16xf32>
-  // CHECK: xsmm.brgemm.offs.alloc.f32 9
-  // CHECK: xsmm.brgemm.offs.alloc.f32 9
   // CHECK: xsmm.brgemm.offs.dispatch.f32 [14, 16, 16], [256, 16, 224]
   // CHECK: affine.for  
   // CHECK: affine.for
@@ -31,8 +29,6 @@ func @pad_contraction(%A: tensor<1x16x16x16xf32>, %B: tensor<3x3x16x16xf32>, %C:
   // CHECK: affine.for
   // CHECK: affine.for  
   // CHECK: xsmm.brgemm.offs.invoke.f32
-  // CHECK: xsmm.brgemm.offs.dealloc.f32
-  // CHECK: xsmm.brgemm.offs.dealloc.f32  
 
   return %0 : tensor<1x14x14x16xf32>
 }
