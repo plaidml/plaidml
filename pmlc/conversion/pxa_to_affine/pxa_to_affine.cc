@@ -149,9 +149,8 @@ struct PxaVectorLoadOpConversion
   }
 };
 
-static Value createAggregation(ConversionPatternRewriter &rewriter,
-                               Location loc, AtomicRMWKind agg, Value source,
-                               Value val) {
+static Value createReduction(ConversionPatternRewriter &rewriter, Location loc,
+                             AtomicRMWKind agg, Value source, Value val) {
   switch (agg) {
   case AtomicRMWKind::assign:
     return val;
@@ -189,7 +188,7 @@ static Value createAggregation(ConversionPatternRewriter &rewriter,
     return rewriter.create<MulIOp>(loc, source, val);
   default:
     llvm_unreachable("Unsupported aggregation for "
-                     "PxaReduceOpConversion::createAggregation");
+                     "PxaReduceOpConversion::createReduction");
   }
 }
 
@@ -202,7 +201,7 @@ struct PxaReduceOpConversion : public OpConversionPattern<pxa::PxaReduceOp> {
     auto source = rewriter.create<AffineLoadOp>(op.getLoc(), op.memref(),
                                                 op.map(), op.idxs());
     auto reduce =
-        createAggregation(rewriter, op.getLoc(), op.agg(), source, op.val());
+        createReduction(rewriter, op.getLoc(), op.agg(), source, op.val());
     rewriter.create<AffineStoreOp>(op.getLoc(), reduce, op.memref(), op.map(),
                                    op.idxs());
     op.replaceAllUsesWith(op.memref());
@@ -222,7 +221,7 @@ struct PxaVectorReduceOpConversion
         op.getLoc(), op.getVectorType(), op.memref(), op.getAffineMap(),
         op.idxs());
     auto reduce =
-        createAggregation(rewriter, op.getLoc(), op.agg(), source, op.vector());
+        createReduction(rewriter, op.getLoc(), op.agg(), source, op.vector());
     rewriter.create<AffineVectorStoreOp>(op.getLoc(), reduce, op.memref(),
                                          op.getAffineMap(), op.idxs());
     op.replaceAllUsesWith(op.memref());
@@ -239,9 +238,8 @@ struct PxaStoreOpConversion : public OpConversionPattern<pxa::PxaStoreOp> {
                   ConversionPatternRewriter &rewriter) const final {
     auto source =
         rewriter.create<LoadOp>(op.getLoc(), op.memref(), op.indices());
-    auto store =
-        createAggregation(rewriter, op.getLoc(), op.agg(), source, op.value());
-    rewriter.create<StoreOp>(op.getLoc(), store, op.memref(), op.indices());
+    rewriter.create<AtomicRMWOp>(op.getLoc(), source.getType(), op.agg(),
+                                 source, op.memref(), op.indices());
     op.replaceAllUsesWith(op.memref());
     rewriter.eraseOp(op);
     return success();
