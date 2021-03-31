@@ -28,7 +28,8 @@ util::StrideArray getStrideArray(Value operand, AffineMap tileMap) {
   int64_t offset;
   SmallVector<int64_t, 4> strides;
   auto type = operand.getType().cast<MemRefType>();
-  getStridesAndOffset(type, strides, offset);
+  // TODO: check LogicalResult
+  (void)getStridesAndOffset(type, strides, offset);
   auto layoutMap =
       makeStridedLinearLayoutMap(strides, offset, operand.getContext());
   auto info = util::computeStrideArray(layoutMap.compose(tileMap));

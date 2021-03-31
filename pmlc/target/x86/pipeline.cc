@@ -11,6 +11,7 @@
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
 #include "mlir/Dialect/Affine/Passes.h"
+#include "mlir/Dialect/Math/Transforms/Passes.h"
 #include "mlir/Dialect/OpenMP/OpenMPDialect.h"
 #include "mlir/Dialect/StandardOps/Transforms/Passes.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -207,8 +208,9 @@ struct XSMMStencilPass : public XSMMStencilBase<XSMMStencilPass> {
     IVLOG(3, "XSMMStencilPass> numThreads: " << numThreads.getValue());
     IVLOG(3, "XSMMStencilPass> isBatched: " << isBatched.getValue());
     getFunction().walk([this](AffineParallelOp op) {
-      pxa::applyStencilGEMM(op, numThreads.getValue(), isBatched.getValue(),
-                            heatmapCostTransposed);
+      // TODO: check LogicalResult
+      (void)pxa::applyStencilGEMM(op, numThreads.getValue(),
+                                  isBatched.getValue(), heatmapCostTransposed);
     });
   }
 };
