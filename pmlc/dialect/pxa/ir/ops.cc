@@ -546,7 +546,7 @@ ParseResult parsePxaGemmOp(OpAsmParser &parser, OperationState &result) {
   auto i64Type = builder.getIntegerType(64);
   GemmOperandParser a("a"), b("b"), c("c");
   ArrayAttr tileAttr;
-  IntegerAttr numBatchesAttr;
+  ArrayAttr numBatchesAttr;
   FunctionType funcType;
   return failure(
       c.parse(parser, result) || parser.parseEqual() ||
