@@ -15,17 +15,10 @@ heatmap(
 
 gentbl(
     name = "gen-pass",
-    tbl_outs = [
-        (
-            "-gen-pass-decls",
-            "passes.h.inc",
-        ),
-    ],
+    tbl_outs = [("-gen-pass-decls", "passes.h.inc")],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "passes.td",
-    td_srcs = [
-        "@llvm-project//mlir:PassBaseTdFiles",
-    ],
+    td_srcs = ["@llvm-project//mlir:PassBaseTdFiles"],
 )
 
 plaidml_cc_library(
@@ -36,30 +29,39 @@ plaidml_cc_library(
         "pass_detail.h",
         "pipeline.cc",
         "trace_linking.cc",
+        "utils.cc",
+        "utils.h",
         "xsmm_lowering.cc",
         ":heatmap",
     ],
     hdrs = [
         "passes.h",
+        "pipeline.h",
     ],
     deps = [
         ":gen-pass",
         ":prng_lowering",
         "//pmlc/compiler",
         "//pmlc/conversion/pxa_to_affine",
+        "//pmlc/conversion/scf_to_omp",
         "//pmlc/conversion/stdx_to_llvm",
         "//pmlc/conversion/tile_to_pxa",
+        "//pmlc/dialect/layer/transforms",
         "//pmlc/dialect/pxa/analysis",
         "//pmlc/dialect/pxa/transforms",
         "//pmlc/dialect/stdx/transforms",
         "//pmlc/dialect/tile/transforms",
         "//pmlc/dialect/xsmm",
         "//pmlc/rt",
+        "//pmlc/transforms",
         "@llvm-project//mlir:AffineToStandardTransforms",
         "@llvm-project//mlir:AffineTransforms",
         "@llvm-project//mlir:LLVMTransforms",
+        "@llvm-project//mlir:MathTransforms",
+        "@llvm-project//mlir:OpenMPToLLVM",
         "@llvm-project//mlir:SCFToStandard",
         "@llvm-project//mlir:StandardOpsTransforms",
+        "@llvm-project//openmp",
     ],
 )
 

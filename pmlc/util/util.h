@@ -7,33 +7,17 @@
 
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/IR/Module.h"
 #include "llvm/Support/FormatVariadic.h"
 
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OperationSupport.h"
-#include "mlir/IR/StandardTypes.h"
 
 #include "pmlc/util/logging.h"
 
 namespace pmlc::util {
 
 static constexpr const char *kTagAttribute = "tags";
-
-// Adjust the result types on the containing FuncOp if this op relates to an
-// output
-void UpdateFuncOpType(mlir::Operation *op);
-
-llvm::StringRef getOpName(const mlir::OperationName &name);
-
-template <typename Set>
-std::string getUniqueName(Set *names, llvm::StringRef name) {
-  auto next = name.str();
-  auto [it, isUnique] = names->insert(next); // NOLINT(whitespace/braces)
-  for (unsigned i = 0; !isUnique; i++) {
-    next = llvm::formatv("{0}_{1}", name, i).str();
-    std::tie(it, isUnique) = names->insert(next);
-  }
-  return next;
-}
 
 uint64_t getByteSize(mlir::MemRefType type);
 
@@ -45,6 +29,11 @@ bool hasTag(mlir::Operation *op, llvm::StringRef tag);
 
 // Set tags in op
 void setTags(mlir::Operation *op, llvm::ArrayRef<llvm::StringRef> tags);
+
+// Pack function arguments to an i8** pointer
+void wrapFunctionAndPackArguments(llvm::Module *module,
+                                  llvm::StringRef funcName,
+                                  llvm::StringRef newName);
 
 // A diagnostic tool for searching for problematic transformations in passes.
 // Example usage:

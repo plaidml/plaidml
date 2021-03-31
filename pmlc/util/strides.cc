@@ -59,7 +59,7 @@ mlir::Optional<StrideArray> computeStrideArray(mlir::MemRefType memRefType,
 
   // MLIR doesnt' corrently handle rank 0 in some places, early exit
   if (memRefType.getRank() == 0) {
-    return StrideArray(0);
+    return StrideArray(map.getNumDims(), 0);
   }
 
   // Get the memref strides

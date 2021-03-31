@@ -14,6 +14,8 @@
 #include <memory>
 #include <stdexcept>
 
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/OpenMP/OpenMPDialect.h"
 #include "mlir/ExecutionEngine/OptUtils.h"
 #include "mlir/Support/FileUtilities.h"
 #include "llvm/Support/CommandLine.h"
@@ -32,6 +34,7 @@ using namespace mlir; // NOLINT
 using llvm::Error;
 using pmlc::compiler::Program;
 using pmlc::rt::Executable;
+using pmlc::util::BufferPtr;
 
 namespace {
 /// This options struct prevents the need for global static initializers, and
@@ -67,11 +70,15 @@ int JitRunnerMain(int argc, char **argv) {
     return EXIT_FAILURE;
   }
 
-  auto program = std::make_shared<Program>(std::move(file));
+  DialectRegistry registry;
+  registry.insert<LLVM::LLVMDialect, omp::OpenMPDialect>();
+
+  auto context = std::make_unique<MLIRContext>(registry);
+  auto program = std::make_shared<Program>(std::move(context), std::move(file));
   program->entry = options.mainFuncName.getValue();
-  auto executable = Executable::fromProgram(
-      program, options.optDeviceID.getValue(), ArrayRef<void *>{});
-  executable->invoke();
+  auto executable =
+      Executable::fromProgram(program, options.optDeviceID.getValue());
+  executable->invoke(ArrayRef<BufferPtr>{}, ArrayRef<BufferPtr>{});
 
   return EXIT_SUCCESS;
 }
@@ -86,13 +93,11 @@ int main(int argc, char **argv) {
     IVLOG(level, "PLAIDML_VERBOSE=" << level);
   }
 
-  mlir::enableGlobalDialectRegistry(true);
-  registerAllDialects();
-
   llvm::InitLLVM y(argc, argv);
   llvm::InitializeNativeTarget();
   llvm::InitializeNativeTargetAsmPrinter();
   mlir::initializeLLVMPasses();
+  pmlc::rt::registerRuntimes();
   pmlc::rt::initRuntimes();
 
   std::set_terminate([]() {

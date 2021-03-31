@@ -3,13 +3,50 @@
 #pragma once
 
 #include <cstring>
+#include <exception>
 #include <functional>
 #include <memory>
+#include <sstream>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "plaidml/core/ffi.h"
+
+#if __has_include(<source_location>)
+#include <source_location>
+using edsl_source_location = std::source_location;
+#elif __cplusplus >= 201402 && __has_include(<experimental/source_location>)
+#include <experimental/source_location>
+using edsl_source_location = std::experimental::source_location;
+#else
+struct edsl_source_location {
+  static edsl_source_location current() { return edsl_source_location{}; }
+  constexpr uint_least32_t line() const noexcept { return 0; }
+  constexpr uint_least32_t column() const noexcept { return 0; }
+  constexpr const char* file_name() const noexcept { return "??"; }
+  constexpr const char* function_name() const noexcept { return "??"; }
+};
+#endif
+
+class ffi_exception : public std::exception {
+ private:
+  std::string msg_;
+
+ public:
+  explicit ffi_exception(const std::string& message, edsl_source_location loc) {
+    std::stringstream ss;
+    if (std::string(loc.file_name()).find("edsl/edsl.h") == std::string::npos) {
+      ss << "Exception at " << loc.file_name() << ":" << std::to_string(loc.line());
+    } else {
+      ss << "Exception at ??:0";
+    }
+    ss << " with message: " << message;
+    msg_ = ss.str();
+  }
+  virtual const char* what() const noexcept { return msg_.c_str(); }
+};
 
 namespace plaidml {
 
@@ -22,6 +59,16 @@ inline std::string str(plaidml_string* ptr) {
 }
 
 template <typename T, typename F, typename... Args>
+T call(edsl_source_location loc, F fn, Args... args) {
+  plaidml_error err;
+  auto ret = fn(&err, args...);
+  if (err.code) {
+    throw ffi_exception(str(err.msg), loc);
+  }
+  return ret;
+}
+
+template <typename T, typename F, typename... Args>
 T call(F fn, Args... args) {
   plaidml_error err;
   auto ret = fn(&err, args...);
@@ -29,6 +76,15 @@ T call(F fn, Args... args) {
     throw std::runtime_error(str(err.msg));
   }
   return ret;
+}
+
+template <typename F, typename... Args>
+void call_void(edsl_source_location loc, F fn, Args... args) {
+  plaidml_error err;
+  fn(&err, args...);
+  if (err.code) {
+    throw ffi_exception(str(err.msg), loc);
+  }
 }
 
 template <typename F, typename... Args>
@@ -47,8 +103,9 @@ namespace details {
 struct Deleter {
   void operator()(plaidml_buffer* ptr) { ffi::call_void(plaidml_buffer_free, ptr); }
   void operator()(plaidml_integers* ptr) { ffi::call_void(plaidml_integers_free, ptr); }
+  void operator()(plaidml_program* ptr) { ffi::call_void(plaidml_program_free, ptr); }
   void operator()(plaidml_shape* ptr) { ffi::call_void(plaidml_shape_free, ptr); }
-  void operator()(plaidml_view* ptr) { ffi::call_void(plaidml_view_free, ptr); }
+  void operator()(plaidml_shapes* ptr) { ffi::call_void(plaidml_shapes_free, ptr); }
 };
 
 template <typename T>
@@ -58,11 +115,13 @@ inline std::shared_ptr<T> make_ptr(T* ptr) {
 
 }  // namespace details
 
+class Program;
+
 ///
 /// Initializes the PlaidML Core API.
 ///
-inline void init() {  //
-  ffi::call_void(plaidml_init);
+inline void init(edsl_source_location loc = edsl_source_location::current()) {  //
+  ffi::call_void(loc, plaidml_init);
 }
 
 ///
@@ -76,6 +135,9 @@ inline void init() {  //
 ///
 enum class DType {
   INVALID = PLAIDML_DATA_INVALID,
+  INTX = PLAIDML_DATA_INTX,
+  UINTX = PLAIDML_DATA_UINTX,
+  FLOATX = PLAIDML_DATA_FLOATX,
   BOOLEAN = PLAIDML_DATA_BOOLEAN,
   INT8 = PLAIDML_DATA_INT8,
   UINT8 = PLAIDML_DATA_UINT8,
@@ -85,10 +147,10 @@ enum class DType {
   UINT32 = PLAIDML_DATA_UINT32,
   INT64 = PLAIDML_DATA_INT64,
   UINT64 = PLAIDML_DATA_UINT64,
-  BFLOAT16 = PLAIDML_DATA_BFLOAT16,
   FLOAT16 = PLAIDML_DATA_FLOAT16,
   FLOAT32 = PLAIDML_DATA_FLOAT32,
   FLOAT64 = PLAIDML_DATA_FLOAT64,
+  _LAST,
 };
 
 inline const char* to_string(DType dtype) {
@@ -111,8 +173,6 @@ inline const char* to_string(DType dtype) {
       return "int64";
     case DType::UINT64:
       return "uint64";
-    case DType::BFLOAT16:
-      return "bfloat16";
     case DType::FLOAT16:
       return "float16";
     case DType::FLOAT32:
@@ -140,15 +200,15 @@ class TensorShape {
   /// TensorShape constructor
   /// \param dtype DType
   ///
-  TensorShape(DType dtype, const std::vector<int64_t>& sizes) {
-    size_t stride = 1;
-    std::vector<int64_t> strides(sizes.size());
-    for (int i = sizes.size() - 1; i >= 0; --i) {
-      strides[i] = stride;
-      stride *= sizes[i];
-    }
-    ptr_ = details::make_ptr(ffi::call<plaidml_shape*>(plaidml_shape_alloc, static_cast<plaidml_datatype>(dtype),
-                                                       sizes.size(), sizes.data(), strides.data()));
+  TensorShape(DType dtype, const std::vector<int64_t>& sizes,
+              edsl_source_location loc = edsl_source_location::current()) {
+    ptr_ = details::make_ptr(ffi::call<plaidml_shape*>(  //
+        loc,                                             //
+        plaidml_shape_alloc,                             //
+        static_cast<plaidml_datatype>(dtype),            //
+        sizes.size(),                                    //
+        sizes.data(),                                    //
+        /*strides=*/nullptr));
   }
 
   ///
@@ -159,12 +219,17 @@ class TensorShape {
   ///
   TensorShape(DType dtype,                        //
               const std::vector<int64_t>& sizes,  //
-              const std::vector<int64_t>& strides) {
+              const std::vector<int64_t>& strides, edsl_source_location loc = edsl_source_location::current()) {
     if (sizes.size() != strides.size()) {
-      throw std::runtime_error("Sizes and strides must have the same rank.");
+      throw ffi_exception("Sizes and strides must have the same rank.", loc);
     }
-    ptr_ = details::make_ptr(ffi::call<plaidml_shape*>(plaidml_shape_alloc, static_cast<plaidml_datatype>(dtype),
-                                                       sizes.size(), sizes.data(), strides.data()));
+    ptr_ = details::make_ptr(ffi::call<plaidml_shape*>(  //
+        loc,                                             //
+        plaidml_shape_alloc,                             //
+        static_cast<plaidml_datatype>(dtype),            //
+        sizes.size(),                                    //
+        sizes.data(),                                    //
+        strides.data()));
   }
 
   // This is an internal constructor.
@@ -176,26 +241,30 @@ class TensorShape {
   ///
   /// Returns the element DType of this TensorShape.
   ///
-  DType dtype() const { return static_cast<DType>(ffi::call<plaidml_datatype>(plaidml_shape_get_dtype, as_ptr())); }
+  DType dtype(edsl_source_location loc = edsl_source_location::current()) const {
+    return static_cast<DType>(ffi::call<plaidml_datatype>(loc, plaidml_shape_get_dtype, as_ptr()));
+  }
 
   ///
   /// Returns the number of dimensions in this TensorShape.
   ///
-  size_t rank() const { return ffi::call<size_t>(plaidml_shape_get_rank, as_ptr()); }
+  size_t rank(edsl_source_location loc = edsl_source_location::current()) const {
+    return ffi::call<size_t>(loc, plaidml_shape_get_rank, as_ptr());
+  }
 
   ///
   /// Returns the sizes of this TensorShape.
   ///
-  std::vector<int64_t> sizes() const {
-    auto dims = details::make_ptr(ffi::call<plaidml_integers*>(plaidml_shape_get_sizes, as_ptr()));
+  std::vector<int64_t> sizes(edsl_source_location loc = edsl_source_location::current()) const {
+    auto dims = details::make_ptr(ffi::call<plaidml_integers*>(loc, plaidml_shape_get_sizes, as_ptr()));
     return std::vector<int64_t>(dims->elts, dims->elts + dims->size);
   }
 
   ///
   /// Returns the strides of this TensorShape.
   ///
-  std::vector<int64_t> strides() const {
-    auto dims = details::make_ptr(ffi::call<plaidml_integers*>(plaidml_shape_get_strides, as_ptr()));
+  std::vector<int64_t> strides(edsl_source_location loc = edsl_source_location::current()) const {
+    auto dims = details::make_ptr(ffi::call<plaidml_integers*>(loc, plaidml_shape_get_strides, as_ptr()));
     return std::vector<int64_t>(dims->elts, dims->elts + dims->size);
   }
 
@@ -203,12 +272,16 @@ class TensorShape {
   /// Returns the amount of memory that a Tensor with this TensorShape would
   /// occupy in bytes.
   ///
-  uint64_t byte_size() const { return ffi::call<uint64_t>(plaidml_shape_get_nbytes, as_ptr()); }
+  uint64_t byte_size(edsl_source_location loc = edsl_source_location::current()) const {
+    return ffi::call<uint64_t>(loc, plaidml_shape_get_nbytes, as_ptr());
+  }
 
   ///
   /// Returns a string representation of this TensorShape.
   ///
-  std::string str() const { return ffi::str(ffi::call<plaidml_string*>(plaidml_shape_repr, as_ptr())); }
+  std::string str(edsl_source_location loc = edsl_source_location::current()) const {
+    return ffi::str(ffi::call<plaidml_string*>(loc, plaidml_shape_repr, as_ptr()));
+  }
 
   ///
   /// Equality comparison for TensorShape types.
@@ -224,42 +297,6 @@ class TensorShape {
 
 ///
 /// \ingroup core_objects
-/// \class View
-///
-class View {
-  friend class Buffer;
-
- public:
-  ///
-  /// data
-  ///
-  char* data() {  //
-    return ffi::call<char*>(plaidml_view_data, ptr_.get());
-  }
-
-  ///
-  /// size
-  ///
-  size_t size() {  //
-    return ffi::call<size_t>(plaidml_view_size, ptr_.get());
-  }
-
-  ///
-  /// writeback
-  ///
-  void writeback() {  //
-    ffi::call_void(plaidml_view_writeback, ptr_.get());
-  }
-
- private:
-  explicit View(const std::shared_ptr<plaidml_view>& ptr) : ptr_(ptr) {}
-
- private:
-  std::shared_ptr<plaidml_view> ptr_;
-};
-
-///
-/// \ingroup core_objects
 /// \class Buffer
 ///
 class Buffer {
@@ -271,57 +308,123 @@ class Buffer {
 
   ///
   /// Buffer constructor
-  /// \param device string
   /// \param shape TensorShape
   ///
-  Buffer(const std::string& device, const TensorShape& shape)
-      : ptr_(details::make_ptr(ffi::call<plaidml_buffer*>(plaidml_buffer_alloc, device.c_str(), shape.byte_size()))),
-        shape_(shape) {}
+  Buffer(char* data, size_t size, const TensorShape& shape, edsl_source_location loc = edsl_source_location::current())
+      : ptr_(details::make_ptr(ffi::call<plaidml_buffer*>(loc, plaidml_buffer_adopt, shape.as_ptr(), data, size))) {}
+
+  template <typename T>
+  Buffer(const std::vector<T>& vec, const TensorShape& shape,
+         edsl_source_location loc = edsl_source_location::current())
+      : ptr_(details::make_ptr(ffi::call<plaidml_buffer*>(        //
+            loc,                                                  //
+            plaidml_buffer_adopt,                                 //
+            shape.as_ptr(),                                       //
+            reinterpret_cast<char*>(const_cast<T*>(vec.data())),  //
+            vec.size() * sizeof(T)))) {}
+
+  ///
+  /// Buffer constructor
+  /// \param shape TensorShape
+  ///
+  explicit Buffer(const TensorShape& shape, edsl_source_location loc = edsl_source_location::current())
+      : ptr_(details::make_ptr(ffi::call<plaidml_buffer*>(loc, plaidml_buffer_alloc, shape.as_ptr()))) {}
 
   ///
   /// Buffer constructor
   /// \param ptr plaidml_buffer*
   /// \param shape TensorShape
-  explicit Buffer(plaidml_buffer* ptr, const TensorShape& shape) : ptr_(details::make_ptr(ptr)), shape_(shape) {}
+  explicit Buffer(plaidml_buffer* ptr) : ptr_(details::make_ptr(ptr)) {}
 
   ///
-  /// Returns a pointer to the Buffer.
-  /// \return plaidml_buffer*
+  /// data
   ///
-  plaidml_buffer* as_ptr() const {  //
-    return ptr_.get();
+  char* data(edsl_source_location loc = edsl_source_location::current()) {
+    return ffi::call<char*>(loc, plaidml_buffer_data, as_ptr());
   }
 
   ///
-  /// mmap_current
-  /// \return View
+  /// size
   ///
-  View mmap_current() {
-    return View(details::make_ptr(ffi::call<plaidml_view*>(plaidml_buffer_mmap_current, as_ptr())));
+  size_t size(edsl_source_location loc = edsl_source_location::current()) {
+    return ffi::call<size_t>(loc, plaidml_buffer_size, as_ptr());
   }
 
   ///
-  /// mmap_discard
-  /// \return View
+  /// shape
   ///
-  View mmap_discard() {
-    return View(details::make_ptr(ffi::call<plaidml_view*>(plaidml_buffer_mmap_discard, as_ptr())));
+
+  TensorShape shape(edsl_source_location loc = edsl_source_location::current()) {
+    return TensorShape{ffi::call<plaidml_shape*>(loc, plaidml_buffer_shape, as_ptr())};
   }
 
-  void copy_into(void* dst) {
-    auto view = mmap_current();
-    memcpy(dst, view.data(), view.size());
-  }
+  plaidml_buffer* as_ptr() const { return ptr_.get(); }
 
-  void copy_from(const void* src) {
-    auto view = mmap_discard();
-    memcpy(view.data(), src, view.size());
-    view.writeback();
-  }
+  void copy_into(void* dst) { memcpy(dst, data(), size()); }
+
+  void copy_from(const void* src) { memcpy(data(), src, size()); }
 
  private:
   std::shared_ptr<plaidml_buffer> ptr_;
-  TensorShape shape_;
+};
+
+///
+/// \ingroup core_objects
+/// \class Program
+///
+class Program {
+ public:
+  explicit Program(plaidml_program* ptr) : ptr_(details::make_ptr(ptr)) {}
+
+  ///
+  /// Returns a textual representation of the program.
+  ///
+  std::string str(edsl_source_location loc = edsl_source_location::current()) const {
+    return ffi::str(ffi::call<plaidml_string*>(loc, plaidml_program_repr, as_ptr()));
+  }
+
+  ///
+  /// Compiles a program using the specified target.
+  ///
+  void compile(const std::string& target = "", bool debug = false,
+               edsl_source_location loc = edsl_source_location::current()) {
+    ffi::call_void(loc, plaidml_program_compile, as_ptr(), debug, target.c_str());
+  }
+
+  std::vector<TensorShape> inputs(edsl_source_location loc = edsl_source_location::current()) const {
+    auto shapes = details::make_ptr(ffi::call<plaidml_shapes*>(loc, plaidml_program_get_inputs, as_ptr()));
+    std::vector<TensorShape> ret(shapes->size);
+    for (size_t i = 0; i < shapes->size; i++) {
+      ret[i] = TensorShape(shapes->elts[i]);
+    }
+    return ret;
+  }
+
+  std::vector<TensorShape> outputs(edsl_source_location loc = edsl_source_location::current()) const {
+    auto shapes = details::make_ptr(ffi::call<plaidml_shapes*>(loc, plaidml_program_get_outputs, as_ptr()));
+    std::vector<TensorShape> ret(shapes->size);
+    for (size_t i = 0; i < shapes->size; i++) {
+      ret[i] = TensorShape(shapes->elts[i]);
+    }
+    return ret;
+  }
+
+  Buffer save(const std::unordered_map<std::string, std::string>& config = {},
+              edsl_source_location loc = edsl_source_location::current()) const {
+    std::vector<const char*> keys;
+    std::vector<const char*> values;
+    for (const auto& kvp : config) {
+      keys.push_back(kvp.first.c_str());
+      values.push_back(kvp.second.c_str());
+    }
+    return Buffer(
+        ffi::call<plaidml_buffer*>(loc, plaidml_program_save, as_ptr(), config.size(), keys.data(), values.data()));
+  }
+
+  plaidml_program* as_ptr() const { return ptr_.get(); }
+
+ private:
+  std::shared_ptr<plaidml_program> ptr_;
 };
 
 ///
@@ -339,8 +442,8 @@ struct Settings {
   /// \param key string
   /// \return string
   ///
-  static std::string get(const std::string& key) {
-    return ffi::str(ffi::call<plaidml_string*>(plaidml_settings_get, key.c_str()));
+  static std::string get(const std::string& key, edsl_source_location loc = edsl_source_location::current()) {
+    return ffi::str(ffi::call<plaidml_string*>(loc, plaidml_settings_get, key.c_str()));
   }
 
   ///
@@ -348,10 +451,16 @@ struct Settings {
   /// \param key string
   /// \param value string
   ///
-  static void set(const std::string& key, const std::string& value) {
-    ffi::call_void(plaidml_settings_set, key.c_str(), value.c_str());
+  static void set(const std::string& key, const std::string& value,
+                  edsl_source_location loc = edsl_source_location::current()) {
+    ffi::call_void(loc, plaidml_settings_set, key.c_str(), value.c_str());
   }
 };
+
+inline std::ostream& operator<<(std::ostream& os, const Program& x) {
+  os << x.str();
+  return os;
+}
 
 inline std::ostream& operator<<(std::ostream& os, const TensorShape& x) {
   os << x.str();

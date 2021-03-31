@@ -58,7 +58,9 @@ def get_engine(pkey):
         return ':crown::cl:'
     if 'tf-' in pkey:
         return ':tensorflow:'
-    if '-gen' in pkey:
+    if 'ocl-gen' in pkey:
+        return ':information_source::cl:'
+    if 'vk-gen' in pkey:
         return ':information_source:'
     return ':small_blue_diamond:'
 

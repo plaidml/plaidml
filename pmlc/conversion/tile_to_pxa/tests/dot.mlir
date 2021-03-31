@@ -5,16 +5,12 @@
 #map2 = affine_map<(i, j, k) -> (i, k)>
 
 func @dot(%arg0: tensor<1x784xf32>, %arg1: tensor<784x512xf32>) -> tensor<1x512xf32> {
-  %c0 = "eltwise.sconst"() {value = 0.0 : f64} : () -> f32
-  %0 = tile.constant 512
-  %1 = tile.constant 1
+  %c0 = tile.constant(0.0 : f64) : tensor<f32>
   %2 = tile.contract add, mul, %c0, %arg0, %arg1 {sink=#map0, srcs=[#map1, #map2]} :
-    f32, tensor<1x784xf32>, tensor<784x512xf32> -> tensor<1x512xf32>
+    tensor<f32>, tensor<1x784xf32>, tensor<784x512xf32> -> tensor<1x512xf32>
   return %2 : tensor<1x512xf32>
 }
 
-// CHECK-DAG: [[map_lb:#map[0-9]+]] = affine_map<() -> (0, 0, 0)>
-// CHECK-DAG: [[map_ub:#map[0-9]+]] = affine_map<() -> (784, 1, 512)>
 // CHECK-LABEL: func @dot
 // CHECK-SAME: %[[ARG0:.*]]: memref<1x784xf32>
 // CHECK-SAME: %[[ARG1:.*]]: memref<784x512xf32>

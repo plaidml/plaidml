@@ -10,10 +10,23 @@ plaidml_cc_library(
         "device.h",
         "runtime.cc",
     ],
+    hdrs = ["register.h"],
+    visibility = ["//visibility:public"],
     deps = [
+        ":openmp",
         "//pmlc/compiler",
         "//pmlc/rt",
     ],
     alwayslink = 1,
-    visibility = ["//visibility:public"],
+)
+
+plaidml_cc_library(
+    name = "openmp",
+    srcs = ["openmp.cc"],
+    copts = ["-w"],
+    deps = [
+        "//pmlc/rt",
+        "@llvm-project//openmp",
+    ],
+    alwayslink = 1,
 )

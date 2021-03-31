@@ -96,8 +96,7 @@ public:
   explicit OpenCLDevice(cl::Device device);
 
   std::unique_ptr<Executable>
-  compile(const std::shared_ptr<pmlc::compiler::Program> &program,
-          mlir::ArrayRef<void *> bufptrs) final;
+  compile(const std::shared_ptr<pmlc::compiler::Program> &program) final;
 
   /// Returns OpenCL context created with only this device.
   cl::Context getOclContext() { return context; }

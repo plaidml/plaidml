@@ -9,6 +9,7 @@ dependencies:
   - libopencv=4.2.0
   - numpy
   - openmp=8.0.1
+  - perl
   - pip=19
   - python=3.7.4
   - scikit-image
@@ -22,6 +23,7 @@ dependencies:
       - dm-sonnet<2.0.0
       - drawSvg
       - graphviz
+      - h5py < 3.0.0
       - humanize
       - keras==2.2.4
       - keras-applications==1.0.8
@@ -33,8 +35,9 @@ dependencies:
       - pybuildkite==0.0.6
       - pygments
       - pystache
-      - pyyaml
+      - pyyaml==5.3.1
       - sphinxcontrib.katex
+      - sphinxcontrib.bibtex
       - sphinxcontrib-napoleon
       - sphinx_rtd_theme
       - sphinx-tabs

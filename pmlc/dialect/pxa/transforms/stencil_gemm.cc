@@ -1,20 +1,21 @@
 // Copyright 2020 Intel Corporation
 
+#include <string>
+
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Pass/Pass.h"
-#include "mlir/Pass/PassOptions.h"
 #include "mlir/Support/DebugStringHelper.h"
 
-// TODO: Including autotile.h for PowerOfTwoGenerator, but maybe instead both
-// should include a third file with the tile size generators
 #include "pmlc/dialect/pxa/analysis/strides.h"
+#include "pmlc/dialect/pxa/ir/matchers.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/dialect/pxa/transforms/autotile.h"
 #include "pmlc/dialect/pxa/transforms/passes.h"
 #include "pmlc/dialect/pxa/transforms/stencil.h"
-
 #include "pmlc/util/logging.h"
+#include "pmlc/util/matchers.h"
+#include "pmlc/util/tags.h"
 
 using namespace mlir; // NOLINT
 
@@ -58,85 +59,63 @@ struct GemmOperand {
 class StencilGEMM : public StencilBase {
 private:
   unsigned numThreads;
+  bool doBatch;
   StencilCostFunction stencilCostFn;
 
   Optional<LoadStoreOps> capture() {
+    using matchers::m_Any;
     // Looking for load..load..mul..reduce..terminator
-    LoadStoreOps ret;
-    const unsigned kNumValidInstrInGemmRegion = 5;
-    auto *body = op.getBody();
-
-    // Verify the number of ops
-    if (body->getOperations().size() != kNumValidInstrInGemmRegion) {
-      IVLOG(5, "The AffineParallelOp region didn't have the right number of "
-               "instructions for a GEMM");
-      return llvm::None;
+    Value load1, load2, reduce;
+    Operation *yield = op.getBody()->getTerminator();
+    if (matchPattern(
+            yield,
+            m_Op<AffineYieldOp>(m_Capture(
+                &reduce, m_PxaReduceOp(
+                             AtomicRMWKind::addf,
+                             m_Op<MulFOp>(m_Capture(&load1, m_Op<PxaLoadOp>()),
+                                          m_Capture(&load2, m_Op<PxaLoadOp>())),
+                             m_Any())))) ||
+        matchPattern(
+            yield,
+            m_Op<AffineYieldOp>(m_Capture(
+                &reduce, m_PxaReduceOp(
+                             AtomicRMWKind::addi,
+                             m_Op<MulIOp>(m_Capture(&load1, m_Op<PxaLoadOp>()),
+                                          m_Capture(&load2, m_Op<PxaLoadOp>())),
+                             m_Any()))))) {
+      return LoadStoreOps{{reduce}, {load1, load2}};
     }
+    return llvm::None;
+  }
 
-    // Find the Reduce Op
-    auto it = std::prev(body->end(), 2);
-    auto reduceOp = dyn_cast<PxaReduceOp>(*it);
-    if (!reduceOp) {
-      IVLOG(5, "The AffineParallelOp region didn't have a reduce as its last "
-               "non-terminator");
-      return llvm::None;
-    }
-    ret.stores.push_back(&*it);
-    IVLOG(5, "Found ReduceOp");
+  // Requirements for additional reduction indices
+  // that do not appear in output tensor
+  IdxStrideReqs additionalReductionIdxReqs = IdxStrideReqs{
+      [](int64_t stride) { return stride == 0; }, // output
+      [](int64_t stride) { return stride != 0; }, // input0
+      [](int64_t stride) { return stride != 0; }, // input1
+  };
 
-    // Now check the reduceOp aggregation.
-    if (reduceOp.agg() != AtomicRMWKind::addf) {
-      IVLOG(5, "the reduce operation is not addition");
-      return llvm::None;
-    }
-
-    // Get the operand for the reduce op and make sure it is the result of a
-    // multiplication.
-    auto defOp = reduceOp.val().getDefiningOp();
-    if (!defOp) {
-      IVLOG(5,
-            "the source of the reduce operation is not defined in this block");
-      return llvm::None;
-    }
-
-    Operation *lhs;
-    Operation *rhs;
-    if (auto mulfOp = dyn_cast_or_null<MulFOp>(defOp)) {
-      lhs = mulfOp.lhs().getDefiningOp();
-      if (!dyn_cast_or_null<PxaLoadOp>(lhs)) {
-        IVLOG(3, "The LHS of the mul op is not affine.load.");
-        return llvm::None;
+  bool isAdditionalReductionIndex(const BlockArgument &index,
+                                  ArrayRef<Value> tensor) {
+    for (size_t i = 0; i < tensor.size(); i++) {
+      auto strideInfo = getStrideInfo(tensor[i]);
+      auto stride = strideInfo->strides[index];
+      if (!additionalReductionIdxReqs[i](stride)) {
+        return false;
       }
-      rhs = mulfOp.rhs().getDefiningOp();
-      if (!dyn_cast_or_null<PxaLoadOp>(rhs)) {
-        IVLOG(3, "The RHS of the mul op is not affine.load.");
-        return llvm::None;
-      }
-    } else if (auto muliOp = dyn_cast_or_null<MulIOp>(defOp)) {
-      lhs = muliOp.lhs().getDefiningOp();
-      if (!dyn_cast_or_null<PxaLoadOp>(lhs)) {
-        IVLOG(3, "The LHS of the mul op is not affine.load.");
-        return llvm::None;
-      }
-      rhs = muliOp.rhs().getDefiningOp();
-      if (!dyn_cast_or_null<PxaLoadOp>(rhs)) {
-        IVLOG(3, "The RHS of the mul op is not affine.load.");
-        return llvm::None;
-      }
-    } else {
-      IVLOG(5, "The source of the reduce is not a multiplication operation");
-      return llvm::None;
     }
-    ret.loads.push_back(lhs);
-    ret.loads.push_back(rhs);
-
-    return Optional<LoadStoreOps>(ret);
+    return true;
   }
 
   double getCost(TensorAndIndexPermutation perm, ArrayRef<int64_t> tileSize) {
     unsigned tot_inner_loop = tileSize[0] * tileSize[1] * tileSize[2];
 
-    auto cost = stencilCostFn(tileSize);
+    SmallVector<Type, 3> types;
+    for (Value value : perm.values) {
+      types.push_back(value.getType());
+    }
+    auto cost = stencilCostFn(tileSize, types);
     if (cost.throughput == 0) {
       return std::numeric_limits<double>::infinity();
     }
@@ -150,7 +129,7 @@ private:
     // The middle idxs are the accumulation indexes, i.e. those used on loads
     // but not stores
     DenseMap<BlockArgument, unsigned> middle_idxs;
-    auto in0StrideInfo = getStrideInfo(perm.ioOps[1]);
+    auto in0StrideInfo = getStrideInfo(perm.values[1]);
     for (const auto &kvp : in0StrideInfo->strides) {
       if (getBlockArgsAsSet().count(kvp.first)) {
         IVLOG(6, "Based on first tensor, inserting middle index "
@@ -163,7 +142,7 @@ private:
     }
     IVLOG(5, "Current size of middle_idxs = " << middle_idxs.size());
 
-    auto in1StrideInfo = getStrideInfo(perm.ioOps[2]);
+    auto in1StrideInfo = getStrideInfo(perm.values[2]);
     for (const auto &kvp : in1StrideInfo->strides) {
       if (getBlockArgsAsSet().count(kvp.first)) {
         IVLOG(6, "Based on second tensor, inserting middle index "
@@ -175,7 +154,7 @@ private:
       }
     }
     IVLOG(5, "Current size of middle_idxs = " << middle_idxs.size());
-    auto outStrideInfo = getStrideInfo(perm.ioOps[0]);
+    auto outStrideInfo = getStrideInfo(perm.values[0]);
     for (const auto &kvp : outStrideInfo->strides) {
       if (getBlockArgsAsSet().count(kvp.first)) {
         auto it = middle_idxs.find(kvp.first);
@@ -260,43 +239,111 @@ private:
   }
 
   void transform(TensorAndIndexPermutation perm, ArrayRef<int64_t> tileSize) {
+    int64_t numBatches = 1;
+    int64_t kRange = getIdxRange(perm.indexes[2]);
+    IVLOG(3, "kRange: " << kRange);
+    SmallVector<BlockArgument, 4> Aindices, Bindices;
+    SmallVector<int64_t> numBatchesArr;
+    Aindices.emplace_back(perm.indexes[0]);
+    Aindices.emplace_back(perm.indexes[2]);
+    Bindices.emplace_back(perm.indexes[2]);
+    Bindices.emplace_back(perm.indexes[1]);
+
+    // Generate the GEMM op; select inputs based on permutation order
+    auto opC = cast<PxaReduceOp>(perm.values[0].getDefiningOp());
+    auto opA = cast<PxaLoadOp>(perm.values[1].getDefiningOp());
+    auto opB = cast<PxaLoadOp>(perm.values[2].getDefiningOp());
+
     // First, modify step size of all tiled indexes
     auto steps = op.getSteps();
     for (size_t i = 0; i < getBlockArgsAsSet().size(); i++) {
+      bool foundBlockArg = false;
       for (size_t j = 0; j < getTiledIdxCount(); j++) {
         if (perm.indexes[j] == op.getBody()->getArgument(i)) {
           steps[i] *= tileSize[j];
+          foundBlockArg = true;
+
+          // K index (reduction dimension)
+          if (doBatch && j == 2) {
+            // We want to transform "regular" pxa.gemm where numBatches is 1:
+            // affine.parallel (i, j, k) = (..., 0) to (..., kRange)
+            //                             step (kStep) {
+            //   pxa.gemm C[i, j] = A[i, k], B[k, j]: [..., kStep], 1
+            // }
+            //
+            // to
+            //
+            // affine.parallel (i, j, k) = (..., 0) to (..., kRange) step (..,
+            //                             step (kRange) {
+            // pxa.gemm C[i, j] = A[i, k], B[k, j]: [..., kStep], (kRange/64)
+            // }
+            //
+            // where the number of batches of A and B matrices to multiply is
+            // the k loop's range divided by the original step size for the k
+            // loop.
+            //
+            // Subsequently, kStep is set to kRange. That is, in one step, a
+            // block of C is completely computed through reduction of batches of
+            // A and B matrix multiplies.
+            numBatches = kRange / steps[i];
+            steps[i] = kRange;
+
+            IVLOG(3, "steps[" << i << "] = " << steps[i]);
+            IVLOG(3, "numBatches: " << numBatches);
+          }
         }
+      }
+
+      // Check for additional reduction indices with a range greater than 1
+      if (doBatch && !foundBlockArg && steps[i] == 1 &&
+          getIdxRange(op.getBody()->getArgument(i)) > 1 &&
+          isAdditionalReductionIndex(op.getBody()->getArgument(i),
+                                     ArrayRef<Value>{opC, opA, opB})) {
+        auto index = op.getBody()->getArgument(i);
+        int64_t indexRange = getIdxRange(index);
+
+        Aindices.emplace_back(index);
+        Bindices.emplace_back(index);
+
+        numBatchesArr.emplace_back(indexRange);
+        foundBlockArg = true;
+        steps[i] = indexRange;
       }
     }
     op.setSteps(steps);
 
-    // Generate the GEMM op; select inputs based on permutation order
-    auto opC = cast<PxaReduceOp>(*perm.ioOps[0]);
-    auto opA = cast<PxaLoadOp>(*perm.ioOps[1]);
-    auto opB = cast<PxaLoadOp>(*perm.ioOps[2]);
+    // The numbatches array's first element corresponds to the 'k'
+    // index of GEMM. The other reduction indices follow 'k'.
+
+    numBatchesArr.insert(numBatchesArr.begin(), numBatches);
 
     auto bodyBuilder = op.getBodyBuilder();
 
     auto tileAttr = bodyBuilder.getI64ArrayAttr(tileSize);
+    auto numBatchesAttr =
+        bodyBuilder.getI64ArrayAttr(ArrayRef<int64_t>(numBatchesArr));
 
     SmallVector<Value, 8> mapOperands;
     GemmOperand c(opC, {perm.indexes[0], perm.indexes[1]}, mapOperands);
-    GemmOperand a(opA, {perm.indexes[0], perm.indexes[2]}, mapOperands);
-    GemmOperand b(opB, {perm.indexes[2], perm.indexes[1]}, mapOperands);
+    GemmOperand a(opA, ArrayRef<BlockArgument>(Aindices), mapOperands);
+    GemmOperand b(opB, ArrayRef<BlockArgument>(Bindices), mapOperands);
 
-    auto gemm =
-        bodyBuilder.create<pxa::PxaGemmOp>(op.getLoc(), c.memref.getType(),  //
-                                           c.memref, c.accessMap, c.tileMap, //
-                                           a.memref, a.accessMap, a.tileMap, //
-                                           b.memref, b.accessMap, b.tileMap, //
-                                           tileAttr, mapOperands);
+    auto brgemm = bodyBuilder.create<pxa::PxaGemmOp>(
+        op.getLoc(), c.memref.getType(), //
+        c.memref, AffineMapAttr::get(c.accessMap),
+        AffineMapAttr::get(c.tileMap), //
+        a.memref, AffineMapAttr::get(a.accessMap),
+        AffineMapAttr::get(a.tileMap), //
+        b.memref, AffineMapAttr::get(b.accessMap),
+        AffineMapAttr::get(b.tileMap), //
+        tileAttr, numBatchesAttr, mapOperands);
 
-    opC.result().replaceAllUsesWith(gemm);
+    opC.result().replaceAllUsesWith(brgemm);
+    opC.erase();
   }
 
 public:
-  StencilGEMM(AffineParallelOp op, unsigned numThreads,
+  StencilGEMM(AffineParallelOp op, unsigned numThreads, bool doBatch,
               StencilCostFunction costFn)
       : StencilBase{op,
                     3, // Three tileable indexes
@@ -317,39 +364,14 @@ public:
                          [](int64_t stride) { return stride == 1; }, // input0
                          [](int64_t stride) { return stride != 0; }, // input1
                      }}},
-        numThreads{numThreads}, stencilCostFn(costFn) {}
+        numThreads{numThreads}, doBatch{doBatch}, stencilCostFn(costFn) {}
 };
 
-struct StencilGEMMPass : public PassWrapper<StencilGEMMPass, FunctionPass> {
-  StencilGEMMPass() { assert(false && "StencilGEMMPass must be configured"); }
-
-  StencilGEMMPass(const StencilGEMMPass &rhs) : costFn(rhs.costFn) {
-    numThreads = rhs.numThreads.getValue();
-  }
-
-  StencilGEMMPass(unsigned numThreads_, StencilCostFunction costFn)
-      : costFn(costFn) {
-    numThreads = numThreads_;
-  }
-
-  void runOnFunction() final {
-    auto func = getFunction();
-    func.walk([this](AffineParallelOp op) {
-      StencilGEMM stencil(op, numThreads.getValue(), costFn);
-      stencil.DoStenciling();
-    });
-  }
-
-  StencilCostFunction costFn;
-
-  Option<unsigned> numThreads{
-      *this, "threads",
-      llvm::cl::desc("Specifies number of threads for the stencil pass")};
-};
-
-std::unique_ptr<Pass> createStencilGEMMPass(unsigned numThreads,
-                                            StencilCostFunction costFn) {
-  return std::make_unique<StencilGEMMPass>(numThreads, costFn);
+LogicalResult applyStencilGEMM(AffineParallelOp op, unsigned numThreads,
+                               bool doBatch, StencilCostFunction costFn) {
+  StencilGEMM stencil(op, numThreads, doBatch, costFn);
+  stencil.DoStenciling();
+  return success();
 }
 
 } // namespace pmlc::dialect::pxa

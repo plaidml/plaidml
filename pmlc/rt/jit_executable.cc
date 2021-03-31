@@ -8,12 +8,16 @@
 #include <utility>
 #include <vector>
 
+#include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
+#include "mlir/Target/LLVMIR/Dialect/OpenMP/OpenMPToLLVMIRTranslation.h"
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
 #include "llvm/ExecutionEngine/GenericValue.h"
 #include "llvm/ExecutionEngine/JITLink/JITLinkMemoryManager.h"
 #include "llvm/ExecutionEngine/MCJIT.h"
 #include "llvm/ExecutionEngine/ObjectCache.h"
 #include "llvm/ExecutionEngine/Orc/ExecutionUtils.h"
+#include "llvm/ExecutionEngine/Orc/IRCompileLayer.h"
+#include "llvm/ExecutionEngine/Orc/JITTargetMachineBuilder.h"
 #include "llvm/ExecutionEngine/Orc/LLJIT.h"
 #include "llvm/ExecutionEngine/Orc/ObjectLinkingLayer.h"
 #include "llvm/ExecutionEngine/Orc/RTDyldObjectLinkingLayer.h"
@@ -30,7 +34,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/DebugStringHelper.h"
-#include "mlir/Target/LLVMIR.h"
+#include "mlir/Target/LLVMIR/Export.h"
 #include "mlir/Transforms/Passes.h"
 
 #include "pmlc/rt/device_id.h"
@@ -39,6 +43,7 @@
 #include "pmlc/rt/symbol_registry.h"
 #include "pmlc/util/env.h"
 #include "pmlc/util/logging.h"
+#include "pmlc/util/util.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
 
@@ -83,48 +88,16 @@ static std::string makeCWrapperFunctionName(StringRef name) {
 // invocation interface.
 static std::string packFunctionArguments(llvm::Module *module,
                                          StringRef entry) {
-  auto &ctx = module->getContext();
-  llvm::IRBuilder<> builder(ctx);
   auto funcName = makeCWrapperFunctionName(entry);
-  auto *func = module->getFunction(funcName);
-
-  // Given a function `foo(<...>)`, define the interface function
-  // `mlir_foo(i8**)`.
-  auto newType = llvm::FunctionType::get(builder.getVoidTy(),
-                                         builder.getInt8PtrTy()->getPointerTo(),
-                                         /*isVarArg=*/false);
   auto newName = makePackedFunctionName(entry);
-  auto funcCst = module->getOrInsertFunction(newName, newType);
-  llvm::Function *interfaceFunc = cast<llvm::Function>(funcCst.getCallee());
-
-  // Extract the arguments from the type-erased argument list and cast them to
-  // the proper types.
-  auto bb = llvm::BasicBlock::Create(ctx);
-  bb->insertInto(interfaceFunc);
-  builder.SetInsertPoint(bb);
-  llvm::Value *argList = interfaceFunc->arg_begin();
-  SmallVector<llvm::Value *, 8> args;
-  args.reserve(llvm::size(func->args()));
-  for (auto &indexedArg : llvm::enumerate(func->args())) {
-    llvm::Value *argIndex = llvm::Constant::getIntegerValue(
-        builder.getInt64Ty(), APInt(64, indexedArg.index()));
-    llvm::Value *argPtrPtr = builder.CreateGEP(argList, argIndex);
-    llvm::Value *argPtr = builder.CreateLoad(argPtrPtr);
-    llvm::Value *arg =
-        builder.CreateBitCast(argPtr, indexedArg.value().getType());
-    args.push_back(arg);
-  }
-
-  // Call the implementation function with the extracted arguments.
-  builder.CreateCall(func, args);
-
-  // The interface function returns void.
-  builder.CreateRetVoid();
-
+  util::wrapFunctionAndPackArguments(module, funcName, newName);
   return newName;
 }
 
 namespace {
+
+constexpr const char *kInitName = "init";
+constexpr const char *kFiniName = "fini";
 
 class MemRefDescriptor {
 private:
@@ -145,7 +118,7 @@ public:
     auto shape = type.getShape();
     auto memRefType = MemRefType::get(shape, type.getElementType());
     SmallVector<int64_t, 8> strides;
-    getStridesAndOffset(memRefType, strides, base->offset);
+    (void)getStridesAndOffset(memRefType, strides, base->offset);
     for (unsigned i = 0; i < rank; i++) {
       base->sizesAndStrides[i] = shape[i];
       base->sizesAndStrides[i + rank] = strides[i];
@@ -166,13 +139,13 @@ private:
   std::vector<char> memory;
 };
 
-using Function = void (*)(void **);
+using Function = uint8_t *(*)(void **);
 
 struct EngineImpl {
   virtual ~EngineImpl() = default;
-  virtual Function compile(std::unique_ptr<llvm::Module> module,
-                           std::unique_ptr<llvm::LLVMContext> ctx,
-                           StringRef entryPoint) = 0;
+  virtual void compile(std::unique_ptr<llvm::Module> module,
+                       std::unique_ptr<llvm::LLVMContext> ctx) = 0;
+  virtual Function getFunction(StringRef symbol) = 0;
 };
 
 static void *tryResolveSymbol(StringRef symbol) {
@@ -214,9 +187,8 @@ struct MCJITEngineImpl : EngineImpl {
     }
   };
 
-  Function compile(std::unique_ptr<llvm::Module> module,
-                   std::unique_ptr<llvm::LLVMContext> ctx,
-                   StringRef entryPoint) final {
+  void compile(std::unique_ptr<llvm::Module> module,
+               std::unique_ptr<llvm::LLVMContext> ctx) final {
     std::string error;
     std::unique_ptr<llvm::LegacyJITSymbolResolver> resolver(new Runtime);
     engine = std::unique_ptr<llvm::ExecutionEngine>(
@@ -232,11 +204,13 @@ struct MCJITEngineImpl : EngineImpl {
     }
 
     engine->finalizeObject();
+  }
 
-    uint64_t addr = engine->getFunctionAddress(entryPoint.str());
+  Function getFunction(StringRef symbol) final {
+    uint64_t addr = engine->getFunctionAddress(symbol.str());
     if (!addr) {
       throw std::runtime_error(
-          llvm::formatv("Entry point not found: {0}", entryPoint.str()));
+          llvm::formatv("Entry point not found: {0}", symbol.str()));
     }
     return reinterpret_cast<Function>(addr);
   }
@@ -245,17 +219,33 @@ struct MCJITEngineImpl : EngineImpl {
 };
 
 struct OrcJITEngineImpl : EngineImpl {
-  Function compile(std::unique_ptr<llvm::Module> module,
-                   std::unique_ptr<llvm::LLVMContext> ctx,
-                   StringRef entryPoint) final {
+  void compile(std::unique_ptr<llvm::Module> module,
+               std::unique_ptr<llvm::LLVMContext> ctx) final {
+    using llvm::Expected;
     using llvm::orc::DynamicLibrarySearchGenerator;
+    using llvm::orc::IRCompileLayer;
+    using llvm::orc::JITTargetMachineBuilder;
     using llvm::orc::MangleAndInterner;
     using llvm::orc::SymbolMap;
     using llvm::orc::ThreadSafeModule;
+    using llvm::orc::TMOwningSimpleCompiler;
 
     auto dataLayout = module->getDataLayout();
 
-    jit = llvm::cantFail(llvm::orc::LLJITBuilder().create());
+    // Callback to inspect the cache and recompile on demand. This follows
+    // Lang's LLJITWithObjectCache example.
+    auto compileFunctionCreator = [&](JITTargetMachineBuilder JTMB)
+        -> Expected<std::unique_ptr<IRCompileLayer::IRCompiler>> {
+      JTMB.setCodeGenOptLevel(llvm::CodeGenOpt::Level::Aggressive);
+      auto TM = JTMB.createTargetMachine();
+      if (!TM)
+        return TM.takeError();
+      return std::make_unique<TMOwningSimpleCompiler>(std::move(*TM), nullptr);
+    };
+
+    jit = llvm::cantFail(llvm::orc::LLJITBuilder()
+                             .setCompileFunctionCreator(compileFunctionCreator)
+                             .create());
 
     // Add a ThreadSafeModule to the engine and return.
     ThreadSafeModule tsm(std::move(module), std::move(ctx));
@@ -282,14 +272,16 @@ struct OrcJITEngineImpl : EngineImpl {
     mainJitDylib.addGenerator(
         cantFail(DynamicLibrarySearchGenerator::GetForCurrentProcess(
             dataLayout.getGlobalPrefix())));
+  }
 
+  Function getFunction(StringRef symbol) {
     // JIT lookup may return an Error referring to strings stored internally by
     // the JIT. If the Error outlives the ExecutionEngine, it would want have a
     // dangling reference, which is currently caught by an assertion inside JIT
     // thanks to hand-rolled reference counting. Rewrap the error message into a
     // string before returning. Alternatively, ORC JIT should consider copying
     // the string into the error message.
-    auto expectedSymbol = jit->lookup(entryPoint);
+    auto expectedSymbol = jit->lookup(symbol);
     if (!expectedSymbol) {
       std::string errorMessage;
       llvm::raw_string_ostream os(errorMessage);
@@ -330,9 +322,9 @@ struct StopWatch {
 class JitExecutable final : public Executable {
 public:
   JitExecutable(const std::shared_ptr<Program> &program,
-                std::shared_ptr<Device> device, ArrayRef<void *> preParams,
-                ArrayRef<void *> bufptrs)
-      : program(program), device(std::move(device)) {
+                std::shared_ptr<Device> device, ArrayRef<void *> preParams)
+      : program(program), device(std::move(device)), preParams(preParams),
+        jitInit(nullptr), jitFini(nullptr), initPack(nullptr) {
     static std::once_flag is_initialized;
     std::call_once(is_initialized, []() {
       llvm::InitializeNativeTarget();
@@ -340,8 +332,8 @@ public:
       initializeLLVMPasses();
       llvm::sys::DynamicLibrary::LoadLibraryPermanently(nullptr);
     });
-
-    ptrs.reserve(preParams.size() + bufptrs.size());
+    registerLLVMDialectTranslation(*program->context);
+    registerOpenMPDialectTranslation(*program->context);
 
     EngineKind kind = EngineKind::OrcJIT;
     auto jit = pmlc::util::getEnvVar("LLVM_JIT");
@@ -362,10 +354,6 @@ public:
       throw std::runtime_error("Invalid EngineKind");
     }
 
-    if (program->arguments.size() != bufptrs.size()) {
-      throw std::runtime_error("Program arguments and bufptrs size mismatch");
-    }
-
     auto ctx = std::make_unique<llvm::LLVMContext>();
     auto llvmModule = translateModuleToLLVMIR(*program->module, *ctx);
     if (!llvmModule) {
@@ -374,53 +362,125 @@ public:
 
     setupTargetTriple(llvmModule.get());
     auto entryPoint = packFunctionArguments(llvmModule.get(), program->entry);
+    std::string initPacked;
+    std::string finiPacked;
+    if (llvmModule->getFunction(kInitName) &&
+        llvmModule->getFunction(kFiniName)) {
+      initPacked = packFunctionArguments(llvmModule.get(), kInitName);
+      finiPacked = packFunctionArguments(llvmModule.get(), kFiniName);
+    }
 
     if (VLOG_IS_ON(6)) {
       llvmModule->print(llvm::errs(), nullptr);
     }
 
-    jitEntry = impl->compile(std::move(llvmModule), std::move(ctx), entryPoint);
-    if (!jitEntry) {
+    impl->compile(std::move(llvmModule), std::move(ctx));
+    jitMain = impl->getFunction(entryPoint);
+    if (initPacked != "" && finiPacked != "") {
+      jitInit = impl->getFunction(initPacked);
+      jitFini = impl->getFunction(finiPacked);
+    }
+
+    if (!jitMain) {
       throw std::runtime_error("jitEntry function is null");
     }
 
-    std::copy(preParams.begin(), preParams.end(), std::back_inserter(ptrs));
-
-    descriptors.reserve(bufptrs.size());
-    for (unsigned i = 0; i < bufptrs.size(); i++) {
-      descriptors.emplace_back(bufptrs[i], program->arguments[i].shape);
-      ptrs.push_back(descriptors[i].ptr());
+    if (jitInit) {
+      IVLOG(3, "Doing jit init");
+      std::vector<void *> initPtrs;
+      std::vector<MemRefDescriptor> initDescriptors;
+      std::copy(preParams.begin(), preParams.end(),
+                std::back_inserter(initPtrs));
+      for (const compiler::ConstantArgument &arg : program->constants) {
+        initDescriptors.emplace_back(arg.buffer->data(),
+                                     arg.type.cast<RankedTensorType>());
+        initPtrs.push_back(initDescriptors.back().ptr());
+      }
+      initPack = jitInit(initPtrs.data());
+      IVLOG(3, "Jit init complete");
+    }
+  }
+  ~JitExecutable() {
+    if (jitFini) {
+      IVLOG(3, "Doing jit fini");
+      std::vector<void *> finiPtrs;
+      finiPtrs.push_back(initPack);
+      IVLOG(3, "Jit fini complete");
+      free(initPack);
     }
   }
 
-  void invoke() final {
+  double invoke(mlir::ArrayRef<util::BufferPtr> inputBuffers,
+                mlir::ArrayRef<util::BufferPtr> outputBuffers) final {
     StopWatch stopWatch;
     if (VLOG_IS_ON(1)) {
       stopWatch.start();
     }
-    jitEntry(ptrs.data());
+    bindArguments(inputBuffers, outputBuffers);
+    jitMain(ptrs.data());
     if (VLOG_IS_ON(1)) {
       stopWatch.stop();
       IVLOG(1, "Execution time: " << stopWatch.delta_ms() << "ms");
+    }
+    return device->execTimeInMS;
+  }
+
+  void bindArguments(ArrayRef<util::BufferPtr> inputBuffers,
+                     ArrayRef<util::BufferPtr> outputBuffers) {
+    if (inputBuffers.size() != program->inputs.size()) {
+      throw std::runtime_error("Program input arguments and buffers mismatch");
+    }
+
+    if (outputBuffers.size() != program->outputs.size()) {
+      throw std::runtime_error(
+          "Program outputs arguments and buffers mismatch");
+    }
+
+    descriptors.clear();
+    ptrs.clear();
+
+    if (jitInit) {
+      ptrs.push_back(initPack);
+    } else {
+      std::copy(preParams.begin(), preParams.end(), std::back_inserter(ptrs));
+    }
+
+    for (auto [type, buffer] : llvm::zip(program->inputs, inputBuffers)) {
+      descriptors.emplace_back(buffer->data(), type.cast<RankedTensorType>());
+      ptrs.push_back(descriptors.back().ptr());
+    }
+    if (!jitInit) {
+      for (const compiler::ConstantArgument &arg : program->constants) {
+        descriptors.emplace_back(arg.buffer->data(),
+                                 arg.type.cast<RankedTensorType>());
+        ptrs.push_back(descriptors.back().ptr());
+      }
+    }
+    for (auto [type, buffer] : llvm::zip(program->outputs, outputBuffers)) {
+      descriptors.emplace_back(buffer->data(), type.cast<RankedTensorType>());
+      ptrs.push_back(descriptors.back().ptr());
     }
   }
 
 private:
   std::shared_ptr<Program> program;
   std::shared_ptr<Device> device;
+  std::vector<void *> preParams;
   std::unique_ptr<EngineImpl> impl;
   std::vector<MemRefDescriptor> descriptors;
   std::vector<void *> ptrs;
-  Function jitEntry;
+  Function jitInit;
+  Function jitMain;
+  Function jitFini;
+  uint8_t *initPack;
 };
 
 } // namespace
 
-std::unique_ptr<Executable> makeJitExecutable(
-    const std::shared_ptr<Program> &program, std::shared_ptr<Device> device,
-    mlir::ArrayRef<void *> preParams, mlir::ArrayRef<void *> bufptrs) {
-  return std::make_unique<JitExecutable>(program, std::move(device), preParams,
-                                         bufptrs);
+std::unique_ptr<Executable>
+makeJitExecutable(const std::shared_ptr<Program> &program,
+                  std::shared_ptr<Device> device, ArrayRef<void *> preParams) {
+  return std::make_unique<JitExecutable>(program, std::move(device), preParams);
 }
 
 } // namespace pmlc::rt

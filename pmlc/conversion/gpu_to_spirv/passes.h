@@ -27,7 +27,13 @@ void populateCustomGLSLToStdSpirvPatterns(
     mlir::MLIRContext *context, mlir::SPIRVTypeConverter &typeConverter,
     mlir::OwningRewritePatternList &patterns);
 
+void populateCustomStdToOCLSpirvPatterns(
+    mlir::MLIRContext *context, mlir::SPIRVTypeConverter &typeConverter,
+    mlir::OwningRewritePatternList &patterns);
+
 std::unique_ptr<mlir::Pass> createGPUToSPIRVCustomPass();
+std::unique_ptr<mlir::Pass>
+createGPUToSPIRVCustomPass(bool nonUniformBroadcast);
 
 /// Generate the code for registering conversion passes.
 #define GEN_PASS_REGISTRATION

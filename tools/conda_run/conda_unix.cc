@@ -53,9 +53,9 @@ int main(int argc, char* argv[]) {
 
 #ifdef DEBUG
     // Useful debugging code
-    std::cout << "argc: " << argc << std::endl;
+    std::cerr << "argc: " << argc << std::endl;
     for (int i = 0; i < argc; i++) {
-      std::cout << "arg[" << i << "]: " << argv[i] << std::endl;
+      std::cerr << "arg[" << i << "]: " << argv[i] << std::endl;
     }
     std::map<std::string, std::string> env_map;
     for (char** env = environ; *env; env++) {
@@ -64,7 +64,7 @@ int main(int argc, char* argv[]) {
       env_map.emplace(env_str.substr(0, pos), env_str.substr(pos + 1));
     }
     for (auto kvp : env_map) {
-      std::cout << kvp.first << "=" << kvp.second << std::endl;
+      std::cerr << kvp.first << "=" << kvp.second << std::endl;
     }
 #endif
 

@@ -1,5 +1,8 @@
-// Copyright 2020 Intel Corporation
+// Copyright 2020, Intel Corporation
 
+#include "pmlc/dialect/pxa/transforms/gpu_thread.h"
+
+#include <algorithm>
 #include <limits>
 #include <memory>
 #include <utility>
@@ -66,29 +69,32 @@ struct GPUThreadPass : public GPUThreadBase<GPUThreadPass> {
     auto func = getFunction();
     // Nest outermost loops into 'blocks' and 'threads'
     for (auto op : func.getOps<AffineParallelOp>()) {
-      auto maybeRanges = op.getConstantRanges();
-      if (!maybeRanges) {
-        // Fail if we can't compute the ranges at compile time
-        continue;
-      }
-      // We want 'logical threads' * 'threads per subgroup' (i.e. subgroupSize)
-      // to end up beging about 'maxThreads' threads, and the rest we put into
-      // the grid
-      unsigned subgroupSize = getIntegerTag(op, subgroupSizeTag(), 1);
-      auto goalThreads =
-          std::max(1u, static_cast<unsigned>(maxThreads / subgroupSize));
-      CostModel model(op, goalThreads);
-      auto tileSize =
-          findBestTileSize(EvenTilingGenerator(), model, *maybeRanges);
-      auto inner = performTiling(op, tileSize);
-      setUnitTag(op, gpuBlockTag());
-      setUnitTag(inner, gpuThreadTag());
-      setIntegerTag(inner, subgroupSizeTag(), subgroupSize);
+      gpuThreadParallelOp(maxThreads, op);
     }
   }
 };
 
 } // namespace
+
+void gpuThreadParallelOp(unsigned maxThreads, mlir::AffineParallelOp op) {
+  auto maybeRanges = op.getConstantRanges();
+  if (!maybeRanges) {
+    // Fail if we can't compute the ranges at compile time
+    return;
+  }
+  // We want 'logical threads' * 'threads per subgroup' (i.e. subgroupSize)
+  // to end up beging about 'maxThreads' threads, and the rest we put into
+  // the grid
+  unsigned subgroupSize = getIntegerTag(op, subgroupSizeTag(), 1);
+  auto goalThreads =
+      std::max(1u, static_cast<unsigned>(maxThreads / subgroupSize));
+  CostModel model(op, goalThreads);
+  auto tileSize = findBestTileSize(EvenTilingGenerator(), model, *maybeRanges);
+  auto inner = performTiling(op, tileSize);
+  setUnitTag(op, gpuBlockTag());
+  setUnitTag(inner, gpuThreadTag());
+  setIntegerTag(inner, subgroupSizeTag(), subgroupSize);
+}
 
 std::unique_ptr<mlir::Pass> createGPUThreadPass() {
   return std::make_unique<GPUThreadPass>();

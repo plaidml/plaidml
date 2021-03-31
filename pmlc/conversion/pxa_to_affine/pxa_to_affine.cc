@@ -10,6 +10,7 @@
 #include "pmlc/conversion/pxa_to_affine/pass_detail.h"
 #include "pmlc/conversion/pxa_to_affine/passes.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
+#include "pmlc/dialect/stdx/ir/ops.h"
 #include "pmlc/util/logging.h"
 #include "pmlc/util/tags.h"
 #include "pmlc/util/util.h"
@@ -19,6 +20,7 @@ using namespace mlir; // NOLINT
 namespace pmlc::conversion::pxa_to_affine {
 
 namespace pxa = dialect::pxa;
+namespace stdx = dialect::stdx;
 
 namespace {
 
@@ -35,14 +37,27 @@ struct AffineParallelOpConversion
     // If it's tagged, leave as a parallel
     if (hasTags(op)) {
       // Make a new affine parallel with no return values
-      auto newOp = rewriter.create<AffineParallelOp>(
-          op.getLoc(),                                      //
-          ArrayRef<Type>{}, ArrayRef<AtomicRMWKind>{},      //
-          op.lowerBoundsMap(), op.getLowerBoundsOperands(), //
-          op.upperBoundsMap(), op.getUpperBoundsOperands(), //
-          steps);
-      for (Value iv : newOp.getIVs()) {
-        ivs.push_back(iv);
+      AffineParallelOp newOp;
+      if (op.getIVs().size() == 0) {
+        // If it's empty, add a dummy index (since some affine / scf things
+        // don't like 0 index affine.parallel
+        newOp = rewriter.create<AffineParallelOp>(
+            op.getLoc(),                                                 //
+            ArrayRef<Type>{}, ArrayRef<AtomicRMWKind>{},                 //
+            AffineMap::getConstantMap(0, op.getContext()), ValueRange(), //
+            AffineMap::getConstantMap(1, op.getContext()), ValueRange(), //
+            ArrayRef<int64_t>{1});
+      } else {
+        // Normal case for parallels with IVs
+        newOp = rewriter.create<AffineParallelOp>(
+            op.getLoc(),                                      //
+            ArrayRef<Type>{}, ArrayRef<AtomicRMWKind>{},      //
+            op.lowerBoundsMap(), op.getLowerBoundsOperands(), //
+            op.upperBoundsMap(), op.getUpperBoundsOperands(), //
+            steps);
+        for (Value iv : newOp.getIVs()) {
+          ivs.push_back(iv);
+        }
       }
       copyTags(newOp, op);
       rewriter.setInsertionPointToStart(newOp.getBody());
@@ -232,12 +247,18 @@ struct FuncOpConversion : public OpConversionPattern<FuncOp> {
     for (unsigned i = 0; i < type.getNumInputs(); ++i) {
       result.addInputs(i, {type.getInput(i)});
     }
+    SmallVector<Type, 1> resultTypes;
+    for (unsigned i = 0; i < type.getNumResults(); ++i) {
+      if (type.getResult(i).isa<stdx::ArgpackType>()) {
+        resultTypes.push_back(type.getResult(i));
+      }
+    }
 
     // Create a new function with an updated signature.
     auto newOp = rewriter.cloneWithoutRegions(op);
     rewriter.inlineRegionBefore(op.getBody(), newOp.getBody(), newOp.end());
-    newOp.setType(FunctionType::get(result.getConvertedTypes(), llvm::None,
-                                    op.getContext()));
+    newOp.setType(FunctionType::get(op.getContext(), result.getConvertedTypes(),
+                                    resultTypes));
 
     // Tell the rewriter to convert the region signature.
     rewriter.applySignatureConversion(&newOp.getBody(), result);
@@ -255,7 +276,13 @@ struct ReturnOpConversion : public OpConversionPattern<ReturnOp> {
   matchAndRewrite(ReturnOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
     IVLOG(2, "ReturnOpConversion::matchAndRewrite>");
-    rewriter.replaceOpWithNewOp<ReturnOp>(op);
+    SmallVector<Value, 1> results;
+    for (auto val : operands) {
+      if (val.getType().isa<stdx::ArgpackType>()) {
+        results.push_back(val);
+      }
+    }
+    rewriter.replaceOpWithNewOp<ReturnOp>(op, results);
     return success();
   }
 };
@@ -269,8 +296,8 @@ struct LowerPXAToAffinePass
     OwningRewritePatternList patterns;
     populatePXAToAffineConversionPatterns(patterns, &ctx);
 
-    if (failed(applyPartialConversion(getOperation(), target, patterns,
-                                      nullptr))) {
+    if (failed(applyPartialConversion(getOperation(), target,
+                                      std::move(patterns)))) {
       getOperation().dump();
       emitError(UnknownLoc::get(&ctx), "Error lowering pxa -> affine\n");
       signalPassFailure();

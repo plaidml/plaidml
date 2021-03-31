@@ -12,11 +12,13 @@ include "mlir/Interfaces/ViewLikeInterface.td"
 
 include "mlir/Dialect/StandardOps/IR/StandardOpsBase.td"
 
-
 def StdX_Dialect : Dialect {
   let name = "stdx";
   let cppNamespace = "pmlc::dialect::stdx";
 }
+
+def Argpack : DialectType<StdX_Dialect, CPred<"$_self.isa<ArgpackType>()">, "Argpack type">,
+        BuildableType<"$_builder.getType<ArgpackType>()">;
 
 class StdX_Op<string mnemonic, list<OpTrait> traits = []> :
     Op<StdX_Dialect, mnemonic, traits> {
@@ -50,12 +52,24 @@ def ACosOp : StdX_UnaryFuncOp<"acos"> {
   let summary = "arccosine";
 }
 
+def ACosHOp : StdX_UnaryFuncOp<"acosh"> {
+  let summary = "hyperbolic arccosine";
+}
+
 def ASinOp : StdX_UnaryFuncOp<"asin"> {
   let summary = "arcsine";
 }
 
+def ASinHOp : StdX_UnaryFuncOp<"asinh"> {
+  let summary = "hyperbolic arcsine";
+}
+
 def ATanOp : StdX_UnaryFuncOp<"atan"> {
   let summary = "arctangent";
+}
+
+def ATanHOp : StdX_UnaryFuncOp<"atanh"> {
+  let summary = "hyperbolic arctangent";
 }
 
 def CosHOp : StdX_UnaryFuncOp<"cosh"> {
@@ -92,7 +106,8 @@ def TanOp : StdX_UnaryFuncOp<"tan"> {
   let summary = "tangent";
 }
 
-def AnyStdScalar : AnyTypeOf<[AnyFloat, AnySignlessInteger]> {} 
+def AnyStdScalar : AnyTypeOf<[AnyFloat, AnySignlessInteger]> {}
+def AnyVectorOrScalar : AnyTypeOf<[AnyStdScalar, AnyVector]> {}
 
 def SubgroupBroadcastOp : StdX_Op<"subgroup_broadcast", [NoSideEffect, AllTypesMatch<["value", "result"]>]> {
   let summary = "broadcast to all elements in subgroup";
@@ -104,39 +119,30 @@ def SubgroupBroadcastOp : StdX_Op<"subgroup_broadcast", [NoSideEffect, AllTypesM
   let verifier = ?;
 }
 
-def AnyVectorOrScalar : AnyTypeOf<[AnyStdScalar, AnyVector]> {} 
-
-def SubgroupBlockReadINTELOp : StdX_Op<"subgroup_block_read_intel",
-     [TypesMatchWith<"result type matches element type of 'memref'",
-                     "memref", "result",
-                     "$_self.cast<MemRefType>().getElementType()">]> {
+def SubgroupBlockReadINTELOp : StdX_Op<"subgroup_block_read_intel", [NoSideEffect]> {
   let summary = "See intel_subgroups extension.";
   let arguments = (ins Arg<AnyMemRef, "the reference to subgroup block read from",
                            [MemRead]>:$memref,
                            Variadic<Index>:$indices);
   let results = (outs AnyVectorOrScalar:$result);
 
-  let builders = [OpBuilder<
-    "OpBuilder &, OperationState &result, Value memref,"
-    "ValueRange indices = {}">];
+  let builders = [
+    OpBuilder<(ins
+      "mlir::Value":$memref,
+      CArg<"mlir::ValueRange", "{}">:$indices
+    )>
+  ];
 
   let extraClassDeclaration = [{
-    Value getMemRef() { return getOperand(0); }
-    void setMemRef(Value value) { setOperand(0, value); }
-    MemRefType getMemRefType() {
-      return getMemRef().getType().cast<MemRefType>();
+    mlir::MemRefType getMemRefType() {
+      return memref().getType().cast<mlir::MemRefType>();
     }
-
-    operand_range getIndices() { return {operand_begin() + 1, operand_end()}; }
   }];
 
-  let assemblyFormat = "$memref `[` $indices `]` attr-dict `:` type($memref)";
+  let assemblyFormat = "$memref `[` $indices `]` attr-dict `:` type($memref)`,` type($result)";
 }
 
-def SubgroupBlockWriteINTELOp : StdX_Op<"subgroup_block_write_intel",
-     [TypesMatchWith<"type of 'value' matches element type of 'memref'",
-                     "memref", "value",
-                     "$_self.cast<MemRefType>().getElementType()">]> {
+def SubgroupBlockWriteINTELOp : StdX_Op<"subgroup_block_write_intel", [NoSideEffect]> {
   let summary = "See intel_subgroups extension.";
 
   let arguments = (ins AnyVectorOrScalar:$value,
@@ -144,26 +150,33 @@ def SubgroupBlockWriteINTELOp : StdX_Op<"subgroup_block_write_intel",
                        [MemWrite]>:$memref,
                        Variadic<Index>:$indices);
 
-  let builders = [OpBuilder<
-    "OpBuilder &, OperationState &result, Value valueToStore, Value memref">];
+  let builders = [
+    OpBuilder<(ins "mlir::Value":$valueToStore, "mlir::Value":$memref)>
+  ];
 
   let extraClassDeclaration = [{
-      Value getValueToStore() { return getOperand(0); }
-
-      Value getMemRef() { return getOperand(1); }
-      void setMemRef(Value value) { setOperand(1, value); }
-      MemRefType getMemRefType() {
-        return getMemRef().getType().cast<MemRefType>();
-      }
-
-      operand_range getIndices() {
-        return {operand_begin() + 2, operand_end()};
+      mlir::MemRefType getMemRefType() {
+        return memref().getType().cast<mlir::MemRefType>();
       }
   }];
 
   let assemblyFormat = [{
-    $value `,` $memref `[` $indices `]` attr-dict `:` type($memref)
+    $value `,` $memref `[` $indices `]` attr-dict `:` type($value) `,` type($memref)
   }];
+}
+
+def PackOp : Op<StdX_Dialect, "pack"> {
+  let summary = "Pack multiple values into a tuple";
+  let arguments = (ins Variadic<AnyType>:$in);
+  let results = (outs Argpack:$out);
+  let assemblyFormat = [{ $in `:` type($in) attr-dict }];
+}
+
+def UnpackOp : Op<StdX_Dialect, "unpack"> {
+  let summary = "Pack multiple values into a tuple";
+  let arguments = (ins Argpack:$in);
+  let results = (outs Variadic<AnyType>:$out);
+  let assemblyFormat = [{ $in `:` type($out) attr-dict }];
 }
 
 #endif // __PML_STDX_OPS__

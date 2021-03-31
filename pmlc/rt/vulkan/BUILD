@@ -17,18 +17,19 @@ plaidml_cc_library(
         "vulkan_state.h",
         "wrappers.cc",
     ],
+    hdrs = ["register.h"],
+    linkstatic = 1,
     local_defines = ["VULKAN_RT_BUILD"],
     deps = [
         "//pmlc/compiler",
         "//pmlc/rt",
         "@half",
         "@llvm-project//mlir:Pass",
-        "@llvm-project//mlir:SPIRVLowering",
+        "@llvm-project//mlir:SPIRVConversion",
         "@llvm-project//mlir:mlir_runner_utils",
         "@volk",
     ],
     alwayslink = 1,
-    linkstatic = 1,
 )
 
 plaidml_cc_binary(

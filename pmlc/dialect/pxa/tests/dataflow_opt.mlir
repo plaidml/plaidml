@@ -57,12 +57,12 @@ func @grn(%arg0: memref<1x4x4x3xf16>) -> memref<1x4x4x3xf16> {
     %11 = addf %10, %cst_1 : f16
     %12 = pxa.reduce assign %11, %2[0, %arg1, %arg2, 0] : memref<1x4x4x1xf16>
     %13 = pxa.load %12[0, %arg1, %arg2, 0] : memref<1x4x4x1xf16>
-    // CHECK-NEXT: sqrt
-    %14 = sqrt %13 : f16
+    // CHECK-NEXT: math.sqrt
+    %14 = math.sqrt %13 : f16
     %15 = pxa.reduce assign %14, %3[0, %arg1, %arg2, 0] : memref<1x4x4x1xf16>
     %16 = pxa.load %15[0, %arg1, %arg2, 0] : memref<1x4x4x1xf16>
-    // CHECK-NEXT: cmpf "olt"
-    %17 = cmpf "olt", %16, %cst : f16
+    // CHECK-NEXT: cmpf olt
+    %17 = cmpf olt, %16, %cst : f16
     %18 = pxa.reduce assign %17, %4[0, %arg1, %arg2, 0] : memref<1x4x4x1xi1>
     %19 = pxa.load %18[0, %arg1, %arg2, 0] : memref<1x4x4x1xi1>
     %20 = pxa.load %15[0, %arg1, %arg2, 0] : memref<1x4x4x1xf16>

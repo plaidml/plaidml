@@ -4,7 +4,7 @@
 
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/Builders.h"
-#include "mlir/IR/StandardTypes.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"
 
@@ -20,7 +20,7 @@ namespace {
 struct TraceLinkingPass : public TraceLinkingBase<TraceLinkingPass> {
   void runOnOperation() override {
     getOperation().walk([](LLVM::LLVMFuncOp op) {
-      if (!op.getAttrOfType<UnitAttr>("trace")) {
+      if (!op->getAttrOfType<UnitAttr>("trace")) {
         return;
       }
       if (!op.empty()) {
@@ -29,12 +29,12 @@ struct TraceLinkingPass : public TraceLinkingBase<TraceLinkingPass> {
       auto loc = op.getLoc();
       auto *context = op.getContext();
       OpBuilder builder(context);
-      auto module = op.getParentOfType<ModuleOp>();
+      auto module = op->getParentOfType<ModuleOp>();
       auto traceRef = getOrInsertTrace(loc, builder, module);
       auto block = op.addEntryBlock();
       builder.setInsertionPointToStart(block);
-      auto id = op.getAttrOfType<IntegerAttr>("id").getValue().getZExtValue();
-      auto msgStr = op.getAttrOfType<StringAttr>("msg").getValue().str();
+      auto id = op->getAttrOfType<IntegerAttr>("id").getValue().getZExtValue();
+      auto msgStr = op->getAttrOfType<StringAttr>("msg").getValue().str();
       auto msg = StringRef(msgStr.c_str(), msgStr.size() + 1);
       auto msgSymbol = llvm::formatv("__trace_msg_{0}", id).str();
       auto msgValue =
@@ -42,9 +42,9 @@ struct TraceLinkingPass : public TraceLinkingBase<TraceLinkingPass> {
       builder.create<LLVM::CallOp>(loc, ArrayRef<Type>{}, traceRef,
                                    ArrayRef<Value>{msgValue});
       builder.create<LLVM::ReturnOp>(loc, ArrayRef<Value>{});
-      op.removeAttr("id");
-      op.removeAttr("msg");
-      op.removeAttr("trace");
+      op->removeAttr("id");
+      op->removeAttr("msg");
+      op->removeAttr("trace");
     });
   }
 
@@ -58,8 +58,8 @@ struct TraceLinkingPass : public TraceLinkingBase<TraceLinkingPass> {
     if (!(global = module.lookupSymbol<LLVM::GlobalOp>(name))) {
       OpBuilder::InsertionGuard insertGuard(builder);
       builder.setInsertionPointToStart(module.getBody());
-      auto type = LLVM::LLVMType::getArrayTy(
-          LLVM::LLVMType::getInt8Ty(builder.getContext()), value.size());
+      auto type =
+          LLVM::LLVMArrayType::get(builder.getIntegerType(8), value.size());
       global = builder.create<LLVM::GlobalOp>(loc, type, /*isConstant=*/true,
                                               LLVM::Linkage::Internal, name,
                                               builder.getStringAttr(value));
@@ -67,11 +67,10 @@ struct TraceLinkingPass : public TraceLinkingBase<TraceLinkingPass> {
 
     // Get the pointer to the first character in the global string.
     Value globalPtr = builder.create<LLVM::AddressOfOp>(loc, global);
-    Value cst0 = builder.create<LLVM::ConstantOp>(
-        loc, LLVM::LLVMType::getInt64Ty(builder.getContext()),
-        builder.getIntegerAttr(builder.getIndexType(), 0));
+    Value cst0 = builder.create<LLVM::ConstantOp>(loc, builder.getI64Type(),
+                                                  builder.getIndexAttr(0));
     return builder.create<LLVM::GEPOp>(
-        loc, LLVM::LLVMType::getInt8PtrTy(builder.getContext()), globalPtr,
+        loc, LLVM::LLVMPointerType::get(builder.getIntegerType(8)), globalPtr,
         ArrayRef<Value>({cst0, cst0}));
   }
 
@@ -80,15 +79,16 @@ struct TraceLinkingPass : public TraceLinkingBase<TraceLinkingPass> {
     const char *symbol = "plaidml_rt_trace";
     auto *context = module.getContext();
     if (module.lookupSymbol(symbol)) {
-      return SymbolRefAttr::get(symbol, context);
+      return SymbolRefAttr::get(context, symbol);
     }
     OpBuilder::InsertionGuard insertGuard(builder);
     builder.setInsertionPointToStart(module.getBody());
-    auto voidTy = LLVM::LLVMType::getVoidTy(context);
-    auto msgTy = LLVM::LLVMType::getInt8PtrTy(context);
-    auto funcType = LLVM::LLVMType::getFunctionTy(voidTy, {msgTy}, false);
+    auto voidTy = LLVM::LLVMVoidType::get(context);
+    auto msgTy = LLVM::LLVMPointerType::get(builder.getIntegerType(8));
+    auto funcType =
+        LLVM::LLVMFunctionType::get(voidTy, {msgTy}, /*isVarArg=*/false);
     builder.create<LLVM::LLVMFuncOp>(loc, symbol, funcType);
-    return SymbolRefAttr::get(symbol, context);
+    return SymbolRefAttr::get(context, symbol);
   }
 };
 

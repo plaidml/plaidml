@@ -332,6 +332,20 @@ gentbl(
 )
 
 gentbl(
+    name = "ve_enums_gen",
+    tbl_outs = [(
+        "-gen-intrinsic-enums -intrinsic-prefix=ve",
+        "include/llvm/IR/IntrinsicsVE.h",
+    )],
+    tblgen = ":llvm-tblgen",
+    td_file = "include/llvm/IR/Intrinsics.td",
+    td_srcs = glob([
+        "include/llvm/CodeGen/*.td",
+        "include/llvm/IR/Intrinsics*.td",
+    ]),
+)
+
+gentbl(
     name = "wasm_enums_gen",
     tbl_outs = [(
         "-gen-intrinsic-enums -intrinsic-prefix=wasm",
@@ -421,7 +435,7 @@ cc_binary(
 )
 
 cc_library(
-    name = "filecheck-lib",
+    name = "FileCheckLib",
     srcs = glob([
         "lib/FileCheck/*.cpp",
         "lib/FileCheck/*.h",
@@ -444,8 +458,8 @@ cc_binary(
     linkopts = llvm_linkopts,
     stamp = 0,
     deps = [
+        ":FileCheckLib",
         ":Support",
-        ":filecheck-lib",
     ],
 )
 
@@ -469,6 +483,7 @@ llvm_target_list = [
             ("-gen-global-isel", "lib/Target/AArch64/AArch64GenGlobalISel.inc"),
             ("-gen-global-isel-combiner -combiners=AArch64PreLegalizerCombinerHelper", "lib/Target/AArch64/AArch64GenPreLegalizeGICombiner.inc"),
             ("-gen-global-isel-combiner -combiners=AArch64PostLegalizerCombinerHelper", "lib/Target/AArch64/AArch64GenPostLegalizeGICombiner.inc"),
+            ("-gen-global-isel-combiner -combiners=AArch64PostLegalizerLoweringHelper", "lib/Target/AArch64/AArch64GenPostLegalizeGILowering.inc"),
             ("-gen-callingconv", "lib/Target/AArch64/AArch64GenCallingConv.inc"),
             ("-gen-subtarget", "lib/Target/AArch64/AArch64GenSubtargetInfo.inc"),
             ("-gen-disassembler", "lib/Target/AArch64/AArch64GenDisassemblerTables.inc"),
@@ -652,8 +667,8 @@ gentbl(
     td_srcs = [
         ":common_target_td_sources",
     ] + glob([
-        "lib/Target/" + target["name"] + "/GISel/*.td",
         "lib/Target/" + target["dir_name"] + "/*.td",
+        "lib/Target/" + target["name"] + "/GISel/*.td",
     ]),
     deps = target.get("tbl_deps", []),
 ) for target in llvm_target_list]
@@ -987,6 +1002,7 @@ cc_library(
         ":IPO",
         ":MC",
         ":MIRParser",
+        ":Passes",
         ":Scalar",
         ":SelectionDAG",
         ":Support",
@@ -1774,6 +1790,50 @@ cc_library(
 )
 
 cc_library(
+    name = "CSKYCodeGen",
+    srcs = glob([
+        "lib/Target/CSKY/*.c",
+        "lib/Target/CSKY/*.cpp",
+        "lib/Target/CSKY/*.inc",
+    ]),
+    hdrs = glob([
+        "include/llvm/Target/CSKY/*.h",
+        "include/llvm/Target/CSKY/*.def",
+        "include/llvm/Target/CSKY/*.inc",
+        "lib/Target/CSKY/*.h",
+    ]),
+    copts = llvm_copts + ["-Iexternal/llvm-project/llvm/lib/Target/CSKY"],
+    deps = [
+        ":CSKYInfo",
+        ":CodeGen",
+        ":Core",
+        ":Support",
+        ":Target",
+        ":config",
+    ],
+)
+
+cc_library(
+    name = "CSKYInfo",
+    srcs = glob([
+        "lib/Target/CSKY/TargetInfo/*.c",
+        "lib/Target/CSKY/TargetInfo/*.cpp",
+        "lib/Target/CSKY/TargetInfo/*.inc",
+    ]),
+    hdrs = glob([
+        "include/llvm/Target/CSKY/TargetInfo/*.h",
+        "include/llvm/Target/CSKY/TargetInfo/*.def",
+        "include/llvm/Target/CSKY/TargetInfo/*.inc",
+        "lib/Target/CSKY/TargetInfo/*.h",
+    ]),
+    copts = llvm_copts + ["-Iexternal/llvm-project/llvm/lib/Target/CSKY"],
+    deps = [
+        ":Support",
+        ":config",
+    ],
+)
+
+cc_library(
     name = "CodeGen",
     srcs = glob([
         "lib/CodeGen/*.c",
@@ -1846,6 +1906,7 @@ cc_library(
         ":r600_enums_gen",
         ":riscv_enums_gen",
         ":s390_enums_gen",
+        ":ve_enums_gen",
         ":wasm_enums_gen",
         ":x86_enums_gen",
         ":xcore_enums_gen",
@@ -2142,6 +2203,57 @@ cc_library(
         ":config",
         ":omp_gen",
         ":omp_gen_impl",
+    ],
+)
+
+filegroup(
+    name = "acc_td_files",
+    srcs = glob([
+        "include/llvm/Frontend/OpenACC/*.td",
+        "include/llvm/Frontend/Directive/*.td",
+    ]),
+)
+
+gentbl(
+    name = "acc_gen",
+    library = False,
+    tbl_outs = [
+        ("--gen-directive-decl", "include/llvm/Frontend/OpenACC/ACC.h.inc"),
+    ],
+    tblgen = ":llvm-tblgen",
+    td_file = "include/llvm/Frontend/OpenACC/ACC.td",
+    td_srcs = [":acc_td_files"],
+)
+
+gentbl(
+    name = "acc_gen_impl",
+    library = False,
+    tbl_outs = [
+        ("--gen-directive-gen", "include/llvm/Frontend/OpenACC/ACC.cpp.inc"),
+        ("--gen-directive-impl", "lib/Frontend/OpenACC/ACC.cpp"),
+    ],
+    tblgen = ":llvm-tblgen",
+    td_file = "include/llvm/Frontend/OpenACC/ACC.td",
+    td_srcs = [":acc_td_files"],
+)
+
+cc_library(
+    name = "FrontendOpenACC",
+    srcs = glob([
+        "lib/Frontend/OpenACC/*.cpp",
+    ]) + [
+        "include/llvm/Frontend/OpenACC/ACC.cpp.inc",
+        "lib/Frontend/OpenACC/ACC.cpp",
+    ],
+    hdrs = glob([
+        "include/llvm/Frontend/OpenACC/*.h",
+    ]) + ["include/llvm/Frontend/OpenACC/ACC.h.inc"],
+    copts = llvm_copts,
+    deps = [
+        ":Analysis",
+        ":Core",
+        ":Support",
+        ":TransformUtils",
     ],
 )
 
@@ -2517,6 +2629,7 @@ cc_library(
     deps = [
         ":BinaryFormat",
         ":Object",
+        ":OrcTargetProcess",
         ":Support",
         ":config",
     ],
@@ -3296,26 +3409,6 @@ cc_library(
 )
 
 cc_library(
-    name = "OrcError",
-    srcs = glob([
-        "lib/ExecutionEngine/OrcError/*.c",
-        "lib/ExecutionEngine/OrcError/*.cpp",
-        "lib/ExecutionEngine/OrcError/*.inc",
-        "lib/ExecutionEngine/OrcError/*.h",
-    ]),
-    hdrs = glob([
-        "include/llvm/ExecutionEngine/OrcError/*.h",
-        "include/llvm/ExecutionEngine/OrcError/*.def",
-        "include/llvm/ExecutionEngine/OrcError/*.inc",
-    ]),
-    copts = llvm_copts,
-    deps = [
-        ":Support",
-        ":config",
-    ],
-)
-
-cc_library(
     name = "OrcJIT",
     srcs = glob([
         "lib/ExecutionEngine/Orc/*.c",
@@ -3335,12 +3428,54 @@ cc_library(
         ":JITLink",
         ":MC",
         ":Object",
-        ":OrcError",
+        ":OrcShared",
+        ":OrcTargetProcess",
         ":Passes",
         ":RuntimeDyld",
         ":Support",
         ":Target",
         ":TransformUtils",
+        ":config",
+    ],
+)
+
+cc_library(
+    name = "OrcShared",
+    srcs = glob([
+        "lib/ExecutionEngine/Orc/Shared/*.c",
+        "lib/ExecutionEngine/Orc/Shared/*.cpp",
+        "lib/ExecutionEngine/Orc/Shared/*.inc",
+        "lib/ExecutionEngine/Orc/Shared/*.h",
+    ]),
+    hdrs = glob([
+        "include/llvm/ExecutionEngine/Orc/Shared/*.h",
+        "include/llvm/ExecutionEngine/Orc/Shared/*.def",
+        "include/llvm/ExecutionEngine/Orc/Shared/*.inc",
+    ]),
+    copts = llvm_copts,
+    deps = [
+        ":Support",
+        ":config",
+    ],
+)
+
+cc_library(
+    name = "OrcTargetProcess",
+    srcs = glob([
+        "lib/ExecutionEngine/Orc/TargetProcess/*.c",
+        "lib/ExecutionEngine/Orc/TargetProcess/*.cpp",
+        "lib/ExecutionEngine/Orc/TargetProcess/*.inc",
+        "lib/ExecutionEngine/Orc/TargetProcess/*.h",
+    ]),
+    hdrs = glob([
+        "include/llvm/ExecutionEngine/Orc/TargetProcess/*.h",
+        "include/llvm/ExecutionEngine/Orc/TargetProcess/*.def",
+        "include/llvm/ExecutionEngine/Orc/TargetProcess/*.inc",
+    ]),
+    copts = llvm_copts,
+    deps = [
+        ":OrcShared",
+        ":Support",
         ":config",
     ],
 )
@@ -3527,6 +3662,7 @@ cc_library(
     copts = llvm_copts,
     deps = [
         ":Core",
+        ":Demangle",
         ":Support",
         ":config",
     ],

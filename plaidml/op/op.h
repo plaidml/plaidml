@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -14,7 +15,6 @@ namespace op {
 inline void init() {
   plaidml::init();
   plaidml::edsl::init();
-  ffi::call_void(plaidml_op_init);
 }
 
 namespace details {
@@ -115,15 +115,22 @@ enum class PadMode {
   _LAST,
 };
 
-struct int_list {
-  int_list(const std::vector<int>& elts)  // NOLINT[runtime/explicit]
+struct Integers {
+  Integers(const std::vector<int>& elts)  // NOLINT[runtime/explicit]
       : value(edsl::make_tuple(elts)) {}
-  int_list(const std::vector<size_t>& elts)  // NOLINT[runtime/explicit]
-      : value(edsl::make_tuple(elts)) {}
-  int_list(const std::initializer_list<int>& elts)  // NOLINT[runtime/explicit]
-      : value(edsl::make_tuple(std::vector<int>(elts))) {}
-  int_list(const std::initializer_list<size_t>& elts)  // NOLINT[runtime/explicit]
-      : value(edsl::make_tuple(std::vector<size_t>(elts))) {}
+  Integers(const std::vector<int64_t>& elts) {  // NOLINT[runtime/explicit]
+    value = edsl::make_tuple(elts);
+  }
+  Integers(const std::vector<size_t>& elts) {  // NOLINT[runtime/explicit]
+    std::vector<int64_t> casted(elts.begin(), elts.end());
+    value = edsl::make_tuple(casted);
+  }
+  Integers(const std::initializer_list<int>& elts)  // NOLINT[runtime/explicit]
+      : Integers(std::vector<int>(elts)) {}
+  Integers(const std::initializer_list<int64_t>& elts)  // NOLINT[runtime/explicit]
+      : Integers(std::vector<int64_t>(elts)) {}
+  Integers(const std::initializer_list<size_t>& elts)  // NOLINT[runtime/explicit]
+      : Integers(std::vector<size_t>(elts)) {}
 
   edsl::Value value;
 };
@@ -153,8 +160,8 @@ inline edsl::Tensor binary_crossentropy(const edsl::Tensor& I, const edsl::Tenso
   return details::op("binary_crossentropy", args).as_tensor();
 }
 
-inline edsl::Tensor broadcast(const edsl::Tensor& I, const std::vector<int>& result_shape,
-                              const std::vector<int>& bcast_axes) {
+inline edsl::Tensor broadcast(const edsl::Tensor& I, const std::vector<int64_t>& result_shape,
+                              const std::vector<int64_t>& bcast_axes) {
   auto args = edsl::make_tuple(I, edsl::make_tuple(result_shape), edsl::make_tuple(bcast_axes));
   return details::op("broadcast", args).as_tensor();
 }
@@ -184,22 +191,22 @@ class convolution {
         deriv_mode_(ConvDerivMode::NONE),
         infer_result_shape_(false) {}
 
-  convolution& strides(int_list elts) {
+  convolution& strides(Integers elts) {
     strides_ = elts.value;
     return *this;
   }
 
-  convolution& dilations(int_list elts) {
+  convolution& dilations(Integers elts) {
     dilations_ = elts.value;
     return *this;
   }
 
-  convolution& data_dilations(int_list elts) {
+  convolution& data_dilations(Integers elts) {
     data_dilations_ = elts.value;
     return *this;
   }
 
-  convolution& filter_shape(int_list elts) {
+  convolution& filter_shape(Integers elts) {
     filter_shape_ = elts.value;
     return *this;
   }
@@ -209,7 +216,7 @@ class convolution {
     return *this;
   }
 
-  convolution& manual_padding(int_list elts) {
+  convolution& manual_padding(Integers elts) {
     manual_padding_ = elts.value;
     return *this;
   }
@@ -254,7 +261,7 @@ class convolution {
     return *this;
   }
 
-  convolution& result_shape(int_list elts) {
+  convolution& result_shape(Integers elts) {
     result_shape_ = elts.value;
     return *this;
   }
@@ -313,8 +320,8 @@ inline edsl::Tensor cumprod(const edsl::Tensor& I, int axis) {
   return details::op("cumprod", args).as_tensor();
 }
 
-inline edsl::Tensor cumsum(const edsl::Tensor& I, int axis) {
-  auto args = edsl::make_tuple(I, axis);
+inline edsl::Tensor cumsum(const edsl::Tensor& I, int axis, bool exclusive = false) {
+  auto args = edsl::make_tuple(I, axis, exclusive);
   return details::op("cumsum", args).as_tensor();
 }
 
@@ -331,7 +338,7 @@ inline edsl::Tensor elu(const edsl::Tensor& I, double alpha) {
 class explicit_padding {
  public:
   explicit explicit_padding(const edsl::Tensor& I, const std::vector<int>& lo_pads, const std::vector<int>& hi_pads)
-      : I_(I), lo_pads_(lo_pads), hi_pads_(hi_pads), mode_(PadMode::CONSTANT), padval_(0) {}
+      : I_(I), lo_pads_(lo_pads), hi_pads_(hi_pads), mode_(PadMode::CONSTANT), padval_(edsl::Constant(0)) {}
 
   explicit_padding& lo_pads(const std::vector<int>& lo_pads) {
     lo_pads_ = lo_pads;
@@ -348,9 +355,8 @@ class explicit_padding {
     return *this;
   }
 
-  template <typename T>
-  explicit_padding& padval(const T& padval) {
-    padval_ = edsl::Value(padval);
+  explicit_padding& padval(const edsl::Tensor& padval) {
+    padval_ = padval;
     return *this;
   }
 
@@ -365,7 +371,7 @@ class explicit_padding {
   std::vector<int> lo_pads_;
   std::vector<int> hi_pads_;
   PadMode mode_;
-  edsl::Value padval_;
+  edsl::Tensor padval_;
 };
 
 inline edsl::Tensor flip(const edsl::Tensor& I, int axis) {
@@ -509,6 +515,70 @@ class mvn {
   std::string layout_;
 };
 
+class nms {
+ public:
+  explicit nms(edsl::Tensor Boxes, edsl::Tensor Scores, edsl::Tensor IOU_threshold, edsl::Tensor Score_threshold,
+               int max_output_boxes_per_class)
+      : Boxes_(Boxes),
+        Scores_(Scores),
+        IOU_threshold_(IOU_threshold),
+        Score_threshold_(Score_threshold),
+        max_output_boxes_per_class_(max_output_boxes_per_class),
+        soft_nms_sigma_(0.0f),
+        center_point_box_(false),
+        sort_result_descending_(false),
+        box_output_type_(DType::INT32) {}
+
+  nms& soft_nms_sigma(float soft_nms_sigma) {
+    soft_nms_sigma_ = soft_nms_sigma;
+    return *this;
+  }
+
+  nms& center_point_box(bool center_point_box) {
+    center_point_box_ = center_point_box;
+    return *this;
+  }
+
+  nms& sort_result_descending(bool sort_result_descending) {
+    sort_result_descending_ = sort_result_descending;
+    return *this;
+  }
+
+  nms& box_output_type(DType box_output_type) {
+    box_output_type_ = box_output_type;
+    return *this;
+  }
+
+  std::vector<edsl::Tensor> build() {
+    auto args = edsl::make_tuple(     //
+        Boxes_,                       //
+        Scores_,                      //
+        IOU_threshold_,               //
+        Score_threshold_,             //
+        max_output_boxes_per_class_,  //
+        soft_nms_sigma_,              //
+        center_point_box_,            //
+        sort_result_descending_,      //
+        static_cast<int>(box_output_type_));
+    auto R = details::op("nms", args).as_tuple();
+    auto B = R[0].as_tensor();
+    auto S = R[1].as_tensor();
+    auto V = R[2].as_tensor();
+    return {B, S, V};
+  }
+
+ private:
+  edsl::Tensor Boxes_;
+  edsl::Tensor Scores_;
+  edsl::Tensor IOU_threshold_;
+  edsl::Tensor Score_threshold_;
+  int max_output_boxes_per_class_;
+  float soft_nms_sigma_;
+  bool center_point_box_;
+  bool sort_result_descending_;
+  DType box_output_type_;
+};
+
 class l2norm {
  public:
   explicit l2norm(const edsl::Tensor& I, const std::vector<int64_t> axes)
@@ -596,15 +666,40 @@ class relu {
   double threshold_ = 0.0;
 };
 
-inline edsl::Tensor reorg_yolo(const edsl::Tensor& I, int stride, bool decrease) {
-  auto args = edsl::make_tuple(I, stride, decrease);
+inline edsl::Tensor reorg_yolo(const edsl::Tensor& I, int stride, bool decrease, const std::string& layout = "NCHW") {
+  auto args = edsl::make_tuple(I, stride, decrease, layout);
   return details::op("reorg_yolo", args).as_tensor();
 }
 
-inline edsl::Tensor repeat(const edsl::Tensor& I, int repeats, int axis) {
-  auto args = edsl::make_tuple(I, repeats, axis);
-  return details::op("repeat", args).as_tensor();
-}
+class repeat {
+ public:
+  explicit repeat(const edsl::Tensor& I) : I_(I) {}
+
+  repeat& count(int count) {
+    count_ = edsl::Value(count);
+    return *this;
+  }
+
+  repeat& count(const edsl::TensorDim& count) {
+    count_ = edsl::Value(count);
+    return *this;
+  }
+
+  repeat& axis(int axis) {
+    axis_ = edsl::Value(axis);
+    return *this;
+  }
+
+  operator edsl::Tensor() const {
+    auto args = edsl::make_tuple(I_, count_, axis_);
+    return details::op("repeat", args).as_tensor();
+  }
+
+ private:
+  edsl::Tensor I_;
+  edsl::Value count_ = edsl::Value(1);
+  edsl::Value axis_ = edsl::Value(0);
+};
 
 inline edsl::Tensor reshape(const edsl::Tensor& I, const edsl::Value& dims) {
   auto args = edsl::make_tuple(I, dims);
@@ -655,6 +750,11 @@ class slice {
 inline edsl::Tensor softmax(const edsl::Tensor& I, int axis) {
   auto args = edsl::make_tuple(I, axis);
   return details::op("softmax", args).as_tensor();
+}
+
+inline edsl::Tensor sort(const edsl::Tensor& I, int axis, edsl::SortDirection direction = edsl::SortDirection::ASC) {
+  auto args = edsl::make_tuple(I, axis, static_cast<int>(direction));
+  return details::op("sort", args).as_tensor();
 }
 
 inline edsl::Tensor square(const edsl::Tensor& x) {  //

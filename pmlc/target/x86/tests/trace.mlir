@@ -1,9 +1,9 @@
-// RUN: pmlc-opt -convert-tile-to-pxa -target-cpu %s | FileCheck %s
-// RUN: pmlc-opt -convert-tile-to-pxa -target-cpu %s | pmlc-jit | FileCheck %s --check-prefix=JIT
+// RUN: pmlc-opt -convert-tile-to-pxa -target-llvm_cpu %s | FileCheck %s
+// RUN: pmlc-opt -convert-tile-to-pxa -target-llvm_cpu %s | pmlc-jit | FileCheck %s --check-prefix=JIT
 
 func @main() {
   %c1 = constant 1.0 : f32
-  "tile.trace"(%c1) {msg = "msg"} : (f32) -> (f32)
+  tile.pragma %c1 "trace" {msg = "msg"} : f32
   return
 }
 

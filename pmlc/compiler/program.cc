@@ -14,7 +14,6 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/DebugStringHelper.h"
 #include "mlir/Support/FileUtilities.h"
-#include "mlir/Transforms/Passes.h"
 
 #include "pmlc/compiler/registry.h"
 #include "pmlc/util/logging.h"
@@ -80,15 +79,25 @@ private:
 
 } // namespace
 
-Program::Program(mlir::ModuleOp module) : module(module) {}
+Program::Program(ModuleOp module)
+    : context(std::make_unique<MLIRContext>()), module(module) {}
 
-Program::Program(mlir::StringRef source)
-    : Program(llvm::MemoryBuffer::getMemBuffer(source)) {}
+Program::Program(llvm::StringRef name)
+    : context(std::make_unique<MLIRContext>()),
+      module(ModuleOp::create(UnknownLoc::get(context.get()), name)) {}
 
-Program::Program(std::unique_ptr<llvm::MemoryBuffer> buffer) {
+std::unique_ptr<Program>
+Program::fromSource(std::unique_ptr<MLIRContext> context, StringRef source) {
+  return std::make_unique<Program>(std::move(context),
+                                   llvm::MemoryBuffer::getMemBuffer(source));
+}
+
+Program::Program(std::unique_ptr<MLIRContext> context,
+                 std::unique_ptr<llvm::MemoryBuffer> buffer)
+    : context(std::move(context)) {
   llvm::SourceMgr sourceMgr;
   sourceMgr.AddNewSourceBuffer(std::move(buffer), llvm::SMLoc());
-  module = mlir::parseSourceFile(sourceMgr, &context);
+  module = parseSourceFile(sourceMgr, this->context.get());
 }
 
 static StringRef getDiagKindStr(DiagnosticSeverity kind) {
@@ -105,16 +114,25 @@ static StringRef getDiagKindStr(DiagnosticSeverity kind) {
   llvm_unreachable("Unknown DiagnosticSeverity");
 }
 
-void Program::compile(StringRef target, bool collectPasses, StringRef dumpDir) {
-  if (target.empty()) {
+void Program::compile(StringRef targetNameAndOptions, bool collectPasses,
+                      StringRef dumpDir) {
+  if (targetNameAndOptions.empty()) {
     return;
   }
 
   PassManager pm(module->getContext());
   ScopedDiagnosticHandler diagHandler(pm.getContext(), [&](Diagnostic &diag) {
-    IVLOG(1, getDiagKindStr(diag.getSeverity()).str() << ": " << diag.str());
-    for (auto &note : diag.getNotes()) {
-      IVLOG(1, "  note: " << note.str());
+    if (diag.getSeverity() == DiagnosticSeverity::Error ||
+        diag.getSeverity() == DiagnosticSeverity::Warning) {
+      llvm::errs() << getDiagKindStr(diag.getSeverity()) << ": " << diag
+                   << "\n";
+      for (const auto &note : diag.getNotes()) {
+        llvm::errs() << "  note: " << note << "\n";
+      }
+    }
+    IVLOG(2, getDiagKindStr(diag.getSeverity()).str() << ": " << diag.str());
+    for (const auto &note : diag.getNotes()) {
+      IVLOG(2, "  note: " << note.str());
     }
     return success();
   });
@@ -145,9 +163,19 @@ void Program::compile(StringRef target, bool collectPasses, StringRef dumpDir) {
                         /*out=*/llvm::errs());
   }
 
-  auto pipelineBuilder = resolveTarget(target);
-  pipelineBuilder(pm);
+  auto begOpts = targetNameAndOptions.find('{');
+  auto targetName = targetNameAndOptions.substr(0, begOpts);
+  auto targetOptions = targetNameAndOptions.substr(begOpts);
 
+  // if target options are specified
+  if (!targetOptions.empty()) {
+    // trim off curly braces
+    auto endOpts = targetOptions.find('}');
+    targetOptions = targetOptions.substr(1, endOpts - 1);
+  }
+
+  target = resolveTarget(targetName);
+  target->buildPipeline(pm, targetOptions);
   if (failed(pm.run(*module))) {
     throw std::runtime_error("Compilation failure");
   }
@@ -164,7 +192,7 @@ void Program::compile(StringRef target, bool collectPasses, StringRef dumpDir) {
       SmallString<128> path(dumpDir);
       llvm::sys::path::append(
           path, llvm::formatv("{0,0+2}_{1}.mlir", pass.index(), info.name));
-      auto file = mlir::openOutputFile(path, &err);
+      auto file = openOutputFile(path, &err);
       if (!err.empty()) {
         throw std::runtime_error("Failed to dump pass: " + err);
       }
@@ -172,6 +200,14 @@ void Program::compile(StringRef target, bool collectPasses, StringRef dumpDir) {
       file->keep();
     }
   }
+}
+
+util::BufferPtr
+Program::save(const std::unordered_map<std::string, std::string> &config) {
+  if (!target) {
+    throw std::runtime_error("Program must be compiled to be saved.");
+  }
+  return target->save(*this, config);
 }
 
 } // namespace pmlc::compiler

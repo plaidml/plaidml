@@ -1,10 +1,14 @@
 // Copyright 2020 Intel Corporation
 
+#include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/StandardOps/EDSC/Builders.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Vector/VectorOps.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/PatternMatch.h"
-#include "mlir/IR/StandardTypes.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+
 #include "pmlc/dialect/stdx/transforms/pass_detail.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
@@ -12,7 +16,6 @@ using namespace mlir; // NOLINT[build/namespaces]
 namespace pmlc::dialect::stdx {
 
 namespace {
-
 /// Changes loadOp from i1 memref to loadOp i32 followed by creating constant
 /// value 0 of i32 type and doing cmpi afterwards, next this bool-like type will
 /// be produced
@@ -21,6 +24,18 @@ public:
   using OpRewritePattern<LoadOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(LoadOp loadOp,
+                                PatternRewriter &rewriter) const override;
+};
+
+/// Changes transferReadOp from i1 memref to TransferReadOp i32 followed by
+/// creating constant value 0 of i32 type and doing cmpi afterwards, next
+/// this bool-like type will be produced
+class TransferReadOpI1ToI32 final
+    : public OpRewritePattern<vector::TransferReadOp> {
+public:
+  using OpRewritePattern<vector::TransferReadOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(vector::TransferReadOp transferReadOp,
                                 PatternRewriter &rewriter) const override;
 };
 
@@ -33,6 +48,18 @@ public:
   LogicalResult matchAndRewrite(StoreOp storeOp,
                                 PatternRewriter &rewriter) const override;
 };
+
+/// Changes transferWriteOp to i1 memref to i32 select(val, 1, 0) followed by
+/// transferWriteOp to i32
+class TransferWriteOpI1ToI32 final
+    : public OpRewritePattern<vector::TransferWriteOp> {
+public:
+  using OpRewritePattern<vector::TransferWriteOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(vector::TransferWriteOp transferWriteOp,
+                                PatternRewriter &rewriter) const override;
+};
+
 } // namespace
 
 /// Changes loadOp from i1 memref to loadOp i32 followed by creating constant
@@ -46,6 +73,10 @@ LogicalResult LoadOpI1ToI32::matchAndRewrite(LoadOp loadOp,
   }
 
   auto elementType = loadOp.result().getType();
+  auto vectorType = elementType.dyn_cast<VectorType>();
+  if (vectorType)
+    elementType = vectorType.getElementType();
+
   if (!elementType.isInteger(1)) {
     return failure();
   }
@@ -53,17 +84,69 @@ LogicalResult LoadOpI1ToI32::matchAndRewrite(LoadOp loadOp,
   auto destType = rewriter.getIntegerType(32);
   auto loc = loadOp.getLoc();
 
+  Type destTypeTmp = destType;
+  if (vectorType)
+    destTypeTmp = VectorType::get(vectorType.getNumElements(), destType);
+
   loadOp.getMemRef().setType(
-      MemRefType::get(loadOp.getMemRefType().getShape(), destType));
+      MemRefType::get(loadOp.getMemRefType().getShape(), destTypeTmp));
 
   auto newLoadOp =
       rewriter.create<LoadOp>(loc, loadOp.memref(), loadOp.indices());
 
   auto const0 = rewriter.create<ConstantIntOp>(loc, 0, destType);
+
+  Operation *const0Op = const0;
+  if (vectorType)
+    const0Op = rewriter.create<vector::BroadcastOp>(loc, destTypeTmp,
+                                                    const0.getResult());
+
   auto cmpOp = rewriter.create<CmpIOp>(
-      loc, CmpIPredicate::ne, newLoadOp.getResult(), const0.getResult());
+      loc, CmpIPredicate::ne, newLoadOp.getResult(), const0Op->getResult(0));
 
   rewriter.replaceOp(loadOp, {cmpOp});
+  return success();
+}
+
+/// Changes transferReadOp from i1 memref to TransferReadOp i32 followed by
+/// creating constant value 0 of i32 type and doing cmpi afterwards, next
+/// this bool-like type will be produced
+LogicalResult
+TransferReadOpI1ToI32::matchAndRewrite(vector::TransferReadOp transferReadOp,
+                                       PatternRewriter &rewriter) const {
+  // Not convert function argument as we alloc i32 buffer for it.
+  if (!transferReadOp.source().getDefiningOp()) {
+    return failure();
+  }
+
+  auto vectorType = transferReadOp.vector().getType().dyn_cast<VectorType>();
+  auto elementType = vectorType.getElementType();
+
+  if (!elementType.isInteger(1)) {
+    return failure();
+  }
+
+  auto destType = rewriter.getIntegerType(32);
+  auto loc = transferReadOp.getLoc();
+
+  auto destTypeVec = VectorType::get(vectorType.getNumElements(), destType);
+
+  transferReadOp.source().setType(MemRefType::get(
+      transferReadOp.source().getType().cast<MemRefType>().getShape(),
+      destType));
+
+  auto newTransferReadOp = rewriter.create<vector::TransferReadOp>(
+      loc, destTypeVec, transferReadOp.source(), transferReadOp.indices());
+
+  auto const0 = rewriter.create<ConstantIntOp>(loc, 0, destType);
+  auto const0Op = rewriter.create<vector::BroadcastOp>(loc, destTypeVec,
+                                                       const0.getResult());
+
+  auto cmpOp = rewriter.create<CmpIOp>(loc, CmpIPredicate::ne,
+                                       newTransferReadOp.getResult(),
+                                       const0Op.getResult());
+
+  rewriter.replaceOp(transferReadOp, {cmpOp});
   return success();
 }
 
@@ -77,20 +160,35 @@ LogicalResult StoreOpI1ToI32::matchAndRewrite(StoreOp storeOp,
   }
 
   auto elementType = storeOp.value().getType();
+  auto vectorType = elementType.dyn_cast<VectorType>();
+  if (vectorType)
+    elementType = vectorType.getElementType();
+
   if (!elementType.isInteger(1)) {
     return failure();
   }
 
-  auto destType = rewriter.getIntegerType(32);
+  Type destType = rewriter.getIntegerType(32);
   auto loc = storeOp.getLoc();
 
   auto const0 = rewriter.create<ConstantIntOp>(loc, 0, destType);
   auto const1 = rewriter.create<ConstantIntOp>(loc, 1, destType);
-  auto selOp = rewriter.create<SelectOp>(
-      loc, storeOp.value(), const1.getResult(), const0.getResult());
+
+  Operation *const0Op = const0;
+  Operation *const1Op = const1;
+  if (vectorType) {
+    destType = VectorType::get(vectorType.getNumElements(), destType);
+    const0Op =
+        rewriter.create<vector::BroadcastOp>(loc, destType, const0.getResult());
+    const1Op =
+        rewriter.create<vector::BroadcastOp>(loc, destType, const1.getResult());
+  }
 
   storeOp.getMemRef().setType(
       MemRefType::get(storeOp.getMemRefType().getShape(), destType));
+
+  auto selOp = rewriter.create<SelectOp>(
+      loc, storeOp.value(), const1Op->getResult(0), const0Op->getResult(0));
 
   rewriter.replaceOpWithNewOp<StoreOp>(storeOp, selOp.getResult(),
                                        storeOp.memref(), storeOp.indices());
@@ -98,10 +196,54 @@ LogicalResult StoreOpI1ToI32::matchAndRewrite(StoreOp storeOp,
   return success();
 }
 
+/// Changes transferWriteOp to i1 memref to i32 select(val, 1, 0) followed by
+/// transferWriteOp to i32
+LogicalResult
+TransferWriteOpI1ToI32::matchAndRewrite(vector::TransferWriteOp transferWriteOp,
+                                        PatternRewriter &rewriter) const {
+  // Not convert function argument as we alloc i32 buffer for it.
+  if (!transferWriteOp.source().getDefiningOp()) {
+    return failure();
+  }
+
+  auto vectorType = transferWriteOp.vector().getType().dyn_cast<VectorType>();
+  auto elementType = vectorType.getElementType();
+
+  if (!elementType.isInteger(1)) {
+    return failure();
+  }
+
+  Type destType = rewriter.getIntegerType(32);
+  auto loc = transferWriteOp.getLoc();
+
+  auto const0 = rewriter.create<ConstantIntOp>(loc, 0, destType);
+  auto const1 = rewriter.create<ConstantIntOp>(loc, 1, destType);
+  auto destTypeVec = VectorType::get(vectorType.getNumElements(), destType);
+  auto const0Op = rewriter.create<vector::BroadcastOp>(loc, destTypeVec,
+                                                       const0.getResult());
+  auto const1Op = rewriter.create<vector::BroadcastOp>(loc, destTypeVec,
+                                                       const1.getResult());
+
+  transferWriteOp.source().setType(MemRefType::get(
+      transferWriteOp.source().getType().cast<MemRefType>().getShape(),
+      destType));
+
+  auto selOp =
+      rewriter.create<SelectOp>(loc, transferWriteOp.vector(),
+                                const1Op.getResult(), const0Op.getResult());
+
+  rewriter.replaceOpWithNewOp<vector::TransferWriteOp>(
+      transferWriteOp, selOp.getResult(), transferWriteOp.source(),
+      transferWriteOp.indices());
+
+  return success();
+}
+
 /// Hook for adding patterns.
 void populateI1StorageToI32(MLIRContext *context,
                             OwningRewritePatternList &patterns) {
-  patterns.insert<LoadOpI1ToI32, StoreOpI1ToI32>(context);
+  patterns.insert<LoadOpI1ToI32, StoreOpI1ToI32, TransferReadOpI1ToI32,
+                  TransferWriteOpI1ToI32>(context);
 }
 
 // Adaptor for building loop nests for the specific memRef shape
@@ -112,55 +254,18 @@ void buildLoopForMemRef(
   if (!memRefType)
     return;
 
-  mlir::edsc::ScopedContext context(builder, loc);
-  mlir::edsc::MemRefBoundsCapture mBoundsCapture(memRef);
-
+  auto indexConst0 = builder.create<ConstantOp>(loc, builder.getIndexAttr(0));
   auto indexConst1 = builder.create<ConstantOp>(loc, builder.getIndexAttr(1));
-  SmallVector<Value, 8> steps, ivs;
-  int rank = memRefType.getRank();
-  steps.reserve(rank);
-  for (int i = 0; i < rank; i++)
-    steps.push_back(indexConst1);
-
-  Block *currentBlock = builder.getInsertionBlock();
-  Block *ifBlock, *thenBlock, *continueBlock;
-
-  for (int i = 0; i < rank; i++) {
-    // Create blocks
-    auto currentPoint = builder.getInsertionPoint();
-    ifBlock = currentBlock->splitBlock(currentPoint);
-    thenBlock = ifBlock->splitBlock(ifBlock->begin());
-    continueBlock = thenBlock->splitBlock(thenBlock->begin());
-
-    // Create loop entry
-    builder.setInsertionPointToEnd(currentBlock);
-    builder.create<BranchOp>(loc, ifBlock, mBoundsCapture.lb(i));
-
-    // Check up bound
-    builder.setInsertionPointToStart(ifBlock);
-    ifBlock->addArgument(mBoundsCapture.lb(i).getType());
-    auto comparsion = builder.create<CmpIOp>(
-        loc, CmpIPredicate::slt, ifBlock->getArgument(0), mBoundsCapture.ub(i));
-    builder.create<CondBranchOp>(loc, comparsion, thenBlock, ArrayRef<Value>(),
-                                 continueBlock, ArrayRef<Value>());
-
-    // Update index with step
-    builder.setInsertionPointToStart(thenBlock);
-    auto stepped =
-        builder.create<AddIOp>(loc, ifBlock->getArgument(0), steps[i])
-            .getResult();
-    builder.create<BranchOp>(loc, ifBlock, stepped);
-
-    // Ready for next dimension
-    builder.setInsertionPointToStart(thenBlock);
-    currentBlock = thenBlock;
-    ivs.push_back(ifBlock->getArgument(0));
+  SmallVector<Value, 8> lower, upper, step;
+  auto shape = memRefType.getShape();
+  for (size_t i = 0; i < shape.size(); i++) {
+    lower.push_back(indexConst0);
+    auto indexConstUB =
+        builder.create<ConstantOp>(loc, builder.getIndexAttr(shape[i]));
+    upper.push_back(indexConstUB);
+    step.push_back(indexConst1);
   }
-
-  // Create loop body
-  if (thenBlock && bodyBuilder) {
-    bodyBuilder(builder, loc, ivs);
-  }
+  mlir::scf::buildLoopNest(builder, loc, lower, upper, step, bodyBuilder);
 }
 
 struct I1StorageToI32Pass : public I1StorageToI32Base<I1StorageToI32Pass> {
@@ -175,19 +280,16 @@ struct I1StorageToI32Pass : public I1StorageToI32Base<I1StorageToI32Pass> {
                                 .getType()
                                 .dyn_cast_or_null<MemRefType>()) {
         if (memRefType.getElementType().isInteger(1)) {
+          OpBuilder builder(context);
+
           // shall convert this memref to int32
           auto argument = entryBlock.getArgument(i);
-          auto intType = IntegerType::get(32, context);
+          auto intType = builder.getI32Type();
           auto newMemRefType = MemRefType::get(memRefType.getShape(), intType);
-          OpBuilder builder(context);
           Location loc = entryBlock.front().getLoc();
 
           builder.setInsertionPointToStart(&entryBlock);
           auto alloc = builder.create<AllocOp>(loc, newMemRefType);
-
-          // Make sure to allocate at the beginning of the block.
-          auto *parentBlock = alloc.getOperation()->getBlock();
-          alloc.getOperation()->moveBefore(&parentBlock->front());
 
           // Update old memref uses with new memref
           argument.replaceUsesWithIf(alloc,
@@ -227,7 +329,9 @@ struct I1StorageToI32Pass : public I1StorageToI32Base<I1StorageToI32Pass> {
       }
 
     populateI1StorageToI32(context, patterns);
-    applyPatternsAndFoldGreedily(getOperation(), patterns);
+    if (failed(
+            applyPatternsAndFoldGreedily(getOperation(), std::move(patterns))))
+      signalPassFailure();
   }
 };
 

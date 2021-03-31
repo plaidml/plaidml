@@ -23,6 +23,8 @@ namespace pmlc::rt::vulkan {
 using DescriptorSetIndex = uint32_t;
 using BindingIndex = uint32_t;
 
+class VulkanInvocation;
+
 /// Struct containing information regarding to a device memory buffer.
 struct VulkanDeviceMemoryBuffer {
   BindingIndex bindingIndex{0};
@@ -33,12 +35,17 @@ struct VulkanDeviceMemoryBuffer {
   size_t bufferSize{0};
 };
 
-/// Struct containing information regarding to a host memory buffer.
-struct VulkanHostMemoryBuffer {
-  /// Pointer to a host memory.
-  void *ptr{nullptr};
-  /// Size of a host memory in bytes.
-  uint32_t size{0};
+/// A wrapper of VulkanDeviceMemoryBuffer.
+struct vulkanBuffer {
+  VulkanDeviceMemoryBuffer devBuffer;
+  DescriptorSetIndex descriptorSet;
+};
+
+/// A wrapper of VkEvent.
+struct vulkanEvent {
+  VkEvent event{VK_NULL_HANDLE};
+  VulkanInvocation *invocation = nullptr;
+  bool bufferCopyEvent = false;
 };
 
 /// Struct containing the number of local workgroups to dispatch for each
@@ -58,16 +65,6 @@ struct DescriptorSetInfo {
   /// Type of a descriptor set.
   VkDescriptorType descriptorType{VK_DESCRIPTOR_TYPE_MAX_ENUM};
 };
-
-/// VulkanHostMemoryBuffer mapped into a descriptor set and a binding.
-using ResourceData =
-    llvm::DenseMap<DescriptorSetIndex,
-                   llvm::DenseMap<BindingIndex, VulkanHostMemoryBuffer>>;
-
-/// StorageClass mapped into a descriptor set and a binding.
-using ResourceStorageClassBindingMap =
-    llvm::DenseMap<DescriptorSetIndex,
-                   llvm::DenseMap<BindingIndex, mlir::spirv::StorageClass>>;
 
 struct Action {
   virtual ~Action() {}
@@ -112,21 +109,20 @@ struct LaunchKernelAction : Action {
   const char *entryPoint{nullptr};
   uint8_t *binary{nullptr};
   uint32_t binarySize{0};
-
-  //===--------------------------------------------------------------------===//
-  // Vulkan resource data and storage classes.
-  //===--------------------------------------------------------------------===//
-
-  ResourceData resourceData;
-  ResourceStorageClassBindingMap resourceStorageClassData;
-
-  llvm::SmallVector<VkBufferMemoryBarrier, 4> deps;
 };
 
 struct MemoryTransferAction : Action {
   VkBuffer src;
   VkBuffer dst;
   llvm::SmallVector<VkBufferCopy, 1> regions;
+};
+
+struct SetEventAction : Action {
+  VkEvent event;
+};
+
+struct WaitEventsAction : Action {
+  std::vector<VkEvent> events;
 };
 
 // VulkanInvocation encapsulates a particular run of a network on a Vulkan
@@ -137,59 +133,51 @@ public:
   explicit VulkanInvocation(VulkanDevice *device);
   ~VulkanInvocation();
 
-  void createLaunchKernelAction(uint8_t *shader, uint32_t size,
-                                const char *entryPoint,
-                                NumWorkGroups numWorkGroups);
-
-  void setLaunchKernelAction(uint32_t subgroupSize);
-
-  void addLaunchActionToSchedule();
-
-  void createMemoryTransferAction(uint64_t src_index, uint64_t src_binding,
-                                  uint64_t dst_index, uint64_t dst_binding);
-
-  void createMemoryTransferAction(VkBuffer src, VkBuffer dst, size_t size);
-
+  vulkanBuffer *createMemoryBuffer(uint32_t bytes, void *hostPtr);
+  vulkanEvent *scheduleLaunchKernelAction(uint32_t subgroupSize,
+                                          uint8_t *shader, uint32_t size,
+                                          const char *entryPoint,
+                                          NumWorkGroups numWorkGroups,
+                                          std::vector<void *> deviceBuffers);
   void run();
-
-  /// Sets needed data for Vulkan device.
-  void setResourceData(const DescriptorSetIndex desIndex,
-                       const BindingIndex bindIndex,
-                       const VulkanHostMemoryBuffer &hostMemBuffer);
+  VkEvent createSetEventAction();
+  void createWaitEventsAction(std::vector<vulkanEvent *> &events);
+  vulkanEvent *copyHostBufferToDevice(void *srcPtr, void *deviceBuffer);
+  vulkanEvent *copyDeviceBufferToHost(void *hostPtr, void *deviceBuffer);
+  void deallocDeviceBuffer(void *buffer);
 
 private:
-  void mapStorageClassToDescriptorType(mlir::spirv::StorageClass storageClass,
-                                       VkDescriptorType &descriptorType);
-
-  void mapStorageClassToBufferUsageFlag(mlir::spirv::StorageClass storageClass,
-                                        VkBufferUsageFlagBits &bufferUsage);
-
-  void checkResourceData();
-
-  void createMemoryBuffers();
   void createQueryPool();
-  void createShaderModule();
-  void initDescriptorSetLayoutBindingMap();
-  void createDescriptorSetLayout();
-  void createPipelineLayout();
-  void createComputePipeline(uint32_t subgroupSize);
-  void createDescriptorPool();
-  void allocateDescriptorSets();
-  void setWriteDescriptors();
   void createSchedule();
+  void freeScheduleResources();
+  void freeCommandBuffers();
   void getQueryPoolResults();
   void submitCommandBuffersToQueue();
-  void updateHostMemoryBuffers();
+  void mapStorageClassToDescriptorType(mlir::spirv::StorageClass storageClass,
+                                       VkDescriptorType &descriptorType);
+  void mapStorageClassToBufferUsageFlag(mlir::spirv::StorageClass storageClass,
+                                        VkBufferUsageFlagBits &bufferUsage);
+  void allocateDescriptorSets(std::shared_ptr<LaunchKernelAction> &action);
+  void createComputePipeline(std::shared_ptr<LaunchKernelAction> &action,
+                             uint32_t subgroupSize);
+  void createDescriptorPool(std::shared_ptr<LaunchKernelAction> &action);
+  void createDescriptorSetLayout(std::shared_ptr<LaunchKernelAction> &action);
+  void createPipelineLayout(std::shared_ptr<LaunchKernelAction> &action);
+  void createShaderModule(std::shared_ptr<LaunchKernelAction> &action);
+  void initDescriptorSetLayoutBindingMap(
+      std::shared_ptr<LaunchKernelAction> &action);
+  void setWriteDescriptors(std::shared_ptr<LaunchKernelAction> &action);
 
   std::vector<ActionPtr> schedule;
-  std::shared_ptr<LaunchKernelAction> curr;
+  std::vector<vulkanBuffer *> deviceBufferPool;
   std::shared_ptr<VulkanDevice> device;
   VkCommandPool commandPool;
   llvm::SmallVector<VkCommandBuffer, 1> commandBuffers;
   VkQueryPool timestampQueryPool;
   const uint32_t timestampQueryPoolSize{8192};
-  uint32_t timestampQueryCount{2};
-  uint32_t memoryTransferCount{0};
+  uint32_t timestampQueryCount{0};
+  double bufferTransferTime{0.0};
+  uint32_t bufferTransferCount{0};
 };
 
 } // namespace pmlc::rt::vulkan

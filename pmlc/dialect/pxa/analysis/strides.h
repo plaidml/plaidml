@@ -187,6 +187,9 @@ struct RelativeAccessPattern {
   // For each dimension what is the number of accesses
   mlir::SmallVector<int64_t, 4> innerCount;
 
+  // For each dimension what is the number of accesses including skipped elements
+  mlir::SmallVector<int64_t, 4> wholeInnerCount;
+
   // For each dimension what is the minimal stride of the access.  Note:
   // dimensions with a count of 1 have a stride of 1 automatically
   mlir::SmallVector<int64_t, 4> innerStride() const;
@@ -197,7 +200,7 @@ struct RelativeAccessPattern {
   // Return the inner linearized strides relative to each block argument.
   mlir::Optional<StrideInfo> flatInner() const;
 
-  MemRefType getMemRefType() const;
+  mlir::MemRefType getMemRefType() const;
 
   // Return the total element count for all inner accesses.
   int64_t totalInnerCount() const;
@@ -206,7 +209,7 @@ struct RelativeAccessPattern {
   int64_t totalInnerBytes() const;
 
   // Merge another RelativeAccesPattern together by using a union.
-  LogicalResult unionMerge(const RelativeAccessPattern &rhs);
+  mlir::LogicalResult unionMerge(const RelativeAccessPattern &rhs);
 
   // Given a full set of outer indexes (in case some of them are unused in the
   // various stride-infos), return true if two distinct outer loop interations
@@ -225,5 +228,13 @@ mlir::Optional<RelativeAccessPattern> computeRelativeAccess(mlir::Operation *op,
 bool hasPerfectAliasing(
     const RelativeAccessPattern &aRap, RelativeAccessPattern bRap,
     const mlir::DenseMap<mlir::BlockArgument, mlir::BlockArgument> &bToA);
+
+// Compute the number of cache misses for a given tile dimensions and strides
+// cacheElems = cache size in elements = cache size / element width in bytes
+// tileDimensions = dimensions of the tile to be loaded into cache
+// tensorStrides = natural / flat strides of the untiled tensor
+double computeCacheMiss(double cacheElems,
+                        mlir::SmallVector<int64_t, 4> tileDimensions,
+                        mlir::SmallVector<int64_t, 4> tensorStrides);
 
 } // namespace pmlc::dialect::pxa

@@ -1,59 +1,37 @@
 # Copyright 2020 Intel Corporation
 
-load("//vendor/mlir:tblgen.bzl", "COPTS", "gentbl")
+load("//vendor/mlir:tblgen.bzl", "gentbl")
 load("//bzl:plaidml.bzl", "plaidml_cc_library")
 
 package(default_visibility = ["//visibility:public"])
 
 filegroup(
-    name = "enums-td",
-    srcs = ["enums.td"],
-)
-
-filegroup(
-    name = "interfaces-td",
-    srcs = ["interfaces.td"],
-)
-
-filegroup(
     name = "td_files",
     srcs = [
-        ":enums-td",
-        ":interfaces-td",
+        "enums.td",
+        "loop_with_epilog.td",
     ],
-)
-
-gentbl(
-    name = "interfaces-gen",
-    tbl_outs = [
-        (
-            "-gen-op-interface-decls",
-            "interfaces.h.inc",
-        ),
-        (
-            "-gen-op-interface-defs",
-            "interfaces.cc.inc",
-        ),
-    ],
-    tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "interfaces.td",
-    td_srcs = ["@llvm-project//mlir:OpBaseTdFiles"],
 )
 
 gentbl(
     name = "enums-gen",
     tbl_outs = [
-        (
-            "-gen-enum-decls",
-            "enums.h.inc",
-        ),
-        (
-            "-gen-enum-defs",
-            "enums.cc.inc",
-        ),
+        ("-gen-enum-decls", "enums.h.inc"),
+        ("-gen-enum-defs", "enums.cc.inc"),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "enums.td",
+    td_srcs = ["@llvm-project//mlir:OpBaseTdFiles"],
+)
+
+gentbl(
+    name = "loop_with_epilog-gen",
+    tbl_outs = [
+        ("-gen-op-interface-decls", "loop_with_epilog.h.inc"),
+        ("-gen-op-interface-defs", "loop_with_epilog.cc.inc"),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "loop_with_epilog.td",
     td_srcs = ["@llvm-project//mlir:OpBaseTdFiles"],
 )
 
@@ -61,11 +39,11 @@ plaidml_cc_library(
     name = "util",
     srcs = glob(["*.cc"]),
     hdrs = glob(["*.h"]),
-    copts = COPTS,
     deps = [
         ":enums-gen",
-        ":interfaces-gen",
+        ":loop_with_epilog-gen",
         "@easylogging",
+        "@llvm-project//llvm:Core",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:IR",

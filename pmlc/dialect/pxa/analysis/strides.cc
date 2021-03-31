@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "mlir/Dialect/Affine/IR/AffineValueMap.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/Support/DebugStringHelper.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -213,22 +214,40 @@ StrideRange StrideInfo::range() const {
 }
 
 AffineValueExpr StrideInfo::toValueExpr(MLIRContext *ctx) const {
+  typedef std::pair<unsigned, unsigned> nestedArgNumber;
+  std::map<nestedArgNumber, mlir::BlockArgument> ordered;
+
+  for (auto kvp : strides) {
+    unsigned loopDepth = 0;
+    auto parent = kvp.first.getOwner()->getParentOp();
+    while (!dyn_cast<FuncOp>(parent)) {
+      loopDepth++;
+      parent = parent->getParentOp();
+    }
+
+    ordered.emplace(nestedArgNumber(loopDepth, kvp.first.getArgNumber()),
+                    kvp.first);
+  }
+
   auto tot = AffineValueExpr(ctx, offset);
-  for (const auto &kvp : strides) {
-    Operation *baseOp = kvp.first.getOwner()->getParentOp();
-    AffineValueExpr idx(kvp.first);
+  for (auto item : llvm::enumerate(ordered)) {
+    auto blockArg = item.value().second;
+    Operation *baseOp = blockArg.getOwner()->getParentOp();
+    AffineValueExpr idx(blockArg);
     if (auto op = dyn_cast<AffineParallelOp>(baseOp)) {
       idx = idx - AffineValueExpr(op.getLowerBoundsValueMap(),
-                                  kvp.first.getArgNumber());
+                                  blockArg.getArgNumber());
     } else if (auto op = dyn_cast<AffineForOp>(baseOp)) {
       auto map = op.getLowerBoundMap();
       idx = idx - AffineValueExpr(map.getResult(0), op.getLowerBoundOperands());
     } else {
       llvm_unreachable("Invalid op type in toValueMap");
     }
-    int64_t step = getIVStep(kvp.first);
-    assert(kvp.second % step == 0 && "Stride not divisible by step");
-    tot = tot + idx * (kvp.second / step);
+    int64_t step = getIVStep(blockArg);
+    auto si = strides.find(blockArg);
+    assert(si != strides.end());
+    assert(si->second % step == 0 && "Stride not divisible by step");
+    tot = tot + idx * (si->second / step);
   }
   return tot;
 }
@@ -497,6 +516,7 @@ computeRelativeAccess(Operation *op, BlockArgumentBoundaryFn fn) {
       return None;
     }
     ret.innerRanges.push_back(range);
+    ret.wholeInnerCount.push_back(range.maxVal - range.minVal + 1);
     ret.innerCount.push_back(range.count());
   }
   return ret;
@@ -680,6 +700,33 @@ bool hasPerfectAliasing(const RelativeAccessPattern &aRap,
     }
   }
   return true;
+}
+
+double computeCacheMiss(double cacheElems,
+                        SmallVector<int64_t, 4> tileDimensions,
+                        SmallVector<int64_t, 4> tensorStrides) {
+  // Start with one cache line
+  double cacheLines = 1.0;
+  // Current accumulated maximum value
+  int64_t maxVal = 0;
+  // For each dimension (in sorted order)
+  assert(tileDimensions.size() == tensorStrides.size());
+  for (size_t i = tileDimensions.size(); i > 0; i--) {
+    // Compute gap per step
+    int64_t gap = std::abs(tensorStrides[i - 1]) - maxVal;
+    // Multiply current cache hits by size
+    cacheLines *= static_cast<double>(tileDimensions[i - 1]);
+    // Compute probability that cache line is shared across gap
+    double probShared = 0.0; // Assume it's never shared
+    if (cacheElems != 0.0 && gap < cacheElems) {
+      probShared = 1.0 - (gap / cacheElems);
+    }
+    // Subtract shared elements
+    cacheLines -= probShared * static_cast<double>(tileDimensions[i - 1] - 1);
+    // Update maxVal
+    maxVal += std::abs(tensorStrides[i - 1]) * (tileDimensions[i - 1] - 1);
+  }
+  return cacheLines;
 }
 
 } // namespace pmlc::dialect::pxa

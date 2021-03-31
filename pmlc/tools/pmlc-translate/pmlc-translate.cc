@@ -9,6 +9,7 @@
 
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/MLIRContext.h"
+#include "mlir/InitAllTranslations.h"
 #include "mlir/Support/FileUtilities.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Support/ToolUtilities.h"
@@ -43,6 +44,8 @@ int main(int argc, char **argv) {
     }
   }
 
+  mlir::registerAllTranslations();
+
   // Add flags for all the registered translations.
   llvm::cl::opt<const TranslateFunction *, false, TranslationParser>
       translationRequested("", llvm::cl::desc("Translation to perform"),
@@ -75,7 +78,8 @@ int main(int argc, char **argv) {
     // diagnostics were produced as expected.
     mlir::SourceMgrDiagnosticVerifierHandler sourceMgrHandler(sourceMgr,
                                                               &context);
-    (*translationRequested)(sourceMgr, os, &context);
+    if (failed((*translationRequested)(sourceMgr, os, &context)))
+      return failure();
     return sourceMgrHandler.verify();
   };
 

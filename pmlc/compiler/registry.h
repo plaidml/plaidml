@@ -5,27 +5,18 @@
 #include <functional>
 #include <vector>
 
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
 
-namespace mlir {
-class OpPassManager;
-} // namespace mlir
+#include "pmlc/compiler/program.h"
+#include "pmlc/util/buffer.h"
 
 namespace pmlc::compiler {
 
-using TargetRegistryFunction = std::function<void(mlir::OpPassManager &)>;
+void registerTarget(llvm::StringRef name, TargetPtr target);
 
-void registerTarget(llvm::StringRef name,
-                    const TargetRegistryFunction &function);
-
-TargetRegistryFunction resolveTarget(llvm::StringRef name);
+TargetPtr resolveTarget(llvm::StringRef name);
 
 std::vector<llvm::StringRef> listTargets();
-
-struct TargetRegistration {
-  TargetRegistration(llvm::StringRef name, TargetRegistryFunction builder) {
-    registerTarget(name, builder);
-  }
-};
 
 } // namespace pmlc::compiler

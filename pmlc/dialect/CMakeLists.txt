@@ -1,0 +1,8 @@
+add_subdirectory(abi)
+add_subdirectory(affinex)
+add_subdirectory(comp)
+add_subdirectory(layer)
+add_subdirectory(pxa)
+add_subdirectory(stdx)
+add_subdirectory(tile)
+add_subdirectory(xsmm)

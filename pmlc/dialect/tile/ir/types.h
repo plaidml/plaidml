@@ -1,4 +1,4 @@
-// Copyright 2019, Intel Corporation
+// Copyright 2020 Intel Corporation
 
 #pragma once
 
@@ -6,34 +6,27 @@
 
 namespace pmlc::dialect::tile {
 
-class AffineTensorMapType
-    : public mlir::Type::TypeBase<AffineTensorMapType, mlir::Type,
-                                  mlir::TypeStorage> {
+class APFloatType : public mlir::Type::TypeBase<APFloatType, mlir::Type,
+                                                mlir::DefaultTypeStorage> {
 public:
   using Base::Base;
-  static AffineTensorMapType get(mlir::MLIRContext *context);
+  using Base::getChecked;
 };
 
-class AffineMapType : public mlir::Type::TypeBase<AffineMapType, mlir::Type,
-                                                  mlir::TypeStorage> {
+class APSignedIntegerType
+    : public mlir::Type::TypeBase<APSignedIntegerType, mlir::Type,
+                                  mlir::DefaultTypeStorage> {
 public:
   using Base::Base;
-  static AffineMapType get(mlir::MLIRContext *context);
+  using Base::getChecked;
 };
 
-class AffineConstraintsType
-    : public mlir::Type::TypeBase<AffineConstraintsType, mlir::Type,
-                                  mlir::TypeStorage> {
+class APUnsignedIntegerType
+    : public mlir::Type::TypeBase<APUnsignedIntegerType, mlir::Type,
+                                  mlir::DefaultTypeStorage> {
 public:
   using Base::Base;
-  static AffineConstraintsType get(mlir::MLIRContext *context);
-};
-
-class StringType
-    : public mlir::Type::TypeBase<StringType, mlir::Type, mlir::TypeStorage> {
-public:
-  using Base::Base;
-  static StringType get(mlir::MLIRContext *context);
+  using Base::getChecked;
 };
 
 } // namespace pmlc::dialect::tile

@@ -3,6 +3,7 @@
 #include "pmlc/compiler/registry.h"
 
 #include <string>
+#include <utility>
 
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -23,38 +24,38 @@ public:
     return &registry;
   }
 
-  void registerTarget(StringRef name, const TargetRegistryFunction &function) {
-    if (registry.count(name)) {
+  void registerTarget(StringRef name, TargetPtr target) {
+    if (targets.count(name)) {
       throw std::runtime_error(
           formatv("Target is already registered: {0}", name));
     }
-    registry[name] = function;
+    targets[name] = target;
   }
 
-  TargetRegistryFunction resolve(StringRef name) {
-    auto it = registry.find(name);
-    if (it == registry.end()) {
+  TargetPtr resolve(StringRef name) {
+    auto itTarget = targets.find(name);
+    if (itTarget == targets.end()) {
       throw std::runtime_error(formatv("Could not find target: {0}", name));
     }
-    return it->second;
+    return itTarget->second;
   }
 
   std::vector<StringRef> list() {
-    auto keys = registry.keys();
+    auto keys = targets.keys();
     return std::vector<StringRef>(keys.begin(), keys.end());
   }
 
 private:
-  StringMap<TargetRegistryFunction> registry;
+  StringMap<TargetPtr> targets;
 };
 
 } // namespace
 
-void registerTarget(StringRef name, const TargetRegistryFunction &function) {
-  TargetRegistry::instance()->registerTarget(name, function);
+void registerTarget(StringRef name, TargetPtr target) {
+  TargetRegistry::instance()->registerTarget(name, target);
 }
 
-TargetRegistryFunction resolveTarget(StringRef name) {
+TargetPtr resolveTarget(StringRef name) {
   return TargetRegistry::instance()->resolve(name);
 }
 

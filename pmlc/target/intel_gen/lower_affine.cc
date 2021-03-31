@@ -78,7 +78,8 @@ public:
         proc = static_cast<Processor>(static_cast<int>(proc) + 1);
       }
     }
-    setMappingAttr(parallelOp, mappings);
+    if (failed(setMappingAttr(parallelOp, mappings)))
+      return failure();
     copyTags(parallelOp, op);
 
     rewriter.eraseBlock(parallelOp.getBody());
@@ -99,7 +100,8 @@ struct IntelGenLowerAffinePass
     ConversionTarget target(getContext());
     target
         .addLegalDialect<scf::SCFDialect, StandardOpsDialect, VectorDialect>();
-    if (failed(applyPartialConversion(getFunction(), target, patterns)))
+    if (failed(
+            applyPartialConversion(getFunction(), target, std::move(patterns))))
       signalPassFailure();
   }
 };

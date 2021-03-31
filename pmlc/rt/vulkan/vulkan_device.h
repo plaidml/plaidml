@@ -18,10 +18,10 @@
 #include <string>
 #include <vector>
 
-#include "mlir/Dialect/SPIRV/SPIRVOps.h"
-#include "mlir/Dialect/SPIRV/Serialization.h"
-#include "mlir/IR/Module.h"
+#include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/Support/LLVM.h"
+#include "mlir/Target/SPIRV/Serialization.h"
 #include "pmlc/rt/runtime.h"
 #include "pmlc/rt/vulkan/vulkan_state.h"
 #include "llvm/Support/ToolOutputFile.h"
@@ -41,8 +41,7 @@ public:
   VulkanDevice &operator=(const VulkanDevice &) = delete;
 
   std::unique_ptr<Executable>
-  compile(const std::shared_ptr<pmlc::compiler::Program> &program,
-          mlir::ArrayRef<void *> bufptrs) final;
+  compile(const std::shared_ptr<pmlc::compiler::Program> &program) final;
 
   const VkDevice &getDevice() const { return device; }
   const VkQueue &getQueue() const { return queue; }

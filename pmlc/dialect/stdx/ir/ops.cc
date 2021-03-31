@@ -2,12 +2,12 @@
 
 #include "pmlc/dialect/stdx/ir/ops.h"
 
+#include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpImplementation.h"
 
-namespace pmlc::dialect::stdx {
+using namespace mlir; // NOLINT
 
-using mlir::failure;
-using mlir::success;
+namespace pmlc::dialect::stdx {
 
 // ---- ReshapeOp ----
 
@@ -20,7 +20,7 @@ void SubgroupBlockReadINTELOp::build(OpBuilder &builder, OperationState &result,
   auto memrefType = memref.getType().cast<MemRefType>();
   result.addOperands(memref);
   result.addOperands(indices);
-  result.types.push_back(memrefType.getElementType());
+  result.addTypes(memrefType.getElementType());
 }
 
 static LogicalResult
@@ -48,10 +48,28 @@ verifySubgroupBlockWriteINTELOp(SubgroupBlockWriteINTELOp op) {
   return success();
 }
 
-#define GET_OP_CLASSES
-#include "pmlc/dialect/stdx/ir/ops.cc.inc"
+Type StdXDialect::parseType(DialectAsmParser &parser) const {
+  StringRef keyword;
+  if (parser.parseKeyword(&keyword)) {
+    return Type();
+  }
+  if (keyword == "argpack") {
+    return ArgpackType::get(getContext());
+  }
+  parser.emitError(parser.getNameLoc(), "unknown type: ") << keyword;
+  return Type();
+}
+
+void StdXDialect::printType(Type type, DialectAsmPrinter &os) const {
+  if (type.isa<ArgpackType>()) {
+    os << "argpack";
+    return;
+  }
+  llvm_unreachable("unexpected stdx type kind");
+}
 
 void StdXDialect::initialize() {
+  addTypes<ArgpackType>();
   addOperations<
 #define GET_OP_LIST
 #include "pmlc/dialect/stdx/ir/ops.cc.inc" // NOLINT
@@ -59,3 +77,6 @@ void StdXDialect::initialize() {
 }
 
 } // namespace pmlc::dialect::stdx
+
+#define GET_OP_CLASSES
+#include "pmlc/dialect/stdx/ir/ops.cc.inc" // NOLINT

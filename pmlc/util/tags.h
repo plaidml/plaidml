@@ -63,5 +63,6 @@ int64_t getIntegerTag(T op, llvm::StringRef name, int64_t defaultVal) {
 inline llvm::StringRef subgroupSizeTag() { return "subgroupSize"; }
 inline llvm::StringRef gpuThreadTag() { return "gpuThread"; }
 inline llvm::StringRef gpuBlockTag() { return "gpuBlock"; }
+inline llvm::StringRef cpuThreadTag() { return "cpuThread"; }
 
 } // end namespace pmlc

@@ -246,7 +246,7 @@ TEST_P(PlaidMLEltwiseOperationTest, EltwiseDivOp) {
   std::vector<float> expected_val = {1.0 / 9, 0.25, 3.0 / 7, 2.0 / 3, 1, 1.5, 7.0 / 3, 4, 9};
 
   TestCases testcases = {
-      TestCaseIO{{B, A}, {expected_val}},
+      TestCaseIO{{A, B}, {expected_val}},
   };
 
   HloComputation::Builder builder("EltwiseDivOp");
@@ -329,7 +329,7 @@ TEST_P(PlaidMLEltwiseOperationTest, EltwisePowOp) {
   std::vector<float> expected_val = {1, 1, 1, 1, 2, 3, 1, 4, 9};
 
   TestCases testcases = {
-      TestCaseIO{{B, A}, {expected_val}},
+      TestCaseIO{{A, B}, {expected_val}},
   };
 
   HloComputation::Builder builder("EltwisePowOp");
@@ -350,7 +350,7 @@ TEST_P(PlaidMLEltwiseOperationTest, EltwiseRemOp) {
   std::vector<float> expected_val = {0, 0, 1, 2, 0, 4, 3, 2, 1};
 
   TestCases testcases = {
-      TestCaseIO{{B, A}, {expected_val}},
+      TestCaseIO{{A, B}, {expected_val}},
   };
 
   HloComputation::Builder builder("EltwiseRemOp");
@@ -371,7 +371,7 @@ TEST_P(PlaidMLEltwiseOperationTest, EltwiseSubOp) {
   std::vector<float> expected_val = {-8, -6, -4, -2, 0, 2, 4, 6, 8};
 
   TestCases testcases = {
-      TestCaseIO{{B, A}, {expected_val}},
+      TestCaseIO{{A, B}, {expected_val}},
   };
 
   HloComputation::Builder builder("EltwiseSubOp");
