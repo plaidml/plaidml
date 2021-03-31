@@ -82,25 +82,6 @@ def XSMM_BRGemmOffsDispatchF32Op : XSMM_Op<"brgemm.offs.dispatch.f32", [NoSideEf
 }
 
 
-def XSMM_BRGemmOffsAllocF32Op : XSMM_Op<"brgemm.offs.alloc.f32"> {
-  let summary = "Alloc offset array for offset based brgemm in LIBXMM";
-  let arguments = (ins I64Attr:$numBatches);
-  let results = (outs Res<I64, "the allocated offset pointer", [MemAlloc]>:$offsetsPtr);
-  let printer = ?;
-  let parser =  ?;
-  let assemblyFormat = "$numBatches attr-dict";
-}
-
-def XSMM_BRGemmOffsDeallocF32Op : XSMM_Op<"brgemm.offs.dealloc.f32"> { 
-  let summary = "Dealloc offset array for offset based brgemm in LIBXMM";
-  let arguments = (ins Arg<I64, "the offset pointer to free", [MemFree]>:$offsetsPtr); 
-  let printer = ?;
-  let parser =  ?;
-  let assemblyFormat = "$offsetsPtr attr-dict"; 
-}
-
-
-
 def XSMM_BRGemmOffsInvokeF32Op : XSMM_Op<"brgemm.offs.invoke.f32"> {
   let summary = "invoke a previously queried LIBXSMM kernel";
   let arguments = (ins I64:$ptr,

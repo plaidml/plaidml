@@ -23,7 +23,6 @@ namespace {
 int aOffsetGlobalVarCount = 0;
 int bOffsetGlobalVarCount = 0;
 
-
 util::StrideArray getStrideArray(Value operand, AffineMap tileMap) {
   int64_t offset;
   SmallVector<int64_t, 4> strides;
@@ -211,28 +210,12 @@ struct PxaGemmOpConversion : public OpConversionPattern<pxa::PxaGemmOp> {
       auto dispatch = rewriter.create<xsmm::BRGemmOffsDispatchF32Op>(
           op.getLoc(), rewriter.getI64Type(), op.tile(), leadingDimsAttr);
 
-      // Allocation ops for offset table
-      
-      /*
-      auto aOffsetsPtr = rewriter.create<xsmm::BRGemmOffsAllocF32Op>(
-          op.getLoc(), rewriter.getI64Type(),
-          rewriter.getI64IntegerAttr(numSteps));
-
-      auto bOffsetsPtr = rewriter.create<xsmm::BRGemmOffsAllocF32Op>(
-          op.getLoc(), rewriter.getI64Type(),
-          rewriter.getI64IntegerAttr(numSteps));
-      */
       rewriter.create<xsmm::BRGemmOffsInvokeF32Op>(
           op.getLoc(), ArrayRef<Type>(), dispatch, transformed.c(),
           transformed.a(), transformed.b(),
           rewriter.getI64IntegerAttr(numSteps),
           rewriter.getI64ArrayAttr(ArrayRef<int64_t>(aOffsets)),
           rewriter.getI64ArrayAttr(ArrayRef<int64_t>(bOffsets)), indices);
-
-      // Deallocation ops for offset table
-      //rewriter.create<xsmm::BRGemmOffsDeallocF32Op>(op.getLoc(), aOffsetsPtr);
-      //rewriter.create<xsmm::BRGemmOffsDeallocF32Op>(op.getLoc(), bOffsetsPtr);
-
     } else
       return failure();
 
@@ -545,99 +528,13 @@ struct XSMMBRGemmOffsDispatchF32Lowering
   }
 };
 
-struct XSMMBRGemmOffsAllocF32Lowering
-    : public ConvertOpToLLVMPattern<xsmm::BRGemmOffsAllocF32Op> {
-  using ConvertOpToLLVMPattern<
-      xsmm::BRGemmOffsAllocF32Op>::ConvertOpToLLVMPattern;
-
-  LogicalResult
-  matchAndRewrite(xsmm::BRGemmOffsAllocF32Op op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
-
-    llvm::StringRef kMalloc = "malloc";
-    auto module = op->getParentOfType<ModuleOp>();
-    auto mallocFunc = module.lookupSymbol<LLVM::LLVMFuncOp>(kMalloc);
-    auto numBatches = rewriter.getI64IntegerAttr(op.numBatches());
-
-    auto numBatchesValue = rewriter.create<LLVM::ConstantOp>(
-        op->getLoc(), rewriter.getI64Type(), numBatches);
-
-    if (!mallocFunc) {
-
-      OpBuilder builder(module.getBodyRegion());
-
-      mallocFunc = builder.create<LLVM::LLVMFuncOp>(
-          builder.getUnknownLoc(), kMalloc,
-          LLVM::LLVMFunctionType::get(
-              LLVM::LLVMPointerType::get(
-                  IntegerType::get(module->getContext(), 8)),
-              getIndexType()));
-    }
-
-    auto offsMallocPtr = rewriter.create<LLVM::CallOp>(
-        op->getLoc(), getVoidPtrType(), rewriter.getSymbolRefAttr(mallocFunc),
-        ArrayRef<Value>{rewriter.create<LLVM::MulOp>(
-            op->getLoc(), numBatchesValue,
-            getSizeInBytes(op->getLoc(), rewriter.getI64Type(), rewriter))});
-
-    rewriter.replaceOpWithNewOp<LLVM::PtrToIntOp>(op, rewriter.getI64Type(),
-                                                  offsMallocPtr.getResult(0));
-    return success();
-  }
-};
-
-struct XSMMBRGemmOffsDeallocF32Lowering
-    : public ConvertOpToLLVMPattern<xsmm::BRGemmOffsDeallocF32Op> {
-  using ConvertOpToLLVMPattern<
-      xsmm::BRGemmOffsDeallocF32Op>::ConvertOpToLLVMPattern;
-
-  LogicalResult
-  matchAndRewrite(xsmm::BRGemmOffsDeallocF32Op op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
-
-    xsmm::BRGemmOffsDeallocF32Op::Adaptor transformed(operands);
-    auto module = op->getParentOfType<ModuleOp>();
-
-    llvm::StringRef kFree = "free";
-    auto freeFunc = module.lookupSymbol<LLVM::LLVMFuncOp>(kFree);
-    auto offsetsInt = transformed.offsetsPtr();
-    auto longPtrType = LLVM::LLVMPointerType::get(rewriter.getI64Type());
-    auto offsetsIntToPtr = rewriter.create<LLVM::IntToPtrOp>(
-        op->getLoc(), longPtrType, offsetsInt);
-
-    if (!freeFunc) {
-
-      OpBuilder builder(module.getBodyRegion());
-
-      freeFunc = builder.create<LLVM::LLVMFuncOp>(
-          builder.getUnknownLoc(), kFree,
-          LLVM::LLVMFunctionType::get(
-              LLVM::LLVMVoidType::get(module->getContext()),
-              LLVM::LLVMPointerType::get(
-                  IntegerType::get(module->getContext(), 8))));
-    }
-
-    auto offsetsPtr = rewriter.create<LLVM::BitcastOp>(
-        op->getLoc(),
-        LLVM::LLVMPointerType::get(IntegerType::get(module->getContext(), 8)),
-        offsetsIntToPtr.getResult());
-    rewriter.create<LLVM::CallOp>(op->getLoc(), freeFunc,
-                                  offsetsPtr.getResult());
-
-    rewriter.eraseOp(op);
-
-    return success();
-  }
-};
-
 struct XSMMBRGemmOffsInvokeF32Lowering
     : public ConvertOpToLLVMPattern<xsmm::BRGemmOffsInvokeF32Op> {
   using ConvertOpToLLVMPattern<
       xsmm::BRGemmOffsInvokeF32Op>::ConvertOpToLLVMPattern;
 
-
-  //static int aOffsetGlobalVarCount;
-  //static int bOffsetGlobalVarCount;
+  // static int aOffsetGlobalVarCount;
+  // static int bOffsetGlobalVarCount;
 
   LogicalResult
   matchAndRewrite(xsmm::BRGemmOffsInvokeF32Op op, ArrayRef<Value> operands,
@@ -666,54 +563,51 @@ struct XSMMBRGemmOffsInvokeF32Lowering
 
     auto numBatchesValue =
         rewriter.create<LLVM::ConstantOp>(op->getLoc(), int64Type, numBatches);
-    
-    
+
     auto module = op->getParentOfType<ModuleOp>();
     OpBuilder builder(module.getBodyRegion());
-
 
     auto aOffsetType = RankedTensorType::get({numBatches.getInt()}, int64Type);
     auto bOffsetType = RankedTensorType::get({numBatches.getInt()}, int64Type);
     LLVM::GlobalOp aOffsets;
     LLVM::GlobalOp bOffsets;
-    std::string aGlobalVar = "brgemm_aoffsets" + std::to_string(aOffsetGlobalVarCount++);
-    std::string bGlobalVar = "brgemm_boffsets" + std::to_string(bOffsetGlobalVarCount++);
+    std::string aGlobalVar =
+        "brgemm_aoffsets" + std::to_string(aOffsetGlobalVarCount++);
+    std::string bGlobalVar =
+        "brgemm_boffsets" + std::to_string(bOffsetGlobalVarCount++);
 
-    aOffsets = builder.create<LLVM::GlobalOp>(builder.getUnknownLoc(), LLVM::LLVMArrayType::get(int64Type, numBatches.getInt()), /*isConstant=*/true,
-                                              LLVM::Linkage::Internal, StringRef(aGlobalVar),
-                                              DenseElementsAttr::get(aOffsetType, op.aOffsets().getValue()));
-    bOffsets = builder.create<LLVM::GlobalOp>(builder.getUnknownLoc(), LLVM::LLVMArrayType::get(int64Type, numBatches.getInt()), /*isConstant=*/true,
-                                              LLVM::Linkage::Internal, StringRef(bGlobalVar),
-                                              DenseElementsAttr::get(bOffsetType, op.bOffsets().getValue()));
-
-
-
-
+    aOffsets = builder.create<LLVM::GlobalOp>(
+        builder.getUnknownLoc(),
+        LLVM::LLVMArrayType::get(int64Type, numBatches.getInt()),
+        /*isConstant=*/true, LLVM::Linkage::Internal, StringRef(aGlobalVar),
+        DenseElementsAttr::get(aOffsetType, op.aOffsets().getValue()));
+    bOffsets = builder.create<LLVM::GlobalOp>(
+        builder.getUnknownLoc(),
+        LLVM::LLVMArrayType::get(int64Type, numBatches.getInt()),
+        /*isConstant=*/true, LLVM::Linkage::Internal, StringRef(bGlobalVar),
+        DenseElementsAttr::get(bOffsetType, op.bOffsets().getValue()));
 
     auto longPtrType = LLVM::LLVMPointerType::get(rewriter.getI64Type());
 
-    auto aOffsetsBase = rewriter.create<LLVM::AddressOfOp>(
-        op->getLoc(), aOffsets);
+    auto aOffsetsBase =
+        rewriter.create<LLVM::AddressOfOp>(op->getLoc(), aOffsets);
 
-    auto bOffsetsBase = rewriter.create<LLVM::AddressOfOp>(
-        op->getLoc(), bOffsets);
-
-
+    auto bOffsetsBase =
+        rewriter.create<LLVM::AddressOfOp>(op->getLoc(), bOffsets);
 
     SmallVector<Value, 4> aOffsetOperands = {aOffsetsBase};
     aOffsetOperands.insert(aOffsetOperands.end(), aOffsetType.getRank() + 1,
-                    createIndexConstant(rewriter, op->getLoc(), 0));
-    
+                           createIndexConstant(rewriter, op->getLoc(), 0));
 
     SmallVector<Value, 4> bOffsetOperands = {bOffsetsBase};
     bOffsetOperands.insert(bOffsetOperands.end(), bOffsetType.getRank() + 1,
-                    createIndexConstant(rewriter, op->getLoc(), 0));
+                           createIndexConstant(rewriter, op->getLoc(), 0));
 
+    auto aOffsetsPtr = rewriter.create<LLVM::GEPOp>(op->getLoc(), longPtrType,
+                                                    aOffsetOperands);
 
-    auto aOffsetsPtr = rewriter.create<LLVM::GEPOp>(op->getLoc(), longPtrType, aOffsetOperands);
-
-    auto bOffsetsPtr = rewriter.create<LLVM::GEPOp>(op->getLoc(), longPtrType, bOffsetOperands);
-
+    auto bOffsetsPtr = rewriter.create<LLVM::GEPOp>(op->getLoc(), longPtrType,
+                                                    bOffsetOperands);
 
     auto func = getOrInsertFunc(op, rewriter);
     rewriter.create<LLVM::CallOp>(
@@ -761,11 +655,9 @@ void populatePXAGemmToXSMMConversionPatterns(OwningRewritePatternList &patterns,
 
 void populateXSMMToLLVMConversionPatterns(LLVMTypeConverter &converter,
                                           OwningRewritePatternList &patterns) {
-  patterns
-      .insert<XSMMGemmDispatchF32Lowering, XSMMGemmInvokeF32Lowering,
-              XSMMBRGemmDispatchF32Lowering, XSMMBRGemmInvokeF32Lowering,
-              XSMMBRGemmOffsDispatchF32Lowering, XSMMBRGemmOffsAllocF32Lowering,
-              XSMMBRGemmOffsDeallocF32Lowering,
-              XSMMBRGemmOffsInvokeF32Lowering>(converter);
+  patterns.insert<XSMMGemmDispatchF32Lowering, XSMMGemmInvokeF32Lowering,
+                  XSMMBRGemmDispatchF32Lowering, XSMMBRGemmInvokeF32Lowering,
+                  XSMMBRGemmOffsDispatchF32Lowering,
+                  XSMMBRGemmOffsInvokeF32Lowering>(converter);
 }
 } // namespace pmlc::target::x86

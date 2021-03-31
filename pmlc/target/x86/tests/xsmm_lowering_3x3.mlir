@@ -1,5 +1,5 @@
 // RUN: pmlc-opt -tile-compute-bounds -convert-tile-to-pxa  --pass-pipeline='func(x86-affine-stencil-xsmm{threads=1 batched=true})'  -x86-convert-pxa-to-affine \
-// RUN:     -buffer-loop-hoisting -buffer-deallocation -loop-invariant-code-motion \
+// RUN:      -loop-invariant-code-motion \
 // RUN:     -canonicalize -split-input-file %s | FileCheck %s
 
 
