@@ -9,12 +9,23 @@
 
 namespace pmlc::dialect::pxa {
 
+// Trace through any parallel fors to find the previous writer operation for a
+// given value.
+mlir::Operation *getPrevWriter(mlir::Value value);
+
+mlir::Value getPrevIndirectDef(mlir::OpResult def);
+mlir::Value getNextIndirectUse(mlir::OpOperand &use);
+
+mlir::Value getIndirectDef(mlir::Value value);
+mlir::Value getIndirectDefOutsideScope(mlir::Value value,
+                                       mlir::Operation *scope);
+
 class IndirectValuesIterator
     : public llvm::iterator_facade_base<
           IndirectValuesIterator, std::forward_iterator_tag, mlir::Value> {
 public:
   IndirectValuesIterator() {}
-  explicit IndirectValuesIterator(Value value) : curValue(value) {}
+  explicit IndirectValuesIterator(mlir::Value value) : curValue(value) {}
 
   IndirectValuesIterator &
   operator=(const IndirectValuesIterator &other) = default;
@@ -27,28 +38,33 @@ public:
   mlir::Value operator*() const { return curValue; }
 
   IndirectValuesIterator &operator++();
+  IndirectValuesIterator operator++(int) {
+    IndirectValuesIterator cur = *this;
+    ++(*this);
+    return cur;
+  }
 
 private:
-  void enqueueNext(Value value);
+  void enqueueNext(mlir::Value value);
 
 private:
   // The current value.
-  Value curValue;
+  mlir::Value curValue;
   // The next values to process.
-  std::queue<Value> workQueue;
+  std::queue<mlir::Value> workQueue;
   // Avoid duplicate visitations.
-  llvm::DenseSet<Value> visited;
+  llvm::DenseSet<mlir::Value> visited;
 };
 
 using IndirectValuesRange = llvm::iterator_range<IndirectValuesIterator>;
-IndirectValuesRange getIndirectValues(Value value);
+IndirectValuesRange getIndirectValues(mlir::Value value);
 
 class IndirectUsesIterator
     : public llvm::iterator_facade_base<
           IndirectUsesIterator, std::forward_iterator_tag, mlir::OpOperand> {
 public:
   IndirectUsesIterator() {}
-  explicit IndirectUsesIterator(Value value);
+  explicit IndirectUsesIterator(mlir::Value value);
 
   IndirectUsesIterator &operator=(const IndirectUsesIterator &other) = default;
 
@@ -60,6 +76,11 @@ public:
   mlir::OpOperand &operator*() { return *curIt; }
 
   IndirectUsesIterator &operator++();
+  IndirectUsesIterator operator++(int) {
+    IndirectUsesIterator cur = *this;
+    ++(*this);
+    return cur;
+  }
 
 private:
   void nextValue();
@@ -68,11 +89,11 @@ private:
   // The current value iterator.
   IndirectValuesIterator inner;
   // The use iterator.
-  Value::use_iterator curIt;
+  mlir::Value::use_iterator curIt;
 };
 
 using IndirectUsesRange = llvm::iterator_range<IndirectUsesIterator>;
-IndirectUsesRange getIndirectUses(Value value);
+IndirectUsesRange getIndirectUses(mlir::Value value);
 
 // Subsets all uses to only acceses (skipping yield/return)
 class IndirectAccessUsesIterator
@@ -82,7 +103,7 @@ class IndirectAccessUsesIterator
 public:
   IndirectAccessUsesIterator() {}
 
-  explicit IndirectAccessUsesIterator(Value value) : inner(value) {
+  explicit IndirectAccessUsesIterator(mlir::Value value) : inner(value) {
     skipNonAccess();
   }
 
@@ -97,6 +118,11 @@ public:
   mlir::OpOperand &operator*() { return *inner; }
 
   IndirectAccessUsesIterator &operator++();
+  IndirectAccessUsesIterator operator++(int) {
+    IndirectAccessUsesIterator cur = *this;
+    ++(*this);
+    return cur;
+  }
 
 private:
   void skipNonAccess();
@@ -106,6 +132,6 @@ private:
 
 using IndirectAccessUsesRange =
     llvm::iterator_range<IndirectAccessUsesIterator>;
-IndirectAccessUsesRange getIndirectAccessUses(Value value);
+IndirectAccessUsesRange getIndirectAccessUses(mlir::Value value);
 
 } // namespace pmlc::dialect::pxa

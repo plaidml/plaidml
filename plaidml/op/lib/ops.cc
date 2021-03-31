@@ -31,7 +31,7 @@ Value cumprod(const Value&);
 Value cumsum(const Value&);
 Value dot(const Value&);
 Value elu(const Value&);
-Value expand_dims(const Value&);
+Value explicit_padding(const Value&);
 Value flip(const Value&);
 Value hard_sigmoid(const Value&);
 Value image_resize(const Value&);
@@ -40,6 +40,9 @@ Value maximum(const Value&);
 Value mean(const Value&);
 Value min(const Value&);
 Value minimum(const Value&);
+Value mvn(const Value&);
+Value nms(const Value&);
+Value l2norm(const Value&);
 Value pool(const Value&);
 Value prod(const Value&);
 Value relu(const Value&);
@@ -49,12 +52,14 @@ Value reshape(const Value&);
 Value sigmoid(const Value&);
 Value slice(const Value&);
 Value softmax(const Value&);
+Value sort(const Value&);
 Value spatial_padding(const Value&);
 Value square(const Value&);
 Value squeeze(const Value&);
 Value sum(const Value&);
 Value tile(const Value&);
 Value transpose(const Value&);
+Value unsqueeze(const Value&);
 Value variance(const Value&);
 
 namespace {
@@ -180,14 +185,29 @@ std::ostream& operator<<(std::ostream& os, const AutoGroupMode& mode) {
 
 std::string to_string(AutoPadMode mode) {
   switch (mode) {
-    case AutoPadMode::NONE:
-      return "AutoPadMode::NONE (a.k.a. EXPLICIT)";
+    case AutoPadMode::EXPLICIT:
+      return "AutoPadMode::EXPLICIT";
     case AutoPadMode::SAME_LOWER:
       return "AutoPadMode::SAME_LOWER";
     case AutoPadMode::SAME_UPPER:
       return "AutoPadMode::SAME_UPPER";
     case AutoPadMode::VALID:
       return "AutoPadMode::VALID";
+    default:
+      return "<<UNRECOGNIZED AutoPadMode>>";
+  }
+}
+
+std::string to_string(PadMode mode) {
+  switch (mode) {
+    case PadMode::CONSTANT:
+      return "PadMode::CONSTANT";
+    case PadMode::EDGE:
+      return "PadMode::EDGE";
+    case PadMode::REFLECT:
+      return "PadMode::REFLECT";
+    case PadMode::SYMMETRIC:
+      return "PadMode::SYMMETRIC";
     default:
       return "<<UNRECOGNIZED AutoPadMode>>";
   }
@@ -332,13 +352,13 @@ std::pair<TensorDim, TensorDim> compute_padding_and_output_size(  //
     bool use_ceil_for_output_shape) {
   // Effective input and filter sizes are the sizes after dilations are
   // accounted for. So a 4x3 filter dilated by (3, 2) has an effective filter
-  // size of 11 and 5 for its 2 spatial dims
+  // size of 10 and 5 for its 2 spatial dims
 
   auto I_eff = (data_dilation * (input_size - 1)) + 1;  // Effective Input Size
   auto F_eff = (dilation * (filter_size - 1)) + 1;      // Effective Filter Size
   int64_t ceil_term =
       use_ceil_for_output_shape ? stride - 1 : 0;  // TODO: Will need to confirm that this is the intended behavior
-  if (autopad_mode == AutoPadMode::NONE) {
+  if (autopad_mode == AutoPadMode::EXPLICIT) {
     TensorDim pad_before(pad_lo);
     TensorDim output_size((I_eff + pad_lo + pad_hi - F_eff + stride + ceil_term) / stride);
     return std::pair<TensorDim, TensorDim>(pad_before, output_size);
@@ -374,7 +394,7 @@ std::pair<TensorDim, TensorDim> compute_padding_and_input_size(  //
 
   auto O_eff = output_size;
   auto F_eff = (dilation * (filter_size - 1)) + 1;  // Effective Filter Size
-  if (autopad_mode == AutoPadMode::NONE) {
+  if (autopad_mode == AutoPadMode::EXPLICIT) {
     TensorDim pad_before(pad_lo);
     TensorDim input_size(O_eff * stride - pad_lo - pad_hi + F_eff - stride);
     return std::pair<TensorDim, TensorDim>(pad_before, input_size);
@@ -433,7 +453,9 @@ Value all(const Value& value) {
   auto axes = args[1];
   auto keepdims = args[2].as_bool();
 
-  auto I_as_bool = select(I == 0, Tensor{0}, Tensor{1});
+  auto one = cast(Tensor{1}, I.dtype());
+  auto zero = cast(Tensor{0}, I.dtype());
+  auto I_as_bool = select(I == 0, zero, one);
   if (I.rank() == 0) {
     return Value{cast(I_as_bool, DType::UINT8)};
   }
@@ -444,8 +466,7 @@ Value all(const Value& value) {
   AggregationAxes agg(I.rank(), axes, keepdims);
 
   I.bind_dims(agg.src_dims);
-  auto O = TensorOutput(agg.dst_dims);
-  O(agg.dst_idxs) *= I_as_bool(agg.src_idxs);
+  Tensor O = Contraction(agg.dst_dims, agg.dst_idxs).product(I_as_bool(agg.src_idxs));
   return Value{cast(O, DType::UINT8)};
 }
 
@@ -459,7 +480,9 @@ Value any(const Value& value) {
   auto axes = args[1];
   auto keepdims = args[2].as_bool();
 
-  auto I_as_bool = select(I == 0, Tensor{0}, Tensor{1});
+  auto one = cast(Tensor{1}, I.dtype());
+  auto zero = cast(Tensor{0}, I.dtype());
+  auto I_as_bool = select(I == 0, zero, one);
   if (I.rank() == 0) {
     return Value{cast(I_as_bool, DType::UINT8)};
   }
@@ -470,9 +493,8 @@ Value any(const Value& value) {
   AggregationAxes agg(I.rank(), axes, keepdims);
 
   I.bind_dims(agg.src_dims);
-  auto S = TensorOutput(agg.dst_dims);
-  S(agg.dst_idxs) += I_as_bool(agg.src_idxs);
-  auto O = select(S == 0, Tensor{0}, Tensor{1});
+  Tensor S = Contraction(agg.dst_dims, agg.dst_idxs).sum(I_as_bool(agg.src_idxs));
+  auto O = select(S == 0, zero, one);
   return Value{cast(O, DType::UINT8)};
 }
 
@@ -486,11 +508,9 @@ Value argmax(const Value& value) {
   auto axes = args[1];
   AggregationAxes agg(I.rank(), axes, false);
   I.bind_dims(agg.src_dims);
-  auto M = TensorOutput(agg.dst_dims);
-  M(agg.dst_idxs) >= I(agg.src_idxs);
+  Tensor M = Contraction(agg.dst_dims, agg.dst_idxs).max(I(agg.src_idxs));
   auto IX = index(agg.reduce_dims, 0);
-  auto AM = TensorOutput(agg.dst_dims);
-  AM(agg.dst_idxs) >= cond(I(agg.src_idxs), M(agg.dst_idxs), IX(agg.reduce_idxs));
+  Tensor AM = Contraction(agg.dst_dims, agg.dst_idxs).max(cond(I(agg.src_idxs), M(agg.dst_idxs), IX(agg.reduce_idxs)));
   auto O = cast(AM, DType::UINT32);
   return Value{O};
 }
@@ -503,8 +523,8 @@ Value binary_crossentropy(const Value& value) {
   if (args.size() != 3) {
     throw std::runtime_error("binary_crossentropy expects 3 arguments");
   }
-  auto T = ident(args[0].as_tensor());  // Targets Tensor; copied for safe gradient override
-  auto raw_P = args[1];                 // Predictions Tensor, before clipping
+  auto T = args[0].as_tensor();  // Targets Tensor
+  auto raw_P = args[1];          // Predictions Tensor, before clipping
   auto epsilon = args[2].as_float();
 
   // Check args & set useful values
@@ -515,21 +535,7 @@ Value binary_crossentropy(const Value& value) {
   auto clip_inputs = make_tuple(raw_P, Value{epsilon}, Value{1. - epsilon});
   auto P = clip(clip_inputs).as_tensor();
   auto O = -T * log(P) - (1 - T) * log(1 - P);
-  TensorDeriv deriv = [](const Tensor& Y, const Tensor& DY, const std::vector<Tensor>& X) {  //
-    auto T = X[0];
-    auto P = X[1];
-    Tensor One{1.0};
-    auto ndims = T.rank();
-    std::vector<TensorDim> dims(ndims);
-    T.bind_dims(dims);
-    auto dims_prod = Tensor{1};
-    for (const auto& dim : dims) {
-      dims_prod = dims_prod * dim;
-    }
-    return std::vector<Tensor>{(log(One - P) - log(P)) / dims_prod, (-T / P + (One - T) / (One - P)) / dims_prod};
-  };
-  // Safe to use P without copy since it is built internally to this function
-  return Value{OverrideGrads(deriv, std::vector<Tensor>{T, P}, O)};
+  return Value{O};
 }
 
 Value broadcast(const Value& value) {
@@ -566,9 +572,7 @@ Value broadcast(const Value& value) {
     }
   }
 
-  auto O = TensorOutput(O_dims);
-  O(O_idxs) = I(I_idxs);
-
+  Tensor O = Contraction(O_dims, O_idxs).assign(I(I_idxs));
   return Value{O};
 }
 
@@ -587,11 +591,11 @@ Value clip(const Value& value) {
   auto O = I;
   if (!raw_min.is_none()) {
     auto min = raw_min.as_tensor();
-    O = select(O > min, O, min);
+    O = select(O > min, O, cast(min, O.dtype()));
   }
   if (!raw_max.is_none()) {
     auto max = raw_max.as_tensor();
-    O = select(O < max, O, max);
+    O = select(O < max, O, cast(max, O.dtype()));
   }
   return Value{O};
 }
@@ -646,9 +650,9 @@ Value concatenate(const Value& value) {
 
   // Compute each intermediate output
   for (size_t i = 0; i < tensors.size(); ++i) {
-    results.emplace_back(TensorOutput(dims));
     O_idxs[axis] = axis_idx + axis_dim_subtotals[i];
-    results[i](O_idxs) = tensors[i](I_idxs);
+    Tensor R = Contraction(dims, O_idxs).assign(tensors[i](I_idxs));
+    results.emplace_back(R);
   }
   auto final_result = results[0];
   for (size_t i = 1; i < tensors.size(); ++i) {
@@ -684,8 +688,8 @@ size_t compute_conv_rank_validating_strides(std::vector<int64_t>* strides, const
 
 void validate_conv_padding(const std::vector<int64_t>& manual_padding, AutoPadMode autopad_mode,
                            std::stringstream& args_log) {
-  if (!manual_padding.empty() && autopad_mode != AutoPadMode::NONE) {
-    IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+  if (!manual_padding.empty() && autopad_mode != AutoPadMode::EXPLICIT) {
+    IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
     throw std::runtime_error("Autopadding and manual padding both requested for single conv operation");
   }
 }
@@ -698,7 +702,7 @@ void validate_conv_dilations_rank(size_t spatial_rank, std::vector<int64_t>* dil
       dilations->push_back(1);
     }
   } else if (dilations->size() != spatial_rank) {
-    IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+    IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
     throw std::runtime_error(
         llvm::formatv("Inconsistent spatial rank in conv op (expecting rank {0}, received {1}D dilations)",
                       spatial_rank, dilations->size()));
@@ -713,7 +717,7 @@ void validate_conv_data_dilations_rank(size_t spatial_rank, std::vector<int64_t>
       data_dilations->push_back(1);
     }
   } else if (data_dilations->size() != spatial_rank) {
-    IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+    IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
     throw std::runtime_error(
         llvm::formatv("Inconsistent spatial rank in conv op (expecting rank {0}, received {1}D data_dilations)",
                       spatial_rank, data_dilations->size()));
@@ -722,14 +726,14 @@ void validate_conv_data_dilations_rank(size_t spatial_rank, std::vector<int64_t>
 
 void validate_conv_input_layout(TensorLayout input_layout, std::stringstream& args_log) {
   if (!is_input_layout(input_layout)) {
-    IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+    IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
     throw std::runtime_error("Input tensor layout requested in conv op does not apply to convolution input tensors");
   }
 }
 
 void validate_conv_filter_layout(TensorLayout filter_layout, std::stringstream& args_log) {
   if (!is_filter_layout(filter_layout)) {
-    IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+    IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
     throw std::runtime_error("Filter tensor layout requested in conv op does not apply to convolution filter tensors");
   }
 }
@@ -739,7 +743,7 @@ void validate_conv_input_rank(size_t const spatial_rank, const Tensor& I, Tensor
   if (deriv_mode != ConvDerivMode::DATA && I.rank() - spatial_rank != nonspatial_dims(input_layout)) {
     // If we ever extend possible layouts so that I and O may have different layouts, we will
     // need to do this check in different ways depending on whether deriv_mode is DATA or not
-    IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+    IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
     throw std::runtime_error(llvm::formatv(
         "Inconsistent spatial rank in conv op (expected spatial rank {0} but input tensor has {1} dimensions, and thus "
         "{2} spatial dims). (This error can also occur if the layout of I is incorrectly specified or interpreted.)",
@@ -750,7 +754,7 @@ void validate_conv_input_rank(size_t const spatial_rank, const Tensor& I, Tensor
 void validate_conv_filter_rank(size_t spatial_rank, const Tensor& F, TensorLayout filter_layout,
                                ConvDerivMode deriv_mode, std::stringstream& args_log) {
   if (deriv_mode != ConvDerivMode::FILTER && F.rank() - spatial_rank != nonspatial_dims(filter_layout)) {
-    IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+    IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
     throw std::runtime_error(
         llvm::formatv("Inconsistent spatial rank in conv op (expected spatial rank {0} but filter tensor has {1} "
                       "dimensions, and thus {2} spatial dims). (This error can also occur if the layout of F is "
@@ -762,7 +766,7 @@ void validate_conv_filter_rank(size_t spatial_rank, const Tensor& F, TensorLayou
 void validate_conv_filter_shape_rank(size_t spatial_rank, std::vector<int64_t> filter_shape,
                                      std::stringstream& args_log) {
   if (filter_shape.size() && (filter_shape.size() != spatial_rank)) {
-    IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+    IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
     throw std::runtime_error(
         llvm::formatv("Filter shape manually specified with inconsistent rank (expected spatial rank {0} but "
                       "filter_shape has {1} dimensions)",
@@ -772,11 +776,11 @@ void validate_conv_filter_shape_rank(size_t spatial_rank, std::vector<int64_t> f
 
 void validate_conv_group_layout(TensorLayout filter_layout, GroupLayout group_layout, std::stringstream& args_log) {
   if (is_filter_layout_with_separate_groups(filter_layout) && group_layout != GroupLayout::SEPARATE) {
-    IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+    IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
     throw std::runtime_error("Filter_layout specifies separate groups but group_layout isn't SEPARATE");
   }
   if (!is_filter_layout_with_separate_groups(filter_layout) && group_layout == GroupLayout::SEPARATE) {
-    IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+    IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
     throw std::runtime_error("Filter_layout lacks separate groups but group_layout is SEPARATE");
   }
 }
@@ -785,7 +789,7 @@ void validate_conv_result_shape(size_t spatial_rank, const std::vector<int64_t>&
                                 bool infer_result_shape, std::stringstream& args_log) {
   if (result_shape.empty()) {
     if (deriv_mode != ConvDerivMode::NONE && !infer_result_shape) {
-      IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+      IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
       throw std::runtime_error(
           "Transposed/gradient convolutions require specifying the result_shape. This can be bypassed by setting "
           "infer_result_shape = true, but be warned that infered result shapes do not necessarily match the input "
@@ -793,7 +797,7 @@ void validate_conv_result_shape(size_t spatial_rank, const std::vector<int64_t>&
     }
   } else {
     if (result_shape.size() != spatial_rank) {
-      IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+      IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
       throw std::runtime_error(
           llvm::formatv("Inconsistent spatial rank in conv op (received {0} spatial dimensions based on strides "
                         "but result shape has {1} spatial dims).",
@@ -894,6 +898,7 @@ Value convolution(const Value& value) {
   if (args.size() != 18) {
     throw std::runtime_error("Convolution op expects 18 arguments");
   }
+  IVLOG(5, "Requesting convolution with raw args: " << args);
   auto I_or_O = args[0].as_tensor();  // O if deriv_mode is DATA, else I
   auto F_or_O = args[1].as_tensor();  // O if deriv_mode is FILTER, else F
   auto strides = args[2].as_int_tuple_or_empty();
@@ -941,6 +946,7 @@ Value convolution(const Value& value) {
   Tensor I;  // Inputs (i.e. Data) tensor
   Tensor F;  // Filters (i.e. Weights i.e. Kernel) tensor
   Tensor O;  // Output (i.e. of a forward pass) tensor
+  Contraction OC;
 
   // Connect the inputs to the right names
   switch (deriv_mode) {
@@ -957,7 +963,7 @@ Value convolution(const Value& value) {
       O = F_or_O;
       break;
     default:
-      IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+      IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
       throw std::runtime_error("Invalid ConvDerivMode");
   }
 
@@ -1027,7 +1033,7 @@ Value convolution(const Value& value) {
       } else if (group_layout == GroupLayout::IN_C) {
         // Everything can be inferred, do nothing  // nolint(whitespace/empty_if_body)
       } else {
-        IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+        IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
         throw std::runtime_error(llvm::formatv("Unsupported group layout '{0}' used with autogroup mode DEPTHWISE",
                                                to_string(group_layout)));
       }
@@ -1036,13 +1042,13 @@ Value convolution(const Value& value) {
       if (group_layout == GroupLayout::SEPARATE || group_layout == GroupLayout::IN_K) {
         // just let G be inferred; i.e. do nothing  // nolint(whitespace/empty_if_body)
       } else {
-        IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+        IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
         throw std::runtime_error(
             llvm::formatv("Unsupported group layout '{0}' used with autogroup mode AUTO", to_string(group_layout)));
       }
       break;
     default:
-      IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+      IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
       throw std::runtime_error("Unrecognized AutoGroupMode");
   }
 
@@ -1069,7 +1075,7 @@ Value convolution(const Value& value) {
       // Later: F_CI = CI / G;
       break;
     default:
-      IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+      IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
       throw std::runtime_error("Invalid group_layout");
   }
 
@@ -1091,7 +1097,7 @@ Value convolution(const Value& value) {
         I_dims.push_back(CI);
         break;
       default:
-        IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+        IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
         throw std::runtime_error("Invalid input_layout");
     }
     I.bind_dims(I_dims);
@@ -1134,7 +1140,7 @@ Value convolution(const Value& value) {
         F_explicit_dims.push_back(F_CO);
         break;
       default:
-        IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+        IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
         throw std::runtime_error("Invalid filter_layout");
     }
     F.bind_dims(F_dims);
@@ -1163,7 +1169,7 @@ Value convolution(const Value& value) {
         O_dims.push_back(CO);
         break;
       default:
-        IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+        IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
         throw std::runtime_error("Invalid input_layout");
     }
     O.bind_dims(O_dims);
@@ -1184,7 +1190,7 @@ Value convolution(const Value& value) {
       CI = F_CI * G;
       break;
     default:
-      IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+      IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
       throw std::runtime_error("Invalid group_layout");
   }
 
@@ -1220,7 +1226,7 @@ Value convolution(const Value& value) {
       I_spatial_dims.push_back(local_input_size);
     } else {
       if (deriv_mode == ConvDerivMode::FILTER && result_shape.empty()) {
-        IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+        IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
         throw std::runtime_error(
             "Result shape inference not yet supported for filter transposed/derivative convolutions");
       }
@@ -1264,11 +1270,10 @@ Value convolution(const Value& value) {
           O_dims.push_back(CO);
           break;
         default:
-          IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+          IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
           throw std::runtime_error("Invalid input_layout");
       }
-      O = Tensor{name, O_dims};
-      // O = NamedTensorOutput(name, O_dims);  // TODO: Re-enable when ready
+      OC = Contraction(name).outShape(O_dims);
       break;
     case ConvDerivMode::DATA:
       switch (input_layout) {
@@ -1287,11 +1292,10 @@ Value convolution(const Value& value) {
           I_dims.push_back(CI);
           break;
         default:
-          IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+          IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
           throw std::runtime_error("Invalid input_layout");
       }
-      I = Tensor{name, I_dims};
-      // I = NamedTensorOutput(name, I_dims);  // TODO: Re-enable when ready
+      OC = Contraction(name).outShape(I_dims);
       break;
     case ConvDerivMode::FILTER:
       switch (filter_layout) {
@@ -1318,14 +1322,13 @@ Value convolution(const Value& value) {
           F_dims.push_back(F_CO);
           break;
         default:
-          IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+          IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
           throw std::runtime_error("Invalid filter_layout");
       }
-      F = Tensor{name, F_dims};
-      // F = NamedTensorOutput(name, F_dims);  // TODO: Re-enable when ready
+      OC = Contraction(name).outShape(F_dims);
       break;
     default:
-      IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+      IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
       throw std::runtime_error("Invalid deriv_mode");
   }
 
@@ -1355,7 +1358,7 @@ Value convolution(const Value& value) {
       }
       break;
     default:
-      IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+      IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
       throw std::runtime_error("Invalid input_layout");
   }
 
@@ -1380,7 +1383,7 @@ Value convolution(const Value& value) {
       constraints.push_back(co < CO / G);
       break;
     default:
-      IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+      IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
       throw std::runtime_error("Unrecognized group layout");
   }
   switch (filter_layout) {
@@ -1406,7 +1409,7 @@ Value convolution(const Value& value) {
       F_idxs.push_back(f_co);
       break;
     default:
-      IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+      IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
       throw std::runtime_error("Invalid filter_layout");
   }
 
@@ -1437,26 +1440,23 @@ Value convolution(const Value& value) {
       }
       break;
     default:
-      IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+      IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
       throw std::runtime_error("Invalid input_layout");
   }
 
   // Return the contraction
   switch (deriv_mode) {
     case ConvDerivMode::NONE:
-      O(O_idxs) += I(I_idxs) * F(F_idxs);
-      O.add_constraints(constraints);
-      return Value{O};
+      OC.outAccess(O_idxs).sum(I(I_idxs) * F(F_idxs)).add_constraints(constraints);
+      return Value{OC};
     case ConvDerivMode::DATA:
-      I(I_idxs) += O(O_idxs) * F(F_idxs);
-      I.add_constraints(constraints);
-      return Value{I};
+      OC.outAccess(I_idxs).sum(O(O_idxs) * F(F_idxs)).add_constraints(constraints);
+      return Value{OC};
     case ConvDerivMode::FILTER:
-      F(F_idxs) += I(I_idxs) * O(O_idxs);
-      F.add_constraints(constraints);
-      return Value{F};
+      OC.outAccess(F_idxs).sum(I(I_idxs) * O(O_idxs)).add_constraints(constraints);
+      return Value{OC};
     default:
-      IVLOG(1, "Bad convolution, arguments:\n" << args_log.str());
+      IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
       throw std::runtime_error("Unrecognized deriv_mode");
   }
 }
@@ -1478,20 +1478,19 @@ Value cumprod(const Value& value) {
   std::vector<TensorIndex> O_idxs(I_idxs);
   TensorIndex cumulator_idx;
   I_idxs[axis] = I_idxs[axis] - cumulator_idx;
-  auto O = TensorOutput(dims);
-  O(O_idxs) *= I(I_idxs);
-  O.add_constraint(cumulator_idx < dims[axis]);
+  Tensor O = Contraction(dims, O_idxs).product(I(I_idxs)).add_constraint(cumulator_idx < dims[axis]);
   return Value{O};
 }
 
 Value cumsum(const Value& value) {
   IVLOG(1, "cumsum");
   auto args = value.as_tuple();
-  if (args.size() != 2) {
+  if (args.size() != 3) {
     throw std::runtime_error("cumsum expects 2 arguments");
   }
   auto I = args[0].as_tensor();
   auto raw_axis = args[1].as_int();
+  auto is_exclusive = args[2].as_bool();
 
   auto ndims = I.rank();
   auto axis = normalize_axis(raw_axis, ndims, "cumsum");
@@ -1500,10 +1499,8 @@ Value cumsum(const Value& value) {
   std::vector<TensorIndex> I_idxs(ndims);
   std::vector<TensorIndex> O_idxs(I_idxs);
   TensorIndex cumulator_idx;
-  I_idxs[axis] = I_idxs[axis] - cumulator_idx;
-  auto O = TensorOutput(dims);
-  O(O_idxs) += I(I_idxs);
-  O.add_constraint(cumulator_idx < dims[axis]);
+  I_idxs[axis] = is_exclusive ? I_idxs[axis] - cumulator_idx - 1 : I_idxs[axis] - cumulator_idx;
+  Tensor O = Contraction(dims, O_idxs).sum(I(I_idxs)).add_constraint(cumulator_idx < dims[axis]);
   return Value{O};
 }
 
@@ -1524,8 +1521,7 @@ Value dot(const Value& value) {
     TensorIndex i;
     X.bind_dims(I);
     Y.bind_dims(I);
-    auto O = TensorOutput(I);
-    O(i) += X(i) * Y(i);
+    Tensor O = Contraction({I}, {i}).sum(X(i) * Y(i));
     return Value{O};
   }
   if (1 <= X.rank() && 2 <= Y.rank()) {
@@ -1550,8 +1546,7 @@ Value dot(const Value& value) {
     }
     O_dims.push_back(Y_dims[Y.rank() - 1]);
     O_idxs.push_back(Y_idxs[Y.rank() - 1]);
-    auto O = TensorOutput(O_dims);
-    O(O_idxs) += X(X_idxs) * Y(Y_idxs);
+    Tensor O = Contraction(O_dims, O_idxs).sum(X(X_idxs) * Y(Y_idxs));
     return Value{O};
   }
   throw std::runtime_error(
@@ -1581,42 +1576,77 @@ Value elu(const Value& value) {
   throw std::runtime_error("Unexpected type for alpha in elu");
 }
 
-Value expand_dims(const Value& value) {
-  IVLOG(1, "expand_dims");
-
-  // Read arguments
+Value explicit_padding(const Value& value) {
+  IVLOG(1, "explicit_padding");
   auto args = value.as_tuple();
-  if (args.size() != 2) {
-    throw std::runtime_error(llvm::formatv("PlaidML expand_dims op expects 2 arguments (received {0})", args.size()));
+  if (args.size() < 5) {
+    throw std::runtime_error("explicit_padding expects 5 arguments");
   }
-  auto I = args[0].as_tensor();
-  auto raw_axis = args[1].as_int();
 
-  // Initialize useful values
-  auto ndims = I.rank();
-  // Axis is relative to _output_ tensor, which has one more dim than I
-  size_t axis = normalize_axis(raw_axis, ndims + 1, "expand_dims");
-  std::vector<TensorDim> I_dims(ndims);
-  std::vector<TensorIndex> I_idxs;
+  auto I = args[0].as_tensor();
+  auto lo_pads = args[1].as_int_tuple();
+  auto hi_pads = args[2].as_int_tuple();
+  auto mode = validate<PadMode>(args[3].as_int());
+
+  // validate inputs
+
+  if (lo_pads.size() != I.rank()) {
+    IVLOG(2, lo_pads.size())
+    IVLOG(2, I.rank())
+    IVLOG(2, lo_pads[0])
+    throw std::runtime_error(
+        llvm::formatv("Inconsistent shapes in explicit_padding op (received an input tensor with {0} dims, "
+                      "but received lower padding for {1} dims.)",
+                      I.rank(), lo_pads.size()));
+  }
+  if (hi_pads.size() != I.rank()) {
+    throw std::runtime_error(
+        llvm::formatv("Inconsistent shapes in explicit_padding op (received an input tensor with {0} dims, "
+                      "but received higher padding for {1} dims.)",
+                      I.rank(), hi_pads.size()));
+  }
+
+  std::vector<TensorDim> I_dims;
   std::vector<TensorDim> O_dims;
+  std::vector<TensorIndex> I_idxs;
   std::vector<TensorIndex> O_idxs;
+
+  // Assign dimensions & indices
+  std::vector<TensorDim> X(I.rank());
+  std::vector<TensorIndex> x;
+  for (size_t i = 0; i < I.rank(); ++i) {
+    x.emplace_back(llvm::formatv("x{0}", i));
+  }
+
+  for (size_t i = 0; i < I.rank(); ++i) {
+    I_dims.push_back(X[i]);
+    I_idxs.push_back(x[i]);
+  }
   I.bind_dims(I_dims);
-  for (size_t i = 0; i < ndims; ++i) {
-    I_idxs.emplace_back(llvm::formatv("n{0}", i));
-    if (i == axis) {
-      O_dims.emplace_back(1);
-      O_idxs.emplace_back("a");
-    }
-    O_dims.push_back(I_dims[i]);
-    O_idxs.push_back(I_idxs[i]);
+
+  for (size_t i = 0; i < I.rank(); ++i) {
+    O_dims.push_back(X[i] + lo_pads[i] + hi_pads[i]);
+    O_idxs.push_back(x[i] + lo_pads[i]);
   }
-  if (axis == ndims) {
-    // This one case won't be caught in the main loop, so handle specially
-    O_dims.emplace_back(1);
-    O_idxs.emplace_back("a");
+
+  Tensor O;
+
+  switch (mode) {
+    case PadMode::CONSTANT: {
+      IVLOG(2, "Constant padding requested");
+
+      auto padval = args[4].as_tensor();
+      O = Contraction(O_dims, O_idxs).assign(I(I_idxs)).init(padval);
+    } break;
+    case PadMode::EDGE:
+    case PadMode::SYMMETRIC:
+    case PadMode::REFLECT: {
+      throw std::runtime_error(llvm::formatv("Unimplemented padding mode: {0}", to_string(mode)));
+    } break;
+    default:
+      throw std::runtime_error(llvm::formatv("Unrecognized padding mode: {0}", to_string(mode)));
   }
-  auto O = TensorOutput(O_dims);
-  O(O_idxs) = I(I_idxs);
+
   return Value{O};
 }
 
@@ -1657,8 +1687,7 @@ Value flip(const Value& value) {
   for (const auto& axis : axes) {
     O_idxs[axis] = dims[axis] - 1 - I_idxs[axis];
   }
-  auto O = TensorOutput(dims);
-  O(O_idxs) = I(I_idxs);
+  Tensor O = Contraction(dims, O_idxs).assign(I(I_idxs));
   return Value{O};
 }
 
@@ -1675,8 +1704,8 @@ Value hard_sigmoid(const Value& value) {
   }
   auto hi_cusp = 1. / (2. * slope);
   auto lo_cusp = -hi_cusp;
-  auto lo = Tensor(0.);
-  auto hi = Tensor(1.);
+  auto lo = cast(Tensor(0.), I.dtype());
+  auto hi = cast(Tensor(1.), I.dtype());
   auto O = select(I < lo_cusp, lo, select(I > hi_cusp, hi, slope * I + 0.5));
   return Value{O};
 }
@@ -1702,7 +1731,7 @@ Value image_resize(const Value& value) {
 
   // The total number of spatial dimensions and how many non-spatial dimensions are before & after the spatial dims
   size_t rank;  // an error if this isn't 2
-  size_t pre_axes;
+  int64_t pre_axes;
   auto I = raw_I.as_tensor();
   auto ndims = I.rank();
   switch (layout) {
@@ -1738,36 +1767,18 @@ Value image_resize(const Value& value) {
       // Could likely eke out a bit more perf by precomputing K instead of doing it at runtime on device.
 
       // Setup K
-      auto HCoeff = Tensor{1. / factors[0]};
-      auto WCoeff = Tensor{1. / factors[1]};
+      Tensor HCoeff = cast(Tensor{1.0 / factors[0]}, DType::FLOAT32);
+      Tensor WCoeff = cast(Tensor{1.0 / factors[1]}, DType::FLOAT32);
       TensorDim HFactor{factors[0]};
       TensorDim WFactor{factors[1]};
-      auto HCoeffVec = TensorOutput(HFactor);
-      auto WCoeffVec = TensorOutput(WFactor);
-      HCoeffVec(TensorIndex{"y"}) = HCoeff();
-      WCoeffVec(TensorIndex{"x"}) = WCoeff();
-      auto HK_dim = 2 * HFactor - 1;
-      auto WK_dim = 2 * WFactor - 1;
-      auto HK = TensorOutput(HK_dim);
-      auto WK = TensorOutput(WK_dim);
-      {
-        // Scoped for safe index name reuse
-        TensorIndex j{"j"};
-        TensorIndex i{"i"};
-        TensorIndex y{"y"};
-        TensorIndex x{"x"};
-        HK(y) += HCoeffVec(j + y - HFactor + 1);
-        HK.add_constraint(j < HFactor);
-        WK(x) += WCoeffVec(i + x - WFactor + 1);
-        WK.add_constraint(i < WFactor);
-      }
-      auto K = TensorOutput(HK_dim, WK_dim);
-      {
-        // Scoped for safe index name reuse
-        TensorIndex x{"x"};
-        TensorIndex y{"y"};
-        K(y, x) = HK(y) * WK(x);
-      }
+      TensorIndex j{"j"}, i{"i"}, y{"y"}, x{"x"};
+      Tensor HCoeffVec = Contraction({HFactor}, {y}).assign(HCoeff());
+      Tensor WCoeffVec = Contraction({WFactor}, {x}).assign(WCoeff());
+      TensorDim HK_dim = 2 * HFactor - 1;
+      TensorDim WK_dim = 2 * WFactor - 1;
+      Tensor HK = Contraction({HK_dim}, {y}).sum(HCoeffVec(j + y - HFactor + 1)).add_constraint(j < HFactor);
+      Tensor WK = Contraction({WK_dim}, {x}).sum(WCoeffVec(i + x - WFactor + 1)).add_constraint(i < WFactor);
+      Tensor K = Contraction({HK_dim, WK_dim}, {y, x}).assign(HK(y) * WK(x));
 
       // Resize
       std::vector<TensorDim> I_dims(ndims);
@@ -1775,25 +1786,19 @@ Value image_resize(const Value& value) {
       I.bind_dims(I_dims);
       std::vector<TensorDim> O_dims;
       std::vector<TensorIndex> O_idxs;
-      for (size_t ax = 0; ax < pre_axes; ++ax) {
+      for (int64_t ax = 0; ax < pre_axes; ++ax) {
         O_dims.push_back(I_dims[ax]);
         O_idxs.push_back(I_idxs[ax]);
       }
-      {
-        // Scoped for safe index name reuse
-        TensorIndex i{"i"};
-        TensorIndex j{"j"};
-        O_dims.push_back(HFactor * I_dims[pre_axes]);
-        O_dims.push_back(WFactor * I_dims[pre_axes + 1]);
-        O_idxs.push_back(HFactor * I_idxs[pre_axes] + j - HFactor + 1);
-        O_idxs.push_back(WFactor * I_idxs[pre_axes + 1] + i - WFactor + 1);
-        for (size_t ax = pre_axes + 2; ax < ndims; ++ax) {
-          O_dims.push_back(I_dims[ax]);
-          O_idxs.push_back(I_idxs[ax]);
-        }
-        O = TensorOutput(O_dims);
-        O(O_idxs) += I(I_idxs) * K(j, i);
+      O_dims.push_back(HFactor * I_dims[pre_axes]);
+      O_dims.push_back(WFactor * I_dims[pre_axes + 1]);
+      O_idxs.push_back(HFactor * I_idxs[pre_axes] + j - HFactor + 1);
+      O_idxs.push_back(WFactor * I_idxs[pre_axes + 1] + i - WFactor + 1);
+      for (size_t ax = pre_axes + 2; ax < ndims; ++ax) {
+        O_dims.push_back(I_dims[ax]);
+        O_idxs.push_back(I_idxs[ax]);
       }
+      O = Contraction(O_dims, O_idxs).sum(I(I_idxs) * K(j, i));
     } break;
     default:
       throw std::runtime_error("Unrecognized InterpolationMode in image_resize");
@@ -1819,9 +1824,7 @@ Value lrn(const Value& value) {
   I.bind_dims(dims);
 
   auto I_sqr = I * I;
-  auto local_sum_sqr = TensorOutput(dims);
-  local_sum_sqr(agg.dst_idxs) += I_sqr(agg.src_idxs);
-  local_sum_sqr.add_constraints(agg.constraints);
+  Tensor local_sum_sqr = Contraction(dims, agg.dst_idxs).sum(I_sqr(agg.src_idxs)).add_constraints(agg.constraints);
   return Value{I / edsl::pow(alpha * local_sum_sqr + epsilon, Tensor(beta))};
 }
 
@@ -1836,8 +1839,7 @@ Value max(const Value& value) {
   auto keepdims = args[2].as_bool();
   AggregationAxes agg(I.rank(), axes, keepdims);
   I.bind_dims(agg.src_dims);
-  auto O = TensorOutput(agg.dst_dims);
-  O(agg.dst_idxs) >= I(agg.src_idxs);
+  Tensor O = Contraction(agg.dst_dims, agg.dst_idxs).max(I(agg.src_idxs));
   return Value{O};
 }
 
@@ -1880,8 +1882,7 @@ Value mean(const Value& value) {
   AggregationAxes agg(I.rank(), axes, keepdims);
 
   I.bind_dims(agg.src_dims);
-  auto SO = TensorOutput(agg.dst_dims);
-  SO(agg.dst_idxs) += I(agg.src_idxs);
+  Tensor SO = Contraction(agg.dst_dims, agg.dst_idxs).sum(I(agg.src_idxs));
   auto denom = Tensor{1};
   for (const auto& axis : agg.axes) {
     denom = denom * agg.src_dims.at(axis);
@@ -1900,8 +1901,7 @@ Value min(const Value& value) {
   auto keepdims = args[2].as_bool();
   AggregationAxes agg(I.rank(), axes, keepdims);
   I.bind_dims(agg.src_dims);
-  auto O = TensorOutput(agg.dst_dims);
-  O(agg.dst_idxs) <= I(agg.src_idxs);
+  Tensor O = Contraction(agg.dst_dims, agg.dst_idxs).min(I(agg.src_idxs));
   return Value{O};
 }
 
@@ -1915,6 +1915,281 @@ Value minimum(const Value& value) {
   auto Y = args[1].as_tensor();
   auto O = select(X < Y, X, Y);
   return Value{O};
+}
+
+namespace {
+// NMS helper function
+
+Tensor compute_iou(Tensor Boxes, bool center_point_box) {
+  // Get intersection over union of boxes
+  // The shape of the result tensor is [num_batches, num_boxes, num_boxes]
+  // IOU[batch, box_1, box_2] is the IOU of box_1 and box_2 for the image batch.
+  Tensor Boxes_y1;
+  Tensor Boxes_x1;
+  Tensor Boxes_y2;
+  Tensor Boxes_x2;
+  TensorDim one(1);
+  // The memref is used for gather
+  Tensor Zero = edsl::cast(edsl::index({one}, 0), Boxes.dtype());
+  Tensor Zero_int = edsl::cast(Zero, DType::INT32);
+  if (center_point_box) {
+    // The box data is [x, y, width, height] in center mode.
+    Tensor Boxes_xcenter = edsl::gather(Boxes, Zero_int).axis(2);
+    Tensor Boxes_ycenter = edsl::gather(Boxes, Zero_int + 1).axis(2);
+    Tensor Boxes_width_half = edsl::gather(Boxes, Zero_int + 2).axis(2);
+    Boxes_width_half = Boxes_width_half / 2.0f;
+    Tensor Boxes_height_half = edsl::gather(Boxes, Zero_int + 3).axis(2);
+    Boxes_height_half = Boxes_height_half / 2.0f;
+    Boxes_x1 = Boxes_xcenter - Boxes_width_half;
+    Boxes_x2 = Boxes_xcenter + Boxes_width_half;
+    Boxes_y1 = Boxes_ycenter - Boxes_height_half;
+    Boxes_y2 = Boxes_ycenter + Boxes_height_half;
+  } else {
+    // The box data is [y1, x1, y2, x2] in corner mode
+    Boxes_y1 = edsl::gather(Boxes, Zero_int).axis(2);
+    Boxes_x1 = edsl::gather(Boxes, Zero_int + 1).axis(2);
+    Boxes_y2 = edsl::gather(Boxes, Zero_int + 2).axis(2);
+    Boxes_x2 = edsl::gather(Boxes, Zero_int + 3).axis(2);
+  }
+
+  // Boxes dims is [num_batches, num_boxes, 4]
+  std::vector<TensorDim> dims(Boxes.rank());
+  Boxes.bind_dims(dims);
+  TensorDim num_batches = dims[0];
+  TensorDim num_boxes = dims[1];
+
+  // Create IOU of each box pair.
+  Boxes_y1 = edsl::reshape(Boxes_y1, {num_batches, num_boxes});
+  Boxes_x1 = edsl::reshape(Boxes_x1, {num_batches, num_boxes});
+  Boxes_y2 = edsl::reshape(Boxes_y2, {num_batches, num_boxes});
+  Boxes_x2 = edsl::reshape(Boxes_x2, {num_batches, num_boxes});
+
+  // Calc box local area
+  Tensor IOU_areai = (Boxes_y2 - Boxes_y1) * (Boxes_x2 - Boxes_x1);
+  // Calc intersecion area of box pair
+  Tensor IOU_intersection_ymin = op::maximum(edsl::reshape(Boxes_y1, {num_batches, num_boxes, one}),
+                                             edsl::reshape(Boxes_y1, {num_batches, one, num_boxes}));
+  Tensor IOU_intersection_xmin = op::maximum(edsl::reshape(Boxes_x1, {num_batches, num_boxes, one}),
+                                             edsl::reshape(Boxes_x1, {num_batches, one, num_boxes}));
+  Tensor IOU_intersection_ymax = op::minimum(edsl::reshape(Boxes_y2, {num_batches, num_boxes, one}),
+                                             edsl::reshape(Boxes_y2, {num_batches, one, num_boxes}));
+  Tensor IOU_intersection_xmax = op::minimum(edsl::reshape(Boxes_x2, {num_batches, num_boxes, one}),
+                                             edsl::reshape(Boxes_x2, {num_batches, one, num_boxes}));
+  Tensor IOU_intersection_area_ygap = IOU_intersection_ymax - IOU_intersection_ymin;
+  Tensor IOU_intersection_area_xgap = IOU_intersection_xmax - IOU_intersection_xmin;
+  Tensor IOU_intersection_area = select(IOU_intersection_area_ygap > 0.0f, IOU_intersection_area_ygap, Zero) *
+                                 select(IOU_intersection_area_xgap > 0.0f, IOU_intersection_area_xgap, Zero);
+  // Compute IOU of box pair
+  Tensor IOU_denominator = op::unsqueeze(IOU_areai, {-1}) + op::unsqueeze(IOU_areai, {-2}) - IOU_intersection_area;
+  edsl::Tensor IOU_denominator_reciprocal = edsl::select(IOU_denominator <= 0.0f, Zero, 1.0f / IOU_denominator);
+  edsl::Tensor IOU = IOU_intersection_area * IOU_denominator_reciprocal;
+  return IOU;
+}
+
+}  // namespace
+
+// Non-maximum suppression
+Value nms(const Value& value) {
+  IVLOG(1, "nms");
+  auto args = value.as_tuple();
+  if (args.size() != 9) {
+    throw std::runtime_error("nms expects 9 arguments");
+  }
+  auto Boxes = args[0].as_tensor();
+  auto Scores = args[1].as_tensor();
+  auto IOU_threshold = args[2].as_tensor();
+  auto Score_threshold = args[3].as_tensor();
+  int64_t max_output_boxes_per_class = args[4].as_int();
+  float soft_nms_sigma = args[5].as_float();
+  auto center_point_box = args[6].as_bool();
+  auto sort_result_descending = args[7].as_bool();
+  auto box_output_type = validate<DType>(args[8].as_int());
+  auto box_input_type = Boxes.dtype();
+  auto thres_type = IOU_threshold.dtype();
+
+  std::vector<int64_t> scores_shape = Scores.compute_shape().sizes();
+  int64_t boxes_count = scores_shape[2];
+
+  std::vector<TensorDim> Scores_dims(Scores.rank());
+  Scores.bind_dims(Scores_dims);
+  TensorDim num_batches = Scores_dims[0];
+  TensorDim num_classes = Scores_dims[1];
+  TensorDim num_boxes = Scores_dims[2];
+  TensorDim one(1);
+
+  // Used for gather and select
+  Tensor Zero = edsl::cast(edsl::index({one}, 0), box_input_type);
+  Tensor Zero_int = edsl::cast(Zero, DType::INT32);
+  Tensor One = Zero + 1;
+  Tensor One_int = Zero_int + 1;
+  Tensor NEG1 = -One;
+  Tensor Neg1_o = edsl::cast(NEG1, box_output_type);
+
+  std::vector<Tensor> boxes;
+  std::vector<Tensor> scores;
+  Tensor Valid_outputs = Zero;
+  Tensor IOU = compute_iou(Boxes, center_point_box);
+
+  float weight = 0.0f;
+  if (soft_nms_sigma != 0) {
+    weight = -0.5 / soft_nms_sigma;
+  }
+
+  TensorShape Node_shape(DType::FLOAT32, {1, 1, 2});
+  std::vector<float> invalid_node_index = {-1, -1};
+  Buffer buffer_invalid_node(Node_shape);
+  buffer_invalid_node.copy_from(invalid_node_index.data());
+  auto Invalid_node = edsl::cast(edsl::Constant(buffer_invalid_node, "Invalid_node"), box_output_type);
+
+  int64_t num_boxes_per_class = boxes_count;
+  if (max_output_boxes_per_class != 0) {
+    num_boxes_per_class = std::min(boxes_count, max_output_boxes_per_class);
+  }
+
+  auto Index_b = edsl::index({num_batches, num_classes, one}, 0);
+  auto Index_c = edsl::index({num_batches, num_classes, one}, 1);
+  auto Index_bc = edsl::cast(op::concatenate({Index_b, Index_c}, 2), box_output_type);
+
+  Tensor Score_threshold_i = edsl::cast(Score_threshold, box_input_type);
+  Tensor IOU_threshold_i = edsl::cast(IOU_threshold, box_input_type);
+  Tensor New_scores = edsl::select(Scores > Score_threshold_i, Scores, Zero);
+
+  std::vector<TensorDim> Scatter_dims = {num_batches, num_classes, one};
+  std::vector<TensorIndex> Scatter_idxs(3);
+  Tensor Zero_scatter = edsl::Contraction(Scatter_dims, Scatter_idxs).assign(Zero(0));
+  // Select box
+  for (int64_t k = 0; k < num_boxes_per_class; k++) {
+    // Select the box with largest score
+    Tensor Candidate_index = edsl::gather(edsl::argsort(New_scores, 2, edsl::SortDirection::DESC), Zero_int).axis(2);
+    Tensor SCORE = edsl::reshape(op::max(New_scores, edsl::Value(2)), {num_batches, num_classes, one});
+    Tensor Current_node = edsl::select(SCORE > 0.0f, Index_bc, Invalid_node);
+
+    // Update count of selected box
+    Tensor Valid = op::sum(edsl::select(SCORE != 0.0f, One, Zero));
+    Valid_outputs = Valid_outputs + Valid;
+
+    // Add selected box to scores
+    scores.push_back(edsl::cast(Current_node, thres_type));
+    SCORE = edsl::select(SCORE > 0.0f, SCORE, NEG1);
+    scores.push_back(edsl::cast(SCORE, thres_type));
+
+    // Set scores of current box and boxes which have IOU larger than threshold to zero
+    // The scores can be same, use scatter to update current node
+    Tensor New_scores_update =
+        edsl::scatter(New_scores, Candidate_index, Zero_scatter).axis(2).mode(edsl::ScatterMode::UPDATE_ELT);
+    New_scores = edsl::reshape(New_scores_update, {num_batches, num_classes, num_boxes});
+
+    Tensor IOU_candidate = edsl::gather(IOU, Candidate_index).mode(edsl::GatherMode::ND).batchDims(1);
+    // use >= to include suppose_hard_suppresion case
+    New_scores = edsl::select(IOU_candidate >= IOU_threshold_i, Zero, New_scores);
+
+    // Add selected box to boxes
+    Tensor Box_index = edsl::select(SCORE > 0.0f, edsl::cast(Candidate_index, box_output_type), Neg1_o);
+    boxes.push_back(Current_node);
+    boxes.push_back(edsl::reshape(Box_index, {num_batches, num_classes, one}));
+
+    // update scores for current class
+    Tensor Scale = edsl::exp(IOU_candidate * IOU_candidate * weight);
+    New_scores = New_scores * Scale;
+    New_scores = edsl::select(New_scores > Score_threshold_i, New_scores, Zero);
+  }
+
+  Valid_outputs = edsl::cast(Valid_outputs, box_output_type);
+
+  TensorDim num_results = num_batches * num_classes * num_boxes_per_class;
+  // concatenate scores
+  Tensor Scores_result = edsl::reshape(op::concatenate(scores, 2), {num_results, edsl::TensorDim(3)});
+  // concatenate boxes
+  Tensor Boxes_result = edsl::reshape(op::concatenate(boxes, 2), {num_results, edsl::TensorDim(3)});
+
+  if (sort_result_descending) {
+    // Sort across batch
+    Tensor Scores_slice = edsl::gather(Scores_result, One_int + 1).axis(1);
+    Scores_slice = edsl::reshape(Scores_slice, {num_results});
+    Tensor Indexes = edsl::argsort(Scores_slice, 0, edsl::SortDirection::DESC);
+
+    Scores_result = edsl::gather(Scores_result, Indexes).axis(0);
+    Boxes_result = edsl::gather(Boxes_result, Indexes).axis(0);
+  } else {
+    // Put all -1 to the end, we now just have -1 at end of each class
+    TensorDim dst = num_results * 3;
+    auto Index = edsl::index({dst}, 0);
+    auto Max = edsl::cast(Tensor{dst}, DType::INT32);
+    Scores_result = edsl::reshape(Scores_result, {dst});
+    Boxes_result = edsl::reshape(Boxes_result, {dst});
+    Tensor Neg1_thres = edsl::cast(Tensor(-1), thres_type);
+    auto Index2 = edsl::select(Scores_result != Neg1_thres, Index, Max);
+    auto Index3 = edsl::argsort(edsl::cast(Index2, DType::FLOAT32), 0);
+    Scores_result = edsl::gather(Scores_result, Index3).axis(0);
+    Boxes_result = edsl::gather(Boxes_result, Index3).axis(0);
+    Scores_result = edsl::reshape(Scores_result, {num_results, TensorDim(3)});
+    Boxes_result = edsl::reshape(Boxes_result, {num_results, TensorDim(3)});
+  }
+
+  return edsl::make_tuple(Boxes_result, Scores_result, Valid_outputs);
+}
+
+Value mvn(const Value& value) {
+  IVLOG(1, "mvn");
+  auto args = value.as_tuple();
+  if (args.size() != 6) {
+    throw std::runtime_error("mvn expects 6 arguments");
+  }
+  auto I_raw = args[0];
+  auto I = args[0].as_tensor();
+  auto axes = args[1];
+  auto normalize_variance = args[2].as_bool();
+  auto epsilon = args[3].as_float();
+  auto across_channels = args[4].as_bool();
+  auto layout = args[5].as_str();
+  if (axes.is_none()) {
+    if (layout.empty()) {
+      throw std::runtime_error("Either axes or layout must be specified for MVN");
+    }
+    std::vector<int64_t> raw_axes;
+    for (size_t i = 0; i < layout.size(); i++) {
+      auto dim = layout[i];
+      if (dim == 'N') continue;
+      if (dim == 'C' && !across_channels) continue;
+      raw_axes.push_back(i);
+    }
+    axes = edsl::make_tuple(raw_axes);
+  }
+  auto R = I - mean(edsl::make_tuple(I_raw, axes, /*keepdims=*/true)).as_tensor();
+
+  if (normalize_variance) {
+    auto stdev = edsl::sqrt(variance(edsl::make_tuple(I_raw, axes, /*keepdims=*/true)).as_tensor());
+    R = R / maximum(edsl::make_tuple(stdev, edsl::cast(Tensor(epsilon), I.dtype()))).as_tensor();
+  }
+
+  return Value{R};
+}
+
+Value l2norm(const Value& value) {
+  IVLOG(1, "l2norm");
+  auto args = value.as_tuple();
+  if (args.size() != 4) {
+    throw std::runtime_error("norm expects 4 arguments");
+  }
+
+  auto I = args[0].as_tensor();
+  auto axes = args[1].as_int_tuple();
+  auto epsilon = args[2].as_float();
+  auto eps_mode = validate<EpsMode>(args[3].as_int());
+
+  auto X = op::sum((I * I), edsl::make_tuple(axes), 1);
+  switch (eps_mode) {
+    case EpsMode::ADD:
+      X = X + epsilon;
+      break;
+    case EpsMode::MAX:
+      X = op::maximum(X, edsl::Tensor{epsilon});
+      break;
+    default:
+      throw std::runtime_error("Unrecognized eps_mode in l2norm op");
+  }
+  auto N = edsl::sqrt(X);
+  return Value(N);
 }
 
 Value prod(const Value& value) {
@@ -1943,8 +2218,7 @@ Value prod(const Value& value) {
   AggregationAxes agg(I.rank(), raw_axes, keepdims);
 
   I.bind_dims(agg.src_dims);
-  auto O = TensorOutput(agg.dst_dims);
-  O(agg.dst_idxs) *= I(agg.src_idxs);
+  Tensor O = Contraction(agg.dst_dims, agg.dst_idxs).product(I(agg.src_idxs));
   return Value{O};
 }
 
@@ -1988,7 +2262,7 @@ Value pool(const Value& value) {
   auto I_channel_dims = I.rank() - spatial_rank - 1;
 
   // Verify inputs are consistent
-  if (manual_padding.size() && autopad_mode != AutoPadMode::NONE) {
+  if (manual_padding.size() && autopad_mode != AutoPadMode::EXPLICIT) {
     throw std::runtime_error("Autopadding and manual padding both requested for single pool operation");
   }
   if (strides.size() != spatial_rank) {
@@ -2054,22 +2328,18 @@ Value pool(const Value& value) {
     O_dims.push_back(C);
     O_idxs.push_back(c);
   }
-  auto O = TensorOutput(O_dims);
+  Contraction O = Contraction(O_dims, O_idxs).add_constraints(constraints);
   if (pool_mode == PoolMode::MAX) {
-    O(O_idxs) >= I(I_idxs);
-    O.add_constraints(constraints);
+    O.max(I(I_idxs));
     return Value{O};
   } else if (pool_mode == PoolMode::MIN) {
-    O(O_idxs) <= I(I_idxs);
-    O.add_constraints(constraints);
+    O.min(I(I_idxs));
     return Value{O};
   } else if (pool_mode == PoolMode::SUM) {
-    O(O_idxs) += I(I_idxs);
-    O.add_constraints(constraints);
+    O.sum(I(I_idxs));
     return Value{O};
   } else if (pool_mode == PoolMode::AVG) {
-    O(O_idxs) += I(I_idxs);
-    O.add_constraints(constraints);
+    O.sum(I(I_idxs));
     if (include_padding_in_avg) {
       int64_t total_pool_size = 1;
       for (const auto& sz : pool_size) {
@@ -2077,16 +2347,14 @@ Value pool(const Value& value) {
       }
       return Value{O / total_pool_size};
     } else {
-      auto One = Tensor{1};
-      auto Ones = TensorOutput(I_dims);
-      auto Count = TensorOutput(O_dims);
+      auto One = cast(Tensor{1}, I.dtype());
       // Note: O_idxs is used in both cases b/c both need indexes of the form
       // x0, x1, ... However, they do not represent the same index values (and
-      // notably do not interate over the same size of dimensions as I_dims !=
+      // notably do not iterate over the same size of dimensions as I_dims !=
       // O_dims)
-      Ones(O_idxs) = One(std::vector<TensorIndex>());
-      Count(O_idxs) += Ones(I_idxs);
-      Count.add_constraints(constraints);
+      Tensor Ones = Contraction(I_dims, O_idxs).assign(One());
+      Tensor Count = Contraction(O_dims, O_idxs).sum(Ones(I_idxs)).add_constraints(constraints);
+      // Ones(O_idxs) = One(std::vector<TensorIndex>());
       return Value{O / Count};
     }
   } else {
@@ -2110,9 +2378,9 @@ Value relu(const Value& value) {
   } else {
     A = alpha.as_tensor();
   }
-  auto O = select(I < threshold, A * (I - threshold), I);
+  auto O = select(I < threshold, edsl::cast(A * (I - threshold), I.dtype()), I);
   if (!max_value.is_none()) {
-    auto M = max_value.as_tensor();
+    auto M = cast(max_value.as_tensor(), I.dtype());
     O = select(O < M, O, M);
   }
   return Value{O};
@@ -2122,18 +2390,22 @@ Value reorg_yolo(const Value& value) {
   IVLOG(1, "reorg_yolo");
 
   auto args = value.as_tuple();
-  if (args.size() != 3) {
-    throw std::runtime_error(llvm::formatv("PlaidML reorg_yolo op expects 3 arguments (received {0})", args.size()));
+  if (args.size() != 4) {
+    throw std::runtime_error(llvm::formatv("PlaidML reorg_yolo op expects 4 arguments (received {0})", args.size()));
   }
   auto I = args[0].as_tensor();
   auto stride = args[1].as_int();
   auto decrease = args[2].as_bool();
+  auto layout = args[3].as_str();
 
   auto ndims = I.rank();
   if (ndims != 4) {
     throw std::runtime_error(
         llvm::formatv("PlaidML reorg_yolo op expects I to have 4 dimensions (received {0})", ndims));
   }
+
+  TensorLens lens(layout, "NCHW");
+  I = I.use(lens);
 
   TensorDim N, C, H, W;
   I.bind_dims(N, C, H, W);
@@ -2145,17 +2417,23 @@ Value reorg_yolo(const Value& value) {
   Tensor O;
   if (decrease) {
     auto C_out = C / (stride * stride);
-    O = TensorOutput(N, C_out, H * stride, W * stride);
     auto c = k + ((x + y * stride) * C_out);
-    O(b, k, h, w) = I(b, c, j, i);
+    O = Contraction(lens)
+            .outShape(N, C_out, H * stride, W * stride)
+            .outAccess(b, k, h, w)
+            .assign(I(b, c, j, i))
+            .add_constraint(y < stride)
+            .add_constraint(x < stride);
   } else {
     auto C_out = C * (stride * stride);
-    O = TensorOutput(N, C_out, H / stride, W / stride);
     auto c = k + ((x + y * stride) * C);
-    O(b, c, j, i) = I(b, k, h, w);
+    O = Contraction(lens)
+            .outShape(N, C_out, H / stride, W / stride)
+            .outAccess(b, c, j, i)
+            .assign(I(b, k, h, w))
+            .add_constraint(y < stride)
+            .add_constraint(x < stride);
   }
-  O.add_constraint(y < stride);
-  O.add_constraint(x < stride);
 
   return Value{O};
 }
@@ -2172,8 +2450,16 @@ Value repeat(const Value& value) {
     throw std::runtime_error(llvm::formatv("PlaidML repeat op expects 3 arguments (received {0})", args.size()));
   }
   auto I = args[0].as_tensor();
-  auto repeats = args[1].as_int();
   auto raw_axis = args[2].as_int();
+
+  TensorDim repeats;
+  if (args[1].is_int()) {
+    repeats = TensorDim(args[1].as_int());
+  } else if (args[1].is_dim()) {
+    repeats = args[1].as_dim();
+  } else {
+    throw std::runtime_error("Repeat only accepts int or TensorDim for repeats parameter");
+  }
 
   // Set up useful variables
   auto ndims = I.rank();
@@ -2187,9 +2473,7 @@ Value repeat(const Value& value) {
   std::vector<TensorIndex> O_idxs(I_idxs);
   TensorIndex inner;
   O_idxs[axis] = repeats * I_idxs[axis] + inner;
-  auto O = TensorOutput(O_dims);
-  O(O_idxs) = I(I_idxs);
-  O.add_constraint(inner < repeats);
+  Tensor O = Contraction(O_dims, O_idxs).assign(I(I_idxs)).add_constraint(inner < repeats);
   return Value{O};
 }
 
@@ -2205,7 +2489,8 @@ Value reshape(const Value& value) {
   std::vector<TensorDim> I_dims(I.rank());
   I.bind_dims(I_dims);
 
-  TensorDim* fill_dim = nullptr;
+  size_t fill_dim = 0;
+  bool fill_dim_set = false;
 
   auto target_shape = args[1].as_tuple();
   for (size_t i = 0; i < target_shape.size(); i++) {
@@ -2222,11 +2507,12 @@ Value reshape(const Value& value) {
           break;
 
         case (AUTO_DIM_FILL):
-          if (fill_dim) {
+          if (fill_dim_set) {
             throw std::runtime_error("at most one dimension's size may be inferred");
           }
+          fill_dim_set = true;
           O_dims.emplace_back(1);
-          fill_dim = &O_dims.back();
+          fill_dim = i;
           break;
         default:
           O_dims.emplace_back(dim);
@@ -2244,7 +2530,7 @@ Value reshape(const Value& value) {
     }
   }
 
-  if (fill_dim) {
+  if (fill_dim_set) {
     TensorDim num(1);
     for (size_t i = 0; i < I_dims.size(); i++) {
       num = I_dims[i] * num;
@@ -2253,7 +2539,7 @@ Value reshape(const Value& value) {
     for (size_t i = 0; i < O_dims.size(); i++) {
       den = O_dims[i] * den;
     }
-    *fill_dim = TensorDim(num / den);
+    O_dims[fill_dim] = TensorDim(num / den);
   }
   return Value{edsl::reshape(I, O_dims)};
 }
@@ -2264,19 +2550,16 @@ Value scale_gradient(const Value& value) {
   if (args.size() != 2) {
     throw std::runtime_error("scale_gradient expects 2 arguments");
   }
-  auto I = ident(args[0].as_tensor());  // Copy for safe gradient override
+  auto I = args[0].as_tensor();
   Tensor scale;
   if (args[1].is_float()) {
     // Cast scale to Tensor if it's given as a float
     scale = Tensor{args[1].as_float()};
   } else {
-    scale = ident(args[1].as_tensor());  // Copy for safe gradient override
+    scale = args[1].as_tensor();
   }
   auto O = I;  // Forward pass is NoOp
-  TensorDeriv deriv = [](const Tensor& Y, const Tensor& DY, const std::vector<Tensor>& X) {
-    return std::vector<Tensor>{X[1] * DY, Tensor{0.0}};
-  };
-  return Value{OverrideGrads(deriv, std::vector<Tensor>{I, scale}, O)};
+  return Value{O};
 }
 
 Value sigmoid(const Value& value) {
@@ -2285,12 +2568,9 @@ Value sigmoid(const Value& value) {
   if (args.size() != 1) {
     throw std::runtime_error("sigmoid expects 1 argument");
   }
-  auto I = ident(args[0].as_tensor());  // Copy for safe gradient override
+  auto I = args[0].as_tensor();
   auto O = 1.0 / (1.0 + exp(-I));
-  TensorDeriv deriv = [](const Tensor& Y, const Tensor& DY, const std::vector<Tensor>& X) {  //
-    return std::vector<Tensor>{Y * (1.0 - Y) * DY};
-  };
-  return Value{OverrideGrads(deriv, std::vector<Tensor>{I}, O)};
+  return Value{O};
 }
 
 Value slice(const Value& value) {
@@ -2421,8 +2701,7 @@ Value slice(const Value& value) {
   }
 
   // Perform the slice
-  auto O = TensorOutput(O_dims);
-  O(O_idxs) = I(I_idxs);
+  Tensor O = Contraction(O_dims, O_idxs).assign(I(I_idxs));
   return Value{O};
 }
 
@@ -2432,19 +2711,18 @@ Value softmax(const Value& value) {
   if (args.size() != 2) {
     throw std::runtime_error("softmax expects 2 arguments");
   }
-  auto I_original = args[0].as_tensor();
+  auto I = args[0].as_tensor();
   auto raw_axis = args[1].as_int();
-  auto I = ident(I_original);  // Copy for safe gradient override
 
-  auto ndims = I.rank();
-  auto axis = normalize_axis(raw_axis, ndims, "softmax");
+  int64_t ndims = I.rank();
+  int64_t axis = normalize_axis(raw_axis, ndims, "softmax");
 
   // Ensure the axis is the last dimension, to make the derivative code happy
   bool transposed = false;
   std::vector<Value> pattern(ndims);  // Will be reused at the end to return to original order
   if (axis != ndims - 1) {
     transposed = true;
-    for (size_t i = 0; i < ndims; ++i) {
+    for (int64_t i = 0; i < ndims; ++i) {
       if (i == axis) {
         pattern[i] = Value{ndims - 1};
       } else if (i == ndims - 1) {
@@ -2465,36 +2743,44 @@ Value softmax(const Value& value) {
   std::vector<TensorIndex> R_idxs = I_idxs;
   R_dims[axis] = TensorDim{1};
   R_idxs[axis] = TensorIndex{0};
-  auto M = TensorOutput(R_dims);
-  M(R_idxs) >= I(I_idxs);
+  Tensor M = Contraction(R_dims, R_idxs).max(I(I_idxs));
   auto E = exp(I - M);
-  auto N = TensorOutput(R_dims);
-  N(R_idxs) += E(I_idxs);
+  Tensor N = Contraction(R_dims, R_idxs).sum(E(I_idxs));
   auto O = E / N;
-  TensorDeriv deriv = [](const Tensor& Y, const Tensor& DY, const std::vector<Tensor>& X) {  //
-    auto I = X[0];
-    auto ndims = I.rank();
-    std::vector<TensorDim> I_dims(ndims);
-    std::vector<TensorIndex> I_idxs(ndims);
-    I.bind_dims(I_dims);
-    std::vector<TensorDim> R_dims = I_dims;
-    std::vector<TensorIndex> R_idxs = I_idxs;
-    R_dims.back() = TensorDim{1};    // Softmax along last axis
-    R_idxs.back() = TensorIndex{0};  // Softmax along last axis
-
-    auto YdY = Y * DY;
-    auto T = TensorOutput(R_dims);
-    T(R_idxs) += YdY(I_idxs);
-    auto TB = TensorOutput(I_dims);
-    TB(I_idxs) += T(R_idxs);
-    return std::vector<Tensor>{YdY - TB * Y};
-  };
-  auto Overridden = OverrideGrads(deriv, std::vector<Tensor>{I}, O);
   // If we reordered, return to original order
   if (transposed) {
-    return transpose(make_tuple(Value{Overridden}, Value{pattern}));
+    return transpose(make_tuple(Value{O}, Value{pattern}));
   }
-  return Value{Overridden};
+  return Value{O};
+}
+
+Value sort(const Value& value) {
+  IVLOG(1, "sort");
+  auto args = value.as_tuple();
+  if (args.size() != 3) {
+    throw std::runtime_error("sort expects 3 arguments");
+  }
+  auto I = args[0].as_tensor();
+  auto raw_axis = args[1].as_int();
+  auto direction = validate<SortDirection>(args[2].as_int());
+
+  int64_t ndims = I.rank();
+  int64_t axis = normalize_axis(raw_axis, ndims, "sort");
+
+  std::vector<TensorDim> I_dims(ndims);
+  I.bind_dims(I_dims);
+
+  std::vector<Tensor> IX_dims;
+  for (int64_t i = 0; i < ndims; ++i) {
+    if (i == axis) {
+      IX_dims.push_back(op::unsqueeze(argsort(I, axis, direction), {ndims}));
+    } else {
+      IX_dims.push_back(op::unsqueeze(edsl::index(I_dims, i), {ndims}));
+    }
+  }
+  auto IX = op::concatenate(IX_dims, -1);
+  Tensor O = edsl::gather(I, IX).mode(GatherMode::ND);
+  return Value{O};
 }
 
 Value spatial_padding(const Value& value) {
@@ -2515,21 +2801,21 @@ Value spatial_padding(const Value& value) {
   if (spatial_rank < 1) {
     throw std::runtime_error(llvm::formatv(
         "Insufficient spatial rank in spatial_padding op (At least 1 spatial dim required; received {0} spatial "
-        "dims based on an input tensor with {1} dims with a specified layout with {2} nonspatial dims.",
+        "dims based on an input tensor with {1} dims with a specified layout with {2} nonspatial dims.)",
         spatial_rank, I.rank(), nonspatial_ndims));
   }
   if (lo_pads.size() != spatial_rank) {
     throw std::runtime_error(
         llvm::formatv("Inconsistent spatial rank in spatial_padding op (received {0} spatial dim(s) based on an "
                       "input tensor with {1} dims with a specified layout with {2} nonspatial dims, but received "
-                      "lower padding for {3} spatial dims.",
+                      "lower padding for {3} spatial dims.)",
                       spatial_rank, I.rank(), nonspatial_ndims, lo_pads.size()));
   }
   if (hi_pads.size() != spatial_rank) {
     throw std::runtime_error(
         llvm::formatv("Inconsistent spatial rank in spatial_padding op (received {0} spatial dim(s) based on an "
                       "input tensor with {1} dims with a specified layout with {2} nonspatial dims, but received "
-                      "upper padding for {3} spatial dims.",
+                      "upper padding for {3} spatial dims.)",
                       spatial_rank, I.rank(), nonspatial_ndims, hi_pads.size()));
   }
 
@@ -2540,7 +2826,7 @@ Value spatial_padding(const Value& value) {
 
   switch (data_layout) {
     case TensorLayout::GKCX: {
-      IVLOG(1, "Spatial padding requested for tensor with kernel-style layout.");
+      IVLOG(2, "Spatial padding requested for tensor with kernel-style layout.");
       // Initialize dims & indexes
       TensorDim G, K, C;
       TensorIndex g("g");
@@ -2578,7 +2864,7 @@ Value spatial_padding(const Value& value) {
       }
     } break;
     case TensorLayout::KCX: {
-      IVLOG(1, "Spatial padding requested for tensor with kernel-style layout.");
+      IVLOG(2, "Spatial padding requested for tensor with kernel-style layout.");
       // Initialize dims & indexes
       TensorDim K, C;
       TensorIndex k("k");
@@ -2673,7 +2959,7 @@ Value spatial_padding(const Value& value) {
       O_idxs.push_back(c);
     } break;
     case TensorLayout::XCK: {
-      IVLOG(1, "Spatial padding requested for tensor with kernel-style layout.");
+      IVLOG(2, "Spatial padding requested for tensor with kernel-style layout.");
       TensorDim C, K;
       TensorIndex c("c");
       TensorIndex k("k");
@@ -2705,7 +2991,7 @@ Value spatial_padding(const Value& value) {
       O_idxs.push_back(k);
     } break;
     case TensorLayout::XGCK: {
-      IVLOG(1, "Spatial padding requested for tensor with kernel-style layout.");
+      IVLOG(2, "Spatial padding requested for tensor with kernel-style layout.");
       TensorDim G, C, K;
       TensorIndex g("g");
       TensorIndex c("c");
@@ -2744,8 +3030,7 @@ Value spatial_padding(const Value& value) {
     default:
       throw std::runtime_error("Unrecognized TensorLayout in spatial_padding");
   }
-  auto O = TensorOutput(O_dims);
-  O(O_idxs) = I(I_idxs);
+  Tensor O = Contraction(O_dims, O_idxs).assign(I(I_idxs));
   return Value{O};
 }
 
@@ -2787,7 +3072,7 @@ Value squeeze(const Value& value) {
     }
   }
   std::vector<Value> O_dims_values;
-  for (const auto dim : O_dims) {
+  for (const TensorDim& dim : O_dims) {
     O_dims_values.push_back(Value{dim});
   }
   return reshape(make_tuple(Value{I}, Value{O_dims_values}));
@@ -2818,11 +3103,8 @@ Value sum(const Value& value) {
   auto keepdims = args[2].as_bool();
 
   AggregationAxes agg(I.rank(), axes, keepdims);
-
   I.bind_dims(agg.src_dims);
-  auto O = TensorOutput(agg.dst_dims);
-  O(agg.dst_idxs) += I(agg.src_idxs);
-
+  Tensor O = Contraction(agg.dst_dims, agg.dst_idxs).sum(I(agg.src_idxs));
   return Value{O};
 }
 
@@ -2859,9 +3141,7 @@ Value tile(const Value& value) {
     O_dims.push_back(I_dims[i] * reps[i]);
     O_idxs.push_back(TensorIndex() * I_dims[i] + I_idxs[i]);
   }
-  auto O = TensorOutput(O_dims);
-  O(O_idxs) = I(I_idxs);
-  O.no_reduce();
+  Tensor O = Contraction(O_dims, O_idxs).assign(I(I_idxs));
   return Value{O};
 }
 
@@ -2909,8 +3189,54 @@ Value transpose(const Value& value) {
     O_dims.push_back(I_dims[pattern[i]]);
     O_idxs.push_back(I_idxs[pattern[i]]);
   }
-  auto O = TensorOutput(O_dims);
-  O(O_idxs) = I(I_idxs);
+  Tensor O = Contraction(O_dims, O_idxs).assign(I(I_idxs));
+  return Value{O};
+}
+
+Value unsqueeze(const Value& value) {
+  // Read arguments
+  auto args = value.as_tuple();
+  if (args.size() != 2) {
+    throw std::runtime_error(llvm::formatv("PlaidML unsqueeze op expects 2 arguments (received {0})", args.size()));
+  }
+
+  auto I = args[0].as_tensor();
+  auto ndims = I.rank();
+
+  std::vector<int64_t> raw_axes;
+  if (args[1].is_int()) {
+    raw_axes.push_back(args[1].as_int());
+  } else {
+    raw_axes = args[1].as_int_tuple();
+  }
+
+  std::set<size_t> axes;
+  for (auto& raw_axis : raw_axes) {
+    axes.insert(normalize_axis(raw_axis, ndims + raw_axes.size(), "unsqueeze"));
+  }
+
+  std::vector<TensorDim> I_dims(ndims);
+  std::vector<TensorIndex> I_idxs;
+  std::vector<TensorDim> O_dims;
+  std::vector<TensorIndex> O_idxs;
+  I.bind_dims(I_dims);
+  size_t src_loc = 0;
+  size_t new_rank = ndims + axes.size();
+  for (size_t i = 0; i < new_rank; i++) {
+    if (axes.count(i)) {
+      O_dims.push_back(edsl::TensorDim(1));
+      O_idxs.emplace_back(llvm::formatv("a{0}", i));
+    } else {
+      I_idxs.emplace_back(llvm::formatv("n{0}", i));
+      O_dims.push_back(I_dims[src_loc]);
+      O_idxs.push_back(I_idxs[src_loc]);
+      src_loc++;
+    }
+  }
+  if (src_loc != I.rank()) {
+    throw std::runtime_error(llvm::formatv("Unsqueeze did not replicate entirety of input into output"));
+  }
+  Tensor O = Contraction(O_dims, O_idxs).assign(I(I_idxs));
   return Value{O};
 }
 
@@ -2952,8 +3278,7 @@ Value variance(const Value& value) {
   I.bind_dims(agg.src_dims);
 
   auto SquaredDifference = (I - Mean) * (I - Mean);
-  auto SumSqDiff = TensorOutput(agg.dst_dims);
-  SumSqDiff(agg.dst_idxs) += SquaredDifference(agg.src_idxs);
+  Tensor SumSqDiff = Contraction(agg.dst_dims, agg.dst_idxs).sum(SquaredDifference(agg.src_idxs));
   auto denom = Tensor{1};
   for (const auto& axis : agg.axes) {
     denom = denom * agg.src_dims.at(axis);
@@ -2976,7 +3301,7 @@ void RegisterOps() {
   registry->Register("cumsum", cumsum);
   registry->Register("dot", dot);
   registry->Register("elu", elu);
-  registry->Register("expand_dims", expand_dims);
+  registry->Register("explicit_padding", explicit_padding);
   registry->Register("flip", flip);
   registry->Register("hard_sigmoid", hard_sigmoid);
   registry->Register("image_resize", image_resize);
@@ -2986,6 +3311,9 @@ void RegisterOps() {
   registry->Register("mean", mean);
   registry->Register("min", min);
   registry->Register("minimum", minimum);
+  registry->Register("mvn", mvn);
+  registry->Register("nms", nms);
+  registry->Register("l2norm", l2norm);
   registry->Register("pool", pool);
   registry->Register("prod", prod);
   registry->Register("relu", relu);
@@ -2996,12 +3324,14 @@ void RegisterOps() {
   registry->Register("sigmoid", sigmoid);
   registry->Register("slice", slice);
   registry->Register("softmax", softmax);
+  registry->Register("sort", sort);
   registry->Register("spatial_padding", spatial_padding);
   registry->Register("square", square);
   registry->Register("squeeze", squeeze);
   registry->Register("sum", sum);
   registry->Register("tile", tile);
   registry->Register("transpose", transpose);
+  registry->Register("unsqueeze", unsqueeze);
   registry->Register("variance", variance);
 }
 

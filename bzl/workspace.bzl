@@ -2,7 +2,6 @@
 
 load("//vendor/bazel:repo.bzl", "http_archive")
 load("//vendor/conda:repo.bzl", "conda_repo")
-load("//vendor/openvino:workspace.bzl", "openvino_workspace")
 
 # Sanitize a dependency so that it works correctly from code that includes it as a submodule.
 def clean_dep(dep):
@@ -29,6 +28,13 @@ def plaidml_workspace():
         url = "https://github.com/google/benchmark/archive/v1.5.0.tar.gz",
         sha256 = "3c6a165b6ecc948967a1ead710d4a181d7b0fbcaa183ef7ea84604994966221a",
         strip_prefix = "benchmark-1.5.0",
+    )
+
+    http_archive(
+        name = "com_google_googletest",
+        url = "https://github.com/google/googletest/archive/release-1.10.0.tar.gz",
+        sha256 = "9dc9157a9a1551ec7a7e43daea9a694a0bb5fb8bec81235d8a1e6ef64c716dcb",
+        strip_prefix = "googletest-release-1.10.0",
     )
 
     conda_repo(
@@ -63,14 +69,6 @@ def plaidml_workspace():
     )
 
     http_archive(
-        name = "gmock",
-        url = "https://github.com/google/googletest/archive/release-1.8.0.tar.gz",
-        sha256 = "58a6f4277ca2bc8565222b3bbd58a177609e9c488e8a72649359ba51450db7d8",
-        strip_prefix = "googletest-release-1.8.0",
-        build_file = clean_dep("//bzl:gmock.BUILD"),
-    )
-
-    http_archive(
         name = "half",
         url = "https://github.com/plaidml/depot/raw/master/half-1.11.0.zip",
         sha256 = "9e5ddb4b43abeafe190e780b5b606b081acb511e6edd4ef6fbe5de863a4affaf",
@@ -92,8 +90,8 @@ def plaidml_workspace():
         strip_prefix = "jsonnet-0.13.0",
     )
 
-    LLVM_COMMIT = "3149709e7f809405a861f4460c7c2aaf98ba350c"
-    LLVM_SHA256 = "7c9ae29375d3bc2e84f890b035197cab417a8393b28fdf561713108e30703e95"
+    LLVM_COMMIT = "4f9da4c89c754f49cdd465f316d83d35094a18c2"
+    LLVM_SHA256 = "57ebfa9121a785bf853d45186162f3f5d77f5223d68374dde7857938c0fd9e79"
     LLVM_URL = "https://github.com/plaidml/llvm-project/archive/{commit}.tar.gz".format(commit = LLVM_COMMIT)
     http_archive(
         name = "llvm-project",
@@ -104,6 +102,7 @@ def plaidml_workspace():
             clean_dep("//vendor/llvm:llvm.BUILD"): "llvm/BUILD.bazel",
             clean_dep("//vendor/mlir:mlir.BUILD"): "mlir/BUILD.bazel",
             clean_dep("//vendor/mlir:test.BUILD"): "mlir/test/BUILD.bazel",
+            clean_dep("//vendor/openmp:openmp.BUILD"): "openmp/BUILD.bazel",
         },
         override = "PLAIDML_LLVM_REPO",
     )
@@ -170,4 +169,28 @@ def plaidml_workspace():
         build_file = clean_dep("//bzl:zlib.BUILD"),
     )
 
-    openvino_workspace()
+    http_archive(
+        name = "opencl_headers",
+        url = "https://github.com/KhronosGroup/OpenCL-Headers/archive/v2020.06.16.zip",
+        sha256 = "518703d3c3a6333bcf8e4f80758e4e98f7af30fbd72a09fe8c2673da1628d80c",
+        strip_prefix = "OpenCL-Headers-2020.06.16",
+        build_file = clean_dep("//vendor/opencl_headers:opencl_headers.BUILD"),
+    )
+
+    http_archive(
+        name = "opencl_hpp_headers",
+        url = "https://github.com/KhronosGroup/OpenCL-CLHPP/archive/v2.0.12.zip",
+        sha256 = "127936b3a5ef147f23b85fb043599d1480e9e57acabe2d2a67c5dac05aa4ad70",
+        strip_prefix = "OpenCL-CLHPP-2.0.12",
+        build_file = clean_dep("//vendor/opencl_hpp_headers:opencl_hpp_headers.BUILD"),
+        # Patch hpp headers trying to use system OpenCL header on Apple.
+        patches = [clean_dep("//vendor/opencl_hpp_headers:fix_apple_headers.patch")],
+    )
+
+    http_archive(
+        name = "opencl_icd_loader",
+        url = "https://github.com/KhronosGroup/OpenCL-ICD-Loader/archive/v2020.06.16.zip",
+        sha256 = "e4c27a5adcef4dbc0fee98864af203dc78dfc967ca7287c9bad9add030e7516e",
+        strip_prefix = "OpenCL-ICD-Loader-2020.06.16",
+        build_file = clean_dep("//vendor/opencl_icd_loader:opencl_icd_loader.BUILD"),
+    )

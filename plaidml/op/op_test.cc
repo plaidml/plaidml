@@ -3,6 +3,8 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <limits>
+
 #include "llvm/ADT/StringRef.h"
 
 #include "plaidml/op/op.h"
@@ -11,178 +13,86 @@
 
 using ::testing::Eq;
 
+using namespace plaidml;        // NOLINT
 using namespace plaidml::edsl;  // NOLINT
-
-namespace plaidml::edsl {
-
-bool operator==(const Program& lhs, const std::string& rhs) {
-  // TODO: re-enable brittle tests by replacing with lit.
-  return true;
-  // return llvm::StringRef(lhs.str()).trim() == llvm::StringRef(rhs).trim();
-}
-
-}  // namespace plaidml::edsl
-
-namespace plaidml::op {
-namespace {
 
 class OpTest : public TestFixture {};
 
-Program makeProgram(const std::string& name, const std::vector<Tensor>& outputs) {
-  return ProgramBuilder(name, outputs).compile();
-}
-
-TEST(Op, Abs) {
+TEST_F(OpTest, Abs) {
   auto I = Placeholder(DType::FLOAT32, {1, 224, 224, 3}, "I");
-  auto abs = op::abs(I);
-  auto program = makeProgram("abs", {abs});
-  IVLOG(1, program);
-
-  EXPECT_THAT(program, Eq(R"#(
-
-module {
-  func @abs(%arg0: tensor<1x224x224x3xf32> {tile.name = "I"}) -> tensor<1x224x224x3xf32> {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> f32
-    %0 = "eltwise.neg"(%arg0) : (tensor<1x224x224x3xf32>) -> tensor<1x224x224x3xf32>
-    %1 = "eltwise.cmp_lt"(%arg0, %cst) : (tensor<1x224x224x3xf32>, f32) -> tensor<1x224x224x3xi1>
-    %2 = "eltwise.select"(%1, %0, %arg0) : (tensor<1x224x224x3xi1>, tensor<1x224x224x3xf32>, tensor<1x224x224x3xf32>) -> tensor<1x224x224x3xf32>
-    return %2 : tensor<1x224x224x3xf32>
-  }
-}
-)#"));
+  auto program = makeProgram("abs", {I}, {op::abs(I)});
+  runProgram(program);
 }
 
-TEST(Op, All) {
+TEST_F(OpTest, All) {
   auto I = Placeholder(DType::FLOAT32, {1, 224, 224, 3}, "I");
-  auto program = makeProgram("all", {op::all(I)});
-  IVLOG(1, program);
-  EXPECT_THAT(program, Eq(R"#(
-#map0 = affine_map<() -> ()>
-#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
-
-
-module {
-  func @all(%arg0: tensor<1x224x224x3xf32> {tile.name = "I"}) -> ui8 {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> f32
-    %c0 = "eltwise.sconst"() {value = 0 : i64} : () -> si32
-    %c1 = "eltwise.sconst"() {value = 1 : i64} : () -> si32
-    %0 = "eltwise.cmp_eq"(%arg0, %c0) : (tensor<1x224x224x3xf32>, si32) -> tensor<1x224x224x3xi1>
-    %1 = "eltwise.select"(%0, %c0, %c1) : (tensor<1x224x224x3xi1>, si32, si32) -> tensor<1x224x224x3xsi32>
-    %2 = tile.contract mul, none, %cst, %1 {sink = #map0, srcs = [#map1]} : f32, tensor<1x224x224x3xsi32> -> si32
-    %3 = "eltwise.cast"(%2) : (si32) -> ui8
-    return %3 : ui8
-  }
-}
-)#"));
+  auto program = makeProgram("all", {I}, {op::all(I)});
+  runProgram(program);
 }
 
-TEST(Op, Any) {
+TEST_F(OpTest, Any) {
   auto I = Placeholder(DType::FLOAT32, {1, 224, 224, 3}, "I");
-  auto program = makeProgram("any", {op::any(I)});
-  IVLOG(1, program);
-  EXPECT_THAT(program, Eq(R"#(
-#map0 = affine_map<() -> ()>
-#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
-
-
-module {
-  func @any(%arg0: tensor<1x224x224x3xf32> {tile.name = "I"}) -> ui8 {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> f32
-    %c0 = "eltwise.sconst"() {value = 0 : i64} : () -> si32
-    %c1 = "eltwise.sconst"() {value = 1 : i64} : () -> si32
-    %0 = "eltwise.cmp_eq"(%arg0, %c0) : (tensor<1x224x224x3xf32>, si32) -> tensor<1x224x224x3xi1>
-    %1 = "eltwise.select"(%0, %c0, %c1) : (tensor<1x224x224x3xi1>, si32, si32) -> tensor<1x224x224x3xsi32>
-    %2 = tile.contract add, none, %cst, %1 {sink = #map0, srcs = [#map1]} : f32, tensor<1x224x224x3xsi32> -> si32
-    %3 = "eltwise.cmp_eq"(%2, %c0) : (si32, si32) -> i1
-    %4 = "eltwise.select"(%3, %c0, %c1) : (i1, si32, si32) -> si32
-    %5 = "eltwise.cast"(%4) : (si32) -> ui8
-    return %5 : ui8
-  }
-}
-)#"));
+  auto program = makeProgram("any", {I}, {op::any(I)});
+  runProgram(program);
 }
 
 TEST_F(OpTest, Argmax) {
   auto I = Placeholder(DType::FLOAT32, {1, 224, 224, 3}, "I");
-  auto program = makeProgram("argmax", {op::argmax(I)});
-  IVLOG(1, "\n" << program);
+  auto program = makeProgram("argmax", {I}, {op::argmax(I)});
   runProgram(program);
 }
 
-TEST(Op, BinaryCrossentropy) {
+TEST_F(OpTest, BinaryCrossentropy) {
   auto I = Placeholder(DType::FLOAT32, {7, 7, 3, 64}, "I");
   auto O = Placeholder(DType::FLOAT32, {7, 7, 3, 64}, "O");
-  auto program = makeProgram("binary_crossentropy", {op::binary_crossentropy(I, O, 0.0)});
-  IVLOG(1, program);
-  EXPECT_THAT(program, Eq(R"#(
-module {
-  func @binary_crossentropy(%arg0: tensor<7x7x3x64xf32> {tile.name = "O"}, %arg1: tensor<7x7x3x64xf32> {tile.name = "I"}) -> tensor<7x7x3x64xf32> {
-    %c1 = "eltwise.sconst"() {value = 1 : i64} : () -> si32
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> f32
-    %cst_0 = "eltwise.sconst"() {value = 1.000000e+00 : f64} : () -> f32
-    %0 = "eltwise.cmp_gt"(%arg0, %cst) : (tensor<7x7x3x64xf32>, f32) -> tensor<7x7x3x64xi1>
-    %1 = "eltwise.select"(%0, %arg0, %cst) : (tensor<7x7x3x64xi1>, tensor<7x7x3x64xf32>, f32) -> tensor<7x7x3x64xf32>
-    %2 = "eltwise.cmp_lt"(%1, %cst_0) : (tensor<7x7x3x64xf32>, f32) -> tensor<7x7x3x64xi1>
-    %3 = "eltwise.select"(%2, %1, %cst_0) : (tensor<7x7x3x64xi1>, tensor<7x7x3x64xf32>, f32) -> tensor<7x7x3x64xf32>
-    %4 = "eltwise.sub"(%c1, %3) : (si32, tensor<7x7x3x64xf32>) -> tensor<7x7x3x64xf32>
-    %5 = "eltwise.log"(%4) : (tensor<7x7x3x64xf32>) -> tensor<7x7x3x64xf32>
-    %6 = "eltwise.ident"(%arg1) : (tensor<7x7x3x64xf32>) -> tensor<7x7x3x64xf32>
-    %7 = "eltwise.sub"(%c1, %6) : (si32, tensor<7x7x3x64xf32>) -> tensor<7x7x3x64xf32>
-    %8 = "eltwise.mul"(%7, %5) : (tensor<7x7x3x64xf32>, tensor<7x7x3x64xf32>) -> tensor<7x7x3x64xf32>
-    %9 = "eltwise.log"(%3) : (tensor<7x7x3x64xf32>) -> tensor<7x7x3x64xf32>
-    %10 = "eltwise.neg"(%6) : (tensor<7x7x3x64xf32>) -> tensor<7x7x3x64xf32>
-    %11 = "eltwise.mul"(%10, %9) : (tensor<7x7x3x64xf32>, tensor<7x7x3x64xf32>) -> tensor<7x7x3x64xf32>
-    %12 = "eltwise.sub"(%11, %8) : (tensor<7x7x3x64xf32>, tensor<7x7x3x64xf32>) -> tensor<7x7x3x64xf32>
-    return %12 : tensor<7x7x3x64xf32>
-  }
-}
-)#"));
+  auto program = makeProgram("binary_crossentropy", {I, O}, {op::binary_crossentropy(I, O, 0.0)});
+  runProgram(program);
 }
 
 TEST_F(OpTest, BroadcastNoOp) {
   auto A = Placeholder(DType::FLOAT32, {3});
-  std::vector<int> rshape = {3};
-  std::vector<int> bdims = {0};
-  auto C = broadcast(A, rshape, bdims);
-  auto program = makeProgram("broadcast_nop", {C});
+  std::vector<int64_t> rshape = {3};
+  std::vector<int64_t> bdims = {0};
+  auto C = op::broadcast(A, rshape, bdims);
+  auto program = makeProgram("broadcast_nop", {A}, {C});
 
   std::vector<float> A_input = {0, 1, 2};
-  checkProgram(program, {{A, A_input}}, {{C, A_input}});
+  checkExact(program, {A_input}, {A_input});
 }
 
 TEST_F(OpTest, BroadcastScalar) {
   auto A = Placeholder(DType::FLOAT32, {});
-  std::vector<int> rshape = {3, 4};
-  std::vector<int> bdims = {};
-  auto C = broadcast(A, rshape, bdims);
-  auto program = makeProgram("broadcast_scalar", {C});
+  std::vector<int64_t> rshape = {3, 4};
+  std::vector<int64_t> bdims = {};
+  auto C = op::broadcast(A, rshape, bdims);
+  auto program = makeProgram("broadcast_scalar", {A}, {C});
 
   std::vector<float> A_input = {3};
   std::vector<float> C_output = {3, 3, 3, 3,  //
                                  3, 3, 3, 3,  //
                                  3, 3, 3, 3};
-  checkProgram(program, {{A, A_input}}, {{C, C_output}});
+  checkExact(program, {A_input}, {C_output});
 }
 
 TEST_F(OpTest, BroadcastNoOpLarge) {
   auto A = Placeholder(DType::FLOAT32, {3, 4});
-  std::vector<int> rshape = {3, 4};
-  std::vector<int> bdims = {0, 1};
-  auto C = broadcast(A, rshape, bdims);
-  auto program = makeProgram("broadcast_nop_large", {C});
+  std::vector<int64_t> rshape = {3, 4};
+  std::vector<int64_t> bdims = {0, 1};
+  auto C = op::broadcast(A, rshape, bdims);
+  auto program = makeProgram("broadcast_nop_large", {A}, {C});
 
   std::vector<float> A_input = {0, 1, 2, 3,  //
                                 0, 1, 2, 3,  //
                                 0, 1, 2, 3};
-  checkProgram(program, {{A, A_input}}, {{C, A_input}});
+  checkExact(program, {A_input}, {A_input});
 }
 
 TEST_F(OpTest, BroadcastNumpy) {
   auto A = Placeholder(DType::FLOAT32, {1, 3, 3});
-  std::vector<int> rshape = {1, 4, 3, 3};
-  std::vector<int> bdims = {0, 2, 3};
-  auto C = broadcast(A, rshape, bdims);
-  auto program = makeProgram("broadcast_numpy", {C});
+  std::vector<int64_t> rshape = {1, 4, 3, 3};
+  std::vector<int64_t> bdims = {0, 2, 3};
+  auto C = op::broadcast(A, rshape, bdims);
+  auto program = makeProgram("broadcast_numpy", {A}, {C});
 
   std::vector<float> A_input = {0, 1, 2,  //
                                 0, 1, 2,  //
@@ -199,514 +109,364 @@ TEST_F(OpTest, BroadcastNumpy) {
                                  0, 1, 2,  //
                                  0, 1, 2,  //
                                  0, 1, 2};
+  checkExact(program, {A_input}, {C_output});
 }
 
 TEST_F(OpTest, BroadcastNumpy2) {
   auto A = Placeholder(DType::FLOAT32, {3, 1});
-  std::vector<int> rshape = {3, 4};
-  std::vector<int> bdims = {0, 1};
-  auto C = broadcast(A, rshape, bdims);
-  auto program = makeProgram("broadcast_numpy_2", {C});
+  std::vector<int64_t> rshape = {3, 4};
+  std::vector<int64_t> bdims = {0, 1};
+  auto C = op::broadcast(A, rshape, bdims);
+  auto program = makeProgram("broadcast_numpy_2", {A}, {C});
 
   std::vector<float> A_input = {0, 1, 2};
   std::vector<float> C_output = {0, 0, 0, 0,  //
                                  1, 1, 1, 1,  //
                                  2, 2, 2, 2};
-  checkProgram(program, {{A, A_input}}, {{C, C_output}});
+  checkExact(program, {A_input}, {C_output});
 }
 
 TEST_F(OpTest, BroadcastNumpy3) {
   auto A = Placeholder(DType::FLOAT32, {3});
-  std::vector<int> rshape = {4, 3};
-  std::vector<int> bdims = {1};
-  auto C = broadcast(A, rshape, bdims);
-  auto program = makeProgram("broadcast_numpy_3", {C});
+  std::vector<int64_t> rshape = {4, 3};
+  std::vector<int64_t> bdims = {1};
+  auto C = op::broadcast(A, rshape, bdims);
+  auto program = makeProgram("broadcast_numpy_3", {A}, {C});
 
   std::vector<float> A_input = {0, 1, 2};
   std::vector<float> C_output = {0, 1, 2,  //
                                  0, 1, 2,  //
                                  0, 1, 2,  //
                                  0, 1, 2};
-  checkProgram(program, {{A, A_input}}, {{C, C_output}});
+  checkExact(program, {A_input}, {C_output});
 }
 
 TEST_F(OpTest, BroadcastNonNumpy) {
   auto A = Placeholder(DType::FLOAT32, {3});
-  std::vector<int> rshape = {3, 4};
-  std::vector<int> bdims = {0};
-  auto C = broadcast(A, rshape, bdims);
-  auto program = makeProgram("broadcast_non_numpy", {C});
+  std::vector<int64_t> rshape = {3, 4};
+  std::vector<int64_t> bdims = {0};
+  auto C = op::broadcast(A, rshape, bdims);
+  auto program = makeProgram("broadcast_non_numpy", {A}, {C});
 
   std::vector<float> A_input = {0, 1, 2};
   std::vector<float> C_output = {0, 0, 0, 0,  //
                                  1, 1, 1, 1,  //
                                  2, 2, 2, 2};
-  checkProgram(program, {{A, A_input}}, {{C, C_output}});
+  checkExact(program, {A_input}, {C_output});
 }
 
-TEST(Op, Broadcast) {
+TEST_F(OpTest, Broadcast) {
   auto I = Placeholder(DType::FLOAT32, {1, 224, 224}, "I");
-  std::vector<int> result_shape = {1, 224, 224, 3};
-  std::vector<int> bcast_axes = {0, 1, 2};
-  auto program = makeProgram("broadcast", {op::broadcast(I, result_shape, bcast_axes)});
-  IVLOG(1, program);
-  EXPECT_THAT(program, Eq(R"#(
-
-#map0 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
-#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
-
-
-module {
-  func @broadcast(%arg0: tensor<1x224x224xf32> {tile.name = "I"}) -> tensor<1x224x224x3xf32> {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> tensor<f32>
-    %0 = tile.contract assign, none, %cst, %arg0 {idxs = ["x0", "x1", "x2", "x3"], sink = #map0, srcs = [#map1]} : tensor<f32>, tensor<1x224x224xf32> -> tensor<1x224x224x3xf32>
-    return %0 : tensor<1x224x224x3xf32>
-  }
-}
-)#"));
+  std::vector<int64_t> result_shape = {1, 224, 224, 3};
+  std::vector<int64_t> bcast_axes = {0, 1, 2};
+  auto program = makeProgram("broadcast", {I}, {op::broadcast(I, result_shape, bcast_axes)});
+  runProgram(program);
 }
 
-TEST(Op, Clip) {
+TEST_F(OpTest, Clip) {
   auto I = Placeholder(DType::FLOAT32, {7, 7, 3, 64}, "I");
   auto raw_min = Placeholder(DType::FLOAT32, {7, 7, 3, 64}, "raw_min");
   auto raw_max = Placeholder(DType::FLOAT32, {7, 7, 3, 64}, "raw_max");
-  auto program = makeProgram("clip", {op::clip(I, raw_min, raw_max)});
-  IVLOG(1, program);
-  EXPECT_THAT(program, Eq(R"#(
-
-module {
-  func @clip(%arg0: tensor<7x7x3x64xf32> {tile.name = "raw_max"}, %arg1: tensor<7x7x3x64xf32> {tile.name = "raw_min"}, %arg2: tensor<7x7x3x64xf32> {tile.name = "I"}) -> tensor<7x7x3x64xf32> {
-    %0 = "eltwise.cmp_gt"(%arg2, %arg1) : (tensor<7x7x3x64xf32>, tensor<7x7x3x64xf32>) -> tensor<7x7x3x64xi1>
-    %1 = "eltwise.select"(%0, %arg2, %arg1) : (tensor<7x7x3x64xi1>, tensor<7x7x3x64xf32>, tensor<7x7x3x64xf32>) -> tensor<7x7x3x64xf32>
-    %2 = "eltwise.cmp_lt"(%1, %arg0) : (tensor<7x7x3x64xf32>, tensor<7x7x3x64xf32>) -> tensor<7x7x3x64xi1>
-    %3 = "eltwise.select"(%2, %1, %arg0) : (tensor<7x7x3x64xi1>, tensor<7x7x3x64xf32>, tensor<7x7x3x64xf32>) -> tensor<7x7x3x64xf32>
-    return %3 : tensor<7x7x3x64xf32>
-  }
-}
-)#"));
+  auto program = makeProgram("clip", {I, raw_min, raw_max}, {op::clip(I, raw_min, raw_max)});
+  runProgram(program);
 }
 
-TEST(Op, Concatenate) {
+TEST_F(OpTest, Concatenate) {
   auto A = Placeholder(DType::FLOAT32, {7, 7, 3, 64}, "A");
   auto B = Placeholder(DType::FLOAT32, {7, 7, 3, 64}, "B");
-  auto program = makeProgram("concatenate", {op::concatenate({A, B}, 2)});
-  IVLOG(1, program);
-  EXPECT_THAT(program, Eq(R"#(
-#map0 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2 + 3, d3)>
-#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
-
-
-module {
-  func @concatenate(%arg0: tensor<7x7x3x64xf32> {tile.name = "B"}, %arg1: tensor<7x7x3x64xf32> {tile.name = "A"}) -> tensor<7x7x6x64xf32> {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> f32
-    %0 = tile.contract assign, none, %cst, %arg0 {idxs = ["n0", "n1", "a", "n3"], sink = #map0, srcs = [#map1]} : f32, tensor<7x7x3x64xf32> -> tensor<7x7x6x64xf32>
-    %1 = tile.contract assign, none, %cst, %arg1 {idxs = ["n0", "n1", "a", "n3"], sink = #map1, srcs = [#map1]} : f32, tensor<7x7x3x64xf32> -> tensor<7x7x6x64xf32>
-    %2 = "eltwise.add"(%1, %0) : (tensor<7x7x6x64xf32>, tensor<7x7x6x64xf32>) -> tensor<7x7x6x64xf32>
-    return %2 : tensor<7x7x6x64xf32>
-  }
-}
-)#"));
+  auto program = makeProgram("concatenate", {A, B}, {op::concatenate({A, B}, 2)});
+  runProgram(program);
 }
 
-TEST(Op, Convolution) {
-  auto I = Placeholder(DType::FLOAT32, {1, 224, 224, 3}, "I");
+struct ConvolutionParams {
+  DType dType;
+  std::vector<int64_t> I_dims;
+  std::vector<int64_t> K_dims;
+  std::function<void(op::convolution&)> builder;
+};
+
+struct ConvolutionTest : public OpTest, public ::testing::WithParamInterface<ConvolutionParams> {};
+
+TEST_P(ConvolutionTest, Basic) {
+  const auto& params = GetParam();
+  auto I = Placeholder(params.dType, params.I_dims);
+  auto K = Placeholder(params.dType, params.K_dims);
+  auto conv = op::convolution(I, K);
+  params.builder(conv);
+  auto program = makeProgram("convolution", {I, K}, {conv});
+  runProgram(program);
+}
+
+ConvolutionParams convParams[] = {
+    {
+        DType::FLOAT32,
+        {1, 224, 224, 3},
+        {7, 7, 3, 64},
+        [](op::convolution& conv) {
+          conv.strides({2, 2}).autopad_mode(op::AutoPadMode::EXPLICIT).manual_padding({2, 2});
+        },
+    },
+    {
+        // resnet/conv1
+        DType::FLOAT32,
+        {1, 224, 224, 3},
+        {7, 7, 3, 64},
+        [](op::convolution& conv) {
+          conv.name("conv1").strides({2, 2}).autopad_mode(op::AutoPadMode::EXPLICIT).manual_padding({3, 3});
+        },
+    },
+    {
+        // resnet/res2a_branch1
+        DType::FLOAT32,
+        {1, 56, 56, 64},
+        {1, 1, 64, 256},
+        [](op::convolution& conv) {
+          conv.name("res2a_branch1").strides({1, 1}).autopad_mode(op::AutoPadMode::VALID);
+        },
+    },
+    {
+        // 3D convolution
+        DType::FLOAT32,
+        {1, 32, 224, 224, 3},
+        {7, 7, 7, 3, 64},
+        [](op::convolution& conv) {
+          conv.strides({2, 2, 2}).autopad_mode(op::AutoPadMode::EXPLICIT).manual_padding({2, 3, 2, 3, 2, 3});
+        },
+    },
+    {
+        // 3D convolution
+        DType::FLOAT32,
+        {1, 3, 1, 1, 1024},
+        {1, 1, 1, 1024, 400},
+        [](op::convolution& conv) {
+          conv.strides({1, 1, 1}).autopad_mode(op::AutoPadMode::EXPLICIT).manual_padding({0, 0, 0, 0, 0, 0});
+        },
+    },
+    {
+        // 3D convolution
+        DType::FLOAT32,
+        {1, 16, 56, 56, 64},
+        {1, 1, 1, 64, 64},
+        [](op::convolution& conv) {
+          conv.strides({1, 1, 1}).autopad_mode(op::AutoPadMode::EXPLICIT).manual_padding({0, 0, 0, 0, 0, 0});
+        },
+    },
+    {
+        // 3D convolution
+        DType::FLOAT32,
+        {1, 16, 56, 56, 64},
+        {3, 3, 3, 64, 192},
+        [](op::convolution& conv) {
+          conv.strides({1, 1, 1}).autopad_mode(op::AutoPadMode::EXPLICIT).manual_padding({1, 1, 1, 1, 1, 1});
+        },
+    },
+};
+
+INSTANTIATE_TEST_CASE_P(Suite, ConvolutionTest, ::testing::ValuesIn(convParams));
+
+TEST_F(OpTest, CumProd) {
+  auto I = Placeholder(DType::FLOAT32, {7, 7, 3, 64}, "I");
+  auto program = makeProgram("cumprod", {I}, {op::cumprod(I, 2)});
+  runProgram(program);
+}
+
+TEST_F(OpTest, CumSum) {
+  auto I = Placeholder(DType::FLOAT32, {7, 7, 3, 64}, "I");
+  auto program = makeProgram("cumsum", {I}, {op::cumsum(I, 2)});
+  runProgram(program);
+}
+
+TEST_F(OpTest, CumSumExclusive) {
+  auto I = Placeholder(DType::FLOAT32, {4}, "I");
+  auto program = makeProgram("cumsum", {I}, {op::cumsum(I, 0, true)});
+  std::vector<float> input = {2, 4, 6, 8};
+  std::vector<float> output = {0, 2, 6, 12};
+  checkExact(program, {input}, {output});
+}
+
+TEST_F(OpTest, Dot) {
+  auto I = Placeholder(DType::FLOAT32, {7, 7, 3, 64}, "I");
   auto K = Placeholder(DType::FLOAT32, {7, 7, 3, 64}, "K");
-  auto O = op::convolution(I, K).strides({2, 2}).autopad_mode(AutoPadMode::EXPLICIT).manual_padding({3, 3});
-  auto program = makeProgram("convolution", {O});
-  IVLOG(1, program);
-  EXPECT_THAT(program, Eq(R"#(
-#map0 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
-#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 * 2 + d4 - 3, d2 * 2 + d5 - 3, d6)>
-#map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d3)>
-
-
-module {
-  func @convolution(%arg0: tensor<7x7x3x64xf32> {tile.name = "K"}, %arg1: tensor<1x224x224x3xf32> {tile.name = "I"}) -> tensor<1x112x112x64xf32> {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> f32
-    %conv = tile.contract add, mul, %cst, %arg1, %arg0 {idxs = ["n", "x0", "x1", "co", "k0", "k1", "ci"], sink = #map0, srcs = [#map1, #map2]} : f32, tensor<1x224x224x3xf32>, tensor<7x7x3x64xf32> -> tensor<1x112x112x64xf32>
-    return %conv : tensor<1x112x112x64xf32>
-  }
-}
-)#"));
+  auto program = makeProgram("dot", {I, K}, {op::dot(I, K)});
+  runProgram(program);
 }
 
-TEST(Op, CumProd) {
+TEST_F(OpTest, Elu) {
   auto I = Placeholder(DType::FLOAT32, {7, 7, 3, 64}, "I");
-  auto program = makeProgram("cumprod", {op::cumprod(I, 2)});
-  IVLOG(1, program);
-  EXPECT_THAT(program, Eq(R"#(
-#map0 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>
-#map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2 - d4, d3)>
-
-#set0 = affine_set<(d0, d1, d2, d3, d4) : (d4 >= 0, -d4 + 2 >= 0)>
-
-module {
-  func @cumprod(%arg0: tensor<7x7x3x64xf32> {tile.name = "I"}) -> tensor<7x7x3x64xf32> {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> f32
-    %0 = tile.contract mul, none, %cst, %arg0 {cons = #set0, sink = #map0, srcs = [#map1]} : f32, tensor<7x7x3x64xf32> -> tensor<7x7x3x64xf32>
-    return %0 : tensor<7x7x3x64xf32>
-  }
-}
-)#"));
+  auto program = makeProgram("elu", {I}, {op::elu(I, 0.1)});
+  runProgram(program);
 }
 
-TEST(Op, CumSum) {
+TEST_F(OpTest, ExplicitPadding) {
+  auto I = Placeholder(DType::FLOAT32, {2, 3}, "A");
+  auto O = op::explicit_padding(I, {2, 1}, {2, 1}).padval(Constant(-1.0));
+  auto program = makeProgram("explicit_padding", {I}, {O});
+
+  std::vector<float> I_input = {1, 2, 3,  //
+                                4, 5, 6};
+  std::vector<float> O_output = {-1, -1, -1, -1, -1,  //
+                                 -1, -1, -1, -1, -1,  //
+                                 -1, 1,  2,  3,  -1,  //
+                                 -1, 4,  5,  6,  -1,  //
+                                 -1, -1, -1, -1, -1,  //
+                                 -1, -1, -1, -1, -1};
+
+  checkExact(program, {I_input}, {O_output});
+}
+
+TEST_F(OpTest, ExplicitPaddingNegInf) {
+  auto I = Placeholder(DType::FLOAT32, {2, 3}, "A");
+  float neg_inf = -std::numeric_limits<float>::infinity();
+  auto O = op::explicit_padding(I, {2, 1}, {2, 1}).padval(Constant(neg_inf));
+  auto program = makeProgram("explicit_padding", {I}, {O});
+
+  std::vector<float> I_input = {1, 2, 3,  //
+                                4, 5, 6};
+  std::vector<float> O_output = {neg_inf, neg_inf, neg_inf, neg_inf, neg_inf,  //
+                                 neg_inf, neg_inf, neg_inf, neg_inf, neg_inf,  //
+                                 neg_inf, 1,       2,       3,       neg_inf,  //
+                                 neg_inf, 4,       5,       6,       neg_inf,  //
+                                 neg_inf, neg_inf, neg_inf, neg_inf, neg_inf,  //
+                                 neg_inf, neg_inf, neg_inf, neg_inf, neg_inf};
+
+  checkExact(program, {I_input}, {O_output});
+}
+
+TEST_F(OpTest, ExplicitPaddingInf) {
+  auto I = Placeholder(DType::FLOAT32, {2, 3}, "A");
+  float inf = std::numeric_limits<float>::infinity();
+  auto O = op::explicit_padding(I, {2, 1}, {2, 1}).padval(Constant(inf));
+  auto program = makeProgram("explicit_padding", {I}, {O});
+
+  std::vector<float> I_input = {-1, -2, -3,  //
+                                -4, -5, -6};
+  std::vector<float> O_output = {inf, inf, inf, inf, inf,  //
+                                 inf, inf, inf, inf, inf,  //
+                                 inf, -1,  -2,  -3,  inf,  //
+                                 inf, -4,  -5,  -6,  inf,  //
+                                 inf, inf, inf, inf, inf,  //
+                                 inf, inf, inf, inf, inf};
+
+  checkExact(program, {I_input}, {O_output});
+}
+
+// TODO: Consider writing a folder for this test case.
+TEST_F(OpTest, ExplicitPaddingNoOp) {
+  auto I = Placeholder(DType::FLOAT32, {2, 3}, "A");
+  auto O = op::explicit_padding(I, {0, 0}, {0, 0}).padval(Constant(0));
+  auto program = makeProgram("explicit_padding", {I}, {O});
+
+  std::vector<float> I_input = {1, 2, 3,  //
+                                4, 5, 6};
+  std::vector<float> O_output = {1, 2, 3,  //
+                                 4, 5, 6};
+
+  checkExact(program, {I_input}, {O_output});
+}
+
+TEST_F(OpTest, Flip) {
   auto I = Placeholder(DType::FLOAT32, {7, 7, 3, 64}, "I");
-  auto program = makeProgram("cumsum", {op::cumsum(I, 2)});
-  IVLOG(1, program);
-  EXPECT_THAT(program, Eq(R"#(
-#map0 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>
-#map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2 - d4, d3)>
-
-#set0 = affine_set<(d0, d1, d2, d3, d4) : (d4 >= 0, -d4 + 2 >= 0)>
-
-module {
-  func @cumsum(%arg0: tensor<7x7x3x64xf32> {tile.name = "I"}) -> tensor<7x7x3x64xf32> {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> f32
-    %0 = tile.contract add, none, %cst, %arg0 {cons = #set0, sink = #map0, srcs = [#map1]} : f32, tensor<7x7x3x64xf32> -> tensor<7x7x3x64xf32>
-    return %0 : tensor<7x7x3x64xf32>
-  }
-}
-)#"));
+  auto program = makeProgram("flip", {I}, {op::flip(I, 2)});
+  runProgram(program);
 }
 
-TEST(Op, Dot) {
-  auto I = Placeholder(DType::FLOAT32, {7, 7, 3, 64}, "I");
-  auto K = Placeholder(DType::FLOAT32, {7, 7, 3, 64}, "K");
-  auto program = makeProgram("dot", {op::dot(I, K)});
-  IVLOG(1, program);
-  EXPECT_THAT(program, Eq(R"#(
-#map0 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3, d4, d5)>
-#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d6)>
-#map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d3, d4, d6, d5)>
-
-
-module {
-  func @dot(%arg0: tensor<7x7x3x64xf32> {tile.name = "K"}, %arg1: tensor<7x7x3x64xf32> {tile.name = "I"}) -> tensor<7x7x3x7x7x64xf32> {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> f32
-    %0 = tile.contract add, mul, %cst, %arg1, %arg0 {sink = #map0, srcs = [#map1, #map2]} : f32, tensor<7x7x3x64xf32>, tensor<7x7x3x64xf32> -> tensor<7x7x3x7x7x64xf32>
-    return %0 : tensor<7x7x3x7x7x64xf32>
-  }
-}
-)#"));
-}
-
-TEST(Op, Elu) {
-  auto I = Placeholder(DType::FLOAT32, {7, 7, 3, 64}, "I");
-  auto program = makeProgram("elu", {op::elu(I, 0.1)});
-  IVLOG(1, program);
-  EXPECT_THAT(program, Eq(R"#(
-module {
-  func @elu(%arg0: tensor<7x7x3x64xf32> {tile.name = "I"}) -> tensor<7x7x3x64xf32> {
-    %c0 = "eltwise.sconst"() {value = 0 : i64} : () -> si32
-    %cst = "eltwise.sconst"() {value = 1.000000e-01 : f64} : () -> f32
-    %0 = "eltwise.exp"(%arg0) : (tensor<7x7x3x64xf32>) -> tensor<7x7x3x64xf32>
-    %1 = "eltwise.mul"(%0, %cst) : (tensor<7x7x3x64xf32>, f32) -> tensor<7x7x3x64xf32>
-    %2 = "eltwise.sub"(%1, %cst) : (tensor<7x7x3x64xf32>, f32) -> tensor<7x7x3x64xf32>
-    %3 = "eltwise.cmp_lt"(%arg0, %c0) : (tensor<7x7x3x64xf32>, si32) -> tensor<7x7x3x64xi1>
-    %4 = "eltwise.select"(%3, %2, %arg0) : (tensor<7x7x3x64xi1>, tensor<7x7x3x64xf32>, tensor<7x7x3x64xf32>) -> tensor<7x7x3x64xf32>
-    return %4 : tensor<7x7x3x64xf32>
-  }
-}
-)#"));
-}
-
-TEST(Op, ExpandDims) {
-  auto I = Placeholder(DType::FLOAT32, {7, 7, 3, 64}, "I");
-  auto program = makeProgram("expand_dims", {op::expand_dims(I, 2)});
-  IVLOG(1, program);
-  EXPECT_THAT(program, Eq(R"#(
-#map0 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>
-#map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3, d4)>
-
-
-module {
-  func @expand_dims(%arg0: tensor<7x7x3x64xf32> {tile.name = "I"}) -> tensor<7x7x1x3x64xf32> {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> f32
-    %0 = tile.contract assign, none, %cst, %arg0 {idxs = ["n0", "n1", "a", "n2", "n3"], sink = #map0, srcs = [#map1]} : f32, tensor<7x7x3x64xf32> -> tensor<7x7x1x3x64xf32>
-    return %0 : tensor<7x7x1x3x64xf32>
-  }
-}
-)#"));
-}
-
-TEST(Op, Flip) {
-  auto I = Placeholder(DType::FLOAT32, {7, 7, 3, 64}, "I");
-  auto program = makeProgram("flip", {op::flip(I, 2)});
-  IVLOG(1, program);
-  EXPECT_THAT(program, Eq(R"#(
-#map0 = affine_map<(d0, d1, d2, d3) -> (d0, d1, -d2 + 2, d3)>
-#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
-
-
-module {
-  func @flip(%arg0: tensor<7x7x3x64xf32> {tile.name = "I"}) -> tensor<7x7x3x64xf32> {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> f32
-    %0 = tile.contract assign, none, %cst, %arg0 {sink = #map0, srcs = [#map1]} : f32, tensor<7x7x3x64xf32> -> tensor<7x7x3x64xf32>
-    return %0 : tensor<7x7x3x64xf32>
-  }
-}
-)#"));
-}
-
-TEST(Op, HardSigmoid) {
+TEST_F(OpTest, HardSigmoid) {
   auto A = Placeholder(DType::FLOAT32, {10, 20}, "A");
-  auto program = makeProgram("hard_sigmoid", {op::hard_sigmoid(A, 0.05)});
-  IVLOG(1, program);
-  EXPECT_THAT(program, Eq(R"#(
-
-module {
-  func @hard_sigmoid(%arg0: tensor<10x20xf32> {tile.name = "A"}) -> tensor<10x20xf32> {
-    %cst = "eltwise.sconst"() {value = -1.000000e+01 : f64} : () -> f32
-    %cst_0 = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> f32
-    %cst_1 = "eltwise.sconst"() {value = 1.000000e+01 : f64} : () -> f32
-    %cst_2 = "eltwise.sconst"() {value = 1.000000e+00 : f64} : () -> f32
-    %cst_3 = "eltwise.sconst"() {value = 5.000000e-02 : f64} : () -> f32
-    %cst_4 = "eltwise.sconst"() {value = 5.000000e-01 : f64} : () -> f32
-    %0 = "eltwise.mul"(%arg0, %cst_3) : (tensor<10x20xf32>, f32) -> tensor<10x20xf32>
-    %1 = "eltwise.add"(%0, %cst_4) : (tensor<10x20xf32>, f32) -> tensor<10x20xf32>
-    %2 = "eltwise.cmp_gt"(%arg0, %cst_1) : (tensor<10x20xf32>, f32) -> tensor<10x20xi1>
-    %3 = "eltwise.select"(%2, %cst_2, %1) : (tensor<10x20xi1>, f32, tensor<10x20xf32>) -> tensor<10x20xf32>
-    %4 = "eltwise.cmp_lt"(%arg0, %cst) : (tensor<10x20xf32>, f32) -> tensor<10x20xi1>
-    %5 = "eltwise.select"(%4, %cst_0, %3) : (tensor<10x20xi1>, f32, tensor<10x20xf32>) -> tensor<10x20xf32>
-    return %5 : tensor<10x20xf32>
-  }
-}
-)#"));
+  auto program = makeProgram("hard_sigmoid", {A}, {op::hard_sigmoid(A, 0.05)});
+  runProgram(program);
 }
 
-TEST(Op, ImageResize) {
+TEST_F(OpTest, ImageResize) {
   auto I = Placeholder(DType::FLOAT32, {1, 224, 224, 3}, "I");
-  auto image_resize = op::image_resize(I, std::vector<int>{5, 4}, InterpolationMode::BILINEAR, TensorLayout::NXC);
-  auto program = makeProgram("image_resize", {image_resize});
-  IVLOG(1, program);
+  auto O = op::image_resize(I, {5, 4}, op::InterpolationMode::BILINEAR, op::TensorLayout::NXC);
+  auto program = makeProgram("image_resize", {I}, {O});
+  runProgram(program);
 }
 
-TEST(Op, Max) {
+TEST_F(OpTest, Max) {
   auto I = Placeholder(DType::FLOAT32, {1, 224, 224, 3}, "I");
-  auto program = makeProgram("max", {op::max(I)});  // NOLINT(build/include_what_you_use)
-  IVLOG(1, program);
-  EXPECT_THAT(program, Eq(R"#(
-#map0 = affine_map<() -> ()>
-#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
-
-
-module {
-  func @max(%arg0: tensor<1x224x224x3xf32> {tile.name = "I"}) -> f32 {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> f32
-    %0 = tile.contract max, none, %cst, %arg0 {sink = #map0, srcs = [#map1]} : f32, tensor<1x224x224x3xf32> -> f32
-    return %0 : f32
-  }
-}
-)#"));
+  auto program = makeProgram("max", {I}, {op::max(I)});  // NOLINT(build/include_what_you_use)
+  runProgram(program);
 }
 
-TEST(Op, Maximum) {
+TEST_F(OpTest, Maximum) {
   auto A = Placeholder(DType::FLOAT32, {10, 20}, "A");
   auto B = Placeholder(DType::FLOAT32, {10, 20}, "B");
-  auto program = makeProgram("maximum", {op::maximum(A, B)});
-  IVLOG(1, program);
-  EXPECT_THAT(program, Eq(R"#(
-
-module {
-  func @maximum(%arg0: tensor<10x20xf32> {tile.name = "A"}, %arg1: tensor<10x20xf32> {tile.name = "B"}) -> tensor<10x20xf32> {
-    %0 = "eltwise.cmp_lt"(%arg0, %arg1) : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xi1>
-    %1 = "eltwise.select"(%0, %arg1, %arg0) : (tensor<10x20xi1>, tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
-    return %1 : tensor<10x20xf32>
-  }
-}
-)#"));
+  auto program = makeProgram("maximum", {A, B}, {op::maximum(A, B)});
+  runProgram(program);
 }
 
-TEST(Op, Mean) {
+TEST_F(OpTest, Mean) {
   auto A = Placeholder(DType::FLOAT32, {10, 20}, "A");
-  auto program = makeProgram("mean", {op::mean(A)});
-  IVLOG(1, program);
-  EXPECT_THAT(program, Eq(R"#(
-#map0 = affine_map<() -> ()>
-#map1 = affine_map<(d0, d1) -> (d0, d1)>
-
-
-module {
-  func @mean(%arg0: tensor<10x20xf32> {tile.name = "A"}) -> f32 {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> f32
-    %c200 = "eltwise.sconst"() {value = 200 : index} : () -> si32
-    %0 = tile.contract add, none, %cst, %arg0 {sink = #map0, srcs = [#map1]} : f32, tensor<10x20xf32> -> f32
-    %1 = "eltwise.div"(%0, %c200) : (f32, si32) -> f32
-    return %1 : f32
-  }
-}
-)#"));
+  auto program = makeProgram("mean", {A}, {op::mean(A)});
+  runProgram(program);
 }
 
-TEST(Op, Min) {
+TEST_F(OpTest, Min) {
   auto A = Placeholder(DType::FLOAT32, {10, 20}, "A");
-  auto program = makeProgram("min", {op::min(A)});  // NOLINT(build/include_what_you_use)
-  IVLOG(1, program);
-  EXPECT_THAT(program, Eq(R"#(
-#map0 = affine_map<() -> ()>
-#map1 = affine_map<(d0, d1) -> (d0, d1)>
-
-
-module {
-  func @min(%arg0: tensor<10x20xf32> {tile.name = "A"}) -> f32 {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> f32
-    %0 = tile.contract min, none, %cst, %arg0 {sink = #map0, srcs = [#map1]} : f32, tensor<10x20xf32> -> f32
-    return %0 : f32
-  }
-}
-)#"));
+  auto program = makeProgram("min", {A}, {op::min(A)});  // NOLINT(build/include_what_you_use)
+  runProgram(program);
 }
 
-TEST(Op, Minimum) {
+TEST_F(OpTest, Minimum) {
   auto A = Placeholder(DType::FLOAT32, {10, 20}, "A");
   auto B = Placeholder(DType::FLOAT32, {10, 20}, "B");
-  auto program = makeProgram("minimum", {op::minimum(A, B)});
-  IVLOG(1, program);
-  EXPECT_THAT(program, Eq(R"#(
-
-module {
-  func @minimum(%arg0: tensor<10x20xf32> {tile.name = "B"}, %arg1: tensor<10x20xf32> {tile.name = "A"}) -> tensor<10x20xf32> {
-    %0 = "eltwise.cmp_lt"(%arg1, %arg0) : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xi1>
-    %1 = "eltwise.select"(%0, %arg1, %arg0) : (tensor<10x20xi1>, tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
-    return %1 : tensor<10x20xf32>
-  }
-}
-)#"));
+  auto program = makeProgram("minimum", {A, B}, {op::minimum(A, B)});
+  runProgram(program);
 }
 
-TEST(Op, Pool) {
+TEST_F(OpTest, L2Norm) {
+  auto I = Placeholder(DType::FLOAT32, {10, 20}, "I");
+  auto program = makeProgram("l2norm", {I}, {op::l2norm(I, {1}).epsilon(0.01).eps_mode(op::EpsMode::ADD)});
+  runProgram(program);
+}
+
+TEST_F(OpTest, Pool) {
   auto I = Placeholder(DType::FLOAT32, {10, 20, 30, 40, 50}, "I");
-  auto program = makeProgram("pool", {op::pool(I, PoolMode::SUM, {1, 2, 3}, {1, 2, 3}, AutoPadMode::NONE, {1, 2},
-                                               TensorLayout::NXC, true, true)});
-  IVLOG(1, program);
-  EXPECT_THAT(program, Eq(R"#(
-#map0 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4)>
-#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1 + d5 - 1, d2 * 2 + d6 - 2, d3 * 3 + d7, d4)>
-
-#set0 = affine_set<(d0, d1, d2, d3, d4, d5, d6, d7) : (d5 >= 0, -d5 >= 0, d6 >= 0, -d6 + 1 >= 0, d7 >= 0, -d7 + 2 >= 0)>
-
-module {
-  func @pool(%arg0: tensor<10x20x30x40x50xf32> {tile.name = "I"}) -> tensor<10x22x17x14x50xf32> {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> f32
-    %0 = tile.contract add, none, %cst, %arg0 {cons = #set0, sink = #map0, srcs = [#map1]} : f32, tensor<10x20x30x40x50xf32> -> tensor<10x22x17x14x50xf32>
-    return %0 : tensor<10x22x17x14x50xf32>
-  }
-}
-)#"));
+  auto program = makeProgram("pool", {I},
+                             {op::pool(I, op::PoolMode::SUM, {1, 2, 3}, {1, 2, 3}, op::AutoPadMode::EXPLICIT, {1, 2},
+                                       op::TensorLayout::NXC, true, true)});
+  runProgram(program);
 }
 
-TEST(Op, Prod) {
+TEST_F(OpTest, Prod) {
   auto A = Placeholder(DType::FLOAT32, {10, 20}, "A");
-  auto program = makeProgram("prod", {op::prod(A)});
-  IVLOG(1, program);
-  EXPECT_THAT(program, Eq(R"#(
-#map0 = affine_map<() -> ()>
-#map1 = affine_map<(d0, d1) -> (d0, d1)>
-
-
-module {
-  func @prod(%arg0: tensor<10x20xf32> {tile.name = "A"}) -> f32 {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> f32
-    %0 = tile.contract mul, none, %cst, %arg0 {sink = #map0, srcs = [#map1]} : f32, tensor<10x20xf32> -> f32
-    return %0 : f32
-  }
-}
-)#"));
+  auto program = makeProgram("prod", {A}, {op::prod(A)});
+  runProgram(program);
 }
 
-TEST(Op, Relu) {
+TEST_F(OpTest, Relu) {
   auto I = Placeholder(DType::FLOAT32, {10, 20}, "I");
   auto A = Placeholder(DType::FLOAT32, {10, 20}, "A");
   auto M = Placeholder(DType::FLOAT32, {10, 20}, "M");
-  auto program = makeProgram("relu", {op::relu(I).alpha(A).max_value(M).threshold(0.05)});
-  EXPECT_THAT(program, Eq(R"#(
-
-module {
-  func @relu(%arg0: tensor<10x20xf32> {tile.name = "M"}, %arg1: tensor<10x20xf32> {tile.name = "I"}, %arg2: tensor<10x20xf32> {tile.name = "A"}) -> tensor<10x20xf32> {
-    %cst = "eltwise.sconst"() {value = 5.000000e-02 : f64} : () -> f32
-    %0 = "eltwise.sub"(%arg1, %cst) : (tensor<10x20xf32>, f32) -> tensor<10x20xf32>
-    %1 = "eltwise.mul"(%arg2, %0) : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
-    %2 = "eltwise.cmp_lt"(%arg1, %cst) : (tensor<10x20xf32>, f32) -> tensor<10x20xi1>
-    %3 = "eltwise.select"(%2, %1, %arg1) : (tensor<10x20xi1>, tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
-    %4 = "eltwise.cmp_lt"(%3, %arg0) : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xi1>
-    %5 = "eltwise.select"(%4, %3, %arg0) : (tensor<10x20xi1>, tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
-    return %5 : tensor<10x20xf32>
-  }
-}
-)#"));
+  auto program = makeProgram("relu", {I, A, M}, {op::relu(I).alpha(A).max_value(M).threshold(0.05)});
+  runProgram(program);
 }
 
-TEST(Op, ReluNoAlpha) {
+TEST_F(OpTest, ReluNoAlpha) {
   auto I = Placeholder(DType::FLOAT32, {10, 20}, "I");
   auto M = Placeholder(DType::FLOAT32, {10, 20}, "M");
-  auto program = makeProgram("relu", {op::relu(I).max_value(M).threshold(0.05)});
-  EXPECT_THAT(program, Eq(R"#(
-
-module {
-  func @relu(%arg0: tensor<10x20xf32> {tile.name = "M"}, %arg1: tensor<10x20xf32> {tile.name = "I"}) -> tensor<10x20xf32> {
-    %cst = "eltwise.sconst"() {value = 5.000000e-02 : f64} : () -> f32
-    %cst_0 = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> f32
-    %0 = "eltwise.cmp_lt"(%arg1, %cst) : (tensor<10x20xf32>, f32) -> tensor<10x20xi1>
-    %1 = "eltwise.select"(%0, %cst_0, %arg1) : (tensor<10x20xi1>, f32, tensor<10x20xf32>) -> tensor<10x20xf32>
-    %2 = "eltwise.cmp_lt"(%1, %arg0) : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xi1>
-    %3 = "eltwise.select"(%2, %1, %arg0) : (tensor<10x20xi1>, tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
-    return %3 : tensor<10x20xf32>
-  }
-}
-)#"));
+  auto program = makeProgram("relu", {I, M}, {op::relu(I).max_value(M).threshold(0.05)});
+  runProgram(program);
 }
 
-TEST(Op, ReluNoMaxValue) {
+TEST_F(OpTest, ReluNoMaxValue) {
   auto I = Placeholder(DType::FLOAT32, {10, 20}, "I");
   auto A = Placeholder(DType::FLOAT32, {10, 20}, "A");
-  auto program = makeProgram("relu", {op::relu(I).alpha(A).threshold(0.05)});
-  EXPECT_THAT(program, Eq(R"#(
-
-module {
-  func @relu(%arg0: tensor<10x20xf32> {tile.name = "I"}, %arg1: tensor<10x20xf32> {tile.name = "A"}) -> tensor<10x20xf32> {
-    %cst = "eltwise.sconst"() {value = 5.000000e-02 : f64} : () -> f32
-    %0 = "eltwise.sub"(%arg0, %cst) : (tensor<10x20xf32>, f32) -> tensor<10x20xf32>
-    %1 = "eltwise.mul"(%arg1, %0) : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
-    %2 = "eltwise.cmp_lt"(%arg0, %cst) : (tensor<10x20xf32>, f32) -> tensor<10x20xi1>
-    %3 = "eltwise.select"(%2, %1, %arg0) : (tensor<10x20xi1>, tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
-    return %3 : tensor<10x20xf32>
-  }
-}
-)#"));
+  auto program = makeProgram("relu", {I, A}, {op::relu(I).alpha(A).threshold(0.05)});
+  runProgram(program);
 }
 
-TEST(Op, ReluOnlyThreshold) {
+TEST_F(OpTest, ReluOnlyThreshold) {
   auto I = Placeholder(DType::FLOAT32, {10, 20}, "I");
-  auto program = makeProgram("relu", {op::relu(I).threshold(0.05)});
-  EXPECT_THAT(program, Eq(R"#(
-
-module {
-  func @relu(%arg0: tensor<10x20xf32> {tile.name = "I"}) -> tensor<10x20xf32> {
-    %cst = "eltwise.sconst"() {value = 5.000000e-02 : f64} : () -> f32
-    %cst_0 = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> f32
-    %0 = "eltwise.cmp_lt"(%arg0, %cst) : (tensor<10x20xf32>, f32) -> tensor<10x20xi1>
-    %1 = "eltwise.select"(%0, %cst_0, %arg0) : (tensor<10x20xi1>, f32, tensor<10x20xf32>) -> tensor<10x20xf32>
-    return %1 : tensor<10x20xf32>
-  }
-}
-)#"));
+  auto program = makeProgram("relu", {I}, {op::relu(I).threshold(0.05)});
+  runProgram(program);
 }
 
-TEST(Op, ReluNoParams) {
+TEST_F(OpTest, ReluNoParams) {
   auto I = Placeholder(DType::FLOAT32, {10, 20}, "I");
-  auto program = makeProgram("relu", {op::relu(I)});
-  EXPECT_THAT(program, Eq(R"#(
-
-module {
-  func @relu(%arg0: tensor<10x20xf32> {tile.name = "I"}) -> tensor<10x20xf32> {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> f32
-    %0 = "eltwise.cmp_lt"(%arg0, %cst) : (tensor<10x20xf32>, f32) -> tensor<10x20xi1>
-    %1 = "eltwise.select"(%0, %cst, %arg0) : (tensor<10x20xi1>, f32, tensor<10x20xf32>) -> tensor<10x20xf32>
-    return %1 : tensor<10x20xf32>
-  }
-}
-)#"));
+  auto program = makeProgram("relu", {I}, {op::relu(I)});
+  runProgram(program);
 }
 
 // See: https://leimao.github.io/blog/Reorg-Layer-Explained/
@@ -742,16 +502,14 @@ TEST_F(OpTest, ReorgYoloDecrease) {
 
   auto I = Placeholder(DType::INT64, {N, C, H, W});
   auto O = op::reorg_yolo(I, S, decrease);
-  auto program = ProgramBuilder("reorg_yolo", {O}).compile();
-  IVLOG(1, "program:\n" << program);
+  auto program = makeProgram("reorg_yolo", {I}, {O});
 
   std::vector<int64_t> I_input(N * C * H * W);
   for (unsigned i = 0; i < I_input.size(); i++) {
     I_input[i] = i;
   }
   auto O_expected = reorgYoloRefImpl(I_input, N, C, H, W, S, decrease);
-  IVLOG(1, "expected:\n" << O_expected);
-  checkProgram(program, {{I, I_input}}, {{O, O_expected}});
+  checkExact(program, {I_input}, {O_expected});
 }
 
 TEST_F(OpTest, ReorgYoloIncrease) {
@@ -761,86 +519,51 @@ TEST_F(OpTest, ReorgYoloIncrease) {
 
   auto I = Placeholder(DType::INT64, {N, C, H, W});
   auto O = op::reorg_yolo(I, S, decrease);
-  auto program = ProgramBuilder("reorg_yolo", {O}).compile();
-  IVLOG(1, "program:\n" << program);
+  auto program = makeProgram("reorg_yolo", {I}, {O});
 
   std::vector<int64_t> I_input(N * C * H * W);
   for (unsigned i = 0; i < I_input.size(); i++) {
     I_input[i] = i;
   }
   auto O_expected = reorgYoloRefImpl(I_input, N, C_out, H_out, W_out, S, decrease);
-  IVLOG(1, "expected:\n" << O_expected);
-  checkProgram(program, {{I, I_input}}, {{O, O_expected}});
+  checkExact(program, {I_input}, {O_expected});
 }
 
-TEST(Op, Repeat) {
+TEST_F(OpTest, ReorgYoloNHWC) {
+  const unsigned N = 1, C = 4, H = 6, W = 6, S = 2;
+  const bool decrease = true;
+
+  auto I = Placeholder(DType::INT64, {N, H, W, C});
+  auto O = op::reorg_yolo(I, S, decrease, /*layout=*/"NHWC");
+  auto program = makeProgram("reorg_yolo", {I}, {O});
+  runProgram(program);
+}
+
+TEST_F(OpTest, Repeat) {
   auto A = Placeholder(DType::FLOAT32, {32, 1, 4, 1}, "A");
-  auto X = op::repeat(  //
-      A,                // tensor to repeat
-      3,                // number of repeats
-      2);               // axis to repeat
-  auto program = makeProgram("repeat", {X});
-  IVLOG(1, program);
-  EXPECT_THAT(program, Eq(R"#(
-#map0 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2 * 3 + d3, d4)>
-#map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d4)>
-
-#set0 = affine_set<(d0, d1, d2, d3, d4) : (d3 >= 0, -d3 + 2 >= 0)>
-
-module {
-  func @repeat(%arg0: tensor<32x1x4x1xf32> {tile.name = "A"}) -> tensor<32x1x12x1xf32> {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> f32
-    %0 = tile.contract assign, none, %cst, %arg0 {cons = #set0, sink = #map0, srcs = [#map1]} : f32, tensor<32x1x4x1xf32> -> tensor<32x1x12x1xf32>
-    return %0 : tensor<32x1x12x1xf32>
-  }
-}
-)#"));
+  auto X = op::repeat(A).count(3).axis(2);
+  auto program = makeProgram("repeat", {A}, {X});
+  runProgram(program);
 }
 
-TEST(Op, Reshape) {
+TEST_F(OpTest, Reshape) {
   auto A = Placeholder(DType::FLOAT32, {10, 20}, "A");
   TensorDim I, J;
   A.bind_dims(I, J);
-  auto program = makeProgram("reshape", {op::reshape(A, make_tuple(J, I))});
-  IVLOG(1, program);
-  EXPECT_THAT(program, Eq(R"#(
-module {
-  func @reshape(%arg0: tensor<10x20xf32> {tile.name = "A"}) -> tensor<20x10xf32> {
-    %c20 = tile.constant 20
-    %c10 = tile.constant 10
-    %0 = "tile.reshape"(%arg0, %c20, %c10) : (tensor<10x20xf32>, index, index) -> tensor<20x10xf32>
-    return %0 : tensor<20x10xf32>
-  }
-}
-)#"));
+  auto program = makeProgram("reshape", {A}, {op::reshape(A, make_tuple(J, I))});
+  runProgram(program);
 }
 
-TEST(Op, Sigmoid) {
+TEST_F(OpTest, Sigmoid) {
   auto A = Placeholder(DType::FLOAT32, {10}, "A");
-  auto program = makeProgram("sigmoid", {op::sigmoid(A)});
-  IVLOG(1, program);
-  EXPECT_THAT(program, Eq(R"#(
-
-module {
-  func @sigmoid(%arg0: tensor<10xf32> {tile.name = "A"}) -> tensor<10xf32> {
-    %cst = "eltwise.sconst"() {value = 1.000000e+00 : f64} : () -> f32
-    %0 = "eltwise.ident"(%arg0) : (tensor<10xf32>) -> tensor<10xf32>
-    %1 = "eltwise.neg"(%0) : (tensor<10xf32>) -> tensor<10xf32>
-    %2 = "eltwise.exp"(%1) : (tensor<10xf32>) -> tensor<10xf32>
-    %3 = "eltwise.add"(%2, %cst) : (tensor<10xf32>, f32) -> tensor<10xf32>
-    %4 = "eltwise.div"(%cst, %3) : (f32, tensor<10xf32>) -> tensor<10xf32>
-    return %4 : tensor<10xf32>
-  }
-}
-)#"));
+  auto program = makeProgram("sigmoid", {A}, {op::sigmoid(A)});
+  runProgram(program);
 }
 
 TEST_F(OpTest, Slice) {
   auto A = Placeholder(DType::FLOAT32, {10, 20}, "A");
-  auto X = op::slice(A)  //
-               .add_dims({2, 10});
-  auto program = makeProgram("slice", {X});
-  IVLOG(1, program);
+  auto X = op::slice(A).add_dims({2, 10});
+  auto program = makeProgram("slice", {A}, {X});
   runProgram(program);
 }
 
@@ -849,179 +572,94 @@ TEST_F(OpTest, Slice2) {
   auto X = op::slice(A)  //
                .add_dim(/*start=*/0, /*stop=*/2)
                .add_dim(/*start=*/2, /*stop=*/8, /*step=*/2);
-  auto program = makeProgram("slice", {X});
-  IVLOG(1, program);
+  auto program = makeProgram("slice", {A}, {X});
   runProgram(program);
 }
 
-TEST(Op, Softmax) {
+TEST_F(OpTest, Softmax) {
   auto A = Placeholder(DType::FLOAT32, {10, 20}, "A");
-  auto program = makeProgram("softmax", {op::softmax(A, 1)});
-  IVLOG(1, program);
-  EXPECT_THAT(program, Eq(R"#(
-#map0 = affine_map<(d0, d1) -> (d0, 0)>
-#map1 = affine_map<(d0, d1) -> (d0, d1)>
-
-
-module {
-  func @softmax(%arg0: tensor<10x20xf32> {tile.name = "A"}) -> tensor<10x20xf32> {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> f32
-    %0 = "eltwise.ident"(%arg0) : (tensor<10x20xf32>) -> tensor<10x20xf32>
-    %1 = tile.contract max, none, %cst, %0 {sink = #map0, srcs = [#map1]} : f32, tensor<10x20xf32> -> tensor<10x1xf32>
-    %2 = "eltwise.sub"(%0, %1) : (tensor<10x20xf32>, tensor<10x1xf32>) -> tensor<10x20xf32>
-    %3 = "eltwise.exp"(%2) : (tensor<10x20xf32>) -> tensor<10x20xf32>
-    %4 = tile.contract add, none, %cst, %3 {sink = #map0, srcs = [#map1]} : f32, tensor<10x20xf32> -> tensor<10x1xf32>
-    %5 = "eltwise.div"(%3, %4) : (tensor<10x20xf32>, tensor<10x1xf32>) -> tensor<10x20xf32>
-    return %5 : tensor<10x20xf32>
-  }
-}
-)#"));
+  auto program = makeProgram("softmax", {A}, {op::softmax(A, 1)});
+  runProgram(program);
 }
 
-TEST(Op, SpatialPadding) {
+TEST_F(OpTest, Sort) {
+  auto A = Placeholder(DType::FLOAT32, {5, 4}, "A");
+  auto program = makeProgram("sort", {A}, {op::sort(A, 1, SortDirection::ASC)});
+
+  std::vector<float> input = {
+      81.69, 95.74, 27.74, 43.69,  //
+      55.79, 56.79, 57.52, 5.9,    //
+      39.48, 7.11,  14.81, 66.23,  //
+      20.25, 66.05, 64.5,  71.07,  //
+      67.6,  54.42, 87.59, 80.02,  //
+  };
+
+  std::vector<float> sorted = {
+      27.74, 43.69, 81.69, 95.74,  //
+      5.9,   55.79, 56.79, 57.52,  //
+      7.11,  14.81, 39.48, 66.23,  //
+      20.25, 64.5,  66.05, 71.07,  //
+      54.42, 67.6,  80.02, 87.59,  //
+  };
+
+  checkClose(program, {input}, {sorted});
+}
+
+TEST_F(OpTest, SpatialPadding) {
   auto A = Placeholder(DType::FLOAT32, {64, 4, 32, 32}, "A");
-  auto X = op::spatial_padding(  //
-      A,                         // tensor to perform spatial padding on
-      {1, 3},                    // low pads
-      {3, 3},                    // high pads
-      TensorLayout::NXC);        // data layout
-  auto program = makeProgram("spatial_padding", {X});
-  IVLOG(1, program);
-  EXPECT_THAT(program, Eq(R"#(
-#map0 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2 + 1, d3 + 3)>
-#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
-
-
-module {
-  func @spatial_padding(%arg0: tensor<64x4x32x32xf32> {tile.name = "A"}) -> tensor<64x4x36x38xf32> {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> f32
-    %0 = tile.contract assign, none, %cst, %arg0 {idxs = ["n", "c", "x0", "x1"], sink = #map0, srcs = [#map1]} : f32, tensor<64x4x32x32xf32> -> tensor<64x4x36x38xf32>
-    return %0 : tensor<64x4x36x38xf32>
-  }
-}
-)#"));
+  auto X = op::spatial_padding(A, {1, 3}, {3, 3}, op::TensorLayout::NXC);
+  auto program = makeProgram("spatial_padding", {A}, {X});
+  runProgram(program);
 }
 
-TEST(Op, Square) {
+TEST_F(OpTest, Square) {
   auto A = Placeholder(DType::FLOAT32, {10}, "A");
-  auto program = makeProgram("square", {op::square(A)});
-  IVLOG(1, program);
-  EXPECT_THAT(program, Eq(R"#(
-
-module {
-  func @square(%arg0: tensor<10xf32> {tile.name = "A"}) -> tensor<10xf32> {
-    %0 = "eltwise.mul"(%arg0, %arg0) : (tensor<10xf32>, tensor<10xf32>) -> tensor<10xf32>
-    return %0 : tensor<10xf32>
-  }
-}
-)#"));
+  auto program = makeProgram("square", {A}, {op::square(A)});
+  runProgram(program);
 }
 
-TEST(Op, Sum) {
+TEST_F(OpTest, Sum) {
   auto A = Placeholder(DType::FLOAT32, {10, 20}, "A");
-  auto program = makeProgram("sum", {op::sum(A)});
-  IVLOG(1, program);
-  EXPECT_THAT(program, Eq(R"#(
-#map0 = affine_map<() -> ()>
-#map1 = affine_map<(d0, d1) -> (d0, d1)>
-
-
-module {
-  func @sum(%arg0: tensor<10x20xf32> {tile.name = "A"}) -> f32 {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> f32
-    %0 = tile.contract add, none, %cst, %arg0 {sink = #map0, srcs = [#map1]} : f32, tensor<10x20xf32> -> f32
-    return %0 : f32
-  }
-}
-)#"));
+  auto program = makeProgram("sum", {A}, {op::sum(A)});
+  runProgram(program);
 }
 
-TEST(Op, Squeeze) {
-  auto A = Placeholder(DType::FLOAT32, {32, 1, 4, 1}, "A");
-  auto X = op::squeeze(  //
-      A,                 // tensor to squeeze
-      {1, 3});           // axes to squeeze
-  auto program = makeProgram("squeeze", {X});
-  IVLOG(1, program);
-  EXPECT_THAT(program, Eq(R"#(
-module {
-  func @squeeze(%arg0: tensor<32x1x4x1xf32> {tile.name = "A"}) -> tensor<32x4xf32> {
-    %c32 = tile.constant 32
-    %c4 = tile.constant 4
-    %0 = "tile.reshape"(%arg0, %c32, %c4) : (tensor<32x1x4x1xf32>, index, index) -> tensor<32x4xf32>
-    return %0 : tensor<32x4xf32>
-  }
-}
-)#"));
+TEST_F(OpTest, Squeeze) {
+  auto A = Placeholder(DType::UINT64, {3, 1, 4, 1}, "A");
+  auto C = op::squeeze(A, {1, 3});
+  auto program = makeProgram("squeeze", {A}, {C});
+
+  std::vector<uint64_t> A_input = {0, 1, 2,  3,  //
+                                   4, 5, 6,  7,  //
+                                   8, 9, 10, 11};
+  checkExact(program, {A_input}, {A_input});
 }
 
-TEST(Op, Tile) {
+TEST_F(OpTest, Tile) {
   auto A = Placeholder(DType::FLOAT32, {10, 20}, "A");
-  auto X = op::tile(  //
-      A,              // tensor to tile
-      {5, 4});        // tiling factors
-  auto program = makeProgram("tile", {X});
-  IVLOG(1, program);
-  EXPECT_THAT(program, Eq(R"#(
-#map0 = affine_map<(d0, d1, d2, d3) -> (d0 * 10 + d1, d2 * 20 + d3)>
-#map1 = affine_map<(d0, d1, d2, d3) -> (d1, d3)>
-
-
-module {
-  func @tile(%arg0: tensor<10x20xf32> {tile.name = "A"}) -> tensor<50x80xf32> {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> f32
-    %0 = tile.contract assign, none, %cst, %arg0 {no_reduce, sink = #map0, srcs = [#map1]} : f32, tensor<10x20xf32> -> tensor<50x80xf32>
-    return %0 : tensor<50x80xf32>
-  }
-}
-)#"));
+  auto X = op::tile(A, {5, 4});
+  auto program = makeProgram("tile", {A}, {X});
+  runProgram(program);
 }
 
-TEST(Op, Transpose) {
+TEST_F(OpTest, Transpose) {
   auto A = Placeholder(DType::FLOAT32, {10, 20}, "A");
-  auto program = makeProgram("transpose", {op::transpose(A)});
-  IVLOG(1, program);
-  EXPECT_THAT(program, Eq(R"#(
-#map0 = affine_map<(d0, d1) -> (d0, d1)>
-#map1 = affine_map<(d0, d1) -> (d1, d0)>
-
-
-module {
-  func @transpose(%arg0: tensor<10x20xf32> {tile.name = "A"}) -> tensor<20x10xf32> {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> f32
-    %0 = tile.contract assign, none, %cst, %arg0 {sink = #map0, srcs = [#map1]} : f32, tensor<10x20xf32> -> tensor<20x10xf32>
-    return %0 : tensor<20x10xf32>
-  }
-}
-)#"));
+  auto program = makeProgram("transpose", {A}, {op::transpose(A)});
+  runProgram(program);
 }
 
-TEST(Op, Variance) {
+TEST_F(OpTest, Unsqueeze) {
+  auto A = Placeholder(DType::UINT64, {3, 4}, "A");
+  auto C = op::unsqueeze(A, {0});
+  auto program = makeProgram("unsqueeze", {A}, {C});
+  std::vector<uint64_t> A_input = {0, 1, 2,  3,  //
+                                   4, 5, 6,  7,  //
+                                   8, 9, 10, 11};
+  checkExact(program, {A_input}, {A_input});
+}
+
+TEST_F(OpTest, Variance) {
   auto A = Placeholder(DType::FLOAT32, {10, 20}, "A");
-  auto program = makeProgram("variance", {op::variance(A)});
-  IVLOG(1, program);
-  EXPECT_THAT(program, Eq(R"#(
-#map0 = affine_map<(d0, d1, d2, d3) -> (d0, d1)>
-#map1 = affine_map<(d0, d1, d2, d3) -> (d2, d3)>
-#map2 = affine_map<() -> ()>
-#map3 = affine_map<(d0, d1) -> (d0, d1)>
-
-
-module {
-  func @variance(%arg0: tensor<10x20xf32> {tile.name = "A"}) -> f32 {
-    %cst = "eltwise.sconst"() {value = 0.000000e+00 : f64} : () -> f32
-    %c200 = "eltwise.sconst"() {value = 200 : index} : () -> si32
-    %0 = tile.contract add, none, %cst, %arg0 {sink = #map0, srcs = [#map1]} : f32, tensor<10x20xf32> -> tensor<1x1xf32>
-    %1 = "eltwise.div"(%0, %c200) : (tensor<1x1xf32>, si32) -> tensor<1x1xf32>
-    %2 = "eltwise.sub"(%arg0, %1) : (tensor<10x20xf32>, tensor<1x1xf32>) -> tensor<10x20xf32>
-    %3 = "eltwise.mul"(%2, %2) : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
-    %4 = tile.contract add, none, %cst, %3 {sink = #map2, srcs = [#map3]} : f32, tensor<10x20xf32> -> f32
-    %5 = "eltwise.div"(%4, %c200) : (f32, si32) -> f32
-    return %5 : f32
-  }
+  auto program = makeProgram("variance", {A}, {op::variance(A)});
+  runProgram(program);
 }
-)#"));
-}
-
-}  // namespace
-}  // namespace plaidml::op

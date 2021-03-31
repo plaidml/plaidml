@@ -4,6 +4,7 @@ import argparse
 import glob
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -55,8 +56,13 @@ def get_engine(pkey):
         return ':crown:'
     if 'opencl-cpu' in pkey:
         return ':crown::cl:'
-    else:
-        return (':tensorflow:')
+    if 'tf-' in pkey:
+        return ':tensorflow:'
+    if 'ocl-gen' in pkey:
+        return ':information_source::cl:'
+    if 'vk-gen' in pkey:
+        return ':information_source:'
+    return ':small_blue_diamond:'
 
 
 def get_shard_emoji(shard):
@@ -150,7 +156,7 @@ def cmd_build(args, remainder):
 
     env = os.environ.copy()
     variant = plan['VARIANTS'][args.variant]
-    for key, value in variant['env'].items():
+    for key, value in variant.get('env', {}).items():
         env[key] = str(value)
 
     explain_log = 'explain.log'
@@ -225,8 +231,8 @@ def make_all_wheels(workdir):
 
 
 def download_test_artifacts(pattern):
-    util.buildkite_download(pattern, '.')
-    util.buildkite_download(pattern.replace('/', '\\'), '.')
+    util.buildkite_download(pattern, '.', check=False)
+    util.buildkite_download(pattern.replace('/', '\\'), '.', check=False)
     for path in glob.glob(pattern):
         src = Path(path)
         tgt = Path(path.replace('\\', '/'))

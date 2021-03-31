@@ -28,7 +28,7 @@ class BoundsCheckGenerator {
 private:
   BoundsCheckGenerator(LoadStoreOp op, Builder builder)
       : op(op), loc(op.getLoc()),
-        module(op.template getParentOfType<ModuleOp>()),
+        module(op->template getParentOfType<ModuleOp>()),
         i64Type(builder.getIntegerType(64)), indexType(builder.getIndexType()) {
   }
 
@@ -42,15 +42,15 @@ public:
     const char *symbol = "plaidml_rt_bounds_check";
     auto context = module.getContext();
     if (module.lookupSymbol(symbol)) {
-      return SymbolRefAttr::get(symbol, context);
+      return SymbolRefAttr::get(context, symbol);
     }
     OpBuilder builder(module.getBodyRegion());
     std::array<Type, 2> inputs{indexType, i64Type};
     ArrayRef<Type> results{};
     auto funcType = builder.getFunctionType(inputs, results);
     ArrayRef<NamedAttribute> attrs{};
-    builder.create<FuncOp>(loc, symbol, funcType, attrs);
-    return SymbolRefAttr::get(symbol, context);
+    builder.create<FuncOp>(loc, symbol, funcType, attrs).setPrivate();
+    return SymbolRefAttr::get(context, symbol);
   }
 
   void generateBoundsChecks() {

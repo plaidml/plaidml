@@ -5,49 +5,71 @@
 #include <string>
 #include <vector>
 
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/IR/Module.h"
 #include "llvm/Support/FormatVariadic.h"
 
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OperationSupport.h"
-#include "mlir/IR/StandardTypes.h"
+
+#include "pmlc/util/logging.h"
 
 namespace pmlc::util {
 
-// Adjust the result types on the containing FuncOp if this op relates to an
-// output
-void UpdateFuncOpType(mlir::Operation *op);
+static constexpr const char *kTagAttribute = "tags";
 
-llvm::StringRef getOpName(const mlir::OperationName &name);
+uint64_t getByteSize(mlir::MemRefType type);
 
-template <typename Filter>
-std::vector<mlir::AbstractOperation *> getAllOpsWith(mlir::MLIRContext *context,
-                                                     Filter filter) {
-  std::vector<mlir::AbstractOperation *> ops;
-  for (auto *op : context->getRegisteredOperations()) {
-    if (filter(op)) {
-      ops.emplace_back(op);
-    }
-  }
-  return ops;
-}
+// Check if all tags exist in op and they are all true
+bool hasAllTags(mlir::Operation *op, llvm::ArrayRef<llvm::StringRef> tags);
 
-template <typename Interface>
-std::vector<mlir::AbstractOperation *>
-getAllOpsWithInterface(mlir::MLIRContext *context) {
-  return getAllOpsWith(context, [](mlir::AbstractOperation *op) {
-    return op->getInterface<Interface>();
-  });
-}
+// Check if tag exists in op
+bool hasTag(mlir::Operation *op, llvm::StringRef tag);
 
-template <typename Set>
-std::string getUniqueName(Set *names, llvm::StringRef name) {
-  auto next = name.str();
-  auto [it, isUnique] = names->insert(next); // NOLINT(whitespace/braces)
-  for (unsigned i = 0; !isUnique; i++) {
-    next = llvm::formatv("{0}_{1}", name, i).str();
-    std::tie(it, isUnique) = names->insert(next);
-  }
-  return next;
-}
+// Set tags in op
+void setTags(mlir::Operation *op, llvm::ArrayRef<llvm::StringRef> tags);
+
+// Pack function arguments to an i8** pointer
+void wrapFunctionAndPackArguments(llvm::Module *module,
+                                  llvm::StringRef funcName,
+                                  llvm::StringRef newName);
+
+// A diagnostic tool for searching for problematic transformations in passes.
+// Example usage:
+//   DiagnosticCounter counter;
+//   for (auto op : func.getOps<SomeOp>()) {
+//     auto result = counter.next();
+//     if (result == DiagnosticCounter::Result::Break)
+//       continue;
+//     if (result == DiagnosticCounter::Result::Match)
+//       IVLOG(0, "match: " << debugString(*fuseA));
+//     // Do transformation as normal
+//   }
+// Use the PLAIDML_COUNTER environment variable to define the threshold where
+// the counter will return Break. When the counter reaches the threshold
+// excatly, Match is returned.
+struct DiagnosticCounter {
+  enum Result {
+    Break,
+    Continue,
+    Match,
+  };
+
+  DiagnosticCounter();
+  Result next();
+
+  size_t counter;
+  size_t threshold;
+};
 
 } // namespace pmlc::util
+
+namespace llvm {
+
+template <class T>
+inline std::ostream &operator<<(std::ostream &os, const SmallVectorImpl<T> &x) {
+  return stringify_collection(os, x.begin(), x.end());
+}
+
+} // namespace llvm

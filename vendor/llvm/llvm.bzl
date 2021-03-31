@@ -191,6 +191,7 @@ posix_cmake_vars = {
     "HAVE_PTHREAD_H": 1,
     "HAVE_SIGNAL_H": 1,
     "HAVE_STDINT_H": 1,
+    "HAVE_SYSEXITS_H": 1,
     "HAVE_SYS_IOCTL_H": 1,
     "HAVE_SYS_MMAN_H": 1,
     "HAVE_SYS_PARAM_H": 1,
@@ -214,7 +215,7 @@ posix_cmake_vars = {
     "HAVE_GETTIMEOFDAY": 1,
     "HAVE_INT64_T": 1,
     "HAVE_ISATTY": 1,
-    "HAVE_LIBEDIT": 0,
+    "HAVE_LIBEDIT": 0,  # (PlaidML)
     "HAVE_LIBPTHREAD": 1,
     "HAVE_LIBZ": 1,
     "HAVE_MKDTEMP": 1,
@@ -293,11 +294,6 @@ win32_cmake_vars = {
 
     # LLVM features
     "LTDL_SHLIB_EXT": ".dll",
-
-    # ThreadPoolExecutor global destructor and thread handshaking do not work
-    # on this platform when used as a DLL.
-    # See: https://bugs.llvm.org/show_bug.cgi?id=44211
-    "LLVM_ENABLE_THREADS": 0,
 }
 
 # Select a set of CMake variables based on the platform.
@@ -312,6 +308,33 @@ llvm_all_cmake_vars = select({
             darwin_cmake_vars,
         ),
     ),
+    # (PlaidML)
+    # "@bazel_tools//src/conditions:macos_arm64": cmake_var_string(
+    #     _dict_add(
+    #         cmake_vars,
+    #         llvm_target_cmake_vars("AArch64", "arm64-apple-darwin"),
+    #         posix_cmake_vars,
+    #         darwin_cmake_vars,
+    #     ),
+    # ),
+    # (PlaidML)
+    # "@bazel_tools//src/conditions:linux_aarch64": cmake_var_string(
+    #     _dict_add(
+    #         cmake_vars,
+    #         llvm_target_cmake_vars("AArch64", "aarch64-unknown-linux_gnu"),
+    #         posix_cmake_vars,
+    #         linux_cmake_vars,
+    #     ),
+    # ),
+    # (PlaidML)
+    # "@bazel_tools//src/conditions:linux_ppc64le": cmake_var_string(
+    #     _dict_add(
+    #         cmake_vars,
+    #         llvm_target_cmake_vars("PowerPC", "powerpc64le-unknown-linux_gnu"),
+    #         posix_cmake_vars,
+    #         linux_cmake_vars,
+    #     ),
+    # ),
     "@bazel_tools//src/conditions:windows": cmake_var_string(
         _dict_add(
             cmake_vars,
@@ -319,6 +342,23 @@ llvm_all_cmake_vars = select({
             win32_cmake_vars,
         ),
     ),
+    # (PlaidML)
+    # "@bazel_tools//src/conditions:freebsd": cmake_var_string(
+    #     _dict_add(
+    #         cmake_vars,
+    #         llvm_target_cmake_vars("X86", "x86_64-unknown-freebsd"),
+    #         posix_cmake_vars,
+    #     ),
+    # ),
+    # (PlaidML)
+    # "@bazel_tools//src/conditions:linux_s390x": cmake_var_string(
+    #     _dict_add(
+    #         cmake_vars,
+    #         llvm_target_cmake_vars("SystemZ", "systemz-unknown-linux_gnu"),
+    #         posix_cmake_vars,
+    #         linux_cmake_vars,
+    #     ),
+    # ),
     "//conditions:default": cmake_var_string(
         _dict_add(
             cmake_vars,
@@ -331,6 +371,8 @@ llvm_all_cmake_vars = select({
 
 llvm_linkopts = select({
     "@bazel_tools//src/conditions:windows": [],
+    # (PlaidML)
+    # "@bazel_tools//src/conditions:freebsd": ["-ldl", "-lm", "-lpthread", "-lexecinfo"],
     "//conditions:default": ["-ldl", "-lm", "-lpthread"],
 })
 

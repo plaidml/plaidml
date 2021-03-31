@@ -1,75 +1,46 @@
 #pragma once
 
+#include <gflags/gflags.h>
 #include <gmock/gmock.h>
 
-#include <map>
+#include <string>
 #include <variant>
 #include <vector>
 
-#include "plaidml/exec/exec.h"
-#include "pmlc/util/logging.h"
+#include "half.hpp"
+#include "plaidml/edsl/edsl.h"
 
-namespace plaidml::edsl {
+DECLARE_bool(generate_filecheck_input);
 
-using MultiBuffer = std::variant<  //
-    std::vector<float>,            //
-    std::vector<double>,           //
-    std::vector<int8_t>,           //
-    std::vector<int16_t>,          //
-    std::vector<int32_t>,          //
-    std::vector<int64_t>,          //
-    std::vector<uint8_t>,          //
-    std::vector<uint16_t>,         //
-    std::vector<uint32_t>,         //
+namespace plaidml {
+
+using MultiBuffer = std::variant<   //
+    std::vector<half_float::half>,  //
+    std::vector<float>,             //
+    std::vector<double>,            //
+    std::vector<int8_t>,            //
+    std::vector<int16_t>,           //
+    std::vector<int32_t>,           //
+    std::vector<int64_t>,           //
+    std::vector<uint8_t>,           //
+    std::vector<uint16_t>,          //
+    std::vector<uint32_t>,          //
     std::vector<uint64_t>>;
 
-using TensorBuffers = std::map<TensorRef, MultiBuffer>;
+using TensorBuffers = std::vector<MultiBuffer>;
 
 class TestFixture : public ::testing::Test {
  protected:
-  template <typename T>
-  void compareElements(T a, T b) {
-    EXPECT_EQ(a, b);
-  }
+  void checkExact(Program program, const TensorBuffers& inputs, const TensorBuffers& expected);
 
-  void compareElements(float a, float b) { EXPECT_NEAR(a, b, (fabs(a) + fabs(b)) / 10000.0); }
-  void compareElements(double a, double b) { EXPECT_NEAR(a, b, (fabs(a) + fabs(b)) / 10000.0); }
+  void checkClose(Program program, const TensorBuffers& inputs, const TensorBuffers& expected, double tolerance = 1e-5);
 
-  template <typename T>
-  void compareBuffers(plaidml::View view, const std::vector<T>& expected) {
-    ASSERT_THAT(view.size(), expected.size() * sizeof(expected[0]));
-    auto data = reinterpret_cast<T*>(view.data());
-    std::vector<T> actual(data, data + expected.size());
-    IVLOG(3, "Expected: " << expected);
-    IVLOG(3, "Actual  : " << actual);
-    for (size_t i = 0; i < actual.size(); i++) {
-      compareElements(actual[i], expected[i]);
-    }
-  }
+  Program makeProgram(const std::string& name, const std::vector<edsl::Tensor>& inputs,
+                      const std::vector<edsl::Tensor>& outputs);
 
-  void checkProgram(                //
-      const Program& program,       //
-      const TensorBuffers& inputs,  //
-      const TensorBuffers& expected) {
-#if !defined(_WIN32)
-    auto binder = exec::Binder(program);
-    auto executable = binder.compile();
-    for (const auto& kvp : inputs) {
-      std::visit([&](auto&& vec) { binder.input(kvp.first).copy_from(vec.data()); }, kvp.second);
-    }
-    executable->run();
-    for (auto kvp : expected) {
-      auto view = binder.output(kvp.first).mmap_current();
-      std::visit([&](auto&& vec) { compareBuffers(view, vec); }, kvp.second);
-    }
-#endif
-  }
+  void writeForFileCheck(const Program& program);
 
-  void runProgram(const Program& program) {
-#if !defined(_WIN32)
-    exec::Binder(program).compile()->run();
-#endif
-  }
+  void runProgram(Program program);
 };
 
-}  // namespace plaidml::edsl
+}  // namespace plaidml

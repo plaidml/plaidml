@@ -1,0 +1,33 @@
+#!/bin/bash
+
+set -euo pipefail
+
+if [ "${BUILDKITE_STEP_KEY}" != "linux_x86_64_cmake" ]; then
+    exit 0
+fi
+
+echo "--- :snake: Providing conda and job environment"
+
+if [ ! -d ${CONDA_PREFIX} ]; then
+  echo "Can't find conda installation. Please set CONDA_PREFIX to the local conda root directory on ${BUILDKITE_AGENT_NAME}."
+  exit 1
+fi
+
+# shellcheck disable=SC1090
+source "${CONDA_PREFIX}/etc/profile.d/conda.sh"
+
+# Default name is pipeline-slug
+CONDA_ENV="${BUILDKITE_AGENT_NAME}-${BUILDKITE_PIPELINE_SLUG}"
+CONDA_ENV_FILE=environment.yml
+
+# Handle env update
+echo "Auto-Update environment $CONDA_ENV."
+conda env update --prune -n "${CONDA_ENV}" -f "${CONDA_ENV_FILE}"
+
+if conda activate "$CONDA_ENV"; then
+  :
+else
+  echo "Creating environment $CONDA_ENV from $CONDA_ENV_FILE."
+  conda env create --force -n "$CONDA_ENV" -f "$CONDA_ENV_FILE" || { echo "Failed to create environment."; exit 1; }
+  conda activate "$CONDA_ENV" || { echo "Failed to activate new environment."; exit 1; }
+fi

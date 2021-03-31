@@ -8,138 +8,101 @@
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "pmlc/conversion/pxa_to_affine/pass_detail.h"
+#include "pmlc/conversion/pxa_to_affine/passes.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
+#include "pmlc/dialect/stdx/ir/ops.h"
 #include "pmlc/util/logging.h"
+#include "pmlc/util/tags.h"
 #include "pmlc/util/util.h"
 
+using namespace mlir; // NOLINT
+
 namespace pmlc::conversion::pxa_to_affine {
+
 namespace pxa = dialect::pxa;
-
-using mlir::AffineIfOp;
-using mlir::AffineLoadOp;
-using mlir::AffineParallelOp;
-using mlir::AffineStoreOp;
-using mlir::AllocOp;
-using mlir::ArrayRef;
-using mlir::ConversionPattern;
-using mlir::ConversionPatternRewriter;
-using mlir::FloatAttr;
-using mlir::FloatType;
-using mlir::FuncOp;
-using mlir::FunctionType;
-using mlir::IntegerAttr;
-using mlir::IntegerType;
-using mlir::LogicalResult;
-using mlir::MLIRContext;
-using mlir::OpBuilder;
-using mlir::OpConversionPattern;
-using mlir::Operation;
-using mlir::RankedTensorType;
-using mlir::ReturnOp;
-using mlir::Type;
-using mlir::Value;
-
-using util::AggregationKind;
+namespace stdx = dialect::stdx;
 
 namespace {
 
-struct LowerPXAToAffinePass
-    : public LowerPXAToAffineBase<LowerPXAToAffinePass> {
-  void runOnOperation() final;
-};
-
-template <typename OpType>
-struct LoweringBase : public OpConversionPattern<OpType> {
-  MLIRContext *ctx;
-
-  explicit LoweringBase(MLIRContext *ctx)
-      : OpConversionPattern<OpType>(ctx), ctx(ctx) {}
-  LogicalResult match(Operation *op) const override { return mlir::success(); }
-};
-
-// This pattern removes affine.parallel ops with no induction variables
-struct AffineParallelRank0Remover
-    : public mlir::OpRewritePattern<AffineParallelOp> {
-  using mlir::OpRewritePattern<AffineParallelOp>::OpRewritePattern;
-
-  explicit AffineParallelRank0Remover(MLIRContext *ctx)
-      : OpRewritePattern(ctx) {}
-
-  LogicalResult
-  matchAndRewrite(AffineParallelOp op,
-                  mlir::PatternRewriter &rewriter) const override {
-    // Check that there are no induction variables
-    if (op.lowerBoundsMap().getNumResults() != 0)
-      return mlir::failure();
-    // Remove the affine.parallel wrapper, retain the body in the same location
-    auto &parentOps = rewriter.getInsertionBlock()->getOperations();
-    auto &parallelBodyOps = op.region().front().getOperations();
-    parentOps.splice(mlir::Block::iterator(op), parallelBodyOps,
-                     parallelBodyOps.begin(), std::prev(parallelBodyOps.end()));
-    // Replace outputs with values from yield
-    auto termIt = std::prev(parallelBodyOps.end());
-    for (size_t i = 0; i < op.getNumResults(); i++) {
-      op.getResult(i).replaceAllUsesWith(termIt->getOperand(i));
-    }
-    rewriter.eraseOp(op);
-    return mlir::success();
-  }
-};
-
 struct AffineParallelOpConversion
     : public OpConversionPattern<AffineParallelOp> {
-
-  explicit AffineParallelOpConversion(MLIRContext *ctx)
-      : OpConversionPattern<AffineParallelOp>(ctx) {}
+  using OpConversionPattern<AffineParallelOp>::OpConversionPattern;
 
   LogicalResult
   matchAndRewrite(AffineParallelOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
-    // This conversion doesn't work in the rank 0 case; that case will be
-    // covered by AffineParallelRank0Remover
-    if (op.lowerBoundsMap().getNumResults() == 0)
-      return mlir::failure();
-    // Create an affine loop nest, capture induction variables
+                  ConversionPatternRewriter &rewriter) const final {
+    // Make a map for induction variable
     llvm::SmallVector<Value, 8> ivs;
-    for (unsigned int i = 0; i < op.lowerBoundsMap().getNumResults(); i++) {
-      auto step = op.steps().getValue()[i].cast<IntegerAttr>().getInt();
-      auto af = rewriter.create<mlir::AffineForOp>(
-          op.getLoc(), op.getLowerBoundsOperands(),
-          op.lowerBoundsMap().getSubMap({i}), op.getUpperBoundsOperands(),
-          op.upperBoundsMap().getSubMap({i}), step);
-      rewriter.setInsertionPointToStart(&af.region().front());
-      ivs.push_back(af.getInductionVar());
+    auto steps = op.getSteps();
+    // If it's tagged, leave as a parallel
+    if (hasTags(op)) {
+      // Make a new affine parallel with no return values
+      AffineParallelOp newOp;
+      if (op.getIVs().size() == 0) {
+        // If it's empty, add a dummy index (since some affine / scf things
+        // don't like 0 index affine.parallel
+        newOp = rewriter.create<AffineParallelOp>(
+            op.getLoc(),                                                 //
+            ArrayRef<Type>{}, ArrayRef<AtomicRMWKind>{},                 //
+            AffineMap::getConstantMap(0, op.getContext()), ValueRange(), //
+            AffineMap::getConstantMap(1, op.getContext()), ValueRange(), //
+            ArrayRef<int64_t>{1});
+      } else {
+        // Normal case for parallels with IVs
+        newOp = rewriter.create<AffineParallelOp>(
+            op.getLoc(),                                      //
+            ArrayRef<Type>{}, ArrayRef<AtomicRMWKind>{},      //
+            op.lowerBoundsMap(), op.getLowerBoundsOperands(), //
+            op.upperBoundsMap(), op.getUpperBoundsOperands(), //
+            steps);
+        for (Value iv : newOp.getIVs()) {
+          ivs.push_back(iv);
+        }
+      }
+      copyTags(newOp, op);
+      rewriter.setInsertionPointToStart(newOp.getBody());
+    } else {
+      // Otherwise unroll into serial loops
+      for (unsigned int i = 0; i < op.lowerBoundsMap().getNumResults(); i++) {
+        auto forOp = rewriter.create<AffineForOp>(
+            op.getLoc(), op.getLowerBoundsOperands(),
+            op.lowerBoundsMap().getSubMap({i}), op.getUpperBoundsOperands(),
+            op.upperBoundsMap().getSubMap({i}), steps[i]);
+        rewriter.setInsertionPointToStart(forOp.getBody());
+        ivs.push_back(forOp.getInductionVar());
+      }
     }
-    // Move ParallelOp's operations (single block) to Affine innermost loop.
-    auto &innerLoopOps = rewriter.getInsertionBlock()->getOperations();
-    auto &parallelBodyOps = op.region().front().getOperations();
-    innerLoopOps.splice(std::prev(innerLoopOps.end()), parallelBodyOps,
-                        parallelBodyOps.begin(),
-                        std::prev(parallelBodyOps.end()));
+
+    // Move ParallelOp's operations across to the new op
+    auto &oldBodyOps = op.getBody()->getOperations();
+    auto &newBodyOps = rewriter.getInsertionBlock()->getOperations();
+    newBodyOps.splice(std::prev(newBodyOps.end()), oldBodyOps,
+                      oldBodyOps.begin(), std::prev(oldBodyOps.end()));
     // Replace all uses of old values
     size_t idx = 0;
-    for (auto arg : op.region().front().getArguments()) {
+    for (auto arg : op.getBody()->getArguments()) {
       arg.replaceAllUsesWith(ivs[idx++]);
     }
     // Replace outputs with values from yield
-    auto termIt = std::prev(parallelBodyOps.end());
+    auto termIt = std::prev(oldBodyOps.end());
     for (size_t i = 0; i < op.getNumResults(); i++) {
       op.getResult(i).replaceAllUsesWith(termIt->getOperand(i));
     }
     // We are done. Remove original op.
     rewriter.eraseOp(op);
-    return mlir::success();
+    return success();
   }
 };
 
-struct AffineIfOpConversion : public LoweringBase<AffineIfOp> {
-  explicit AffineIfOpConversion(MLIRContext *ctx) : LoweringBase(ctx) {}
+struct AffineIfOpConversion : public OpConversionPattern<AffineIfOp> {
+  using OpConversionPattern<AffineIfOp>::OpConversionPattern;
 
-  void rewrite(AffineIfOp op, ArrayRef<Value> operands,
-               ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(AffineIfOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const final {
     // Make a new if value
-    auto newIf = rewriter.create<mlir::AffineIfOp>(
-        op.getLoc(), op.getIntegerSet(), op.getOperands(), op.hasElse());
+    auto newIf = rewriter.create<AffineIfOp>(op.getLoc(), op.getIntegerSet(),
+                                             op.getOperands(), op.hasElse());
     // Move 'then' operations over, ignoring terminator
     auto &newThenOps = newIf.getThenBlock()->getOperations();
     auto &oldThenOps = op.getThenBlock()->getOperations();
@@ -157,70 +120,113 @@ struct AffineIfOpConversion : public LoweringBase<AffineIfOp> {
                       oldElseOps.begin(), std::prev(oldElseOps.end()));
     // Erase original
     rewriter.eraseOp(op);
+    return success();
   }
 };
 
-struct AffineReduceOpConversion : public LoweringBase<pxa::AffineReduceOp> {
-  explicit AffineReduceOpConversion(MLIRContext *ctx) : LoweringBase(ctx) {}
+struct PxaLoadOpConversion : public OpConversionPattern<pxa::PxaLoadOp> {
+  using OpConversionPattern<pxa::PxaLoadOp>::OpConversionPattern;
 
-  void rewrite(pxa::AffineReduceOp op, ArrayRef<Value> operands,
-               ConversionPatternRewriter &rewriter) const override {
-    auto source = rewriter.create<AffineLoadOp>(op.getLoc(), op.mem(), op.map(),
-                                                op.idxs());
-    auto reduce = createReduction(rewriter, op, source.getResult());
-    rewriter.create<AffineStoreOp>(op.getLoc(), reduce, op.mem(), op.map(),
-                                   op.idxs());
-    op.replaceAllUsesWith(op.mem());
-    rewriter.eraseOp(op);
+  LogicalResult
+  matchAndRewrite(pxa::PxaLoadOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const final {
+    rewriter.replaceOpWithNewOp<AffineLoadOp>(op, op.memref(),
+                                              op.getAffineMap(), op.indices());
+    return success();
   }
+};
 
-  Value createReduction(ConversionPatternRewriter &rewriter,
-                        pxa::AffineReduceOp op, Value source) const {
-    switch (op.agg()) {
-    case AggregationKind::assign:
-      return op.val();
-    case AggregationKind::add: {
-      if (source.getType().isa<FloatType>()) {
-        return rewriter.create<mlir::AddFOp>(op.getLoc(), source, op.val());
-      }
-      return rewriter.create<mlir::AddIOp>(op.getLoc(), source, op.val());
-    }
-    case AggregationKind::max: {
-      if (source.getType().isa<FloatType>()) {
-        auto cmp = rewriter.create<mlir::CmpFOp>(
-            op.getLoc(), mlir::CmpFPredicate::OGT, op.val(), source);
-        return rewriter.create<mlir::SelectOp>(op.getLoc(), cmp, op.val(),
-                                               source);
-      }
-      // TODO: determine whether to use signed or unsigned compare
-      auto cmp = rewriter.create<mlir::CmpIOp>(
-          op.getLoc(), mlir::CmpIPredicate::sgt, op.val(), source);
-      return rewriter.create<mlir::SelectOp>(op.getLoc(), cmp, op.val(),
-                                             source);
-    }
-    case AggregationKind::min: {
-      if (source.getType().isa<FloatType>()) {
-        auto cmp = rewriter.create<mlir::CmpFOp>(
-            op.getLoc(), mlir::CmpFPredicate::OLT, op.val(), source);
-        return rewriter.create<mlir::SelectOp>(op.getLoc(), cmp, op.val(),
-                                               source);
-      }
-      // TODO: determine whether to use signed or unsigned compare
-      auto cmp = rewriter.create<mlir::CmpIOp>(
-          op.getLoc(), mlir::CmpIPredicate::slt, op.val(), source);
-      return rewriter.create<mlir::SelectOp>(op.getLoc(), cmp, op.val(),
-                                             source);
-    }
-    case AggregationKind::mul: {
-      if (source.getType().isa<FloatType>()) {
-        return rewriter.create<mlir::MulFOp>(op.getLoc(), source, op.val());
-      }
-      return rewriter.create<mlir::MulIOp>(op.getLoc(), source, op.val());
-    }
-    default:
-      llvm_unreachable("Unsupported aggregation for "
-                       "AffineReduceOpConversion::createReduction");
-    }
+struct PxaVectorLoadOpConversion
+    : public OpConversionPattern<pxa::PxaVectorLoadOp> {
+  using OpConversionPattern<pxa::PxaVectorLoadOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(pxa::PxaVectorLoadOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const final {
+    rewriter.replaceOpWithNewOp<AffineVectorLoadOp>(
+        op, op.getVectorType(), op.memref(), op.getAffineMap(), op.indices());
+    return success();
+  }
+};
+
+static Value createReduction(ConversionPatternRewriter &rewriter, Location loc,
+                             AtomicRMWKind agg, Value source, Value val) {
+  switch (agg) {
+  case AtomicRMWKind::assign:
+    return val;
+  case AtomicRMWKind::addf:
+    return rewriter.create<AddFOp>(loc, source, val);
+  case AtomicRMWKind::addi:
+    return rewriter.create<AddIOp>(loc, source, val);
+  case AtomicRMWKind::maxf: {
+    auto cmp = rewriter.create<CmpFOp>(loc, CmpFPredicate::OGT, val, source);
+    return rewriter.create<SelectOp>(loc, cmp, val, source);
+  }
+  case AtomicRMWKind::maxu: {
+    auto cmp = rewriter.create<CmpIOp>(loc, CmpIPredicate::ugt, val, source);
+    return rewriter.create<SelectOp>(loc, cmp, val, source);
+  }
+  case AtomicRMWKind::maxs: {
+    auto cmp = rewriter.create<CmpIOp>(loc, CmpIPredicate::sgt, val, source);
+    return rewriter.create<SelectOp>(loc, cmp, val, source);
+  }
+  case AtomicRMWKind::minf: {
+    auto cmp = rewriter.create<CmpFOp>(loc, CmpFPredicate::OLT, val, source);
+    return rewriter.create<SelectOp>(loc, cmp, val, source);
+  }
+  case AtomicRMWKind::minu: {
+    auto cmp = rewriter.create<CmpIOp>(loc, CmpIPredicate::ult, val, source);
+    return rewriter.create<SelectOp>(loc, cmp, val, source);
+  }
+  case AtomicRMWKind::mins: {
+    auto cmp = rewriter.create<CmpIOp>(loc, CmpIPredicate::slt, val, source);
+    return rewriter.create<SelectOp>(loc, cmp, val, source);
+  }
+  case AtomicRMWKind::mulf:
+    return rewriter.create<MulFOp>(loc, source, val);
+  case AtomicRMWKind::muli:
+    return rewriter.create<MulIOp>(loc, source, val);
+  default:
+    llvm_unreachable("Unsupported aggregation for "
+                     "PxaReduceOpConversion::createReduction");
+  }
+}
+
+struct PxaReduceOpConversion : public OpConversionPattern<pxa::PxaReduceOp> {
+  using OpConversionPattern<pxa::PxaReduceOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(pxa::PxaReduceOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const final {
+    auto source = rewriter.create<AffineLoadOp>(op.getLoc(), op.memref(),
+                                                op.map(), op.idxs());
+    auto reduce =
+        createReduction(rewriter, op.getLoc(), op.agg(), source, op.val());
+    rewriter.create<AffineStoreOp>(op.getLoc(), reduce, op.memref(), op.map(),
+                                   op.idxs());
+    op.replaceAllUsesWith(op.memref());
+    rewriter.eraseOp(op);
+    return success();
+  }
+};
+
+struct PxaVectorReduceOpConversion
+    : public OpConversionPattern<pxa::PxaVectorReduceOp> {
+  using OpConversionPattern<pxa::PxaVectorReduceOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(pxa::PxaVectorReduceOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const final {
+    auto source = rewriter.create<AffineVectorLoadOp>(
+        op.getLoc(), op.getVectorType(), op.memref(), op.getAffineMap(),
+        op.idxs());
+    auto reduce =
+        createReduction(rewriter, op.getLoc(), op.agg(), source, op.vector());
+    rewriter.create<AffineVectorStoreOp>(op.getLoc(), reduce, op.memref(),
+                                         op.getAffineMap(), op.idxs());
+    op.replaceAllUsesWith(op.memref());
+    rewriter.eraseOp(op);
+    return success();
   }
 };
 
@@ -232,32 +238,34 @@ struct FuncOpConversion : public OpConversionPattern<FuncOp> {
                   ConversionPatternRewriter &rewriter) const final {
     FunctionType type = op.getType();
     if (op.isExternal()) {
-      return mlir::success();
+      return success();
     }
-    IVLOG(2, "FuncOpConversion::rewrite> " << mlir::debugString(type));
+    IVLOG(2, "FuncOpConversion::rewrite> " << debugString(type));
 
     // Convert the function signature
-    mlir::TypeConverter::SignatureConversion result(type.getNumInputs() +
-                                                    type.getNumResults());
+    TypeConverter::SignatureConversion result(type.getNumInputs());
     for (unsigned i = 0; i < type.getNumInputs(); ++i) {
       result.addInputs(i, {type.getInput(i)});
     }
+    SmallVector<Type, 1> resultTypes;
     for (unsigned i = 0; i < type.getNumResults(); ++i) {
-      result.addInputs({type.getResult(i)});
+      if (type.getResult(i).isa<stdx::ArgpackType>()) {
+        resultTypes.push_back(type.getResult(i));
+      }
     }
 
     // Create a new function with an updated signature.
     auto newOp = rewriter.cloneWithoutRegions(op);
     rewriter.inlineRegionBefore(op.getBody(), newOp.getBody(), newOp.end());
-    newOp.setType(FunctionType::get(result.getConvertedTypes(), llvm::None,
-                                    op.getContext()));
+    newOp.setType(FunctionType::get(op.getContext(), result.getConvertedTypes(),
+                                    resultTypes));
 
     // Tell the rewriter to convert the region signature.
     rewriter.applySignatureConversion(&newOp.getBody(), result);
 
     // Finally cause the old func op to be erased
     rewriter.eraseOp(op);
-    return mlir::success();
+    return success();
   }
 };
 
@@ -268,52 +276,68 @@ struct ReturnOpConversion : public OpConversionPattern<ReturnOp> {
   matchAndRewrite(ReturnOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
     IVLOG(2, "ReturnOpConversion::matchAndRewrite>");
-    auto &block = op.getParentRegion()->front();
-    auto funcOp = op.getParentOfType<FuncOp>();
-    auto blockArg = funcOp.getType().getNumInputs() - op.getNumOperands();
-    for (auto operand : operands) {
-      // Find very initial allocation of memref
-      operand.replaceAllUsesWith(block.getArgument(blockArg++));
+    SmallVector<Value, 1> results;
+    for (auto val : operands) {
+      if (val.getType().isa<stdx::ArgpackType>()) {
+        results.push_back(val);
+      }
     }
-    rewriter.replaceOpWithNewOp<ReturnOp>(op);
-    return mlir::success();
+    rewriter.replaceOpWithNewOp<ReturnOp>(op, results);
+    return success();
   }
 };
 
-void LowerPXAToAffinePass::runOnOperation() {
-  // Set up target (i.e. what is legal)
-  mlir::ConversionTarget target(getContext());
-  target.addLegalDialect<mlir::AffineDialect>();
-  target.addLegalDialect<mlir::StandardOpsDialect>();
-  target.addIllegalDialect<pxa::PXADialect>();
-  target.addIllegalOp<AffineParallelOp>();
-  target.addDynamicallyLegalOp<AffineIfOp>(
-      [](AffineIfOp op) { return op.getNumResults() == 0; });
-  target.addDynamicallyLegalOp<FuncOp>([](FuncOp op) {
-    return op.isExternal() || op.getType().getNumResults() == 0;
-  });
-  target.addDynamicallyLegalOp<ReturnOp>(
-      [](ReturnOp op) { return op.getNumOperands() == 0; });
+struct LowerPXAToAffinePass
+    : public LowerPXAToAffineBase<LowerPXAToAffinePass> {
+  void runOnOperation() final {
+    auto &ctx = getContext();
+    PXAToAffineConversionTarget target(ctx);
 
-  // Setup rewrite patterns
-  mlir::OwningRewritePatternList patterns;
-  patterns.insert<AffineParallelRank0Remover, AffineParallelOpConversion,
-                  AffineIfOpConversion, AffineReduceOpConversion,
-                  FuncOpConversion, ReturnOpConversion>(&getContext());
+    OwningRewritePatternList patterns;
+    populatePXAToAffineConversionPatterns(patterns, &ctx);
 
-  // Run the conversion
-  if (failed(
-          applyPartialConversion(getOperation(), target, patterns, nullptr))) {
-    getOperation().dump();
-    emitError(mlir::UnknownLoc::get(&getContext()),
-              "Error lowering pxa -> affine\n");
-    signalPassFailure();
+    if (failed(applyPartialConversion(getOperation(), target,
+                                      std::move(patterns)))) {
+      getOperation().dump();
+      emitError(UnknownLoc::get(&ctx), "Error lowering pxa -> affine\n");
+      signalPassFailure();
+    }
   }
-}
+};
 
 } // namespace
 
-std::unique_ptr<mlir::Pass> createLowerPXAToAffinePass() {
+PXAToAffineConversionTarget::PXAToAffineConversionTarget(MLIRContext &ctx)
+    : ConversionTarget(ctx) {
+  addLegalDialect<AffineDialect>();
+  addLegalDialect<StandardOpsDialect>();
+  addIllegalDialect<pxa::PXADialect>();
+  addDynamicallyLegalOp<AffineParallelOp>([](AffineParallelOp op) {
+    return op.getNumResults() == 0 && hasTags(op);
+  });
+  addDynamicallyLegalOp<AffineIfOp>(
+      [](AffineIfOp op) { return op.getNumResults() == 0; });
+  addDynamicallyLegalOp<FuncOp>([](FuncOp op) {
+    return op.isExternal() || op.getType().getNumResults() == 0;
+  });
+  addDynamicallyLegalOp<ReturnOp>(
+      [](ReturnOp op) { return op.getNumOperands() == 0; });
+}
+
+void populatePXAToAffineConversionPatterns(OwningRewritePatternList &patterns,
+                                           MLIRContext *ctx) {
+  patterns.insert<                 //
+      AffineIfOpConversion,        //
+      AffineParallelOpConversion,  //
+      FuncOpConversion,            //
+      PxaLoadOpConversion,         //
+      PxaReduceOpConversion,       //
+      PxaVectorLoadOpConversion,   //
+      PxaVectorReduceOpConversion, //
+      ReturnOpConversion>(ctx);
+}
+
+std::unique_ptr<Pass> createLowerPXAToAffinePass() {
   return std::make_unique<LowerPXAToAffinePass>();
 }
 

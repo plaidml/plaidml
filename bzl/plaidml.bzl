@@ -1,5 +1,8 @@
 # Copyright 2020 Intel Corporation.
 
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test", "objc_library")
+load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
+
 PLAIDML_COPTS = select({
     "@com_intel_plaidml//:msvc": [
         "/std:c++17",  # This MUST match all other compilation units
@@ -36,16 +39,16 @@ def clean_dep(dep):
     return str(Label(dep))
 
 def plaidml_cc_library(copts = [], **kwargs):
-    native.cc_library(copts = PLAIDML_COPTS + copts, **kwargs)
+    cc_library(copts = PLAIDML_COPTS + copts, **kwargs)
 
 def plaidml_objc_library(copts = [], linkopts = [], **kwargs):
-    native.objc_library(copts = PLAIDML_COPTS + copts + ["-Wno-shorten-64-to-32"], **kwargs)
+    objc_library(copts = PLAIDML_COPTS + copts + ["-Wno-shorten-64-to-32"], **kwargs)
 
 def plaidml_cc_binary(copts = [], linkopts = [], **kwargs):
-    native.cc_binary(copts = PLAIDML_COPTS + copts, linkopts = PLAIDML_LINKOPTS + linkopts, **kwargs)
+    cc_binary(copts = PLAIDML_COPTS + copts, linkopts = PLAIDML_LINKOPTS + linkopts, **kwargs)
 
-def plaidml_cc_test(copts = [], deps = (), linkopts = [], **kwargs):
-    native.cc_test(
+def plaidml_cc_test(copts = [], deps = [], linkopts = [], **kwargs):
+    cc_test(
         copts = PLAIDML_COPTS + copts,
         deps = deps + [clean_dep("//pmlc/testing:gtest_main")],
         linkopts = PLAIDML_LINKOPTS + linkopts,
@@ -88,36 +91,18 @@ plaidml_py_version = rule(
     implementation = _plaidml_version_impl,
 )
 
-def _shlib_name_patterns(name):
-    return {
-        "@bazel_tools//src/conditions:windows": ["{}.dll".format(name)],
-        "@bazel_tools//src/conditions:darwin_x86_64": ["lib{}.dylib".format(name)],
-        "//conditions:default": ["lib{}.so".format(name)],
-    }
+def _plaidml_settings_impl(ctx):
+    return [
+        platform_common.TemplateVariableInfo({
+            "plaidml_device": ctx.attr._device[BuildSettingInfo].value,
+            "plaidml_target": ctx.attr._target[BuildSettingInfo].value,
+        }),
+    ]
 
-def plaidml_cc_shlib(
-        name,
-        shlib_name = None,
-        copts = [],
-        linkopts = [],
-        visibility = None,
-        **kwargs):
-    if shlib_name == None:
-        shlib_name = name
-    names = _shlib_name_patterns(shlib_name)
-    for key, name_list in names.items():
-        for name_os in name_list:
-            native.cc_binary(
-                name = name_os,
-                copts = PLAIDML_COPTS + copts,
-                linkopts = PLAIDML_LINKOPTS + linkopts,
-                linkshared = 1,
-                tags = PLATFORM_TAGS[key],
-                visibility = visibility,
-                **kwargs
-            )
-    native.filegroup(
-        name = name,
-        srcs = select(names),
-        visibility = visibility,
-    )
+plaidml_settings = rule(
+    attrs = {
+        "_device": attr.label(default = "//plaidml:device"),
+        "_target": attr.label(default = "//plaidml:target"),
+    },
+    implementation = _plaidml_settings_impl,
+)

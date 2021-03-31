@@ -65,13 +65,11 @@ def run(args, remainder):
     shutil.rmtree(input, ignore_errors=True)
     if args.local:
         pkg_path = pathlib.Path('bazel-bin/pkg.tar.gz')
-        outdir = root / 'nas'
         version = '0.0.0.dev0'
     else:
         archive_path = os.path.join('tmp', 'build', variant_name, 'pkg.tar.gz')
         util.buildkite_download(archive_path, '.')
         pkg_path = root / 'build' / variant_name / 'pkg.tar.gz'
-        outdir = root
         version = args.version
 
     util.printf('--- Extracting {} -> {}'.format(pkg_path, input))
@@ -81,7 +79,7 @@ def run(args, remainder):
     shutil.rmtree(output_root, ignore_errors=True)
     output.mkdir(parents=True)
 
-    cwd = popt.get('cwd', '.')
+    cwd = os.path.abspath(popt.get('cwd', '.'))
     spec = pathlib.Path(popt.get('conda_env'))
 
     util.printf('--- :snake: Creating conda env from {}'.format(spec))
@@ -101,15 +99,9 @@ def run(args, remainder):
         whl_path = input / whl_filename
         conda_env.install(whl_path)
 
-    if 'stripe' in args.platform:
-        env['PLAIDML_USE_STRIPE'] = '1'
-    else:
-        env['PLAIDML_USE_STRIPE'] = '0'
     if 'cuda' in args.platform:
         env['CUDA_DEVICE_ORDER'] = buildkite_metadata('CUDA_CUDA_DEVICE_ORDER', 'PCI_BUS_ID')
         env['CUDA_VISIBLE_DEVICES'] = buildkite_metadata('CUDA_VISIBLE_DEVICES', '0')
-    env['PLAIDML_DEVICE_IDS'] = buildkite_metadata('PLAIDML_DEVICE_IDS')
-    env['PLAIDML_EXPERIMENTAL'] = buildkite_metadata('PLAIDML_EXPERIMENTAL', '0')
     device = buildkite_metadata('PLAIDML_DEVICE')
     target = buildkite_metadata('PLAIDML_TARGET')
     if device != None:
@@ -137,13 +129,13 @@ def run(args, remainder):
         workload=args.workload,
     )
     cmd_args = [str(x).format(**ctx) for x in cmd_args]
-    if 'stripe' in args.platform:
+    if 'pml' in args.platform:
         try:
             cmd_args.remove('--no-kernel-timing')
         except ValueError:
             pass
 
-    runner = shutil.which(popt.get('runner'), path=env['PATH'])
+    runner = shutil.which(popt.get('runner'), path=os.pathsep.join([cwd, env['PATH']]))
     cmd = [runner] + cmd_args
     retcode = util.call(cmd, cwd=cwd, env=env)
 

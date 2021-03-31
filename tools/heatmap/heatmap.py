@@ -6,9 +6,11 @@ import gzip
 
 import pystache
 
+
 def load_template(path):
     with open(path, 'r') as fp:
         return fp.read()
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -23,7 +25,13 @@ if __name__ == "__main__":
     data = list(reader)
 
     tpl = load_template(args.template)
-    ctx = {'size': {'SIZE': len(data)}, 'key': data, 'value': data}
+    ctx = {
+        'size': {
+            'SIZE': len(data)
+        },
+        'key': data,
+        'value': data,
+    }
     out = pystache.render(tpl, ctx)
 
     with open(args.out, 'w') as fp:

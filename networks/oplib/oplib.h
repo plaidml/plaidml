@@ -2,10 +2,11 @@
 
 #pragma once
 
-#include "plaidml/edsl/edsl.h"
+#include "plaidml/core/core.h"
+#include "plaidml/exec/exec.h"
 
 namespace networks::oplib {
 
-plaidml::edsl::Program buildResnet50(int64_t batch_size = 1);
+plaidml::Program buildResnet50(int64_t batch_size = 1);
 
 }  // namespace networks::oplib

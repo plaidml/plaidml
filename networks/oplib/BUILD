@@ -1,6 +1,6 @@
 # Copyright 2020 Intel Corporation
 
-load("//bzl:plaidml.bzl", "plaidml_cc_binary", "plaidml_cc_library")
+load("//bzl:plaidml.bzl", "plaidml_cc_binary", "plaidml_cc_library", "plaidml_cc_test")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -9,7 +9,7 @@ plaidml_cc_library(
     srcs = ["resnet50.cc"],
     hdrs = ["oplib.h"],
     deps = [
-        "//plaidml",
+        "//plaidml:lib",
         "//pmlc/util",
         "@llvm-project//llvm:Support",
     ],
@@ -27,9 +27,11 @@ plaidml_cc_binary(
     ],
 )
 
-plaidml_cc_binary(
-    name = "run",
+plaidml_cc_test(
+    name = "resnet50_test",
+    size = "large",
     srcs = ["run.cc"],
+    linkstatic = 1,
     deps = [
         ":oplib",
         "//plaidml/exec",

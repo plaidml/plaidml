@@ -1,8 +1,8 @@
 # Copyright 2019 Intel Corporation.
 
-load("@rules_python//python:defs.bzl", "py_test")
-load("@rules_pkg//:pkg.bzl", "pkg_tar")
+load("@rules_python//python:defs.bzl", "py_library")
 load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test")
+load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
 
 SDK_HDRS = [
     "ffi.h",
@@ -16,6 +16,13 @@ exports_files([
 filegroup(
     name = "sdk",
     srcs = SDK_HDRS,
+    visibility = ["//visibility:public"],
+)
+
+pkg_tar(
+    name = "sdk_tar",
+    srcs = [":sdk"],
+    package_dir = "include/plaidml/op",
     visibility = ["//visibility:public"],
 )
 
@@ -61,8 +68,14 @@ py_library(
 )
 
 plaidml_cc_test(
-    name = "cc_test",
+    name = "op_test",
+    size = "medium",
     srcs = ["op_test.cc"],
+    copts = select({
+        "@bazel_tools//src/conditions:darwin_x86_64": ["-Wno-deprecated-declarations"],
+        "//conditions:default": [],
+    }),
+    linkstatic = True,
     deps = [
         ":op",
         "//plaidml:testenv",

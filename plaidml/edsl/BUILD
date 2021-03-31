@@ -1,11 +1,10 @@
 # Copyright 2020 Intel Corporation
 
-load("@rules_python//python:defs.bzl", "py_test")
+load("@rules_python//python:defs.bzl", "py_library", "py_test")
 load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test")
-load("//pmlc:lit.bzl", "lit_test")
+load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
 
 SDK_HDRS = [
-    "autodiff.h",
     "edsl.h",
     "ffi.h",
 ]
@@ -20,7 +19,7 @@ filegroup(
         "edsl.h",
         "edsl_docs.cc",
         "edsl_docs.py",
-    ],
+    ] + glob(["examples/**"]),
     visibility = ["//visibility:public"],
 )
 
@@ -30,23 +29,24 @@ filegroup(
     visibility = ["//visibility:public"],
 )
 
+pkg_tar(
+    name = "sdk_tar",
+    srcs = [":sdk"],
+    package_dir = "include/plaidml/edsl",
+    visibility = ["//visibility:public"],
+)
+
 plaidml_cc_library(
     name = "edsl",
-    srcs = [
-        "derivs.cc",
-        "derivs.h",
-        "ffi.cc",
-    ],
+    srcs = ["ffi.cc"],
     hdrs = SDK_HDRS,
     visibility = ["//visibility:public"],
     deps = [
         "//plaidml/core",
-        "//pmlc:all_passes_and_dialects_no_registration",
-        "//pmlc/dialect/tile",
+        "//pmlc/ast",
         "//pmlc/util",
         "@llvm-project//llvm:Support",
     ],
-    alwayslink = 1,
 )
 
 py_library(
@@ -62,7 +62,9 @@ py_library(
 
 plaidml_cc_test(
     name = "cc_docs",
+    size = "small",
     srcs = ["edsl_docs.cc"],
+    linkstatic = True,
     deps = [
         ":edsl",
         "//plaidml:testenv",
@@ -72,6 +74,8 @@ plaidml_cc_test(
 
 py_test(
     name = "py_docs",
+    size = "small",
+    timeout = "moderate",
     srcs = ["edsl_docs.py"],
     main = "edsl_docs.py",
     deps = [

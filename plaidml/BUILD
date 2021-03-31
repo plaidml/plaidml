@@ -2,18 +2,31 @@
 
 load("//tools/py_cffi:build_defs.bzl", "py_cffi")
 load("//tools/py_setup:build_defs.bzl", "py_setup")
-load("@rules_python//python:defs.bzl", "py_binary")
+load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
+load("@bazel_skylib//lib:selects.bzl", "selects")
+load("@rules_python//python:defs.bzl", "py_binary", "py_library")
 load("@io_bazel_rules_jsonnet//jsonnet:jsonnet.bzl", "jsonnet_to_json")
-load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_shlib")
+load("//bzl:plaidml.bzl", "plaidml_cc_binary", "plaidml_cc_library", "plaidml_settings")
+load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
 
 plaidml_cc_library(
-    name = "plaidml",
+    name = "api",
     visibility = ["//visibility:public"],
     deps = [
         "//plaidml/core",
         "//plaidml/edsl",
         "//plaidml/exec",
         "//plaidml/op",
+    ],
+)
+
+plaidml_cc_library(
+    name = "lib",
+    visibility = ["//visibility:public"],
+    deps = [
+        ":api",
+        "//pmlc/rt:all_runtimes",
+        "//pmlc/target:all_targets",
     ],
 )
 
@@ -28,8 +41,8 @@ jsonnet_to_json(
     extra_args = ["-S"],
 )
 
-plaidml_cc_shlib(
-    name = "shlib",
+plaidml_cc_binary(
+    name = "plaidml",
     linkopts = select({
         "@bazel_tools//src/conditions:windows": [],
         "@bazel_tools//src/conditions:darwin_x86_64": [
@@ -44,11 +57,11 @@ plaidml_cc_shlib(
             "$(location :plaidml.lds)",
         ],
     }),
-    shlib_name = "plaidml",
+    linkshared = 1,
     visibility = ["//visibility:public"],
     win_def_file = ":plaidml.def",
     deps = [
-        ":plaidml",
+        ":lib",
     ] + select({
         "@bazel_tools//src/conditions:windows": [],
         "@bazel_tools//src/conditions:darwin_x86_64": [
@@ -60,15 +73,27 @@ plaidml_cc_shlib(
     }),
 )
 
+pkg_tar(
+    name = "sdk_tar",
+    srcs = [
+        ":plaidml",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//plaidml/core:sdk_tar",
+        "//plaidml/edsl:sdk_tar",
+        "//plaidml/exec:sdk_tar",
+        "//plaidml/op:sdk_tar",
+    ],
+)
+
 py_library(
     name = "py",
     srcs = [
         "__init__.py",
         "ffi.py",
     ],
-    data = [
-        ":shlib",
-    ],
+    data = [":plaidml"],
     visibility = ["//visibility:public"],
     deps = [
         ":_ffi",
@@ -106,13 +131,13 @@ py_binary(
         "plaidml-config.cmake",
         ":setup",
         "//:LICENSE",
+        "//bzl:googlemock.LICENSE",
         "//plaidml/core:sdk",
         "//plaidml/edsl:sdk",
         "//plaidml/exec:sdk",
         "//plaidml/op:sdk",
         "@boost//:LICENSE_1_0.txt",
         "@easylogging//:LICENSE",
-        "@gmock//:googlemock/LICENSE",
         "@half//:LICENSE.txt",
         "@llvm-project//llvm:LICENSE.TXT",
         "@llvm-project//mlir:LICENSE.TXT",
@@ -144,13 +169,13 @@ py_setup(
 
 plaidml_cc_library(
     name = "testenv",
-    testonly = 1,
     srcs = ["testenv.cc"],
     hdrs = ["testenv.h"],
     visibility = ["//visibility:public"],
     deps = [
-        ":plaidml",
-        "@gmock//:gtest",
+        ":lib",
+        "@com_google_googletest//:gtest",
+        "@gflags",
     ],
     alwayslink = 1,
 )
@@ -165,4 +190,48 @@ py_binary(
         "//plaidml/exec:py",
         "//plaidml/op:py",
     ],
+)
+
+string_flag(
+    name = "device",
+    build_setting_default = "llvm_cpu.0",
+)
+
+string_flag(
+    name = "target",
+    build_setting_default = "llvm_cpu",
+)
+
+config_setting(
+    name = "llvm_cpu",
+    flag_values = {
+        ":target": "llvm_cpu",
+    },
+)
+
+config_setting(
+    name = "intel_gen",
+    flag_values = {
+        ":target": "intel_gen",
+    },
+)
+
+config_setting(
+    name = "intel_gen_ocl_spirv",
+    flag_values = {
+        ":target": "intel_gen_ocl_spirv",
+    },
+)
+
+selects.config_setting_group(
+    name = "gpu_target",
+    match_any = [
+        ":intel_gen",
+        ":intel_gen_ocl_spirv",
+    ],
+)
+
+plaidml_settings(
+    name = "settings",
+    visibility = ["//visibility:public"],
 )

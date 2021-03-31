@@ -1,16 +1,34 @@
-#ifndef __PMLC_CONVERSION_GPU_TO_VULKAN_PASSES__
-#define __PMLC_CONVERSION_GPU_TO_VULKAN_PASSES__
+// Copyright 2020, Intel Corporation
+#ifndef __PMLC_GPU_TRANSFORMS__
+#define __PMLC_GPU_TRANSFORMS__
 
 include "mlir/Pass/PassBase.td"
-
-def ConvertGpuLaunchFuncToVulkanCalls : Pass<"pmlc-convert-gpu-to-vulkan", "mlir::ModuleOp"> {
-  let summary = "Convert gpu.launch_func op to Vulkan runtime calls";
-  let constructor = "pmlc::conversion::gpu::createConvertGpuLaunchFuncToVulkanCallsPass()";
-}
 
 def GpuKernelOutliningPass : Pass<"pmlc-kernel_outlining", "mlir::ModuleOp"> {
   let summary = "Outline gpu.launch bodies to kernel functions";
   let constructor = "pmlc::conversion::gpu::createGpuKernelOutliningPass()";
+  let options = [
+    Option<"execEnvRuntime", "comp-execenv-runtime", "unsigned",
+           /*default=*/"0", "Runtime to use for gpu kernels.">,
+    Option<"execEnvMemorySpace", "comp-execenv-memory-space", "unsigned",
+           /*default=*/"0", "Memory space to use for data transferred to device.">
+  ];
+
+  let dependentDialects = [
+    "dialect::comp::COMPDialect",
+    "mlir::gpu::GPUDialect",
+    "mlir::spirv::SPIRVDialect"
+  ];
 }
 
-#endif // __PMLC_CONVERSION_GPU_TO_VULKAN_PASSES__
+def GatherGpuLaunchFuncsPass : Pass<"pmlc-gather_gpu_launch_funcs", "mlir::ModuleOp"> {
+  let summary = "Gather gpu.launch_func separated by std.alloc";
+  let constructor = "pmlc::conversion::gpu::createGatherGpuLaunchFuncsPass()";
+  let dependentDialects = [
+    "mlir::gpu::GPUDialect",
+    "mlir::spirv::SPIRVDialect"
+  ];
+}
+
+
+#endif // __PMLC_GPU_TRANSFORMS__

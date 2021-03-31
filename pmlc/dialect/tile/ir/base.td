@@ -4,28 +4,7 @@
 #define __PML_TILE_BASE__
 
 include "mlir/Interfaces/SideEffectInterfaces.td"
-
-#ifndef AFFINE_OPS_BASE
-include "mlir/Dialect/Affine/IR/AffineOpsBase.td"
-#endif
-
-include "pmlc/util/enums.td"
-include "pmlc/util/interfaces.td"
-include "pmlc/dialect/eltwise/ir/interfaces.td"
-
-#ifndef __PML_ELTWISE_PREDICATES__
-include "pmlc/dialect/eltwise/ir/predicates.td"
-#endif
-
 include "pmlc/dialect/tile/ir/interfaces.td"
-
-// TODO: this should be defined upstream
-def IntegerSetAttr : Attr<
-    CPred<"$_self.isa<IntegerSetAttr>()">, "IntegerSet attribute"> {
-  let storageType = [{ IntegerSetAttr }];
-  let returnType = [{ IntegerSet }];
-  let constBuilderCall = "IntegerSetAttr::get($0)";
-}
 
 def TileDialect : Dialect {
   let name = "tile";
@@ -37,30 +16,68 @@ def TileDialect : Dialect {
   }];
 }
 
-def AffineMap : DialectType<TileDialect,
-  CPred<"$_self.isa<AffineMapType>()">,
-  "affine-map">;
-
-def AffineConstraints : DialectType<TileDialect,
-  CPred<"$_self.isa<AffineConstraintsType>()">,
-  "affine-constraints">;
-
-def AffineTensorMap : DialectType<TileDialect,
-  CPred<"$_self.isa<AffineTensorMapType>()">,
-  "affine-tensor-map">;
-
-def StrType : DialectType<TileDialect,
-  CPred<"$_self.isa<StringType>()">,
-  "string">;
-
 class TileOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
     Op<TileDialect, mnemonic, traits> {}
 
-class TileOpWithPPV<string mnemonic, list<OpTrait> traits = []> :
-    TileOp<mnemonic, traits> {
-  let printer = [{ print$cppClass(&p, *this); }];
-  let parser = [{ return parse$cppClass(&parser, result); }];
-  let verifier = [{ return verify$cppClass(*this); }];
+class HasFolder {
+  bit hasFolder = 1;
+}
+
+def APFloatType : DialectType<TileDialect,
+  CPred<"$_self.isa<tile::APFloatType>()">,"fx">;
+
+def APSignedIntegerType : DialectType<TileDialect,
+  CPred<"$_self.isa<tile::APSignedIntegerType>()">, "six">;
+
+def APUnsignedIntegerType : DialectType<TileDialect,
+  CPred<"$_self.isa<tile::APUnsignedIntegerType>()">, "uix">;
+
+def AnyScalar : Type<Or<[
+    Index.predicate,
+    AnyFloat.predicate,
+    I1.predicate,
+    AnySignedInteger.predicate,
+    AnyUnsignedInteger.predicate,
+    APFloatType.predicate,
+    APSignedIntegerType.predicate,
+    APUnsignedIntegerType.predicate
+  ]>, "scalar">;
+
+def EltwiseAny : Type<RankedTensorOf<[AnyScalar]>.predicate,
+  "eltwise-any">;
+
+def EltwiseBool : Type<RankedTensorOf<[I1]>.predicate,
+  "eltwise-bool">;
+
+def EltwiseFloat : Type<RankedTensorOf<[AnyFloat, APFloatType]>.predicate,
+  "eltwise-float">;
+
+def EltwiseSigned : Type<
+  RankedTensorOf<[AnySignedInteger, APSignedIntegerType]>.predicate,
+  "eltwise-signed">;
+
+def EltwiseUnsigned : Type<
+  RankedTensorOf<[AnyUnsignedInteger, APUnsignedIntegerType]>.predicate,
+  "eltwise-unsigned">;
+
+def EltwiseInteger : Type<RankedTensorOf<[
+    AnySignedInteger,
+    AnyUnsignedInteger,
+    APSignedIntegerType,
+    APUnsignedIntegerType
+  ]>.predicate,
+  "eltwise-integer">;
+
+def EltwiseIndex : Type<RankedTensorOf<[SI32]>.predicate, "eltwise-index">;
+
+def SortDirection : I64EnumAttr<
+    "SortDirection",
+    "Direction for sorting operation",
+    [
+      I64EnumAttrCase<"asc", 0>,
+      I64EnumAttrCase<"desc", 1>,
+    ]> {
+  let cppNamespace = "pmlc::dialect::tile";
 }
 
 #endif // __PML_TILE_BASE__

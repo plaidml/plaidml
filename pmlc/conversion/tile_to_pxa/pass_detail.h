@@ -1,6 +1,11 @@
 #pragma once
 
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Pass/Pass.h"
+
+#include "pmlc/dialect/layer/ir/ops.h"
+#include "pmlc/dialect/pxa/ir/ops.h"
+#include "pmlc/dialect/stdx/ir/ops.h"
 
 namespace pmlc::conversion::tile_to_pxa {
 

@@ -1,6 +1,6 @@
-package(default_visibility = ["//visibility:public"])
-
 load("@rules_python//python:defs.bzl", "py_binary")
+
+package(default_visibility = ["//visibility:public"])
 
 py_binary(
     name = "report",
@@ -14,12 +14,10 @@ py_binary(
         "templates/*",
     ]),
     tags = ["manual"],
-    deps = ["//tools/analysis"],
 )
 
 py_binary(
     name = "timeline",
     srcs = ["timeline.py"],
     tags = ["manual"],
-    deps = ["//tools/analysis"],
 )

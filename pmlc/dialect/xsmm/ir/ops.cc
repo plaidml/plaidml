@@ -6,15 +6,11 @@
 
 #include "mlir/IR/OpImplementation.h"
 
+using namespace mlir; // NOLINT
+
 namespace pmlc::dialect::xsmm {
 
-using llvm::SmallVector;
-using mlir::failure;
-using mlir::FunctionType;
-using mlir::success;
-
-XSMMDialect::XSMMDialect(mlir::MLIRContext *ctx)
-    : mlir::Dialect(getDialectNamespace(), ctx) {
+void XSMMDialect::initialize() {
   addOperations<
 #define GET_OP_LIST
 #include "pmlc/dialect/xsmm/ir/ops.cc.inc"
@@ -22,97 +18,111 @@ XSMMDialect::XSMMDialect(mlir::MLIRContext *ctx)
 }
 
 //
-// ---- GemmInvokeOp ----
+// ---- GemmInvokeF32Op ----
 //
 
-GemmInvokeOp::operand_range GemmInvokeOp::getOperandsForA() {
-  return getOperands().slice(4 + cAccessMap().getNumInputs(),
-                             aAccessMap().getNumInputs());
+GemmInvokeF32Op::operand_range GemmInvokeF32Op::getOperandsForA() {
+  auto aType = a().getType().cast<MemRefType>();
+  auto cType = c().getType().cast<MemRefType>();
+  return getOperands().slice(4 + cType.getRank(), aType.getRank());
 }
 
-GemmInvokeOp::operand_range GemmInvokeOp::getOperandsForB() {
-  return getOperands().slice(4 + cAccessMap().getNumInputs() +
-                                 aAccessMap().getNumInputs(),
-                             bAccessMap().getNumInputs());
+GemmInvokeF32Op::operand_range GemmInvokeF32Op::getOperandsForB() {
+  auto aType = a().getType().cast<MemRefType>();
+  auto bType = b().getType().cast<MemRefType>();
+  auto cType = c().getType().cast<MemRefType>();
+  return getOperands().slice(4 + cType.getRank() + aType.getRank(),
+                             bType.getRank());
 }
 
-GemmInvokeOp::operand_range GemmInvokeOp::getOperandsForC() {
-  return getOperands().slice(4, cAccessMap().getNumInputs());
+GemmInvokeF32Op::operand_range GemmInvokeF32Op::getOperandsForC() {
+  auto cType = c().getType().cast<MemRefType>();
+  return getOperands().slice(4, cType.getRank());
 }
 
-void printGemmInvokeOp(OpAsmPrinter &p, GemmInvokeOp op) {
-  auto funcType = FunctionType::get({op.a().getType(), op.b().getType()},
-                                    {op.c().getType()}, op.getContext());
+void printGemmInvokeF32Op(OpAsmPrinter &p, GemmInvokeF32Op op) {
+  auto funcType =
+      FunctionType::get(op.getContext(), {op.a().getType(), op.b().getType()},
+                        {op.c().getType()});
   p << op.getOperation()->getName() << ' ';
   p << op.ptr() << ", ";
   p << op.c() << '[';
-  p.printAffineMapOfSSAIds(op.cAccessMapAttr(), op.getOperandsForC());
-  p << "]:";
-  p.printAttribute(op.cTileMapAttr());
-  p << " = " << op.a() << '[';
-  p.printAffineMapOfSSAIds(op.aAccessMapAttr(), op.getOperandsForA());
-  p << "]:";
-  p.printAttribute(op.aTileMapAttr());
-  p << ", " << op.b() << '[';
-  p.printAffineMapOfSSAIds(op.bAccessMapAttr(), op.getOperandsForB());
-  p << "]:";
-  p.printAttribute(op.bTileMapAttr());
-  p << ", " << op.tile() << " : " << funcType;
+  p.printOperands(op.getOperandsForC());
+  p << "] = " << op.a() << '[';
+  p.printOperands(op.getOperandsForA());
+  p << "], " << op.b() << '[';
+  p.printOperands(op.getOperandsForB());
+  p << "] : " << funcType;
 }
 
-struct GemmOperandParser {
-  OpAsmParser::OperandType operand;
-  SmallVector<OpAsmParser::OperandType, 4> accessOperands;
-  AffineMapAttr accessMapAttr;
-  AffineMapAttr tileMapAttr;
-  std::string accessMapAttrName;
-  std::string tileMapAttrName;
-
-  explicit GemmOperandParser(StringRef name)
-      : accessMapAttrName(name.str() + "AccessMap"),
-        tileMapAttrName(name.str() + "TileMap") {}
-
-  ParseResult parse(OpAsmParser &parser, OperationState &result) {
-    return failure(
-        parser.parseOperand(operand) ||
-        parser.parseAffineMapOfSSAIds(accessOperands, accessMapAttr,
-                                      accessMapAttrName, result.attributes) ||
-        parser.parseColon() ||
-        parser.parseAttribute(tileMapAttr, tileMapAttrName, result.attributes));
-  }
+struct GemmOperand {
+  OpAsmParser::OperandType memref;
+  SmallVector<OpAsmParser::OperandType, 4> indices;
 };
 
-ParseResult parseGemmInvokeOp(OpAsmParser &parser, OperationState &result) {
+ParseResult parseGemmInvokeF32Op(OpAsmParser &parser, OperationState &result) {
   auto &builder = parser.getBuilder();
   auto indexType = builder.getIndexType();
   auto i64Type = builder.getIntegerType(64);
-  GemmOperandParser a("a"), b("b"), c("c");
+  GemmOperand a, b, c;
   OpAsmParser::OperandType ptr;
-  ArrayAttr tileAttr;
   FunctionType funcType;
   return failure(
-      parser.parseOperand(ptr) || //
-      parser.parseComma() ||      //
-      c.parse(parser, result) ||  //
-      parser.parseEqual() ||      //
-      a.parse(parser, result) ||  //
-      parser.parseComma() ||      //
-      b.parse(parser, result) ||  //
-      parser.parseComma() ||
-      parser.parseAttribute(tileAttr, i64Type, "tile", result.attributes) ||
+      parser.parseOperand(ptr) || parser.parseComma() ||
+      parser.parseOperand(c.memref) ||
+      parser.parseOperandList(c.indices, OpAsmParser::Delimiter::Square) ||
+      parser.parseEqual() || parser.parseOperand(a.memref) ||
+      parser.parseOperandList(a.indices, OpAsmParser::Delimiter::Square) ||
+      parser.parseComma() || parser.parseOperand(b.memref) ||
+      parser.parseOperandList(b.indices, OpAsmParser::Delimiter::Square) ||
       parser.parseColonType(funcType) ||
-      parser.addTypesToList(funcType.getResults(), result.types) ||
       parser.resolveOperand(ptr, i64Type, result.operands) ||
-      parser.resolveOperand(c.operand, funcType.getResult(0),
-                            result.operands) ||
-      parser.resolveOperand(a.operand, funcType.getInput(0), result.operands) ||
-      parser.resolveOperand(b.operand, funcType.getInput(1), result.operands) ||
-      parser.resolveOperands(c.accessOperands, indexType, result.operands) ||
-      parser.resolveOperands(a.accessOperands, indexType, result.operands) ||
-      parser.resolveOperands(b.accessOperands, indexType, result.operands));
+      parser.resolveOperand(c.memref, funcType.getResult(0), result.operands) ||
+      parser.resolveOperand(a.memref, funcType.getInput(0), result.operands) ||
+      parser.resolveOperand(b.memref, funcType.getInput(1), result.operands) ||
+      parser.resolveOperands(c.indices, indexType, result.operands) ||
+      parser.resolveOperands(a.indices, indexType, result.operands) ||
+      parser.resolveOperands(b.indices, indexType, result.operands));
 }
+
+ParseResult parseBRGemmOffsInvokeF32Op(OpAsmParser &parser,
+                                       OperationState &result) {
+  auto &builder = parser.getBuilder();
+  auto indexType = builder.getIndexType();
+  auto i64Type = builder.getIntegerType(64);
+  GemmOperand a, b, c;
+  ArrayAttr aOffs, bOffs;
+  IntegerAttr numBatchesAttr;
+  FunctionType funcType;
+  OpAsmParser::OperandType ptr;
+ 
+  return failure(
+ 
+      parser.parseOperand(ptr) || parser.parseComma() ||
+      parser.parseOperand(c.memref) ||
+      parser.parseOperandList(c.indices, OpAsmParser::Delimiter::Square) ||
+      parser.parseEqual() || parser.parseOperand(a.memref) ||
+      parser.parseOperandList(a.indices, OpAsmParser::Delimiter::Square) ||
+      parser.parseComma() || parser.parseOperand(b.memref) ||
+      parser.parseOperandList(b.indices, OpAsmParser::Delimiter::Square) ||
+      parser.parseComma() ||
+      parser.parseAttribute(numBatchesAttr, i64Type, "numBatches",
+                            result.attributes) ||
+      parser.parseComma() ||
+      parser.parseAttribute(aOffs, i64Type, "aOffsets", result.attributes) ||
+      parser.parseComma() ||
+      parser.parseAttribute(bOffs, i64Type, "bOffsets", result.attributes) ||
+      parser.parseColonType(funcType) ||
+      parser.resolveOperand(ptr, i64Type, result.operands) ||
+      parser.resolveOperand(c.memref, funcType.getResult(0), result.operands) ||
+      parser.resolveOperand(a.memref, funcType.getInput(0), result.operands) ||
+      parser.resolveOperand(b.memref, funcType.getInput(1), result.operands) ||
+      parser.resolveOperands(c.indices, indexType, result.operands) ||
+      parser.resolveOperands(a.indices, indexType, result.operands) ||
+      parser.resolveOperands(b.indices, indexType, result.operands));
+}
+
+} // namespace pmlc::dialect::xsmm
 
 #define GET_OP_CLASSES
 #include "pmlc/dialect/xsmm/ir/ops.cc.inc" // NOLINT
-
-} // namespace pmlc::dialect::xsmm

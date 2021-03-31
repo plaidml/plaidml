@@ -5,7 +5,8 @@ import shutil
 import subprocess
 import sys
 
-verbose = False  # pylint: disable=invalid-name
+verbose = True  # pylint: disable=invalid-name
+DEFAULT_RATIO_THRESHOLD = 0.8
 
 
 def printf(*args, **kwargs):
@@ -39,8 +40,12 @@ def buildkite_upload(pattern, **kwargs):
     check_call(['buildkite-agent', 'artifact', 'upload', pattern], **kwargs)
 
 
-def buildkite_download(pattern, destination, **kwargs):
-    check_call(['buildkite-agent', 'artifact', 'download', pattern, destination], **kwargs)
+def buildkite_download(pattern, destination, check=True, **kwargs):
+    cmd = ['buildkite-agent', 'artifact', 'download', pattern, destination]
+    if check:
+        check_call(cmd, **kwargs)
+    else:
+        call(cmd, **kwargs)
 
 
 class CondaEnv(object):
@@ -150,11 +155,9 @@ class PlanOption(object):
 class Platform(object):
 
     def __init__(self, full, gpu_flops):
-        parts = full.split('-')
         self.full = full
-        self.framework = parts[0]
-        self.engine = '_'.join(parts[1:3])
-        self.gpu = parts[3]
+        self.compiler, self.runtime, self.gpu = full.split('-')
+        self.engine = '{}_{}'.format(self.compiler, self.runtime)
         self.gpu_flops = gpu_flops.get(self.gpu)
 
     def __repr__(self):
@@ -172,6 +175,7 @@ class TestInfo(object):
         self.timeout = popt.get('timeout', 20)
         self.retry = popt.get('retry')
         self.soft_fail = popt.get('soft_fail')
+        self.perf_threshold = popt.get('perf_threshold', DEFAULT_RATIO_THRESHOLD)
         self.shards = shards
         self.shard_id = shard_id
         if self.shards > 1:

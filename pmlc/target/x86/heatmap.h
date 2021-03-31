@@ -7,10 +7,10 @@
 
 #include "llvm/ADT/ArrayRef.h"
 
-#include "pmlc/dialect/pxa/transforms/passes.h"
+#include "pmlc/dialect/pxa/transforms/stencil.h"
 
 namespace pmlc::target::x86 {
 
-dialect::pxa::StencilCost heatmapCost(llvm::ArrayRef<unsigned> tile);
+dialect::pxa::StencilCost heatmapCost(llvm::ArrayRef<int64_t> tile);
 
 } // namespace pmlc::target::x86

@@ -18,8 +18,7 @@
 // `DoStenciling` Overview
 // -----------------------
 //  `DoStenciling` will first find appropriate IO ops (i.e., loads
-//  (`mlir::AffineLoadOp`) and stores (`mlir::AffineStoreOp` or
-//  `pxa::AffineReduceOp`)) using the `capture` function.
+//  (`PxaLoadOp`) and stores (pxa::PxaReduceOp`)) using the `capture` function.
 //
 //  It will then iterate through all permutations of the IO ops that have all
 //  stores precede all loads, and all permutations of `op`'s `BlockArgument`s as
@@ -137,30 +136,27 @@ using BlockArgumentSet = llvm::SmallPtrSet<mlir::BlockArgument, 8>;
 using IdxStrideReqs = llvm::SmallVector<std::function<bool(int64_t)>, 3>;
 
 struct TensorAndIndexPermutation {
-  // An order of the Tensors and Indexes used in an operation
-  // Note: Tensors are tracked by their load/store/reduce ops, not values,
-  // because we need to get stride information, which means we need the op,
-  // and for stores/reduces getting to the op from the value is nontrivial
-  llvm::SmallVector<mlir::Operation *, 3> ioOps;
+  // An order of the Tensors and indicies used in an operation
+  llvm::SmallVector<mlir::Value, 3> values;
   llvm::SmallVector<mlir::BlockArgument, 8> indexes;
 
   TensorAndIndexPermutation() = default;
 
-  TensorAndIndexPermutation(llvm::ArrayRef<mlir::Operation *> ioOps,
+  TensorAndIndexPermutation(llvm::ArrayRef<mlir::Value> values,
                             llvm::ArrayRef<mlir::BlockArgument> indexes)
-      : ioOps(ioOps.begin(), ioOps.end()),
+      : values(values.begin(), values.end()),
         indexes(indexes.begin(), indexes.end()) {}
 };
 
 struct LoadStoreOps {
   // The load and store ops of an AffineParallel
   // Loads and stores are expected to be distinguished within a single op, so
-  // are stored separately. Stores and Reduces are not expected to be
+  // are stored separately. Reduces are not expected to be
   // distinguished within a single op (`capture` may only allow one or the other
   // (or both), but may not distinguish between store and reduce within a single
   // op). Thus, `stores` might have either store or reduce ops.
-  llvm::SmallVector<mlir::Operation *, 1> stores;
-  llvm::SmallVector<mlir::Operation *, 2> loads;
+  llvm::SmallVector<mlir::Value, 1> stores;
+  llvm::SmallVector<mlir::Value, 2> loads;
 };
 
 using TileSizeGenerator = std::function<std::vector<int64_t>(int64_t)>;
@@ -191,17 +187,17 @@ protected:
   virtual llvm::Optional<LoadStoreOps> capture() = 0;
   // Determine the cost of the specified stencil
   virtual double getCost(TensorAndIndexPermutation perm,
-                         ArrayRef<int64_t> tileSize) = 0;
+                         llvm::ArrayRef<int64_t> tileSize) = 0;
   // Rewrite `op` by applying the specified stencil
   virtual void transform(TensorAndIndexPermutation perm,
-                         ArrayRef<int64_t> tileSize) = 0;
+                         llvm::ArrayRef<int64_t> tileSize) = 0;
 
   // Get the range of the `idx`th BlockArg
   int64_t getIdxRange(mlir::BlockArgument idx);
 
   // Call `computeStrideInfo` with caching and automatic conversion to whichever
-  // of AffineLoadOp, AffineStoreOp, or AffineReduceOp is correct
-  mlir::Optional<mlir::StrideInfo> getStrideInfo(mlir::Operation *ioOp);
+  // of PxaLoadOp, or PxaReduceOp is correct
+  mlir::Optional<StrideInfo> getStrideInfo(mlir::Value value);
 
   // Print a log of the best stencil (reporting on cost, permutation, and
   // tiling) provided verbosity is at least `logLevel`
@@ -217,9 +213,9 @@ protected:
   mlir::AffineParallelOp op;
 
 private:
-  void BindIndexes(llvm::ArrayRef<mlir::Operation *> ioOps);
+  void BindIndexes(llvm::ArrayRef<mlir::Value> values);
   void RecursiveBindIndex(llvm::SmallVector<mlir::BlockArgument, 8> &bound_idxs,
-                          llvm::ArrayRef<mlir::Operation *> ioOps);
+                          llvm::ArrayRef<mlir::Value> values);
   void RecursiveTileIndex(const TensorAndIndexPermutation &perm,
                           llvm::MutableArrayRef<int64_t> tileSize,
                           int64_t currIdx);
@@ -239,8 +235,7 @@ private:
   llvm::SmallVector<int64_t, 8> ranges;
 
   // Cache of StrideInfo results
-  llvm::DenseMap<mlir::Operation *, mlir::Optional<mlir::StrideInfo>>
-      strideInfoCache;
+  llvm::DenseMap<mlir::Value, mlir::Optional<StrideInfo>> strideInfoCache;
 
   // The load and store ops
   LoadStoreOps loadsAndStores;
@@ -262,5 +257,17 @@ private:
   TensorAndIndexPermutation bestPermutation;
   llvm::SmallVector<int64_t, 8> bestTiling;
 };
+
+struct StencilCost {
+  double throughput;
+  unsigned startupCost;
+};
+
+using StencilCostFunction = std::function<StencilCost(
+    llvm::ArrayRef<int64_t>, llvm::ArrayRef<mlir::Type>)>;
+
+mlir::LogicalResult applyStencilGEMM(mlir::AffineParallelOp op,
+                                     unsigned numThreads, bool isBatched,
+                                     StencilCostFunction costFn);
 
 } // namespace pmlc::dialect::pxa

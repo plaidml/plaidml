@@ -7,34 +7,33 @@ package(default_visibility = ["//visibility:public"])
 
 gentbl(
     name = "gen-pass",
-    tbl_outs = [
-        (
-            "-gen-pass-decls",
-            "passes.h.inc",
-        ),
-    ],
+    tbl_outs = [("-gen-pass-decls", "passes.h.inc")],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "passes.td",
-    td_srcs = [
-        "@llvm-project//mlir:PassBaseTdFiles",
-    ],
+    td_srcs = ["@llvm-project//mlir:PassBaseTdFiles"],
 )
 
 plaidml_cc_library(
     name = "transforms",
     srcs = [
-        "constant_types.cc",
         "contraction.cc",
-        "make_program.cc",
+        "expand_reshape.cc",
+        "materialize.cc",
+        "pad_constraints.cc",
+        "pad_ranges.cc",
         "padding.cc",
         "pass_detail.h",
+        "split_main.cc",
     ],
     hdrs = [
         "contraction.h",
+        "expand_reshape.h",
         "padding.h",
         "passes.h",
     ],
     deps = [
         ":gen-pass",
+        "//pmlc/dialect/stdx/ir",
         "//pmlc/dialect/tile/ir",
         "//pmlc/util",
         "//pmlc/util/bilp",

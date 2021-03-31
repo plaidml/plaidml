@@ -3,10 +3,10 @@ package(default_visibility = ["//visibility:public"])
 py_binary(
     name = "demo",
     srcs = [
-        "demo.py",
         "app.py",
         "core.py",
-        "style/custom_html.py"
+        "demo.py",
+        "style/custom_html.py",
     ],
     data = [
         "edsl_demo.ipynb",
@@ -24,7 +24,7 @@ py_binary(
     name = "voila",
     srcs = glob([
         "*.py",
-        "style/*.py"
+        "style/*.py",
     ]),
     args = [
         "--no-browser",

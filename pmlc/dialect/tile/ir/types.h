@@ -1,4 +1,4 @@
-// Copyright 2019, Intel Corporation
+// Copyright 2020 Intel Corporation
 
 #pragma once
 
@@ -6,47 +6,27 @@
 
 namespace pmlc::dialect::tile {
 
-namespace TypeKinds {
-enum Kind {
-  AffineMap = mlir::Type::Kind::FIRST_PRIVATE_EXPERIMENTAL_2_TYPE,
-  AffineTensorMap,
-  AffineConstraints,
-  String,
-};
-}
-
-class AffineTensorMapType
-    : public mlir::Type::TypeBase<AffineTensorMapType, mlir::Type> {
+class APFloatType : public mlir::Type::TypeBase<APFloatType, mlir::Type,
+                                                mlir::DefaultTypeStorage> {
 public:
   using Base::Base;
-  static AffineTensorMapType get(mlir::MLIRContext *context);
-  static bool kindof(unsigned kind) {
-    return kind == TypeKinds::AffineTensorMap;
-  }
+  using Base::getChecked;
 };
 
-class AffineMapType : public mlir::Type::TypeBase<AffineMapType, mlir::Type> {
+class APSignedIntegerType
+    : public mlir::Type::TypeBase<APSignedIntegerType, mlir::Type,
+                                  mlir::DefaultTypeStorage> {
 public:
   using Base::Base;
-  static AffineMapType get(mlir::MLIRContext *context);
-  static bool kindof(unsigned kind) { return kind == TypeKinds::AffineMap; }
+  using Base::getChecked;
 };
 
-class AffineConstraintsType
-    : public mlir::Type::TypeBase<AffineConstraintsType, mlir::Type> {
+class APUnsignedIntegerType
+    : public mlir::Type::TypeBase<APUnsignedIntegerType, mlir::Type,
+                                  mlir::DefaultTypeStorage> {
 public:
   using Base::Base;
-  static AffineConstraintsType get(mlir::MLIRContext *context);
-  static bool kindof(unsigned kind) {
-    return kind == TypeKinds::AffineConstraints;
-  }
-};
-
-class StringType : public mlir::Type::TypeBase<StringType, mlir::Type> {
-public:
-  using Base::Base;
-  static StringType get(mlir::MLIRContext *context);
-  static bool kindof(unsigned kind) { return kind == TypeKinds::String; }
+  using Base::getChecked;
 };
 
 } // namespace pmlc::dialect::tile

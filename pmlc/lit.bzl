@@ -45,12 +45,16 @@ def _run_lit_test(name, data, size, tags, features):
         name = name,
         srcs = ["@llvm-project//llvm:lit"],
         tags = tags,
-        args = ["pmlc", "-v"] + features,
+        args = [
+            "pmlc",
+            "-v",
+        ] + features,
         data = data + [
             "//pmlc/tools/pmlc-jit",
             "//pmlc/tools/pmlc-opt",
             "//pmlc/tools/pmlc-translate",
             "//pmlc/tools/pmlc-vulkan-runner",
+            "//pmlc/tools/pmlc-opencl-runner",
             "//pmlc:lit_files",
             "@llvm-project//llvm:FileCheck",
             "@llvm-project//llvm:count",

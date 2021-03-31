@@ -6,6 +6,7 @@ filegroup(
         "Doxyfile",
         "conf.py",
         "**/*.rst",
+        'refs.bib',
     ]),
     visibility = ["//visibility:public"],
 )
@@ -19,6 +20,7 @@ py_binary(
         ":runfiles",
         "//plaidml/core:docs",
         "//plaidml/edsl:docs",
+        "//plaidml/edsl/examples:docs",
         "//plaidml/exec:docs",
     ],
     deps = [

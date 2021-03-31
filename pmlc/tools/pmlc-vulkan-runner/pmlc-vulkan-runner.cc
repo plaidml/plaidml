@@ -12,45 +12,59 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "mlir/Conversion/GPUToSPIRV/ConvertGPUToSPIRVPass.h"
-#include "mlir/Conversion/GPUToVulkan/ConvertGPUToVulkanPass.h"
+#include "mlir/Conversion/GPUToSPIRV/GPUToSPIRVPass.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
-#include "mlir/Conversion/StandardToSPIRV/ConvertStandardToSPIRVPass.h"
+#include "mlir/Conversion/StandardToSPIRV/StandardToSPIRVPass.h"
 #include "mlir/Dialect/GPU/Passes.h"
-#include "mlir/Dialect/SPIRV/Passes.h"
-#include "mlir/Dialect/SPIRV/SPIRVOps.h"
+#include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
+#include "mlir/Dialect/SPIRV/Transforms/Passes.h"
 #include "mlir/ExecutionEngine/OptUtils.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/FileUtilities.h"
 #include "llvm/Support/InitLLVM.h"
+#include "llvm/Support/Process.h"
 #include "llvm/Support/TargetSelect.h"
 
-#include "pmlc/compiler/executable.h"
+#include "pmlc/all_dialects.h"
 #include "pmlc/compiler/program.h"
-#include "pmlc/conversion/gpu/lowering.h"
-#include "pmlc/util/all_dialects.h"
-#include "pmlc/util/all_passes.h"
-#include "pmlc/util/env.h"
+#include "pmlc/conversion/comp_to_llvm/passes.h"
+#include "pmlc/conversion/gpu/passes.h"
+#include "pmlc/dialect/comp/ir/types.h"
+#include "pmlc/dialect/comp/transforms/passes.h"
+#include "pmlc/rt/executable.h"
+#include "pmlc/rt/runtime_registry.h"
 #include "pmlc/util/logging.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
-using pmlc::compiler::Executable;
 using pmlc::compiler::Program;
+using pmlc::rt::Executable;
+using pmlc::util::BufferPtr;
+namespace comp = pmlc::dialect::comp;
 
 static LogicalResult runMLIRPasses(ModuleOp module) {
   PassManager passManager(module.getContext());
   applyPassManagerCLOptions(passManager);
 
+  passManager.addPass(pmlc::conversion::gpu::createGpuKernelOutliningPass(
+      comp::ExecEnvRuntime::Vulkan, /*memorySpace=*/0));
+
   passManager.addPass(createGpuKernelOutliningPass());
+
   passManager.addPass(createLegalizeStdOpsForSPIRVLoweringPass());
   passManager.addPass(createConvertGPUToSPIRVPass());
   OpPassManager &modulePM = passManager.nest<spirv::ModuleOp>();
   modulePM.addPass(spirv::createLowerABIAttributesPass());
   modulePM.addPass(spirv::createUpdateVersionCapabilityExtensionPass());
+  // Comp to LLVM - Vulkan function calls.
   passManager.addPass(
-      pmlc::conversion::gpu::createConvertGpuLaunchFuncToVulkanCallsPass());
-  passManager.addPass(pmlc::conversion::gpu::createLLVMLoweringPass());
+      pmlc::conversion::comp_to_llvm::createConvertCompToLLVMPass());
+  passManager.addPass(createLowerToLLVMPass(LowerToLLVMOptions{
+      /*useBarePtrCallConv=*/false,
+      /*emitCWrappers=*/true,
+      /*indexBitwidth=*/kDeriveIndexBitwidthFromDataLayout,
+      /*useAlignedAlloc=*/false,
+  }));
   return passManager.run(module);
 }
 
@@ -64,6 +78,10 @@ struct Options {
   llvm::cl::opt<std::string> mainFuncName{
       "e", llvm::cl::desc("The function to be called"),
       llvm::cl::value_desc("<function name>"), llvm::cl::init("main")};
+
+  llvm::cl::opt<std::string> optDeviceID{
+      "device", llvm::cl::desc("The device to use"),
+      llvm::cl::value_desc("<device_id>"), llvm::cl::init("vulkan.0")};
 };
 } // namespace
 
@@ -81,21 +99,27 @@ int JitRunnerMain(int argc, char **argv) {
     return EXIT_FAILURE;
   }
 
-  auto program = std::make_shared<Program>(std::move(file));
+  mlir::DialectRegistry registry;
+  registerAllDialects(registry);
+
+  auto context = std::make_unique<MLIRContext>(registry);
+  auto program = std::make_shared<Program>(std::move(context), std::move(file));
   program->entry = options.mainFuncName.getValue();
 
-  runMLIRPasses(*program->module);
+  if (failed(runMLIRPasses(*program->module)))
+    return EXIT_FAILURE;
 
-  Executable executable(program, ArrayRef<void *>{});
-  executable.invoke();
+  auto executable =
+      Executable::fromProgram(program, options.optDeviceID.getValue());
+  executable->invoke(ArrayRef<BufferPtr>{}, ArrayRef<BufferPtr>{});
 
   return EXIT_SUCCESS;
 }
 
 int main(int argc, char **argv) {
-  auto level_str = pmlc::util::getEnvVar("PLAIDML_VERBOSE");
-  if (level_str.size()) {
-    auto level = std::atoi(level_str.c_str());
+  auto verboseEnv = llvm::sys::Process::GetEnv("PLAIDML_VERBOSE");
+  if (verboseEnv) {
+    auto level = std::atoi(verboseEnv->c_str());
     if (level) {
       el::Loggers::setVerboseLevel(level);
     }
@@ -105,11 +129,16 @@ int main(int argc, char **argv) {
   llvm::llvm_shutdown_obj x;
   registerPassManagerCLOptions();
 
-  registerAllDialects();
   llvm::InitLLVM y(argc, argv);
   llvm::InitializeNativeTarget();
   llvm::InitializeNativeTargetAsmPrinter();
   mlir::initializeLLVMPasses();
+  pmlc::rt::initRuntimes();
 
-  return JitRunnerMain(argc, argv);
+  try {
+    return JitRunnerMain(argc, argv);
+  } catch (const std::exception &ex) {
+    llvm::errs() << "Unhandled exception caught: " << ex.what() << "\n";
+  }
+  return EXIT_FAILURE;
 }

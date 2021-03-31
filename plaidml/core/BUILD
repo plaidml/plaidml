@@ -7,6 +7,7 @@ load(
     "plaidml_cc_version",
     "plaidml_py_version",
 )
+load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
 
 SDK_HDRS = [
     "core.h",
@@ -26,6 +27,13 @@ filegroup(
 filegroup(
     name = "sdk",
     srcs = SDK_HDRS,
+    visibility = ["//visibility:public"],
+)
+
+pkg_tar(
+    name = "sdk_tar",
+    srcs = [":sdk"],
+    package_dir = "include/plaidml/core",
     visibility = ["//visibility:public"],
 )
 
@@ -51,12 +59,11 @@ plaidml_cc_library(
     hdrs = SDK_HDRS,
     visibility = ["//visibility:public"],
     deps = [
+        "//pmlc/ast",
         "//pmlc/compiler",
-        "//pmlc/dialect/tile",
         "//pmlc/util",
         "@llvm-project//llvm:Support",
     ],
-    alwayslink = 1,
 )
 
 py_library(
@@ -71,6 +78,7 @@ py_library(
 
 py_test(
     name = "py_test",
+    size = "small",
     srcs = ["core_test.py"],
     args = ["-v"],
     main = "core_test.py",

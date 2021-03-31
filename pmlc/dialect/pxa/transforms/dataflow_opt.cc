@@ -5,6 +5,7 @@
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Support/DebugStringHelper.h"
 
+#include "pmlc/dialect/pxa/analysis/memref_access.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/dialect/pxa/transforms/pass_detail.h"
 #include "pmlc/util/logging.h"
@@ -15,60 +16,43 @@ namespace pmlc::dialect::pxa {
 
 namespace {
 
-struct MemRefAccess {
-  AffineValueMap accessMap;
-
-  explicit MemRefAccess(AffineLoadOp op) {
-    getAccessMap(op.getAffineMap(), op.getMapOperands(), &accessMap);
-  }
-
-  explicit MemRefAccess(AffineReduceOp op) {
-    getAccessMap(op.getAffineMap(), op.getMapOperands(), &accessMap);
-  }
-
-  static void getAccessMap(AffineMap map, SmallVector<Value, 8> operands,
-                           AffineValueMap *accessMap) {
-    fullyComposeAffineMapAndOperands(&map, &operands);
-    map = simplifyAffineMap(map);
-    canonicalizeMapAndOperands(&map, &operands);
-    accessMap->reset(map, operands);
-  }
-
-  bool operator==(const MemRefAccess &rhs) const {
-    AffineValueMap diff, lhsMap, rhsMap;
-    AffineValueMap::difference(accessMap, rhs.accessMap, &diff);
-    return llvm::all_of(diff.getAffineMap().getResults(),
-                        [](AffineExpr expr) { return expr == 0; });
-  }
-
-  bool operator!=(const MemRefAccess &rhs) const { return !(*this == rhs); }
-};
-
 struct MemRefDataFlowOptPass
     : public MemRefDataFlowOptBase<MemRefDataFlowOptPass> {
+
+  explicit MemRefDataFlowOptPass(bool onlyParallelNested) {
+    this->onlyParallelNested = onlyParallelNested;
+  }
+
   void runOnFunction() final {
     // Walk all load's and perform reduce to load forwarding.
     FuncOp f = getFunction();
-    f.walk([&](AffineLoadOp loadOp) {
+    f.walk([&](PxaReadOpInterface loadOp) {
       auto defOp = loadOp.getMemRef().getDefiningOp();
       if (!defOp) {
         return;
       }
 
-      auto reduceOp = dyn_cast_or_null<AffineReduceOp>(defOp);
-      if (!reduceOp || reduceOp.agg() != AggregationKind::assign) {
+      auto reduceOp = dyn_cast_or_null<PxaReduceOpInterface>(defOp);
+      if (!reduceOp || reduceOp.getAgg() != AtomicRMWKind::assign) {
+        return;
+      }
+
+      if (onlyParallelNested &&
+          (!dyn_cast<AffineParallelOp>(loadOp->getParentOp()) ||
+           !dyn_cast<AffineParallelOp>(reduceOp->getParentOp()))) {
         return;
       }
 
       MemRefAccess srcAccess(reduceOp);
       MemRefAccess dstAccess(loadOp);
-      IVLOG(1, "src: " << debugString(*reduceOp));
-      IVLOG(1, "dst: " << debugString(*loadOp));
+      IVLOG(3, "src: " << debugString(*reduceOp));
+      IVLOG(3, "dst: " << debugString(*loadOp));
       if (srcAccess != dstAccess)
         return;
 
       // Perform the actual store to load forwarding.
-      loadOp.getResult().replaceAllUsesWith(reduceOp.getValueToStore());
+      loadOp.getOperation()->getResult(0).replaceAllUsesWith(
+          reduceOp.getValueToStore());
 
       loadOp.erase();
     });
@@ -77,8 +61,8 @@ struct MemRefDataFlowOptPass
 
 } // namespace
 
-std::unique_ptr<Pass> createMemRefDataFlowOptPass() {
-  return std::make_unique<MemRefDataFlowOptPass>();
+std::unique_ptr<Pass> createMemRefDataFlowOptPass(bool onlyParallelNested) {
+  return std::make_unique<MemRefDataFlowOptPass>(onlyParallelNested);
 }
 
 } // namespace pmlc::dialect::pxa

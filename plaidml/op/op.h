@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -14,7 +15,6 @@ namespace op {
 inline void init() {
   plaidml::init();
   plaidml::edsl::init();
-  ffi::call_void(plaidml_op_init);
 }
 
 namespace details {
@@ -37,9 +37,7 @@ enum class AutoGroupMode {
 };
 
 enum class AutoPadMode {
-  NONE,
-  NOTSET = NONE,
-  EXPLICIT = NONE,
+  EXPLICIT,
   SAME_LOWER,
   SAME_UPPER,
   VALID,
@@ -50,6 +48,12 @@ enum class ConvDerivMode {
   NONE,    // Forward Pass
   DATA,    // Computing derivative of input data (or equivalently a transposed conv)
   FILTER,  // Computing derivative of filters
+  _LAST,
+};
+
+enum class EpsMode {
+  ADD,
+  MAX,
   _LAST,
 };
 
@@ -103,6 +107,34 @@ enum class TensorLayout {
   _LAST,
 };
 
+enum class PadMode {
+  CONSTANT,
+  EDGE,
+  REFLECT,
+  SYMMETRIC,
+  _LAST,
+};
+
+struct Integers {
+  Integers(const std::vector<int>& elts)  // NOLINT[runtime/explicit]
+      : value(edsl::make_tuple(elts)) {}
+  Integers(const std::vector<int64_t>& elts) {  // NOLINT[runtime/explicit]
+    value = edsl::make_tuple(elts);
+  }
+  Integers(const std::vector<size_t>& elts) {  // NOLINT[runtime/explicit]
+    std::vector<int64_t> casted(elts.begin(), elts.end());
+    value = edsl::make_tuple(casted);
+  }
+  Integers(const std::initializer_list<int>& elts)  // NOLINT[runtime/explicit]
+      : Integers(std::vector<int>(elts)) {}
+  Integers(const std::initializer_list<int64_t>& elts)  // NOLINT[runtime/explicit]
+      : Integers(std::vector<int64_t>(elts)) {}
+  Integers(const std::initializer_list<size_t>& elts)  // NOLINT[runtime/explicit]
+      : Integers(std::vector<size_t>(elts)) {}
+
+  edsl::Value value;
+};
+
 inline edsl::Tensor abs(const edsl::Tensor& I) {
   auto args = edsl::make_tuple(I);
   return details::op("abs", args).as_tensor();
@@ -128,8 +160,8 @@ inline edsl::Tensor binary_crossentropy(const edsl::Tensor& I, const edsl::Tenso
   return details::op("binary_crossentropy", args).as_tensor();
 }
 
-inline edsl::Tensor broadcast(const edsl::Tensor& I, const std::vector<int>& result_shape,
-                              const std::vector<int>& bcast_axes) {
+inline edsl::Tensor broadcast(const edsl::Tensor& I, const std::vector<int64_t>& result_shape,
+                              const std::vector<int64_t>& bcast_axes) {
   auto args = edsl::make_tuple(I, edsl::make_tuple(result_shape), edsl::make_tuple(bcast_axes));
   return details::op("broadcast", args).as_tensor();
 }
@@ -159,51 +191,23 @@ class convolution {
         deriv_mode_(ConvDerivMode::NONE),
         infer_result_shape_(false) {}
 
-  template <typename T, typename std::enable_if<std::is_integral<T>::value>::type* = nullptr>
-  convolution& strides(const std::vector<T>& strides) {
-    strides_ = edsl::make_tuple(strides);
+  convolution& strides(Integers elts) {
+    strides_ = elts.value;
     return *this;
   }
 
-  template <typename T, typename std::enable_if<std::is_integral<T>::value>::type* = nullptr>
-  convolution& strides(const std::initializer_list<T>& strides) {
-    strides_ = edsl::make_tuple(std::vector<T>(strides));
+  convolution& dilations(Integers elts) {
+    dilations_ = elts.value;
     return *this;
   }
 
-  template <typename T, typename std::enable_if<std::is_integral<T>::value>::type* = nullptr>
-  convolution& dilations(const std::vector<T>& dilations) {
-    dilations_ = edsl::make_tuple(dilations);
+  convolution& data_dilations(Integers elts) {
+    data_dilations_ = elts.value;
     return *this;
   }
 
-  template <typename T, typename std::enable_if<std::is_integral<T>::value>::type* = nullptr>
-  convolution& dilations(const std::initializer_list<T>& dilations) {
-    dilations_ = edsl::make_tuple(std::vector<T>(dilations));
-    return *this;
-  }
-
-  template <typename T, typename std::enable_if<std::is_integral<T>::value>::type* = nullptr>
-  convolution& data_dilations(const std::vector<T>& data_dilations) {
-    data_dilations_ = edsl::make_tuple(data_dilations);
-    return *this;
-  }
-
-  template <typename T, typename std::enable_if<std::is_integral<T>::value>::type* = nullptr>
-  convolution& data_dilations(const std::initializer_list<T>& data_dilations) {
-    data_dilations_ = edsl::make_tuple(std::vector<T>(data_dilations));
-    return *this;
-  }
-
-  template <typename T, typename std::enable_if<std::is_integral<T>::value>::type* = nullptr>
-  convolution& filter_shape(const std::vector<T>& filter_shape) {
-    filter_shape_ = edsl::make_tuple(filter_shape);
-    return *this;
-  }
-
-  template <typename T, typename std::enable_if<std::is_integral<T>::value>::type* = nullptr>
-  convolution& filter_shape(const std::initializer_list<T>& filter_shape) {
-    filter_shape_ = edsl::make_tuple(std::vector<T>(filter_shape));
+  convolution& filter_shape(Integers elts) {
+    filter_shape_ = elts.value;
     return *this;
   }
 
@@ -212,15 +216,8 @@ class convolution {
     return *this;
   }
 
-  template <typename T, typename std::enable_if<std::is_integral<T>::value>::type* = nullptr>
-  convolution& manual_padding(const std::vector<T>& manual_padding) {
-    manual_padding_ = edsl::make_tuple(manual_padding);
-    return *this;
-  }
-
-  template <typename T, typename std::enable_if<std::is_integral<T>::value>::type* = nullptr>
-  convolution& manual_padding(const std::initializer_list<T>& manual_padding) {
-    manual_padding_ = edsl::make_tuple(std::vector<T>(manual_padding));
+  convolution& manual_padding(Integers elts) {
+    manual_padding_ = elts.value;
     return *this;
   }
 
@@ -264,15 +261,8 @@ class convolution {
     return *this;
   }
 
-  template <typename T, typename std::enable_if<std::is_integral<T>::value>::type* = nullptr>
-  convolution& result_shape(const std::vector<T>& result_shape) {
-    result_shape_ = edsl::make_tuple(result_shape);
-    return *this;
-  }
-
-  template <typename T, typename std::enable_if<std::is_integral<T>::value>::type* = nullptr>
-  convolution& result_shape(const std::initializer_list<T>& result_shape) {
-    result_shape_ = edsl::make_tuple(std::vector<T>(result_shape));
+  convolution& result_shape(Integers elts) {
+    result_shape_ = elts.value;
     return *this;
   }
 
@@ -330,8 +320,8 @@ inline edsl::Tensor cumprod(const edsl::Tensor& I, int axis) {
   return details::op("cumprod", args).as_tensor();
 }
 
-inline edsl::Tensor cumsum(const edsl::Tensor& I, int axis) {
-  auto args = edsl::make_tuple(I, axis);
+inline edsl::Tensor cumsum(const edsl::Tensor& I, int axis, bool exclusive = false) {
+  auto args = edsl::make_tuple(I, axis, exclusive);
   return details::op("cumsum", args).as_tensor();
 }
 
@@ -345,10 +335,44 @@ inline edsl::Tensor elu(const edsl::Tensor& I, double alpha) {
   return details::op("elu", args).as_tensor();
 }
 
-inline edsl::Tensor expand_dims(const edsl::Tensor& I, int axis) {
-  auto args = edsl::make_tuple(I, axis);
-  return details::op("expand_dims", args).as_tensor();
-}
+class explicit_padding {
+ public:
+  explicit explicit_padding(const edsl::Tensor& I, const std::vector<int>& lo_pads, const std::vector<int>& hi_pads)
+      : I_(I), lo_pads_(lo_pads), hi_pads_(hi_pads), mode_(PadMode::CONSTANT), padval_(edsl::Constant(0)) {}
+
+  explicit_padding& lo_pads(const std::vector<int>& lo_pads) {
+    lo_pads_ = lo_pads;
+    return *this;
+  }
+
+  explicit_padding& hi_pads(const std::vector<int>& hi_pads) {
+    hi_pads_ = hi_pads;
+    return *this;
+  }
+
+  explicit_padding& mode(PadMode mode) {
+    mode_ = mode;
+    return *this;
+  }
+
+  explicit_padding& padval(const edsl::Tensor& padval) {
+    padval_ = padval;
+    return *this;
+  }
+
+  operator edsl::Tensor() const {
+    auto args =
+        edsl::make_tuple(I_, edsl::make_tuple(lo_pads_), edsl::make_tuple(hi_pads_), static_cast<int>(mode_), padval_);
+    return details::op("explicit_padding", args).as_tensor();
+  }
+
+ private:
+  edsl::Tensor I_;
+  std::vector<int> lo_pads_;
+  std::vector<int> hi_pads_;
+  PadMode mode_;
+  edsl::Tensor padval_;
+};
 
 inline edsl::Tensor flip(const edsl::Tensor& I, int axis) {
   auto args = edsl::make_tuple(I, axis);
@@ -437,6 +461,151 @@ inline edsl::Tensor minimum(const edsl::Tensor& X, const edsl::Tensor& Y) {
   return details::op("minimum", args).as_tensor();
 }
 
+class mvn {
+ public:
+  explicit mvn(const plaidml::edsl::Tensor& I)
+      : I_(I), axes_(edsl::None()), normalize_variance_(true), epsilon_(1e-9), across_channels_(true) {}
+
+  mvn& axes(const std::vector<int64_t>& axes) {
+    // negative axes interpreted as in numpy
+    if (!across_channels_ || !layout_.empty()) {
+      throw std::runtime_error("When using layout and across_channels, axes may not be specified");
+    }
+    axes_ = edsl::make_tuple(axes);
+    return *this;
+  }
+
+  mvn& across_channels(bool flag) {
+    if (!axes_.is_none()) {
+      throw std::runtime_error("May not specify both axes and across_channels for MVN");
+    }
+    across_channels_ = flag;
+    return *this;
+  }
+
+  mvn& normalize_variance(bool flag) {
+    normalize_variance_ = flag;
+    return *this;
+  }
+
+  mvn& epsilon(double value) {
+    epsilon_ = value;
+    return *this;
+  }
+
+  mvn& layout(const std::string& value) {
+    if (!axes_.is_none()) {
+      throw std::runtime_error("May not specify both axes and layout for MVN");
+    }
+    layout_ = value;
+    return *this;
+  }
+
+  operator plaidml::edsl::Tensor() const {
+    auto args = edsl::make_tuple(I_, axes_, normalize_variance_, epsilon_, across_channels_, layout_);
+    return details::op("mvn", args).as_tensor();
+  }
+
+ private:
+  plaidml::edsl::Tensor I_;
+  edsl::Value axes_;
+  bool normalize_variance_;
+  double epsilon_;
+  bool across_channels_;
+  std::string layout_;
+};
+
+class nms {
+ public:
+  explicit nms(edsl::Tensor Boxes, edsl::Tensor Scores, edsl::Tensor IOU_threshold, edsl::Tensor Score_threshold,
+               int max_output_boxes_per_class)
+      : Boxes_(Boxes),
+        Scores_(Scores),
+        IOU_threshold_(IOU_threshold),
+        Score_threshold_(Score_threshold),
+        max_output_boxes_per_class_(max_output_boxes_per_class),
+        soft_nms_sigma_(0.0f),
+        center_point_box_(false),
+        sort_result_descending_(false),
+        box_output_type_(DType::INT32) {}
+
+  nms& soft_nms_sigma(float soft_nms_sigma) {
+    soft_nms_sigma_ = soft_nms_sigma;
+    return *this;
+  }
+
+  nms& center_point_box(bool center_point_box) {
+    center_point_box_ = center_point_box;
+    return *this;
+  }
+
+  nms& sort_result_descending(bool sort_result_descending) {
+    sort_result_descending_ = sort_result_descending;
+    return *this;
+  }
+
+  nms& box_output_type(DType box_output_type) {
+    box_output_type_ = box_output_type;
+    return *this;
+  }
+
+  std::vector<edsl::Tensor> build() {
+    auto args = edsl::make_tuple(     //
+        Boxes_,                       //
+        Scores_,                      //
+        IOU_threshold_,               //
+        Score_threshold_,             //
+        max_output_boxes_per_class_,  //
+        soft_nms_sigma_,              //
+        center_point_box_,            //
+        sort_result_descending_,      //
+        static_cast<int>(box_output_type_));
+    auto R = details::op("nms", args).as_tuple();
+    auto B = R[0].as_tensor();
+    auto S = R[1].as_tensor();
+    auto V = R[2].as_tensor();
+    return {B, S, V};
+  }
+
+ private:
+  edsl::Tensor Boxes_;
+  edsl::Tensor Scores_;
+  edsl::Tensor IOU_threshold_;
+  edsl::Tensor Score_threshold_;
+  int max_output_boxes_per_class_;
+  float soft_nms_sigma_;
+  bool center_point_box_;
+  bool sort_result_descending_;
+  DType box_output_type_;
+};
+
+class l2norm {
+ public:
+  explicit l2norm(const edsl::Tensor& I, const std::vector<int64_t> axes)
+      : I_(I), axes_(axes), epsilon_(0), eps_mode_(EpsMode::ADD) {}
+
+  l2norm& epsilon(float epsilon) {
+    epsilon_ = epsilon;
+    return *this;
+  }
+
+  l2norm& eps_mode(EpsMode eps_mode) {
+    eps_mode_ = eps_mode;
+    return *this;
+  }
+
+  operator edsl::Tensor() const {
+    auto args = edsl::make_tuple(I_, edsl::make_tuple(axes_), epsilon_, static_cast<int>(eps_mode_));
+    return details::op("l2norm", args).as_tensor();
+  }
+
+ private:
+  edsl::Tensor I_;
+  std::vector<int64_t> axes_;
+  float epsilon_;
+  EpsMode eps_mode_;
+};
+
 inline edsl::Tensor pool(                    //
     const edsl::Tensor I,                    //
     PoolMode pool_mode,                      //
@@ -497,15 +666,40 @@ class relu {
   double threshold_ = 0.0;
 };
 
-inline edsl::Tensor reorg_yolo(const edsl::Tensor& I, int stride, bool decrease) {
-  auto args = edsl::make_tuple(I, stride, decrease);
+inline edsl::Tensor reorg_yolo(const edsl::Tensor& I, int stride, bool decrease, const std::string& layout = "NCHW") {
+  auto args = edsl::make_tuple(I, stride, decrease, layout);
   return details::op("reorg_yolo", args).as_tensor();
 }
 
-inline edsl::Tensor repeat(const edsl::Tensor& I, int repeats, int axis) {
-  auto args = edsl::make_tuple(I, repeats, axis);
-  return details::op("repeat", args).as_tensor();
-}
+class repeat {
+ public:
+  explicit repeat(const edsl::Tensor& I) : I_(I) {}
+
+  repeat& count(int count) {
+    count_ = edsl::Value(count);
+    return *this;
+  }
+
+  repeat& count(const edsl::TensorDim& count) {
+    count_ = edsl::Value(count);
+    return *this;
+  }
+
+  repeat& axis(int axis) {
+    axis_ = edsl::Value(axis);
+    return *this;
+  }
+
+  operator edsl::Tensor() const {
+    auto args = edsl::make_tuple(I_, count_, axis_);
+    return details::op("repeat", args).as_tensor();
+  }
+
+ private:
+  edsl::Tensor I_;
+  edsl::Value count_ = edsl::Value(1);
+  edsl::Value axis_ = edsl::Value(0);
+};
 
 inline edsl::Tensor reshape(const edsl::Tensor& I, const edsl::Value& dims) {
   auto args = edsl::make_tuple(I, dims);
@@ -558,6 +752,11 @@ inline edsl::Tensor softmax(const edsl::Tensor& I, int axis) {
   return details::op("softmax", args).as_tensor();
 }
 
+inline edsl::Tensor sort(const edsl::Tensor& I, int axis, edsl::SortDirection direction = edsl::SortDirection::ASC) {
+  auto args = edsl::make_tuple(I, axis, static_cast<int>(direction));
+  return details::op("sort", args).as_tensor();
+}
+
 inline edsl::Tensor square(const edsl::Tensor& x) {  //
   return details::op("square", edsl::Value(x)).as_tensor();
 }
@@ -589,6 +788,11 @@ inline edsl::Tensor tile(const edsl::Tensor& I, const std::vector<int>& tiling_f
 inline edsl::Tensor transpose(const edsl::Tensor& I, const edsl::Value& axes = edsl::None()) {
   auto args = edsl::make_tuple(I, axes);
   return details::op("transpose", args).as_tensor();
+}
+
+inline edsl::Tensor unsqueeze(const edsl::Tensor& I, const std::vector<int64_t>& axes) {
+  auto args = edsl::make_tuple(I, edsl::make_tuple(axes));
+  return details::op("unsqueeze", args).as_tensor();
 }
 
 inline edsl::Tensor variance(const edsl::Tensor& I, const edsl::Value& axes = edsl::None(), bool keepdims = false) {

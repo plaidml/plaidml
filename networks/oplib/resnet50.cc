@@ -19,6 +19,7 @@ using llvm::ArrayRef;
 using llvm::SmallVector;
 using llvm::StringRef;
 using plaidml::DType;
+using plaidml::Program;
 
 edsl::Tensor block(             //
     const edsl::Tensor& I_raw,  //
@@ -33,39 +34,20 @@ edsl::Tensor block(             //
   // as their existence depends on use_shortcut_conv
   auto conv_2a = op::convolution(I, W[0])
                      .name(base_name.str() + "_branch2a")
-                     .strides<int>(strides)
-                     .dilations({1, 1})
-                     .data_dilations({1, 1})
-                     .autopad_mode(op::AutoPadMode::VALID)
-                     .input_layout(op::TensorLayout::NXC)
-                     .filter_layout(op::TensorLayout::XCK);
+                     .strides(strides.vec())
+                     .autopad_mode(op::AutoPadMode::VALID);
   auto relu_2a = op::relu(conv_2a + B[0]);
-  auto conv_2b = op::convolution(relu_2a, W[1])
-                     .name(base_name.str() + "_branch2b")
-                     .strides({1, 1})
-                     .dilations({1, 1})
-                     .data_dilations({1, 1})
-                     .autopad_mode(op::AutoPadMode::SAME_UPPER)
-                     .input_layout(op::TensorLayout::NXC)
-                     .filter_layout(op::TensorLayout::XCK);
+  auto conv_2b = op::convolution(relu_2a, W[1])  //
+                     .name(base_name.str() + "_branch2b");
   auto relu_2b = op::relu(conv_2b + B[1]);
-  auto conv_2c = op::convolution(relu_2b, W[2])
+  auto conv_2c = op::convolution(relu_2b, W[2])  //
                      .name(base_name.str() + "_branch2b")
-                     .strides({1, 1})
-                     .dilations({1, 1})
-                     .data_dilations({1, 1})
-                     .autopad_mode(op::AutoPadMode::VALID)
-                     .input_layout(op::TensorLayout::NXC)
-                     .filter_layout(op::TensorLayout::XCK);
+                     .autopad_mode(op::AutoPadMode::VALID);
   if (use_shortcut_conv) {
     auto conv_1 = op::convolution(I, W[3])
                       .name(base_name.str() + "_branch1")
-                      .strides<int>(strides)
-                      .dilations({1, 1})
-                      .data_dilations({1, 1})
-                      .autopad_mode(op::AutoPadMode::VALID)
-                      .input_layout(op::TensorLayout::NXC)
-                      .filter_layout(op::TensorLayout::XCK);
+                      .strides(strides.vec())
+                      .autopad_mode(op::AutoPadMode::VALID);
     return op::relu(conv_2c + B[2] + conv_1 + B[3]);
   } else {
     return op::relu(conv_2c + B[2] + I);
@@ -236,27 +218,23 @@ std::vector<edsl::Tensor> bias_placeholders() {
   };
 }
 
-edsl::Program build(int64_t batch_size, const edsl::Tensor& I, ArrayRef<edsl::Tensor> W, ArrayRef<edsl::Tensor> B) {
+Program build(int64_t batch_size, const edsl::Tensor& I, ArrayRef<edsl::Tensor> W, ArrayRef<edsl::Tensor> B) {
   auto W_conv1 = W[0];
   auto B_conv1 = B[0];
   auto conv1 = op::convolution(I, W_conv1)
                    .name("conv1")
                    .strides({2, 2})
-                   .dilations({1, 1})
-                   .data_dilations({1, 1})
-                   .autopad_mode(op::AutoPadMode::NONE)
-                   .manual_padding({3, 3})
-                   .input_layout(op::TensorLayout::NXC)
-                   .filter_layout(op::TensorLayout::XCK);
+                   .autopad_mode(op::AutoPadMode::EXPLICIT)
+                   .manual_padding({3, 3});
   auto relu1 = op::relu(conv1 + B_conv1);
-  auto pool1 = op::pool(       //
-      relu1,                   // input
-      op::PoolMode::MAX,       // pool mode
-      {3, 3},                  // pool shape
-      {2, 2},                  // strides
-      op::AutoPadMode::NONE,   // autopadding
-      {1, 1},                  // manual padding
-      op::TensorLayout::NXC);  // input layout
+  auto pool1 = op::pool(          //
+      relu1,                      // input
+      op::PoolMode::MAX,          // pool mode
+      {3, 3},                     // pool shape
+      {2, 2},                     // strides
+      op::AutoPadMode::EXPLICIT,  // autopadding
+      {1, 1},                     // manual padding
+      op::TensorLayout::NXC);     // input layout
 
   // 2
   SmallVector<edsl::Tensor, 4> W_block2a = {W[1], W[2], W[3], W[4]};
@@ -332,12 +310,16 @@ edsl::Program build(int64_t batch_size, const edsl::Tensor& I, ArrayRef<edsl::Te
   auto B_dense = B[53];
   auto dense = op::dot(global_mean, W_dense) + B_dense;
   auto softmax = op::softmax(dense, 1);
-  return edsl::ProgramBuilder("resnet50", {edsl::trace(softmax, "done")}).compile();
+  auto O = edsl::trace(softmax, "done");
+  std::vector<edsl::Tensor> inputs{I};
+  inputs.insert(inputs.end(), W.begin(), W.end());
+  inputs.insert(inputs.end(), B.begin(), B.end());
+  return edsl::buildProgram("resnet50", inputs, {O});
 }
 
 }  // namespace
 
-edsl::Program buildResnet50(int64_t batch_size) {
+Program buildResnet50(int64_t batch_size) {
   auto I = edsl::Placeholder(DType::FLOAT32, {batch_size, 224, 224, 3});
   auto W = weight_placeholders();
   auto B = bias_placeholders();

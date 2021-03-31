@@ -1,9 +1,9 @@
 # Copyright 2020 Intel Corporation
 
-package(default_visibility = ["//visibility:public"])
-
-load("//bzl:plaidml.bzl", "plaidml_cc_library", "plaidml_cc_test")
+load("//bzl:plaidml.bzl", "plaidml_cc_library")
 load("//vendor/mlir:tblgen.bzl", "gentbl")
+
+package(default_visibility = ["//visibility:public"])
 
 filegroup(
     name = "td_files",
@@ -16,19 +16,11 @@ filegroup(
 gentbl(
     name = "gen-ops",
     tbl_outs = [
-        (
-            "-gen-op-decls",
-            "ops.h.inc",
-        ),
-        (
-            "-gen-op-defs",
-            "ops.cc.inc",
-        ),
-        (
-            "-gen-dialect-decls",
-            "dialect.h.inc",
-        ),
+        ("-gen-op-decls", "ops.h.inc"),
+        ("-gen-op-defs", "ops.cc.inc"),
+        ("-gen-dialect-decls", "dialect.h.inc"),
     ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "ops.td",
     td_srcs = [":td_files"],
 )

@@ -1,6 +1,9 @@
 #pragma once
 
+#include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Pass/Pass.h"
+
+#include "pmlc/dialect/stdx/ir/ops.h"
 
 namespace pmlc::dialect::stdx {
 
