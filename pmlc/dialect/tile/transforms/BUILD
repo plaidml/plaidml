@@ -17,6 +17,7 @@ plaidml_cc_library(
     name = "transforms",
     srcs = [
         "contraction.cc",
+        "conv2d_finder.cc",
         "expand_reshape.cc",
         "materialize.cc",
         "pad_constraints.cc",

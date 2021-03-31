@@ -44,4 +44,9 @@ def SplitMain :  Pass<"tile-split-main", "mlir::ModuleOp"> {
   ];
 }
 
+def Conv2dFinder : FunctionPass<"diag-conv2d-finder"> {
+  let summary = "Diagnostic pass for Conv2d analysis code";
+  let constructor = "pmlc::dialect::tile::createConv2dFinderPass()";
+}
+
 #endif // __PMLC_DIALECT_TILE_PASSES__
