@@ -52,6 +52,7 @@ Value getNextIndirectUse(mlir::OpOperand &use) {
         return op.getResult(use.getOperandNumber()); //
       })
       .Case<PxaReduceOp>([&](auto op) { return op.result(); })
+      .Case<PxaStoreOp>([&](auto op) { return op.result(); })
       .Case<PxaVectorReduceOp>([&](auto op) { return op.result(); })
       .Case<PxaGemmOp>([&](auto op) {
         if (op.getOperand(use.getOperandNumber()) == op.c()) {
@@ -167,7 +168,7 @@ IndirectAccessUsesIterator &IndirectAccessUsesIterator::operator++() {
 
 void IndirectAccessUsesIterator::skipNonAccess() {
   while (inner != IndirectUsesIterator()) {
-    if (isa<PxaLoadOp, PxaReduceOp, PxaVectorLoadOp, PxaVectorReduceOp>(
+    if (isa<PxaLoadOp, PxaReduceOp, PxaStoreOp, PxaVectorLoadOp, PxaVectorReduceOp>(
             inner->getOwner())) {
       break;
     }
