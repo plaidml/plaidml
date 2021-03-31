@@ -236,10 +236,10 @@ struct PxaStoreOpConversion : public OpConversionPattern<pxa::PxaStoreOp> {
   LogicalResult
   matchAndRewrite(pxa::PxaStoreOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
-    auto source =
-        rewriter.create<LoadOp>(op.getLoc(), op.memref(), op.indices());
-    rewriter.create<AtomicRMWOp>(op.getLoc(), source.getType(), op.agg(),
-                                 source, op.memref(), op.indices());
+    auto memref = op.memref();
+    auto resultType = memref.getType().cast<MemRefType>().getElementType();
+    rewriter.create<AtomicRMWOp>(op.getLoc(), resultType, op.agg(), op.value(),
+                                 memref, op.indices());
     op.replaceAllUsesWith(op.memref());
     rewriter.eraseOp(op);
     return success();
