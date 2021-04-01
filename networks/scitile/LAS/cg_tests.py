@@ -25,8 +25,12 @@ def make_sparse_inputs(A, b):
 class LASTest(unittest.TestCase):
 
     def test_cg_10x10(self):
-        testdat = np.load('networks/scitile/LAS/test_data/10x10.npz')
-        A, b = testdat['A'], testdat['b']
+        # testdat = np.load('networks/scitile/LAS/test_data/10x10.npz')
+        # A, b = testdat['A'], testdat['b']
+
+        A = np.random.rand((10, 10))
+        b = np.random.rand(10)
+
         testdat.close()
         res = cg_solve(A, b)
         sol = np.linalg.solve(A, b)
@@ -34,8 +38,12 @@ class LASTest(unittest.TestCase):
         npt.assert_allclose(res[filt], sol[filt], rtol=DEFAULT_TOL, atol=DEFAULT_ATOL)
 
     def test_cg_20x20(self):
-        testdat = np.load('networks/scitile/LAS/test_data/20x20.npz')
-        A, b = testdat['A'], testdat['b']
+        # testdat = np.load('networks/scitile/LAS/test_data/20x20.npz')
+        # A, b = testdat['A'], testdat['b']
+
+        A = np.random.rand((20, 20))
+        b = np.random.rand(20)
+
         testdat.close()
         res = cg_solve(A, b)
         sol = np.linalg.solve(A, b)

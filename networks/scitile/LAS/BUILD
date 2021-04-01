@@ -32,21 +32,6 @@ py_binary(
     args =["10x10"]
 )
 
-py_binary(
-    name = "solver_timings",
-    srcs = [
-        "conjgrad.py",
-        "solver_timings.py",
-    ],
-    deps = [
-        "//plaidml:py",
-        "//plaidml/op:py",
-        "//plaidml/edsl:py",
-        "//plaidml/exec:py",
-    ],
-    data = glob(["test_data/*.npz"])
-)
-
 py_test(
     name = "cg_tests",
     srcs = [
