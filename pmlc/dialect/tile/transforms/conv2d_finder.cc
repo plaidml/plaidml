@@ -32,75 +32,72 @@ struct Conv2dFinderPass : public Conv2dFinderBase<Conv2dFinderPass> {
 
 class Conv2dFinder {
 public:
-  explicit Conv2dFinder(ContractionOp op) {
-    // must be 2 inputs with comb=mul and agg=add
-    if (op.combo() != CombinationKind::mul ||
-        op.agg() != AggregationKind::add || op.getNumTensors() != 2) {
-      isConv2d = false;
-      return;
+  explicit Conv2dFinder(ContractionOp op) : contract(op) {}
+
+  bool isaConv2d() {
+    if (contract.combo() != CombinationKind::mul) {
+      reason = "Invalid CombinationKind";
+      return false;
     }
 
-    // TODO
-    // must not have constraints
-    if (auto constraints = *op.cons()) {
-      if (constraints.getNumConstraints() != 0) {
-        isConv2d = false;
-        return;
-      }
+    if (contract.agg() != AggregationKind::add) {
+      reason = "Invalid AggregationKind";
+      return false;
     }
 
     // assume activation is 0, kernel is 1
-    AffineMap act = op.getSourceMap(0);
-    AffineMap ker = op.getSourceMap(1);
-    AffineMap out = op.sink();
-
-    // activation, kernel, output must be 4D tensors
-    if (act.getNumResults() != numDims || ker.getNumResults() != numDims ||
-        out.getNumResults() != numDims) {
-      isConv2d = false;
-      return;
-    }
+    assert(contract.getNumTensors() == 2);
+    AffineMap act = contract.getSourceMap(0);
+    AffineMap ker = contract.getSourceMap(1);
+    assert(contract.getNumResults() == 1);
+    AffineMap out = contract.sink();
 
     // assume N is dimension 0 of activation, output
     unsigned nPos = 0;
     if (act.getResult(nPos) != out.getResult(nPos)) {
-      isConv2d = false;
-      return;
-    }
-
-    // look for Co
-    unsigned outCoPos = 0;
-    unsigned kerCoPos = 0;
-    if (!findCommonResult(out, ker, outCoPos, kerCoPos)) {
-      isConv2d = false;
-      return;
+      reason = "Unable to find batch dimension";
+      return false;
     }
 
     // look for Ci
-    unsigned actCiPos = 0;
+    // skip dimension 0 (nPos) of the activation
+    unsigned actCiPos = 1;
     unsigned kerCiPos = 0;
     if (!findCommonResult(act, ker, actCiPos, kerCiPos)) {
-      isConv2d = false;
-      return;
+      reason = "Unable to find channel-in dimension";
+      return false;
+    }
+
+    // look for Co
+    // skip dimension 0 (nPos) of the output
+    unsigned outCoPos = 1;
+    unsigned kerCoPos = 0;
+    if (!findCommonResult(out, ker, outCoPos, kerCoPos)) {
+      reason = "Unable to find channel-out dimension";
+      return false;
+    }
+
+    // activation, kernel, output must be 4D tensors
+    if (act.getNumResults() != numTotalDims ||
+        ker.getNumResults() != numTotalDims ||
+        out.getNumResults() != numTotalDims) {
+      reason = "Invalid tensor rank";
+      return false;
     }
 
     // calculate spatial dimensions
-    llvm::SmallVector<unsigned, numSpatialDims> actSpatial;
-    for (unsigned i = 0; i < numDims; ++i) {
+    llvm::SmallVector<unsigned, numSpatialDims> actSpatial, kerSpatial,
+        outSpatial;
+    for (unsigned i = 0; i < numTotalDims; ++i) {
+      // activation - exclude batch and channel in dimensions
       if (i != nPos && i != actCiPos) {
         actSpatial.push_back(i);
       }
-    }
-
-    llvm::SmallVector<unsigned, numSpatialDims> kerSpatial;
-    for (unsigned i = 0; i < numDims; ++i) {
+      // kernel - exclude channel in and out dimensions
       if (i != kerCiPos && i != kerCoPos) {
         kerSpatial.push_back(i);
       }
-    }
-
-    llvm::SmallVector<unsigned, numSpatialDims> outSpatial;
-    for (unsigned i = 0; i < numDims; ++i) {
+      // output - exclude batch and channel out dimensions
       if (i != nPos && i != outCoPos) {
         outSpatial.push_back(i);
       }
@@ -109,85 +106,117 @@ public:
     if (actSpatial.size() != numSpatialDims ||
         kerSpatial.size() != numSpatialDims ||
         outSpatial.size() != numSpatialDims) {
-      isConv2d = false;
-      return;
+      reason = "Invalid spatial rank";
+      return false;
     }
 
-    // flatten the Affine expressions
-    std::vector<llvm::SmallVector<int64_t, 8>> actFlatExprs;
-    if (failed(getFlattenedAffineExprs(act, &actFlatExprs, nullptr))) {
-      isConv2d = false;
-      return;
+    // flatten the Affine expressions in each AffineMap
+    std::vector<flatExpr> actFlatExprs, kerFlatExprs, outFlatExprs;
+    if (failed(getFlattenedAffineExprs(act, &actFlatExprs, nullptr)) ||
+        failed(getFlattenedAffineExprs(ker, &kerFlatExprs, nullptr)) ||
+        failed(getFlattenedAffineExprs(out, &outFlatExprs, nullptr))) {
+      reason = "Unable to get flattened Affine expressions";
+      return false;
     }
 
-    std::vector<llvm::SmallVector<int64_t, 8>> kerFlatExprs;
-    if (failed(getFlattenedAffineExprs(ker, &kerFlatExprs, nullptr))) {
-      isConv2d = false;
-      return;
-    }
-
-    std::vector<llvm::SmallVector<int64_t, 8>> outFlatExprs;
-    if (failed(getFlattenedAffineExprs(out, &outFlatExprs, nullptr))) {
-      isConv2d = false;
-      return;
-    }
-
-    // assume spatial dimensions are ordered between tensors
-    // i.e. can't have NHWC output and NWHC input
-    //      H and W will appear in the same order
-    for (auto dim : actSpatial) {
-      int64_t padding = actFlatExprs[dim].back();
-      paddings.push_back(padding);
-    }
-
+    // Canonical NHWC example
+    // N = batch
+    // Y = output Y
+    // X = output X
+    // Co = Channel out
+    // Ky = Kernel Y
+    // Kx = Kernel X
+    // Ci = Channel in
+    // P = padding
+    // S = strides
+    // D = dilations
+    //                 N Y X C K K C
+    //                       o y x i
+    // Activation:
+    // (N)  flatExpr = 1 0 0 0 0 0 0 0
+    // (H)  flatExpr = 0 S 0 0 D 0 0 P
+    // (W)  flatExpr = 0 0 S 0 0 D 0 P
+    // (Ci) flatExpr = 0 0 0 0 0 0 1 0
+    // Kernel:
+    // (H)  flatExpr = 0 0 0 0 1 0 0 0
+    // (W)  flatExpr = 0 0 0 0 0 1 0 0
+    // (Ci) flatExpr = 0 0 0 0 0 0 1 0
+    // (Co) flatExpr = 0 0 0 1 0 0 0 0
+    // Output:
+    // (N)  flatExpr = 1 0 0 0 0 0 0 0
+    // (H)  flatExpr = 0 1 0 0 0 0 0 0
+    // (W)  flatExpr = 0 0 1 0 0 0 0 0
+    // (Co) flatExpr = 0 0 0 1 0 0 0 0
     for (unsigned i = 0; i < numSpatialDims; ++i) {
-      int64_t dilation =
-          multiply(actFlatExprs[actSpatial[i]], kerFlatExprs[kerSpatial[i]]);
-      if (!dilation) {
-        isConv2d = false;
-        return;
+      flatExpr actFlat = actFlatExprs[actSpatial[i]];
+      flatExpr kerFlat = kerFlatExprs[kerSpatial[i]];
+      flatExpr outFlat = outFlatExprs[outSpatial[i]];
+
+      // Activation:
+      // (H)  flatExpr = 0 S 0 0 D 0 0 P*
+      // (W)  flatExpr = 0 0 S 0 0 D 0 P*
+      int64_t padding = actFlat.back();
+
+      // Activation:
+      // (H)  flatExpr = 0 S* 0 0 D 0 0 P
+      // (W)  flatExpr = 0 0 S* 0 0 D 0 P
+      // Output:
+      // (H)  flatExpr = 0 1* 0 0 0 0 0 0
+      // (W)  flatExpr = 0 0 1* 0 0 0 0 0
+      int64_t stride = multiply(actFlat, outFlat);
+
+      // Activation:
+      // (H)  flatExpr = 0 S 0 0 D* 0 0 P
+      // (W)  flatExpr = 0 0 S 0 0 D* 0 P
+      // Kernel:
+      // (H)  flatExpr = 0 0 0 0 1* 0 0 0
+      // (W)  flatExpr = 0 0 0 0 0 1* 0 0
+      int64_t dilation = multiply(actFlat, kerFlat);
+
+      // Expecting non-zero stride, dilation else something is wrong
+      if (!stride || !dilation) {
+        reason = "Invalid spatial dimensions";
+        return false;
       }
+
+      paddings.push_back(padding);
+      strides.push_back(stride);
       dilations.push_back(dilation);
     }
 
-    for (unsigned i = 0; i < numSpatialDims; ++i) {
-      int64_t stride =
-          multiply(actFlatExprs[actSpatial[i]], outFlatExprs[outSpatial[i]]);
-      if (!stride) {
-        isConv2d = false;
-        return;
-      }
-      strides.push_back(stride);
-    }
-
     isConv2d = true;
-    return;
+    return true;
   }
 
-  bool isaConv2d() { return isConv2d; }
+  std::string getReason() {
+    assert(!conv2d);
+    return reason;
+  }
   SmallVector<int64_t, 2> getPaddings() {
-    assert(isConv2d);
+    assert(conv2d);
     return paddings;
   }
-  SmallVector<int64_t, 2> getDilations() {
-    assert(isConv2d);
-    return dilations;
-  }
   SmallVector<int64_t, 2> getStrides() {
-    assert(isConv2d);
+    assert(conv2d);
     return strides;
+  }
+  SmallVector<int64_t, 2> getDilations() {
+    assert(conv2d);
+    return dilations;
   }
 
 private:
+  ContractionOp contract;
   bool isConv2d{false};
-  static const unsigned numDims{4};
+  std::string reason;
+  static const unsigned numTotalDims{4};
   static const unsigned numSpatialDims{2};
   SmallVector<int64_t, numSpatialDims> paddings;
-  SmallVector<int64_t, numSpatialDims> dilations;
   SmallVector<int64_t, numSpatialDims> strides;
+  SmallVector<int64_t, numSpatialDims> dilations;
+  typedef llvm::SmallVector<int64_t, 8> flatExpr;
 
-  int64_t multiply(llvm::SmallVector<int64_t, 8> flatExprA,
-                   llvm::SmallVector<int64_t, 8> flatExprB) {
+  int64_t multiply(flatExpr flatExprA, flatExpr flatExprB) {
     size_t size = flatExprA.size();
     assert(flatExprB.size() == size);
     int64_t ret = 0;
@@ -199,8 +228,9 @@ private:
 
   bool findCommonResult(AffineMap mapA, AffineMap mapB, unsigned &indexA,
                         unsigned &indexB) {
-    for (indexA = 0; indexA <= mapA.getNumResults(); ++indexA) {
-      for (indexB = 0; indexB < mapB.getNumResults(); ++indexB) {
+    unsigned init = indexB;
+    for (; indexA <= mapA.getNumResults(); ++indexA) {
+      for (indexB = init; indexB < mapB.getNumResults(); ++indexB) {
         if (mapA.getResult(indexA) == mapB.getResult(indexB)) {
           return true;
         }
@@ -212,6 +242,7 @@ private:
 
 void Conv2dFinderPass::runOnFunction() {
   auto func = getFunction();
+  llvm::errs() << "Testing : " << getFunction().getName() << "\n";
   func.walk([&](ContractionOp op) {
     Conv2dFinder conv2dFinder(op);
     if (conv2dFinder.isaConv2d()) {
@@ -240,6 +271,7 @@ void Conv2dFinderPass::runOnFunction() {
 
     } else {
       llvm::errs() << "Well, you know, we all want to change the world.\n";
+      llvm::errs() << conv2dFinder.getReason() << "\n";
     }
   });
 }
