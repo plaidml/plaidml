@@ -17,6 +17,7 @@ pml_cc_library(
     LLVMSupport
     MLIRIR
     pmlc::dialect::stdx::ir
+    pmlc::dialect::tile::analysis
     pmlc::dialect::tile::ir
     pmlc::util
     pmlc::util::bilp
