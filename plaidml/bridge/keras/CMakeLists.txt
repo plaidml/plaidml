@@ -13,16 +13,6 @@ pml_py_test(
 )
 
 pml_py_test(
-  NAME regression_test
-  SRC regression_test.py
-  CHECKS
-    core
-    keras
-    smoke
-    test
-)
-
-pml_py_test(
   NAME trivial_model_test
   SRC trivial_model_test.py
   CHECKS
