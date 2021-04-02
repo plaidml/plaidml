@@ -12,6 +12,7 @@ pml_cc_library(
     pad_ranges.cc
     padding.cc
     split_main.cc
+    test_conv2d_finder.cc
   DEPS
     LLVMSupport
     MLIRIR

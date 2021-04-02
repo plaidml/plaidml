@@ -19,7 +19,7 @@ void TestConv2dFinderPass::runOnFunction() {
   llvm::errs() << "Testing : " << getFunction().getName() << "\n";
   func.walk([&](ContractionOp op) {
     Conv2dFinder conv2dFinder(op);
-    if (conv2dFinder.isaConv2d()) {
+    if (conv2dFinder.isContractOpConv2d()) {
       llvm::errs() << "You say you want a convolution.\n";
 
       llvm::errs() << "paddings =";

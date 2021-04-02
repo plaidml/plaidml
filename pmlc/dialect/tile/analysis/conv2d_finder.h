@@ -14,25 +14,50 @@ using namespace mlir; // NOLINT
 
 class Conv2dFinder {
 public:
-  explicit Conv2dFinder(ContractionOp op) : contract(op) {}
+  explicit Conv2dFinder(ContractionOp op) { isOpConv2d = isaConv2D(op); }
 
-  bool isaConv2d() {
-    if (contract.combo() != CombinationKind::mul) {
+  // returns whether the contract op is a Conv2d
+  bool isContractOpConv2d() { return isOpConv2d; }
+
+  // returns reason if NOT a Conv2d, else empty
+  std::string getReason() { return reason; }
+
+  // returns paddings if a Conv2d, else empty
+  SmallVector<int64_t, 2> getPaddings() { return paddings; }
+
+  // returns strides if a Conv2d, else empty
+  SmallVector<int64_t, 2> getStrides() { return strides; }
+
+  // returns dilations if a Conv2d, else empty
+  SmallVector<int64_t, 2> getDilations() { return dilations; }
+
+private:
+  bool isOpConv2d{false};
+  std::string reason;
+  static const unsigned numTotalDims{4};
+  static const unsigned numSpatialDims{2};
+  SmallVector<int64_t, numSpatialDims> paddings;
+  SmallVector<int64_t, numSpatialDims> strides;
+  SmallVector<int64_t, numSpatialDims> dilations;
+  typedef llvm::SmallVector<int64_t, 8> flatExpr;
+
+  bool isaConv2D(ContractionOp op) {
+    if (op.combo() != CombinationKind::mul) {
       reason = "Invalid CombinationKind";
       return false;
     }
 
-    if (contract.agg() != AggregationKind::add) {
+    if (op.agg() != AggregationKind::add) {
       reason = "Invalid AggregationKind";
       return false;
     }
 
     // assume activation is 0, kernel is 1
-    assert(contract.getNumTensors() == 2);
-    AffineMap act = contract.getSourceMap(0);
-    AffineMap ker = contract.getSourceMap(1);
-    assert(contract.getNumResults() == 1);
-    AffineMap out = contract.sink();
+    assert(op.getNumTensors() == 2);
+    AffineMap act = op.getSourceMap(0);
+    AffineMap ker = op.getSourceMap(1);
+    assert(op.getNumResults() == 1);
+    AffineMap out = op.sink();
 
     // assume N is dimension 0 of activation, output
     unsigned nPos = 0;
@@ -101,7 +126,12 @@ public:
       return false;
     }
 
-    // Canonical NHWC example
+    // Canonical NHWC example:
+    // affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
+    // affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 * 2 + d4 * 3 - 2, d2 *
+    // 2 + d5 * 3 - 2, d6)> affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d5,
+    // d6, d3)>
+    //
     // N = batch
     // Y = output Y
     // X = output X
@@ -109,9 +139,11 @@ public:
     // Ky = Kernel Y
     // Kx = Kernel X
     // Ci = Channel in
+    //
     // P = padding
     // S = strides
     // D = dilations
+    //
     //                 N Y X C K K C
     //                       o y x i
     // Activation:
@@ -164,6 +196,12 @@ public:
       //    of a 1x1 kernel
       if (!stride || !dilation) {
         reason = "Invalid spatial dimensions";
+
+        // clear any previously set paddings, strides, dilations
+        paddings.clear();
+        strides.clear();
+        dilations.clear();
+
         return false;
       }
 
@@ -171,38 +209,8 @@ public:
       strides.push_back(stride);
       dilations.push_back(dilation);
     }
-
-    isConv2d = true;
     return true;
   }
-
-  std::string getReason() {
-    assert(!conv2d);
-    return reason;
-  }
-  SmallVector<int64_t, 2> getPaddings() {
-    assert(conv2d);
-    return paddings;
-  }
-  SmallVector<int64_t, 2> getStrides() {
-    assert(conv2d);
-    return strides;
-  }
-  SmallVector<int64_t, 2> getDilations() {
-    assert(conv2d);
-    return dilations;
-  }
-
-private:
-  ContractionOp contract;
-  bool isConv2d{false};
-  std::string reason;
-  static const unsigned numTotalDims{4};
-  static const unsigned numSpatialDims{2};
-  SmallVector<int64_t, numSpatialDims> paddings;
-  SmallVector<int64_t, numSpatialDims> strides;
-  SmallVector<int64_t, numSpatialDims> dilations;
-  typedef llvm::SmallVector<int64_t, 8> flatExpr;
 
   int64_t multiply(flatExpr flatExprA, flatExpr flatExprB) {
     size_t size = flatExprA.size();
