@@ -17,7 +17,6 @@ plaidml_cc_library(
     name = "transforms",
     srcs = [
         "contraction.cc",
-        "conv2d_finder.cc",
         "expand_reshape.cc",
         "materialize.cc",
         "pad_constraints.cc",
@@ -25,6 +24,7 @@ plaidml_cc_library(
         "padding.cc",
         "pass_detail.h",
         "split_main.cc",
+        "test_conv2d_finder.cc",
     ],
     hdrs = [
         "contraction.h",
@@ -35,6 +35,7 @@ plaidml_cc_library(
     deps = [
         ":gen-pass",
         "//pmlc/dialect/stdx/ir",
+        "//pmlc/dialect/tile/analysis",
         "//pmlc/dialect/tile/ir",
         "//pmlc/util",
         "//pmlc/util/bilp",

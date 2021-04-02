@@ -1,14 +1,17 @@
-# Copyright 2019 Intel Corporation.
+# Copyright 2020 Intel Corporation.
 
 load("//bzl:plaidml.bzl", "plaidml_cc_library")
 
 package(default_visibility = ["//visibility:public"])
 
 plaidml_cc_library(
-    name = "tile",
+    name = "analysis",
+    srcs = [],
+    hdrs = [
+        "conv2d_finder.h",
+    ],
     deps = [
-        "//pmlc/dialect/tile/analysis",
         "//pmlc/dialect/tile/ir",
-        "//pmlc/dialect/tile/transforms",
+        "@llvm-project//mlir:IR",
     ],
 )

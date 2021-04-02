@@ -1,34 +1,16 @@
 // Copyright 2021, Intel Corporation
 
-#include <algorithm>
-#include <memory>
-#include <utility>
+#pragma once
+
+#include <string>
 #include <vector>
 
-#include "llvm/Support/MathExtras.h"
-
 #include "mlir/Analysis/AffineStructures.h"
-#include "mlir/IR/AffineExprVisitor.h"
-#include "mlir/IR/AffineMap.h"
-#include "mlir/IR/Builders.h"
-#include "mlir/Pass/Pass.h"
-
 #include "pmlc/dialect/tile/ir/ops.h"
-#include "pmlc/dialect/tile/transforms/padding.h"
-#include "pmlc/dialect/tile/transforms/pass_detail.h"
-#include "pmlc/util/logging.h"
-#include "pmlc/util/math/util.h"
-#include "pmlc/util/strides.h"
 
 namespace pmlc::dialect::tile {
 
 using namespace mlir; // NOLINT
-
-namespace {
-
-struct Conv2dFinderPass : public Conv2dFinderBase<Conv2dFinderPass> {
-  void runOnFunction() final;
-};
 
 class Conv2dFinder {
 public:
@@ -174,6 +156,12 @@ public:
       int64_t dilation = multiply(actFlat, kerFlat);
 
       // Expecting non-zero stride, dilation else something is wrong
+      // Effectively, this means...
+      // 1) Spatial dimensions are listed in order in each tensor
+      //    e.g. can't have NHWC activation and NWHC output
+      // 2) The activation spatial dimensions are comprised of both
+      //    kernel and output spatial dimensions even in the case
+      //    of a 1x1 kernel
       if (!stride || !dilation) {
         reason = "Invalid spatial dimensions";
         return false;
@@ -239,47 +227,5 @@ private:
     return false;
   }
 };
-
-void Conv2dFinderPass::runOnFunction() {
-  auto func = getFunction();
-  llvm::errs() << "Testing : " << getFunction().getName() << "\n";
-  func.walk([&](ContractionOp op) {
-    Conv2dFinder conv2dFinder(op);
-    if (conv2dFinder.isaConv2d()) {
-      llvm::errs() << "You say you want a convolution.\n";
-
-      llvm::errs() << "paddings =";
-      auto paddings = conv2dFinder.getPaddings();
-      for (size_t i = 0; i < paddings.size(); ++i) {
-        llvm::errs() << " " << paddings[i];
-      }
-      llvm::errs() << "\n";
-
-      llvm::errs() << "strides =";
-      auto strides = conv2dFinder.getStrides();
-      for (size_t i = 0; i < strides.size(); ++i) {
-        llvm::errs() << " " << strides[i];
-      }
-      llvm::errs() << "\n";
-
-      llvm::errs() << "dilations =";
-      auto dilations = conv2dFinder.getDilations();
-      for (size_t i = 0; i < dilations.size(); ++i) {
-        llvm::errs() << " " << dilations[i];
-      }
-      llvm::errs() << "\n";
-
-    } else {
-      llvm::errs() << "Well, you know, we all want to change the world.\n";
-      llvm::errs() << conv2dFinder.getReason() << "\n";
-    }
-  });
-}
-
-} // namespace
-
-std::unique_ptr<Pass> createConv2dFinderPass() {
-  return std::make_unique<Conv2dFinderPass>();
-}
 
 } // namespace pmlc::dialect::tile

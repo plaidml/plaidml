@@ -1,4 +1,4 @@
-// RUN: pmlc-opt %s -diag-conv2d-finder -mlir-disable-threading -split-input-file 2>&1 | FileCheck %s
+// RUN: pmlc-opt %s -test-conv2d-finder -mlir-disable-threading -split-input-file 2>&1 | FileCheck %s
 
 #conv2d_1x1_0 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
 #conv2d_1x1_1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4, d2 + d5, d6)>
