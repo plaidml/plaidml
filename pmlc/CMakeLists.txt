@@ -9,8 +9,8 @@ add_subdirectory(tools)
 add_subdirectory(transforms)
 add_subdirectory(util)
 
-get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
-get_property(conversion_libs GLOBAL PROPERTY MLIR_CONVERSION_LIBS)
+get_property(MLIR_DIALECT_LIBS GLOBAL PROPERTY MLIR_DIALECT_LIBS)
+get_property(MLIR_CONVERSION_LIBS GLOBAL PROPERTY MLIR_CONVERSION_LIBS)
 
 pml_cc_library(
   NAME init_passes_and_dialects
@@ -20,8 +20,8 @@ pml_cc_library(
   SRCS
     all_dialects.cc
   DEPS
-    ${dialect_libs}
-    ${conversion_libs}
+    ${MLIR_DIALECT_LIBS}
+    ${MLIR_CONVERSION_LIBS}
     MLIRTransforms
     pmlc::conversion::comp_to_llvm
     pmlc::conversion::gpu
@@ -54,6 +54,7 @@ pml_lit_test(
     pmlc-jit
     pmlc-opt
   CHECKS
+    core
     smoke
     test
 )

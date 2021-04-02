@@ -58,3 +58,32 @@ pml_cc_library(
   COMPONENTS
     devkit
 )
+
+pml_py_library(
+  NAME py
+  SRCS
+    __init__.py
+    ffi.py
+    plaidml_setup.py
+    setup.py
+  DEPS
+    _ffi
+    ::plaidml
+)
+
+pml_py_cffi(
+    NAME _ffi
+    MODULE plaidml._ffi
+    SRCS
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/ffi.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/edsl/ffi.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/exec/ffi.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/op/ffi.h
+)
+
+add_custom_command(
+  TARGET plaidml_plaidml
+  COMMAND ${CMAKE_COMMAND} -E create_symlink
+    ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/libplaidml.so
+    ${CMAKE_CURRENT_BINARY_DIR}/libplaidml.so
+)
