@@ -56,7 +56,6 @@ private:
     assert(op.getNumTensors() == 2);
     AffineMap act = op.getSourceMap(0);
     AffineMap ker = op.getSourceMap(1);
-    assert(op.getNumResults() == 1);
     AffineMap out = op.sink();
 
     // assume N is dimension 0 of activation, output
