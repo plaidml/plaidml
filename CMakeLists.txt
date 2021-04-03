@@ -88,6 +88,10 @@ include(xsmm)
 # -------------------------------------------------------------------------------
 if(PML_BUILD_TESTS)
   enable_testing()
+  add_custom_target(check-core
+    COMMAND ${CMAKE_CTEST_COMMAND} -L core
+    USES_TERMINAL
+  )
   add_custom_target(check-smoke
     COMMAND ${CMAKE_CTEST_COMMAND} -L smoke
     USES_TERMINAL
@@ -108,6 +112,7 @@ include(pml_cc_binary)
 include(pml_cc_library)
 include(pml_cc_test)
 include(pml_lit_test)
+include(pml_python)
 include(pml_tblgen_library)
 include(pml_whole_archive_link)
 
