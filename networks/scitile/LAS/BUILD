@@ -5,19 +5,6 @@ load("@rules_python//python:defs.bzl", "py_binary")
 package(default_visibility = ["//visibility:public"])
 
 py_binary(
-    name = "min_ex",
-    srcs = [
-        "min_ex.py",
-    ],
-    deps = [
-        "//plaidml:py",
-        "//plaidml/op:py",
-        "//plaidml/edsl:py",
-        "//plaidml/exec:py",
-    ],
-)
-
-py_binary(
     name = "conjgrad",
     srcs = [
         "conjgrad.py",
@@ -28,23 +15,7 @@ py_binary(
         "//plaidml/edsl:py",
         "//plaidml/exec:py",
     ],
-    data = glob(["test_data/*.npz"]),
     args =["10x10"]
-)
-
-py_binary(
-    name = "solver_timings",
-    srcs = [
-        "conjgrad.py",
-        "solver_timings.py",
-    ],
-    deps = [
-        "//plaidml:py",
-        "//plaidml/op:py",
-        "//plaidml/edsl:py",
-        "//plaidml/exec:py",
-    ],
-    data = glob(["test_data/*.npz"])
 )
 
 py_test(
@@ -58,7 +29,6 @@ py_test(
         "//plaidml/op:py",
         "//plaidml/edsl:py",
         "//plaidml/exec:py",
-    ],
-    data = glob(["test_data/*.npz"])
+    ]
 )
 

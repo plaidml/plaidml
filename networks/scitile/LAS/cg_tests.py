@@ -24,23 +24,21 @@ def make_sparse_inputs(A, b):
 
 class LASTest(unittest.TestCase):
 
-    def test_cg_10x10(self):
-        testdat = np.load('networks/scitile/LAS/test_data/10x10.npz')
-        A, b = testdat['A'], testdat['b']
-        testdat.close()
+    def test_cg_eye_rand(self):
+        A = np.eye(10)
+        b = np.random.rand(10)
         res = cg_solve(A, b)
         sol = np.linalg.solve(A, b)
         filt = np.abs(sol) > 0.01 * np.mean(sol)
         npt.assert_allclose(res[filt], sol[filt], rtol=DEFAULT_TOL, atol=DEFAULT_ATOL)
 
-    def test_cg_20x20(self):
-        testdat = np.load('networks/scitile/LAS/test_data/20x20.npz')
-        A, b = testdat['A'], testdat['b']
-        testdat.close()
-        res = cg_solve(A, b)
-        sol = np.linalg.solve(A, b)
-        filt = np.abs(sol) > 0.01 * np.mean(sol)
-        npt.assert_allclose(res[filt], sol[filt], rtol=DEFAULT_TOL, atol=DEFAULT_ATOL)
+    # def test_cg_20x20(self):
+    #     A = np.array([[2,-1,0,0],[-1,2,-1,0],[0,-1,2,-1],[0,0,-1.,1.]])
+    #     b = np.array([0,0,0,1.])
+    #     res = cg_solve(A, b)
+    #     sol = np.linalg.solve(A, b)
+    #     filt = np.abs(sol) > 0.01 * np.mean(sol)
+    #     npt.assert_allclose(res[filt], sol[filt], rtol=DEFAULT_TOL, atol=DEFAULT_ATOL)
 
 
 if __name__ == '__main__':
