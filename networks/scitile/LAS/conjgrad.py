@@ -2,10 +2,6 @@ import numpy as np
 import sys
 import time
 
-from scipy.sparse import csc_matrix
-from scipy.sparse.linalg import spsolve
-from scipy.linalg import solve as densolve
-
 import plaidml
 import plaidml.edsl as edsl
 import plaidml.op as op
@@ -67,31 +63,3 @@ def cg_solve(np_A, np_r, timing=False, resthrsh=RESIDUAL_THRESHOLD):
     if timing:
         return np_x, tm
     return np_x
-
-
-if __name__ == '__main__':
-    # Load test case
-    testname = sys.argv[1]
-    testdat = np.load('networks/scitile/LAS/test_data/' + testname +
-                      '.npz')  # networks/scitile/LAS/
-    A, b = testdat['A'], testdat['b']
-    testdat.close()
-
-    print("Test case data loaded")
-
-    np_x, tm = cg_solve(A, b, True)
-
-    print("PlaidML Time: ", tm)
-
-    sp_A = csc_matrix(A)
-    t0 = time.time()
-    true_sol = spsolve(sp_A, b)
-    scpysp_tm = time.time() - t0
-
-    print("SciPy Sparse Time: ", scpysp_tm)
-
-    thrs = 0.01 * np.mean(true_sol)
-    err = 100 * np.mean(
-        np.abs((np_x[abs(true_sol) > thrs] - true_sol[abs(true_sol) > thrs]) /
-               true_sol[abs(true_sol) > thrs]))
-    print("Avg. % Error: ", err)
