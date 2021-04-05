@@ -91,15 +91,15 @@ func @dot2d_negative(%arg0: tensor<8x16xf32>, %arg1: tensor<16x32xf32>) -> tenso
   return %0 : tensor<8x32xf32>
 }
 
-#dot4d_0 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>
-#dot4d_1 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d5)>
-#dot4d_2 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d4, d5, d2, d3)>
+#dot4d_0 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
+#dot4d_1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d4, d5)>
+#dot4d_2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d5, d6, d2, d3)>
 
 // CHECK-LABEL: Testing : dot4d_negative
-func @dot4d_negative(%arg0: tensor<4x8x16x16xf32>, %arg1: tensor<16x16x32x4xf32>) -> tensor<4x8x32x4xf32> {
+func @dot4d_negative(%arg0: tensor<4x8x16x32xf32>, %arg1: tensor<32x16x8x4xf32>) -> tensor<4x8x8x4xf32> {
   %cst = tile.constant(0.000000e+00 : f64) : tensor<f32>
   // CHECK-NEXT: Well, you know, we all want to change the world.
   // CHECK-NEXT: Invalid spatial dimensions
-  %0 = tile.contract add, mul, %cst, %arg0, %arg1 {sink = #dot4d_0, srcs = [#dot4d_1, #dot4d_2]} : tensor<f32>, tensor<4x8x16x16xf32>, tensor<16x16x32x4xf32> -> tensor<4x8x32x4xf32>
-  return %0 : tensor<4x8x32x4xf32>
+  %0 = tile.contract add, mul, %cst, %arg0, %arg1 {sink = #dot4d_0, srcs = [#dot4d_1, #dot4d_2]} : tensor<f32>, tensor<4x8x16x32xf32>, tensor<32x16x8x4xf32> -> tensor<4x8x8x4xf32>
+  return %0 : tensor<4x8x8x4xf32>
 }
