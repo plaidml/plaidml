@@ -142,6 +142,7 @@ set(CPACK_COMPONENTS_ALL
 include(CPack)
 
 
+add_subdirectory(plaidbench)
 add_subdirectory(plaidml)
 add_subdirectory(pmlc)
 add_subdirectory(docs)
