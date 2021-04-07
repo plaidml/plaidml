@@ -131,13 +131,65 @@ function(pml_py_cffi)
 
   add_custom_command(
     OUTPUT ${_RULE_NAME}
-    COMMAND ${PYTHON_EXECUTABLE}
-      ${PROJECT_SOURCE_DIR}/tools/py_cffi/py_cffi.py
+    COMMAND
+      ${PYTHON_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/py_cffi/py_cffi.py
         --module ${_RULE_MODULE}
         --output ${CMAKE_CURRENT_BINARY_DIR}/${_RULE_NAME}.py
         ${_SRC_ARGS}
     DEPENDS
       ${PROJECT_SOURCE_DIR}/tools/py_cffi/py_cffi.py
       ${_RULE_SRCS}
+  )
+endfunction()
+
+
+# pml_py_wheel()
+#
+# Create a python wheel
+#
+# Parameters:
+# NAME: Name of target
+# PKG_NAME:
+# PLATFORM:
+# DEPS:
+# VERSION:
+function(pml_py_wheel)
+  cmake_parse_arguments(
+    _RULE
+    ""
+    "NAME;PKG_NAME;PLATFORM;VERSION"
+    "DEPS"
+    ${ARGN}
+  )
+
+  if(NOT _RULE_PLATFORM)
+    set(_RULE_PLATFORM "any")
+  endif()
+
+  pml_package_ns(_PACKAGE_NS)
+  # Replace dependencies passed by ::name with ::pml::package::name
+  list(TRANSFORM _RULE_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
+
+  pml_package_name(_PACKAGE_NAME)
+  set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
+
+  configure_file(setup.in.py setup.py)
+
+  set(_ABI "none")
+  set(_PY_VER "py3")
+  set(_WHEEL_FILE ${PROJECT_BINARY_DIR}/${_RULE_PKG_NAME}-${_RULE_VERSION}-${_PY_VER}-${_ABI}-${_RULE_PLATFORM}.whl)
+
+  add_custom_command(
+    OUTPUT ${_WHEEL_FILE}
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/setup.py
+      "--no-user-cfg"
+      "bdist_wheel"
+      "--dist-dir" ${PROJECT_BINARY_DIR}
+      "--plat-name" ${_RULE_PLATFORM}
+    DEPENDS ${_RULE_DEPS}
+  )
+
+  add_custom_target(${_NAME} ALL
+    DEPENDS ${_WHEEL_FILE}
   )
 endfunction()

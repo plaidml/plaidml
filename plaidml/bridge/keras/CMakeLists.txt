@@ -21,3 +21,9 @@ pml_py_test(
     smoke
     test
 )
+
+pml_py_wheel(
+  NAME wheel
+  PKG_NAME "plaidml_keras"
+  VERSION ${PLAIDML_VERSION}
+)
