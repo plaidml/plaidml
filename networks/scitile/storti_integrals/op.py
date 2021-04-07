@@ -14,16 +14,12 @@ def sq(X):
 
 def sum(R):
     idxs = edsl.TensorIndexes(3)
-    O = edsl.TensorOutput()
-    O[()] += R[idxs]
-    return O
+    return edsl.Contraction().sum(R[idxs]).build()
 
 
 def sum_4D(R):
     idxs = edsl.TensorIndexes(4)
-    O = edsl.TensorOutput()
-    O[()] += R[idxs]
-    return O
+    return edsl.Contraction().sum(R[idxs]).build()
 
 
 def meshgrid(
@@ -35,9 +31,9 @@ def meshgrid(
     X_data = coordvals.reshape(n, 1, 1)
     Y_data = coordvals.reshape(1, n, 1)
     Z_data = coordvals.reshape(1, 1, n)
-    X = edsl.Tensor(edsl.LogicalShape(plaidml.DType.FLOAT32, X_data.shape))
-    Y = edsl.Tensor(edsl.LogicalShape(plaidml.DType.FLOAT32, Y_data.shape))
-    Z = edsl.Tensor(edsl.LogicalShape(plaidml.DType.FLOAT32, Z_data.shape))
+    X = edsl.Placeholder(plaidml.DType.FLOAT32, X_data.shape)
+    Y = edsl.Placeholder(plaidml.DType.FLOAT32, Y_data.shape)
+    Z = edsl.Placeholder(plaidml.DType.FLOAT32, Z_data.shape)
     return X, Y, Z, X_data, Y_data, Z_data
 
 
@@ -52,10 +48,11 @@ def meshgrid_4D(
     Z_data = coordvals.reshape(1, 1, n, 1)
     W_data = coordvals.reshape(1, 1, 1, n)
 
-    X = edsl.Tensor(edsl.LogicalShape(plaidml.DType.FLOAT32, X_data.shape))
-    Y = edsl.Tensor(edsl.LogicalShape(plaidml.DType.FLOAT32, Y_data.shape))
-    Z = edsl.Tensor(edsl.LogicalShape(plaidml.DType.FLOAT32, Z_data.shape))
-    W = edsl.Tensor(edsl.LogicalShape(plaidml.DType.FLOAT32, W_data.shape))
+    X = edsl.Placeholder(plaidml.DType.FLOAT32, X_data.shape)
+    Y = edsl.Placeholder(plaidml.DType.FLOAT32, Y_data.shape)
+    Z = edsl.Placeholder(plaidml.DType.FLOAT32, Z_data.shape)
+    W = edsl.Placeholder(plaidml.DType.FLOAT32, W_data.shape)
+
     return X, Y, Z, W, X_data, Y_data, Z_data, W_data
 
 
@@ -67,13 +64,13 @@ def partial(
     dims = edsl.TensorDims(3)
     x, y, z = edsl.TensorIndexes(3)
     F.bind_dims(*dims)
-    O = edsl.TensorOutput(*dims)
+    OC = edsl.Contraction().outShape(*dims)
     if wrt == 'x':
-        O[x, y, z] = F[x + 1, y, z] + F_neg[x - 1, y, z]
+        O = OC.outAccess(x, y, z).assign(F[x + 1, y, z] + F_neg[x - 1, y, z]).build()
     elif wrt == 'y':
-        O[x, y, z] = F[x, y + 1, z] + F_neg[x, y - 1, z]
+        O = OC.outAccess(x, y, z).assign(F[x, y + 1, z] + F_neg[x, y - 1, z]).build()
     elif wrt == 'z':
-        O[x, y, z] = F[x, y, z + 1] + F_neg[x, y, z - 1]
+        O = OC.outAccess(x, y, z).assign(F[x, y, z + 1] + F_neg[x, y, z - 1]).build()
     return O / (2.0 * delta)
 
 
@@ -85,15 +82,15 @@ def partial_4D(
     dims = edsl.TensorDims(4)
     x, y, z, w = edsl.TensorIndexes(4)
     F.bind_dims(*dims)
-    O = edsl.TensorOutput(*dims)
+    OC = edsl.Contraction().outShape(*dims)
     if wrt == 'x':
-        O[x, y, z, w] = F[x + 1, y, z, w] + F_neg[x - 1, y, z, w]
+        O = OC.outAccess(x, y, z, w).assign(F[x + 1, y, z, w] + F_neg[x - 1, y, z, w]).build()
     elif wrt == 'y':
-        O[x, y, z, w] = F[x, y + 1, z, w] + F_neg[x, y - 1, z, w]
+        O = OC.outAccess(x, y, z, w).assign(F[x, y + 1, z, w] + F_neg[x, y - 1, z, w]).build()
     elif wrt == 'z':
-        O[x, y, z, w] = F[x, y, z + 1, w] + F_neg[x, y, z - 1, w]
+        O = OC.outAccess(x, y, z, w).assign(F[x, y, z + 1, w] + F_neg[x, y, z - 1, w]).build()
     elif wrt == 'w':
-        O[x, y, z, w] = F[x, y, z, w + 1] + F_neg[x, y, z, w - 1]
+        O = OC.outAccess(x, y, z, w).assign(F[x, y, z, w + 1] + F_neg[x, y, z, w - 1]).build()
     return O / (2.0 * delta)
 
 
@@ -139,14 +136,17 @@ def integral_surface_area(
     DFDZ = partial(F, 'z', delta)
 
     # chi: occupancy function: 1 inside the region (f<0), 0 outside the region (f>0)
-    CHI = edsl.select(F > 0, 0, 1)
+    one = edsl.cast(1, F.dtype)
+    zero = edsl.cast(0, F.dtype)
+    CHI = edsl.select(F > zero, zero, one)
     DCHIDX = partial(CHI, 'x', delta)
     DCHIDY = partial(CHI, 'y', delta)
     DCHIDZ = partial(CHI, 'z', delta)
 
     NUMER = DFDX * DCHIDX + DFDY * DCHIDY + DFDZ * DCHIDZ
     DENOM = edsl.sqrt(sq(DFDX) + sq(DFDY) + sq(DFDZ))
-    H = edsl.select(DENOM < eps, 0, NUMER / DENOM)
+    zero = edsl.cast(0, DENOM.dtype)
+    H = edsl.select(DENOM < eps, zero, NUMER / DENOM)
     O = sum(-H * G)
 
     result = run_program(X, Y, Z, X_data, Y_data, Z_data, O, benchmark)
@@ -175,7 +175,9 @@ def integral_surface_area_4D(
     DFDW = partial_4D(F, 'w', delta)
 
     # chi: occupancy function: 1 inside the region (f<0), 0 outside the region (f>0)
-    CHI = edsl.select(F > 0, 0, 1)
+    one = edsl.cast(1, F.dtype)
+    zero = edsl.cast(0, F.dtype)
+    CHI = edsl.select(F > zero, zero, one)
     DCHIDX = partial_4D(CHI, 'x', delta)
     DCHIDY = partial_4D(CHI, 'y', delta)
     DCHIDZ = partial_4D(CHI, 'z', delta)
@@ -183,7 +185,7 @@ def integral_surface_area_4D(
 
     NUMER = DFDX * DCHIDX + DFDY * DCHIDY + DFDZ * DCHIDZ + DFDW * DCHIDW
     DENOM = edsl.sqrt(sq(DFDX) + sq(DFDY) + sq(DFDZ) + sq(DFDW))
-    H = edsl.select(DENOM < eps, 0, NUMER / DENOM)
+    H = edsl.select(DENOM < eps, zero, NUMER / DENOM)
     O = sum_4D(-H * G)
 
     result = run_program_4D(X, Y, Z, W, X_data, Y_data, Z_data, W_data, O, benchmark)
@@ -206,7 +208,9 @@ def integral_volume(
 
     PHI = (X + Y + Z) / 3.0
     # chi: occupancy function: 1 inside the region (f<0), 0 outside the region (f>0)
-    CHI = edsl.select(F > 0, 0, 1)
+    one = edsl.cast(1, F.dtype)
+    zero = edsl.cast(0, F.dtype)
+    CHI = edsl.select(F > zero, zero, one)
 
     DelCHI = grad(CHI, delta)
     O = sum(-PHI * DelCHI)
@@ -232,7 +236,9 @@ def integral_volume_4D(
 
     PHI = (X + Y + Z + W) / 4.0
     # chi: occupancy function: 1 inside the region (f<0), 0 outside the region (f>0)
-    CHI = edsl.select(F > 0, 0, 1)
+    one = edsl.cast(1, F.dtype)
+    zero = edsl.cast(0, F.dtype)
+    CHI = edsl.select(F > zero, zero, one)
 
     DelCHI = grad_4D(CHI, delta)
     O = sum_4D(-PHI * DelCHI)
@@ -243,16 +249,12 @@ def integral_volume_4D(
 
 
 def run_program(X, Y, Z, X_data, Y_data, Z_data, O, benchmark=False):
-    program = edsl.Program('integral_program', [O])
-    binder = plaidml_exec.Binder(program)
-    executable = binder.compile()
+    program = plaidml.Program('integral_program', [X, Y, Z], [O])
+    executable = plaidml.exec.Runner(program)
 
     def run():
-        binder.input(X).copy_from_ndarray(X_data)
-        binder.input(Y).copy_from_ndarray(Y_data)
-        binder.input(Z).copy_from_ndarray(Z_data)
-        executable.run()
-        return binder.output(O).as_ndarray()
+        outputs = executable.run([X_data, Y_data, Z_data])
+        return outputs[0]
 
     if benchmark:
         # the first run will compile and run
@@ -270,17 +272,12 @@ def run_program(X, Y, Z, X_data, Y_data, Z_data, O, benchmark=False):
 
 
 def run_program_4D(X, Y, Z, W, X_data, Y_data, Z_data, W_data, O, benchmark=False):
-    program = edsl.Program('4D_integral_program', [O])
-    binder = plaidml_exec.Binder(program)
-    executable = binder.compile()
+    program = plaidml.Program('4D_integral_program', [X, Y, Z, W], [O])
+    executable = plaidml.exec.Runner(program)
 
     def run():
-        binder.input(X).copy_from_ndarray(X_data)
-        binder.input(Y).copy_from_ndarray(Y_data)
-        binder.input(Z).copy_from_ndarray(Z_data)
-        binder.input(W).copy_from_ndarray(W_data)
-        executable.run()
-        return binder.output(O).as_ndarray()
+        outputs = executable.run([X_data, Y_data, Z_data, W_data])
+        return outputs[0]
 
     if benchmark:
         # the first run will compile and run
