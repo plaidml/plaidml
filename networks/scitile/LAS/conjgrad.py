@@ -28,7 +28,7 @@ def cg_solve(np_A, np_r, timing=False, resthrsh=RESIDUAL_THRESHOLD):
 
     dtype = plaidml.DType.FLOAT32
 
-    A = edsl.Placeholder(dtype, np_A.shape)  #edsl.Tensor(edsl.LogicalShape(dtype, np_A.shape))
+    A = edsl.Placeholder(dtype, np_A.shape)
     X = edsl.Placeholder(dtype, np_x.shape)
     R = edsl.Placeholder(dtype, np_r.shape)
     P = edsl.Placeholder(dtype, np_p.shape)
