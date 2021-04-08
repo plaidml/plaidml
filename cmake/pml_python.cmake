@@ -17,7 +17,7 @@ function(pml_py_library)
     _RULE
     ""
     "NAME"
-    "SRCS;DEPS"
+    "SRCS;DEPS;GEN_SRCS"
     ${ARGN}
   )
 
@@ -29,19 +29,23 @@ function(pml_py_library)
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
 
   add_custom_target(${_NAME} ALL
-    DEPENDS ${_RULE_DEPS}
+    DEPENDS ${_RULE_DEPS} ${_RULE_SRCS}
   )
 
-  # Symlink each file as its own target.
+  # Copy each source file to the build directory.
   foreach(SRC_FILE ${_RULE_SRCS})
     add_custom_command(
-      TARGET ${_NAME}
-      COMMAND ${CMAKE_COMMAND} -E create_symlink
+      OUTPUT ${SRC_FILE}
+      COMMAND ${CMAKE_COMMAND} -E copy
         ${CMAKE_CURRENT_SOURCE_DIR}/${SRC_FILE}
         ${CMAKE_CURRENT_BINARY_DIR}/${SRC_FILE}
-      BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/${SRC_FILE}
+      DEPENDS ${SRC_FILE}
     )
+    set_property(TARGET ${_NAME} APPEND PROPERTY PY_SRCS ${CMAKE_CURRENT_BINARY_DIR}/${SRC_FILE})
   endforeach()
+  if (${_RULE_GEN_SRCS})
+    set_property(TARGET ${_NAME} APPEND PROPERTY PY_SRCS ${_RULE_GEN_SRCS})
+  endif()
 endfunction()
 
 # pml_py_test()
@@ -92,14 +96,15 @@ function(pml_py_test)
     COMPONENT Tests
   )
 
-  add_custom_target(${_NAME} ALL)
+  add_custom_target(${_NAME} ALL
+    DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${_RULE_SRC}
+  )
 
   add_custom_command(
-    TARGET ${_NAME}
-    COMMAND ${CMAKE_COMMAND} -E create_symlink
+    OUTPUT ${_RULE_SRC}
+    COMMAND ${CMAKE_COMMAND} -E copy
       ${CMAKE_CURRENT_SOURCE_DIR}/${_RULE_SRC}
       ${CMAKE_CURRENT_BINARY_DIR}/${_RULE_SRC}
-    BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/${_RULE_SRC}
   )
 endfunction()
 
@@ -129,8 +134,12 @@ function(pml_py_cffi)
     list(APPEND _SRC_ARGS "--source" "${SRC}")
   endforeach()
 
+  add_custom_target(${_NAME} ALL
+    DEPENDS ${_RULE_NAME}.py
+  )
+
   add_custom_command(
-    OUTPUT ${_RULE_NAME}
+    OUTPUT ${_RULE_NAME}.py
     COMMAND
       ${PYTHON_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/py_cffi/py_cffi.py
         --module ${_RULE_MODULE}
@@ -152,13 +161,14 @@ endfunction()
 # PKG_NAME:
 # PLATFORM:
 # DEPS:
+# PY_DEPS:
 # VERSION:
 function(pml_py_wheel)
   cmake_parse_arguments(
     _RULE
     ""
     "NAME;PKG_NAME;PLATFORM;VERSION"
-    "DEPS"
+    "DEPS;PY_DEPS"
     ${ARGN}
   )
 
@@ -169,6 +179,8 @@ function(pml_py_wheel)
   pml_package_ns(_PACKAGE_NS)
   # Replace dependencies passed by ::name with ::pml::package::name
   list(TRANSFORM _RULE_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
+  list(TRANSFORM _RULE_PY_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
+  list(TRANSFORM _RULE_PY_DEPS REPLACE "::" "_")
 
   pml_package_name(_PACKAGE_NAME)
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
@@ -177,19 +189,33 @@ function(pml_py_wheel)
 
   set(_ABI "none")
   set(_PY_VER "py3")
-  set(_WHEEL_FILE ${PROJECT_BINARY_DIR}/${_RULE_PKG_NAME}-${_RULE_VERSION}-${_PY_VER}-${_ABI}-${_RULE_PLATFORM}.whl)
-
-  add_custom_command(
-    OUTPUT ${_WHEEL_FILE}
-    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/setup.py
-      "--no-user-cfg"
-      "bdist_wheel"
-      "--dist-dir" ${PROJECT_BINARY_DIR}
-      "--plat-name" ${_RULE_PLATFORM}
-    DEPENDS ${_RULE_DEPS}
-  )
+  set(_WHEEL_FILE ${_RULE_PKG_NAME}-${_RULE_VERSION}-${_PY_VER}-${_ABI}-${_RULE_PLATFORM}.whl)
 
   add_custom_target(${_NAME} ALL
     DEPENDS ${_WHEEL_FILE}
+  )
+
+  foreach(_PY_DEP ${_RULE_PY_DEPS})
+    get_target_property(_PY_SRCS ${_PY_DEP} PY_SRCS)
+    list(APPEND _PY_DEP_SRCS ${_PY_SRCS})
+  endforeach()
+
+  add_custom_command(
+    OUTPUT ${_WHEEL_FILE}
+    COMMAND ${PYTHON_EXECUTABLE} setup.py
+      "--no-user-cfg"
+      "bdist_wheel"
+      "--dist-dir" ${CMAKE_CURRENT_BINARY_DIR}
+      "--plat-name" ${_RULE_PLATFORM}
+    DEPENDS ${_RULE_DEPS} ${CMAKE_CURRENT_BINARY_DIR}/setup.py ${_PY_DEP_SRCS}
+  )
+
+  # Copy wheels into top level directory.
+  add_custom_command(
+    TARGET ${_NAME}
+    COMMAND ${CMAKE_COMMAND} -E copy
+      ${CMAKE_CURRENT_BINARY_DIR}/${_WHEEL_FILE}
+      ${PROJECT_BINARY_DIR}/${_WHEEL_FILE}
+    COMMENT "Copying ${_WHEEL_FILE} to ${PROJECT_BINARY_DIR}"
   )
 endfunction()

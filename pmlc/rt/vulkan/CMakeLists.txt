@@ -16,7 +16,6 @@ pml_cc_library(
     pmlc::rt
     MLIRPass
     MLIRSPIRV
-    mlir_runner_utils
     half
     vulkan_headers
     volk

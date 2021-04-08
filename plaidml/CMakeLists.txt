@@ -66,8 +66,8 @@ pml_py_library(
     ffi.py
     plaidml_setup.py
   DEPS
-    _ffi
     ::plaidml
+    plaidml__ffi
 )
 
 pml_py_cffi(
@@ -85,7 +85,7 @@ set(_PLAIDML_BINARY "libplaidml.so")
 
 add_custom_command(
   TARGET plaidml_plaidml
-  COMMAND ${CMAKE_COMMAND} -E create_symlink
+  COMMAND ${CMAKE_COMMAND} -E copy
     ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${_PLAIDML_BINARY}
     ${CMAKE_CURRENT_BINARY_DIR}/${_PLAIDML_BINARY}
 )
@@ -96,4 +96,10 @@ pml_py_wheel(
   VERSION ${PLAIDML_VERSION}
   PLATFORM "manylinux1_x86_64" # TODO: support other platforms
   DEPS ::plaidml
+  PY_DEPS
+    ::py
+    plaidml::core::py
+    plaidml::edsl::py
+    plaidml::exec::py
+    plaidml::op::py
 )
