@@ -23,17 +23,11 @@ pml_cc_library(
     ${MLIR_DIALECT_LIBS}
     ${MLIR_CONVERSION_LIBS}
     MLIRTransforms
-    pmlc::conversion::comp_to_llvm
-    pmlc::conversion::gpu
-    pmlc::conversion::gpu_to_spirv
     pmlc::conversion::pxa_to_affine
     pmlc::conversion::scf_to_omp
     pmlc::conversion::stdx_to_llvm
     pmlc::conversion::tile_to_pxa
-    pmlc::dialect::abi::ir
     pmlc::dialect::affinex::transforms
-    pmlc::dialect::comp::ir
-    pmlc::dialect::comp::transforms
     pmlc::dialect::layer::ir
     pmlc::dialect::layer::transforms
     pmlc::dialect::pxa::ir
