@@ -31,6 +31,7 @@ pml_cc_library(
     runtime_registry.cc
     symbol_registry.cc
     xsmm.cc
+    ${MLIR_SOURCE_DIR}/lib/ExecutionEngine/RunnerUtils.cpp
   DEPS
     pmlc::compiler
     pmlc::util
@@ -46,7 +47,6 @@ pml_cc_library(
     MLIROpenMPToLLVMIRTranslation
     MLIRTargetLLVMIRExport
     MLIRTransforms
-    mlir_runner_utils
 )
 
 set_property(SOURCE xsmm.cc

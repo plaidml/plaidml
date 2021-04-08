@@ -34,7 +34,7 @@ pml_cc_library(
 )
 
 pml_py_library(
-  NAME py_core
+  NAME py
   SRCS
     __init__.py
     settings.py
