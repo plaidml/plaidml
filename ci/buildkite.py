@@ -175,6 +175,7 @@ def cmd_build(args, remainder):
 
     if 'dbg' not in args.variant:
         util.buildkite_upload(build_dir / '*.whl')
+        util.buildkite_upload(build_dir / '*.tar.gz')
 
 
 @util.subcommand(
