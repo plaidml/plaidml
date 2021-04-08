@@ -1,10 +1,10 @@
 #!/bin/bash
 
-set -euo pipefail
+set -eo pipefail
 
 echo "--- :snake: Providing conda and job environment"
 
-if [ ! -d "${CONDA_PREFIX}" ]; then
+if [ ! -d ${CONDA_PREFIX} ]; then
   echo "Can't find conda installation. Please set CONDA_PREFIX to the local conda root directory on ${BUILDKITE_AGENT_NAME}."
   exit 1
 fi
