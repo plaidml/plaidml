@@ -1,13 +1,5 @@
 add_subdirectory(llvm)
 
-if(PML_ENABLE_VULKAN)
-  add_subdirectory(vulkan)
-endif()
-
-if(PML_ENABLE_OPENCL)
-  add_subdirectory(opencl)
-endif()
-
 pml_cc_library(
   NAME rt
   HDRS
@@ -60,16 +52,6 @@ set(_RT_DEPS
   ::rt
   pmlc::rt::llvm
 )
-
-if(PML_ENABLE_OPENCL)
-  list(APPEND _RT_DEFINES PML_ENABLE_OPENCL)
-  list(APPEND _RT_DEPS pmlc::rt::opencl)
-endif()
-
-if(PML_ENABLE_VULKAN)
-  list(APPEND _RT_DEFINES PML_ENABLE_VULKAN)
-  list(APPEND _RT_DEPS pmlc::rt::vulkan)
-endif()
 
 pml_cc_library(
   NAME all_runtimes
