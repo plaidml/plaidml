@@ -71,7 +71,7 @@ VARIANTS:
     arch: manylinux1_x86_64
     build_root: build-x86_64
     build_type: Debug
-    check: core
+    check: smoke
     system: Linux
     env:
       PLAIDML_DEVICE: llvm_cpu.0
