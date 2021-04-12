@@ -1728,7 +1728,7 @@ struct ScatterOpConversion : public OpConversionPattern<tile::ScatterOp> {
       if (srcVal.getType().isa<FloatType>()) {
         storeResult = rewriter.create<pxa::PxaStoreOp>(
             loc, AtomicRMWKind::addf, srcVal, copyLoop.getResult(0), dstOps);
-      } else if (resultType.isa<IntegerType>()) {
+      } else if (srcVal.getType().isa<IntegerType>()) {
         storeResult = rewriter.create<pxa::PxaStoreOp>(
             loc, AtomicRMWKind::addi, srcVal, copyLoop.getResult(0), dstOps);
       } else {
