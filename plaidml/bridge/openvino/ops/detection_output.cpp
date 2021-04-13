@@ -15,49 +15,6 @@ using namespace plaidml::edsl;
 
 namespace PlaidMLPlugin {
 
-edsl::Tensor decodeBoxes(edsl::Tensor priors, edsl::Tensor prior_variances, edsl::Tensor location,
-                         const std::string& code_type, int input_height, int input_width, int batch, int num_priors,
-                         bool clip_before_nms) {
-  edsl::Tensor decoded_bboxes;
-  if (code_type == "caffe.PriorBoxParameter.CORNER") {
-    decoded_bboxes = priors / input_width + prior_variances * location;
-  } else if (code_type == "caffe.PriorBoxParameter.CENTER_SIZE") {
-    auto var_xmin = op::slice(prior_variances).add_dim(0, batch).add_dim(0, num_priors).add_dim(0, 1);
-    auto var_ymin = op::slice(prior_variances).add_dim(0, batch).add_dim(0, num_priors).add_dim(1, 2);
-    auto var_xmax = op::slice(prior_variances).add_dim(0, batch).add_dim(0, num_priors).add_dim(2, 3);
-    auto var_ymax = op::slice(prior_variances).add_dim(0, batch).add_dim(0, num_priors).add_dim(3, 4);
-    edsl::Tensor prior_xmin, prior_ymin, prior_xmax, prior_ymax;
-    prior_xmin = op::slice(priors).add_dim(0, batch).add_dim(0, num_priors).add_dim(0, 1) / input_width;
-    prior_ymin = op::slice(priors).add_dim(0, batch).add_dim(0, num_priors).add_dim(1, 2) / input_height;
-    prior_xmax = op::slice(priors).add_dim(0, batch).add_dim(0, num_priors).add_dim(2, 3) / input_width;
-    prior_ymax = op::slice(priors).add_dim(0, batch).add_dim(0, num_priors).add_dim(3, 4) / input_height;
-    auto loc_xmin = op::slice(location).add_dim(0, batch).add_dim(0, num_priors).add_dim(0, 1);
-    auto loc_ymin = op::slice(location).add_dim(0, batch).add_dim(0, num_priors).add_dim(1, 2);
-    auto loc_xmax = op::slice(location).add_dim(0, batch).add_dim(0, num_priors).add_dim(2, 3);
-    auto loc_ymax = op::slice(location).add_dim(0, batch).add_dim(0, num_priors).add_dim(3, 4);
-    auto prior_w = prior_xmax - prior_xmin;
-    auto prior_h = prior_ymax - prior_ymin;
-    auto prior_center_x = (prior_xmin + prior_xmax) / 2.0f;
-    auto prior_center_y = (prior_ymin + prior_ymax) / 2.0f;
-    auto decoded_center_x = var_xmin * loc_xmin * prior_w + prior_center_x;
-    auto decoded_center_y = var_ymin * loc_ymin * prior_h + prior_center_y;
-    auto decoded_w = edsl::exp(var_xmax * loc_xmax) * prior_w;
-    auto decoded_h = edsl::exp(var_ymax * loc_ymax) * prior_h;
-    auto decoded_xmin = decoded_center_x - decoded_w / 2.0f;
-    auto decoded_ymin = decoded_center_y - decoded_h / 2.0f;
-    auto decoded_xmax = decoded_center_x + decoded_w / 2.0f;
-    auto decoded_ymax = decoded_center_y + decoded_h / 2.0f;
-    std::vector<edsl::Tensor> decoded_slices = {decoded_xmin, decoded_ymin, decoded_xmax, decoded_ymax};
-    decoded_bboxes = op::concatenate(decoded_slices, 2);
-  }
-  if (clip_before_nms) {
-    decoded_bboxes =
-        op::clip(decoded_bboxes, cast(edsl::Tensor{0.0f}, DType::FLOAT32), cast(edsl::Tensor{1.0f}, DType::FLOAT32));
-  }
-
-  return decoded_bboxes;
-}
-
 void registerDetectionOutput() {
   registerOp("DetectionOutput", [](const Context& ctx) {
     auto* layer = ngraph::as_type<ngraph::opset4::DetectionOutput>(ctx.layer);
@@ -138,6 +95,7 @@ void registerDetectionOutput() {
     prior_boxes = op::squeeze(prior_boxes, {1});
 
     edsl::Tensor decoded_bboxes;
+    edsl::Tensor arm_loc;
     if (with_add_pred) {
       // Update confidence if there are 5 inputs.
       Tensor IX = edsl::index({edsl::TensorDim(num_priors)}, 0);
@@ -146,15 +104,7 @@ void registerDetectionOutput() {
       arm_conf = op::repeat(op::unsqueeze(arm_conf, {-1})).count(num_classes).axis(2);
       confidence = edsl::select(arm_conf < objectness_score, cast(edsl::Tensor{0.0f}, DType::FLOAT32), confidence);
 
-      // Decode bounding boxes
-      edsl::Tensor arm_loc = edsl::reshape(ArmLocation, location_shape);
-      auto decoded_priors =
-          decodeBoxes(prior_boxes, prior_variances, arm_loc, code_type, i_h, i_w, batch, num_priors, clip_before_nms);
-      decoded_bboxes = decodeBoxes(decoded_priors, prior_variances, location, code_type, i_h, i_w, batch, num_priors,
-                                   clip_before_nms);
-    } else {
-      decoded_bboxes =
-          decodeBoxes(prior_boxes, prior_variances, location, code_type, i_h, i_w, batch, num_priors, clip_before_nms);
+      arm_loc = edsl::reshape(ArmLocation, location_shape);
     }
 
     // Transpose the confidence to match the input shape of `scores` in NMS.
@@ -171,33 +121,32 @@ void registerDetectionOutput() {
       nms_conf = edsl::scatter(nms_conf, scatter_idx, bg_slice).axis(1).mode(edsl::ScatterMode::UPDATE_SLICE);
     }
 
+    bool center_decode_mode = false;
+    if (code_type == "caffe.PriorBoxParameter.CENTER_SIZE") {
+      center_decode_mode = true;
+    }
+
     edsl::Tensor iou_threshold = cast(edsl::Tensor{nms_threshold}, DType::FLOAT32);
     edsl::Tensor score_threshold = cast(edsl::Tensor{confidence_threshold}, DType::FLOAT32);
-    std::vector<edsl::Tensor> result = op::nms(decoded_bboxes, nms_conf, iou_threshold, score_threshold, top_k)
+    std::vector<edsl::Tensor> result = op::nms(prior_boxes, nms_conf, iou_threshold, score_threshold, top_k)
                                            .soft_nms_sigma(0.0f)
-                                           .center_point_box(false)
+                                           .center_point_box(center_decode_mode)
                                            .sort_result_descending(false)
                                            .box_output_type(DType::INT32)
+                                           .boxes_decode_mode(op::BoxesDecodeMode::SSD)
+                                           .clip_before_nms(clip_before_nms)
+                                           .clip_after_nms(clip_after_nms)
+                                           .ssd_input_height(i_h)
+                                           .ssd_input_width(i_w)
+                                           .ssd_variances(prior_variances)
+                                           .ssd_location(location)
+                                           .ssd_with_arm_loc(with_add_pred)
+                                           .ssd_arm_location(arm_loc)
                                            .build();
     edsl::Tensor selected_indices = result[0];
     auto selected_indices_shape = selected_indices.compute_shape().sizes();
     edsl::Tensor selected_scores = result[1];
     edsl::Tensor valid_outputs = result[2];
-
-    edsl::Tensor idxs = edsl::index({edsl::TensorDim(3)}, 0);
-    edsl::Tensor batch_slice_idxs = op::slice(idxs).add_dim(0, 1);
-    edsl::Tensor box_slice_idxs = op::slice(idxs).add_dim(2, 3);
-    std::vector<edsl::Tensor> slice_idxs_vec = {batch_slice_idxs, box_slice_idxs};
-    edsl::Tensor slice_idxs = cast(op::concatenate(slice_idxs_vec, 0), DType::INT32);
-    edsl::Tensor gather_idxs = edsl::gather(selected_indices, slice_idxs).axis(1);
-    edsl::Tensor out_boxes = edsl::gather(decoded_bboxes, gather_idxs).mode(GatherMode::ND);
-
-    if (clip_after_nms) {
-      out_boxes =
-          op::clip(out_boxes, cast(edsl::Tensor{0.0f}, DType::FLOAT32), cast(edsl::Tensor{1.0f}, DType::FLOAT32));
-    }
-
-    edsl::Tensor O = op::concatenate({selected_scores, out_boxes}, 1);
 
     edsl::Tensor topk_results;
     if (keep_top_k[0] > -1 && selected_indices_shape[0] > keep_top_k[0]) {
@@ -205,7 +154,7 @@ void registerDetectionOutput() {
       auto sorted_idxs = op::squeeze(edsl::argsort(scores_slice, 0, edsl::SortDirection::DESC), {-1});
       edsl::Tensor idxs_topk = edsl::gather(sorted_idxs, edsl::index({edsl::TensorDim(keep_top_k[0])}, 0));
       auto idxs_topk_sorted = op::sort(idxs_topk, 0, edsl::SortDirection::ASC);
-      topk_results = edsl::gather(O, idxs_topk_sorted).axis(0);
+      topk_results = edsl::gather(selected_scores, idxs_topk_sorted).axis(0);
     } else {
       // Pad -1 at the end the valid data.
       auto neg_one = cast(edsl::Tensor{-1}, selected_indices.dtype());
@@ -213,7 +162,7 @@ void registerDetectionOutput() {
       int output_tuple_size = 7;
       std::vector<int64_t> pad_shape = {1, output_tuple_size};
       auto pad_slice = op::broadcast(neg_one, pad_shape, {});
-      topk_results = op::concatenate({O, pad_slice}, 0);
+      topk_results = op::concatenate({selected_scores, pad_slice}, 0);
     }
 
     return edsl::make_tuple(topk_results);
