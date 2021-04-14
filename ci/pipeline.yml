@@ -18,6 +18,7 @@ steps:
   - label: 'IRv10 models'
     trigger: irv10
     async: false
+    depends_on: linux_x86_64
     build:
       message: "${BUILDKITE_MESSAGE}"
       commit: 85b1add931d04a6cdfaaf4fc3b7ddfc21bc75580
