@@ -22,7 +22,7 @@ func @matrixPower(%m : tensor<16x16xf32>) -> tensor<16x16xf32> {
 // CHECK: %[[c1:.*]] = constant 1
 // CHECK: %[[c4:.*]] = constant 4
 // CHECK: scf.for {{.*}} = %[[c0]] to %[[c4]] step %[[c1]] iter_args({{.*}} = %[[arg0]])
-// CHECK:   alloc() : memref<16x16xf32>
+// CHECK:   memref.alloc() : memref<16x16xf32>
 // CHECK:   affine.parallel ({{.*}}, {{.*}}) = (0, 0) to (16, 16)
 // CHECK:     pxa.reduce assign
 // CHECK:     affine.yield

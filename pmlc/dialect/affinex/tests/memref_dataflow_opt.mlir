@@ -158,7 +158,7 @@ func @res2a_accum(%arg0: memref<1x56x56x64xf32>, %arg1: memref<1x1x64x64xf32>, %
   // CHECK: %[[CST:.*]] = constant
   %cst = constant dense<0.000000e+00> : vector<16xf32>
   %c0 = constant 0 : index
-  %0 = alloc() : memref<1x1x8x1xvector<16xf32>>
+  %0 = memref.alloc() : memref<1x1x8x1xvector<16xf32>>
   affine.store %cst, %0[0, 0, 0, 0] : memref<1x1x8x1xvector<16xf32>>
   affine.parallel (%arg3, %arg4) = (0, 0) to (56, 7) {
     affine.parallel (%arg5) = (0) to (4) {

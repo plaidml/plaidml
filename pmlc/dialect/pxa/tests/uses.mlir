@@ -5,7 +5,7 @@ func @simple(%arg0: memref<3xf32>) -> memref<3xf32> {
   %zero = constant 0.0 : f32
   // USES: alloc: %0
   // VALUES: alloc: %0
-  %0 = alloc() {tag="%0"} : memref<3xf32>
+  %0 = memref.alloc() {tag="%0"} : memref<3xf32>
   %1 = affine.parallel (%i) = (0) to (3) reduce ("assign") -> (memref<3xf32>) {
     // USES: use: %1
     // VALUES: def: %1
@@ -28,7 +28,7 @@ func @complex(%arg0: memref<1x26x26x64xi8>) -> memref<1x13x13x256xi8> {
   %c0_i8 = constant 0 : i8
   // USES: alloc: %0
   // VALUES: alloc: %0
-  %0 = alloc() {tag="%0"} : memref<1x13x13x256xi8>
+  %0 = memref.alloc() {tag="%0"} : memref<1x13x13x256xi8>
   %1 = affine.parallel (%arg1, %arg2, %arg3, %arg4) = (0, 0, 0, 0) to (1, 13, 13, 256) reduce ("assign") -> (memref<1x13x13x256xi8>) {
     // USES-DAG: use: %1
     // VALUES-DAG: def: %1

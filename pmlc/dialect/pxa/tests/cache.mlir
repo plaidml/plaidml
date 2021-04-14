@@ -24,12 +24,12 @@ func @argmax_0(%arg0: memref<1x256x256x16xf16>, %arg1: memref<1x256x16xf16>) {
 
 // CHECK-LABEL: func @argmax_0
 // CHECK:       affine.parallel (%{{.*}}) = (0) to (64)
-// CHECK:         %[[cache2:.*]] = alloc() {cache} : memref<1x4x16xf16>
+// CHECK:         %[[cache2:.*]] = memref.alloc() {cache} : memref<1x4x16xf16>
 // CHECK:         %[[copy2:.*]] = affine.parallel (%{{.*}}, %{{.*}}, %{{.*}}) = (0, 0, 0) to (1, 4, 16)
 // CHECK:           pxa.load %{{.*}}[{{.*}}] : memref<1x256x16xf16>
 // CHECK:           pxa.reduce assign %{{.*}}, %[[cache2]][{{.*}}] : memref<1x4x16xf16>
 // CHECK:         {cache_in}
-// CHECK:         %[[cache1:.*]] = alloc() {cache} : memref<1x256x4x16xf16>
+// CHECK:         %[[cache1:.*]] = memref.alloc() {cache} : memref<1x256x4x16xf16>
 // CHECK:         %[[copy1:.*]] = affine.parallel (%{{.*}}, %{{.*}}, %{{.*}}, %{{.*}}) = (0, 0, 0, 0) to (1, 256, 4, 16)
 // CHECK:           pxa.load %{{.*}}[{{.*}}] : memref<1x256x256x16xf16>
 // CHECK:           pxa.reduce assign %{{.*}}, %[[cache1]][{{.*}}] : memref<1x256x4x16xf16>
@@ -72,18 +72,18 @@ func @argmax_1(%arg0: memref<1x256x256x16xf16>, %arg1: memref<1x256x16xf16>, %ar
 
 // CHECK-LABEL: func @argmax_1
 // CHECK:       affine.parallel () = () to ()
-// CHECK:         %[[cache2:.*]] = alloc() {cache} : memref<1x256x16xi32>
+// CHECK:         %[[cache2:.*]] = memref.alloc() {cache} : memref<1x256x16xi32>
 // CHECK:         %[[copy2:.*]] = affine.parallel (%{{.*}}, %{{.*}}, %{{.*}}) = (0, 0, 0) to (1, 256, 16)
 // CHECK:           pxa.load %{{.*}}[{{.*}}] : memref<1x256x16xi32>
 // CHECK:           pxa.reduce assign %{{.*}}, %[[cache2]][{{.*}}] : memref<1x256x16xi32>
 // CHECK:         {cache_in}
-// CHECK:         %[[cache1:.*]] = alloc() {cache} : memref<1x256x16xf16>
+// CHECK:         %[[cache1:.*]] = memref.alloc() {cache} : memref<1x256x16xf16>
 // CHECK:         %[[copy1:.*]] = affine.parallel (%{{.*}}, %{{.*}}, %{{.*}}) = (0, 0, 0) to (1, 256, 16)
 // CHECK:           pxa.load %{{.*}}[{{.*}}] : memref<1x256x16xf16>
 // CHECK:           pxa.reduce assign %{{.*}}, %[[cache1]][{{.*}}] : memref<1x256x16xf16>
 // CHECK:         {cache_in}
 // CHECK:         %[[middle:.*]] = affine.parallel (%{{.*}}) = (0) to (64)
-// CHECK:           %[[cache3:.*]] = alloc() {cache} : memref<1x4x256x16xf16>
+// CHECK:           %[[cache3:.*]] = memref.alloc() {cache} : memref<1x4x256x16xf16>
 // CHECK:           %[[copy3:.*]] = affine.parallel (%{{.*}}, %{{.*}}, %{{.*}}, %{{.*}}) = (0, 0, 0, 0) to (1, 4, 256, 16)
 // CHECK:             pxa.load %{{.*}}[{{.*}}] : memref<1x256x256x16xf16>
 // CHECK:             pxa.reduce assign %{{.*}}, %[[cache3]][{{.*}}] : memref<1x4x256x16xf16>

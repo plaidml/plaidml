@@ -4,6 +4,7 @@
 
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/DebugStringHelper.h"
@@ -78,10 +79,12 @@ struct BoundsCheckPass : public BoundsCheckBase<BoundsCheckPass> {
     auto func = getFunction();
     func.walk([&](Operation *op) {
       TypeSwitch<Operation *>(op)
-          .Case<LoadOp>(
-              [](auto op) { BoundsCheckGenerator<LoadOp>::generate(op); })
-          .Case<StoreOp>(
-              [](auto op) { BoundsCheckGenerator<StoreOp>::generate(op); });
+          .Case<memref::LoadOp>([](auto op) {
+            BoundsCheckGenerator<memref::LoadOp>::generate(op);
+          })
+          .Case<memref::StoreOp>([](auto op) {
+            BoundsCheckGenerator<memref::StoreOp>::generate(op);
+          });
     });
   }
 };

@@ -2,6 +2,7 @@
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/IR/AffineValueMap.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Support/DebugStringHelper.h"
 
@@ -319,7 +320,7 @@ void SubgroupApply(AffineParallelOp op, SubgroupPlan plan) {
     (void)cacheLoadAsVector(inner, load, plan.subgroupSize);
   });
   // Convert local allocations to vector types
-  op.walk([&](AllocOp alloc) {
+  op.walk([&](memref::AllocOp alloc) {
     // TODO: check LogicalResult
     (void)vectorizeBuffer(alloc);
   });

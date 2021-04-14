@@ -1,5 +1,5 @@
-// Check if pack/unpack crash for constant op.
 // RUN: pmlc-opt -convert-tile-to-pxa %s | FileCheck %s
+// Check if pack/unpack crash for constant op.
 
 // CHECK-LABEL: @init
 func @init() -> !stdx.argpack {
