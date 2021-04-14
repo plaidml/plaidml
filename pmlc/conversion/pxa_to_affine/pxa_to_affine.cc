@@ -1,5 +1,6 @@
 // Copyright 2020 Intel Corporation
 
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/IntegerSet.h"
 #include "mlir/Pass/Pass.h"
@@ -79,9 +80,8 @@ struct AffineParallelOpConversion
     newBodyOps.splice(std::prev(newBodyOps.end()), oldBodyOps,
                       oldBodyOps.begin(), std::prev(oldBodyOps.end()));
     // Replace all uses of old values
-    size_t idx = 0;
-    for (auto arg : op.getBody()->getArguments()) {
-      arg.replaceAllUsesWith(ivs[idx++]);
+    for (auto [arg, iv] : llvm::zip(op.getBody()->getArguments(), ivs)) {
+      arg.replaceAllUsesWith(iv);
     }
     // Replace outputs with values from yield
     auto termIt = std::prev(oldBodyOps.end());
@@ -204,8 +204,7 @@ struct PxaReduceOpConversion : public OpConversionPattern<pxa::PxaReduceOp> {
         createReduction(rewriter, op.getLoc(), op.agg(), source, op.val());
     rewriter.create<AffineStoreOp>(op.getLoc(), reduce, op.memref(), op.map(),
                                    op.idxs());
-    op.replaceAllUsesWith(op.memref());
-    rewriter.eraseOp(op);
+    rewriter.replaceOp(op, op.memref());
     return success();
   }
 };
@@ -224,8 +223,7 @@ struct PxaVectorReduceOpConversion
         createReduction(rewriter, op.getLoc(), op.agg(), source, op.vector());
     rewriter.create<AffineVectorStoreOp>(op.getLoc(), reduce, op.memref(),
                                          op.getAffineMap(), op.idxs());
-    op.replaceAllUsesWith(op.memref());
-    rewriter.eraseOp(op);
+    rewriter.replaceOp(op, op.memref());
     return success();
   }
 };
@@ -236,17 +234,17 @@ struct PxaStoreOpConversion : public OpConversionPattern<pxa::PxaStoreOp> {
   LogicalResult
   matchAndRewrite(pxa::PxaStoreOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
-    auto memref = op.memref();
-    auto agg = op.agg();
+    Value memref = op.memref();
+    AtomicRMWKind agg = op.agg();
     if (agg == AtomicRMWKind::assign) {
-      rewriter.create<StoreOp>(op.getLoc(), op.value(), memref, op.indices());
+      rewriter.create<memref::StoreOp>(op.getLoc(), op.value(), memref,
+                                       op.indices());
     } else {
-      auto resultType = memref.getType().cast<MemRefType>().getElementType();
+      Type resultType = memref.getType().cast<MemRefType>().getElementType();
       rewriter.create<AtomicRMWOp>(op.getLoc(), resultType, agg, op.value(),
                                    memref, op.indices());
     }
-    op.replaceAllUsesWith(op.memref());
-    rewriter.eraseOp(op);
+    rewriter.replaceOp(op, memref);
     return success();
   }
 };
@@ -276,7 +274,7 @@ struct FuncOpConversion : public OpConversionPattern<FuncOp> {
     }
 
     // Create a new function with an updated signature.
-    auto newOp = rewriter.cloneWithoutRegions(op);
+    FuncOp newOp = rewriter.cloneWithoutRegions(op);
     rewriter.inlineRegionBefore(op.getBody(), newOp.getBody(), newOp.end());
     newOp.setType(FunctionType::get(op.getContext(), result.getConvertedTypes(),
                                     resultTypes));
@@ -298,7 +296,7 @@ struct ReturnOpConversion : public OpConversionPattern<ReturnOp> {
                   ConversionPatternRewriter &rewriter) const final {
     IVLOG(2, "ReturnOpConversion::matchAndRewrite>");
     SmallVector<Value, 1> results;
-    for (auto val : operands) {
+    for (Value val : operands) {
       if (val.getType().isa<stdx::ArgpackType>()) {
         results.push_back(val);
       }
@@ -311,11 +309,11 @@ struct ReturnOpConversion : public OpConversionPattern<ReturnOp> {
 struct LowerPXAToAffinePass
     : public LowerPXAToAffineBase<LowerPXAToAffinePass> {
   void runOnOperation() final {
-    auto &ctx = getContext();
+    MLIRContext &ctx = getContext();
     PXAToAffineConversionTarget target(ctx);
 
-    OwningRewritePatternList patterns;
-    populatePXAToAffineConversionPatterns(patterns, &ctx);
+    RewritePatternSet patterns(&ctx);
+    populatePXAToAffineConversionPatterns(patterns);
 
     if (failed(applyPartialConversion(getOperation(), target,
                                       std::move(patterns)))) {
@@ -330,8 +328,9 @@ struct LowerPXAToAffinePass
 
 PXAToAffineConversionTarget::PXAToAffineConversionTarget(MLIRContext &ctx)
     : ConversionTarget(ctx) {
-  addLegalDialect<AffineDialect>();
-  addLegalDialect<StandardOpsDialect>();
+  addLegalDialect<AffineDialect,      //
+                  StandardOpsDialect, //
+                  memref::MemRefDialect>();
   addIllegalDialect<pxa::PXADialect>();
   addDynamicallyLegalOp<AffineParallelOp>([](AffineParallelOp op) {
     return op.getNumResults() == 0 && hasTags(op);
@@ -345,8 +344,7 @@ PXAToAffineConversionTarget::PXAToAffineConversionTarget(MLIRContext &ctx)
       [](ReturnOp op) { return op.getNumOperands() == 0; });
 }
 
-void populatePXAToAffineConversionPatterns(OwningRewritePatternList &patterns,
-                                           MLIRContext *ctx) {
+void populatePXAToAffineConversionPatterns(RewritePatternSet &patterns) {
   patterns.insert<                 //
       AffineIfOpConversion,        //
       AffineParallelOpConversion,  //
@@ -356,7 +354,7 @@ void populatePXAToAffineConversionPatterns(OwningRewritePatternList &patterns,
       PxaVectorLoadOpConversion,   //
       PxaVectorReduceOpConversion, //
       PxaStoreOpConversion,        //
-      ReturnOpConversion>(ctx);
+      ReturnOpConversion>(patterns.getContext());
 }
 
 std::unique_ptr<Pass> createLowerPXAToAffinePass() {

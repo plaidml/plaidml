@@ -3,6 +3,7 @@
 #include <map>
 #include <string>
 
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Support/DebugStringHelper.h"
 #include "llvm/ADT/TypeSwitch.h"
@@ -47,7 +48,7 @@ struct TestIndirectValuesIteratorPass
     : public TestIndirectValuesIteratorBase<TestIndirectValuesIteratorPass> {
   void runOnOperation() final {
     auto op = getOperation();
-    op->walk([&](AllocOp allocOp) {
+    op->walk([&](memref::AllocOp allocOp) {
       llvm::outs() << "alloc: ";
       printDef(allocOp.getOperation());
       for (auto value : getIndirectValues(allocOp)) {
@@ -72,7 +73,7 @@ struct TestIndirectUsesIteratorPass
     : public TestIndirectUsesIteratorBase<TestIndirectUsesIteratorPass> {
   void runOnOperation() final {
     auto op = getOperation();
-    op->walk([&](AllocOp allocOp) {
+    op->walk([&](memref::AllocOp allocOp) {
       llvm::outs() << "alloc: ";
       printDef(allocOp.getOperation());
       for (auto &use : getIndirectUses(allocOp)) {

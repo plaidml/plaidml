@@ -1,7 +1,7 @@
 // RUN: pmlc-opt %s -convert-pxa-to-affine | FileCheck %s
 
 func @eltwise_sum(%arg0: memref<1x256x256x16xf16>, %arg1: memref<1x256x256x16xf16>) -> memref<1x256x256x16xf16> {
-  %0 = alloc() : memref<1x256x256x16xf16>
+  %0 = memref.alloc() : memref<1x256x256x16xf16>
   %1 = affine.parallel (%arg2, %arg3, %arg4) = (0, 0, 0) to (256, 256, 2) reduce ("assign") -> (memref<1x256x256x16xf16>) {
     %2 = pxa.vector_load %arg1[0, %arg2, %arg3, %arg4 * 8] : memref<1x256x256x16xf16>, vector<8xf16>
     %3 = pxa.vector_load %arg0[0, %arg2, %arg3, %arg4 * 8] : memref<1x256x256x16xf16>, vector<8xf16>

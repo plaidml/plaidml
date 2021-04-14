@@ -1,5 +1,6 @@
 // Copyright 2021 Intel Corporation
 
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
@@ -35,12 +36,12 @@ struct MemOpPattern final : public OpRewritePattern<MemOp> {
     auto affineMap =
         AffineMap::getMultiDimIdentityMap(idxs.size(), op.getContext());
     auto memRef = op.getMemRef();
-    if (isa<LoadOp>(op.getOperation())) {
+    if (isa<memref::LoadOp>(op.getOperation())) {
       // Convert to PxaLoadOp
       rewriter.replaceOpWithNewOp<PxaLoadOp>(op, memRef, affineMap, idxs);
       return;
     }
-    if (auto store = dyn_cast<StoreOp>(op.getOperation())) {
+    if (auto store = dyn_cast<memref::StoreOp>(op.getOperation())) {
       // Convert to PxaReduceOp
       auto result = rewriter.create<PxaReduceOp>(
           op.getLoc(), AtomicRMWKind::assign, store.getValueToStore(), memRef,
@@ -86,9 +87,10 @@ struct MemOpPattern final : public OpRewritePattern<MemOp> {
 struct ConvertMemOpPass : public ConvertMemOpBase<ConvertMemOpPass> {
 public:
   void runOnFunction() override {
-    OwningRewritePatternList patterns;
-    auto *context = &getContext();
-    patterns.insert<MemOpPattern<LoadOp>, MemOpPattern<StoreOp>>(context);
+    MLIRContext *context = &getContext();
+    RewritePatternSet patterns(context);
+    patterns.insert<MemOpPattern<memref::LoadOp>, //
+                    MemOpPattern<memref::StoreOp>>(context);
     if (failed(
             applyPatternsAndFoldGreedily(getOperation(), std::move(patterns))))
       signalPassFailure();

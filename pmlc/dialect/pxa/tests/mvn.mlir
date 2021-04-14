@@ -4,7 +4,7 @@
 func @mvn(%arg0: memref<1x224x128x24xf16>) -> memref<1x1x1x24xf16> {
   %cst = constant 0.000000e+00 : f16
   %c28672_i32 = constant 28672 : i32
-  %0 = alloc() : memref<1x1x1x24xf16>
+  %0 = memref.alloc() : memref<1x1x1x24xf16>
   %1 = affine.parallel (%arg1) = (0) to (24) reduce ("assign") -> (memref<1x1x1x24xf16>) {
     %7 = pxa.reduce assign %cst, %0[0, 0, 0, %arg1] : memref<1x1x1x24xf16>
     affine.yield %7 : memref<1x1x1x24xf16>

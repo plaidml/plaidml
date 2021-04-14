@@ -6,15 +6,14 @@
 
 namespace mlir {
 class LLVMTypeConverter;
-class OwningRewritePatternList;
+class RewritePatternSet;
 class Pass;
 } // namespace mlir
 
 namespace pmlc::conversion::stdx_to_llvm {
 
-void populateStdXToLLVMConversionPatterns(
-    mlir::LLVMTypeConverter &converter,
-    mlir::OwningRewritePatternList &patterns);
+void populateStdXToLLVMConversionPatterns(mlir::LLVMTypeConverter &converter,
+                                          mlir::RewritePatternSet &patterns);
 
 std::unique_ptr<mlir::Pass> createLowerToLLVMPass();
 
