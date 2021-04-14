@@ -5,7 +5,7 @@
 
 // CHECK-LABEL: func @pxa_norm() -> memref<10x10xf32>
 func @pxa_norm() ->  memref<100xf32, #block> {
-  %0 = alloc() : memref<100xf32, #block>
+  %0 = memref.alloc() : memref<100xf32, #block>
   // CHECK: %1 = affine.parallel (%{{.*}}) = (0) to (100) reduce ("assign") -> (memref<10x10xf32>)
   %1 = affine.parallel (%i) = (0) to (100) reduce ("assign") ->  memref<100xf32, #block> {
     // CHECK: pxa.load %{{.*}}[%{{.*}} floordiv 10, %{{.*}} mod 10] : memref<10x10xf32>

@@ -5,14 +5,11 @@ pml_cc_library(
     passes.h
   SRCS
     boundscheck.cc
-    i1_to_i32.cc
   DEPS
     LLVMSupport
     MLIRIR
     ::passes-gen
     pmlc::dialect::stdx::ir
-    pmlc::util::bilp
-    pmlc::util::math
   PUBLIC
 )
 

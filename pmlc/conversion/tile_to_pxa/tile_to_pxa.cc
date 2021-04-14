@@ -5,6 +5,7 @@
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Math/IR/Math.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Matchers.h"
@@ -533,7 +534,7 @@ buildBroadcastLoad(OpBuilder &builder, Location loc, Value operand,
   auto body = builder.getBlock();
   auto operandType = operand.getType().cast<MemRefType>();
   assert(operandType.getRank() <= outRank && "result rank < operand rank");
-  auto shape = operandType.getShape();
+  ArrayRef<int64_t> shape = operandType.getShape();
   SmallVector<Value, 8> operandIdxs(operandType.getRank());
   for (unsigned i = 0; i < operandType.getRank(); i++) {
     unsigned j = outRank - i - 1;
@@ -616,7 +617,7 @@ struct BufferAllocator {
     auto loc = op->getLoc();
     rankedTensorType = getRankedTensorType(resultType);
     elementType = typeConverter.convertType(rankedTensorType.getElementType());
-    auto originalShape = rankedTensorType.getShape();
+    ArrayRef<int64_t> originalShape = rankedTensorType.getShape();
     auto shape = llvm::to_vector<8>(originalShape);
 
     // If padding is detected, expand the shape to accomodate.
@@ -629,7 +630,7 @@ struct BufferAllocator {
 
     // Make an allocation for the output
     memRefType = MemRefType::get(shape, elementType);
-    resultMemRef = builder.create<AllocOp>(loc, memRefType);
+    resultMemRef = builder.create<memref::AllocOp>(loc, memRefType);
     if (maybePadding) {
       auto initValue = createInit(builder, loc, elementType, maybePadding->agg);
       auto parallel = builder.create<AffineParallelOp>(
@@ -760,7 +761,7 @@ struct ContractionOpConversion
     BufferAllocator alloc(rewriter, op.getOperation(), op.result().getType());
 
     // Do initialization
-    auto shape = alloc.rankedTensorType.getShape();
+    ArrayRef<int64_t> shape = alloc.rankedTensorType.getShape();
     auto parallel = rewriter.create<AffineParallelOp>(
         loc,
         /*resultTypes=*/ArrayRef<Type>{alloc.memRefType},
@@ -873,15 +874,15 @@ struct ArgSortOpConversion : public OpConversionPattern<tile::ArgSortOp> {
     IVLOG(3, "ArgSortOpConversion::matchAndRewrite");
     tile::ArgSortOpAdaptor adaptor(operands);
     auto loc = op.getLoc();
-    auto i32Type = rewriter.getI32Type();
-    auto indexType = rewriter.getIndexType();
+    IntegerType i32Type = rewriter.getI32Type();
+    IndexType indexType = rewriter.getIndexType();
 
     // Axis represents one of the tensor dimensions.
     int64_t axisAttr = op.axis().getSExtValue();
 
     // Special case value -1 indicates the last axis.
     Value tensor = adaptor.tensor();
-    auto shape = tensor.getType().cast<MemRefType>().getShape();
+    ArrayRef<int64_t> shape = tensor.getType().cast<MemRefType>().getShape();
     size_t tensorDims = shape.size();
     if (axisAttr < 0) {
       axisAttr += static_cast<int64_t>(tensorDims);
@@ -894,7 +895,8 @@ struct ArgSortOpConversion : public OpConversionPattern<tile::ArgSortOp> {
 
     // Allocate an output tensor to contain the sorted argument indices.
     auto resultType = MemRefType::get(shape, i32Type);
-    Value result = rewriter.create<AllocOp>(loc, resultType).getResult();
+    Value result =
+        rewriter.create<memref::AllocOp>(loc, resultType).getResult();
 
     llvm::SmallVector<Type, 4> resultTypes;
     resultTypes.push_back(resultType);
@@ -956,7 +958,7 @@ struct ArgSortOpConversion : public OpConversionPattern<tile::ArgSortOp> {
       auto indexVal =
           rewriter.create<IndexCastOp>(loc, initIV, i32Type).getResult();
       ops[axis] = initIV;
-      rewriter.create<StoreOp>(loc, indexVal, result, ops);
+      rewriter.create<memref::StoreOp>(loc, indexVal, result, ops);
       rewriter.setInsertionPointAfter(initLoop);
     }
 
@@ -987,19 +989,21 @@ struct ArgSortOpConversion : public OpConversionPattern<tile::ArgSortOp> {
       // Get the value associated with the current minimum index position.
       // create a MemRefType which is a single-element index
       MemRefType minIdxVarType = MemRefType::get({1}, indexType);
-      auto minIdxVar = rewriter.create<AllocaOp>(loc, minIdxVarType);
-      rewriter.create<StoreOp>(loc, sortIV, minIdxVar, zeroIndex);
+      auto minIdxVar = rewriter.create<memref::AllocaOp>(loc, minIdxVarType);
+      rewriter.create<memref::StoreOp>(loc, sortIV, minIdxVar, zeroIndex);
 
       ops[axis] = sortIV;
-      auto minValIdxInt = rewriter.create<LoadOp>(loc, result, ops).getResult();
+      auto minValIdxInt =
+          rewriter.create<memref::LoadOp>(loc, result, ops).getResult();
       auto minValIdx =
           rewriter.create<IndexCastOp>(loc, minValIdxInt, indexType)
               .getResult();
       ops[axis] = minValIdx;
-      Value minVal = rewriter.create<LoadOp>(loc, tensor, ops).getResult();
+      Value minVal =
+          rewriter.create<memref::LoadOp>(loc, tensor, ops).getResult();
       MemRefType minValVarType = MemRefType::get({1}, elementType);
-      auto minValVar = rewriter.create<AllocaOp>(loc, minValVarType);
-      rewriter.create<StoreOp>(loc, minVal, minValVar, zeroIndex);
+      auto minValVar = rewriter.create<memref::AllocaOp>(loc, minValVarType);
+      rewriter.create<memref::StoreOp>(loc, minVal, minValVar, zeroIndex);
 
       // Iterate over the remaining elements, looking for a smaller value.
       auto minLB = rewriter.create<AddIOp>(loc, sortIV, icon1);
@@ -1010,15 +1014,17 @@ struct ArgSortOpConversion : public OpConversionPattern<tile::ArgSortOp> {
       // Get the comparison value for the search iterator position.
       ops[axis] = minIV;
       auto compValIdxInt =
-          rewriter.create<LoadOp>(loc, result, ops).getResult();
+          rewriter.create<memref::LoadOp>(loc, result, ops).getResult();
       auto compValIdx =
           rewriter.create<IndexCastOp>(loc, compValIdxInt, indexType)
               .getResult();
       ops[axis] = compValIdx;
-      Value compVal = rewriter.create<LoadOp>(loc, tensor, ops).getResult();
+      Value compVal =
+          rewriter.create<memref::LoadOp>(loc, tensor, ops).getResult();
 
       // What is the current minimum value, stored in the min val var?
-      minVal = rewriter.create<LoadOp>(loc, minValVar, zeroIndex).getResult();
+      minVal = rewriter.create<memref::LoadOp>(loc, minValVar, zeroIndex)
+                   .getResult();
       // Is compVal smaller than minVal? If so, update the allocs
       Value orderPred;
       orderPred = convertCmpOp(loc, rewriter, compVal, minVal, elementType,
@@ -1027,9 +1033,9 @@ struct ArgSortOpConversion : public OpConversionPattern<tile::ArgSortOp> {
       auto ifReorder = rewriter.create<scf::IfOp>(loc, orderPred, false);
       rewriter.setInsertionPointToStart(&ifReorder.thenRegion().front());
       // store minIV -> minIdxVar
-      rewriter.create<StoreOp>(loc, minIV, minIdxVar, zeroIndex);
+      rewriter.create<memref::StoreOp>(loc, minIV, minIdxVar, zeroIndex);
       // store compVal -> minValVar
-      rewriter.create<StoreOp>(loc, compVal, minValVar, zeroIndex);
+      rewriter.create<memref::StoreOp>(loc, compVal, minValVar, zeroIndex);
       // End the conditional block. We would set the insertion point after
       // the ifReorder block, except that we are about to...
       // End the inner sort loop, which found the smallest value in the
@@ -1037,9 +1043,11 @@ struct ArgSortOpConversion : public OpConversionPattern<tile::ArgSortOp> {
       rewriter.setInsertionPointAfter(minLoop);
 
       auto finalMinPos =
-          rewriter.create<LoadOp>(loc, minIdxVar, zeroIndex).getResult();
+          rewriter.create<memref::LoadOp>(loc, minIdxVar, zeroIndex)
+              .getResult();
       ops[axis] = finalMinPos;
-      auto finalMinIdx = rewriter.create<LoadOp>(loc, result, ops).getResult();
+      auto finalMinIdx =
+          rewriter.create<memref::LoadOp>(loc, result, ops).getResult();
 
       // Move every element between [sortIV,finalMinPos) a step forward
       // and then move the minimum index to the head to keep it stable.
@@ -1051,12 +1059,13 @@ struct ArgSortOpConversion : public OpConversionPattern<tile::ArgSortOp> {
       moveIV = rewriter.create<AddIOp>(loc, moveIV, sortIV);
       auto moveNext = rewriter.create<SubIOp>(loc, moveIV, icon1);
       ops[axis] = moveNext;
-      auto moveNextVal = rewriter.create<LoadOp>(loc, result, ops).getResult();
+      auto moveNextVal =
+          rewriter.create<memref::LoadOp>(loc, result, ops).getResult();
       ops[axis] = moveIV;
-      rewriter.create<StoreOp>(loc, moveNextVal, result, ops);
+      rewriter.create<memref::StoreOp>(loc, moveNextVal, result, ops);
       rewriter.setInsertionPointAfter(moveLoop);
       ops[axis] = sortIV;
-      rewriter.create<StoreOp>(loc, finalMinIdx, result, ops);
+      rewriter.create<memref::StoreOp>(loc, finalMinIdx, result, ops);
 
       // The minimum remaining value is now at the end of the sorted region.
       // Advance to the next minimum in the remaining unsorted region.
@@ -1151,7 +1160,8 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
     auto memrefType = resultType.cast<MemRefType>();
 
     // Make an allocation for the output
-    auto resultMemRef = rewriter.create<AllocOp>(loc, memrefType).getResult();
+    auto resultMemRef =
+        rewriter.create<memref::AllocOp>(loc, memrefType).getResult();
 
     // We need an array of int64_t representing the results tensor's dims
     ArrayRef<int64_t> size = memrefType.getShape();
@@ -1164,8 +1174,9 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
     // Create an affine map for loading the index, using the leading counters
     size_t axis = *(op.axis().getRawData());
     size_t batchDims = *(op.batchDims().getRawData());
-    auto idxShape = indices.getType().cast<MemRefType>().getShape();
-    size_t idxDims = indices.getType().cast<MemRefType>().getShape().size();
+    ArrayRef<int64_t> idxShape =
+        indices.getType().cast<MemRefType>().getShape();
+    size_t idxDims = idxShape.size();
     auto idxLoadMap = AffineMap::getMultiDimIdentityMap(idxDims, ctx);
 
     // Create default source map
@@ -1207,13 +1218,13 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
         }
       } else {
         if (!idx.getType().isa<IndexType>()) {
-          auto indexType = rewriter.getIndexType();
+          IndexType indexType = rewriter.getIndexType();
           // Cast from whatever integer type it has to index type
           idx = rewriter.create<mlir::IndexCastOp>(loc, idx, indexType)
                     .getResult();
         }
         srcOps.at(axis) = idx;
-        interpVal = rewriter.create<mlir::LoadOp>(loc, tensor, srcOps);
+        interpVal = rewriter.create<memref::LoadOp>(loc, tensor, srcOps);
       }
     } break;
     case GatherMode::nd: {
@@ -1227,7 +1238,7 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
             rewriter.create<pxa::PxaLoadOp>(loc, indices, idxLoadMap, combIdx)
                 .getResult();
         if (!idx.getType().isa<IndexType>()) {
-          auto indexType = rewriter.getIndexType();
+          IndexType indexType = rewriter.getIndexType();
           idx = rewriter.create<mlir::IndexCastOp>(loc, idx, indexType)
                     .getResult();
         }
@@ -1240,7 +1251,7 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
       for (size_t i = idxDims - 1; i < dstDims; ++i) {
         srcOps.push_back(loop.getIVs()[i]);
       }
-      interpVal = rewriter.create<mlir::LoadOp>(loc, tensor, srcOps);
+      interpVal = rewriter.create<memref::LoadOp>(loc, tensor, srcOps);
     } break;
     default:
       llvm_unreachable("unrecognized gather mode");
@@ -1263,9 +1274,9 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
                                      Value tensor, Value idx,
                                      std::vector<Value> &srcOps, size_t axis,
                                      NearestMode nearestMode) const {
-    auto idxType = rewriter.getIndexType();
-    auto i32Type = rewriter.getI32Type();
-    auto bounds = GetIndexBounds(loc, rewriter, tensor, axis, i32Type);
+    IndexType idxType = rewriter.getIndexType();
+    IntegerType i32Type = rewriter.getI32Type();
+    IndexBounds bounds = getIndexBounds(loc, rewriter, tensor, axis, i32Type);
     switch (nearestMode) {
     case NearestMode::round_prefer_floor: {
       auto cmp = isHalfWayFloat(loc, rewriter, idx);
@@ -1291,10 +1302,10 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
     default:
       llvm_unreachable("Unsupported NearestMode");
     }
-    idx = checkIntOutOfBounds(loc, rewriter, idx, bounds[0], bounds[1]);
+    idx = checkIntOutOfBounds(loc, rewriter, idx, bounds);
     idx = rewriter.create<mlir::IndexCastOp>(loc, idx, idxType).getResult();
     srcOps.at(axis) = idx;
-    return rewriter.create<mlir::LoadOp>(loc, tensor, srcOps);
+    return rewriter.create<memref::LoadOp>(loc, tensor, srcOps);
   }
 
   Value buildLinearInterpolationOps(Location loc,
@@ -1302,10 +1313,10 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
                                     Value tensor, Value idx,
                                     std::vector<Value> &srcOps,
                                     size_t axis) const {
-    auto idxType = rewriter.getIndexType();
-    auto i32Type = rewriter.getI32Type();
+    IndexType idxType = rewriter.getIndexType();
+    IntegerType i32Type = rewriter.getI32Type();
     auto elementType = tensor.getType().cast<MemRefType>().getElementType();
-    auto bounds = GetIndexBounds(loc, rewriter, tensor, axis, i32Type);
+    IndexBounds bounds = getIndexBounds(loc, rewriter, tensor, axis, i32Type);
     auto cst1F =
         rewriter
             .create<mlir::ConstantOp>(loc, elementType,
@@ -1315,16 +1326,16 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
     // Calculate interpolation nodes: floor and ceil
     auto floor = floorFPToSI(loc, rewriter, idx, i32Type);
     auto ceil = ceilFPToSI(loc, rewriter, idx, i32Type);
-    floor = checkIntOutOfBounds(loc, rewriter, floor, bounds[0], bounds[1]);
-    ceil = checkIntOutOfBounds(loc, rewriter, ceil, bounds[0], bounds[1]);
+    floor = checkIntOutOfBounds(loc, rewriter, floor, bounds);
+    ceil = checkIntOutOfBounds(loc, rewriter, ceil, bounds);
     floor = rewriter.create<mlir::IndexCastOp>(loc, floor, idxType).getResult();
     ceil = rewriter.create<mlir::IndexCastOp>(loc, ceil, idxType).getResult();
 
     // Load sample data g0 and g1 at interpolation nodes
     srcOps.at(axis) = ceil;
-    auto g0 = rewriter.create<mlir::LoadOp>(loc, tensor, srcOps).getResult();
+    auto g0 = rewriter.create<memref::LoadOp>(loc, tensor, srcOps).getResult();
     srcOps.at(axis) = floor;
-    auto g1 = rewriter.create<mlir::LoadOp>(loc, tensor, srcOps).getResult();
+    auto g1 = rewriter.create<memref::LoadOp>(loc, tensor, srcOps).getResult();
 
     // Calculate coefficients of g0 and g1
     auto floorF =
@@ -1346,10 +1357,10 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
     // Follow the algorithm used in ngraph cubic interpolation (also see, e.g.
     // [article](https://ieeexplore.ieee.org/document/1163711/).
 
-    auto idxType = rewriter.getIndexType();
-    auto i32Type = rewriter.getI32Type();
+    IndexType idxType = rewriter.getIndexType();
+    IntegerType i32Type = rewriter.getI32Type();
     auto elementType = tensor.getType().cast<MemRefType>().getElementType();
-    auto bounds = GetIndexBounds(loc, rewriter, tensor, axis, i32Type);
+    IndexBounds bounds = getIndexBounds(loc, rewriter, tensor, axis, i32Type);
 
     // Create constant a (cubeCoeff)
     auto a = rewriter
@@ -1390,10 +1401,10 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
     // Load sample data g at interpolation nodes
     SmallVector<Value, 4> g;
     for (size_t i = 0; i < x.size(); i++) {
-      x[i] = checkIntOutOfBounds(loc, rewriter, x[i], bounds[0], bounds[1]);
+      x[i] = checkIntOutOfBounds(loc, rewriter, x[i], bounds);
       x[i] = rewriter.create<mlir::IndexCastOp>(loc, x[i], idxType).getResult();
       srcOps.at(axis) = x[i];
-      auto loadOp = rewriter.create<mlir::LoadOp>(loc, tensor, srcOps);
+      auto loadOp = rewriter.create<memref::LoadOp>(loc, tensor, srcOps);
       g.push_back(loadOp.getResult());
     }
 
@@ -1438,10 +1449,14 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
     return rewriter.create<mlir::AddFOp>(loc, r, p[3]).getResult();
   }
 
-  SmallVector<Value, 2> GetIndexBounds(Location loc,
-                                       ConversionPatternRewriter &rewriter,
-                                       Value tensor, size_t axis,
-                                       IntegerType integerType) const {
+  struct IndexBounds {
+    Value lower;
+    Value upper;
+  };
+
+  IndexBounds getIndexBounds(Location loc, ConversionPatternRewriter &rewriter,
+                             Value tensor, size_t axis,
+                             IntegerType integerType) const {
     // Return lower and upper bounds of a tensor at an axis
     SmallVector<Value, 2> bounds;
     auto axisLen = tensor.getType().cast<MemRefType>().getShape()[axis];
@@ -1449,23 +1464,20 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
         loc, integerType, rewriter.getIntegerAttr(integerType, 0));
     auto upper = rewriter.create<mlir::ConstantOp>(
         loc, integerType, rewriter.getIntegerAttr(integerType, axisLen - 1));
-    bounds.push_back(lower.getResult());
-    bounds.push_back(upper.getResult());
-    return bounds;
+    return IndexBounds{lower, upper};
   }
 
   Value checkIntOutOfBounds(Location loc, ConversionPatternRewriter &rewriter,
-                            Value value, Value lowerBound,
-                            Value upperBound) const {
+                            Value value, const IndexBounds &bounds) const {
     // Check if a mlir::IntegerType value is out of bounds. If it is, set it to
     // lower/upper bound.
     auto cmpLower = rewriter.create<mlir::CmpIOp>(loc, CmpIPredicate::slt,
-                                                  value, lowerBound);
+                                                  value, bounds.lower);
     auto cmpUpper = rewriter.create<mlir::CmpIOp>(loc, CmpIPredicate::slt,
-                                                  value, upperBound);
-    value = rewriter.create<mlir::SelectOp>(loc, cmpLower, lowerBound, value)
+                                                  value, bounds.upper);
+    value = rewriter.create<mlir::SelectOp>(loc, cmpLower, bounds.lower, value)
                 .result();
-    value = rewriter.create<mlir::SelectOp>(loc, cmpUpper, value, upperBound)
+    value = rewriter.create<mlir::SelectOp>(loc, cmpUpper, value, bounds.upper)
                 .result();
     return value;
   }
@@ -1524,7 +1536,8 @@ struct IndexOpConversion : public OpConversionPattern<tile::IndexOp> {
         typeConverter.convertType(op.result().getType()).cast<MemRefType>();
 
     // Make an allocation for the output
-    auto resultMemRef = rewriter.create<AllocOp>(loc, resultType).getResult();
+    auto resultMemRef =
+        rewriter.create<memref::AllocOp>(loc, resultType).getResult();
 
     // Make a parallel for loop to fill the result
     auto forOp = rewriter.create<AffineParallelOp>(
@@ -1591,13 +1604,13 @@ struct ShapeOpConversion : public OpConversionPattern<tile::ShapeOp> {
         typeConverter.convertType(op.result().getType()).cast<MemRefType>();
 
     // Make an allocation for the output
-    auto memRef = rewriter.create<AllocOp>(loc, resultType).getResult();
+    auto memRef = rewriter.create<memref::AllocOp>(loc, resultType).getResult();
 
     // Populate the buffer with the shape dims
     auto operandType = adaptor.tensor().getType().cast<MemRefType>();
     auto aggOp = AtomicRMWKind::assign;
     for (unsigned i = 0; i < operandType.getRank(); i++) {
-      auto dim = rewriter.create<mlir::DimOp>(loc, adaptor.tensor(), i);
+      auto dim = rewriter.create<mlir::memref::DimOp>(loc, adaptor.tensor(), i);
       auto cast = rewriter.create<mlir::IndexCastOp>(
           loc, dim, rewriter.getIntegerType(32));
       auto map = rewriter.getConstantAffineMap(i);
@@ -1621,8 +1634,8 @@ struct ScatterOpConversion : public OpConversionPattern<tile::ScatterOp> {
     // Helpful explanation of scatter from tensorflow docs:
     // https://www.tensorflow.org/api_docs/python/tf/scatter_nd
 
-    auto loc = op.getLoc();
-    auto ctx = rewriter.getContext();
+    Location loc = op.getLoc();
+    MLIRContext *ctx = rewriter.getContext();
     TypeConverter typeConverter;
 
     // Create an adaptor, to interpret the operands
@@ -1636,12 +1649,12 @@ struct ScatterOpConversion : public OpConversionPattern<tile::ScatterOp> {
     auto updates = adaptor.updates();
 
     // Make an allocation for the output
-    auto resultType = typeConverter.convertType(op.result().getType());
+    Type resultType = typeConverter.convertType(op.result().getType());
     auto resultMemRefType = resultType.cast<MemRefType>();
     auto resultMemRef =
-        rewriter.create<AllocOp>(loc, resultMemRefType).getResult();
+        rewriter.create<memref::AllocOp>(loc, resultMemRefType).getResult();
 
-    auto dataShape = data.getType().cast<MemRefType>().getShape();
+    ArrayRef<int64_t> dataShape = data.getType().cast<MemRefType>().getShape();
     auto copyLoop = rewriter.create<AffineParallelOp>(
         loc, ArrayRef<Type>{data.getType()},
         ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign}, dataShape);
@@ -1680,7 +1693,8 @@ struct ScatterOpConversion : public OpConversionPattern<tile::ScatterOp> {
     // Load the location value from the indices tensor.
     // Create an affine map for loading the index, using leading counters.
     size_t axis = *(op.axis().getRawData());
-    auto idxShape = indices.getType().cast<MemRefType>().getShape();
+    ArrayRef<int64_t> idxShape =
+        indices.getType().cast<MemRefType>().getShape();
     size_t idxDims = idxShape.size();
     auto idxLoadMap = AffineMap::getMultiDimIdentityMap(idxDims, ctx);
     SmallVector<Value, 4> dstOps;
@@ -1753,7 +1767,7 @@ struct ScatterOpConversion : public OpConversionPattern<tile::ScatterOp> {
     // Cast the index value from its integer type to the index type
     if (!indexVal.getType().isa<IndexType>()) {
       // cast from whatever integer type it has to index type
-      auto indexType = rewriter.getIndexType();
+      IndexType indexType = rewriter.getIndexType();
       indexVal = rewriter.create<mlir::IndexCastOp>(loc, indexVal, indexType)
                      .getResult();
     }
@@ -1762,7 +1776,7 @@ struct ScatterOpConversion : public OpConversionPattern<tile::ScatterOp> {
 
   void getOutputIndices(Value indexVal, size_t axis, size_t idxStart,
                         size_t end, SmallVector<Value, 4> &dstOps,
-                        std::vector<BlockArgument> loopArgs) const {
+                        ArrayRef<BlockArgument> loopArgs) const {
     for (size_t i = 0; i < axis; ++i) {
       dstOps.push_back(loopArgs[i]);
     }
@@ -1793,7 +1807,8 @@ struct CastOpConversion : public OpConversionPattern<tile::CastOp> {
     }
 
     // Make an allocation for the output
-    auto resultMemRef = rewriter.create<AllocOp>(loc, resultType).getResult();
+    auto resultMemRef =
+        rewriter.create<memref::AllocOp>(loc, resultType).getResult();
 
     // Make a parallel for loop to fill the result
     auto forOp = rewriter.create<AffineParallelOp>(
@@ -2042,14 +2057,18 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
     ConversionTarget target(getContext());
     TypeConverter converter;
     target.addLegalDialect<mlir::AffineDialect,          //
-                           mlir::math::MathDialect,      //
-                           mlir::scf::SCFDialect,        //
                            mlir::StandardOpsDialect,     //
+                           mlir::math::MathDialect,      //
+                           mlir::memref::MemRefDialect,  //
+                           mlir::scf::SCFDialect,        //
                            dialect::layer::LayerDialect, //
                            dialect::pxa::PXADialect,     //
                            dialect::stdx::StdXDialect>();
-    target.addLegalOp<scf::ForOp, scf::YieldOp, scf::IfOp>();
-    target.addLegalOp<mlir::ModuleOp, mlir::ModuleTerminatorOp, ReturnOp>();
+    target.addLegalOp<scf::ForOp,   //
+                      scf::YieldOp, //
+                      scf::IfOp>();
+    target.addLegalOp<mlir::ModuleOp, //
+                      ReturnOp>();
     target.addDynamicallyLegalOp<FuncOp>(
         [&](FuncOp op) { return converter.isSignatureLegal(op.getType()); });
     target.addDynamicallyLegalOp<ReturnOp>(
@@ -2072,7 +2091,7 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         CmpIntInequalityOp<CmpIPredicate::sgt, CmpIPredicate::ugt>;
     using CmpIntGeOp =
         CmpIntInequalityOp<CmpIPredicate::sge, CmpIPredicate::uge>;
-    OwningRewritePatternList patterns;
+    RewritePatternSet patterns(&getContext());
     patterns.insert<
         ArgSortOpConversion,  //
         CastOpConversion,     //

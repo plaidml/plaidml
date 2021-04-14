@@ -2,6 +2,7 @@
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/IR/AffineValueMap.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/IR/AsmState.h"
@@ -57,7 +58,7 @@ using namespace mlir; // NOLINT[build/namespaces]
 //
 // Modified Op:
 //  %1 = affine.parallel (%arg1) = (0) to (16) step (8) {
-//    %2 = alloc() : memref<128xf32>
+//    %2 = memref.alloc() : memref<128xf32>
 //    %3 = affine.parallel (%arg2) = (%arg1) to (%arg1 + 8) {
 //      %4 = pxa.load
 //      %5 = subi %arg2, %arg1 : index
@@ -306,7 +307,8 @@ struct VectorizeMemImpl {
 
     auto newMemrefType =
         MemRefType::get(vectorType.getShape(), vectorType.getElementType());
-    auto newAllocOp = builder.create<AllocOp>(loopOp.getLoc(), newMemrefType);
+    auto newAllocOp =
+        builder.create<memref::AllocOp>(loopOp.getLoc(), newMemrefType);
     auto const0 = builder.create<ConstantIndexOp>(loopOp.getLoc(), 0);
     AffineMap identityMap = AffineMap::getMultiDimIdentityMap(
         /*numDims=*/1, vectorReduce.getContext());
@@ -411,7 +413,7 @@ struct VectorizeMemImpl {
 };
 
 void getGlobalMemory(FuncOp f, std::list<Operation *> &globalAllocList) {
-  for (auto allocOp : f.getOps<AllocOp>()) {
+  for (auto allocOp : f.getOps<memref::AllocOp>()) {
     globalAllocList.push_back(allocOp.getOperation());
   }
   for (auto parallelOp : f.getOps<AffineParallelOp>()) {

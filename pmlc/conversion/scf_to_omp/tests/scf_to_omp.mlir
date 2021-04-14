@@ -15,7 +15,7 @@ module @get_value {
     scf.parallel (%arg3) = (%c0) to (%c64) step (%c1) {
       scf.for %arg4 = %c0 to %c56 step %c1 {
         scf.for %arg5 = %c0 to %c56 step %c1 {
-          store %cst, %arg2[%c0, %arg4, %arg5, %arg3] : memref<1x56x56x64xf32>
+          memref.store %cst, %arg2[%c0, %arg4, %arg5, %arg3] : memref<1x56x56x64xf32>
         }
       }
       // CHECK: omp.terminator

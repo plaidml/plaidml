@@ -3,9 +3,9 @@
 func @main() {
   %c0 = constant 0 : index
   %c10 = constant 10 : index // out of bounds
-  %buf = alloc() : memref<20x10xf32>
-  %0 = load %buf[%c0, %c10] : memref<20x10xf32>
-  dealloc %buf : memref<20x10xf32>
+  %buf = memref.alloc() : memref<20x10xf32>
+  %0 = memref.load %buf[%c0, %c10] : memref<20x10xf32>
+  memref.dealloc %buf : memref<20x10xf32>
   return
 }
-// CHECK: ERROR: Out of bounds index for mlir::LoadOp or mlir::StoreOp
+// CHECK: ERROR: Out of bounds index for mlir::memref::LoadOp or mlir::memref::StoreOp

@@ -7,6 +7,7 @@
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/IR/AffineValueMap.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 
 #include "pmlc/dialect/pxa/analysis/strides.h"
@@ -76,7 +77,7 @@ static Value allocateLocalCache(OpBuilder &builder, Value memref, Location loc,
   auto elementType = originalType.getElementType();
   auto memRefType = MemRefType::get(
       wholeBlock ? rap.wholeInnerCount : rap.innerCount, elementType);
-  auto alloc = builder.create<AllocOp>(loc, memRefType);
+  auto alloc = builder.create<memref::AllocOp>(loc, memRefType);
   alloc.getOperation()->setAttr("cache", builder.getUnitAttr());
   return alloc;
 }
@@ -103,7 +104,7 @@ LogicalResult cacheLoad(AffineParallelOp par, PxaLoadOp load) {
   // Allocate a temporary buffer
   auto type =
       MemRefType::get(rap.innerCount, load.getMemRefType().getElementType());
-  auto localBuf = builder.create<AllocOp>(loc, type);
+  auto localBuf = builder.create<memref::AllocOp>(loc, type);
   // Implement the copy loop
   SmallVector<StrideInfo, 4> zeroOffset(rap.innerCount.size());
   auto copyLoop =
@@ -241,7 +242,7 @@ LogicalResult cacheReduce(AffineParallelOp par, PxaReduceOp reduce) {
   // Allocate a temporary buffer
   auto eltType = reduce.getMemRefType().getElementType();
   auto type = MemRefType::get(rap.innerCount, eltType);
-  auto localBuf = builder.create<AllocOp>(loc, type);
+  auto localBuf = builder.create<memref::AllocOp>(loc, type);
 
   // If it's not an assign, clear it to the reduction identity
   Value initBuf = localBuf;
@@ -282,7 +283,7 @@ LogicalResult cacheReduce(AffineParallelOp par, PxaReduceOp reduce) {
 
 static bool isInitialized(Value memref) {
   if (auto op = memref.getDefiningOp()) {
-    if (isa<AllocOp>(op)) {
+    if (isa<memref::AllocOp>(op)) {
       return false;
     }
     return true;

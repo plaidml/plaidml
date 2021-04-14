@@ -8,7 +8,7 @@ func @grn(%arg0: index, %arg1: memref<1x4x128x24xf16>, %arg2: memref<1x4x128x24x
   // expected-remark@+2 {{Vectorize: Failed, !vectorizable}}
   // expected-remark@+1 {{Vectorize: Failed, dimension is not a multiple of the vector width}}
   %0 = affine.parallel (%arg3, %arg4) = (0, 0) to (4, 128) reduce ("assign") -> (memref<1x4x128x24xf16>) {
-    %1 = alloc() : memref<1x1x1x1xf32>
+    %1 = memref.alloc() : memref<1x1x1x1xf32>
     %2 = fpext %cst : f16 to f32
     // expected-remark@+1 {{Vectorize op: Failed, unsupported reduction or type for vector::ReductionOp}}
     %3 = pxa.reduce assign %2, %1[0, 0, 0, 0] : memref<1x1x1x1xf32>

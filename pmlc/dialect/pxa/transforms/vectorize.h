@@ -4,6 +4,8 @@
 
 #include "pmlc/dialect/pxa/ir/ops.h"
 
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
+
 namespace pmlc::dialect::pxa {
 
 static constexpr const char *kVectorizeStrategy_Outputs = "outputs";
@@ -20,6 +22,6 @@ mlir::LogicalResult vectorizeOverOutputs(mlir::AffineParallelOp op,
                                          unsigned vecSize);
 
 // Attempt to vectorize a buffer (given it's allocation)
-mlir::LogicalResult vectorizeBuffer(mlir::AllocOp op);
+mlir::LogicalResult vectorizeBuffer(mlir::memref::AllocOp op);
 
 } // namespace pmlc::dialect::pxa
