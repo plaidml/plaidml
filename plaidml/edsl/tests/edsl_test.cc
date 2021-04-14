@@ -13,17 +13,13 @@
 #include <random>
 
 #include "half.hpp"
-#include "llvm/ADT/StringRef.h"
 
 #include "plaidml/edsl/edsl.h"
 #include "plaidml/exec/exec.h"
 #include "plaidml/op/op.h"
 #include "plaidml/testenv.h"
-#include "pmlc/util/env.h"
-#include "pmlc/util/logging.h"
 
 using half_float::half;
-using llvm::StringRef;
 using ::testing::AnyOf;
 using ::testing::ContainerEq;
 using ::testing::Eq;
@@ -444,6 +440,8 @@ TEST_F(CppEdsl, DotF16) {
   // CHECK-SAME: tensor<f16>, tensor<8x16xf16>, tensor<16x32xf16> -> tensor<8x32xf16>
   // CHECK: return %[[cion]] : tensor<8x32xf16>
   // clang-format on
+
+  runProgram(program);
 }
 
 TEST_F(CppEdsl, DotF16_AccF32) {

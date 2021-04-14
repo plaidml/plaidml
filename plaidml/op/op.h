@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -117,12 +118,17 @@ enum class PadMode {
 struct Integers {
   Integers(const std::vector<int>& elts)  // NOLINT[runtime/explicit]
       : value(edsl::make_tuple(elts)) {}
+  Integers(const std::vector<int64_t>& elts) {  // NOLINT[runtime/explicit]
+    value = edsl::make_tuple(elts);
+  }
   Integers(const std::vector<size_t>& elts) {  // NOLINT[runtime/explicit]
     std::vector<int64_t> casted(elts.begin(), elts.end());
     value = edsl::make_tuple(casted);
   }
   Integers(const std::initializer_list<int>& elts)  // NOLINT[runtime/explicit]
       : Integers(std::vector<int>(elts)) {}
+  Integers(const std::initializer_list<int64_t>& elts)  // NOLINT[runtime/explicit]
+      : Integers(std::vector<int64_t>(elts)) {}
   Integers(const std::initializer_list<size_t>& elts)  // NOLINT[runtime/explicit]
       : Integers(std::vector<size_t>(elts)) {}
 
@@ -154,8 +160,8 @@ inline edsl::Tensor binary_crossentropy(const edsl::Tensor& I, const edsl::Tenso
   return details::op("binary_crossentropy", args).as_tensor();
 }
 
-inline edsl::Tensor broadcast(const edsl::Tensor& I, const std::vector<int>& result_shape,
-                              const std::vector<int>& bcast_axes) {
+inline edsl::Tensor broadcast(const edsl::Tensor& I, const std::vector<int64_t>& result_shape,
+                              const std::vector<int64_t>& bcast_axes) {
   auto args = edsl::make_tuple(I, edsl::make_tuple(result_shape), edsl::make_tuple(bcast_axes));
   return details::op("broadcast", args).as_tensor();
 }
@@ -507,6 +513,70 @@ class mvn {
   double epsilon_;
   bool across_channels_;
   std::string layout_;
+};
+
+class nms {
+ public:
+  explicit nms(edsl::Tensor Boxes, edsl::Tensor Scores, edsl::Tensor IOU_threshold, edsl::Tensor Score_threshold,
+               int max_output_boxes_per_class)
+      : Boxes_(Boxes),
+        Scores_(Scores),
+        IOU_threshold_(IOU_threshold),
+        Score_threshold_(Score_threshold),
+        max_output_boxes_per_class_(max_output_boxes_per_class),
+        soft_nms_sigma_(0.0f),
+        center_point_box_(false),
+        sort_result_descending_(false),
+        box_output_type_(DType::INT32) {}
+
+  nms& soft_nms_sigma(float soft_nms_sigma) {
+    soft_nms_sigma_ = soft_nms_sigma;
+    return *this;
+  }
+
+  nms& center_point_box(bool center_point_box) {
+    center_point_box_ = center_point_box;
+    return *this;
+  }
+
+  nms& sort_result_descending(bool sort_result_descending) {
+    sort_result_descending_ = sort_result_descending;
+    return *this;
+  }
+
+  nms& box_output_type(DType box_output_type) {
+    box_output_type_ = box_output_type;
+    return *this;
+  }
+
+  std::vector<edsl::Tensor> build() {
+    auto args = edsl::make_tuple(     //
+        Boxes_,                       //
+        Scores_,                      //
+        IOU_threshold_,               //
+        Score_threshold_,             //
+        max_output_boxes_per_class_,  //
+        soft_nms_sigma_,              //
+        center_point_box_,            //
+        sort_result_descending_,      //
+        static_cast<int>(box_output_type_));
+    auto R = details::op("nms", args).as_tuple();
+    auto B = R[0].as_tensor();
+    auto S = R[1].as_tensor();
+    auto V = R[2].as_tensor();
+    return {B, S, V};
+  }
+
+ private:
+  edsl::Tensor Boxes_;
+  edsl::Tensor Scores_;
+  edsl::Tensor IOU_threshold_;
+  edsl::Tensor Score_threshold_;
+  int max_output_boxes_per_class_;
+  float soft_nms_sigma_;
+  bool center_point_box_;
+  bool sort_result_descending_;
+  DType box_output_type_;
 };
 
 class l2norm {

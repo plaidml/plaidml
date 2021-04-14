@@ -16,7 +16,8 @@ pml_cc_library(
     plaidml::edsl
     plaidml::op::lib
     pmlc::util
-    LLVMSupport
+  COMPONENTS
+    devkit
 )
 
 pml_cc_library(
@@ -29,7 +30,6 @@ pml_cc_library(
     plaidml::edsl::obj
     plaidml::op::lib
     pmlc::util
-    LLVMSupport
 )
 
 pml_cc_test(
@@ -39,6 +39,13 @@ pml_cc_test(
     plaidml::testenv
     pmlc::testing
   CHECKS
+    core
     smoke
     test
+)
+
+pml_py_library(
+  NAME py
+  SRCS
+    __init__.py
 )

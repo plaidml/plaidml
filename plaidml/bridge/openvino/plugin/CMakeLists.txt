@@ -18,6 +18,7 @@ ie_add_plugin(
 target_link_libraries(${TARGET_NAME}
   PRIVATE
     IE::inference_engine
+    IE::inference_engine_transformations
     ${NGRAPH_LIBRARIES}
     plaidml::bridge::openvino
     plaidml::plaidml

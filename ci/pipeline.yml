@@ -12,42 +12,30 @@ steps:
     agents:
       PLATFORM: '{{name}}'
     artifact_paths:
-      {{#artifacts}}
-      - "tmp/build/**/*"
-      {{/artifacts}}
-      - "bazel-testlogs/**/test.log"
+      - "logs/*.log"
 {{/variants}}
-
-  - label: ':hammer_and_wrench: :linux: :beer:'
-    command: |
-      echo --- :building_construction: cmake configuration
-      export TEMP=/tmp/$${BUILDKITE_AGENT_NAME}/$${BUILDKITE_PIPELINE_SLUG}
-      cmake \
-        -B build-opt \
-        -G Ninja \
-        -D CMAKE_BUILD_TYPE=Release \
-        -D CPM_SOURCE_CACHE=$${TEMP}/cpm \
-        -D PML_OPENVINO_BRIDGE=ON \
-        -D TEMP=$${TEMP}
-
-      echo --- :hammer_and_wrench: ninja
-      ninja -C build-opt
-
-      echo --- :hammer_and_wrench: ninja check-test
-      ninja -C build-opt check-test
-    key: linux_x86_64_cmake
-    agents:
-      PLATFORM: linux_x86_64
+  
+  - label: 'IRv10 models'
+    trigger: irv10
+    async: false
+    build:
+      message: "${BUILDKITE_MESSAGE}"
+      commit: 1eda26a86aafd5552989f757f48cac8c1083294e
+      env:
+        PLAIDML_COMMIT: "${BUILDKITE_COMMIT}"
+        BUILDKITE_PULL_REQUEST: "${BUILDKITE_PULL_REQUEST}"
+        BUILDKITE_PULL_REQUEST_BASE_BRANCH: "${BUILDKITE_PULL_REQUEST_BASE_BRANCH}"
+        BUILDKITE_PULL_REQUEST_REPO: "${BUILDKITE_PULL_REQUEST_REPO}"
 
 
 # test phase
 
 
 {{#tests}}
-  - label: '{{emoji}}{{engine}}{{shard_emoji}}{{suite}}/{{workload}}/{{platform}} BATCH_SIZE={{batch_size}}'
+  - label: '{{emoji}}{{engine}}{{suite}}/{{workload}}/{{platform}} BATCH_SIZE={{batch_size}}'
     command: |
       {{python}} -m pip install pyyaml --user
-      {{python}} ci/buildkite.py test {{platform}} {{suite}} {{workload}} {{batch_size}} {{#shard}}--shard-count {{count}} --shard {{id}}{{/shard}}
+      {{python}} ci/buildkite.py test {{platform}} {{suite}} {{workload}} {{batch_size}}
     depends_on: {{variant}}
 
   {{#soft_fail}}

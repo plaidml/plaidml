@@ -19,6 +19,8 @@ std::unique_ptr<mlir::Pass> createDeallocPlacementPass();
 
 std::unique_ptr<mlir::Pass> createCachePass(bool wholeBlock = false);
 
+std::unique_ptr<mlir::Pass> createConvertMemOpPass();
+
 std::unique_ptr<mlir::Pass> createCPUThreadPass();
 std::unique_ptr<mlir::Pass> createCPUThreadPass(unsigned threads);
 

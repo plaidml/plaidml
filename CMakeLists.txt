@@ -39,10 +39,10 @@ endif()
 # -------------------------------------------------------------------------------
 # Project component configuration
 # -------------------------------------------------------------------------------
-option(PML_BUILD_TESTS "Builds PML unit tests." ON)
+option(PML_BUILD_TESTS "Builds PML unit tests" ON)
+option(PML_ENABLE_DEVKIT "Enable the devkit" ON)
+option(PML_INCLUDE_LLVM "Fetch and include the llvm-project" ON)
 option(PML_OPENVINO_BRIDGE "Enable the OpenVINO plugin" ON)
-option(PML_ENABLE_OPENCL "Enable OpenCL support" ON)
-option(PML_ENABLE_VULKAN "Enable Vulkan support" ON)
 
 list(APPEND CMAKE_MODULE_PATH
   ${CMAKE_CURRENT_LIST_DIR}/cmake
@@ -61,20 +61,14 @@ endif()
 include(CPM)
 include(boost)
 include(easylogging)
-if(NOT PML_OPENVINO_BRIDGE OR InferenceEngineDeveloperPackage_FOUND)
+if(NOT InferenceEngineDeveloperPackage_FOUND)
   include(gflags)
   include(googletest)
 endif()
 include(half)
-include(llvm-project)
-if(PML_ENABLE_OPENCL)
-  include(opencl_headers)
-  include(opencl_hpp_headers)
-  include(opencl_icd_loader)
-endif()
-if(PML_ENABLE_VULKAN)
-  include(vulkan_headers)
-  include(volk)
+
+if(PML_INCLUDE_LLVM)
+  include(llvm-project)
 endif()
 include(xsmm)
 
@@ -83,12 +77,16 @@ include(xsmm)
 # -------------------------------------------------------------------------------
 if(PML_BUILD_TESTS)
   enable_testing()
+  add_custom_target(check-core
+    COMMAND ${CMAKE_CTEST_COMMAND} -L core --output-on-failure
+    USES_TERMINAL
+  )
   add_custom_target(check-smoke
-    COMMAND ${CMAKE_CTEST_COMMAND} -L smoke
+    COMMAND ${CMAKE_CTEST_COMMAND} -L smoke --output-on-failure
     USES_TERMINAL
   )
   add_custom_target(check-test
-    COMMAND ${CMAKE_CTEST_COMMAND} -L test
+    COMMAND ${CMAKE_CTEST_COMMAND} -L test --output-on-failure
     USES_TERMINAL
   )
 endif()
@@ -103,6 +101,7 @@ include(pml_cc_binary)
 include(pml_cc_library)
 include(pml_cc_test)
 include(pml_lit_test)
+include(pml_python)
 include(pml_tblgen_library)
 include(pml_whole_archive_link)
 
@@ -117,6 +116,22 @@ else()
   )
 endif()
 
+# Set general cpack variables for package description
+set(CPACK_GENERATOR "TGZ")
+set(CPACK_ARCHIVE_COMPONENT_INSTALL 1)
+set(CPACK_PACKAGE_NAME "PlaidML")
+set(CPACK_PACKAGE_VENDOR "Intel Corp")
+set(CPACK_PACKAGE_CONTACT "Intel")
+set(CPACK_PACKAGE_VERSION ${PLAIDML_VERSION})
+set(CPACK_COMPONENTS_IGNORE_GROUPS 1)
+set(CPACK_COMPONENTS_ALL
+  devkit
+  testkit
+)
+include(CPack)
+
+
+add_subdirectory(plaidbench)
 add_subdirectory(plaidml)
 add_subdirectory(pmlc)
 add_subdirectory(docs)
@@ -131,4 +146,6 @@ configure_lit_site_cfg(
   ${CMAKE_CURRENT_SOURCE_DIR}/lit.cfg.py
 )
 
-ie_cpack(BENCHMARK_APP)
+if(PML_ENABLE_DEVKIT)
+  include(devkit)
+endif()

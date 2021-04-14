@@ -22,7 +22,6 @@ void registerRegionYolo() {
 
     auto input_shape = I.compute_shape().sizes();
     size_t batches = input_shape[0];
-    size_t channels = input_shape[1];
     size_t height = input_shape[2];
     size_t width = input_shape[3];
 
