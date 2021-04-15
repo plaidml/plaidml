@@ -2,8 +2,8 @@
 
 // CHECK-LABEL: func @vectorize_gemm
 func @vectorize_gemm(%arg0: memref<64x64xf32>, %arg1: memref<64x64xf32>) -> (memref<64x64xf32>, memref<64xf32>) {
-  %a = alloc() : memref<64x64xf32>
-  %b = alloc() : memref<64xf32>
+  %a = memref.alloc() : memref<64x64xf32>
+  %b = memref.alloc() : memref<64xf32>
   // expected-remark@+1 {{Vectorize: Failed, !vectorizable}}
   %r1, %r2 = affine.parallel (%i, %j, %k) = (0, 0, 0) to (64, 64, 64) reduce ("assign", "assign") -> (memref<64x64xf32>, memref<64xf32>) {
     // We must vectorize on j since it is the only stride one output
@@ -43,7 +43,7 @@ func @vectorize_gemm(%arg0: memref<64x64xf32>, %arg1: memref<64x64xf32>) -> (mem
 
 // CHECK-LABEL: func @vector_set
 func @vector_set(%val: f32) -> (memref<64xf32>) {
-  %a = alloc() : memref<64xf32>
+  %a = memref.alloc() : memref<64xf32>
   %o = affine.parallel (%i) = (0) to (64) reduce ("assign") -> (memref<64xf32>) {
   // CHECK: affine.parallel (%{{.*}}) = (0) to (64) step (8) reduce ("assign") -> (memref<64xf32>)
     %0 = pxa.reduce assign %val, %a[%i] : memref<64xf32>

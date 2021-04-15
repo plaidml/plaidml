@@ -39,9 +39,7 @@ def PadConstraints : FunctionPass<"tile-pad-constraints"> {
 def SplitMain :  Pass<"tile-split-main", "mlir::ModuleOp"> {
   let summary = "Split main into init/main/fini";
   let constructor = "pmlc::dialect::tile::createSplitMainPass()";
-  let dependentDialects = [
-    "pmlc::dialect::stdx::StdXDialect"
-  ];
+  let dependentDialects = ["pmlc::dialect::stdx::StdXDialect"];
 }
 
 def Conv2dFinder : FunctionPass<"test-conv2d-finder"> {

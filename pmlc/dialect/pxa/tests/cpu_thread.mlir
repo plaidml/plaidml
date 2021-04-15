@@ -2,7 +2,7 @@
 
 // CHECK-LABEL: func @basic
 func @basic(%arg0: memref<100x100xf32>, %arg1: memref<100x100xf32>) -> (memref<100x100xf32>) {
-  %a = alloc() : memref<100x100xf32>
+  %a = memref.alloc() : memref<100x100xf32>
   %r = affine.parallel (%i, %j, %k) = (0, 0, 0) to (100, 100, 100) reduce ("assign") -> (memref<100x100xf32>) {
   // tile-accumulate should move the inner loop in, and then threading should thread the 100x100 outer
   // loop over 50 values, leaving 100x2 for the next loop, and 100 for the interiormost loop

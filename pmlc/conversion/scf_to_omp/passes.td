@@ -8,7 +8,7 @@ def LowerSCFToOpenMP : Pass<"convert-scf-to-omp", "mlir::ModuleOp"> {
   let constructor = "pmlc::conversion::scf_to_omp::createLowerSCFToOpenMPPass()";
   let dependentDialects = [
     "mlir::scf::SCFDialect",
-    "mlir::omp::OpenMPDialect"
+    "mlir::omp::OpenMPDialect",
   ];
 }
 

@@ -57,20 +57,18 @@ namespace {
 struct LowerPXAToAffinePass
     : public ConvertPXAToAffineBase<LowerPXAToAffinePass> {
   void runOnOperation() final {
-    auto &ctx = getContext();
-    conversion::pxa_to_affine::PXAToAffineConversionTarget target(ctx);
+    MLIRContext &context = getContext();
+    conversion::pxa_to_affine::PXAToAffineConversionTarget target(context);
     target.addLegalDialect<xsmm::XSMMDialect>();
 
-    OwningRewritePatternList patterns;
-    populatePXAGemmToXSMMConversionPatterns(patterns, &ctx);
-    populatePXAPrngToAffineConversionPatterns(patterns, &ctx);
-    conversion::pxa_to_affine::populatePXAToAffineConversionPatterns(patterns,
-                                                                     &ctx);
+    RewritePatternSet patterns(&context);
+    populatePXAGemmToXSMMConversionPatterns(patterns);
+    conversion::pxa_to_affine::populatePXAToAffineConversionPatterns(patterns);
 
     if (failed(applyPartialConversion(getOperation(), target,
                                       std::move(patterns)))) {
       getOperation().dump();
-      emitError(UnknownLoc::get(&ctx), "Error lowering pxa -> affine\n");
+      emitError(UnknownLoc::get(&context), "Error lowering pxa -> affine\n");
       signalPassFailure();
     }
   }
@@ -79,19 +77,15 @@ struct LowerPXAToAffinePass
 struct ConvertStandardToLLVMPass
     : public ConvertStandardToLLVMBase<ConvertStandardToLLVMPass> {
   void runOnOperation() override {
-    auto module = getOperation();
-    auto *context = module.getContext();
+    ModuleOp module = getOperation();
+    MLIRContext *context = module.getContext();
 
-    LowerToLLVMOptions options = {
-        /*useBarePtrCallConv=*/false,
-        /*emitCWrappers=*/true,
-        /*indexBitwidth=*/kDeriveIndexBitwidthFromDataLayout,
-        /*useAlignedAlloc=*/false,
-    };
+    LowerToLLVMOptions options(context);
+    options.emitCWrappers = true;
     LLVMTypeConverter typeConverter(context, options);
 
-    OwningRewritePatternList patterns;
-    populateExpandTanhPattern(patterns, context);
+    RewritePatternSet patterns(context);
+    populateExpandTanhPattern(patterns);
     populateXSMMToLLVMConversionPatterns(typeConverter, patterns);
     populateStdToLLVMConversionPatterns(typeConverter, patterns);
     conversion::stdx_to_llvm::populateStdXToLLVMConversionPatterns(
@@ -102,8 +96,11 @@ struct ConvertStandardToLLVMPass
     target.addDynamicallyLegalOp<omp::ParallelOp>([&](omp::ParallelOp op) {
       return typeConverter.isLegal(&op.getRegion());
     });
-    target.addLegalOp<omp::TerminatorOp, omp::TaskyieldOp, omp::FlushOp,
-                      omp::BarrierOp, omp::TaskwaitOp>();
+    target.addLegalOp<omp::TerminatorOp, //
+                      omp::TaskyieldOp,  //
+                      omp::FlushOp,      //
+                      omp::BarrierOp,    //
+                      omp::TaskwaitOp>();
     if (failed(applyPartialConversion(module, target, std::move(patterns)))) {
       signalPassFailure();
     }
@@ -285,8 +282,8 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
+  pm.addPass(createPRNGLinkingPass());
   pm.addPass(createLowerPXAToAffinePass());
-
   pm.addPass(createLoopInvariantCodeMotionPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
