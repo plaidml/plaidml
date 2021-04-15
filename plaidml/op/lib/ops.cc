@@ -1937,10 +1937,10 @@ std::vector<Tensor> decode_boxes(Tensor Boxes, Tensor Prior_variances, Tensor Lo
     switch (mode) {
       case BoxesDecodeMode::NMS: {
         // The box data is [x, y, width, height] in center mode.
-        Tensor Boxes_xcenter = edsl::gather(Boxes, Zero_int).axis(2);
-        Tensor Boxes_ycenter = edsl::gather(Boxes, Zero_int + 1).axis(2);
-        Tensor Boxes_width_half = edsl::gather(Boxes, Zero_int + 2).axis(2) / 2.0f;
-        Tensor Boxes_height_half = edsl::gather(Boxes, Zero_int + 3).axis(2) / 2.0f;
+        Boxes_xcenter = edsl::gather(Boxes, Zero_int).axis(2);
+        Boxes_ycenter = edsl::gather(Boxes, Zero_int + 1).axis(2);
+        Boxes_width_half = edsl::gather(Boxes, Zero_int + 2).axis(2) / 2.0f;
+        Boxes_height_half = edsl::gather(Boxes, Zero_int + 3).axis(2) / 2.0f;
       } break;
       case BoxesDecodeMode::SSD: {
         Tensor Prior_x1 = edsl::gather(Boxes, Zero_int).axis(2) / input_width;
