@@ -1973,13 +1973,18 @@ std::vector<Tensor> decode_boxes(Tensor Boxes, Tensor Prior_variances, Tensor Lo
     Boxes_y2 = Boxes_ycenter + Boxes_height_half;
   } else {
     switch (mode) {
-      case BoxesDecodeMode::NMS:
+      case BoxesDecodeMode::NMS: {
         // The box data is [y1, x1, y2, x2] in corner mode
-        Boxes_y1 = edsl::gather(Boxes, Zero_int).axis(2);
-        Boxes_x1 = edsl::gather(Boxes, Zero_int + 1).axis(2);
-        Boxes_y2 = edsl::gather(Boxes, Zero_int + 2).axis(2);
-        Boxes_x2 = edsl::gather(Boxes, Zero_int + 3).axis(2);
-        break;
+        Tensor Boxes_y1_i = edsl::gather(Boxes, Zero_int).axis(2);
+        Tensor Boxes_x1_i = edsl::gather(Boxes, Zero_int + 1).axis(2);
+        Tensor Boxes_y2_i = edsl::gather(Boxes, Zero_int + 2).axis(2);
+        Tensor Boxes_x2_i = edsl::gather(Boxes, Zero_int + 3).axis(2);
+        // Convert to [ymin, xmin, ymax, xmax]
+        Boxes_y1 = op::minimum(Boxes_y1_i, Boxes_y2_i);
+        Boxes_x1 = op::minimum(Boxes_x1_i, Boxes_x2_i);
+        Boxes_y2 = op::maximum(Boxes_y1_i, Boxes_y2_i);
+        Boxes_x2 = op::maximum(Boxes_x1_i, Boxes_x2_i);
+      } break;
       case BoxesDecodeMode::SSD:
         Boxes = Boxes / input_width + Prior_variances * Location;
         // The box data is [x1, y1, x2, y2] in corner mode
