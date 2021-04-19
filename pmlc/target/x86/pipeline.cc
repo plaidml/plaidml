@@ -250,8 +250,8 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(createCSEPass());
   pm.addNestedPass<FuncOp>(layer::createInlineLayersPass());
 
-  pm.addNestedPass<FuncOp>(
-      createXSMMStencilPass(/*numThreads=*/1, /*isBatched=*/true));
+  // pm.addNestedPass<FuncOp>(
+  //     createXSMMStencilPass(/*numThreads=*/1, /*isBatched=*/true));
   pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
 
