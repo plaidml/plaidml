@@ -18,26 +18,18 @@ func @conv() {
     %origArg88 = alloc():  memref<3x3x64x64xf32> // Filter
     %32 = alloc() : memref<1x56x56x64xf32> // output
 
-    %origArg3 = alloc() : memref<64xf32> // bias
     %origArg12 = alloc() : memref<1x1x64x256xf32> // filter2
-
-
-     // bias
-    %arg3 = affine.parallel (%arg111) = (0) to (64) reduce ("assign") -> (memref<64xf32>) {
-      %637 = pxa.reduce assign %cst_1, %origArg3[%arg111] : memref<64xf32>
-      affine.yield %637 : memref<64xf32>
-    }
 
 //  %O_ud = memref_cast %arg3 : memref<64xf32> to memref<*xf32>
 //  call @print_memref_f32(%O_ud) : (memref<*xf32>) -> ()
 
-     // Input
+     // Input initialization
     %orig31_2 = affine.parallel (%arg111, %arg112, %arg113, %arg114) = (0, 0, 0, 0) to (1, 58, 58, 64) reduce ("assign") -> (memref<1x58x58x64xf32>) {
       %637 = pxa.reduce assign %cst_0, %orig31[%arg111, %arg112, %arg113, %arg114] : memref<1x58x58x64xf32>
       affine.yield %637 : memref<1x58x58x64xf32>
     }
 
-     // Input
+     // Input initialization
     %31 = affine.parallel (%arg111, %arg112, %arg113, %arg114) = (0, 0, 0, 0) to (1, 58, 58, 64) reduce ("assign") -> (memref<1x58x58x64xf32>) {
      %ar1 = addi %arg111, %arg112 : index
      %ar2 = addi %arg113, %arg114 : index
@@ -52,7 +44,7 @@ func @conv() {
 //  call @print_memref_f32(%O_ud) : (memref<*xf32>) -> ()
 
 
-     // Filter
+     // Filter init
     %origArg88_2 = affine.parallel (%arg111, %arg112, %arg113, %arg114) = (0, 0, 0, 0) to (3, 3, 64, 64) reduce ("assign") -> (memref<3x3x64x64xf32>) {
       %637 = pxa.reduce assign %cst_0, %origArg88[%arg111, %arg112, %arg113, %arg114] : memref<3x3x64x64xf32>
       affine.yield %637 : memref<3x3x64x64xf32>
@@ -70,7 +62,7 @@ func @conv() {
 
 
 
-     // Filter2
+     // Filter2 init
     %origArg12_2 = affine.parallel (%arg111, %arg112, %arg113, %arg114) = (0, 0, 0, 0) to (1, 1, 64, 256) reduce ("assign") -> (memref<1x1x64x256xf32>) {
       %637 = pxa.reduce assign %cst_0, %origArg12[%arg111, %arg112, %arg113, %arg114] : memref<1x1x64x256xf32>
       affine.yield %637 : memref<1x1x64x256xf32>
