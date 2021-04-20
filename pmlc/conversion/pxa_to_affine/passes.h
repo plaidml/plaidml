@@ -17,8 +17,7 @@ public:
   explicit PXAToAffineConversionTarget(mlir::MLIRContext &ctx);
 };
 
-void populatePXAToAffineConversionPatterns(
-    mlir::OwningRewritePatternList &patterns, mlir::MLIRContext *ctx);
+void populatePXAToAffineConversionPatterns(mlir::RewritePatternSet &patterns);
 
 std::unique_ptr<mlir::Pass> createLowerPXAToAffinePass();
 

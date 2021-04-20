@@ -115,6 +115,12 @@ enum class PadMode {
   _LAST,
 };
 
+enum class BoxesDecodeMode {
+  NMS,
+  SSD,
+  _LAST,
+};
+
 struct Integers {
   Integers(const std::vector<int>& elts)  // NOLINT[runtime/explicit]
       : value(edsl::make_tuple(elts)) {}
@@ -527,7 +533,13 @@ class nms {
         soft_nms_sigma_(0.0f),
         center_point_box_(false),
         sort_result_descending_(false),
-        box_output_type_(DType::INT32) {}
+        box_output_type_(DType::INT32),
+        boxes_decode_mode_(BoxesDecodeMode::NMS),
+        clip_before_nms_(false),
+        clip_after_nms_(false),
+        ssd_input_height_(0.0f),
+        ssd_input_width_(0.0f),
+        ssd_with_arm_loc_(false) {}
 
   nms& soft_nms_sigma(float soft_nms_sigma) {
     soft_nms_sigma_ = soft_nms_sigma;
@@ -549,17 +561,71 @@ class nms {
     return *this;
   }
 
+  nms& boxes_decode_mode(BoxesDecodeMode boxes_decode_mode) {
+    boxes_decode_mode_ = boxes_decode_mode;
+    return *this;
+  }
+
+  nms& clip_before_nms(bool clip_before_nms) {
+    clip_before_nms_ = clip_before_nms;
+    return *this;
+  }
+
+  nms& clip_after_nms(bool clip_after_nms) {
+    clip_after_nms_ = clip_after_nms;
+    return *this;
+  }
+
+  nms& ssd_input_height(int ssd_input_height) {
+    ssd_input_height_ = ssd_input_height;
+    return *this;
+  }
+
+  nms& ssd_input_width(int ssd_input_width) {
+    ssd_input_width_ = ssd_input_width;
+    return *this;
+  }
+
+  nms& ssd_variances(edsl::Tensor ssd_variances) {
+    ssd_variances_ = ssd_variances;
+    return *this;
+  }
+
+  nms& ssd_location(edsl::Tensor ssd_location) {
+    ssd_location_ = ssd_location;
+    return *this;
+  }
+
+  nms& ssd_arm_location(edsl::Tensor ssd_arm_location) {
+    ssd_arm_location_ = ssd_arm_location;
+    return *this;
+  }
+
+  nms& ssd_with_arm_loc(bool ssd_with_arm_loc) {
+    ssd_with_arm_loc_ = ssd_with_arm_loc;
+    return *this;
+  }
+
   std::vector<edsl::Tensor> build() {
-    auto args = edsl::make_tuple(     //
-        Boxes_,                       //
-        Scores_,                      //
-        IOU_threshold_,               //
-        Score_threshold_,             //
-        max_output_boxes_per_class_,  //
-        soft_nms_sigma_,              //
-        center_point_box_,            //
-        sort_result_descending_,      //
-        static_cast<int>(box_output_type_));
+    auto args = edsl::make_tuple(              //
+        Boxes_,                                //
+        Scores_,                               //
+        IOU_threshold_,                        //
+        Score_threshold_,                      //
+        max_output_boxes_per_class_,           //
+        soft_nms_sigma_,                       //
+        center_point_box_,                     //
+        sort_result_descending_,               //
+        static_cast<int>(box_output_type_),    //
+        static_cast<int>(boxes_decode_mode_),  //
+        clip_before_nms_,                      //
+        clip_after_nms_,                       //
+        ssd_input_height_,                     //
+        ssd_input_width_,                      //
+        ssd_variances_,                        //
+        ssd_location_,                         //
+        ssd_with_arm_loc_,                     //
+        ssd_arm_location_);
     auto R = details::op("nms", args).as_tuple();
     auto B = R[0].as_tensor();
     auto S = R[1].as_tensor();
@@ -570,6 +636,9 @@ class nms {
  private:
   edsl::Tensor Boxes_;
   edsl::Tensor Scores_;
+  edsl::Tensor ssd_location_;
+  edsl::Tensor ssd_variances_;
+  edsl::Tensor ssd_arm_location_;
   edsl::Tensor IOU_threshold_;
   edsl::Tensor Score_threshold_;
   int max_output_boxes_per_class_;
@@ -577,6 +646,12 @@ class nms {
   bool center_point_box_;
   bool sort_result_descending_;
   DType box_output_type_;
+  BoxesDecodeMode boxes_decode_mode_;
+  bool clip_before_nms_;
+  bool clip_after_nms_;
+  int ssd_input_height_;
+  int ssd_input_width_;
+  bool ssd_with_arm_loc_;
 };
 
 class l2norm {

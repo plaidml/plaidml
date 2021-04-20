@@ -5,7 +5,7 @@
 //       CHECK:     pxa.load {{.*}}[%[[I]], %[[J]]]
 //       CHECK:     pxa.reduce assign {{.*}}[%[[I]], %[[J]]]
 func @mod(%arg0: memref<3x4xf16>) -> memref<3x4xf16> {
-  %0 = alloc() : memref<3x4xf16>
+  %0 = memref.alloc() : memref<3x4xf16>
   %1 = affine.parallel (%i, %j) = (0, 0) to (3, 4) reduce ("assign") -> (memref<3x4xf16>) {
     %2 = pxa.load %arg0[%i mod 3, %j mod 4] : memref<3x4xf16>
     %3 = pxa.reduce assign %2, %0[%i mod 3, %j mod 4] : memref<3x4xf16>
@@ -18,7 +18,7 @@ func @mod(%arg0: memref<3x4xf16>) -> memref<3x4xf16> {
 //       CHECK:     pxa.load {{.*}}[0, 0]
 //       CHECK:     pxa.reduce assign {{.*}}[0, 0]
 func @floordiv(%arg0: memref<3x4xf16>) -> memref<3x4xf16> {
-  %0 = alloc() : memref<3x4xf16>
+  %0 = memref.alloc() : memref<3x4xf16>
   %1 = affine.parallel (%i, %j) = (0, 0) to (3, 4) reduce ("assign") -> (memref<3x4xf16>) {
     %2 = pxa.load %arg0[%i floordiv 3, %j floordiv 4] : memref<3x4xf16>
     %3 = pxa.reduce assign %2, %0[%i floordiv 3, %j floordiv 4] : memref<3x4xf16>
@@ -32,7 +32,7 @@ func @floordiv(%arg0: memref<3x4xf16>) -> memref<3x4xf16> {
 //       CHECK:     affine.parallel (%[[K:[a-zA-Z0-9]*]], %[[L:[a-zA-Z0-9]*]])
 //       CHECK:       pxa.load {{.*}}[%[[I]], %[[J]], %[[K]], %[[L]]]
 func @blocked_layout(%arg0: memref<2x2x3x4xf16>) -> memref<6x8xf16> {
-  %0 = alloc() : memref<6x8xf16>
+  %0 = memref.alloc() : memref<6x8xf16>
   %1 = affine.parallel (%i, %j) = (0, 0) to (2, 2) reduce ("assign") -> (memref<6x8xf16>) {
     %2 = affine.parallel (%k, %l) = (0, 0) to (3, 4) reduce ("assign") -> (memref<6x8xf16>) {
       %3 = pxa.load %arg0[(%i * 3 + %k) floordiv 3,

@@ -3,6 +3,7 @@ pml_py_library(
   SRCS
     plaidbench.py
     plaidbench/__init__.py
+    plaidbench/cifar16.npy
     plaidbench/cli.py
     plaidbench/core.py
     plaidbench/frontend_keras.py
@@ -24,6 +25,7 @@ pml_py_library(
     plaidbench/golden/nasnet_large/infer,bs-1.npy
     plaidbench/golden/mobilenet/infer,bs-1.npy
     plaidbench/golden/mobilenet/train,bs-1.npy
+    plaidbench/imdb16.npy
     plaidbench/networks/keras/densenet121.py
     plaidbench/networks/keras/densenet169.py
     plaidbench/networks/keras/densenet201.py
@@ -48,4 +50,5 @@ pml_py_wheel(
   NAME wheel
   PKG_NAME "plaidbench"
   VERSION ${PLAIDML_VERSION}
+  PY_DEPS ::py
 )

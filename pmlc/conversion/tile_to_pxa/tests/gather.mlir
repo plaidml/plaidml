@@ -9,7 +9,7 @@ func @gather1(%arg0: tensor<4xsi32>, %arg1: tensor<3x2xf32>) -> tensor<4x2xf32> 
 // CHECK: affine.parallel (%[[I:.*]], %[[J:.*]]) = (0, 0) to (4, 2)
 // CHECK: %[[IDX_RAW:.*]] = pxa.load {{%.*}}[%[[I]]] : memref<4xi32>
 // CHECK: %[[IDX:.*]] = index_cast %[[IDX_RAW]] : i32 to index
-// CHECK: %[[SRC:.*]] = load %{{.*}}[%[[IDX]], %[[J]]] : memref<3x2xf32>
+// CHECK: %[[SRC:.*]] = memref.load %{{.*}}[%[[IDX]], %[[J]]] : memref<3x2xf32>
 // CHECK: %[[OUT:.*]] = pxa.reduce assign %[[SRC]], %{{.*}}[%[[I]], %[[J]]] : memref<4x2xf32>
 // CHECK: affine.yield %[[OUT]] : memref<4x2xf32>
 
@@ -36,8 +36,8 @@ func @gather2(%arg0: tensor<3x2xf32>, %arg1: tensor<4xf32>) -> tensor<3x4xf32> {
 // CHECK: %[[CEIL:.*]] = select %[[CMP3]], %{{.*}},  %{{.*}} : i32
 // CHECK: %[[FIDX:.*]] = index_cast %[[FLOOR]] : i32 to index
 // CHECK: %[[CIDX:.*]] = index_cast %[[CEIL]] : i32 to index
-// CHECK: %[[G1:.*]] = load %{{.*}}[%[[I]], %[[CIDX]]] : memref<3x2xf32>
-// CHECK: %[[G0:.*]] = load %{{.*}}[%[[I]], %[[FIDX]]] : memref<3x2xf32>
+// CHECK: %[[G1:.*]] = memref.load %{{.*}}[%[[I]], %[[CIDX]]] : memref<3x2xf32>
+// CHECK: %[[G0:.*]] = memref.load %{{.*}}[%[[I]], %[[FIDX]]] : memref<3x2xf32>
 // CHECK: %[[S1:.*]] = subf %[[IDX]], %[[FF]] : f32
 // CHECK: %[[S0:.*]] = subf %{{.*}}, %[[S1]] : f32
 // CHECK: %[[P1:.*]] = mulf %[[S1]], %[[G1]] : f32

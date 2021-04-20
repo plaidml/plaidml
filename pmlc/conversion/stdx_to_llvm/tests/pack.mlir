@@ -28,7 +28,7 @@ func @unpackLowering(%P: !stdx.argpack) -> (memref<20x10xf32>, index, f32) {
 func private @print_memref_f32(memref<*xf32>)
 
 func @jitEntry() -> () {
-  %in = alloc() : memref<3xf32>
+  %in = memref.alloc() : memref<3xf32>
   %a = constant 1.0 : f32
   %b = constant 2.0 : f32
   %c = constant 3.0 : f32
@@ -37,10 +37,10 @@ func @jitEntry() -> () {
   %i0 = constant 0 : index
   %i1 = constant 1 : index
   %i2 = constant 2 : index
-  store %a2, %out[%i0] : memref<3xf32>
-  store %b2, %out[%i1] : memref<3xf32>
-  store %c2, %out[%i2] : memref<3xf32>
-  %outUnranked = memref_cast %out : memref<3xf32> to memref<*xf32>
+  memref.store %a2, %out[%i0] : memref<3xf32>
+  memref.store %b2, %out[%i1] : memref<3xf32>
+  memref.store %c2, %out[%i2] : memref<3xf32>
+  %outUnranked = memref.cast %out : memref<3xf32> to memref<*xf32>
   call @print_memref_f32(%outUnranked) : (memref<*xf32>) -> ()
   // JIT: [1, 2, 3]
   return

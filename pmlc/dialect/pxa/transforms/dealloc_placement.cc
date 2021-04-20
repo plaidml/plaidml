@@ -1,5 +1,6 @@
 // Copyright 2020 Intel Corporation
 
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
@@ -41,7 +42,8 @@ struct DeallocPlacementPass
         // be dealloced in fini
         OpBuilder deallocBuilder(finiFunc.begin()->getTerminator());
         runOnFunction(fn, [&](unsigned i) {
-          deallocBuilder.create<DeallocOp>(fn.getLoc(), unpackOp.getResult(i));
+          deallocBuilder.create<memref::DeallocOp>(fn.getLoc(),
+                                                   unpackOp.getResult(i));
         });
       } else {
         // Place allocs, if any escape, it's an error
@@ -58,7 +60,7 @@ struct DeallocPlacementPass
   template <typename Callback>
   void runOnFunction(FuncOp fn, Callback onPack) {
     // Place deallocation for AllocOp
-    fn.walk([&](AllocOp alloc) {
+    fn.walk([&](memref::AllocOp alloc) {
       IVLOG(3, "alloc: " << debugString(*alloc));
       placeDealloc(alloc.getResult(), alloc, alloc.getOperation()->getBlock(),
                    -1, onPack);
@@ -116,7 +118,7 @@ struct DeallocPlacementPass
 
     IVLOG(3, "  next operation: " << debugString(*nextOp));
     OpBuilder builder(nextOp);
-    builder.create<DeallocOp>(firstOp->getLoc(), lastUse->get());
+    builder.create<memref::DeallocOp>(firstOp->getLoc(), lastUse->get());
     if (argNumber >= 0) {
       // Here we need to process scf.for argument, i.e., copy the initial
       // argument
@@ -125,7 +127,8 @@ struct DeallocPlacementPass
       auto inits = scfFor.getIterOperands();
       MemRefType resType = inits[argNumber].getType().cast<MemRefType>();
       // Build the buffer for the new tensor
-      auto newBuf = builder.create<AllocOp>(builder.getUnknownLoc(), resType);
+      auto newBuf =
+          builder.create<memref::AllocOp>(builder.getUnknownLoc(), resType);
       // Build a element-wise for to copy the initial value to the new buffer
       auto forOp = builder.create<AffineParallelOp>(
           builder.getUnknownLoc(),

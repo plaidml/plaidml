@@ -298,11 +298,11 @@ struct LowerToLLVMPass : public LowerToLLVMBase<LowerToLLVMPass> {
   // Run the dialect converter on the module.
   void runOnOperation() final {
     ModuleOp module = getOperation();
-    auto context = module.getContext();
+    MLIRContext *context = module.getContext();
     LLVMTypeConverter typeConverter(context);
 
-    OwningRewritePatternList patterns;
-    populateLoopToStdConversionPatterns(patterns, context);
+    RewritePatternSet patterns(context);
+    populateLoopToStdConversionPatterns(patterns);
     populateStdToLLVMConversionPatterns(typeConverter, patterns);
     populateStdXToLLVMConversionPatterns(typeConverter, patterns);
 
@@ -317,7 +317,7 @@ struct LowerToLLVMPass : public LowerToLLVMBase<LowerToLLVMPass> {
 } // namespace
 
 void populateStdXToLLVMConversionPatterns(LLVMTypeConverter &converter,
-                                          OwningRewritePatternList &patterns) {
+                                          RewritePatternSet &patterns) {
   patterns.insert<ACosLowering,    //
                   ACosHLowering,   //
                   ASinLowering,    //
