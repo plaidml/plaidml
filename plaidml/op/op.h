@@ -701,7 +701,6 @@ class topk {
  private:
   edsl::Tensor I_;
   int k_;
-
   int axis_ = -1;
   edsl::SortDirection sort_direction_ = edsl::SortDirection::DESC;
   TopKSortType sort_type_ = TopKSortType::VALUE;
