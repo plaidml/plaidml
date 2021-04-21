@@ -682,7 +682,7 @@ struct XSMMUnaryExpDispatchF32Lowering
                                     ArrayRef<Type>{int32Type,  // ldi
                                                    int32Type,  // ldo
                                                    int32Type,  // m
-                                                   int32Type,  // n
+                                                   int32Type},  // n
                                     /*isVarArg=*/false));
   }
 };

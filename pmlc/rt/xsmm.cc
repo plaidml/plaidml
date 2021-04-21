@@ -8,7 +8,7 @@
 #include "pmlc/util/logging.h"
 
 using FunctionPtr = void (*)(const void *, const void *, void *, ...);
-using TppFunctionPtr = void (*)(void *);
+using UnaryFunctionPtr = void (*)(const libxsmm_meltw_unary_param *);
 
 extern "C" void plaidml_rt_xsmm_gemm_invoke_f32(int64_t funcAddr, float *a,
                                                 float *b, float *c) {
@@ -41,7 +41,7 @@ extern "C" void plaidml_rt_xsmm_unary_exp_invoke_f32(int64_t funcAddr, float *in
   libxsmm_meltw_unary_param unary_param;
   unary_param.in.primary  = (void*)inp;
   unary_param.out.primary = (void*)out;
-  unary_kernel = reinterpret_cast<TppFunctionPtr>(funcAddr);
+  unary_kernel = reinterpret_cast<UnaryFunctionPtr>(funcAddr);
   unary_kernel( &unary_param );
 }
 
