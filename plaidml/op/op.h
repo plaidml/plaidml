@@ -121,6 +121,12 @@ enum class BoxesDecodeMode {
   _LAST,
 };
 
+enum class TopKSortType {
+  VALUE,
+  INDEX,
+  _LAST,
+};
+
 struct Integers {
   Integers(const std::vector<int>& elts)  // NOLINT[runtime/explicit]
       : value(edsl::make_tuple(elts)) {}
@@ -652,6 +658,53 @@ class nms {
   int ssd_input_height_;
   int ssd_input_width_;
   bool ssd_with_arm_loc_;
+};
+
+class topk {
+ public:
+  explicit topk(edsl::Tensor I, int k) : I_(I), k_(k) {}
+
+  topk& axis(int axis) {
+    axis_ = axis;
+    return *this;
+  }
+
+  topk& sort_direction(edsl::SortDirection sort_direction) {
+    sort_direction_ = sort_direction;
+    return *this;
+  }
+
+  topk& sort_type(TopKSortType sort_type) {
+    sort_type_ = sort_type;
+    return *this;
+  }
+
+  topk& index_element_type(DType index_element_type) {
+    index_element_type_ = index_element_type;
+    return *this;
+  }
+
+  std::vector<edsl::Tensor> build() {
+    auto args = edsl::make_tuple(           //
+        I_,                                 //
+        k_,                                 //
+        axis_,                              //
+        static_cast<int>(sort_direction_),  //
+        static_cast<int>(sort_type_),       //
+        static_cast<int>(index_element_type_));
+    auto R = details::op("topk", args).as_tuple();
+    auto values = R[0].as_tensor();
+    auto indices = R[1].as_tensor();
+    return {values, indices};
+  }
+
+ private:
+  edsl::Tensor I_;
+  int k_;
+  int axis_ = -1;
+  edsl::SortDirection sort_direction_ = edsl::SortDirection::DESC;
+  TopKSortType sort_type_ = TopKSortType::VALUE;
+  DType index_element_type_ = DType::INT32;
 };
 
 class l2norm {

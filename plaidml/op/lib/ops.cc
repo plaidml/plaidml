@@ -42,6 +42,7 @@ Value min(const Value&);
 Value minimum(const Value&);
 Value mvn(const Value&);
 Value nms(const Value&);
+Value topk(const Value&);
 Value l2norm(const Value&);
 Value pool(const Value&);
 Value prod(const Value&);
@@ -2225,6 +2226,55 @@ Value nms(const Value& value) {
   return edsl::make_tuple(Boxes_result, Scores_result, Valid_outputs);
 }
 
+Value topk(const Value& value) {
+  IVLOG(1, "topk");
+  auto args = value.as_tuple();
+  if (args.size() != 6) {
+    throw std::runtime_error("topk expects 6 arguments");
+  }
+  auto I = args[0].as_tensor();
+  auto k = args[1].as_int();
+  auto axis = args[2].as_int();
+  auto sort_direction = validate<edsl::SortDirection>(args[3].as_int());
+  auto sort_type = validate<TopKSortType>(args[4].as_int());
+  auto index_element_type = validate<DType>(args[5].as_int());
+
+  int64_t ndims = I.rank();
+  edsl::Tensor values = op::sort(I, axis, sort_direction);
+  edsl::Tensor indices = edsl::argsort(I, axis, sort_direction);
+  edsl::Tensor idxs_topk = edsl::gather(indices, edsl::index({edsl::TensorDim(k)}, 0)).axis(axis);
+  std::vector<edsl::Tensor> Os;
+
+  switch (sort_type) {
+    case TopKSortType::VALUE: {
+      edsl::Tensor vals_topk_sorted = edsl::gather(values, edsl::index({edsl::TensorDim(k)}, 0)).axis(axis);
+      Os.push_back(vals_topk_sorted);
+      Os.push_back(idxs_topk);
+    } break;
+    case TopKSortType::INDEX: {
+      std::vector<edsl::Tensor> comb_idxs;
+      std::vector<edsl::TensorDim> idxs_dims(ndims);
+      idxs_topk.bind_dims(idxs_dims);
+      auto idxs_topk_sorted = op::sort(idxs_topk, axis, edsl::SortDirection::ASC);
+      for (int i = 0; i < ndims; i++) {
+        if (i == axis) {
+          comb_idxs.push_back(op::unsqueeze(idxs_topk_sorted, {ndims}));
+        } else {
+          comb_idxs.push_back(op::unsqueeze(edsl::index(idxs_dims, i), {ndims}));
+        }
+      }
+      auto idxs_nd = op::concatenate(comb_idxs, -1);
+      auto vals_topk = edsl::gather(I, idxs_nd).mode(edsl::GatherMode::ND);
+      Os.push_back(vals_topk);
+      Os.push_back(idxs_topk_sorted);
+    } break;
+    default:
+      throw std::runtime_error("invalid topk sort type");
+  }
+
+  return edsl::make_tuple(Os);
+}
+
 Value mvn(const Value& value) {
   IVLOG(1, "mvn");
   auto args = value.as_tuple();
@@ -3409,6 +3459,7 @@ void RegisterOps() {
   registry->Register("minimum", minimum);
   registry->Register("mvn", mvn);
   registry->Register("nms", nms);
+  registry->Register("topk", topk);
   registry->Register("l2norm", l2norm);
   registry->Register("pool", pool);
   registry->Register("prod", prod);
