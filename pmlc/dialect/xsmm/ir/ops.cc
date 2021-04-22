@@ -92,12 +92,12 @@ ParseResult parseGemmInvokeF32Op(OpAsmParser &parser, OperationState &result) {
 UnaryExpInvokeF32Op::operand_range UnaryExpInvokeF32Op::getOperandsForOutput() {
   auto inpType = i().getType().cast<MemRefType>();
   auto outType = o().getType().cast<MemRefType>();
-  return getOperands().slice(2 + inpType.getRank(), outType.getRank());
+  return getOperands().slice(3 + inpType.getRank(), outType.getRank());
 }
 
 UnaryExpInvokeF32Op::operand_range UnaryExpInvokeF32Op::getOperandsForInput() {
   auto inpType = i().getType().cast<MemRefType>();
-  return getOperands().slice(2, inpType.getRank());
+  return getOperands().slice(3, inpType.getRank());
 }
 
 void printUnaryExpInvokeF32Op(OpAsmPrinter &p, UnaryExpInvokeF32Op op) {
@@ -109,7 +109,7 @@ void printUnaryExpInvokeF32Op(OpAsmPrinter &p, UnaryExpInvokeF32Op op) {
   p.printOperands(op.getOperandsForOutput());
   p << "] = EXP ( " << op.i() << '[';
   p.printOperands(op.getOperandsForInput());
-  p << "] )" << funcType;
+  p << "] ) : " << funcType;
 }
 
 struct UnaryOperand {
@@ -134,10 +134,10 @@ ParseResult parseUnaryExpInvokeF32Op(OpAsmParser &parser, OperationState &result
       parser.parseOperandList(i.indices, OpAsmParser::Delimiter::Square) || parser.parseRParen() ||
       parser.parseColonType(funcType) ||
       parser.resolveOperand(ptr, i64Type, result.operands) ||
-      parser.resolveOperand(o.memref, funcType.getResult(0), result.operands) ||
       parser.resolveOperand(i.memref, funcType.getInput(0), result.operands) ||
-      parser.resolveOperands(o.indices, indexType, result.operands) ||
-      parser.resolveOperands(i.indices, indexType, result.operands));
+      parser.resolveOperand(o.memref, funcType.getResult(0), result.operands) ||
+      parser.resolveOperands(i.indices, indexType, result.operands) ||
+      parser.resolveOperands(o.indices, indexType, result.operands) );
 }
 
 ParseResult parseBRGemmOffsInvokeF32Op(OpAsmParser &parser,
