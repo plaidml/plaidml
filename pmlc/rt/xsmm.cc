@@ -130,6 +130,12 @@ void registerXsmm() {
   registerSymbol("plaidml_rt_xsmm_gemm_dispatch_f32",
                  reinterpret_cast<void *>(plaidml_rt_xsmm_gemm_dispatch_f32));
 
+  registerSymbol("plaidml_rt_xsmm_unary_exp_invoke_f32",
+                 reinterpret_cast<void *>(plaidml_rt_xsmm_unary_exp_invoke_f32));
+
+  registerSymbol("plaidml_rt_xsmm_unary_exp_dispatch_f32",
+                 reinterpret_cast<void *>(plaidml_rt_xsmm_unary_exp_dispatch_f32));
+
   registerSymbol("plaidml_rt_xsmm_brgemm_invoke_f32",
                  reinterpret_cast<void *>(plaidml_rt_xsmm_brgemm_invoke_f32));
 
