@@ -17,13 +17,13 @@ extern "C" void _mlir_ciface_plaidml_rt_bounds_check(intptr_t index,
         "Out of bounds index for mlir::LoadOp or mlir::StoreOp");
 }
 
-namespace {
-struct Registration {
-  Registration() {
-    pmlc::rt::registerSymbol(
-        "_mlir_ciface_plaidml_rt_bounds_check",
-        reinterpret_cast<void *>(_mlir_ciface_plaidml_rt_bounds_check));
-  }
-};
-static Registration reg;
-} // namespace
+namespace pmlc::rt {
+
+void registerBoundsCheck() {
+  using pmlc::rt::registerSymbol;
+  registerSymbol(
+      "_mlir_ciface_plaidml_rt_bounds_check",
+      reinterpret_cast<void *>(_mlir_ciface_plaidml_rt_bounds_check));
+}
+
+} // namespace pmlc::rt
