@@ -9,7 +9,6 @@
 #include "ngraph/opsets/opset1.hpp"
 
 #include "plaidml/op/op.h"
-#include <iostream>
 
 using namespace plaidml;          // NOLINT[build/namespaces]
 using namespace InferenceEngine;  // NOLINT[build/namespaces]
@@ -18,7 +17,6 @@ namespace PlaidMLPlugin {
 
 void registerConvolution() {
   registerOp("Convolution", [](const Context& ctx) {
-    std::cout << "Making OV convolution" << std::endl;
     auto* layer = ngraph::as_type<ngraph::opset1::Convolution>(ctx.layer);
     IE_ASSERT(ctx.operands.size() == 2);
     auto I = ctx.operands.at(0);
