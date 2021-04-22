@@ -18,9 +18,10 @@ steps:
   - label: 'IRv10 models'
     trigger: irv10
     async: false
+    depends_on: linux_x86_64
     build:
       message: "${BUILDKITE_MESSAGE}"
-      commit: 1eda26a86aafd5552989f757f48cac8c1083294e
+      commit: 85b1add931d04a6cdfaaf4fc3b7ddfc21bc75580
       env:
         PLAIDML_COMMIT: "${BUILDKITE_COMMIT}"
         BUILDKITE_PULL_REQUEST: "${BUILDKITE_PULL_REQUEST}"

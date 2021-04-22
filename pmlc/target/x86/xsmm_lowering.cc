@@ -57,9 +57,7 @@ struct PxaGemmOpConversion : public OpConversionPattern<pxa::PxaGemmOp> {
                             const SmallVector<int64_t, 4> &bStrides,
                             SmallVector<int64_t, 4> &aOffsetsArray,
                             SmallVector<int64_t, 4> &bOffsetsArray) const {
-
     int numBatches = 1;
-
     for (size_t i = 0; i < numSteps.size(); i++) {
       numBatches *= numSteps[i];
     }
@@ -140,7 +138,6 @@ struct PxaGemmOpConversion : public OpConversionPattern<pxa::PxaGemmOp> {
       int numBatches = numBatchesArr[0];
       // If value of numbatches is 1 call xsmm gemm
       if (numBatches == 1) {
-
         auto dispatch = rewriter.create<xsmm::GemmDispatchF32Op>(
             op.getLoc(), rewriter.getI64Type(), op.tile(), leadingDimsAttr);
 
@@ -150,7 +147,6 @@ struct PxaGemmOpConversion : public OpConversionPattern<pxa::PxaGemmOp> {
 
         // Else call batch reduce gemm when number of batches is greater than 1.
       } else if (numBatches > 1) {
-
         auto numBatchesAttr = rewriter.getI64IntegerAttr(numBatches);
         auto dispatch = rewriter.create<xsmm::BRGemmDispatchF32Op>(
             op.getLoc(), rewriter.getI64Type(), op.tile(), leadingDimsAttr);
@@ -216,8 +212,9 @@ struct PxaGemmOpConversion : public OpConversionPattern<pxa::PxaGemmOp> {
           rewriter.getI64IntegerAttr(numSteps),
           rewriter.getI64ArrayAttr(ArrayRef<int64_t>(aOffsets)),
           rewriter.getI64ArrayAttr(ArrayRef<int64_t>(bOffsets)), indices);
-    } else
+    } else {
       return failure();
+    }
 
     op.replaceAllUsesWith(transformed.c());
     rewriter.eraseOp(op);
@@ -366,13 +363,6 @@ struct XSMMBRGemmDispatchF32Lowering
       callOperands.push_back(
           rewriter.create<LLVM::ConstantOp>(op->getLoc(), int32Type, attr));
     }
-
-    /*
-    // stride_a
-    callOperands.push_back(
-      rewriter.create<LLVM::ConstantOp>(op->getLoc(), int32Type,
-    dispatchOp.StrideA()));
-      */
 
     rewriter.replaceOpWithNewOp<LLVM::CallOp>(
         op, int64Type, rewriter.getSymbolRefAttr(func), callOperands);
@@ -533,9 +523,6 @@ struct XSMMBRGemmOffsInvokeF32Lowering
   using ConvertOpToLLVMPattern<
       xsmm::BRGemmOffsInvokeF32Op>::ConvertOpToLLVMPattern;
 
-  // static int aOffsetGlobalVarCount;
-  // static int bOffsetGlobalVarCount;
-
   LogicalResult
   matchAndRewrite(xsmm::BRGemmOffsInvokeF32Op op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
@@ -648,16 +635,17 @@ struct XSMMBRGemmOffsInvokeF32Lowering
 
 } // namespace
 
-void populatePXAGemmToXSMMConversionPatterns(OwningRewritePatternList &patterns,
-                                             MLIRContext *ctx) {
-  patterns.insert<PxaGemmOpConversion>(ctx);
+void populatePXAGemmToXSMMConversionPatterns(RewritePatternSet &patterns) {
+  patterns.insert<PxaGemmOpConversion>(patterns.getContext());
 }
 
 void populateXSMMToLLVMConversionPatterns(LLVMTypeConverter &converter,
-                                          OwningRewritePatternList &patterns) {
-  patterns.insert<XSMMGemmDispatchF32Lowering, XSMMGemmInvokeF32Lowering,
-                  XSMMBRGemmDispatchF32Lowering, XSMMBRGemmInvokeF32Lowering,
-                  XSMMBRGemmOffsDispatchF32Lowering,
+                                          RewritePatternSet &patterns) {
+  patterns.insert<XSMMGemmDispatchF32Lowering,       //
+                  XSMMGemmInvokeF32Lowering,         //
+                  XSMMBRGemmDispatchF32Lowering,     //
+                  XSMMBRGemmInvokeF32Lowering,       //
+                  XSMMBRGemmOffsDispatchF32Lowering, //
                   XSMMBRGemmOffsInvokeF32Lowering>(converter);
 }
 } // namespace pmlc::target::x86

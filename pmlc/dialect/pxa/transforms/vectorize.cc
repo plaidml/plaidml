@@ -398,7 +398,7 @@ static OpTy replaceOp(Operation *op, Args &&... args) {
   return newOp;
 }
 
-LogicalResult vectorizeBuffer(AllocOp op) {
+LogicalResult vectorizeBuffer(memref::AllocOp op) {
   // Verify that all uses are vector load/stores of the same width and with
   // valid minimum strides
   int64_t vectorWidth = 0;
@@ -465,7 +465,7 @@ LogicalResult vectorizeBuffer(AllocOp op) {
   auto newType = MemRefType::get(
       newShape, VectorType::get({vectorWidth}, mtype.getElementType()));
   // Replace the alloc
-  auto newOp = replaceOp<AllocOp>(op, newType);
+  auto newOp = replaceOp<memref::AllocOp>(op, newType);
   // Walk over the uses and update them all
   auto curUse = IndirectUsesIterator(newOp);
   auto updateMap = [&](AffineMap map) {

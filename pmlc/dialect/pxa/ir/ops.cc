@@ -4,6 +4,7 @@
 
 #include <string>
 
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/PatternMatch.h"
@@ -223,7 +224,7 @@ void SimplifyAffineOp<PxaVectorReduceOp>::replaceAffineOp(
 static LogicalResult foldMemRefCast(Operation *op) {
   bool folded = false;
   for (OpOperand &operand : op->getOpOperands()) {
-    auto cast = dyn_cast_or_null<MemRefCastOp>(operand.get().getDefiningOp());
+    auto cast = dyn_cast_or_null<memref::CastOp>(operand.get().getDefiningOp());
     if (cast && !cast.getOperand().getType().isa<UnrankedMemRefType>()) {
       operand.set(cast.getOperand());
       folded = true;
@@ -350,9 +351,9 @@ static ParseResult parsePxaLoadOp(OpAsmParser &parser, OperationState &result) {
       parser.addTypeToList(type.getElementType(), result.types));
 }
 
-void PxaLoadOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void PxaLoadOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
                                             MLIRContext *context) {
-  results.insert<SimplifyAffineOp<PxaLoadOp>>(context);
+  patterns.insert<SimplifyAffineOp<PxaLoadOp>>(patterns.getContext());
 }
 
 OpFoldResult PxaLoadOp::fold(ArrayRef<Attribute> cstOperands) {
@@ -408,9 +409,9 @@ static ParseResult parsePxaVectorLoadOp(OpAsmParser &parser,
       parser.addTypeToList(resultType, result.types));
 }
 
-void PxaVectorLoadOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<SimplifyAffineOp<PxaVectorLoadOp>>(context);
+void PxaVectorLoadOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
+                                                  MLIRContext *context) {
+  patterns.insert<SimplifyAffineOp<PxaVectorLoadOp>>(patterns.getContext());
 }
 
 OpFoldResult PxaVectorLoadOp::fold(ArrayRef<Attribute> cstOperands) {
@@ -460,11 +461,11 @@ ParseResult parsePxaReduceOp(OpAsmParser &parser, OperationState &result) {
       parser.resolveOperands(idxs, indexTy, result.operands));
 }
 
-void PxaReduceOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void PxaReduceOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
                                               MLIRContext *context) {
-  results.insert<                    //
+  patterns.insert<                   //
       SimplifyAffineOp<PxaReduceOp>, //
-      SimplifyDeadWrite<PxaReduceOp>>(context);
+      SimplifyDeadWrite<PxaReduceOp>>(patterns.getContext());
 }
 
 OpFoldResult PxaReduceOp::fold(ArrayRef<Attribute> cstOperands) {
@@ -493,9 +494,9 @@ PxaGemmOp::operand_range PxaGemmOp::getOperandsForC() {
   return getOperands().slice(3, cAccessMap().getNumInputs());
 }
 
-void PxaGemmOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void PxaGemmOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
                                             MLIRContext *context) {
-  results.insert<SimplifyPxaGemmOp>(context);
+  patterns.insert<SimplifyPxaGemmOp>(patterns.getContext());
 }
 
 void printPxaGemmOp(OpAsmPrinter &p, PxaGemmOp op) {
@@ -614,10 +615,10 @@ ParseResult parsePxaVectorReduceOp(OpAsmParser &parser,
       parser.resolveOperands(idxs, indexTy, result.operands));
 }
 
-void PxaVectorReduceOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<SimplifyAffineOp<PxaVectorReduceOp>,
-                 SimplifyDeadWrite<PxaVectorReduceOp>>(context);
+void PxaVectorReduceOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
+                                                    MLIRContext *context) {
+  patterns.insert<SimplifyAffineOp<PxaVectorReduceOp>,
+                  SimplifyDeadWrite<PxaVectorReduceOp>>(patterns.getContext());
 }
 
 OpFoldResult PxaVectorReduceOp::fold(ArrayRef<Attribute> cstOperands) {
@@ -629,9 +630,9 @@ OpFoldResult PxaVectorReduceOp::fold(ArrayRef<Attribute> cstOperands) {
 
 // ---- PxaStoreOp ----
 
-void PxaStoreOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void PxaStoreOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
                                              MLIRContext *context) {
-  results.insert<SimplifyDeadWrite<PxaStoreOp>>(context);
+  patterns.insert<SimplifyDeadWrite<PxaStoreOp>>(patterns.getContext());
 }
 
 OpFoldResult PxaStoreOp::fold(ArrayRef<Attribute> cstOperands) {

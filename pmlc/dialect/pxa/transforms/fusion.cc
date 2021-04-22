@@ -3,6 +3,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/IR/AffineValueMap.h"
 #include "mlir/Dialect/Affine/Utils.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Support/DebugStringHelper.h"
 
 #include "pmlc/dialect/pxa/analysis/strides.h"
@@ -118,7 +119,7 @@ struct FusionInfo {
       });
 
       // Convert local allocations to vector types
-      outer.walk([&](AllocOp alloc) {
+      outer.walk([&](memref::AllocOp alloc) {
         // TODO: check LogicalResult
         (void)vectorizeBuffer(alloc);
       });
@@ -370,7 +371,7 @@ struct FusionInfo {
     int64_t sum = 0;
 
     auto computeMemoryActivityForOp = [&](Operation *op) {
-      if (auto allocOp = dyn_cast<AllocOp>(op)) {
+      if (auto allocOp = dyn_cast<memref::AllocOp>(op)) {
         auto bytes = util::getByteSize(allocOp.getType());
         IVLOG(3, "op: " << debugString(*op) << ", bytes: " << bytes);
         sum += bytes;

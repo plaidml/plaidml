@@ -19,12 +19,12 @@ func @cache(%arg0: memref<1x512x28x28xf16>, %arg1: memref<1x1024x14x14xf16>) {
 // CHECK: (%[[arg0:.*]]: memref<1x512x28x28xf16>, %[[arg1:.*]]: memref<1x1024x14x14xf16>)
 // CHECK: affine.parallel
 // CHECK:   affine.parallel
-// CHECK:     alloc
+// CHECK:     memref.alloc
 // CHECK:     affine.parallel
 // CHECK:       pxa.load
 // CHECK:       pxa.reduce
 // CHECK:       affine.yield
-// CHECK:     %[[b0:.*]] = alloc
+// CHECK:     %[[b0:.*]] = memref.alloc
 // CHECK:     affine.parallel (%[[d0:.*]], %[[d1:.*]], %[[d2:.*]], %[[d3:.*]]) = (0, 0, 0, 0) to (1, 1, 1, 27)
 // CHECK:       %[[r0:.*]] = pxa.load %[[arg0]][%[[d0]], %[[d1]], {{.*}} * 2 + ({{.*}} - {{.*}}) * 2 + %[[d2]], {{.*}} * 2 + ({{.*}} - {{.*}}) * 2 + %[[d3]]]
 // CHECK:       pxa.reduce assign %[[r0]], %[[b0]][%[[d0]], %[[d1]], %[[d2]], %[[d3]]]

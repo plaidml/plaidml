@@ -4,9 +4,9 @@
 func @simple(%out : memref<2xf32>) -> memref<2xf32> {
   // CHECK: constant 0.0
   %zero = constant 0.0 : f32
-  %buf = alloc() : memref<2xf32>
-  // CHECK-NEXT: alloc()
-  %buf2 = alloc() : memref<1xf32>
+  %buf = memref.alloc() : memref<2xf32>
+  // CHECK-NEXT: memref.alloc()
+  %buf2 = memref.alloc() : memref<1xf32>
   // CHECK-NEXT: pxa.reduce assign
   %6 = pxa.reduce assign %zero, %buf2[0] : memref<1xf32>
   // CHECK-NEXT: pxa.load

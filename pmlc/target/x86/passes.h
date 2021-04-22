@@ -9,7 +9,7 @@ class LLVMTypeConverter;
 class LowerToLLVMOptions;
 class MLIRContext;
 class OpPassManager;
-class OwningRewritePatternList;
+class RewritePatternSet;
 } // namespace mlir
 
 namespace pmlc::target::x86 {
@@ -18,23 +18,20 @@ std::unique_ptr<mlir::Pass> createLowerPXAToAffinePass();
 
 std::unique_ptr<mlir::Pass> createLowerToLLVMPass();
 
+std::unique_ptr<mlir::Pass> createOpenMPWorkaroundPass();
+
+std::unique_ptr<mlir::Pass> createPRNGLinkingPass();
+
 std::unique_ptr<mlir::Pass> createTraceLinkingPass();
 
 std::unique_ptr<mlir::Pass> createXSMMLoweringPass();
 
 std::unique_ptr<mlir::Pass> createXSMMStencilPass();
 
-std::unique_ptr<mlir::Pass> createOpenMPWorkaroundPass();
+void populatePXAGemmToXSMMConversionPatterns(mlir::RewritePatternSet &patterns);
 
-void populatePXAGemmToXSMMConversionPatterns(
-    mlir::OwningRewritePatternList &patterns, mlir::MLIRContext *ctx);
-
-void populatePXAPrngToAffineConversionPatterns(
-    mlir::OwningRewritePatternList &patterns, mlir::MLIRContext *ctx);
-
-void populateXSMMToLLVMConversionPatterns(
-    mlir::LLVMTypeConverter &converter,
-    mlir::OwningRewritePatternList &patterns);
+void populateXSMMToLLVMConversionPatterns(mlir::LLVMTypeConverter &converter,
+                                          mlir::RewritePatternSet &patterns);
 
 void pipelineBuilder(mlir::OpPassManager &pm);
 

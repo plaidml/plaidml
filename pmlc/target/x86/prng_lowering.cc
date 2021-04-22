@@ -1,12 +1,10 @@
 // Copyright 2020, Intel Corporation
 
-#include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
-#include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
-#include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
-#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinOps.h"
 
 #include "pmlc/dialect/pxa/ir/ops.h"
+#include "pmlc/target/x86/pass_detail.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
 
@@ -16,61 +14,53 @@ namespace pxa = dialect::pxa;
 
 namespace {
 
-struct PrngOpConversion : public OpConversionPattern<pxa::PrngOp> {
-  using OpConversionPattern<pxa::PrngOp>::OpConversionPattern;
+struct PRNGLinkingPass : public PRNGLinkingBase<PRNGLinkingPass> {
+  void runOnOperation() override {
+    getOperation().walk([](pxa::PrngOp op) {
+      ModuleOp module = op->getParentOfType<ModuleOp>();
+      MLIRContext *context = module.getContext();
+      Location loc = op.getLoc();
+      OpBuilder builder(op);
 
-  LogicalResult
-  matchAndRewrite(pxa::PrngOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
-    pxa::PrngOp::Adaptor transformed(operands);
+      auto resultType =
+          UnrankedMemRefType::get(builder.getF32Type(), /*memorySpace=*/0);
+      auto stateType = UnrankedMemRefType::get(builder.getIntegerType(32),
+                                               /*memorySpace=*/0);
+      auto symbol = getOrInsertFunc(builder, module, builder.getF32Type(), loc,
+                                    resultType, stateType);
 
-    ModuleOp module = op->getParentOfType<ModuleOp>();
-    Location loc = op.getLoc();
+      auto resultCast =
+          builder.create<memref::CastOp>(loc, op.tensor(), resultType);
+      auto stateCast =
+          builder.create<memref::CastOp>(loc, op.state(), stateType);
+      auto newStateCast =
+          builder.create<memref::CastOp>(loc, op.new_state(), stateType);
 
-    auto resultUnrankedType =
-        UnrankedMemRefType::get(rewriter.getF32Type(), /*memorySpace=*/0);
-    auto stateUnrankedType =
-        UnrankedMemRefType::get(rewriter.getIntegerType(32), /*memorySpace=*/0);
-    auto symbol = getOrInsertFunc(rewriter, module, rewriter.getF32Type(), loc,
-                                  resultUnrankedType, stateUnrankedType);
+      builder.create<CallOp>(
+          loc, symbol, ArrayRef<Type>{},
+          ArrayRef<Value>{stateCast, resultCast, newStateCast});
 
-    auto resultCast = rewriter.create<MemRefCastOp>(loc, transformed.tensor(),
-                                                    resultUnrankedType);
-    auto stateCast = rewriter.create<MemRefCastOp>(loc, transformed.state(),
-                                                   stateUnrankedType);
-    auto newStateCast = rewriter.create<MemRefCastOp>(
-        loc, transformed.new_state(), stateUnrankedType);
-
-    rewriter.create<CallOp>(
-        loc, symbol, ArrayRef<Type>{},
-        ArrayRef<Value>{stateCast, resultCast, newStateCast});
-
-    op.result_tensor().replaceAllUsesWith(transformed.tensor());
-    op.result_state().replaceAllUsesWith(transformed.new_state());
-
-    rewriter.eraseOp(op);
-
-    return success();
+      op.result_tensor().replaceAllUsesWith(op.tensor());
+      op.result_state().replaceAllUsesWith(op.new_state());
+      op.erase();
+    });
   }
 
 private:
-  FlatSymbolRefAttr
-  getOrInsertFunc(ConversionPatternRewriter &rewriter, ModuleOp module,
-                  Type elementType, Location loc,
-                  UnrankedMemRefType resultUnrankedType,
-                  UnrankedMemRefType stateUnrankedType) const {
+  static FlatSymbolRefAttr getOrInsertFunc(OpBuilder &builder, ModuleOp module,
+                                           Type elementType, Location loc,
+                                           UnrankedMemRefType resultType,
+                                           UnrankedMemRefType stateType) {
     const char *symbol = "plaidml_rt_prng";
-    auto context = module.getContext();
+    MLIRContext *context = module.getContext();
     if (module.lookupSymbol(symbol)) {
       return SymbolRefAttr::get(context, symbol);
     }
-    OpBuilder::InsertionGuard guard(rewriter);
-    rewriter.setInsertionPointToStart(module.getBody());
-    auto funcType = rewriter.getFunctionType(ArrayRef<Type>{stateUnrankedType,
-                                                            resultUnrankedType,
-                                                            stateUnrankedType},
-                                             ArrayRef<Type>{});
-    rewriter.create<FuncOp>(loc, symbol, funcType, ArrayRef<NamedAttribute>{})
+    OpBuilder::InsertionGuard guard(builder);
+    builder.setInsertionPointToStart(module.getBody());
+    auto funcType = builder.getFunctionType(
+        ArrayRef<Type>{stateType, resultType, stateType}, ArrayRef<Type>{});
+    builder.create<FuncOp>(loc, symbol, funcType, ArrayRef<NamedAttribute>{})
         .setPrivate();
     return SymbolRefAttr::get(context, symbol);
   }
@@ -78,9 +68,8 @@ private:
 
 } // namespace
 
-void populatePXAPrngToAffineConversionPatterns(
-    OwningRewritePatternList &patterns, MLIRContext *ctx) {
-  patterns.insert<PrngOpConversion>(ctx);
+std::unique_ptr<mlir::Pass> createPRNGLinkingPass() {
+  return std::make_unique<PRNGLinkingPass>();
 }
 
 } // namespace pmlc::target::x86
