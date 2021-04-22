@@ -121,7 +121,10 @@ void PadConstraintsPass::runOnFunction() {
     // to copy the value.
     if (def.isa<BlockArgument>() ||
         isa_and_nonnull<stdx::UnpackOp>(def.getDefiningOp()) ||
-        isa_and_nonnull<tile::CastOp>(def.getDefiningOp())) {
+        isa_and_nonnull<tile::CastOp>(def.getDefiningOp()) ||
+        isa_and_nonnull<tile::GatherOp>(def.getDefiningOp()) ||
+        isa_and_nonnull<tile::ScatterOp>(def.getDefiningOp()) ||
+        isa_and_nonnull<tile::PrngOp>(def.getDefiningOp())) {
       OpBuilder inner(&getContext());
       inner.setInsertionPointAfterValue(def);
       // Construct an initial identity operation.
