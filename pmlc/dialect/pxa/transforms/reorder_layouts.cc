@@ -309,8 +309,14 @@ void recognizeConvsAndInsertBlockedDataLayouts(
             filter = loadOp1;
           }
 
-          createBlockedLayoutForInputTensor(input, memLayoutMaps);
-          createBlockedLayoutForFilterTensor(filter, memLayoutMaps);
+          static int count = 0;
+          /* if (count < 1) */ {
+            createBlockedLayoutForInputTensor(input, memLayoutMaps);
+            createBlockedLayoutForFilterTensor(filter, memLayoutMaps);
+          }
+
+          count++;
+          IVLOG(4, "count = " << count);
         }
       }
     }
@@ -1154,6 +1160,8 @@ mlir::Optional<ReorderDesc> optimizeLayoutForReads(
   if (makeUserLayoutsExplicit) {
     selectedReorder = chooseUserProvidedTargetLayout(memoryDesc, memLayoutMaps);
   }
+
+  return selectedReorder;
 
   if (!selectedReorder.hasValue()) {
     mlir::ArrayRef<int64_t> commonVector;
