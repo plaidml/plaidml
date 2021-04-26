@@ -3,7 +3,7 @@ import numpy.testing as npt
 import numpy as np
 import os
 
-from networks.scitile.LAS.conjgrad import cg_solve
+from conjgrad import cg_solve
 
 DEFAULT_TOL = 2e-2
 DEFAULT_ATOL = 2e-2
