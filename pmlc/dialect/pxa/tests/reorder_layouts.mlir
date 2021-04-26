@@ -8,12 +8,12 @@
 //       CHECK:     pxa.load {{.*}}[%[[I]], %[[J]]]
 func @permute_layout() -> memref<1xf32> {
   %cst = constant 0.000000e+00 : f32
-  %0 = alloc() : memref<2x3xf32>
+  %0 = memref.alloc() : memref<2x3xf32>
   %1 = affine.parallel (%i, %j) = (0, 0) to (2, 3) reduce("assign") -> memref<2x3xf32> {
     %2 = pxa.reduce assign %cst, %0[%i, %j] : memref<2x3xf32>
     affine.yield %2 : memref<2x3xf32>
   }
-  %2 = alloc() : memref<1xf32>
+  %2 = memref.alloc() : memref<1xf32>
   %3 = affine.parallel (%i, %j) = (0, 0) to (3, 2) reduce("addf") -> memref<1xf32> {
     %4 = pxa.load %1[%j, %i] : memref<2x3xf32>
     %5 = pxa.reduce addf %4, %2[0] : memref<1xf32>
@@ -30,12 +30,12 @@ func @permute_layout() -> memref<1xf32> {
 //       CHECK:       pxa.load {{.*}}[%[[I]], %[[J]], %[[K]], %[[L]]]
 func @block_layout() -> memref<1xf32> {
   %cst = constant 0.000000e+00 : f32
-  %0 = alloc() : memref<16x16xf32>
+  %0 = memref.alloc() : memref<16x16xf32>
   %1 = affine.parallel (%i, %j) = (0, 0) to (16, 16) reduce("assign") -> memref<16x16xf32> {
     %2 = pxa.reduce assign %cst, %0[%i, %j] : memref<16x16xf32>
     affine.yield %2 : memref<16x16xf32>
   }
-  %2 = alloc() : memref<1xf32>
+  %2 = memref.alloc() : memref<1xf32>
   %3 = affine.parallel (%i, %j) = (0, 0) to (4, 4) reduce("assign") -> memref<1xf32> {
     %4 = affine.parallel (%k, %l) = (0, 0) to (4, 4) reduce("addf") -> memref<1xf32> {
       %5 = pxa.load %1[%i * 4 + %k, %j * 4 + %l] : memref<16x16xf32>
@@ -49,7 +49,7 @@ func @block_layout() -> memref<1xf32> {
 
 // CHECK-LABEL: func @separate_reorder
 //  CHECK-SAME:     %[[ARG:[a-zA-Z0-9]*]]:
-//         RDR:   %[[ALLOC:.*]] = alloc() : memref<4x4x4x4xf32>
+//         RDR:   %[[ALLOC:.*]] = memref.alloc() : memref<4x4x4x4xf32>
 //         RDR:   %[[NEW:.*]] = affine.parallel (%[[I:[a-zA-Z0-9]*]], %[[J:[a-zA-Z0-9]*]])
 //         RDR:     pxa.load %[[ARG]][%[[I]], %[[J]]]
 //         RDR:     pxa.reduce assign {{.*}}, %[[ALLOC]][%[[I]] floordiv 4, %[[J]] floordiv 4, %[[I]] mod 4, %[[J]] mod 4]
@@ -58,7 +58,7 @@ func @block_layout() -> memref<1xf32> {
 //       NORDR:       pxa.load %[[ARG]][%[[I]] * 4 + %[[K]], %[[J]] * 4 + %[[L]]]
 //         RDR:       pxa.load %[[NEW]][%[[I]], %[[J]], %[[K]], %[[L]]]
 func @separate_reorder(%arg0: memref<16x16xf32>) -> memref<1xf32> {
-  %0 = alloc() : memref<1xf32>
+  %0 = memref.alloc() : memref<1xf32>
   %1 = affine.parallel (%i, %j) = (0, 0) to (4, 4) reduce("assign") -> memref<1xf32> {
     %2 = affine.parallel (%k, %l) = (0, 0) to (4, 4) reduce("addf") -> memref<1xf32> {
       %3 = pxa.load %arg0[%i * 4 + %k, %j * 4 + %l] : memref<16x16xf32>
@@ -77,12 +77,12 @@ func @separate_reorder(%arg0: memref<16x16xf32>) -> memref<1xf32> {
 //       CHECK:     pxa.vector_load {{.*}}[%[[I]], %[[J]], 0]
 func @vector_load() -> memref<4xf32> {
   %cst = constant 0.000000e+00 : f32
-  %0 = alloc() : memref<2x16xf32>
+  %0 = memref.alloc() : memref<2x16xf32>
   %1 = affine.parallel (%i, %j) = (0, 0) to (2, 16) reduce("assign") -> memref<2x16xf32> {
     %2 = pxa.reduce assign %cst, %0[%i, %j] : memref<2x16xf32>
     affine.yield %2 : memref<2x16xf32>
   }
-  %2 = alloc() : memref<4xf32>
+  %2 = memref.alloc() : memref<4xf32>
   %3 = affine.parallel (%i, %j) = (0, 0) to (4, 2) reduce("assign") -> memref<4xf32> {
     %4 = pxa.vector_load %1[%j, %i * 4] : memref<2x16xf32>, vector<4xf32>
     %5 = pxa.vector_reduce addf %4, %2[0] : memref<4xf32>, vector<4xf32>
@@ -99,12 +99,12 @@ func @vector_load() -> memref<4xf32> {
 func @vector_store() -> memref<1xf32> {
   %cst = constant 0.000000e+00 : f32
   %cst_vec = vector.broadcast %cst : f32 to vector<4xf32>
-  %0 = alloc() : memref<2x16xf32>
+  %0 = memref.alloc() : memref<2x16xf32>
   %1 = affine.parallel (%i, %j) = (0, 0) to (2, 4) reduce("assign") -> memref<2x16xf32> {
     %2 = pxa.vector_reduce assign %cst_vec, %0[%i, %j * 4] : memref<2x16xf32>, vector<4xf32>
     affine.yield %2 : memref<2x16xf32>
   }
-  %2 = alloc() : memref<1xf32>
+  %2 = memref.alloc() : memref<1xf32>
   %3 = affine.parallel (%i, %j) = (0, 0) to (16, 2) reduce("assign") -> memref<1xf32> {
     %4 = pxa.load %1[%j, %i] : memref<2x16xf32>
     %5 = pxa.reduce addf %4, %2[0] : memref<1xf32>
@@ -121,12 +121,12 @@ func @vector_store() -> memref<1xf32> {
 func @different_vector() -> memref<4xf32> {
   %cst = constant 0.000000e+00 : f32
   %cst_vec = vector.broadcast %cst : f32 to vector<2x1xf32>
-  %0 = alloc() : memref<2x16xf32>
+  %0 = memref.alloc() : memref<2x16xf32>
   %1 = affine.parallel (%i) = (0) to (16) reduce("assign") -> memref<2x16xf32> {
     %2 = pxa.vector_reduce assign %cst_vec, %0[0, %i] : memref<2x16xf32>, vector<2x1xf32>
     affine.yield %2 : memref<2x16xf32>
   }
-  %2 = alloc() : memref<4xf32>
+  %2 = memref.alloc() : memref<4xf32>
   %3 = affine.parallel (%i, %j) = (0, 0) to (4, 2) reduce("assign") -> memref<4xf32> {
     %4 = pxa.vector_load %1[%j, %i * 4] : memref<2x16xf32>, vector<4xf32>
     %5 = pxa.vector_reduce addf %4, %2[0] : memref<4xf32>, vector<4xf32>
@@ -136,7 +136,7 @@ func @different_vector() -> memref<4xf32> {
 }
 
 // CHECK-LABEL: func @init
-//       CHECK:   alloc()
+//       CHECK:   memref.alloc()
 //    RDR-NEXT:   affine.parallel
 //    RDR-NEXT:   pxa.load
 //    RDR-NEXT:   pxa.reduce
@@ -149,7 +149,7 @@ func @different_vector() -> memref<4xf32> {
   }
   func @main(%arg0: !stdx.argpack) -> memref<1xf32> {
     %0:1 = stdx.unpack %arg0 : memref<16x16xf32>
-    %2 = alloc() : memref<1xf32>
+    %2 = memref.alloc() : memref<1xf32>
     %3 = affine.parallel (%i, %j) = (0, 0) to (4, 4) reduce("assign") -> memref<1xf32> {
       %4 = affine.parallel (%k, %l) = (0, 0) to (4, 4) reduce("addf") -> memref<1xf32> {
         %5 = pxa.load %0#0[%i * 4 + %k, %j * 4 + %l] : memref<16x16xf32>

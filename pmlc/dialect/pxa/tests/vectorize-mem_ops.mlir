@@ -3,7 +3,7 @@
 
 // CHECK-LABEL: func @vectorize_mem 
 func @vectorize_mem(%arg0: memref<16x16xf32>) {
-  %0 = alloc() : memref<1x1x16x1xvector<16xf32>>
+  %0 = memref.alloc() : memref<1x1x16x1xvector<16xf32>>
   // CHECK: affine.parallel (%[[VECIDX:.*]])
   // CHECK:   %[[VECLOAD:.*]] = pxa.vector_load
   // CHECK:   affine.parallel
@@ -20,9 +20,9 @@ func @vectorize_mem(%arg0: memref<16x16xf32>) {
 
 // CHECK-LABEL: func @vectorize_mem_write
 func @vectorize_mem_write(%arg0: memref<16x16xf32>, %arg1: memref<16x16xf32>) {
-  %0 = alloc() : memref<16xvector<16xf32>>
+  %0 = memref.alloc() : memref<16xvector<16xf32>>
   // CHECK: affine.parallel (%[[VECIDX:.*]])
-  // CHECK:   %[[ALLOC:.*]] = alloc() : memref<128xf32>
+  // CHECK:   %[[ALLOC:.*]] = memref.alloc() : memref<128xf32>
   // CHECK:   affine.parallel
   // CHECK:     %[[LOAD_INNER:.*]] = pxa.load
   // CHECK:     %[[SUBIDX:.*]] = subi
@@ -41,10 +41,10 @@ func @vectorize_mem_write(%arg0: memref<16x16xf32>, %arg1: memref<16x16xf32>) {
 
 // CHECK-LABEL: func @vectorize_mem_read_write
 func @vectorize_mem_read_write(%arg0: memref<16x16xf32>, %arg1: memref<16x16xf32>) {
-  %0 = alloc() : memref<1x1x16x1xvector<16xf32>>
+  %0 = memref.alloc() : memref<1x1x16x1xvector<16xf32>>
   // CHECK: affine.parallel (%[[VECIDX:.*]])
   // CHECK:   %[[VECLOAD:.*]] = pxa.vector_load
-  // CHECK:   %[[ALLOC:.*]] = alloc() : memref<128xf32>
+  // CHECK:   %[[ALLOC:.*]] = memref.alloc() : memref<128xf32>
   // CHECK:   affine.parallel
   // CHECK:     %[[SUBIDX:.*]] = subi
   // CHECK:     %[[EXTRACT:.*]] = vector.extract_map %[[VECLOAD]][%[[SUBIDX]] : 8] : vector<128xf32> to vector<16xf32>
@@ -65,7 +65,7 @@ func @vectorize_mem_read_write(%arg0: memref<16x16xf32>, %arg1: memref<16x16xf32
 func @vectorize_mem_multi_dim(%arg0: memref<4x16x16xf32>, %arg1: memref<4x16x16xf32>) {
   // CHECK: affine.parallel (%{{.*}}, %[[VECIDX:.*]])
   // CHECK:   %[[VECLOAD:.*]] = pxa.vector_load
-  // CHECK:   %[[ALLOC:.*]] = alloc() : memref<128xf32>
+  // CHECK:   %[[ALLOC:.*]] = memref.alloc() : memref<128xf32>
   // CHECK:   affine.parallel
   // CHECK:     %[[SUBIDX:.*]] = subi
   // CHECK:     %[[EXTRACT:.*]] = vector.extract_map %[[VECLOAD]][%[[SUBIDX]] : 8] : vector<128xf32> to vector<16xf32>

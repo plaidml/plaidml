@@ -1,5 +1,6 @@
 // Copyright 2020 Intel Corporation
 
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Dominance.h"
 #include "mlir/Support/DebugStringHelper.h"
@@ -40,7 +41,7 @@ struct LocalizePass : public LocalizeBase<LocalizePass> {
     DenseMap<Operation *, Block *> toMove;
     auto &analysis = getAnalysis<LocalizeAnalysis>();
 
-    f.walk([&](AllocOp allocOp) {
+    f.walk([&](memref::AllocOp allocOp) {
       // Collect all the indirect users of the alloc op.
       SmallVector<Operation *, 4> opGroup;
       for (auto &use : getIndirectUses(allocOp)) {

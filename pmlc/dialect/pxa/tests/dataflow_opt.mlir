@@ -4,7 +4,7 @@
 func @simple(%out : memref<2xf32>) -> memref<2xf32> {
   // CHECK: constant 0.0
   %zero = constant 0.0 : f32
-  %buf = alloc() : memref<2xf32>
+  %buf = memref.alloc() : memref<2xf32>
   // CHECK-NEXT: affine.parallel
   %0 = affine.parallel (%i) = (0) to (2) reduce ("assign") -> (memref<2xf32>) {
     %1 = pxa.reduce assign %zero, %buf[%i] : memref<2xf32>
@@ -24,15 +24,15 @@ func @grn(%arg0: memref<1x4x4x3xf16>) -> memref<1x4x4x3xf16> {
   %cst_0 = constant 0.000000e+00 : f16
   // CHECK-NEXT: constant 1.0
   %cst_1 = constant 1.000000e+00 : f16
-  // CHECK-NEXT: alloc() : memref<1x4x4x1xf16>
-  // CHECK-NEXT: alloc() : memref<1x4x4x3xf16>
-  %0 = alloc() : memref<1x4x4x3xf16>
-  %1 = alloc() : memref<1x4x4x1xf16>
-  %2 = alloc() : memref<1x4x4x1xf16>
-  %3 = alloc() : memref<1x4x4x1xf16>
-  %4 = alloc() : memref<1x4x4x1xi1>
-  %5 = alloc() : memref<1x4x4x1xf16>
-  %6 = alloc() : memref<1x4x4x3xf16>
+  // CHECK-NEXT: memref.alloc() : memref<1x4x4x1xf16>
+  // CHECK-NEXT: memref.alloc() : memref<1x4x4x3xf16>
+  %0 = memref.alloc() : memref<1x4x4x3xf16>
+  %1 = memref.alloc() : memref<1x4x4x1xf16>
+  %2 = memref.alloc() : memref<1x4x4x1xf16>
+  %3 = memref.alloc() : memref<1x4x4x1xf16>
+  %4 = memref.alloc() : memref<1x4x4x1xi1>
+  %5 = memref.alloc() : memref<1x4x4x1xf16>
+  %6 = memref.alloc() : memref<1x4x4x3xf16>
   // CHECK-NEXT: affine.parallel
   %7 = affine.parallel (%arg1, %arg2) = (0, 0) to (4, 4) reduce ("assign") -> (memref<1x4x4x3xf16>) {
     // CHECK-NEXT: pxa.reduce assign

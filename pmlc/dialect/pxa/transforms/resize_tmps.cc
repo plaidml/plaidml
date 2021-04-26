@@ -2,6 +2,7 @@
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/IR/AffineValueMap.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Support/DebugStringHelper.h"
 
@@ -25,7 +26,7 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
 
   void runOnFunction() final {
     auto func = getFunction();
-    func.walk([&](AllocOp op) { runOnAlloc(op); });
+    func.walk([&](memref::AllocOp op) { runOnAlloc(op); });
   }
 
   AffineValueMap computeInnerValueMap(AffineMap orig, ValueRange operands,
@@ -40,7 +41,7 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
     return convertToValueMap(orig.getContext(), inner);
   }
 
-  void runOnAlloc(AllocOp op) {
+  void runOnAlloc(memref::AllocOp op) {
     Block *opBlock = op.getOperation()->getBlock();
     IVLOG(2, "Considering: " << debugString(*op.getOperation()));
 
