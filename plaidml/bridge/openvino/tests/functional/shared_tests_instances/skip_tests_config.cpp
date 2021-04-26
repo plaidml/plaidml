@@ -9,7 +9,8 @@
 
 std::vector<std::string> disabledTestPatterns() {
   return {
-      ".*ShapeOfLayerTest.*",  // Broken until https://github.com/plaidml/openvino/issues/88 is fixed
+      ".*ShapeOfLayerTest.*",          // Broken until https://github.com/plaidml/openvino/issues/88 is fixed
+      ".*DetectionOutputLayerTest.*",  // TODO: Investigate and re-enable
 #ifdef SMOKE_TESTS_ONLY
       "^(?!smoke).*",
 #endif  // SMOKE_TESTS_ONLY
