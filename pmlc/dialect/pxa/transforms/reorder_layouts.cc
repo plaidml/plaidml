@@ -48,13 +48,14 @@ public:
   void runOnFunction() {
     mlir::FuncOp func = getFunction();
     mlir::DenseMap<mlir::Value, mlir::AffineMap> memLayoutMaps;
-    recognizeConvsAndInsertBlockedDataLayouts(func, memLayoutMaps);
+    llvm::SmallSet<mlir::AffineParallelOp, 4> parallelOps;
+
+    recognizeConvsAndInsertBlockedDataLayouts(func, memLayoutMaps, parallelOps);
     IVLOG(4, "Size of memLayoutMaps after Convolutions are recognized: "
                  << memLayoutMaps.size());
 
     mlir::DenseMap<mlir::Value, MemoryUsageDesc> globalMemory =
         gatherGlobalMemoryDescs(func, naiveScheduleModel);
-    llvm::SmallSet<mlir::AffineParallelOp, 4> parallelOps;
     llvm::SetVector<mlir::Operation *> toRemove;
 
     for (auto &valueDesc : globalMemory) {
@@ -69,11 +70,10 @@ public:
       ReorderDesc &reorder = optReorder.getValue();
       IVLOG(3, "Optimized layout: " << mlir::debugString(reorder.reorderMap));
       if (mlir::succeeded(convertMemoryLayout(memoryDesc.value, reorder))) {
-        /*
-          if (memoryDesc.parallelOp.hasValue()) {
-            parallelOps.insert(memoryDesc.parallelOp.getValue());
-          }
-        */
+        if (memoryDesc.parallelOp.hasValue()) {
+          parallelOps.insert(memoryDesc.parallelOp.getValue());
+        }
+
         continue;
       }
 
@@ -231,7 +231,8 @@ void createBlockedLayoutForFilterTensor(
 
 void recognizeConvsAndInsertBlockedDataLayouts(
     mlir::FuncOp func,
-    mlir::DenseMap<mlir::Value, mlir::AffineMap> &memLayoutMaps) {
+    mlir::DenseMap<mlir::Value, mlir::AffineMap> &memLayoutMaps,
+    llvm::SmallSet<mlir::AffineParallelOp, 4> &parallelOps) {
   IVLOG(4, "Looking for Conv2ds");
   func.walk([&](mlir::AffineParallelOp parallelOp) {
     size_t numLoopsInConv2d = 7;
@@ -251,6 +252,7 @@ void recognizeConvsAndInsertBlockedDataLayouts(
                                     m_Capture(&load2, mlir::m_Op<PxaLoadOp>())),
                                 m_Any()))))) {
         IVLOG(4, "Conv2d found");
+
         // Output - Input = %arg114 (the output channel)
         // Output - filter = %arg111, %arg112, %arg113 (NHW)
 
@@ -315,6 +317,7 @@ void recognizeConvsAndInsertBlockedDataLayouts(
             createBlockedLayoutForFilterTensor(filter, memLayoutMaps);
           }
 
+          parallelOps.insert(parallelOp);
           count++;
           IVLOG(4, "count = " << count);
         }
@@ -623,6 +626,7 @@ void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {
   mlir::DenseMap<mlir::Value, int64_t> tileSizeMap;
   bool tileSizesAreConsistent = true;
   IVLOG(4, "In tileLoopNestsToAlignWithDataMaps()");
+  IVLOG(4, "parallelOp: " << mlir::debugString(parallelOp));
 
   mlir::Block *outerBody = parallelOp.getBody();
   auto outerIdxs = outerBody->getArguments();
@@ -636,7 +640,7 @@ void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {
     IVLOG(4, "read load op: " << op);
     mlir::Value memRef = op.getMemRef();
     IVLOG(4, "op.getMemRef(): " << mlir::debugString(memRef));
-    IVLOG(4, "op.getMapOperands().size(): " << op.getMapOperands().size());
+    IVLOG(4, "op.getMapOperands().size(): " << op.indices().size());
 
     mlir::AffineMap map = op.getAffineMap();
     IVLOG(4, "map: " << mlir::debugString(map));
@@ -646,12 +650,20 @@ void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {
       if (expr.getKind() == mlir::AffineExprKind::FloorDiv) {
         auto divExpr = expr.cast<mlir::AffineBinaryOpExpr>();
         mlir::AffineExpr rhsExpr = divExpr.getRHS();
+        mlir::AffineExpr lhsExpr = divExpr.getLHS();
 
-        if (rhsExpr.getKind() == mlir::AffineExprKind::Constant) {
+        if (rhsExpr.getKind() == mlir::AffineExprKind::Constant &&
+            lhsExpr.getKind() == mlir::AffineExprKind::DimId) {
           auto constantExpr = rhsExpr.cast<mlir::AffineConstantExpr>();
           int64_t res = constantExpr.getValue();
           IVLOG(4, "The floor div constantValue: " << res);
-          mlir::Value operand = op.getOperands()[idx];
+
+          auto dimExpr = lhsExpr.cast<mlir::AffineDimExpr>();
+          unsigned pos = dimExpr.getPosition();
+
+          IVLOG(4, "lhsExpr-pos: " << pos);
+          mlir::Value operand = op.indices()[pos];
+
           IVLOG(4, "operand: " << mlir::debugString(operand));
 
           for (unsigned i = 0; i < outerIdxs.size(); ++i) {
@@ -715,7 +727,7 @@ void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {
           int64_t loopLength = loopLengths.getValue()[i];
           int64_t tileSize = tileSizes[i];
           IVLOG(4, "loopLength: " << loopLength << " tile size: " << tileSize);
-          if (!(loopLength > tileSize && loopLength % tileSize == 0)) {
+          if (!(loopLength >= tileSize && loopLength % tileSize == 0)) {
             tileSizesDivideLoopLengths = false;
             break;
           }
@@ -824,7 +836,7 @@ void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {
 
           // TODO: Establish the conditions under which simplifying the affine
           // expressions is OK
-          simplifyMemrefMapsInInnerLoops(innerLoops, varMap);
+          // simplifyMemrefMapsInInnerLoops(innerLoops, varMap);
         }
       }
     }
