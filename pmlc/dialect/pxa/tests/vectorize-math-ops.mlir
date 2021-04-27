@@ -9,7 +9,7 @@ func @sigmoid(%arg0: memref<1x1152x1x1xf16>, %arg1: memref<1x1152x1x1xf16>) -> m
     %2 = negf %1 : f16
     // CHECK: negf %{{.*}} : vector<8xf16>
     %3 = math.exp %2 : f16
-    // CHECK: alloc() : memref<8xf16>
+    // CHECK: memref.alloc() : memref<8xf16>
     // CHECK: constant {{.*}}
     // CHECK: vector.transfer_write %{{.*}}, %{{.*}}[%{{.*}}] : vector<8xf16>, memref<8xf16>
     // CHECK: affine.parallel (%{{.*}}) = (0) to (8) reduce ("assign") -> (memref<8xf16>)

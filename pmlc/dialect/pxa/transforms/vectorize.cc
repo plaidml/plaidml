@@ -151,7 +151,7 @@ private:
 
     auto memrefType =
         MemRefType::get(vectorType.getShape(), vectorType.getElementType());
-    auto vecMem = builder.create<AllocOp>(loc, memrefType);
+    auto vecMem = builder.create<memref::AllocOp>(loc, memrefType);
     SmallVector<Value, 8> vectorIvs{builder.create<ConstantIndexOp>(loc, 0)};
     builder.create<vector::TransferWriteOp>(loc, operand, vecMem, vectorIvs);
 
@@ -207,10 +207,10 @@ private:
     SmallVector<Value, 8> vectorIvs{builder.create<ConstantIndexOp>(loc, 0)};
 
     mlir::Value operand1 = op.getOperand(0);
-    auto vecMem1 = builder.create<AllocOp>(loc, memrefType);
+    auto vecMem1 = builder.create<memref::AllocOp>(loc, memrefType);
     builder.create<vector::TransferWriteOp>(loc, operand1, vecMem1, vectorIvs);
     mlir::Value operand2 = op.getOperand(1);
-    auto vecMem2 = builder.create<AllocOp>(loc, memrefType);
+    auto vecMem2 = builder.create<memref::AllocOp>(loc, memrefType);
     builder.create<vector::TransferWriteOp>(loc, operand2, vecMem2, vectorIvs);
 
     auto parallelOp = builder.create<AffineParallelOp>(
