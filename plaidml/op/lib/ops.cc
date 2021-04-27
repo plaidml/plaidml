@@ -790,16 +790,15 @@ void validate_conv_result_shape(size_t spatial_rank, const std::vector<int64_t>&
                                 bool infer_result_shape, std::stringstream& args_log) {
   if (result_shape.empty()) {
     if (deriv_mode != ConvDerivMode::NONE && !infer_result_shape) {
-      IVLOG(0, "Bad convolution, arguments:\n" << args_log.str());
+      IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
       throw std::runtime_error(
           "Transposed/gradient convolutions require specifying the result_shape. This can be bypassed by setting "
           "infer_result_shape = true, but be warned that infered result shapes do not necessarily match the input "
           "shape used in the forward convolution, as multiple input shapes produce the same output shape.");
     }
   } else {
-    IVLOG(0, "Result shape size: " << result_shape.size());
     if (result_shape.size() != spatial_rank) {
-      IVLOG(0, "Bad convolution, arguments:\n" << args_log.str());
+      IVLOG(2, "Bad convolution, arguments:\n" << args_log.str());
       throw std::runtime_error(
           llvm::formatv("Inconsistent spatial rank in conv op (received {0} spatial dimensions based on strides "
                         "but result shape has {1} spatial dims).",
@@ -920,7 +919,7 @@ Value convolution(const Value& value) {
   auto autogroup_mode = validate<AutoGroupMode>(args[14].as_int());
   auto deriv_mode = validate<ConvDerivMode>(args[15].as_int());
   auto result_shape = args[16].as_int_tuple_or_empty();
-  auto infer_result_shape = true;  // args[17].as_bool();
+  auto infer_result_shape = args[17].as_bool();
 
   // Construct a string to log the arguments if something throws
   std::stringstream args_log;
