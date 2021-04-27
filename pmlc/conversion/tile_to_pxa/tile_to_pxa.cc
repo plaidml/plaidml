@@ -843,6 +843,58 @@ struct ShapeOpConversion : public OpConversionPattern<tile::ShapeOp> {
   }
 };
 
+// struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
+//   using OpConversionPattern<FromOpType>::OpConversionPattern;
+
+//   LogicalResult match(Operation *op) const final {
+//     Matcher pred;
+//     return pred(op);
+//   }
+
+//   void rewrite(FromOpType op, ArrayRef<Value> operands,
+//                ConversionPatternRewriter &rewriter) const final {
+//     auto loc = op.getLoc();
+//     BufferAllocator alloc(rewriter, op.getOperation(),
+//     op.result().getType());
+
+//     // Make a parallel for loop to fill the result
+//     auto forOp = rewriter.create<AffineParallelOp>(
+//         loc,
+//         /*resultTypes=*/ArrayRef<Type>{alloc.memRefType},
+//         /*reductions=*/ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign},
+//         /*ranges=*/alloc.rankedTensorType.getShape());
+//     auto body = forOp.getBody();
+//     rewriter.setInsertionPointToStart(body);
+
+//     // Create the loads
+//     SmallVector<Value, 4> scalars;
+//     for (size_t i = 0; i < operands.size(); i++) {
+//       auto maybePadding = tile::getPaddingInfo(
+//           op.getOperation()->getOperand(i).getDefiningOp());
+//       scalars.push_back(buildBroadcastLoad(rewriter, loc, operands[i],
+//                                            alloc.memRefType.getRank(),
+//                                            maybePadding));
+//     }
+
+//     // Create the standard op
+//     SmallVector<Type, 4> operandTypes;
+//     for (auto type : op.getOperation()->getOperandTypes()) {
+//       operandTypes.push_back(getElementType(type));
+//     }
+//     IntoOpBuilder intoOpBuilder;
+//     auto result = intoOpBuilder.create(rewriter, loc, alloc.elementType,
+//                                        scalars, operandTypes);
+
+//     // Create the store
+//     auto stored = buildSimpleStore(rewriter, loc, result, alloc.resultMemRef,
+//                                    tile::getPaddingInfo(op));
+//     rewriter.create<AffineYieldOp>(loc, ValueRange{stored});
+
+//     // Replace output with the newly allocated buffer
+//     rewriter.replaceOp(op, forOp.getResult(0));
+//   }
+// };
+
 struct CastOpConversion : public OpConversionPattern<tile::CastOp> {
   using OpConversionPattern<tile::CastOp>::OpConversionPattern;
 
@@ -851,40 +903,36 @@ struct CastOpConversion : public OpConversionPattern<tile::CastOp> {
                   ConversionPatternRewriter &rewriter) const override {
     auto loc = op.getLoc();
     TileToPXATypeConverter typeConverter;
-    auto oldResultType = op.result().getType();
-    auto resultType =
-        typeConverter.convertType(oldResultType).cast<MemRefType>();
     auto operand = operands[0];
-    if (resultType == operand.getType()) {
+    if (op.result().getType() == operand.getType()) {
       rewriter.replaceOp(op, operand);
       return success();
     }
 
-    // Make an allocation for the output
-    auto resultMemRef =
-        rewriter.create<memref::AllocOp>(loc, resultType).getResult();
+    BufferAllocator alloc(rewriter, op.getOperation(), op.result().getType());
 
     // Make a parallel for loop to fill the result
     auto forOp = rewriter.create<AffineParallelOp>(
         loc,
-        /*resultTypes=*/ArrayRef<Type>{resultType},
+        /*resultTypes=*/ArrayRef<Type>{alloc.memRefType},
         /*reductions=*/ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign},
-        /*ranges=*/resultType.getShape());
+        /*ranges=*/alloc.rankedTensorType.getShape());
     auto body = forOp.getBody();
     rewriter.setInsertionPointToStart(body);
 
     // Create the load
     auto scalar =
-        buildBroadcastLoad(rewriter, loc, operand, resultType.getRank());
+        buildBroadcastLoad(rewriter, loc, operand, alloc.memRefType.getRank());
 
     // Create the standard cast op
     auto dtype = getElementType(op.tensor());
-    bool resultIsSigned = getElementType(oldResultType).isSignedInteger();
+    bool resultIsSigned =
+        getElementType(op.result().getType()).isSignedInteger();
     auto result = createCastOp(rewriter, loc, scalar, dtype.isSignedInteger(),
-                               resultType.getElementType(), resultIsSigned);
+                               alloc.elementType, resultIsSigned);
 
     // Create the store
-    auto stored = buildSimpleStore(rewriter, loc, result, resultMemRef,
+    auto stored = buildSimpleStore(rewriter, loc, result, alloc.resultMemRef,
                                    tile::getPaddingInfo(op));
     rewriter.create<AffineYieldOp>(loc, ValueRange{stored});
 
