@@ -135,6 +135,7 @@ add_subdirectory(plaidbench)
 add_subdirectory(plaidml)
 add_subdirectory(pmlc)
 add_subdirectory(docs)
+add_subdirectory(networks)
 
 # Note: this must be called after all libraries have been declared.
 pml_complete_binary_link_options()
