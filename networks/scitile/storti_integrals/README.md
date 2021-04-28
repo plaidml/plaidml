@@ -1,48 +1,7 @@
+This is an eDSL implementation of volume and surface integrals as defined in : [Treat all Integrals as Volume Integraks: A unified, parallel, grid based method for evaluation of volume, surface and path integrals on implicitly defined domains ](https://asmedigitalcollection.asme.org/computingengineering/article-abstract/18/2/021013/371579/Treat-All-Integrals-as-Volume-Integrals-A-Unified?redirectedFrom=fulltext)
 
-Instructions
 -------------------------------------------------------------------
-How to run the EDSL examples
+How to run this eDSL example using devkit 
 -------------------------------------------------------------------
 
-1. Create a python environment 
-
-```
-virtualenv plaidml-venv
-source plaidml-venv/bin/activate
-```
-
-2. Download and install plaidml2
-
-  * Go to: https://buildkite.com/plaidml/plaidml-plaidml/builds?branch=master
-  * Click on the platform that you are using 
-  * Click on artifacts 
-  * download the plaidml2 wheel for your platform
-
-```
-pip install /path/to/the/downloaded/wheel
-```
-
-4. Run plaidml2 setup
-
-```
-plaidml2-setup
-```
-
-4. Grab the EDSL example code that you would like to run
-
-```
-wget https://raw.githubusercontent.com/plaidml/plaidml/master/networks/scitile/storti_integrals/op.py
-wget https://raw.githubusercontent.com/plaidml/plaidml/master/networks/scitile/storti_integrals/torus.py
-```
-
-5. run the example 
-
-```
-python torus.py 
-```
-
-6. depending on which example you choose you run you might need additinal dependencies like matplotlib
-
-```
-pip install matplotlib
-```
+TODO

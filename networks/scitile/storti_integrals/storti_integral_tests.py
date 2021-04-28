@@ -2,15 +2,15 @@ import unittest
 import numpy.testing as npt
 import os
 import math
-from networks.scitile.storti_integrals.torus import toroidal_shell_integral_moment_of_innertia_exact
-from networks.scitile.storti_integrals.torus import torus_surface_area_exact
-from networks.scitile.storti_integrals.torus import torus_volume_exact
-from networks.scitile.storti_integrals.torus import torus
-from networks.scitile.storti_integrals.torus import integrand_inertia
-from networks.scitile.storti_integrals.hypersphere import hypersphere
-from networks.scitile.storti_integrals.hypersphere import hypersphere_area_exact
-from networks.scitile.storti_integrals.hypersphere import hypersphere_volume_exact
-from networks.scitile.storti_integrals.op import *
+from torus import toroidal_shell_integral_moment_of_innertia_exact
+from torus import torus_surface_area_exact
+from torus import torus_volume_exact
+from torus import torus
+from torus import integrand_inertia
+from hypersphere import hypersphere
+from hypersphere import hypersphere_area_exact
+from hypersphere import hypersphere_volume_exact
+from op import *
 
 DEFAULT_TOL = 1e-2
 DEFAULT_ATOL = 1e-8
@@ -54,7 +54,7 @@ class TorusTest(unittest.TestCase):
         result = integral_volume(N, minval, maxval, eps, torus, [R, r])
         npt.assert_allclose(result, exact_value, rtol=DEFAULT_TOL, atol=DEFAULT_ATOL)
 
-    def test_hypershpere_area(self):
+    def test_hypersphere_area(self):
         R = 1.0  # radius
         p = 2.0  # Lp distance measure
         N = 32
@@ -66,7 +66,7 @@ class TorusTest(unittest.TestCase):
                                           integrand_empty_4D)
         npt.assert_allclose(result, exact_value, rtol=DEFAULT_TOL, atol=DEFAULT_ATOL)
 
-    def test_hypershpere_volume(self):
+    def test_hypersphere_volume(self):
         R = 1.0  # radius
         p = 2.0  # Lp distance measure
         N = 32
