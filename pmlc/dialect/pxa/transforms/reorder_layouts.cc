@@ -94,9 +94,7 @@ public:
 
     int count = 0;
     for (auto parallelOp : parallelOps) {
-      if (count == 0) {
-        // tileLoopNestsToAlignWithDataMaps(parallelOp);
-      }
+      /* if (count == 0) */ { tileLoopNestsToAlignWithDataMaps(parallelOp); }
 
       count++;
     }
@@ -580,6 +578,68 @@ MemRefSimplificationResults simplifyMemrefMapsInInnerLoops(
   return results;
 }
 
+MemRefSimplificationResults scaleAndRewriteMemrefMapsInInnerLoops(
+    mlir::AffineMap &map, mlir::ValueRange mapOperands,
+    mlir::AffineParallelOp innerParallelOp,
+    mlir::DenseMap<mlir::Value, mlir::Value> &varMap) {
+  IVLOG(4, "Entered scaleAndRewriteMemrefMapsInInnerLoops()");
+
+  MemRefSimplificationResults results;
+  results.error = false;
+  IVLOG(4, "map: " << mlir::debugString(map));
+
+  unsigned currentNumDims = map.getNumDims();
+  unsigned newDims = 0;
+  results.newMapFormed = false;
+  mlir::SmallVector<mlir::AffineExpr, 6> simplifiedExprs;
+
+  for (unsigned i = 0; i < mapOperands.size(); i++) {
+    results.resultOperands.push_back(mapOperands[i]);
+  }
+
+  for (unsigned idx = 0; idx < map.getNumResults(); ++idx) {
+    bool expressionAdded = false;
+    mlir::AffineExpr expr = map.getResult(idx);
+    if (expr.getKind() == mlir::AffineExprKind::DimId) {
+      auto dimExpr = expr.cast<mlir::AffineDimExpr>();
+      unsigned pos = dimExpr.getPosition();
+
+      auto varMapIt = varMap.find(mapOperands[pos]);
+      if (varMapIt != varMap.end()) {
+        auto newDimIdExpr =
+            mlir::getAffineDimExpr(currentNumDims + newDims, map.getContext());
+        newDims++;
+        results.resultOperands.push_back(varMapIt->second);
+        // FIXME: Remove the hard coded constant - it needs to be deciphered
+        // from the loop steps
+        int multiplier = 16;
+        simplifiedExprs.push_back(expr * multiplier + newDimIdExpr);
+        expressionAdded = true;
+        results.newMapFormed = true;
+      }
+    }
+
+    if (!expressionAdded) {
+      simplifiedExprs.push_back(expr);
+    }
+  }
+
+  if (results.error) {
+    results.newMapFormed = false;
+    return results;
+  }
+
+  if (results.newMapFormed) {
+    results.simplifiedMap = mlir::AffineMap::get(
+        map.getNumDims() + newDims, 0, simplifiedExprs, map.getContext());
+    IVLOG(4, "resultOperands.size(): " << results.resultOperands.size());
+    IVLOG(4, "simplifiedMap: " << mlir::debugString(results.simplifiedMap));
+  }
+
+  IVLOG(4, "Returning from scaleAndRewriteMemrefMapsInInnerLoops()");
+  return results;
+}
+
 void simplifyMemrefMapsInInnerLoops(
     mlir::AffineParallelOp &parallelOp,
     mlir::DenseMap<mlir::Value, mlir::Value> &varMap) {
@@ -611,17 +671,36 @@ void simplifyMemrefMapsInInnerLoops(
     IVLOG(4, "map: " << mlir::debugString(map));
 
     mlir::OpBuilder builder(reduceOp);
-    MemRefSimplificationResults results = simplifyMemrefMapsInInnerLoops(
-        map, reduceOp.idxs(), parallelOp, varMap);
 
-    if (results.newMapFormed) {
-      mlir::Value reduceRes = builder.create<PxaReduceOp>(
-          reduceOp.getLoc(), reduceOp.getAgg(), reduceOp.val(),
-          reduceOp.getMemRef(), results.simplifiedMap,
-          /* reduceOp.idxs() */ results.resultOperands);
+    {
+      MemRefSimplificationResults results = simplifyMemrefMapsInInnerLoops(
+          map, reduceOp.idxs(), parallelOp, varMap);
 
-      reduceOp.replaceAllUsesWith(reduceRes);
-      reduceOp.erase();
+      if (results.newMapFormed) {
+        mlir::Value reduceRes = builder.create<PxaReduceOp>(
+            reduceOp.getLoc(), reduceOp.getAgg(), reduceOp.val(),
+            reduceOp.getMemRef(), results.simplifiedMap,
+            results.resultOperands);
+
+        reduceOp.replaceAllUsesWith(reduceRes);
+        reduceOp.erase();
+      }
+    }
+
+    {
+      MemRefSimplificationResults results =
+          scaleAndRewriteMemrefMapsInInnerLoops(map, reduceOp.idxs(),
+                                                parallelOp, varMap);
+
+      if (results.newMapFormed) {
+        mlir::Value reduceRes = builder.create<PxaReduceOp>(
+            reduceOp.getLoc(), reduceOp.getAgg(), reduceOp.val(),
+            reduceOp.getMemRef(), results.simplifiedMap,
+            results.resultOperands);
+
+        reduceOp.replaceAllUsesWith(reduceRes);
+        reduceOp.erase();
+      }
     }
   });
 
@@ -767,6 +846,30 @@ void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {
           // something like the following: Lower bounds: (d0, d1, d2 floordiv
           // 16, d3 floordiv 16, d4, d5) Upper bounds: (d0 + 1, d1 + 1, d2
           // floordiv 16 + 1, d3 floordiv 16 + 1, d4 + 1, d5 + 1)
+          // TODO: the load/reduce ops' variables need to be modified too if
+          // they depend upon the modified loop variables.
+          /*
+              %8 = affine.parallel (%arg0, %arg1, %arg2, %arg3, %arg4, %arg5,
+            %arg6) = (0, 0, 0, 0, 0, 0, 0) to (1, 56, 56, 64, 3, 3, 64) step (1,
+            1, 1, 16, 1, 1, 16) reduce ("assign") -> (memref<1x56x56x64xf32>) {
+                %10 = affine.parallel (%arg7, %arg8, %arg9, %arg10, %arg11,
+            %arg12, %arg13, %arg14, %arg15) = (%arg0, %arg1, %arg2, %arg3
+            floordiv 16, %arg4, %arg5, %arg6 floordiv 16, 0, 0) to (%arg0 + 1,
+            %arg1 + 1, %arg2 + 1, %arg3 floordiv 16 + 1, %arg4 + 1, %arg5 + 1,
+            %arg6 floordiv 16 + 1, 16, 16) reduce ("assign") ->
+            (memref<1x56x56x64xf32>) { %11 = pxa.load %4[%arg7, %arg13, %arg8 +
+            %arg11, %arg9 + %arg12, %arg15] : memref<1x4x58x58x16xf32> %12 =
+            pxa.load %6[%arg13, %arg10, %arg11, %arg12, %arg15, %arg14] :
+            memref<4x4x3x3x16x16xf32> %13 = mulf %11, %12 : f32 %14 = pxa.reduce
+            addf %13, %7[%arg7, %arg8, %arg9, %arg10] : memref<1x56x56x64xf32>
+                  affine.yield %14 : memref<1x56x56x64xf32>
+                }
+                affine.yield %10 : memref<1x56x56x64xf32>
+              }
+
+            pxa.reduce addf %13, %7[%arg7, %arg8, %arg9, %arg10] ->
+            pxa.reduce addf %13, %7[%arg7, %arg8, %arg9, %arg10 * 16 + %arg14]
+          */
           for (size_t i = 0; i < tileSizes.size(); i++) {
             if (tileSizes[i] != 1) {
               lowerBoundsMap.setResult(
