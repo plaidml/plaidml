@@ -851,11 +851,6 @@ struct CastOpConversion : public OpConversionPattern<tile::CastOp> {
                   ConversionPatternRewriter &rewriter) const override {
     auto loc = op.getLoc();
     TileToPXATypeConverter typeConverter;
-    auto operand = operands[0];
-    if (op.result().getType() == operand.getType()) {
-      rewriter.replaceOp(op, operand);
-      return success();
-    }
 
     BufferAllocator alloc(rewriter, op.getOperation(), op.result().getType());
 
@@ -869,8 +864,8 @@ struct CastOpConversion : public OpConversionPattern<tile::CastOp> {
     rewriter.setInsertionPointToStart(body);
 
     // Create the load
-    auto scalar =
-        buildBroadcastLoad(rewriter, loc, operand, alloc.memRefType.getRank());
+    auto scalar = buildBroadcastLoad(rewriter, loc, operands[0],
+                                     alloc.memRefType.getRank());
 
     // Create the standard cast op
     auto dtype = getElementType(op.tensor());

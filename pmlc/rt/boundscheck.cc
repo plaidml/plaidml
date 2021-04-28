@@ -20,8 +20,7 @@ extern "C" void _mlir_ciface_plaidml_rt_bounds_check(intptr_t index,
 namespace pmlc::rt {
 
 void registerBoundsCheck() {
-  using pmlc::rt::registerSymbol;
-  registerSymbol(
+  pmlc::rt::registerSymbol(
       "_mlir_ciface_plaidml_rt_bounds_check",
       reinterpret_cast<void *>(_mlir_ciface_plaidml_rt_bounds_check));
 }
