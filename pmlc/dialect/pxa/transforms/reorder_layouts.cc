@@ -92,8 +92,13 @@ public:
       }
     }
 
+    int count = 0;
     for (auto parallelOp : parallelOps) {
-      tileLoopNestsToAlignWithDataMaps(parallelOp);
+      if (count == 0) {
+        // tileLoopNestsToAlignWithDataMaps(parallelOp);
+      }
+
+      count++;
     }
 
     // Erase the affine maps attached to the memrefs
@@ -565,7 +570,8 @@ MemRefSimplificationResults simplifyMemrefMapsInInnerLoops(
 
   if (results.newMapFormed) {
     results.simplifiedMap = mlir::AffineMap::get(
-        map.getNumResults(), 0, simplifiedExprs, map.getContext());
+        map.getNumDims() + newDims, 0, simplifiedExprs, map.getContext());
+    IVLOG(4, "resultOperands.size(): " << results.resultOperands.size());
     IVLOG(4, "simplifiedMap: " << mlir::debugString(results.simplifiedMap));
   }
 
@@ -836,7 +842,7 @@ void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {
 
           // TODO: Establish the conditions under which simplifying the affine
           // expressions is OK
-          // simplifyMemrefMapsInInnerLoops(innerLoops, varMap);
+          simplifyMemrefMapsInInnerLoops(innerLoops, varMap);
         }
       }
     }
