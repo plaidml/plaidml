@@ -12,13 +12,13 @@ from plaidml import Program
 DEFAULT_DEVICE = 'llvm_cpu.0'
 DEFAULT_TARGET = 'llvm_cpu'
 
-from plaidml.edsl.examples.complex_conv_2d import *
-from plaidml.edsl.examples.conv_1d import *
-from plaidml.edsl.examples.conv_2d_dilated import *
-from plaidml.edsl.examples.gemm import *
-from plaidml.edsl.examples.gemv import *
-from plaidml.edsl.examples.max_pool_1d import *
-from plaidml.edsl.examples.quantize import *
+from complex_conv_2d import *
+from conv_1d import *
+from conv_2d_dilated import *
+from gemm import *
+from gemv import *
+from max_pool_1d import *
+from quantize import *
 
 
 class TestEdslExamples(unittest.TestCase):
