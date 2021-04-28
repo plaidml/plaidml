@@ -12,6 +12,7 @@
 using namespace plaidml;          // NOLINT[build/namespaces]
 using namespace InferenceEngine;  // NOLINT[build/namespaces]
 using Direction = edsl::SortDirection;
+using SortType = op::TopKSortType;
 using Mode = ngraph::opset4::TopK::Mode;
 using Sort = ngraph::opset4::TopK::SortType;
 
@@ -26,7 +27,6 @@ void registerTopK() {
     auto axis = layer->get_axis();
     auto mode = layer->get_mode();
     auto sort = layer->get_sort_type();
-    long ndims = I.rank();
 
     Direction direction;
     switch (mode) {
@@ -40,43 +40,23 @@ void registerTopK() {
         THROW_IE_EXCEPTION << "invalid topk sort mode";
     }
 
-    edsl::Tensor values = op::sort(I, axis, direction);
-    edsl::Tensor indices = edsl::argsort(I, axis, direction);
-    edsl::Tensor idxs_topk = edsl::gather(indices, edsl::index({edsl::TensorDim(K)}, 0)).axis(axis);
-    std::vector<edsl::Tensor> Os;
-
+    SortType sort_type;
     switch (sort) {
+      case Sort::SORT_VALUES:
+        sort_type = SortType::VALUE;
+        break;
+      case Sort::SORT_INDICES:
+        sort_type = SortType::INDEX;
+        break;
       case Sort::NONE:
         // TODO: According to OV specs, the behavior of Sort::NONE is undefined.
         THROW_IE_EXCEPTION << "SortType::NONE is not implemented";
         break;
-      case Sort::SORT_INDICES: {
-        std::vector<edsl::Tensor> comb_idxs;
-        std::vector<edsl::TensorDim> idxs_dims(ndims);
-        idxs_topk.bind_dims(idxs_dims);
-        auto idxs_topk_sorted = op::sort(idxs_topk, axis, Direction::ASC);
-        for (int i = 0; i < ndims; i++) {
-          if (i == axis) {
-            comb_idxs.push_back(op::unsqueeze(idxs_topk_sorted, {ndims}));
-          } else {
-            comb_idxs.push_back(op::unsqueeze(edsl::index(idxs_dims, i), {ndims}));
-          }
-        }
-        auto idxs_nd = op::concatenate(comb_idxs, -1);
-        auto vals_topk = edsl::gather(I, idxs_nd).mode(edsl::GatherMode::ND);
-        Os.push_back(vals_topk);
-        Os.push_back(idxs_topk_sorted);
-      } break;
-      case Sort::SORT_VALUES: {
-        edsl::Tensor vals_topk_sorted = edsl::gather(values, edsl::index({edsl::TensorDim(K)}, 0)).axis(axis);
-        Os.push_back(vals_topk_sorted);
-        Os.push_back(idxs_topk);
-      } break;
-      default:
-        THROW_IE_EXCEPTION << "invalid topk sort type";
     }
 
-    return edsl::make_tuple(Os);
+    auto O = op::topk(I, K).axis(axis).sort_direction(direction).sort_type(sort_type).build();
+
+    return edsl::make_tuple(O);
   });
 }
 
