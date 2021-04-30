@@ -92,10 +92,11 @@ public:
       }
     }
 
-    int count = 0;
+    static int count = 0;
     for (auto parallelOp : parallelOps) {
-      /* if (count == 0) */ { tileLoopNestsToAlignWithDataMaps(parallelOp); }
-
+      if (count == 0) {
+        tileLoopNestsToAlignWithDataMaps(parallelOp);
+      }
       count++;
     }
 
@@ -584,6 +585,10 @@ MemRefSimplificationResults scaleAndRewriteMemrefMapsInInnerLoops(
     mlir::DenseMap<mlir::Value, mlir::Value> &varMap) {
   IVLOG(4, "Entered scaleAndRewriteMemrefMapsInInnerLoops()");
 
+  auto innerLoopLengths = innerParallelOp.getConstantRanges();
+  mlir::Block *body = innerParallelOp.getBody();
+  auto innerIdxs = body->getArguments();
+
   MemRefSimplificationResults results;
   results.error = false;
   IVLOG(4, "map: " << mlir::debugString(map));
@@ -610,9 +615,21 @@ MemRefSimplificationResults scaleAndRewriteMemrefMapsInInnerLoops(
             mlir::getAffineDimExpr(currentNumDims + newDims, map.getContext());
         newDims++;
         results.resultOperands.push_back(varMapIt->second);
-        // FIXME: Remove the hard coded constant - it needs to be deciphered
-        // from the loop steps
-        int multiplier = 16;
+        auto loopVar = varMapIt->second;
+        int64_t multiplier = -1;
+        for (size_t loopPos = 0; loopPos < innerIdxs.size(); loopPos++) {
+          if (innerIdxs[loopPos] == loopVar) {
+            multiplier = innerLoopLengths.getValue()[loopPos];
+          }
+        }
+
+        if (multiplier == -1) {
+          IVLOG(4, "The multiplier value couldn't be determined. Exiting");
+          exit(1);
+        }
+
+        IVLOG(4, "Multiplier: " << multiplier);
+
         simplifiedExprs.push_back(expr * multiplier + newDimIdExpr);
         expressionAdded = true;
         results.newMapFormed = true;
