@@ -71,7 +71,7 @@ public:
       IVLOG(3, "Optimized layout: " << mlir::debugString(reorder.reorderMap));
       if (mlir::succeeded(convertMemoryLayout(memoryDesc.value, reorder))) {
         if (memoryDesc.parallelOp.hasValue()) {
-          parallelOps.insert(memoryDesc.parallelOp.getValue());
+          // parallelOps.insert(memoryDesc.parallelOp.getValue());
         }
 
         continue;
@@ -88,15 +88,13 @@ public:
       reorderMemoryReads(createReorder, reorder, memoryDesc, moduleOp,
                          toRemove);
       if (memoryDesc.parallelOp.hasValue()) {
-        parallelOps.insert(memoryDesc.parallelOp.getValue());
+        // parallelOps.insert(memoryDesc.parallelOp.getValue());
       }
     }
 
     static int count = 0;
     for (auto parallelOp : parallelOps) {
-      if (count == 0) {
-        tileLoopNestsToAlignWithDataMaps(parallelOp);
-      }
+      /* if (count < 6) */ { tileLoopNestsToAlignWithDataMaps(parallelOp); }
       count++;
     }
 
@@ -256,6 +254,7 @@ void recognizeConvsAndInsertBlockedDataLayouts(
                                     m_Capture(&load2, mlir::m_Op<PxaLoadOp>())),
                                 m_Any()))))) {
         IVLOG(4, "Conv2d found");
+        IVLOG(4, "Conv2dParallel Op: " << mlir::debugString(parallelOp));
 
         // Output - Input = %arg114 (the output channel)
         // Output - filter = %arg111, %arg112, %arg113 (NHW)
@@ -967,6 +966,8 @@ void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {
       }
     }
   }
+
+  IVLOG(4, "modified_parallelOp: " << mlir::debugString(parallelOp));
 }
 // =============================================================================
 // gatherGlobalMemoryDescs - helpers and implementation.
