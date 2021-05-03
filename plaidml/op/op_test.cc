@@ -264,6 +264,24 @@ ConvolutionParams convParams[] = {
 
 INSTANTIATE_TEST_CASE_P(Suite, ConvolutionTest, ::testing::ValuesIn(convParams));
 
+TEST_F(OpTest, CastConv) {
+  auto I = Placeholder(DType::UINT8, {1, 3, 256, 256});
+  auto K = Placeholder(DType::UINT8, {64, 3, 3, 3});
+  auto I_f16 = edsl::cast(I, DType::FLOAT16);
+  auto K_f16 = edsl::cast(K, DType::FLOAT16);
+  auto conv = op::convolution(I_f16, K_f16);
+
+  conv.name("conv1")
+      .strides({1, 1})
+      .dilations({1, 1})
+      .autopad_mode(op::AutoPadMode::EXPLICIT)
+      .manual_padding({1, 1, 1, 1})
+      .input_layout(op::TensorLayout::NCX)
+      .filter_layout(op::TensorLayout::KCX);
+  auto program = makeProgram("convolution", {I, K}, {conv});
+  runProgram(program);
+}
+
 TEST_F(OpTest, CumProd) {
   auto I = Placeholder(DType::FLOAT32, {7, 7, 3, 64}, "I");
   auto program = makeProgram("cumprod", {I}, {op::cumprod(I, 2)});
