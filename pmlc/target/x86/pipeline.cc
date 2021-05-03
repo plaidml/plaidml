@@ -298,7 +298,7 @@ void pipelineBuilder(OpPassManager &pm) {
 
   pm.addPass(createLowerToCFGPass());
   if (pmlc::util::getEnvVar("PLAIDML_BOUNDS_CHECK") == "1") {
-    pm.addPass(stdx::createBoundsCheckPass());
+    pm.addNestedPass<FuncOp>(stdx::createBoundsCheckPass());
   }
 
   pm.addPass(createLowerToLLVMPass());
