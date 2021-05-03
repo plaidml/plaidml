@@ -850,7 +850,6 @@ struct CastOpConversion : public OpConversionPattern<tile::CastOp> {
   matchAndRewrite(tile::CastOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
     auto loc = op.getLoc();
-    TileToPXATypeConverter typeConverter;
 
     BufferAllocator alloc(rewriter, op.getOperation(), op.result().getType());
 
