@@ -19,7 +19,16 @@ pml_cc_test(
 
 pml_py_test(
   NAME examples_py_test
-  SRC example_tests.py
+  SRC 
+    complex_conv_2d.py
+    conv_1d.py
+    conv_2d_dilated.py
+    conv_2d_dilated.py
+    gemm.py
+    gemv.py
+    max_pool_1d.py
+    quantize.py
+    example_tests.py
   CHECKS
     core
     smoke
