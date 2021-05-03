@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.13.4)
+cmake_minimum_required(VERSION 3.13.4 FATAL_ERROR)
 
 if(POLICY CMP0068)
   cmake_policy(SET CMP0068 NEW)
@@ -11,6 +11,7 @@ endif()
 
 if(POLICY CMP0077)
   cmake_policy(SET CMP0077 NEW)
+  set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 endif()
 
 include(FetchContent)
@@ -18,6 +19,7 @@ include(FetchContent)
 project(PlaidML LANGUAGES C CXX)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
@@ -49,16 +51,12 @@ list(APPEND CMAKE_MODULE_PATH
   ${CMAKE_CURRENT_LIST_DIR}/cmake/third_party
 )
 
-find_program(CCACHE_PROGRAM ccache)
-if(CCACHE_PROGRAM)
-  set(CMAKE_C_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
-  set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
-endif()
-
 # -------------------------------------------------------------------------------
 # Third party dependencies
 # -------------------------------------------------------------------------------
-include(CPM)
+if(PML_INCLUDE_LLVM)
+  include(llvm-project)
+endif()
 include(boost)
 include(easylogging)
 if(NOT InferenceEngineDeveloperPackage_FOUND)
@@ -66,10 +64,6 @@ if(NOT InferenceEngineDeveloperPackage_FOUND)
 endif()
 include(googletest)
 include(half)
-
-if(PML_INCLUDE_LLVM)
-  include(llvm-project)
-endif()
 include(xsmm)
 
 # -------------------------------------------------------------------------------
