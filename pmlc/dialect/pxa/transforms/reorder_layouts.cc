@@ -50,7 +50,11 @@ public:
     mlir::DenseMap<mlir::Value, mlir::AffineMap> memLayoutMaps;
     llvm::SmallSet<mlir::AffineParallelOp, 4> parallelOps;
 
-    recognizeConvsAndInsertBlockedDataLayouts(func, memLayoutMaps, parallelOps);
+    if (recognizeConvsAndInsertBlockedDataLayouts) {
+      recognizeConvsAndInsertBlockedDataLayouts(func, memLayoutMaps,
+                                                parallelOps);
+    }
+
     IVLOG(4, "Size of memLayoutMaps after Convolutions are recognized: "
                  << memLayoutMaps.size());
 
@@ -141,7 +145,7 @@ void createBlockedLayoutForInputTensor(
   mlir::AffineMap map = loadOp.getAffineMap();
   mlir::MLIRContext *context = map.getContext();
 
-  int64_t blockSize = 16;
+  int64_t blockSize = 64;
   if (shape[3] % blockSize == 0) {
     //
     // *NHWC -> NCHW: newMap: (d0 d1 d2 d3) -> (d0 d3 d1 d2)
@@ -190,7 +194,7 @@ void createBlockedLayoutForFilterTensor(
   mlir::AffineMap map = loadOp.getAffineMap();
   mlir::MLIRContext *context = map.getContext();
 
-  int64_t blockSize = 16;
+  int64_t blockSize = 64;
   if (shape[2] % blockSize == 0 && shape[3] % blockSize == 0) {
     // RSCK -> C floordiv 16, K floordiv 16, R, S, C mod 16, K mod 16
     // RSCK -> CKRS (d0 d1 d2 d3) -> (d2 d3 d0 d1)
@@ -1297,10 +1301,10 @@ mlir::Optional<ReorderDesc> optimizeLayoutForReads(
   mlir::Optional<ReorderDesc> selectedReorder = llvm::None;
 
   if (makeUserLayoutsExplicit) {
+    // FIXME: short circuiting other reordering logic
     selectedReorder = chooseUserProvidedTargetLayout(memoryDesc, memLayoutMaps);
+    return selectedReorder;
   }
-
-  return selectedReorder;
 
   if (!selectedReorder.hasValue()) {
     mlir::ArrayRef<int64_t> commonVector;
