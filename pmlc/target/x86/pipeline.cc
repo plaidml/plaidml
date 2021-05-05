@@ -188,6 +188,11 @@ static pxa::StencilCost heatmapCostTransposed(ArrayRef<int64_t> tile,
       })) {
     return pxa::StencilCost{/*throughput=*/0.0, /*startupCost=*/0};
   }
+  IVLOG(6, "Transposing row major [M N K] = ["
+               << tile[0] << " " << tile[1] << " " << tile[2] << "] tile "
+               << "to column major [N M K] = [" << tile[1] << " " << tile[0]
+               << " " << tile[2] << "] tile "
+               << "for lookup in column major x86 heatmap");
   return heatmapCost(ArrayRef<int64_t>{tile[1], tile[0], tile[2]});
 }
 
