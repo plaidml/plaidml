@@ -4,7 +4,12 @@ FetchContent_Declare(
   URL      https://github.com/amrayn/easyloggingpp/archive/v9.96.7.tar.gz
   URL_HASH SHA256=237c80072b9b480a9f2942b903b4b0179f65e146e5dcc64864dc91792dedd722
 )
-FetchContent_MakeAvailable(easyloggingpp)
+
+FetchContent_GetProperties(easyloggingpp)
+if(NOT easyloggingpp_POPULATED)
+  FetchContent_Populate(easyloggingpp)
+  add_subdirectory(${easyloggingpp_SOURCE_DIR} ${easyloggingpp_BINARY_DIR})
+endif()
 
 add_library(easyloggingpp STATIC ${easyloggingpp_SOURCE_DIR}/src/easylogging++.cc)
 target_include_directories(easyloggingpp PUBLIC ${easyloggingpp_SOURCE_DIR}/src)
