@@ -98,7 +98,7 @@ public:
 
     static int count = 0;
     for (auto parallelOp : parallelOps) {
-      /* if (count < 6) */ { tileLoopNestsToAlignWithDataMaps(parallelOp); }
+      /* if (count < 10) */ { tileLoopNestsToAlignWithDataMaps(parallelOp); }
       count++;
     }
 
@@ -183,7 +183,8 @@ void createBlockedLayoutForInputTensor(
     memLayoutMaps.insert({loadOp.getMemRef(), newBlockedMap});
   }
 }
-void createBlockedLayoutForFilterTensor(
+
+bool createBlockedLayoutForFilterTensor(
     PxaLoadOp loadOp,
     mlir::DenseMap<mlir::Value, mlir::AffineMap> &memLayoutMaps) {
   mlir::Value indirectDef = getIndirectDef(loadOp.getMemRef());
@@ -232,7 +233,10 @@ void createBlockedLayoutForFilterTensor(
     IVLOG(4, "newBlockedMap: " << mlir::debugString(newBlockedMap));
 
     memLayoutMaps.insert({loadOp.getMemRef(), newBlockedMap});
+    return true;
   }
+
+  return false;
 }
 
 void recognizeConvsAndInsertBlockedDataLayouts(
@@ -320,8 +324,9 @@ void recognizeConvsAndInsertBlockedDataLayouts(
 
           static int count = 0;
           /* if (count < 1) */ {
-            createBlockedLayoutForInputTensor(input, memLayoutMaps);
-            createBlockedLayoutForFilterTensor(filter, memLayoutMaps);
+            if (createBlockedLayoutForFilterTensor(filter, memLayoutMaps)) {
+              createBlockedLayoutForInputTensor(input, memLayoutMaps);
+            }
           }
 
           parallelOps.insert(parallelOp);
