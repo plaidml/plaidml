@@ -16,12 +16,12 @@ template <>
 struct DenseMapInfo<MemAccess> {
   static inline MemAccess getEmptyKey() {
     MemAccess access;
-    access.memref = DenseMapInfo<mlir::Value>::getEmptyKey();
+    access.memref = DenseMapInfo<Value>::getEmptyKey();
     return access;
   }
   static inline MemAccess getTombstoneKey() {
     MemAccess access;
-    access.memref = DenseMapInfo<mlir::Value>::getTombstoneKey();
+    access.memref = DenseMapInfo<Value>::getTombstoneKey();
     return access;
   }
   static unsigned getHashValue(const MemAccess &val) {

@@ -12,7 +12,7 @@ func @pad_input(%arg0: tensor<10xf32>) -> tensor<10xf32> {
 }
 
 // CHECK-LABEL: func @pad_input
-// CHECK: %[[TMP:.*]] = alloc() : memref<12xf32>
+// CHECK: %[[TMP:.*]] = memref.alloc() : memref<12xf32>
 // CHECK: %[[CLEAR:.*]] = affine.parallel (%{{.*}}) = (0) to (12)
 // CHECK:   pxa.reduce assign %{{.*}}, %[[TMP]][%{{.*}}] : memref<12xf32>
 // CHECK: %[[COPY:.*]] = affine.parallel (%{{.*}}) = (0) to (10)
@@ -40,7 +40,7 @@ func @pad_contraction(%A: tensor<10xf32>, %B: tensor<1xf32>, %C: tensor<3xf32>) 
 }
 
 // CHECK-LABEL: func @pad_contraction
-// CHECK: %[[TMP:.*]] = alloc() : memref<12xf32>
+// CHECK: %[[TMP:.*]] = memref.alloc() : memref<12xf32>
 // fill exterior
 // CHECK: %[[CLEAR:.*]] = affine.parallel (%{{.*}}) = (0) to (12)
 // CHECK:   pxa.reduce assign %{{.*}}, %[[TMP]][%{{.*}}] : memref<12xf32>

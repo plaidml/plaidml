@@ -3,7 +3,9 @@ pml_cc_library(
   HDRS
     passes.h
   SRCS
+    specials.cc
     tile_to_pxa.cc
+    utils.cc
   DEPS
     ::passes-gen
     pmlc::dialect::layer::ir

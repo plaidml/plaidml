@@ -125,8 +125,8 @@ private:
       return std::numeric_limits<double>::infinity();
     }
     double inner_time = tot_inner_loop / cost.throughput;
-    IVLOG(6,
-          "Inner: loop = " << tot_inner_loop << " inner_time = " << inner_time);
+    IVLOG(6, "Inner loop (product of tile size) = " << tot_inner_loop);
+    IVLOG(6, "Inner time (inner loop / throughput) = " << inner_time);
     for (unsigned i = 0; i < getTiledIdxCount(); ++i) {
       IVLOG(6, debugString(perm.indexes[i]) << ": " << tileSize[i]);
     }
@@ -236,10 +236,14 @@ private:
     double perf =
         outer_batches * tot_middle_loop * (cost.startupCost + inner_time);
 
-    IVLOG(3, "Performance = " << perf << "(outer count: " << outer_batches
-                              << ", middle count: " << tot_middle_loop
-                              << ", startup cost: " << cost.startupCost
-                              << ", inner time: " << inner_time << ")");
+    IVLOG(3, "Tile Information:");
+    IVLOG(3, " tile:         "
+                 << "[" << tileSize[0] << " " << tileSize[1] << " "
+                 << tileSize[2] << "]");
+    IVLOG(3, " outer count:  " << outer_batches);
+    IVLOG(3, " middle count: " << tot_middle_loop);
+    IVLOG(3, " startup cost: " << cost.startupCost);
+    IVLOG(3, " inner time:   " << inner_time);
     return perf;
   }
 

@@ -6,11 +6,13 @@ namespace pmlc::rt {
 
 extern void registerBuiltins();
 extern void registerPrng();
+extern void registerBoundsCheck();
 extern void registerXsmm();
 
 void registerRuntime() {
   registerBuiltins();
   registerPrng();
+  registerBoundsCheck();
   registerXsmm();
 }
 

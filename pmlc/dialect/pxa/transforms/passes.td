@@ -49,6 +49,7 @@ def Cache : FunctionPass<"pxa-cache"> {
            /*default=*/"false",
            "Whether cache the whole memory block">
   ];
+  let dependentDialects = ["mlir::memref::MemRefDialect"];
 }
 
 def ConvertMemOp : FunctionPass<"pxa-convert-mem-op"> {
@@ -204,7 +205,7 @@ def ReorderLayouts : FunctionPass<"pxa-reorder-layouts"> {
 
     As an example given input with following structure:
     ```mlir
-      %1 = alloc() : memref<1x58x58x64xf32>
+      %1 = memref.alloc() : memref<1x58x58x64xf32>
       %2 = affine.parallel (%arg3, %arg4, %arg5) = (0, 0, 0) to (56, 56, 64) {
         %7 = pxa.reduce assign %6, %1[0, %arg3 + 1, %arg4 + 1, %arg5]
             : memref<1x58x58x64xf32>
@@ -224,7 +225,7 @@ def ReorderLayouts : FunctionPass<"pxa-reorder-layouts"> {
     ```
     Expected output of the pass would be similar to:
     ```mlir
-      %1 = alloc() : memref<1x58x4x58x2x8xf32>
+      %1 = memref.alloc() : memref<1x58x4x58x2x8xf32>
       %2 = affine.parallel (%arg3, %arg4, %arg5) = (0, 0, 0) to (56, 56, 64) {
         %7 = pxa.reduce assign %6, %1[
             0, %arg3 + 1, %arg5 floordiv 16, %arg4 + 1, %arg5 floordiv 8 % 2,

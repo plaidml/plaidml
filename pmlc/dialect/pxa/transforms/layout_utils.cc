@@ -1,10 +1,12 @@
 // Copyright 2020, Intel Corporation
+
 #include "pmlc/dialect/pxa/transforms/layout_utils.h"
 
 #include <list>
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
-#include "mlir/Support/DebugStringHelper.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
+
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/util/logging.h"
 #include "pmlc/util/tags.h"
@@ -16,13 +18,10 @@ mlir::Value createReorder(mlir::Location loc, mlir::OpBuilder &builder,
                           ReorderDesc &desc, mlir::Value srcMem) {
   // Allocate new memory.
   auto srcMemType = srcMem.getType().cast<mlir::MemRefType>();
-  IVLOG(3, "srcMemType: " << mlir::debugString(srcMemType));
-  mlir::MemRefType newMemType = mlir::MemRefType::Builder(
-      desc.reorderedShape, srcMemType.getElementType());
+  mlir::MemRefType newMemType =
+      mlir::MemRefType::Builder(srcMemType).setShape(desc.reorderedShape);
+  mlir::Value newMem = builder.create<mlir::memref::AllocOp>(loc, newMemType);
 
-  IVLOG(3, "newMemType: " << mlir::debugString(newMemType));
-  mlir::Value newMem = builder.create<mlir::AllocOp>(loc, newMemType);
-  IVLOG(3, "newMem: " << mlir::debugString(newMem));
   // Create `affine.parallel` that will perform copy with reordering.
   auto parallel = builder.create<mlir::AffineParallelOp>(
       loc, mlir::ArrayRef<mlir::Type>{newMem.getType()},
@@ -56,7 +55,7 @@ struct LayoutConverter {
       : reorderDesc(desc), builder(context) {}
 
   /// Checks whether indirect use-chain can be converted to new layout.
-  bool checkCanConvert(mlir::AllocOp allocOp);
+  bool checkCanConvert(mlir::memref::AllocOp allocOp);
   bool checkCanConvert(mlir::Value val);
 
   /// Check cases for specific operation kinds.
@@ -66,13 +65,13 @@ struct LayoutConverter {
 
   /// Converts layout for all indirect users by transforming affine maps
   /// and recreating operations to update types.
-  void convert(mlir::AllocOp allocOp);
+  void convert(mlir::memref::AllocOp allocOp);
   /// Starts use-chain walk at `val`, which is expected to already have
   /// expected data and shape.
   void convert(mlir::Value val);
 
   /// Convert cases for specific operation kinds.
-  void convertAllocOp(mlir::AllocOp allocOp);
+  void convertAllocOp(mlir::memref::AllocOp allocOp);
   void convertPxaLoadOp(PxaLoadOp loadOp);
   void convertPxaVectorLoadOp(PxaVectorLoadOp loadOp);
   void convertPxaReduceOp(PxaReduceOp reduceOp);
@@ -118,7 +117,7 @@ mlir::LogicalResult convertMemoryLayout(mlir::Value memory, ReorderDesc &desc) {
   auto opResult = memory.dyn_cast<mlir::OpResult>();
   if (!opResult)
     return mlir::failure();
-  auto allocOp = mlir::dyn_cast<mlir::AllocOp>(opResult.getOwner());
+  auto allocOp = mlir::dyn_cast<mlir::memref::AllocOp>(opResult.getOwner());
   if (!allocOp)
     return mlir::failure();
   LayoutConverter ltConverter(desc, memory.getContext());
@@ -134,7 +133,7 @@ mlir::LogicalResult convertMemoryLayout(mlir::Value memory, ReorderDesc &desc) {
 // LayoutConverter implementation
 // =============================================================================
 
-bool LayoutConverter::checkCanConvert(mlir::AllocOp allocOp) {
+bool LayoutConverter::checkCanConvert(mlir::memref::AllocOp allocOp) {
   return checkCanConvert(allocOp.getResult());
 }
 
@@ -190,7 +189,7 @@ bool LayoutConverter::checkYieldOp(mlir::AffineYieldOp yieldOp,
   return false;
 }
 
-void LayoutConverter::convert(mlir::AllocOp allocOp) {
+void LayoutConverter::convert(mlir::memref::AllocOp allocOp) {
   convertAllocOp(allocOp);
   convertWorkQueue();
 }
@@ -223,7 +222,7 @@ void LayoutConverter::convertWorkQueue() {
   }
 }
 
-void LayoutConverter::convertAllocOp(mlir::AllocOp allocOp) {
+void LayoutConverter::convertAllocOp(mlir::memref::AllocOp allocOp) {
   builder.setInsertionPoint(allocOp.getOperation());
 
   mlir::MemRefType oldMemType = allocOp.getType();
@@ -231,7 +230,7 @@ void LayoutConverter::convertAllocOp(mlir::AllocOp allocOp) {
                                     .setShape(reorderDesc.reorderedShape);
 
   mlir::Value newMemory =
-      builder.create<mlir::AllocOp>(allocOp.getLoc(), newMemType);
+      builder.create<mlir::memref::AllocOp>(allocOp.getLoc(), newMemType);
   allocOp.replaceAllUsesWith(newMemory);
   allocOp.erase();
   workQueue.push_back(newMemory);

@@ -1,7 +1,7 @@
 // RUN: pmlc-opt -pxa-fusion -pxa-normalize -canonicalize %s | FileCheck %s
 
 func @simple_fusion(%A: memref<2x3xf32>, %B: memref<2x3xf32>, %C: memref<2x3xf32>, %D: memref<2x3xf32>) -> memref<2x3xf32> {
-  %T = alloc() : memref<2x3xf32>
+  %T = memref.alloc() : memref<2x3xf32>
   %4 = affine.parallel (%i, %j) = (0, 0) to (2, 3) reduce ("assign") -> (memref<2x3xf32>) {
     %0 = pxa.load %A[%i, %j] : memref<2x3xf32>
     %1 = pxa.load %B[%i, %j] : memref<2x3xf32>
@@ -35,7 +35,7 @@ func @simple_fusion(%A: memref<2x3xf32>, %B: memref<2x3xf32>, %C: memref<2x3xf32
 // -----
 
 func @fusion_different_idxs(%A: memref<2x3xf32>, %B: memref<2x3xf32>, %C: memref<2x3x4xf32>, %D: memref<2x3x4xf32>) -> memref<2x3x4xf32> {
-  %T = alloc() : memref<2x3xf32>
+  %T = memref.alloc() : memref<2x3xf32>
   %4 = affine.parallel (%i, %j) = (0, 0) to (2, 3) reduce ("assign") -> (memref<2x3xf32>) {
     %0 = pxa.load %A[%i, %j] : memref<2x3xf32>
     %1 = pxa.load %B[%i, %j] : memref<2x3xf32>
@@ -72,7 +72,7 @@ func @fusion_different_idxs(%A: memref<2x3xf32>, %B: memref<2x3xf32>, %C: memref
 func @resnet50_tail(%arg0: memref<1000xf32>, %arg1: memref<1x1000xf32>, %out: memref<1x1000xf32>) -> memref<1x1000xf32> {
   %cst = constant 0xFF800000 : f32
   %cst_1 = constant 0.000000e+00 : f32
-  %1 = alloc() : memref<1x1000xf32>
+  %1 = memref.alloc() : memref<1x1000xf32>
   %2 = affine.parallel (%i) = (0) to (1000) reduce ("assign") -> (memref<1x1000xf32>) {
     %9 = pxa.load %arg1[0, %i] : memref<1x1000xf32>
     %10 = pxa.load %arg0[%i] : memref<1000xf32>
@@ -80,13 +80,13 @@ func @resnet50_tail(%arg0: memref<1000xf32>, %arg1: memref<1x1000xf32>, %out: me
     %12 = pxa.reduce assign %11, %1[0, %i] : memref<1x1000xf32>
     affine.yield %12 : memref<1x1000xf32>
   }
-  %3 = alloc() : memref<1x1000xf32>
+  %3 = memref.alloc() : memref<1x1000xf32>
   %4 = affine.parallel (%i) = (0) to (1000) reduce ("assign") -> (memref<1x1000xf32>) {
     %9 = pxa.load %2[0, %i] : memref<1x1000xf32>
     %10 = pxa.reduce assign %9, %3[0, %i] : memref<1x1000xf32>
     affine.yield %10 : memref<1x1000xf32>
   }
-  %5 = alloc() : memref<1x1xf32>
+  %5 = memref.alloc() : memref<1x1xf32>
   %6 = pxa.reduce assign %cst, %5[0, 0] : memref<1x1xf32>
   %7 = affine.parallel (%i) = (0) to (1000) reduce ("assign") -> (memref<1x1xf32>) {
     %9 = pxa.load %4[0, %i] : memref<1x1000xf32>
