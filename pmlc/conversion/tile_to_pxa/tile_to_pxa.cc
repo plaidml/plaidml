@@ -511,7 +511,7 @@ struct BufferAllocator {
       auto initValue = createInit(builder, loc, elementType, maybePadding->agg);
       auto parallel = builder.create<AffineParallelOp>(
           loc,
-          /*resultTypes=*/ArrayRef<Type>{newMemRefType},
+          /*resultTypes=*/ArrayRef<Type>{memRefType},
           /*reductions=*/ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign},
           /*ranges=*/shape);
       auto parallelBuilder = parallel.getBodyBuilder();
@@ -521,7 +521,6 @@ struct BufferAllocator {
                                      llvm::None);
       parallelBuilder.create<AffineYieldOp>(loc, ValueRange{stored});
       resultMemRef = parallel.getResult(0);
-      IVLOG(4, "resultMemRef2: " << mlir::debugString(resultMemRef));
     }
   }
 };

@@ -13,9 +13,9 @@ func @conv() {
     %cst_0 = constant 0.000000e+00 : f32
     %cst_1 = constant 1.000000e+00 : f32
 
-    %orig31 = alloc() : memref<1x58x58x64xf32> // Input
-    %origArg88 = alloc():  memref<3x3x64x64xf32> // Filter
-    %32 = alloc() : memref<1x56x56x64xf32> // output
+    %orig31 = memref.alloc() : memref<1x58x58x64xf32> // Input
+    %origArg88 = memref.alloc():  memref<3x3x64x64xf32> // Filter
+    %32 = memref.alloc() : memref<1x56x56x64xf32> // output
 
 
      // Input
@@ -69,7 +69,7 @@ func @conv() {
     }
 
 
-  %O_ud = memref_cast %34 : memref<1x56x56x64xf32> to memref<*xf32>
+  %O_ud = memref.cast %34 : memref<1x56x56x64xf32> to memref<*xf32>
   call @print_memref_f32(%O_ud) : (memref<*xf32>) -> ()
 
    return

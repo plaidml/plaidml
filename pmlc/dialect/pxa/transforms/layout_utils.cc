@@ -6,6 +6,7 @@
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Support/DebugStringHelper.h"
 
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/util/logging.h"

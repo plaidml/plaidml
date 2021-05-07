@@ -16,12 +16,12 @@ func @conv() {
     %cst_0 = constant 0.000000e+00 : f32
     %cst_1 = constant 1.000000e+00 : f32
 
-    %orig31 = alloc() : memref<1x58x58x64xf32> // Input
-    %origArg88 = alloc():  memref<3x3x64x64xf32> // Filter
-    %32 = alloc() : memref<1x56x56x64xf32> // output
+    %orig31 = memref.alloc() : memref<1x58x58x64xf32> // Input
+    %origArg88 = memref.alloc():  memref<3x3x64x64xf32> // Filter
+    %32 = memref.alloc() : memref<1x56x56x64xf32> // output
 
-    %origArg3 = alloc() : memref<64xf32> // bias
-    %origArg12 = alloc() : memref<1x1x64x256xf32> // filter2
+    %origArg3 = memref.alloc() : memref<64xf32> // bias
+    %origArg12 = memref.alloc() : memref<1x1x64x256xf32> // filter2
 
 
      // bias
@@ -30,7 +30,7 @@ func @conv() {
       affine.yield %637 : memref<64xf32>
     }
 
-//  %O_ud = memref_cast %arg3 : memref<64xf32> to memref<*xf32>
+//  %O_ud = memref.cast %arg3 : memref<64xf32> to memref<*xf32>
 //  call @print_memref_f32(%O_ud) : (memref<*xf32>) -> ()
 
      // Input
@@ -50,7 +50,7 @@ func @conv() {
       affine.yield %637 : memref<1x58x58x64xf32>
     }
 
-//  %O_ud = memref_cast %31 : memref<1x58x58x64xf32> to memref<*xf32>
+//  %O_ud = memref.cast %31 : memref<1x58x58x64xf32> to memref<*xf32>
 //  call @print_memref_f32(%O_ud) : (memref<*xf32>) -> ()
 
 
@@ -103,10 +103,10 @@ func @conv() {
       affine.yield %640 : memref<1x56x56x64xf32>
     }
 
-//  %O_ud = memref_cast %34 : memref<1x56x56x64xf32> to memref<*xf32>
+//  %O_ud = memref.cast %34 : memref<1x56x56x64xf32> to memref<*xf32>
 //  call @print_memref_f32(%O_ud) : (memref<*xf32>) -> ()
 
-    %35 = alloc() : memref<1x56x56x64xf32>
+    %35 = memref.alloc() : memref<1x56x56x64xf32>
    // conv + bias
     %36 = affine.parallel (%arg111, %arg112, %arg113, %arg114) = (0, 0, 0, 0) to (1, 56, 56, 64) reduce ("assign") -> (memref<1x56x56x64xf32>) {
       %637 = pxa.load %34[0, %arg112, %arg113, %arg114] : memref<1x56x56x64xf32>
@@ -116,10 +116,10 @@ func @conv() {
       affine.yield %640 : memref<1x56x56x64xf32>
     }
 
-//  %O_ud = memref_cast %36 : memref<1x56x56x64xf32> to memref<*xf32>
+//  %O_ud = memref.cast %36 : memref<1x56x56x64xf32> to memref<*xf32>
 //  call @print_memref_f32(%O_ud) : (memref<*xf32>) -> ()
 
-    %37 = alloc() : memref<1x56x56x64xi1>
+    %37 = memref.alloc() : memref<1x56x56x64xi1>
 
     // Comparison with 0
     %38 = affine.parallel (%arg111, %arg112, %arg113, %arg114) = (0, 0, 0, 0) to (1, 56, 56, 64) reduce ("assign") -> (memref<1x56x56x64xi1>) {
@@ -129,7 +129,7 @@ func @conv() {
       affine.yield %639 : memref<1x56x56x64xi1>
     }
 
-    %39 = alloc() : memref<1x56x56x64xf32>
+    %39 = memref.alloc() : memref<1x56x56x64xf32>
    // 0
     %40 = affine.parallel (%arg111, %arg112, %arg113, %arg114) = (0, 0, 0, 0) to (1, 56, 56, 64) reduce ("assign") -> (memref<1x56x56x64xf32>) {
       %637 = pxa.load %36[0, %arg112, %arg113, %arg114] : memref<1x56x56x64xf32>
@@ -137,7 +137,7 @@ func @conv() {
       %639 = pxa.reduce assign %638, %39[%arg111, %arg112, %arg113, %arg114] : memref<1x56x56x64xf32>
       affine.yield %639 : memref<1x56x56x64xf32>
     }
-    %41 = alloc() : memref<1x56x56x64xf32>
+    %41 = memref.alloc() : memref<1x56x56x64xf32>
    // Relu: 0, Conv + bias
     %42 = affine.parallel (%arg111, %arg112, %arg113, %arg114) = (0, 0, 0, 0) to (1, 56, 56, 64) reduce ("assign") -> (memref<1x56x56x64xf32>) {
       %637 = pxa.load %38[0, %arg112, %arg113, %arg114] : memref<1x56x56x64xi1>
@@ -148,11 +148,11 @@ func @conv() {
       affine.yield %641 : memref<1x56x56x64xf32>
     }
 
- // %O_ud2 = memref_cast %42 : memref<1x56x56x64xf32> to memref<*xf32>
+ // %O_ud2 = memref.cast %42 : memref<1x56x56x64xf32> to memref<*xf32>
 //  call @print_memref_f32(%O_ud2) : (memref<*xf32>) -> ()
 
 
-    %43 = alloc() : memref<1x56x56x256xf32>
+    %43 = memref.alloc() : memref<1x56x56x256xf32>
 
     // Initializing output2
     %44 = affine.parallel (%arg111, %arg112, %arg113, %arg114) = (0, 0, 0, 0) to (1, 56, 56, 256) reduce ("assign") -> (memref<1x56x56x256xf32>) {
@@ -172,13 +172,13 @@ func @conv() {
     // Printing the output
     affine.parallel (%arg111, %arg112, %arg113, %arg114) = (0, 0, 0, 0) to (1, 56, 56, 256) {
       %637 = pxa.load %44[%arg111, %arg112, %arg113, %arg114] : memref<1x56x56x256xf32>
-      %638 = alloc() : memref<1xf32>
+      %638 = memref.alloc() : memref<1xf32>
       affine.store %637, %638[0] : memref<1xf32>
-      %O_ud = memref_cast %638 : memref<1xf32> to memref<*xf32>
+      %O_ud = memref.cast %638 : memref<1xf32> to memref<*xf32>
       call @print_memref_f32(%O_ud) : (memref<*xf32>) -> ()
     }
 
-//  %O_ud = memref_cast %45 : memref<1x56x56x256xf32> to memref<*xf32>
+//  %O_ud = memref.cast %45 : memref<1x56x56x256xf32> to memref<*xf32>
 //  call @print_memref_f32(%O_ud) : (memref<*xf32>) -> ()
 
    return
