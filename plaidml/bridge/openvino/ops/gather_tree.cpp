@@ -35,6 +35,7 @@ Tensor GatherTree(Tensor STEP_IDS, Tensor PARENT_IDX, Tensor MAX_SEQ_LEN, Tensor
     THROW_IE_EXCEPTION << "end_token must be a scalar";
   }
 
+  // Add padding to convert dynamic count gather to fixed count gather
   Tensor INDEX_BEAM =
       edsl::index({edsl::TensorDim(max_time), edsl::TensorDim(batch_size), edsl::TensorDim(beam_width)}, 2);
   Tensor INDEX_TIME =
@@ -45,12 +46,13 @@ Tensor GatherTree(Tensor STEP_IDS, Tensor PARENT_IDX, Tensor MAX_SEQ_LEN, Tensor
   Tensor ZERO = edsl::cast(edsl::index({edsl::TensorDim(1)}, 0), STEP_IDS.dtype());
   Tensor ZERO_INT = edsl::cast(ZERO, DType::INT32);
   Tensor INDEX_BB = edsl::gather(INDEX_BEAM, ZERO_INT).axis(0);
+  // The slice behind boundary with keep original sequence
   Tensor PARENT_IDX_NEW = edsl::select(PARENT_IDX_FILTER < 0, PARENT_IDX, edsl::cast(INDEX_BEAM, PARENT_IDX.dtype()));
   Tensor INDEX_BATCH = edsl::index(
       {edsl::TensorDim(max_time), edsl::TensorDim(batch_size), edsl::TensorDim(beam_width), edsl::TensorDim(1)}, 1);
   Tensor PARENT_IDX_COR =
       edsl::cast(op::concatenate({INDEX_BATCH, op::unsqueeze(PARENT_IDX_NEW, {-1})}, -1), DType::INT32);
-
+  // Update index
   std::vector<Tensor> parents;
   Tensor INDEX_A = edsl::index({edsl::TensorDim(batch_size), edsl::TensorDim(beam_width), edsl::TensorDim(1)}, 0);
   Tensor INDEX_B = edsl::index({edsl::TensorDim(batch_size), edsl::TensorDim(beam_width), edsl::TensorDim(1)}, 1);
@@ -71,15 +73,18 @@ Tensor GatherTree(Tensor STEP_IDS, Tensor PARENT_IDX, Tensor MAX_SEQ_LEN, Tensor
   Tensor PARENTS_ND_T =
       edsl::select(PARENTS_ND_FILTER < 0, PARENTS_ND, op::unsqueeze(edsl::cast(INDEX_O, PARENTS_ND.dtype()), {0}));
   Tensor PARENTS_ND_NEW = op::concatenate({op::unsqueeze(INDEX_TIME, {-1}), PARENTS_ND_T}, -1);
+  // Get output value
   Tensor UPDATE = edsl::gather(op::unsqueeze(STEP_IDS, {-1}), PARENTS_ND_NEW).mode(edsl::GatherMode::ND);
+  // Change padding to END_TOKEN
   Tensor OUTPUT = edsl::select(PARENT_IDX_FILTER < 0, op::squeeze(UPDATE, {-1}), END_TOKEN);
 
+  // Check the first decoded END_TOKEN on time axis, values are then filled with END_TOKEN
   Tensor FILTER_A;
   if (OUTPUT.dtype() == DType::FLOAT32) {
     float epsilon = 1e-7f;
     FILTER_A = op::abs(edsl::select(op::abs(OUTPUT - END_TOKEN) < epsilon, OUTPUT, ZERO));
   } else {
-    FILTER_A = edsl::select(OUTPUT == END_TOKEN, OUTPUT, ZERO);
+    FILTER_A = op::abs(edsl::select(OUTPUT == END_TOKEN, OUTPUT, ZERO));
   }
   Tensor FILTER_B = op::cumsum(FILTER_A, 0);
   Tensor OUTPUT_F = edsl::select(FILTER_B < op::abs(END_TOKEN), OUTPUT, END_TOKEN);
