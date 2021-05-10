@@ -16,10 +16,8 @@ const std::vector<InferenceEngine::Precision> netPrecisions = {InferenceEngine::
 
 const std::vector<std::vector<size_t>> inputShapes = {{5, 1, 10}, {1, 1, 10}, {20, 1, 10}, {20, 20, 10}};
 
-const std::vector<ngraph::helpers::InputLayerType> secondaryInputTypes = {
-    ngraph::helpers::InputLayerType::CONSTANT,
-    // ngraph::helpers::InputLayerType::PARAMETER
-};
+const std::vector<ngraph::helpers::InputLayerType> secondaryInputTypes = {ngraph::helpers::InputLayerType::CONSTANT,
+                                                                          ngraph::helpers::InputLayerType::PARAMETER};
 
 INSTANTIATE_TEST_CASE_P(GatherTree, GatherTreeLayerTest,
                         ::testing::Combine(::testing::ValuesIn(inputShapes), ::testing::ValuesIn(secondaryInputTypes),
