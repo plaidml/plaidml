@@ -739,6 +739,112 @@ struct XSMMUnaryExpInvokeF32Lowering
   }
 };
 
+struct XSMMUnaryReluDispatchF32Lowering
+    : public ConvertOpToLLVMPattern<xsmm::UnaryReluDispatchF32Op> {
+  using ConvertOpToLLVMPattern<xsmm::UnaryReluDispatchF32Op>::ConvertOpToLLVMPattern;
+
+  LogicalResult
+  matchAndRewrite(xsmm::UnaryReluDispatchF32Op op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto func = getOrInsertFunc(op, rewriter);
+
+    IntegerType int32Type = rewriter.getI32Type();
+    IntegerType int64Type = rewriter.getI64Type();
+    SmallVector<Value, 4> callOperands;
+
+    // ldi, ldo
+    for (auto attr : op.tileld().getValue()) {
+      callOperands.push_back(
+          rewriter.create<LLVM::ConstantOp>(op->getLoc(), int32Type, attr));
+    }
+
+    // m, n
+    for (auto attr : op.tile().getValue()) {
+      callOperands.push_back(
+          rewriter.create<LLVM::ConstantOp>(op->getLoc(), int32Type, attr));
+    }
+
+    rewriter.replaceOpWithNewOp<LLVM::CallOp>(
+        op, int64Type, rewriter.getSymbolRefAttr(func), callOperands);
+    return success();
+  }
+
+  LLVM::LLVMFuncOp getOrInsertFunc(Operation *op,
+                                   ConversionPatternRewriter &rewriter) const {
+    const char *unaryReluDispatchF32 = "plaidml_rt_xsmm_unary_relu_dispatch_f32";
+
+    auto module = op->getParentOfType<ModuleOp>();
+    auto func = module.lookupSymbol<LLVM::LLVMFuncOp>(unaryReluDispatchF32);
+    if (func)
+      return func;
+
+    OpBuilder::InsertionGuard guard(rewriter);
+    rewriter.setInsertionPointToStart(module.getBody());
+    IntegerType int32Type = rewriter.getI32Type();
+    IntegerType int64Type = rewriter.getI64Type();
+    return rewriter.create<LLVM::LLVMFuncOp>(
+        rewriter.getUnknownLoc(), unaryReluDispatchF32,
+        LLVM::LLVMFunctionType::get(int64Type,
+                                    ArrayRef<Type>{int32Type,  // ldi
+                                                   int32Type,  // ldo
+                                                   int32Type,  // m
+                                                   int32Type},  // n
+                                    /*isVarArg=*/false));
+  }
+};
+
+struct XSMMUnaryReluInvokeF32Lowering
+    : public ConvertOpToLLVMPattern<xsmm::UnaryReluInvokeF32Op> {
+  using ConvertOpToLLVMPattern<xsmm::UnaryReluInvokeF32Op>::ConvertOpToLLVMPattern;
+
+  LogicalResult
+  matchAndRewrite(xsmm::UnaryReluInvokeF32Op op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
+    xsmm::UnaryReluInvokeF32Op::Adaptor transformed(operands);
+    auto inpType = op.i().getType().cast<MemRefType>();
+    auto outType = op.o().getType().cast<MemRefType>();
+
+    auto iIndices = transformed.indices().slice(0, inpType.getRank());
+    auto iPtr = getStridedElementPtr(op->getLoc(), inpType, transformed.i(),
+                                     iIndices, rewriter);
+
+
+    auto oIndices = transformed.indices().slice(inpType.getRank(), outType.getRank());
+    auto oPtr = getStridedElementPtr(op->getLoc(), outType, transformed.o(),
+                                     oIndices, rewriter);
+
+    auto func = getOrInsertFunc(op, rewriter);
+    rewriter.create<LLVM::CallOp>(
+        op->getLoc(), ArrayRef<Type>(), rewriter.getSymbolRefAttr(func),
+        ArrayRef<Value>{transformed.ptr(), iPtr, oPtr});
+    rewriter.eraseOp(op);
+
+    return success();
+  }
+
+  LLVM::LLVMFuncOp getOrInsertFunc(Operation *op,
+                                   ConversionPatternRewriter &rewriter) const {
+    const char *unaryReluInvokeF32 = "plaidml_rt_xsmm_unary_relu_invoke_f32";
+
+    auto module = op->getParentOfType<ModuleOp>();
+    auto func = module.lookupSymbol<LLVM::LLVMFuncOp>(unaryReluInvokeF32);
+    if (func)
+      return func;
+
+    OpBuilder::InsertionGuard guard(rewriter);
+    rewriter.setInsertionPointToStart(module.getBody());
+    IntegerType int64Type = rewriter.getI64Type();
+    auto floatPtrType = LLVM::LLVMPointerType::get(rewriter.getF32Type());
+    return rewriter.create<LLVM::LLVMFuncOp>(
+        rewriter.getUnknownLoc(), unaryReluInvokeF32,
+        LLVM::LLVMFunctionType::get(getVoidType(),
+                                    ArrayRef<Type>{int64Type,     // funcPtr
+                                                   floatPtrType,  // i
+                                                   floatPtrType}, // o
+                                    /*isVarArg=*/false));
+  }
+};
+
 } // namespace
 
 void populatePXAGemmToXSMMConversionPatterns(RewritePatternSet &patterns) {
@@ -751,6 +857,8 @@ void populateXSMMToLLVMConversionPatterns(LLVMTypeConverter &converter,
                   XSMMGemmInvokeF32Lowering,         //
                   XSMMUnaryExpDispatchF32Lowering,   //
                   XSMMUnaryExpInvokeF32Lowering,     //
+                  XSMMUnaryReluDispatchF32Lowering,  //
+                  XSMMUnaryReluInvokeF32Lowering,    //
                   XSMMBRGemmDispatchF32Lowering,     //
                   XSMMBRGemmInvokeF32Lowering,       //
                   XSMMBRGemmOffsDispatchF32Lowering, //

@@ -140,6 +140,56 @@ ParseResult parseUnaryExpInvokeF32Op(OpAsmParser &parser, OperationState &result
       parser.resolveOperands(o.indices, indexType, result.operands) );
 }
 
+//
+// ---- UnaryReluInvokeF32Op ----
+//
+
+UnaryReluInvokeF32Op::operand_range UnaryReluInvokeF32Op::getOperandsForOutput() {
+  auto inpType = i().getType().cast<MemRefType>();
+  auto outType = o().getType().cast<MemRefType>();
+  return getOperands().slice(3 + inpType.getRank(), outType.getRank());
+}
+
+UnaryReluInvokeF32Op::operand_range UnaryReluInvokeF32Op::getOperandsForInput() {
+  auto inpType = i().getType().cast<MemRefType>();
+  return getOperands().slice(3, inpType.getRank());
+}
+
+void printUnaryReluInvokeF32Op(OpAsmPrinter &p, UnaryReluInvokeF32Op op) {
+  auto funcType =
+      FunctionType::get(op.getContext(), {op.i().getType()}, {op.o().getType()});
+  p << op.getOperation()->getName() << ' ';
+  p << op.ptr() << ", ";
+  p << op.o() << '[';
+  p.printOperands(op.getOperandsForOutput());
+  p << "] = RELU ( " << op.i() << '[';
+  p.printOperands(op.getOperandsForInput());
+  p << "] ) : " << funcType;
+}
+
+ParseResult parseUnaryReluInvokeF32Op(OpAsmParser &parser, OperationState &result) {
+  auto &builder = parser.getBuilder();
+  auto indexType = builder.getIndexType();
+  auto i64Type = builder.getIntegerType(64);
+  UnaryOperand i, o;
+  OpAsmParser::OperandType ptr;
+  FunctionType funcType;
+  StringRef uname = "RELU";
+  return failure(
+      parser.parseOperand(ptr) || parser.parseComma() ||
+      parser.parseOperand(o.memref) ||
+      parser.parseOperandList(o.indices, OpAsmParser::Delimiter::Square) ||
+      parser.parseEqual() || parser.parseKeyword(&uname) || parser.parseLParen() ||
+      parser.parseOperand(i.memref) ||
+      parser.parseOperandList(i.indices, OpAsmParser::Delimiter::Square) || parser.parseRParen() ||
+      parser.parseColonType(funcType) ||
+      parser.resolveOperand(ptr, i64Type, result.operands) ||
+      parser.resolveOperand(i.memref, funcType.getInput(0), result.operands) ||
+      parser.resolveOperand(o.memref, funcType.getResult(0), result.operands) ||
+      parser.resolveOperands(i.indices, indexType, result.operands) ||
+      parser.resolveOperands(o.indices, indexType, result.operands) );
+}
+
 ParseResult parseBRGemmOffsInvokeF32Op(OpAsmParser &parser,
                                        OperationState &result) {
   auto &builder = parser.getBuilder();

@@ -66,6 +66,28 @@ def XSMM_UnaryExpInvokeF32Op : XSMM_Op<"unary_exp.invoke.f32"> {
   }];
 }
 
+def XSMM_UnaryReluDispatchF32Op : XSMM_Op<"unary_relu.dispatch.f32", [NoSideEffect]> {
+  let summary = "query LIBXSMM's code registry based on unary";
+  let arguments = (ins I64ArrayAttr:$tile, I64ArrayAttr:$tileld);
+  let results = (outs I64:$ptr);
+  let printer = ?;
+  let parser = ?;
+  let assemblyFormat = "$tile `,` $tileld attr-dict";
+}
+
+def XSMM_UnaryReluInvokeF32Op : XSMM_Op<"unary_relu.invoke.f32"> {
+  let summary = "invoke a previously queried LIBXSMM unary kernel";
+  let arguments = (ins I64:$ptr,
+    Arg<F32MemRef, "the input memref to load from", [MemRead]>:$i,
+    Arg<F32MemRef, "the output memref to store to", [MemWrite]>:$o,
+    Variadic<Index>:$indices);
+
+  let extraClassDeclaration = [{
+    operand_range getOperandsForInput();
+    operand_range getOperandsForOutput();
+  }];
+}
+
 def XSMM_BRGemmDispatchF32Op : XSMM_Op<"brgemm.dispatch.f32", [NoSideEffect]> {
   let summary = "query LIBXSMM's code registry based on GEMM shape";
   let arguments = (ins I64ArrayAttr:$tile, I64ArrayAttr:$tileld);
