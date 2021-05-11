@@ -42,6 +42,7 @@ Value min(const Value&);
 Value minimum(const Value&);
 Value mvn(const Value&);
 Value nms(const Value&);
+Value topk(const Value&);
 Value l2norm(const Value&);
 Value pool(const Value&);
 Value prod(const Value&);
@@ -1918,12 +1919,9 @@ Value minimum(const Value& value) {
 }
 
 namespace {
-// NMS helper function
 
-Tensor compute_iou(Tensor Boxes, bool center_point_box) {
-  // Get intersection over union of boxes
-  // The shape of the result tensor is [num_batches, num_boxes, num_boxes]
-  // IOU[batch, box_1, box_2] is the IOU of box_1 and box_2 for the image batch.
+std::vector<Tensor> decode_boxes(Tensor Boxes, Tensor Prior_variances, Tensor Location, BoxesDecodeMode mode,
+                                 int input_height, int input_width, bool clip_before_nms, bool center_point_box) {
   Tensor Boxes_y1;
   Tensor Boxes_x1;
   Tensor Boxes_y2;
@@ -1933,36 +1931,92 @@ Tensor compute_iou(Tensor Boxes, bool center_point_box) {
   Tensor Zero = edsl::cast(edsl::index({one}, 0), Boxes.dtype());
   Tensor Zero_int = edsl::cast(Zero, DType::INT32);
   if (center_point_box) {
-    // The box data is [x, y, width, height] in center mode.
-    Tensor Boxes_xcenter = edsl::gather(Boxes, Zero_int).axis(2);
-    Tensor Boxes_ycenter = edsl::gather(Boxes, Zero_int + 1).axis(2);
-    Tensor Boxes_width_half = edsl::gather(Boxes, Zero_int + 2).axis(2);
-    Boxes_width_half = Boxes_width_half / 2.0f;
-    Tensor Boxes_height_half = edsl::gather(Boxes, Zero_int + 3).axis(2);
-    Boxes_height_half = Boxes_height_half / 2.0f;
+    Tensor Boxes_xcenter;
+    Tensor Boxes_ycenter;
+    Tensor Boxes_width_half;
+    Tensor Boxes_height_half;
+    switch (mode) {
+      case BoxesDecodeMode::NMS: {
+        // The box data is [x, y, width, height] in center mode.
+        Boxes_xcenter = edsl::gather(Boxes, Zero_int).axis(2);
+        Boxes_ycenter = edsl::gather(Boxes, Zero_int + 1).axis(2);
+        Boxes_width_half = edsl::gather(Boxes, Zero_int + 2).axis(2) / 2.0f;
+        Boxes_height_half = edsl::gather(Boxes, Zero_int + 3).axis(2) / 2.0f;
+      } break;
+      case BoxesDecodeMode::SSD: {
+        Tensor Prior_x1 = edsl::gather(Boxes, Zero_int).axis(2) / input_width;
+        Tensor Prior_y1 = edsl::gather(Boxes, Zero_int + 1).axis(2) / input_height;
+        Tensor Prior_x2 = edsl::gather(Boxes, Zero_int + 2).axis(2) / input_width;
+        Tensor Prior_y2 = edsl::gather(Boxes, Zero_int + 3).axis(2) / input_height;
+        Tensor Var_x1 = edsl::gather(Prior_variances, Zero_int).axis(2);
+        Tensor Var_y1 = edsl::gather(Prior_variances, Zero_int + 1).axis(2);
+        Tensor Var_x2 = edsl::gather(Prior_variances, Zero_int + 2).axis(2);
+        Tensor Var_y2 = edsl::gather(Prior_variances, Zero_int + 3).axis(2);
+        Tensor Loc_x1 = edsl::gather(Location, Zero_int).axis(2);
+        Tensor Loc_y1 = edsl::gather(Location, Zero_int + 1).axis(2);
+        Tensor Loc_x2 = edsl::gather(Location, Zero_int + 2).axis(2);
+        Tensor Loc_y2 = edsl::gather(Location, Zero_int + 3).axis(2);
+        Tensor Prior_width = Prior_x2 - Prior_x1;
+        Tensor Prior_height = Prior_y2 - Prior_y1;
+        Tensor Prior_xcenter = (Prior_x1 + Prior_x2) / 2.0f;
+        Tensor Prior_ycenter = (Prior_y1 + Prior_y2) / 2.0f;
+        Boxes_xcenter = Var_x1 * Loc_x1 * Prior_width + Prior_xcenter;
+        Boxes_ycenter = Var_y1 * Loc_y1 * Prior_height + Prior_ycenter;
+        Boxes_width_half = edsl::exp(Var_x2 * Loc_x2) * Prior_width / 2.0f;
+        Boxes_height_half = edsl::exp(Var_y2 * Loc_y2) * Prior_height / 2.0f;
+      } break;
+      default:
+        throw std::runtime_error("Unrecognized boxes decode mode");
+    }
     Boxes_x1 = Boxes_xcenter - Boxes_width_half;
     Boxes_x2 = Boxes_xcenter + Boxes_width_half;
     Boxes_y1 = Boxes_ycenter - Boxes_height_half;
     Boxes_y2 = Boxes_ycenter + Boxes_height_half;
   } else {
-    // The box data is [y1, x1, y2, x2] in corner mode
-    Boxes_y1 = edsl::gather(Boxes, Zero_int).axis(2);
-    Boxes_x1 = edsl::gather(Boxes, Zero_int + 1).axis(2);
-    Boxes_y2 = edsl::gather(Boxes, Zero_int + 2).axis(2);
-    Boxes_x2 = edsl::gather(Boxes, Zero_int + 3).axis(2);
+    switch (mode) {
+      case BoxesDecodeMode::NMS: {
+        // The box data is [y1, x1, y2, x2] in corner mode
+        Tensor Boxes_y1_i = edsl::gather(Boxes, Zero_int).axis(2);
+        Tensor Boxes_x1_i = edsl::gather(Boxes, Zero_int + 1).axis(2);
+        Tensor Boxes_y2_i = edsl::gather(Boxes, Zero_int + 2).axis(2);
+        Tensor Boxes_x2_i = edsl::gather(Boxes, Zero_int + 3).axis(2);
+        // Convert to [ymin, xmin, ymax, xmax]
+        Boxes_y1 = op::minimum(Boxes_y1_i, Boxes_y2_i);
+        Boxes_x1 = op::minimum(Boxes_x1_i, Boxes_x2_i);
+        Boxes_y2 = op::maximum(Boxes_y1_i, Boxes_y2_i);
+        Boxes_x2 = op::maximum(Boxes_x1_i, Boxes_x2_i);
+      } break;
+      case BoxesDecodeMode::SSD:
+        Boxes = Boxes / input_width + Prior_variances * Location;
+        // The box data is [x1, y1, x2, y2] in corner mode
+        Boxes_x1 = edsl::gather(Boxes, Zero_int).axis(2);
+        Boxes_y1 = edsl::gather(Boxes, Zero_int + 1).axis(2);
+        Boxes_x2 = edsl::gather(Boxes, Zero_int + 2).axis(2);
+        Boxes_y2 = edsl::gather(Boxes, Zero_int + 3).axis(2);
+        break;
+      default:
+        throw std::runtime_error("Unrecognized boxes decode mode");
+    }
   }
 
-  // Boxes dims is [num_batches, num_boxes, 4]
-  std::vector<TensorDim> dims(Boxes.rank());
-  Boxes.bind_dims(dims);
-  TensorDim num_batches = dims[0];
-  TensorDim num_boxes = dims[1];
+  if (clip_before_nms) {
+    Boxes_y1 = op::clip(Boxes_y1, cast(edsl::Tensor{0.0f}, DType::FLOAT32), cast(edsl::Tensor{1.0f}, DType::FLOAT32));
+    Boxes_x1 = op::clip(Boxes_x1, cast(edsl::Tensor{0.0f}, DType::FLOAT32), cast(edsl::Tensor{1.0f}, DType::FLOAT32));
+    Boxes_y2 = op::clip(Boxes_y2, cast(edsl::Tensor{0.0f}, DType::FLOAT32), cast(edsl::Tensor{1.0f}, DType::FLOAT32));
+    Boxes_x2 = op::clip(Boxes_x2, cast(edsl::Tensor{0.0f}, DType::FLOAT32), cast(edsl::Tensor{1.0f}, DType::FLOAT32));
+  }
 
+  return {Boxes_y1, Boxes_x1, Boxes_y2, Boxes_x2};
+}
+
+Tensor compute_iou(std::vector<Tensor> Boxes_coordinates, TensorDim num_batches, TensorDim num_boxes) {
   // Create IOU of each box pair.
-  Boxes_y1 = edsl::reshape(Boxes_y1, {num_batches, num_boxes});
-  Boxes_x1 = edsl::reshape(Boxes_x1, {num_batches, num_boxes});
-  Boxes_y2 = edsl::reshape(Boxes_y2, {num_batches, num_boxes});
-  Boxes_x2 = edsl::reshape(Boxes_x2, {num_batches, num_boxes});
+  TensorDim one(1);
+  Tensor Zero = edsl::cast(edsl::index({one}, 0), Boxes_coordinates[0].dtype());
+  Tensor Boxes_y1 = edsl::reshape(Boxes_coordinates[0], {num_batches, num_boxes});
+  Tensor Boxes_x1 = edsl::reshape(Boxes_coordinates[1], {num_batches, num_boxes});
+  Tensor Boxes_y2 = edsl::reshape(Boxes_coordinates[2], {num_batches, num_boxes});
+  Tensor Boxes_x2 = edsl::reshape(Boxes_coordinates[3], {num_batches, num_boxes});
 
   // Calc box local area
   Tensor IOU_areai = (Boxes_y2 - Boxes_y1) * (Boxes_x2 - Boxes_x1);
@@ -1992,8 +2046,8 @@ Tensor compute_iou(Tensor Boxes, bool center_point_box) {
 Value nms(const Value& value) {
   IVLOG(1, "nms");
   auto args = value.as_tuple();
-  if (args.size() != 9) {
-    throw std::runtime_error("nms expects 9 arguments");
+  if (args.size() != 18) {
+    throw std::runtime_error("nms expects 18 arguments");
   }
   auto Boxes = args[0].as_tensor();
   auto Scores = args[1].as_tensor();
@@ -2004,8 +2058,24 @@ Value nms(const Value& value) {
   auto center_point_box = args[6].as_bool();
   auto sort_result_descending = args[7].as_bool();
   auto box_output_type = validate<DType>(args[8].as_int());
+  auto boxes_decode_mode = validate<BoxesDecodeMode>(args[9].as_int());
+  auto clip_before_nms = args[10].as_bool();
+  auto clip_after_nms = args[11].as_bool();
+  auto ssd_input_height = args[12].as_int();
+  auto ssd_input_width = args[13].as_int();
   auto box_input_type = Boxes.dtype();
   auto thres_type = IOU_threshold.dtype();
+  Tensor ssd_variances;
+  Tensor ssd_location;
+  if (boxes_decode_mode == BoxesDecodeMode::SSD) {
+    ssd_variances = args[14].as_tensor();
+    ssd_location = args[15].as_tensor();
+  }
+  Tensor ssd_arm_location;
+  auto ssd_with_arm_loc = args[16].as_bool();
+  if (ssd_with_arm_loc) {
+    ssd_arm_location = args[17].as_tensor();
+  }
 
   std::vector<int64_t> scores_shape = Scores.compute_shape().sizes();
   int64_t boxes_count = scores_shape[2];
@@ -2022,13 +2092,26 @@ Value nms(const Value& value) {
   Tensor Zero_int = edsl::cast(Zero, DType::INT32);
   Tensor One = Zero + 1;
   Tensor One_int = Zero_int + 1;
+  Tensor Two_int = Zero_int + 2;
   Tensor NEG1 = -One;
   Tensor Neg1_o = edsl::cast(NEG1, box_output_type);
 
   std::vector<Tensor> boxes;
   std::vector<Tensor> scores;
   Tensor Valid_outputs = Zero;
-  Tensor IOU = compute_iou(Boxes, center_point_box);
+  std::vector<Tensor> boxes_coordinates;
+  if (ssd_with_arm_loc) {
+    auto prior_coordinates = decode_boxes(Boxes, ssd_variances, ssd_arm_location, boxes_decode_mode, ssd_input_height,
+                                          ssd_input_width, clip_before_nms, center_point_box);
+    Tensor prior_boxes =
+        op::concatenate({prior_coordinates[1], prior_coordinates[0], prior_coordinates[3], prior_coordinates[2]}, 2);
+    boxes_coordinates = decode_boxes(prior_boxes, ssd_variances, ssd_location, boxes_decode_mode, ssd_input_height,
+                                     ssd_input_width, clip_before_nms, center_point_box);
+  } else {
+    boxes_coordinates = decode_boxes(Boxes, ssd_variances, ssd_location, boxes_decode_mode, ssd_input_height,
+                                     ssd_input_width, clip_before_nms, center_point_box);
+  }
+  Tensor IOU = compute_iou(boxes_coordinates, num_batches, num_boxes);
 
   float weight = 0.0f;
   if (soft_nms_sigma != 0) {
@@ -2089,9 +2172,11 @@ Value nms(const Value& value) {
     boxes.push_back(edsl::reshape(Box_index, {num_batches, num_classes, one}));
 
     // update scores for current class
-    Tensor Scale = edsl::exp(IOU_candidate * IOU_candidate * weight);
-    New_scores = New_scores * Scale;
-    New_scores = edsl::select(New_scores > Score_threshold_i, New_scores, Zero);
+    if (soft_nms_sigma != 0) {
+      Tensor Scale = edsl::exp(IOU_candidate * IOU_candidate * weight);
+      New_scores = New_scores * Scale;
+      New_scores = edsl::select(New_scores > Score_threshold_i, New_scores, Zero);
+    }
   }
 
   Valid_outputs = edsl::cast(Valid_outputs, box_output_type);
@@ -2124,9 +2209,70 @@ Value nms(const Value& value) {
     Boxes_result = edsl::gather(Boxes_result, Index3).axis(0);
     Scores_result = edsl::reshape(Scores_result, {num_results, TensorDim(3)});
     Boxes_result = edsl::reshape(Boxes_result, {num_results, TensorDim(3)});
+    if (boxes_decode_mode == BoxesDecodeMode::SSD) {
+      Tensor decoded_bboxes =
+          op::concatenate({boxes_coordinates[1], boxes_coordinates[0], boxes_coordinates[3], boxes_coordinates[2]}, 2);
+      if (clip_after_nms) {
+        decoded_bboxes = op::clip(decoded_bboxes, cast(edsl::Tensor{0.0f}, DType::FLOAT32),
+                                  cast(edsl::Tensor{1.0f}, DType::FLOAT32));
+      }
+      Tensor slice_idxs = op::concatenate({Zero_int, Two_int}, 0);
+      Tensor gather_idxs = edsl::gather(Boxes_result, slice_idxs).axis(1);
+      Tensor out_boxes = edsl::gather(decoded_bboxes, gather_idxs).mode(GatherMode::ND);
+      Scores_result = op::concatenate({Scores_result, out_boxes}, 1);
+    }
   }
 
   return edsl::make_tuple(Boxes_result, Scores_result, Valid_outputs);
+}
+
+Value topk(const Value& value) {
+  IVLOG(1, "topk");
+  auto args = value.as_tuple();
+  if (args.size() != 6) {
+    throw std::runtime_error("topk expects 6 arguments");
+  }
+  auto I = args[0].as_tensor();
+  auto k = args[1].as_int();
+  auto axis = args[2].as_int();
+  auto sort_direction = validate<edsl::SortDirection>(args[3].as_int());
+  auto sort_type = validate<TopKSortType>(args[4].as_int());
+  auto index_element_type = validate<DType>(args[5].as_int());
+
+  int64_t ndims = I.rank();
+  edsl::Tensor values = op::sort(I, axis, sort_direction);
+  edsl::Tensor indices = edsl::argsort(I, axis, sort_direction);
+  edsl::Tensor idxs_topk = edsl::gather(indices, edsl::index({edsl::TensorDim(k)}, 0)).axis(axis);
+  std::vector<edsl::Tensor> Os;
+
+  switch (sort_type) {
+    case TopKSortType::VALUE: {
+      edsl::Tensor vals_topk_sorted = edsl::gather(values, edsl::index({edsl::TensorDim(k)}, 0)).axis(axis);
+      Os.push_back(vals_topk_sorted);
+      Os.push_back(idxs_topk);
+    } break;
+    case TopKSortType::INDEX: {
+      std::vector<edsl::Tensor> comb_idxs;
+      std::vector<edsl::TensorDim> idxs_dims(ndims);
+      idxs_topk.bind_dims(idxs_dims);
+      auto idxs_topk_sorted = op::sort(idxs_topk, axis, edsl::SortDirection::ASC);
+      for (int i = 0; i < ndims; i++) {
+        if (i == axis) {
+          comb_idxs.push_back(op::unsqueeze(idxs_topk_sorted, {ndims}));
+        } else {
+          comb_idxs.push_back(op::unsqueeze(edsl::index(idxs_dims, i), {ndims}));
+        }
+      }
+      auto idxs_nd = op::concatenate(comb_idxs, -1);
+      auto vals_topk = edsl::gather(I, idxs_nd).mode(edsl::GatherMode::ND);
+      Os.push_back(vals_topk);
+      Os.push_back(idxs_topk_sorted);
+    } break;
+    default:
+      throw std::runtime_error("invalid topk sort type");
+  }
+
+  return edsl::make_tuple(Os);
 }
 
 Value mvn(const Value& value) {
@@ -3313,6 +3459,7 @@ void RegisterOps() {
   registry->Register("minimum", minimum);
   registry->Register("mvn", mvn);
   registry->Register("nms", nms);
+  registry->Register("topk", topk);
   registry->Register("l2norm", l2norm);
   registry->Register("pool", pool);
   registry->Register("prod", prod);

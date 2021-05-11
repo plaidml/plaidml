@@ -3,7 +3,11 @@ FetchContent_Declare(
   xsmm
   URL      https://github.com/hfp/libxsmm/archive/refs/heads/master.zip
 )
-FetchContent_MakeAvailable(xsmm)
+
+FetchContent_GetProperties(xsmm)
+if(NOT xsmm_POPULATED)
+  FetchContent_Populate(xsmm)
+endif()
 
 file(GLOB _GLOB_XSMM_SRCS LIST_DIRECTORIES false ${xsmm_SOURCE_DIR}/src/*.c)
 list(REMOVE_ITEM _GLOB_XSMM_SRCS ${xsmm_SOURCE_DIR}/src/libxsmm_generator_gemm_driver.c)
