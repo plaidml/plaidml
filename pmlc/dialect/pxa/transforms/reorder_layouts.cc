@@ -142,7 +142,7 @@ void createBlockedLayoutForInputTensor(
   mlir::AffineMap map = loadOp.getAffineMap();
   mlir::MLIRContext *context = map.getContext();
 
-  int64_t blockSize = 64;
+  int64_t blockSize = 16;
   if (shape[3] % blockSize == 0) {
     //
     // *NHWC -> NCHW: newMap: (d0 d1 d2 d3) -> (d0 d3 d1 d2)
@@ -192,7 +192,7 @@ bool createBlockedLayoutForFilterTensor(
   mlir::AffineMap map = loadOp.getAffineMap();
   mlir::MLIRContext *context = map.getContext();
 
-  int64_t blockSize = 64;
+  int64_t blockSize = 16;
   if (shape[2] % blockSize == 0 && shape[3] % blockSize == 0) {
     // RSCK -> C floordiv 16, K floordiv 16, R, S, C mod 16, K mod 16
     // RSCK -> CKRS (d0 d1 d2 d3) -> (d2 d3 d0 d1)
