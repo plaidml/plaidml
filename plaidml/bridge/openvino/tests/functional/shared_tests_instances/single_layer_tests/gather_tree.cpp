@@ -11,6 +11,8 @@ using namespace LayerTestsDefinitions;
 
 namespace {
 
+// Openvino requires the input to be float32 or int32.
+// And float32 shall have integer values only.
 const std::vector<InferenceEngine::Precision> netPrecisions = {
     InferenceEngine::Precision::FP32,
     InferenceEngine::Precision::I32,

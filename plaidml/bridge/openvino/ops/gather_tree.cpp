@@ -47,9 +47,10 @@ Tensor GatherTree(Tensor STEP_IDS, Tensor PARENT_IDX, Tensor MAX_SEQ_LEN, Tensor
   Tensor INDEX_BEAM = edsl::index({edsl::TensorDim(batch_size), edsl::TensorDim(beam_width)}, 1);
   Tensor PARENT_IDX_NEW =
       edsl::select(PARENT_IDX_FILTER < 0, edsl::cast(PARENT_IDX, DType::INT32), op::unsqueeze(INDEX_BEAM, {0}));
-  // Update
+  // Update with gather.
   std::vector<Tensor> parents;
   Tensor PARENT = INDEX_BEAM;
+  // TODO: replace "for" with scanOp.
   for (int i = max_time - 1; i > 0; i--) {
     parents.push_back(op::unsqueeze(PARENT, {0}));
     Tensor PARENT_IDX_S = op::squeeze(edsl::gather(PARENT_IDX_NEW, ZERO_INT + i).axis(0), {0});
@@ -59,11 +60,11 @@ Tensor GatherTree(Tensor STEP_IDS, Tensor PARENT_IDX, Tensor MAX_SEQ_LEN, Tensor
   parents.push_back(op::unsqueeze(PARENT, {0}));
   std::reverse(parents.begin(), parents.end());
   Tensor PARENTS_IDX_U = op::concatenate(parents, 0);
-  // Get output value
+  // Get output value.
   Tensor UPDATE = edsl::gather(STEP_IDS, op::unsqueeze(PARENTS_IDX_U, {-1})).mode(edsl::GatherMode::ND).batchDims(2);
-  // Change padding to END_TOKEN
+  // Change padding to END_TOKEN.
   Tensor OUTPUT = edsl::select(PARENT_IDX_FILTER < 0, UPDATE, END_TOKEN);
-  // Check the first decoded END_TOKEN on time axis, values are then filled with END_TOKEN
+  // Check the first decoded END_TOKEN on time axis, values are then filled with END_TOKEN.
   Tensor FILTER_FIRST;
   if (OUTPUT.dtype() == DType::FLOAT32) {
     float epsilon = 1e-7f;
@@ -73,7 +74,7 @@ Tensor GatherTree(Tensor STEP_IDS, Tensor PARENT_IDX, Tensor MAX_SEQ_LEN, Tensor
   }
   Tensor FILTER_EXTEND = op::cumsum(FILTER_FIRST, 0);
   Tensor OUTPUT_F = edsl::select(FILTER_EXTEND < op::abs(END_TOKEN), OUTPUT, END_TOKEN);
-  return {OUTPUT_F};
+  return OUTPUT_F;
 }
 
 void registerGatherTree() {
