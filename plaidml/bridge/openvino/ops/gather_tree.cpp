@@ -44,12 +44,12 @@ Tensor GatherTree(Tensor STEP_IDS, Tensor PARENT_IDX, Tensor MAX_SEQ_LEN, Tensor
   Tensor MAX_SEQ_LEN_IN_BEAM = op::minimum(MAX_SEQ_LEN, MAX_TIME);
   Tensor PARENT_IDX_FILTER = INDEX_TIME - edsl::reshape(MAX_SEQ_LEN_IN_BEAM, {1, batch_size, 1});
   // Set padding value to unused index.
-  Tensor INDEX_BEAM =
-      edsl::index({edsl::TensorDim(max_time), edsl::TensorDim(batch_size), edsl::TensorDim(beam_width)}, 2);
-  Tensor PARENT_IDX_NEW = edsl::select(PARENT_IDX_FILTER < 0, edsl::cast(PARENT_IDX, DType::INT32), INDEX_BEAM);
+  Tensor INDEX_BEAM = edsl::index({edsl::TensorDim(batch_size), edsl::TensorDim(beam_width)}, 1);
+  Tensor PARENT_IDX_NEW =
+      edsl::select(PARENT_IDX_FILTER < 0, edsl::cast(PARENT_IDX, DType::INT32), op::unsqueeze(INDEX_BEAM, {0}));
   // Update
   std::vector<Tensor> parents;
-  Tensor PARENT = op::squeeze(edsl::gather(INDEX_BEAM, ZERO_INT).axis(0), {0});
+  Tensor PARENT = INDEX_BEAM;
   for (int i = max_time - 1; i > 0; i--) {
     parents.push_back(op::unsqueeze(PARENT, {0}));
     Tensor PARENT_IDX_S = op::squeeze(edsl::gather(PARENT_IDX_NEW, ZERO_INT + i).axis(0), {0});
