@@ -254,6 +254,17 @@ std::vector<StridedSliceSpecificParams> ss_only_test_cases = {
         {0, 1, 0, 0, 0},
         {},
     },
+    StridedSliceSpecificParams{
+        {1, 16, 112, 112},
+        {0, -16, 0, 0},
+        {0, 2147483647, 0, 0},
+        {1, 1, 1, 1},
+        {1, 0, 1, 1},
+        {1, 0, 1, 1},
+        {0, 0, 0, 0},
+        {0, 0, 0, 0},
+        {0, 0, 0, 0},
+    },
 
     /// those two case will run into segment fault, it is caused by openvino inference,
     /// which is locate in 'MakeNextStageTask' of 'ie_infer_async_request_thread_safe_default.hpp'
