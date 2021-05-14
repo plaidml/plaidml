@@ -70,12 +70,14 @@ void registerStridedSlice() {
         result.add_dim(edsl::None(), edsl::None(), edsl::None());
         continue;
       }
+
       if (std::abs(starts[i]) > input_sizes[i]) {
         starts[i] = starts[i] < 0 ? -1 * input_sizes[i] : input_sizes[i];
       }
       if (std::abs(stops[i]) > input_sizes[i]) {
         stops[i] = stops[i] < 0 ? -1 * input_sizes[i] : input_sizes[i];
       }
+
       if (!begin_mask[i] && !end_mask[i]) {
         if (starts[i] == stops[i] || (steps[i] == 1 && stops[i] == 0) || shrink_axis_mask[i]) {
           // We hack around nGraph's approach of allowing size 0 dimensions by explicitly looking for the patterns of
