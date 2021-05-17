@@ -47,6 +47,7 @@ Tensor GatherTree(Tensor step_ids, Tensor parent_idx, Tensor max_seq_len, Tensor
   Tensor index_beam = edsl::index({edsl::TensorDim(BatchSize), edsl::TensorDim(BeamWidth)}, 1);
   Tensor parent_idx_new =
       edsl::select(parent_idx_filter < 0, edsl::cast(parent_idx, DType::INT32), op::unsqueeze(index_beam, {0}));
+
   // Update with gather.
   std::vector<Tensor> Parents;
   Tensor parent = index_beam;
