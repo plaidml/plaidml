@@ -15,77 +15,77 @@ using edsl::Tensor;
 
 namespace PlaidMLPlugin {
 
-Tensor GatherTree(Tensor STEP_IDS, Tensor PARENT_IDX, Tensor MAX_SEQ_LEN, Tensor END_TOKEN) {
-  std::vector<int64_t> step_ids_shape = STEP_IDS.compute_shape().sizes();
-  std::vector<int64_t> parent_idx_shape = PARENT_IDX.compute_shape().sizes();
-  std::vector<int64_t> max_seq_len_shape = MAX_SEQ_LEN.compute_shape().sizes();
-  std::vector<int64_t> end_token_shape = END_TOKEN.compute_shape().sizes();
+Tensor GatherTree(Tensor step_ids, Tensor parent_idx, Tensor max_seq_len, Tensor end_token) {
+  std::vector<int64_t> StepIdsShape = step_ids.compute_shape().sizes();
+  std::vector<int64_t> ParentIdxShape = parent_idx.compute_shape().sizes();
+  std::vector<int64_t> MaxSeqLenShape = max_seq_len.compute_shape().sizes();
+  std::vector<int64_t> EndTokenShape = end_token.compute_shape().sizes();
 
   // Check shape
-  if (step_ids_shape.size() != 3) {
+  if (StepIdsShape.size() != 3) {
     THROW_IE_EXCEPTION << "step_ids rank must be 3";
   }
-  int max_time = step_ids_shape[0];
-  int batch_size = parent_idx_shape[1];
-  int beam_width = step_ids_shape[2];
-  if (max_seq_len_shape[0] != batch_size) {
+  int MaxTime = StepIdsShape[0];
+  int BatchSize = ParentIdxShape[1];
+  int BeamWidth = StepIdsShape[2];
+  if (MaxSeqLenShape[0] != BatchSize) {
     THROW_IE_EXCEPTION << "max_seq_len and step_ids must have same batch size";
   }
-  if (end_token_shape.size() != 0) {
+  if (EndTokenShape.size() != 0) {
     THROW_IE_EXCEPTION << "end_token must be a scalar";
   }
 
-  Tensor ZERO = edsl::cast(edsl::index({edsl::TensorDim(1)}, 0), STEP_IDS.dtype());
-  Tensor ZERO_INT = edsl::cast(ZERO, DType::INT32);
+  Tensor zero = edsl::cast(edsl::index({edsl::TensorDim(1)}, 0), step_ids.dtype());
+  Tensor zero_int = edsl::cast(zero, DType::INT32);
   // Add padding to update the whole PARENT_IDX value.
-  Tensor INDEX_TIME =
-      edsl::index({edsl::TensorDim(max_time), edsl::TensorDim(batch_size), edsl::TensorDim(beam_width)}, 0);
-  Tensor MAX_TIME = edsl::cast(Tensor(max_time), MAX_SEQ_LEN.dtype());
-  Tensor MAX_SEQ_LEN_IN_BEAM = op::minimum(MAX_SEQ_LEN, MAX_TIME);
-  Tensor PARENT_IDX_FILTER = INDEX_TIME - edsl::reshape(MAX_SEQ_LEN_IN_BEAM, {1, batch_size, 1});
+  Tensor index_time =
+      edsl::index({edsl::TensorDim(MaxTime), edsl::TensorDim(BatchSize), edsl::TensorDim(BeamWidth)}, 0);
+  Tensor max_time = edsl::cast(Tensor(MaxTime), max_seq_len.dtype());
+  Tensor max_seq_len_in_beam = op::minimum(max_seq_len, max_time);
+  Tensor parent_idx_filter = index_time - edsl::reshape(max_seq_len_in_beam, {1, BatchSize, 1});
   // Set padding value to unused index.
-  Tensor INDEX_BEAM = edsl::index({edsl::TensorDim(batch_size), edsl::TensorDim(beam_width)}, 1);
-  Tensor PARENT_IDX_NEW =
-      edsl::select(PARENT_IDX_FILTER < 0, edsl::cast(PARENT_IDX, DType::INT32), op::unsqueeze(INDEX_BEAM, {0}));
+  Tensor index_beam = edsl::index({edsl::TensorDim(BatchSize), edsl::TensorDim(BeamWidth)}, 1);
+  Tensor parent_idx_new =
+      edsl::select(parent_idx_filter < 0, edsl::cast(parent_idx, DType::INT32), op::unsqueeze(index_beam, {0}));
   // Update with gather.
-  std::vector<Tensor> parents;
-  Tensor PARENT = INDEX_BEAM;
+  std::vector<Tensor> Parents;
+  Tensor parent = index_beam;
   // TODO: replace "for" with scanOp.
-  for (int i = max_time - 1; i > 0; i--) {
-    parents.push_back(op::unsqueeze(PARENT, {0}));
-    Tensor PARENT_IDX_S = op::squeeze(edsl::gather(PARENT_IDX_NEW, ZERO_INT + i).axis(0), {0});
-    Tensor NEW_PARENT = edsl::gather(PARENT_IDX_S, op::unsqueeze(PARENT, {-1})).mode(edsl::GatherMode::ND).batchDims(1);
-    PARENT = NEW_PARENT;
+  for (int i = MaxTime - 1; i > 0; i--) {
+    Parents.push_back(op::unsqueeze(parent, {0}));
+    Tensor parent_idx_s = op::squeeze(edsl::gather(parent_idx_new, zero_int + i).axis(0), {0});
+    Tensor new_parent = edsl::gather(parent_idx_s, op::unsqueeze(parent, {-1})).mode(edsl::GatherMode::ND).batchDims(1);
+    parent = new_parent;
   }
-  parents.push_back(op::unsqueeze(PARENT, {0}));
-  std::reverse(parents.begin(), parents.end());
-  Tensor PARENTS_IDX_U = op::concatenate(parents, 0);
+  Parents.push_back(op::unsqueeze(parent, {0}));
+  std::reverse(Parents.begin(), Parents.end());
+  Tensor parents_idx_u = op::concatenate(Parents, 0);
   // Get output value.
-  Tensor UPDATE = edsl::gather(STEP_IDS, op::unsqueeze(PARENTS_IDX_U, {-1})).mode(edsl::GatherMode::ND).batchDims(2);
-  // Change padding to END_TOKEN.
-  Tensor OUTPUT = edsl::select(PARENT_IDX_FILTER < 0, UPDATE, END_TOKEN);
-  // Check the first decoded END_TOKEN on time axis, values are then filled with END_TOKEN.
-  Tensor FILTER_FIRST;
-  if (OUTPUT.dtype() == DType::FLOAT32) {
-    float epsilon = 1e-7f;
-    FILTER_FIRST = op::abs(edsl::select(op::abs(OUTPUT - END_TOKEN) < epsilon, OUTPUT, ZERO));
+  Tensor update = edsl::gather(step_ids, op::unsqueeze(parents_idx_u, {-1})).mode(edsl::GatherMode::ND).batchDims(2);
+  // Change padding to end_token.
+  Tensor output = edsl::select(parent_idx_filter < 0, update, end_token);
+  // Check the first decoded end_token on time axis, values are then filled with end_token.
+  Tensor filter_first;
+  if (output.dtype() == DType::FLOAT32) {
+    float Epsilon = 1e-7f;
+    filter_first = op::abs(edsl::select(op::abs(output - end_token) < Epsilon, output, zero));
   } else {
-    FILTER_FIRST = op::abs(edsl::select(OUTPUT == END_TOKEN, OUTPUT, ZERO));
+    filter_first = op::abs(edsl::select(output == end_token, output, zero));
   }
-  Tensor FILTER_EXTEND = op::cumsum(FILTER_FIRST, 0);
-  Tensor OUTPUT_F = edsl::select(FILTER_EXTEND < op::abs(END_TOKEN), OUTPUT, END_TOKEN);
-  return OUTPUT_F;
+  Tensor filter_extend = op::cumsum(filter_first, 0);
+  Tensor output_f = edsl::select(filter_extend < op::abs(end_token), output, end_token);
+  return output_f;
 }
 
 void registerGatherTree() {
   registerOp("GatherTree", [](const Context& ctx) {
     IE_ASSERT(ctx.operands.size() == 4);
-    auto STEP_IDS = ctx.operands.at(0);
-    auto PARENT_IDX = ctx.operands.at(1);
-    auto MAX_SEQ_LEN = ctx.operands.at(2);
-    auto END_TOKEN = ctx.operands.at(3);
-    edsl::Tensor O = GatherTree(STEP_IDS, PARENT_IDX, MAX_SEQ_LEN, END_TOKEN);
-    return edsl::make_tuple(O);
+    auto step_ids = ctx.operands.at(0);
+    auto parent_idx = ctx.operands.at(1);
+    auto max_seq_len = ctx.operands.at(2);
+    auto end_token = ctx.operands.at(3);
+    edsl::Tensor o = GatherTree(step_ids, parent_idx, max_seq_len, end_token);
+    return edsl::make_tuple(o);
   });
 }
 
