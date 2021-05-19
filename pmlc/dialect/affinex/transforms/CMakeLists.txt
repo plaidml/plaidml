@@ -8,6 +8,7 @@ pml_cc_library(
     loop_unroll.cc
     memref_dataflow_opt.cc
   DEPS
+    MLIRIR
     ::passes-gen
   PUBLIC
 )
