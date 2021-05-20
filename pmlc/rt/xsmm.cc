@@ -8,7 +8,6 @@
 #include "pmlc/util/logging.h"
 
 using FunctionPtr = void (*)(const void *, const void *, void *, ...);
-using UnaryFunctionPtr = void (*)(const libxsmm_meltw_unary_param *);
 
 extern "C" void plaidml_rt_xsmm_gemm_invoke_f32(int64_t funcAddr, float *a,
                                                 float *b, float *c) {
@@ -33,50 +32,6 @@ extern "C" int64_t plaidml_rt_xsmm_gemm_dispatch_f32(int32_t lda, int32_t ldb,
                           /*flags=*/nullptr, /*prefetch=*/nullptr);
 
   return reinterpret_cast<int64_t>(sgemm);
-}
-
-extern "C" void plaidml_rt_xsmm_unary_exp_invoke_f32(int64_t funcAddr, float *inp,
-                                                float *out) {
-  libxsmm_meltwfunction_unary unary_kernel;
-  libxsmm_meltw_unary_param unary_param;
-  unary_param.in.primary  = (void*)inp;
-  unary_param.out.primary = (void*)out;
-  unary_kernel = reinterpret_cast<UnaryFunctionPtr>(funcAddr);
-  unary_kernel( &unary_param );
-}
-
-extern "C" int64_t plaidml_rt_xsmm_unary_exp_dispatch_f32(int32_t ldi, int32_t ldo,
-                                                     int32_t m, int32_t n) {
-  libxsmm_blasint ldi_int = ldi;
-  libxsmm_blasint ldo_int = ldo;
-  libxsmm_blasint m_int = m;
-  libxsmm_blasint n_int = n;
-
-  auto unary_kernel = libxsmm_dispatch_meltw_unary(n_int, m_int, &ldi_int, &ldo_int, LIBXSMM_DATATYPE_F32, LIBXSMM_DATATYPE_F32, LIBXSMM_DATATYPE_F32, LIBXSMM_MELTW_FLAG_UNARY_NONE, LIBXSMM_MELTW_TYPE_UNARY_EXP);
-
-  return reinterpret_cast<int64_t>(unary_kernel);
-}
-
-extern "C" void plaidml_rt_xsmm_unary_relu_invoke_f32(int64_t funcAddr, float *inp,
-                                                float *out) {
-  libxsmm_meltwfunction_unary unary_kernel;
-  libxsmm_meltw_unary_param unary_param;
-  unary_param.in.primary  = (void*)inp;
-  unary_param.out.primary = (void*)out;
-  unary_kernel = reinterpret_cast<UnaryFunctionPtr>(funcAddr);
-  unary_kernel( &unary_param );
-}
-
-extern "C" int64_t plaidml_rt_xsmm_unary_relu_dispatch_f32(int32_t ldi, int32_t ldo,
-                                                     int32_t m, int32_t n) {
-  libxsmm_blasint ldi_int = ldi;
-  libxsmm_blasint ldo_int = ldo;
-  libxsmm_blasint m_int = m;
-  libxsmm_blasint n_int = n;
-
-  auto unary_kernel = libxsmm_dispatch_meltw_unary(n_int, m_int, &ldi_int, &ldo_int, LIBXSMM_DATATYPE_F32, LIBXSMM_DATATYPE_F32, LIBXSMM_DATATYPE_F32, LIBXSMM_MELTW_FLAG_UNARY_NONE, LIBXSMM_MELTW_TYPE_UNARY_RELU);
-
-  return reinterpret_cast<int64_t>(unary_kernel);
 }
 
 extern "C" void plaidml_rt_xsmm_brgemm_invoke_f32(int64_t funcAddr, float *a,
@@ -108,15 +63,14 @@ extern "C" int64_t plaidml_rt_xsmm_brgemm_dispatch_f32(int32_t lda, int32_t ldb,
   return reinterpret_cast<int64_t>(sgemm);
 }
 
-extern "C" void
-plaidml_rt_xsmm_brgemm_offs_invoke_f32(int64_t funcAddr, float *a, float *b,
-                                       float *c, int64_t numBatches,
-                                       int64_t *a_offsets, int64_t *b_offsets) {
+extern "C" void plaidml_rt_xsmm_brgemm_offs_invoke_f32(
+    int64_t funcAddr, float *a, float *b, float *c, int64_t numBatches,
+    uint64_t *a_offsets, uint64_t *b_offsets) {
   libxsmm_xmmfunction sgemm;
   sgemm.xmm = reinterpret_cast<FunctionPtr>(funcAddr);
-  unsigned long long numBatchesVar = numBatches; // NOLINT
-  unsigned long long *l_a_offs = (unsigned long long *)a_offsets;
-  unsigned long long *l_b_offs = (unsigned long long *)b_offsets;
+  unsigned long long numBatchesVar = numBatches;                      // NOLINT
+  auto *l_a_offs = reinterpret_cast<unsigned long long *>(a_offsets); // NOLINT
+  auto *l_b_offs = reinterpret_cast<unsigned long long *>(b_offsets); // NOLINT
 
   sgemm.smro(b, a, c, &numBatchesVar, l_b_offs, l_a_offs);
 }
@@ -139,6 +93,33 @@ plaidml_rt_xsmm_brgemm_offs_dispatch_f32(int32_t lda, int32_t ldb, int32_t ldc,
   return reinterpret_cast<int64_t>(sgemm);
 }
 
+extern "C" int64_t
+plaidml_rt_xsmm_unary_dispatch(int32_t m, int32_t n, int32_t ldi, int32_t ldo,
+                               int32_t in_type, int32_t compute_type,
+                               int32_t out_type, int32_t type) {
+  libxsmm_blasint ldi_int = ldi;
+  libxsmm_blasint ldo_int = ldo;
+  libxsmm_meltwfunction_unary kernel = libxsmm_dispatch_meltw_unary(
+      static_cast<libxsmm_blasint>(n), static_cast<libxsmm_blasint>(m),
+      &ldi_int, &ldo_int, // leading dimensions
+      static_cast<libxsmm_datatype>(in_type),
+      static_cast<libxsmm_datatype>(compute_type),
+      static_cast<libxsmm_datatype>(out_type),
+      LIBXSMM_MELTW_FLAG_UNARY_NONE, // TODO: add flags to op definition
+      static_cast<libxsmm_meltw_unary_type>(type));
+  return reinterpret_cast<int64_t>(kernel);
+}
+
+extern "C" void plaidml_rt_xsmm_unary_invoke(int64_t addr, void *input,
+                                             void *output) {
+  libxsmm_meltwfunction_unary kernel =
+      reinterpret_cast<libxsmm_meltwfunction_unary>(addr);
+  libxsmm_meltw_unary_param param;
+  param.in.primary = input;
+  param.out.primary = output;
+  kernel(&param);
+}
+
 namespace pmlc::rt {
 
 void registerXsmm() {
@@ -151,18 +132,6 @@ void registerXsmm() {
 
   registerSymbol("plaidml_rt_xsmm_gemm_dispatch_f32",
                  reinterpret_cast<void *>(plaidml_rt_xsmm_gemm_dispatch_f32));
-
-  registerSymbol("plaidml_rt_xsmm_unary_exp_invoke_f32",
-                 reinterpret_cast<void *>(plaidml_rt_xsmm_unary_exp_invoke_f32));
-
-  registerSymbol("plaidml_rt_xsmm_unary_exp_dispatch_f32",
-                 reinterpret_cast<void *>(plaidml_rt_xsmm_unary_exp_dispatch_f32));
-
-  registerSymbol("plaidml_rt_xsmm_unary_relu_invoke_f32",
-                 reinterpret_cast<void *>(plaidml_rt_xsmm_unary_relu_invoke_f32));
-
-  registerSymbol("plaidml_rt_xsmm_unary_relu_dispatch_f32",
-                 reinterpret_cast<void *>(plaidml_rt_xsmm_unary_relu_dispatch_f32));
 
   registerSymbol("plaidml_rt_xsmm_brgemm_invoke_f32",
                  reinterpret_cast<void *>(plaidml_rt_xsmm_brgemm_invoke_f32));
@@ -177,6 +146,12 @@ void registerXsmm() {
   registerSymbol(
       "plaidml_rt_xsmm_brgemm_offs_dispatch_f32",
       reinterpret_cast<void *>(plaidml_rt_xsmm_brgemm_offs_dispatch_f32));
+
+  registerSymbol("plaidml_rt_xsmm_unary_dispatch",
+                 reinterpret_cast<void *>(plaidml_rt_xsmm_unary_dispatch));
+
+  registerSymbol("plaidml_rt_xsmm_unary_invoke",
+                 reinterpret_cast<void *>(plaidml_rt_xsmm_unary_invoke));
 }
 
 } // namespace pmlc::rt

@@ -6,6 +6,8 @@
 
 #include "mlir/IR/OpImplementation.h"
 
+#include "pmlc/dialect/xsmm/ir/enums.cc.inc"
+
 using namespace mlir; // NOLINT
 
 namespace pmlc::dialect::xsmm {
@@ -16,6 +18,11 @@ void XSMMDialect::initialize() {
 #include "pmlc/dialect/xsmm/ir/ops.cc.inc"
       >();
 }
+
+struct GemmOperand {
+  OpAsmParser::OperandType memref;
+  SmallVector<OpAsmParser::OperandType, 4> indices;
+};
 
 //
 // ---- GemmInvokeF32Op ----
@@ -44,7 +51,7 @@ void printGemmInvokeF32Op(OpAsmPrinter &p, GemmInvokeF32Op op) {
   auto funcType =
       FunctionType::get(op.getContext(), {op.a().getType(), op.b().getType()},
                         {op.c().getType()});
-  p << op.getOperation()->getName() << ' ';
+  p << op->getName() << ' ';
   p << op.ptr() << ", ";
   p << op.c() << '[';
   p.printOperands(op.getOperandsForC());
@@ -54,11 +61,6 @@ void printGemmInvokeF32Op(OpAsmPrinter &p, GemmInvokeF32Op op) {
   p.printOperands(op.getOperandsForB());
   p << "] : " << funcType;
 }
-
-struct GemmOperand {
-  OpAsmParser::OperandType memref;
-  SmallVector<OpAsmParser::OperandType, 4> indices;
-};
 
 ParseResult parseGemmInvokeF32Op(OpAsmParser &parser, OperationState &result) {
   auto &builder = parser.getBuilder();
@@ -86,109 +88,8 @@ ParseResult parseGemmInvokeF32Op(OpAsmParser &parser, OperationState &result) {
 }
 
 //
-// ---- UnaryExpInvokeF32Op ----
+// ---- BRGemmOffsInvokeF32Op ----
 //
-
-UnaryExpInvokeF32Op::operand_range UnaryExpInvokeF32Op::getOperandsForOutput() {
-  auto inpType = i().getType().cast<MemRefType>();
-  auto outType = o().getType().cast<MemRefType>();
-  return getOperands().slice(3 + inpType.getRank(), outType.getRank());
-}
-
-UnaryExpInvokeF32Op::operand_range UnaryExpInvokeF32Op::getOperandsForInput() {
-  auto inpType = i().getType().cast<MemRefType>();
-  return getOperands().slice(3, inpType.getRank());
-}
-
-void printUnaryExpInvokeF32Op(OpAsmPrinter &p, UnaryExpInvokeF32Op op) {
-  auto funcType =
-      FunctionType::get(op.getContext(), {op.i().getType()}, {op.o().getType()});
-  p << op.getOperation()->getName() << ' ';
-  p << op.ptr() << ", ";
-  p << op.o() << '[';
-  p.printOperands(op.getOperandsForOutput());
-  p << "] = EXP ( " << op.i() << '[';
-  p.printOperands(op.getOperandsForInput());
-  p << "] ) : " << funcType;
-}
-
-struct UnaryOperand {
-  OpAsmParser::OperandType memref;
-  SmallVector<OpAsmParser::OperandType, 4> indices;
-};
-
-ParseResult parseUnaryExpInvokeF32Op(OpAsmParser &parser, OperationState &result) {
-  auto &builder = parser.getBuilder();
-  auto indexType = builder.getIndexType();
-  auto i64Type = builder.getIntegerType(64);
-  UnaryOperand i, o;
-  OpAsmParser::OperandType ptr;
-  FunctionType funcType;
-  StringRef uname = "EXP";
-  return failure(
-      parser.parseOperand(ptr) || parser.parseComma() ||
-      parser.parseOperand(o.memref) ||
-      parser.parseOperandList(o.indices, OpAsmParser::Delimiter::Square) ||
-      parser.parseEqual() || parser.parseKeyword(&uname) || parser.parseLParen() ||
-      parser.parseOperand(i.memref) ||
-      parser.parseOperandList(i.indices, OpAsmParser::Delimiter::Square) || parser.parseRParen() ||
-      parser.parseColonType(funcType) ||
-      parser.resolveOperand(ptr, i64Type, result.operands) ||
-      parser.resolveOperand(i.memref, funcType.getInput(0), result.operands) ||
-      parser.resolveOperand(o.memref, funcType.getResult(0), result.operands) ||
-      parser.resolveOperands(i.indices, indexType, result.operands) ||
-      parser.resolveOperands(o.indices, indexType, result.operands) );
-}
-
-//
-// ---- UnaryReluInvokeF32Op ----
-//
-
-UnaryReluInvokeF32Op::operand_range UnaryReluInvokeF32Op::getOperandsForOutput() {
-  auto inpType = i().getType().cast<MemRefType>();
-  auto outType = o().getType().cast<MemRefType>();
-  return getOperands().slice(3 + inpType.getRank(), outType.getRank());
-}
-
-UnaryReluInvokeF32Op::operand_range UnaryReluInvokeF32Op::getOperandsForInput() {
-  auto inpType = i().getType().cast<MemRefType>();
-  return getOperands().slice(3, inpType.getRank());
-}
-
-void printUnaryReluInvokeF32Op(OpAsmPrinter &p, UnaryReluInvokeF32Op op) {
-  auto funcType =
-      FunctionType::get(op.getContext(), {op.i().getType()}, {op.o().getType()});
-  p << op.getOperation()->getName() << ' ';
-  p << op.ptr() << ", ";
-  p << op.o() << '[';
-  p.printOperands(op.getOperandsForOutput());
-  p << "] = RELU ( " << op.i() << '[';
-  p.printOperands(op.getOperandsForInput());
-  p << "] ) : " << funcType;
-}
-
-ParseResult parseUnaryReluInvokeF32Op(OpAsmParser &parser, OperationState &result) {
-  auto &builder = parser.getBuilder();
-  auto indexType = builder.getIndexType();
-  auto i64Type = builder.getIntegerType(64);
-  UnaryOperand i, o;
-  OpAsmParser::OperandType ptr;
-  FunctionType funcType;
-  StringRef uname = "RELU";
-  return failure(
-      parser.parseOperand(ptr) || parser.parseComma() ||
-      parser.parseOperand(o.memref) ||
-      parser.parseOperandList(o.indices, OpAsmParser::Delimiter::Square) ||
-      parser.parseEqual() || parser.parseKeyword(&uname) || parser.parseLParen() ||
-      parser.parseOperand(i.memref) ||
-      parser.parseOperandList(i.indices, OpAsmParser::Delimiter::Square) || parser.parseRParen() ||
-      parser.parseColonType(funcType) ||
-      parser.resolveOperand(ptr, i64Type, result.operands) ||
-      parser.resolveOperand(i.memref, funcType.getInput(0), result.operands) ||
-      parser.resolveOperand(o.memref, funcType.getResult(0), result.operands) ||
-      parser.resolveOperands(i.indices, indexType, result.operands) ||
-      parser.resolveOperands(o.indices, indexType, result.operands) );
-}
 
 ParseResult parseBRGemmOffsInvokeF32Op(OpAsmParser &parser,
                                        OperationState &result) {
@@ -200,9 +101,7 @@ ParseResult parseBRGemmOffsInvokeF32Op(OpAsmParser &parser,
   IntegerAttr numBatchesAttr;
   FunctionType funcType;
   OpAsmParser::OperandType ptr;
- 
   return failure(
- 
       parser.parseOperand(ptr) || parser.parseComma() ||
       parser.parseOperand(c.memref) ||
       parser.parseOperandList(c.indices, OpAsmParser::Delimiter::Square) ||
@@ -225,6 +124,60 @@ ParseResult parseBRGemmOffsInvokeF32Op(OpAsmParser &parser,
       parser.resolveOperands(c.indices, indexType, result.operands) ||
       parser.resolveOperands(a.indices, indexType, result.operands) ||
       parser.resolveOperands(b.indices, indexType, result.operands));
+}
+
+//
+// ---- UnaryInvokeOp ----
+//
+
+struct UnaryOperand {
+  OpAsmParser::OperandType memref;
+  SmallVector<OpAsmParser::OperandType, 4> indices;
+};
+
+Operation::operand_range UnaryInvokeOp::getOperandsForOutput() {
+  auto outputType = output().getType().cast<MemRefType>();
+  return getOperands().slice(3, outputType.getRank());
+}
+
+Operation::operand_range UnaryInvokeOp::getOperandsForInput() {
+  auto inputType = input().getType().cast<MemRefType>();
+  auto outputType = output().getType().cast<MemRefType>();
+  return getOperands().slice(3 + outputType.getRank(), inputType.getRank());
+}
+
+void printUnaryInvokeOp(OpAsmPrinter &p, UnaryInvokeOp op) {
+  auto funcType = FunctionType::get(op.getContext(), {op.input().getType()},
+                                    {op.output().getType()});
+  p << op->getName() << ' ';
+  p << op.output() << '[';
+  p.printOperands(op.getOperandsForOutput());
+  p << "] = " << op.ptr() << '(' << op.input() << '[';
+  p.printOperands(op.getOperandsForInput());
+  p << "]) : " << funcType;
+}
+
+ParseResult parseUnaryInvokeOp(OpAsmParser &parser, OperationState &result) {
+  auto &builder = parser.getBuilder();
+  auto indexType = builder.getIndexType();
+  auto i64Type = builder.getIntegerType(64);
+  UnaryOperand input, output;
+  OpAsmParser::OperandType ptr;
+  FunctionType funcType;
+  return failure(
+      parser.parseOperand(output.memref) ||
+      parser.parseOperandList(output.indices, OpAsmParser::Delimiter::Square) ||
+      parser.parseEqual() || parser.parseOperand(ptr) || parser.parseLParen() ||
+      parser.parseOperand(input.memref) ||
+      parser.parseOperandList(input.indices, OpAsmParser::Delimiter::Square) ||
+      parser.parseRParen() || parser.parseColonType(funcType) ||
+      parser.resolveOperand(ptr, i64Type, result.operands) ||
+      parser.resolveOperand(output.memref, funcType.getResult(0),
+                            result.operands) ||
+      parser.resolveOperand(input.memref, funcType.getInput(0),
+                            result.operands) ||
+      parser.resolveOperands(output.indices, indexType, result.operands) ||
+      parser.resolveOperands(input.indices, indexType, result.operands));
 }
 
 } // namespace pmlc::dialect::xsmm
