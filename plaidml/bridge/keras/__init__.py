@@ -1782,7 +1782,10 @@ def variable(value, dtype=None, name=None, constraint=None):
             #     'Casting to requested dtype in variable, received {} and requested {}'.format(
             #         value.dtype, dtype))
             value = value.astype(dtype)
-        return _KerasNode('variable', name=name, var=value)
+        if (str(name) == 'kernel'):
+            return _KerasNode('constant', name=name, const=value)
+        else:
+            return _KerasNode('variable', name=name, var=value)
     raise TypeError('Unknown type for variable: {}'.format(type(value)))
 
 
