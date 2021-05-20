@@ -3,6 +3,7 @@
 #include "plaidml/op/lib/ops.h"
 
 #include <algorithm>
+#include <functional>
 #include <set>
 #include <utility>
 #include <vector>
@@ -2051,8 +2052,8 @@ Tensor compute_iou(std::vector<Tensor> boxes_coordinates, TensorDim num_batches,
 Value nms(const Value& value) {
   IVLOG(1, "nms");
   auto args = value.as_tuple();
-  if (args.size() != 20) {
-    throw std::runtime_error("nms expects 20 arguments");
+  if (args.size() != 21) {
+    throw std::runtime_error("nms expects 21 arguments");
   }
   auto Boxes = args[0].as_tensor();
   auto Scores = args[1].as_tensor();
@@ -2083,6 +2084,7 @@ Value nms(const Value& value) {
   }
   auto nms_style = validate<NmsStyle>(args[18].as_int());
   auto share_location = args[19].as_bool();
+  auto hard_suppression = args[20].as_bool();
 
   std::vector<int64_t> scores_shape = Scores.compute_shape().sizes();
   int64_t boxes_count = scores_shape[2];
@@ -2192,6 +2194,14 @@ Value nms(const Value& value) {
 
   scatter_dims[2] = one_dim;
   zero_scatter = edsl::Contraction(scatter_dims, scatter_idxs).assign(zero(0));
+
+  std::function<edsl::Tensor(edsl::Tensor, edsl::Tensor)> iou_compare;
+  if (hard_suppression) {
+    iou_compare = [](edsl::Tensor lhs, edsl::Tensor rhs) { return lhs >= rhs; };
+  } else {
+    iou_compare = [](edsl::Tensor lhs, edsl::Tensor rhs) { return lhs > rhs; };
+  }
+
   // Select box
   for (int64_t k = 0; k < num_boxes_per_class; k++) {
     // Select the box with largest score
@@ -2224,12 +2234,7 @@ Value nms(const Value& value) {
     }
     Tensor candidate_index_comb = op::concatenate({class_idxs, candidate_index}, 2);
     Tensor iou_candidate = edsl::gather(iou, candidate_index_comb).mode(edsl::GatherMode::ND).batchDims(1);
-    if (nms_style == NmsStyle::OV) {
-      // use >= to include suppose_hard_suppresion case
-      new_scores = edsl::select(iou_candidate >= iou_threshold_i, zero, new_scores);
-    } else {
-      new_scores = edsl::select(iou_candidate > iou_threshold_i, zero, new_scores);
-    }
+    new_scores = edsl::select(iou_compare(iou_candidate, iou_threshold_i), zero, new_scores);
 
     // Add selected box to boxes
     Tensor box_index = edsl::select(score > 0.0f, edsl::cast(candidate_index, box_output_type), neg1_o);

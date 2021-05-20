@@ -560,7 +560,8 @@ class nms {
         ssd_input_width_(0.0f),
         ssd_with_arm_loc_(false),
         nms_style_(NmsStyle::OV),
-        share_location_(true) {}
+        share_location_(true),
+        hard_suppression_(true) {}
 
   nms& soft_nms_sigma(float soft_nms_sigma) {
     soft_nms_sigma_ = soft_nms_sigma;
@@ -637,6 +638,11 @@ class nms {
     return *this;
   }
 
+  nms& hard_suppression(bool hard_suppression) {
+    hard_suppression_ = hard_suppression;
+    return *this;
+  }
+
   std::vector<edsl::Tensor> build() {
     auto args = edsl::make_tuple(              //
         Boxes_,                                //
@@ -658,7 +664,8 @@ class nms {
         ssd_with_arm_loc_,                     //
         ssd_arm_location_,                     //
         static_cast<int>(nms_style_),          //
-        share_location_);
+        share_location_,                       //
+        hard_suppression_);
     auto R = details::op("nms", args).as_tuple();
     auto B = R[0].as_tensor();
     auto S = R[1].as_tensor();
@@ -687,6 +694,7 @@ class nms {
   bool ssd_with_arm_loc_;
   NmsStyle nms_style_;
   bool share_location_;
+  bool hard_suppression_;
 };
 
 class topk {
