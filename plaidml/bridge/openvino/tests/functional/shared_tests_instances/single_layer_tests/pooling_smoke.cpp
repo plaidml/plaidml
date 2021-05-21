@@ -20,11 +20,10 @@ const std::vector<InferenceEngine::Precision> netPrecisions = {
 const std::vector<std::vector<size_t>> kernels = {
     {3, 3},
     {3, 5},
-    {2, 2},
 };
 const std::vector<std::vector<size_t>> strides = {
     {1, 1},
-    {2, 2},
+    // {1, 2},
 };
 const std::vector<std::vector<size_t>> padBegins = {
     {0, 0},
@@ -87,10 +86,10 @@ INSTANTIATE_TEST_CASE_P(smoke_MaxPool_ExplicitPad_CeilRpunding, PoolingLayerTest
 /* ========== Same Upper Pad Ceil Rounding ========== */
 const auto maxPool_SameUpperPad_CeilRounding_Params = ::testing::Combine(  //
     ::testing::Values(ngraph::helpers::PoolingTypes::MAX),                 //
-    ::testing::ValuesIn(kernels),                                          //
-    ::testing::ValuesIn(strides),                                          //
-    ::testing::ValuesIn(padBegins),                                        //
-    ::testing::ValuesIn(padEnds),                                          //
+    ::testing::Values(std::vector<size_t>{2, 2}),                          //
+    ::testing::Values(std::vector<size_t>{2, 2}),                          //
+    ::testing::Values(std::vector<size_t>{0, 0}),                          //
+    ::testing::Values(std::vector<size_t>{0, 0}),                          //
     ::testing::Values(ngraph::op::RoundingType::CEIL),                     //
     ::testing::Values(ngraph::op::PadType::SAME_UPPER),                    //
     ::testing::Values(false)  // placeholder value - exclude pad not applicable for max pooling
