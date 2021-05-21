@@ -17,50 +17,45 @@ edsl::Tensor generate_anchors(const ngraph::op::ProposalAttrs& attrs,  //
                               const int64_t num_anchors,               //
                               const float coordinates_offset,          //
                               DType dtype) {
-  auto base_size = attrs.base_size;
-  auto ratios = attrs.ratio;
-  auto num_ratios = ratios.size();
-  auto scales = attrs.scale;
-  auto num_scales = scales.size();
+  int num_ratios = attrs.ratio.size();
+  int num_scales = attrs.scale.size();
   IE_ASSERT(num_anchors == num_ratios * num_scales);
 
+  auto base_size = attrs.base_size;
+  float base_area = base_size * base_size;
+  float center = 0.5f * (base_size - coordinates_offset);
   auto round_ratios = attrs.framework != "tensorflow";
   auto shift_anchors = attrs.framework == "tensorflow";
 
-  float base_area = base_size * base_size;
-  float center = 0.5f * (base_size - coordinates_offset);
+  // create anchors tensor from ratios and scales based on base size, in which
+  // ratio = base_height / base_width where base_height * base_width = base_size * base_size
+  auto ratio_buff = Buffer(TensorShape(DType::FLOAT32, {num_ratios, 1}));
+  ratio_buff.copy_from(attrs.ratio.data());
+  auto ratios = edsl::Constant(ratio_buff, "ratio_node");
+  ratios = edsl::reshape(op::tile(ratios, {1, num_scales}), {num_anchors, 1});
 
-  std::vector<float> anchor_coordinates_vec;
-  for (auto ratio : ratios) {
-    float ratio_w;
-    float ratio_h;
-    if (round_ratios) {
-      ratio_w = std::roundf(std::sqrt(base_area / ratio));
-      ratio_h = std::roundf(ratio_w * ratio);
-    } else {
-      ratio_w = std::sqrt(base_area / ratio);
-      ratio_h = ratio_w * ratio;
-    }
-    for (auto scale : scales) {
-      // construct anchor tensor: [num_anchors, 4]
-      auto scale_w = (ratio_w * scale - coordinates_offset) * 0.5f;
-      auto scale_h = (ratio_h * scale - coordinates_offset) * 0.5f;
-      anchor_coordinates_vec.push_back(-scale_w);
-      anchor_coordinates_vec.push_back(-scale_h);
-      anchor_coordinates_vec.push_back(scale_w);
-      anchor_coordinates_vec.push_back(scale_h);
-    }
+  edsl::Tensor base_width, base_height;
+  if (round_ratios) {
+    base_width = edsl::round(edsl::sqrt(edsl::Tensor(base_area) / ratios));
+    base_height = edsl::round(base_width * ratios);
+  } else {
+    base_width = edsl::sqrt(edsl::Tensor(base_area) / ratios);
+    base_height = base_width * ratios;
   }
-  TensorShape anchor_shape(DType::FLOAT32, {num_anchors, 4});
-  Buffer anchor_buffer(anchor_shape);
-  anchor_buffer.copy_from(anchor_coordinates_vec.data());
-  auto anchor_offsets = edsl::Constant(anchor_buffer, "anchors_node");
-  anchor_offsets = edsl::cast(anchor_offsets, dtype);
-  auto anchors = anchor_offsets + center;
 
+  auto scale_buff = Buffer(TensorShape(DType::FLOAT32, {num_scales, 1}));
+  scale_buff.copy_from(attrs.scale.data());
+  auto scales = edsl::Constant(scale_buff, "scale_node");
+  scales = edsl::reshape(op::tile(scales, {num_ratios, 1}), {num_anchors, 1});
+  auto offset_w = (base_width * scales - coordinates_offset) * 0.5f;
+  auto offset_h = (base_height * scales - coordinates_offset) * 0.5f;
+
+  auto anchor_offsets = op::concatenate({-offset_w, -offset_h, offset_w, offset_h}, 1);
+  auto anchors = anchor_offsets + center;
   if (shift_anchors) {
     anchors = anchors - base_size * 0.5f;
   }
+  anchors = edsl::cast(anchors, dtype);
   return anchors;
 }
 
@@ -100,131 +95,95 @@ edsl::Tensor enumerate_proposals(edsl::Tensor class_probs,                //
   edsl::Tensor anchor_wp = edsl::gather(anchors, idx_two).axis(1);
   edsl::Tensor anchor_hp = edsl::gather(anchors, idx_three).axis(1);
 
-  std::vector<float> feat_h_vec;
-  std::vector<float> feat_w_vec;
-  for (int64_t idx_feat_h = 0; idx_feat_h < feat_H; idx_feat_h++) {
-    for (int64_t idx_feat_w = 0; idx_feat_w < feat_W; idx_feat_w++) {
-      for (int64_t idx_anchor = 0; idx_anchor < num_anchors; idx_anchor++) {
-        feat_h_vec.push_back(static_cast<float>(idx_feat_h));
-        feat_w_vec.push_back(static_cast<float>(idx_feat_w));
-      }
-    }
+  auto dim_h = edsl::TensorDim(feat_H);
+  auto dim_w = edsl::TensorDim(feat_W);
+  auto dim_anchor = edsl::TensorDim(num_anchors);
+  auto feat_h = edsl::reshape(edsl::index({dim_h, dim_w, dim_anchor}, 0), {num_proposals, 1});
+  auto feat_w = edsl::reshape(edsl::index({dim_h, dim_w, dim_anchor}, 1), {num_proposals, 1});
+  auto img_x = edsl::cast((swap_xy ? feat_h : feat_w) * attrs.feat_stride, dtype);
+  auto img_y = edsl::cast((swap_xy ? feat_w : feat_h) * attrs.feat_stride, dtype);
+
+  // anchor_logits: [num_batches, num_anchors * 4, feat_H, feat_W] -> [num_batches, feat_H * feat_W * num_anchors, 4]
+  auto anchor_logits = edsl::reshape(class_logits, {num_batches, num_anchors, 4, feat_H, feat_W});
+  anchor_logits = op::transpose(anchor_logits, edsl::make_tuple<int64_t>({0, 3, 4, 1, 2}));
+  anchor_logits = edsl::reshape(anchor_logits, {num_batches, num_proposals, 4});
+
+  edsl::Tensor dx = edsl::gather(anchor_logits, idx_zero).axis(2);
+  edsl::Tensor dy = edsl::gather(anchor_logits, idx_one).axis(2);
+  edsl::Tensor d_log_w = edsl::gather(anchor_logits, idx_two).axis(2);
+  edsl::Tensor d_log_h = edsl::gather(anchor_logits, idx_three).axis(2);
+  dx = dx / attrs.box_coordinate_scale;
+  dy = dy / attrs.box_coordinate_scale;
+  d_log_w = d_log_w / attrs.box_size_scale;
+  d_log_h = d_log_h / attrs.box_size_scale;
+
+  // box upper-left corner location
+  auto box_x0 = img_x + anchor_wm;
+  auto box_y0 = img_y + anchor_hm;
+  // box lower-right corner location
+  auto box_x1 = img_x + anchor_wp;
+  auto box_y1 = img_y + anchor_hp;
+
+  if (initial_clip) {
+    box_x0 = op::clip(box_x0, edsl::Tensor(0), edsl::Tensor(img_W));
+    box_y0 = op::clip(box_y0, edsl::Tensor(0), edsl::Tensor(img_H));
+    box_x1 = op::clip(box_x1, edsl::Tensor(0), edsl::Tensor(img_W));
+    box_y1 = op::clip(box_y1, edsl::Tensor(0), edsl::Tensor(img_H));
   }
-  TensorShape proposal_coord_shape(DType::FLOAT32, {num_proposals, 1});
-  auto feat_x_vec = swap_xy ? feat_h_vec : feat_w_vec;
-  auto feat_y_vec = swap_xy ? feat_w_vec : feat_h_vec;
-  Buffer feat_x_buffer(proposal_coord_shape);
-  Buffer feat_y_buffer(proposal_coord_shape);
-  feat_x_buffer.copy_from(feat_x_vec.data());
-  feat_y_buffer.copy_from(feat_y_vec.data());
-  auto feat_x = edsl::Constant(feat_x_buffer, "feat_x_node");
-  auto feat_y = edsl::Constant(feat_y_buffer, "feat_y_node");
-  feat_x = edsl::cast(feat_x, dtype);
-  feat_y = edsl::cast(feat_y, dtype);
-  auto img_x = feat_x * attrs.feat_stride;
-  auto img_y = feat_y * attrs.feat_stride;
 
-  std::vector<edsl::Tensor> batch_proposals_vec;
-  for (int64_t idx_batch = 0; idx_batch < num_batches; idx_batch++) {
-    // anchor_logits: [1, num_anchors * 4, feat_H, feat_W] -> [feat_H * feat_W * num_anchors, 4]
-    edsl::Tensor batch_logits = edsl::gather(class_logits, idx_zero + idx_batch).axis(0);
-    batch_logits = op::squeeze(batch_logits, {0});
-    batch_logits = edsl::reshape(batch_logits, {num_anchors, 4, feat_H, feat_W});
-    batch_logits = op::transpose(batch_logits, edsl::make_tuple<int64_t>({2, 3, 0, 1}));
-    batch_logits = edsl::reshape(batch_logits, {num_proposals, 4});
+  auto box_width = box_x1 - box_x0 + coordinates_offset;
+  auto box_height = box_y1 - box_y0 + coordinates_offset;
+  auto box_ctr_x = box_x0 + box_width * 0.5f;
+  auto box_ctr_y = box_y0 + box_height * 0.5f;
 
-    edsl::Tensor dx = edsl::gather(batch_logits, idx_zero).axis(1);
-    edsl::Tensor dy = edsl::gather(batch_logits, idx_one).axis(1);
-    edsl::Tensor d_log_w = edsl::gather(batch_logits, idx_two).axis(1);
-    edsl::Tensor d_log_h = edsl::gather(batch_logits, idx_three).axis(1);
-    dx = dx / attrs.box_coordinate_scale;
-    dy = dy / attrs.box_coordinate_scale;
-    d_log_w = d_log_w / attrs.box_size_scale;
-    d_log_h = d_log_h / attrs.box_size_scale;
+  auto pred_ctr_x = box_ctr_x + dx * box_width;
+  auto pred_ctr_y = box_ctr_y + dy * box_height;
+  auto pred_width = edsl::exp(d_log_w) * box_width;
+  auto pred_height = edsl::exp(d_log_h) * box_height;
 
-    // box upper-left corner location
-    auto box_x0 = img_x + anchor_wm;
-    auto box_y0 = img_y + anchor_hm;
-    // box lower-right corner location
-    auto box_x1 = img_x + anchor_wp;
-    auto box_y1 = img_y + anchor_hp;
+  box_x0 = pred_ctr_x - pred_width * 0.5f;
+  box_y0 = pred_ctr_y - pred_height * 0.5f;
+  box_x1 = pred_ctr_x + pred_width * 0.5f;
+  box_y1 = pred_ctr_y + pred_height * 0.5f;
 
-    if (initial_clip) {
-      box_x0 = op::clip(box_x0, edsl::Tensor(0), edsl::Tensor(img_W));
-      box_y0 = op::clip(box_y0, edsl::Tensor(0), edsl::Tensor(img_H));
-      box_x1 = op::clip(box_x1, edsl::Tensor(0), edsl::Tensor(img_W));
-      box_y1 = op::clip(box_y1, edsl::Tensor(0), edsl::Tensor(img_H));
-    }
-
-    auto box_width = box_x1 - box_x0 + coordinates_offset;
-    auto box_height = box_y1 - box_y0 + coordinates_offset;
-    auto box_ctr_x = box_x0 + box_width * 0.5f;
-    auto box_ctr_y = box_y0 + box_height * 0.5f;
-
-    auto pred_ctr_x = box_ctr_x + dx * box_width;
-    auto pred_ctr_y = box_ctr_y + dy * box_height;
-    auto pred_width = edsl::exp(d_log_w) * box_width;
-    auto pred_height = edsl::exp(d_log_h) * box_height;
-
-    box_x0 = pred_ctr_x - pred_width * 0.5f;
-    box_y0 = pred_ctr_y - pred_height * 0.5f;
-    box_x1 = pred_ctr_x + pred_width * 0.5f;
-    box_y1 = pred_ctr_y + pred_height * 0.5f;
-
-    if (attrs.clip_before_nms) {
-      box_x0 = op::clip(box_x0, edsl::Tensor(0), edsl::Tensor(img_W - coordinates_offset));
-      box_y0 = op::clip(box_y0, edsl::Tensor(0), edsl::Tensor(img_H - coordinates_offset));
-      box_x1 = op::clip(box_x1, edsl::Tensor(0), edsl::Tensor(img_W - coordinates_offset));
-      box_y1 = op::clip(box_y1, edsl::Tensor(0), edsl::Tensor(img_H - coordinates_offset));
-    }
-
-    auto new_box_width = box_x1 - box_x0 + coordinates_offset;
-    auto new_box_height = box_y1 - box_y0 + coordinates_offset;
-
-    // anchor_score: [1, 2 * num_anchors, feat_H, feat_W] -> [feat_H * feat_W * num_anchors, 2]
-    edsl::Tensor anchor_score = edsl::gather(class_probs, idx_zero + idx_batch).axis(0);
-    anchor_score = op::squeeze(anchor_score, {0});
-    anchor_score = edsl::reshape(anchor_score, {2, num_anchors, feat_H, feat_W});
-    anchor_score = op::transpose(anchor_score, edsl::make_tuple<int64_t>({2, 3, 1, 0}));
-    anchor_score = edsl::reshape(anchor_score, {num_proposals, 2});
-    // Currently only takes second backend scores referring to openvino implementation
-    anchor_score = edsl::gather(anchor_score, idx_one).axis(1);
-    auto valid_box_size = (new_box_width >= min_box_W) * (new_box_height >= min_box_H);
-    auto zero = edsl::cast(edsl::Tensor(0), anchor_score.dtype());
-    auto proposal_score = edsl::select(valid_box_size, anchor_score, zero);
-
-    auto batch_enum_proposals = op::concatenate({box_x0, box_y0, box_x1, box_y1, proposal_score}, 1);
-    batch_enum_proposals = op::unsqueeze(batch_enum_proposals, {0});
-    batch_proposals_vec.push_back(batch_enum_proposals);
+  if (attrs.clip_before_nms) {
+    box_x0 = op::clip(box_x0, edsl::Tensor(0), edsl::Tensor(img_W - coordinates_offset));
+    box_y0 = op::clip(box_y0, edsl::Tensor(0), edsl::Tensor(img_H - coordinates_offset));
+    box_x1 = op::clip(box_x1, edsl::Tensor(0), edsl::Tensor(img_W - coordinates_offset));
+    box_y1 = op::clip(box_y1, edsl::Tensor(0), edsl::Tensor(img_H - coordinates_offset));
   }
+
+  auto new_box_width = box_x1 - box_x0 + coordinates_offset;
+  auto new_box_height = box_y1 - box_y0 + coordinates_offset;
+
+  // anchor_score: [num_batches, 2 * num_anchors, feat_H, feat_W] -> [num_batches, feat_H * feat_W * num_anchors, 2]
+  auto anchor_score = edsl::reshape(class_probs, {num_batches, 2, num_anchors, feat_H, feat_W});
+  anchor_score = op::transpose(anchor_score, edsl::make_tuple<int64_t>({0, 3, 4, 2, 1}));
+  anchor_score = edsl::reshape(anchor_score, {num_batches, num_proposals, 2});
+  // Currently only takes backend scores referring to openvino implementation
+  anchor_score = edsl::gather(anchor_score, idx_one).axis(2);
+  auto valid_box_size = (new_box_width >= min_box_W) * (new_box_height >= min_box_H);
+  auto zero = edsl::cast(edsl::Tensor(0), anchor_score.dtype());
+  auto proposal_score = edsl::select(valid_box_size, anchor_score, zero);
 
   // proposals: [num_batches, num_proposals, 5]
-  auto proposals = op::concatenate(batch_proposals_vec, 0);
+  auto proposals = op::concatenate({box_x0, box_y0, box_x1, box_y1, proposal_score}, 2);
   return proposals;
 }
 
 edsl::Tensor partial_sort(edsl::Tensor proposals, int64_t pre_nms_topn, int64_t num_batches) {
   edsl::Tensor idx_zero = edsl::index({edsl::TensorDim(1)}, 0);
-  edsl::Tensor idx_four = idx_zero + 4;
 
-  std::vector<edsl::Tensor> sorted_proposals_vec;
-  for (int64_t idx_batch = 0; idx_batch < num_batches; idx_batch++) {
-    edsl::Tensor batch_proposals = edsl::gather(proposals, idx_zero + idx_batch).axis(0);
-    edsl::Tensor scores = edsl::gather(batch_proposals, idx_four).axis(2);
-    scores = op::squeeze(scores, {0, 2});
+  edsl::Tensor scores = edsl::gather(proposals, idx_zero + 4).axis(2);
 
-    // pick first pre_nms_topn proposals
-    auto topk_result = op::topk(scores, pre_nms_topn)
-                           .axis(0)
-                           .sort_direction(edsl::SortDirection::DESC)
-                           .sort_type(op::TopKSortType::VALUE)
-                           .build();
-    auto topn_indices = topk_result[1];
-
-    edsl::Tensor batch_topn = edsl::gather(batch_proposals, topn_indices).axis(1);
-    sorted_proposals_vec.push_back(batch_topn);
-  }
-  auto sorted_proposals = op::concatenate(sorted_proposals_vec, 0);
+  // pick first pre_nms_topn proposals
+  auto topk_result = op::topk(scores, pre_nms_topn)
+                         .axis(1)
+                         .sort_direction(edsl::SortDirection::DESC)
+                         .sort_type(op::TopKSortType::VALUE)
+                         .build();
+  auto topn_indices = topk_result[1];
+  edsl::Tensor sorted_proposals = edsl::gather(proposals, topn_indices).mode(edsl::GatherMode::ND).batchDims(1);
   return sorted_proposals;
 }
 
