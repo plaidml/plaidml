@@ -372,7 +372,7 @@ std::pair<TensorDim, TensorDim> compute_padding_and_output_size(  //
   if (autopad_mode == AutoPadMode::SAME_LOWER || autopad_mode == AutoPadMode::SAME_UPPER) {
     TensorDim output_size((I_eff + stride - 1) / stride);
     int64_t lower_term = (autopad_mode == AutoPadMode::SAME_LOWER) ? 1 : 0;
-    TensorDim pad_before(max(0, (output_size - 1) * stride + F_eff - I_eff) * lower_term);
+    TensorDim pad_before((max(0, (output_size - 1) * stride + F_eff - I_eff) + lower_term) / 2);
     return std::pair<TensorDim, TensorDim>(pad_before, output_size);
   }
   throw std::runtime_error(llvm::formatv("Unexpected autopadding mode: {0}", to_string(autopad_mode)));
