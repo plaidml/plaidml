@@ -125,8 +125,8 @@ void wrapFunctionAndPackArguments(llvm::Module *module, StringRef funcName,
     llvm::Value *argIndex = llvm::Constant::getIntegerValue(
         builder.getInt64Ty(), APInt(64, indexedArg.index()));
     llvm::Value *argPtrPtr = builder.CreateGEP(argList, argIndex);
-    llvm::Value *argPtr = builder.CreateLoad(argPtrPtr);
-    auto dstType = indexedArg.value().getType();
+    llvm::Value *argPtr = builder.CreateLoad(builder.getInt8PtrTy(), argPtrPtr);
+    llvm::Type *dstType = indexedArg.value().getType();
     llvm::Value *arg = dstType->isIntegerTy()
                            ? builder.CreatePtrToInt(argPtr, dstType)
                            : builder.CreateBitCast(argPtr, dstType);
@@ -147,6 +147,13 @@ AffineValueMap getRangesValueMap(AffineParallelOp op) {
   AffineValueMap::difference(op.getUpperBoundsValueMap(),
                              op.getLowerBoundsValueMap(), &out);
   return out;
+}
+
+void splitAffineMaps(AffineMap from, SmallVectorImpl<AffineMap> &into) {
+  for (AffineExpr expr : from.getResults()) {
+    into.push_back(
+        AffineMap::get(from.getNumDims(), from.getNumSymbols(), expr));
+  }
 }
 
 } // namespace pmlc::util

@@ -4,12 +4,14 @@
 
 #include <list>
 
+#include "llvm/ADT/TypeSwitch.h"
+
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/util/tags.h"
-#include "llvm/ADT/TypeSwitch.h"
+#include "pmlc/util/util.h"
 
 namespace pmlc::dialect::pxa {
 
@@ -280,14 +282,6 @@ void LayoutConverter::convertPxaVectorReduceOp(PxaVectorReduceOp reduceOp) {
   reduceOp.erase();
 }
 
-static void splitAffineMaps(mlir::AffineMap from,
-                            mlir::SmallVectorImpl<mlir::AffineMap> &into) {
-  for (mlir::AffineExpr expr : from.getResults()) {
-    into.push_back(
-        mlir::AffineMap::get(from.getNumDims(), from.getNumSymbols(), expr));
-  }
-}
-
 void LayoutConverter::convertYieldOp(mlir::AffineYieldOp yieldOp,
                                      unsigned operandNum) {
   builder.setInsertionPoint(yieldOp.getOperation());
@@ -307,8 +301,8 @@ void LayoutConverter::convertYieldOp(mlir::AffineYieldOp yieldOp,
       reductions.push_back(optReduction.getValue());
     }
     mlir::SmallVector<mlir::AffineMap> lbMaps, ubMaps;
-    splitAffineMaps(parallelOp.lowerBoundsMap(), lbMaps);
-    splitAffineMaps(parallelOp.upperBoundsMap(), ubMaps);
+    util::splitAffineMaps(parallelOp.lowerBoundsMap(), lbMaps);
+    util::splitAffineMaps(parallelOp.upperBoundsMap(), ubMaps);
     auto newParallel = builder.create<mlir::AffineParallelOp>(
         parallelOp.getLoc(), newTypes, reductions, lbMaps,
         parallelOp.getLowerBoundsOperands(), ubMaps,
