@@ -18,6 +18,7 @@
 #include "pmlc/dialect/pxa/analysis/affine_expr.h"
 #include "pmlc/util/bilp/ilp_solver.h"
 #include "pmlc/util/logging.h"
+#include "pmlc/util/util.h"
 
 using namespace mlir; // NOLINT
 
@@ -77,7 +78,7 @@ static Optional<StrideInfo> flatten(MemRefType memRefType,
 StrideRange::StrideRange(BlockArgument arg)
     : valid(false), minVal(0), maxVal(0), stride(0) {
   if (auto ap = dyn_cast<AffineParallelOp>(arg.getOwner()->getParentOp())) {
-    auto rangeExpr = ap.getRangesValueMap().getResult(arg.getArgNumber());
+    auto rangeExpr = util::getRangesValueMap(ap).getResult(arg.getArgNumber());
     auto rangeConstantExpr = rangeExpr.dyn_cast<AffineConstantExpr>();
     if (!rangeConstantExpr) {
       return;

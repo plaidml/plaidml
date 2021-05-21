@@ -14,7 +14,7 @@ namespace pmlc::util {
 uint64_t getByteSize(MemRefType type) {
   int64_t offset;
   SmallVector<int64_t, 8> strides;
-  if (failed(mlir::getStridesAndOffset(type, strides, offset))) {
+  if (failed(getStridesAndOffset(type, strides, offset))) {
     throw std::runtime_error("Could not retrieve strides");
   }
   auto sizes = type.getShape();
@@ -140,6 +140,13 @@ void wrapFunctionAndPackArguments(llvm::Module *module, StringRef funcName,
   } else {
     builder.CreateRet(val);
   }
+}
+
+AffineValueMap getRangesValueMap(AffineParallelOp op) {
+  AffineValueMap out;
+  AffineValueMap::difference(op.getUpperBoundsValueMap(),
+                             op.getLowerBoundsValueMap(), &out);
+  return out;
 }
 
 } // namespace pmlc::util

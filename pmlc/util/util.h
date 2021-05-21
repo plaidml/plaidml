@@ -10,6 +10,8 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Support/FormatVariadic.h"
 
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Affine/IR/AffineValueMap.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OperationSupport.h"
 
@@ -62,6 +64,8 @@ struct DiagnosticCounter {
   size_t counter;
   size_t threshold;
 };
+
+mlir::AffineValueMap getRangesValueMap(mlir::AffineParallelOp op);
 
 } // namespace pmlc::util
 

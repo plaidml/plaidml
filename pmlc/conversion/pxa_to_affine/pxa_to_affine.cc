@@ -25,6 +25,13 @@ namespace stdx = dialect::stdx;
 
 namespace {
 
+static void splitAffineMaps(AffineMap from, SmallVectorImpl<AffineMap> &into) {
+  for (AffineExpr expr : from.getResults()) {
+    into.push_back(
+        AffineMap::get(from.getNumDims(), from.getNumSymbols(), expr));
+  }
+}
+
 struct AffineParallelOpConversion
     : public OpConversionPattern<AffineParallelOp> {
   using OpConversionPattern<AffineParallelOp>::OpConversionPattern;
@@ -50,11 +57,14 @@ struct AffineParallelOpConversion
             ArrayRef<int64_t>{1});
       } else {
         // Normal case for parallels with IVs
+        SmallVector<AffineMap> lbMaps, ubMaps;
+        splitAffineMaps(op.lowerBoundsMap(), lbMaps);
+        splitAffineMaps(op.upperBoundsMap(), ubMaps);
         newOp = rewriter.create<AffineParallelOp>(
-            op.getLoc(),                                      //
-            ArrayRef<Type>{}, ArrayRef<AtomicRMWKind>{},      //
-            op.lowerBoundsMap(), op.getLowerBoundsOperands(), //
-            op.upperBoundsMap(), op.getUpperBoundsOperands(), //
+            op.getLoc(),                                 //
+            ArrayRef<Type>{}, ArrayRef<AtomicRMWKind>{}, //
+            lbMaps, op.getLowerBoundsOperands(),         //
+            ubMaps, op.getUpperBoundsOperands(),         //
             steps);
         for (Value iv : newOp.getIVs()) {
           ivs.push_back(iv);

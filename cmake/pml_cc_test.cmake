@@ -100,9 +100,10 @@ function(pml_cc_test)
   )
 
   list(APPEND _RULE_LABELS "${_PACKAGE_PATH}")
-  set_property(TEST ${_TEST_NAME} PROPERTY LABELS "${_RULE_LABELS}" "${_RULE_CHECKS}")
+  set_property(TEST ${_TEST_NAME} PROPERTY LABELS "cc" "${_RULE_LABELS}" "${_RULE_CHECKS}")
 
-  foreach(_CHECK ${_RULE_CHECKS})
-    add_dependencies(check-${_CHECK} ${_NAME})
-  endforeach()
+  pml_add_checks(
+    CHECKS "cc" ${_RULE_CHECKS}
+    DEPS ${_RULE_DEPS}
+  )
 endfunction()

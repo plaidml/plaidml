@@ -7,6 +7,8 @@ pml_py_library(
 pml_py_test(
   NAME backend_test
   SRC backend_test.py
+  DEPS
+    plaidml::plaidml
   CHECKS
     keras
     test
@@ -15,6 +17,8 @@ pml_py_test(
 pml_py_test(
   NAME trivial_model_test
   SRC trivial_model_test.py
+  DEPS
+    plaidml::plaidml
   CHECKS
     core
     keras

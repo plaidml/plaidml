@@ -42,11 +42,12 @@ function(pml_lit_test)
   )
 
   list(APPEND _RULE_LABELS "${_PACKAGE_PATH}")
-  set_property(TEST ${_TEST_NAME} PROPERTY LABELS "${_RULE_LABELS}" "${_RULE_CHECKS}")
+  set_property(TEST ${_TEST_NAME} PROPERTY LABELS "lit" "${_RULE_LABELS}" "${_RULE_CHECKS}")
 
-  foreach(_CHECK ${_RULE_CHECKS})
-    add_dependencies(check-${_CHECK} ${_NAME} ${_DEPS})
-  endforeach()
+  pml_add_checks(
+    CHECKS "lit" ${_RULE_CHECKS}
+    DEPS ${_RULE_DEPS}
+  )
 
   set_target_properties(${_NAME} PROPERTIES FOLDER "Tests")
 endfunction()

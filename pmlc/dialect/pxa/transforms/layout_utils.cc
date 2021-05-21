@@ -280,6 +280,14 @@ void LayoutConverter::convertPxaVectorReduceOp(PxaVectorReduceOp reduceOp) {
   reduceOp.erase();
 }
 
+static void splitAffineMaps(mlir::AffineMap from,
+                            mlir::SmallVectorImpl<mlir::AffineMap> &into) {
+  for (mlir::AffineExpr expr : from.getResults()) {
+    into.push_back(
+        mlir::AffineMap::get(from.getNumDims(), from.getNumSymbols(), expr));
+  }
+}
+
 void LayoutConverter::convertYieldOp(mlir::AffineYieldOp yieldOp,
                                      unsigned operandNum) {
   builder.setInsertionPoint(yieldOp.getOperation());
@@ -298,9 +306,12 @@ void LayoutConverter::convertYieldOp(mlir::AffineYieldOp yieldOp,
           mlir::symbolizeAtomicRMWKind(intAttr.getInt());
       reductions.push_back(optReduction.getValue());
     }
+    mlir::SmallVector<mlir::AffineMap> lbMaps, ubMaps;
+    splitAffineMaps(parallelOp.lowerBoundsMap(), lbMaps);
+    splitAffineMaps(parallelOp.upperBoundsMap(), ubMaps);
     auto newParallel = builder.create<mlir::AffineParallelOp>(
-        parallelOp.getLoc(), newTypes, reductions, parallelOp.lowerBoundsMap(),
-        parallelOp.getLowerBoundsOperands(), parallelOp.upperBoundsMap(),
+        parallelOp.getLoc(), newTypes, reductions, lbMaps,
+        parallelOp.getLowerBoundsOperands(), ubMaps,
         parallelOp.getUpperBoundsOperands(), parallelOp.getSteps());
     newParallel.region().takeBody(parallelOp.region());
     if (hasTags(parallelOp))
