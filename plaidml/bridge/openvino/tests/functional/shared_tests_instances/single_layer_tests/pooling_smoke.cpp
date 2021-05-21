@@ -20,10 +20,11 @@ const std::vector<InferenceEngine::Precision> netPrecisions = {
 const std::vector<std::vector<size_t>> kernels = {
     {3, 3},
     {3, 5},
+    {2, 2},
 };
 const std::vector<std::vector<size_t>> strides = {
     {1, 1},
-    // {1, 2},
+    {2, 2},
 };
 const std::vector<std::vector<size_t>> padBegins = {
     {0, 0},
@@ -101,7 +102,7 @@ INSTANTIATE_TEST_CASE_P(smoke_MaxPool_SameUpperPad_CeilRpunding, PoolingLayerTes
                             ::testing::Values(InferenceEngine::Precision::UNSPECIFIED),  //
                             ::testing::Values(InferenceEngine::Layout::ANY),             //
                             ::testing::Values(InferenceEngine::Layout::ANY),             //
-                            ::testing::Values(std::vector<size_t>({1, 3, 30, 30})),      //
+                            ::testing::Values(std::vector<size_t>({1, 16, 416, 416})),   //
                             ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),         //
                         PoolingLayerTest::getTestCaseName);
 /* ========== Valid Pad Ceil Rounding ========== */
