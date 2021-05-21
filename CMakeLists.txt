@@ -71,19 +71,6 @@ include(xsmm)
 # -------------------------------------------------------------------------------
 if(PML_BUILD_TESTS)
   enable_testing()
-  set(GLOBAL_CHECKS)
-  # add_custom_target(check-core
-  #   COMMAND ${CMAKE_CTEST_COMMAND} -L core --output-on-failure
-  #   USES_TERMINAL
-  # )
-  # add_custom_target(check-smoke
-  #   COMMAND ${CMAKE_CTEST_COMMAND} -L smoke --output-on-failure
-  #   USES_TERMINAL
-  # )
-  # add_custom_target(check-test
-  #   COMMAND ${CMAKE_CTEST_COMMAND} -L test --output-on-failure
-  #   USES_TERMINAL
-  # )
 endif()
 
 # -------------------------------------------------------------------------------
