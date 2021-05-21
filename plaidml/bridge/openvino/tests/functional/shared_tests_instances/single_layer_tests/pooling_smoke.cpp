@@ -61,6 +61,7 @@ INSTANTIATE_TEST_CASE_P(smoke_MaxPool_ExplicitPad_FloorRpunding, PoolingLayerTes
                             ::testing::Values(std::vector<size_t>({1, 3, 30, 30})),      //
                             ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),         //
                         PoolingLayerTest::getTestCaseName);
+
 /* ========== Explicit Pad Ceil Rounding ========== */
 const auto maxPool_ExplicitPad_CeilRounding_Params = ::testing::Combine(  //
     ::testing::Values(ngraph::helpers::PoolingTypes::MAX),                //
