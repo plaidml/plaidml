@@ -106,28 +106,6 @@ INSTANTIATE_TEST_CASE_P(smoke_MaxPool_SameUpperPad_CeilRpunding, PoolingLayerTes
                             ::testing::Values(std::vector<size_t>({1, 16, 416, 416})),   //
                             ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),         //
                         PoolingLayerTest::getTestCaseName);
-/* ========== Valid Pad Ceil Rounding ========== */
-const auto maxPool_ValidPad_CeilRounding_Params = ::testing::Combine(  //
-    ::testing::Values(ngraph::helpers::PoolingTypes::MAX),             //
-    ::testing::ValuesIn(kernels),                                      //
-    ::testing::ValuesIn(strides),                                      //
-    ::testing::ValuesIn(padBegins),                                    //
-    ::testing::ValuesIn(padEnds),                                      //
-    ::testing::Values(ngraph::op::RoundingType::CEIL),                 //
-    ::testing::Values(ngraph::op::PadType::VALID),                     //
-    ::testing::Values(false)  // placeholder value - exclude pad not applicable for max pooling
-);
-INSTANTIATE_TEST_CASE_P(smoke_MaxPool_ValidPad_CeilRpunding, PoolingLayerTest,
-                        ::testing::Combine(                                              //
-                            maxPool_ValidPad_CeilRounding_Params,                        //
-                            ::testing::ValuesIn(netPrecisions),                          //
-                            ::testing::Values(InferenceEngine::Precision::UNSPECIFIED),  //
-                            ::testing::Values(InferenceEngine::Precision::UNSPECIFIED),  //
-                            ::testing::Values(InferenceEngine::Layout::ANY),             //
-                            ::testing::Values(InferenceEngine::Layout::ANY),             //
-                            ::testing::Values(std::vector<size_t>({1, 3, 30, 30})),      //
-                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),         //
-                        PoolingLayerTest::getTestCaseName);
 
 ////* ========== Avg Pooling ========== */
 /* +========== Explicit Pad Ceil Rounding ========== */
