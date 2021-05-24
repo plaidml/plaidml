@@ -17,9 +17,9 @@ pml_cc_test(
     test
 )
 
-pml_py_test(
-  NAME examples_py_test
-  SRC 
+pml_py_library(
+  NAME py
+  SRCS
     complex_conv_2d.py
     conv_1d.py
     conv_2d_dilated.py
@@ -28,6 +28,11 @@ pml_py_test(
     gemv.py
     max_pool_1d.py
     quantize.py
+)
+
+pml_py_test(
+  NAME examples_py_test
+  SRC 
     example_tests.py
   CHECKS
     core
