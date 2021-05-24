@@ -14,6 +14,7 @@
 #include "pmlc/dialect/pxa/transforms/pass_detail.h"
 #include "pmlc/dialect/pxa/transforms/passes.h"
 #include "pmlc/util/tags.h"
+#include "pmlc/util/util.h"
 
 using namespace mlir; // NOLINT
 
@@ -44,12 +45,13 @@ void promoteIfEmptyIVs(AffineParallelOp op) {
 }
 
 void elideSingleIterationIndexes(AffineParallelOp op) {
-  AffineValueMap ranges = op.getRangesValueMap();
+  AffineValueMap ranges = util::getRangesValueMap(op);
   Block *body = op.getBody();
   SmallVector<AffineExpr, 6> newLowerBounds;
   SmallVector<AffineExpr, 6> newUpperBounds;
   SmallVector<int64_t, 6> newSteps;
   SmallVector<BlockArgument, 6> argsToRemove;
+  SmallVector<int32_t> groups;
   auto steps = op.getSteps();
   for (unsigned i = 0, e = body->getNumArguments(); i < e; i++) {
     // Is the range a constant value matching the step size?
@@ -63,6 +65,7 @@ void elideSingleIterationIndexes(AffineParallelOp op) {
       newLowerBounds.push_back(op.lowerBoundsMap().getResult(i));
       newUpperBounds.push_back(op.upperBoundsMap().getResult(i));
       newSteps.push_back(step);
+      groups.push_back(1);
     }
   }
 
@@ -88,7 +91,9 @@ void elideSingleIterationIndexes(AffineParallelOp op) {
                                  op.upperBoundsMap().getNumSymbols(),
                                  newUpperBounds, op.getContext());
   op.lowerBoundsMapAttr(AffineMapAttr::get(newLower));
+  op.lowerBoundsGroupsAttr(builder.getI32TensorAttr(groups));
   op.upperBoundsMapAttr(AffineMapAttr::get(newUpper));
+  op.upperBoundsGroupsAttr(builder.getI32TensorAttr(groups));
   op.setSteps(newSteps);
 }
 

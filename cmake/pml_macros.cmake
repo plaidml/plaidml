@@ -227,3 +227,28 @@ function(pml_add_executable_dependencies EXECUTABLE DEPENDENCY)
     add_dependencies(${EXECUTABLE} ${DEPENDENCY})
   endif()
 endfunction()
+
+
+function(pml_add_checks)
+  cmake_parse_arguments(
+    _RULE
+    ""
+    ""
+    "CHECKS;DEPS"
+    ${ARGN}
+  )
+
+  foreach(_CHECK ${_RULE_CHECKS})
+    get_property(_CHECKS GLOBAL PROPERTY GLOBAL_CHECKS)
+    list(APPEND _CHECKS ${_CHECK})
+    list(REMOVE_DUPLICATES _CHECKS)
+    set_property(GLOBAL PROPERTY GLOBAL_CHECKS ${_CHECKS})
+
+    if(_RULE_DEPS)
+      get_property(_CHECK_DEPS GLOBAL PROPERTY GLOBAL_CHECK_DEPS_${_CHECK})
+      list(APPEND _CHECK_DEPS ${_RULE_DEPS})
+      list(REMOVE_DUPLICATES _CHECK_DEPS)
+      set_property(GLOBAL PROPERTY GLOBAL_CHECK_DEPS_${_CHECK} ${_CHECK_DEPS})
+    endif()
+  endforeach()
+endfunction()

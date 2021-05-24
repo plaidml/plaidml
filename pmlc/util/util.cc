@@ -14,7 +14,7 @@ namespace pmlc::util {
 uint64_t getByteSize(MemRefType type) {
   int64_t offset;
   SmallVector<int64_t, 8> strides;
-  if (failed(mlir::getStridesAndOffset(type, strides, offset))) {
+  if (failed(getStridesAndOffset(type, strides, offset))) {
     throw std::runtime_error("Could not retrieve strides");
   }
   auto sizes = type.getShape();
@@ -125,8 +125,8 @@ void wrapFunctionAndPackArguments(llvm::Module *module, StringRef funcName,
     llvm::Value *argIndex = llvm::Constant::getIntegerValue(
         builder.getInt64Ty(), APInt(64, indexedArg.index()));
     llvm::Value *argPtrPtr = builder.CreateGEP(argList, argIndex);
-    llvm::Value *argPtr = builder.CreateLoad(argPtrPtr);
-    auto dstType = indexedArg.value().getType();
+    llvm::Value *argPtr = builder.CreateLoad(builder.getInt8PtrTy(), argPtrPtr);
+    llvm::Type *dstType = indexedArg.value().getType();
     llvm::Value *arg = dstType->isIntegerTy()
                            ? builder.CreatePtrToInt(argPtr, dstType)
                            : builder.CreateBitCast(argPtr, dstType);
@@ -139,6 +139,20 @@ void wrapFunctionAndPackArguments(llvm::Module *module, StringRef funcName,
     builder.CreateRetVoid();
   } else {
     builder.CreateRet(val);
+  }
+}
+
+AffineValueMap getRangesValueMap(AffineParallelOp op) {
+  AffineValueMap out;
+  AffineValueMap::difference(op.getUpperBoundsValueMap(),
+                             op.getLowerBoundsValueMap(), &out);
+  return out;
+}
+
+void splitAffineMaps(AffineMap from, SmallVectorImpl<AffineMap> &into) {
+  for (AffineExpr expr : from.getResults()) {
+    into.push_back(
+        AffineMap::get(from.getNumDims(), from.getNumSymbols(), expr));
   }
 }
 
