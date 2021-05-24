@@ -104,6 +104,6 @@ function(pml_cc_test)
 
   pml_add_checks(
     CHECKS "cc" ${_RULE_CHECKS}
-    DEPS ${_RULE_DEPS}
+    DEPS ${_NAME} ${_RULE_DEPS}
   )
 endfunction()
