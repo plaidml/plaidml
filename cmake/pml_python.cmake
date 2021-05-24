@@ -24,6 +24,7 @@ function(pml_py_library)
   pml_package_ns(_PACKAGE_NS)
   # Replace dependencies passed by ::name with ::pml::package::name
   list(TRANSFORM _RULE_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
+  list(TRANSFORM _RULE_DEPS REPLACE "::" "_")
 
   pml_package_name(_PACKAGE_NAME)
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
@@ -65,7 +66,7 @@ function(pml_py_test)
     _RULE
     ""
     "NAME;SRC"
-    "ARGS;LABELS;CHECKS"
+    "ARGS;LABELS;CHECKS;DEPS"
     ${ARGN}
   )
 
@@ -76,10 +77,12 @@ function(pml_py_test)
   string(REPLACE "::" "/" _PACKAGE_PATH ${_PACKAGE_NS})
   set(_NAME_PATH "${_PACKAGE_PATH}/${_RULE_NAME}")
   list(APPEND _RULE_LABELS "${_PACKAGE_PATH}")
+  list(TRANSFORM _RULE_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
+  list(TRANSFORM _RULE_DEPS REPLACE "::" "_")
 
   pml_add_installed_test(
     TEST_NAME "${_NAME_PATH}"
-    LABELS "${_RULE_LABELS}" "${_RULE_CHECKS}"
+    LABELS "python" "${_RULE_LABELS}" "${_RULE_CHECKS}"
     ENVIRONMENT
       "PYTHONPATH=${PROJECT_BINARY_DIR}:$ENV{PYTHONPATH}"
     COMMAND
@@ -105,6 +108,11 @@ function(pml_py_test)
     COMMAND ${CMAKE_COMMAND} -E copy
       ${CMAKE_CURRENT_SOURCE_DIR}/${_RULE_SRC}
       ${CMAKE_CURRENT_BINARY_DIR}/${_RULE_SRC}
+  )
+
+  pml_add_checks(
+    CHECKS "python" ${_RULE_CHECKS}
+    DEPS ${_RULE_DEPS}
   )
 endfunction()
 

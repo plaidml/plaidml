@@ -83,6 +83,7 @@ class Configure:
                 str(env_file),
                 '-p',
                 str(self.cenv_dir),
+                '--prune',
             ]
             run(cmd, check=True, stdout=subprocess.DEVNULL)
         else:

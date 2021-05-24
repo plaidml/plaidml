@@ -482,16 +482,20 @@ struct FusionInfo {
               [](const auto &a, const auto &b) {
                 return a.first.getArgNumber() < b.first.getArgNumber();
               });
-    SmallVector<AffineExpr, 4> lowerExprsC;
-    SmallVector<AffineExpr, 4> upperExprsC;
+    SmallVector<AffineMap, 4> lowerMapsC;
+    SmallVector<AffineMap, 4> upperMapsC;
     SmallVector<int64_t, 4> stepsC;
     DenseMap<BlockArgument, size_t> aToNew;
     auto aSteps = aInfo.op.getSteps();
     for (auto &pair : orderedIVs) {
       aToNew[pair.first] = aToNew.size();
       auto idx = pair.first.getArgNumber();
-      lowerExprsC.push_back(aInfo.op.lowerBoundsMap().getResult(idx));
-      upperExprsC.push_back(aInfo.op.upperBoundsMap().getResult(idx));
+      lowerMapsC.push_back(
+          AffineMap::get(aInfo.op.lowerBoundsMap().getNumDims(), 0,
+                         aInfo.op.lowerBoundsMap().getResult(idx)));
+      upperMapsC.push_back(
+          AffineMap::get(aInfo.op.upperBoundsMap().getNumDims(), 0,
+                         aInfo.op.upperBoundsMap().getResult(idx)));
       stepsC.push_back(aSteps[idx]);
     }
     // Compute B mappings to new
@@ -501,18 +505,14 @@ struct FusionInfo {
     }
 
     // Construct the new outer parallel op
-    auto lowerC = AffineMap::get(aInfo.op.lowerBoundsMap().getNumDims(), 0,
-                                 lowerExprsC, aInfo.op.getContext());
-    auto upperC = AffineMap::get(aInfo.op.upperBoundsMap().getNumDims(), 0,
-                                 upperExprsC, aInfo.op.getContext());
     SmallVector<AtomicRMWKind, 8> reductions(typesC.size(),
                                              AtomicRMWKind::assign);
     auto apC = builder.create<AffineParallelOp>(
         aInfo.op.getLoc(),
         /*resultTypes=*/typesC,
         /*reductions=*/reductions,
-        /*lbMap=*/lowerC, /*lbArgs=*/aInfo.op.getLowerBoundsOperands(),
-        /*ubMap=*/upperC, /*ubArgs=*/aInfo.op.getUpperBoundsOperands(),
+        /*lbMaps=*/lowerMapsC, /*lbArgs=*/aInfo.op.getLowerBoundsOperands(),
+        /*ubMaps=*/upperMapsC, /*ubArgs=*/aInfo.op.getUpperBoundsOperands(),
         /*steps=*/stepsC);
 
     // Copy across any tags, prefer A's.
@@ -580,6 +580,7 @@ struct FusionInfo {
       SmallVector<AffineExpr, 6> newLowerBounds;
       SmallVector<AffineExpr, 6> newUpperBounds;
       SmallVector<int64_t, 6> newSteps;
+      SmallVector<int32_t> groups;
       auto apSteps = apOp.getSteps();
       for (size_t i = 0; i < origNumArgs; i++) {
         auto curArg = apOp.getBody()->getArgument(curArgNum);
@@ -592,18 +593,18 @@ struct FusionInfo {
           newUpperBounds.push_back(apOp.upperBoundsMap().getResult(i));
           newSteps.push_back(apSteps[i]);
           curArgNum++;
+          groups.push_back(1);
         }
       }
       auto newLower = AffineMap::get(apOp.lowerBoundsMap().getNumDims(), 0,
                                      newLowerBounds, apOp.getContext());
       auto newUpper = AffineMap::get(apOp.upperBoundsMap().getNumDims(), 0,
                                      newUpperBounds, apOp.getContext());
-      apOp->setAttr(AffineParallelOp::getLowerBoundsMapAttrName(),
-                    AffineMapAttr::get(newLower));
-      apOp->setAttr(AffineParallelOp::getUpperBoundsMapAttrName(),
-                    AffineMapAttr::get(newUpper));
-      apOp->setAttr(AffineParallelOp::getStepsAttrName(),
-                    builder.getI64ArrayAttr(newSteps));
+      apOp.lowerBoundsMapAttr(AffineMapAttr::get(newLower));
+      apOp.lowerBoundsGroupsAttr(builder.getI32TensorAttr(groups));
+      apOp.upperBoundsMapAttr(AffineMapAttr::get(newUpper));
+      apOp.upperBoundsGroupsAttr(builder.getI32TensorAttr(groups));
+      apOp.setSteps(newSteps);
     };
     fixupLoops(aInfo.op, aToNew);
     fixupLoops(bInfo.op, bToNew);

@@ -180,7 +180,6 @@ void StencilBase::RecursiveTileIndex(        //
     int64_t currIdx) {
   assert(tileSize.size() == tiledIdxCount);
   if (currIdx == tiledIdxCount) {
-    auto cost = getCost(perm, tileSize);
     if (VLOG_IS_ON(3)) {
       std::stringstream currTilingStr;
       currTilingStr << "[ ";
@@ -188,9 +187,10 @@ void StencilBase::RecursiveTileIndex(        //
         currTilingStr << sz << " ";
       }
       currTilingStr << "]";
-      IVLOG(3, "Considering Tiling " << currTilingStr.str()
-                                     << ", which would have cost " << cost);
+      IVLOG(3, "Considering Tile " << currTilingStr.str());
     }
+    auto cost = getCost(perm, tileSize);
+    IVLOG(3, "Tile cost = " << cost);
     if (cost < bestCost) {
       bestCost = cost;
       bestPermutation = perm;

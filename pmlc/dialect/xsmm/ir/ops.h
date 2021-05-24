@@ -9,6 +9,8 @@
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
+#include "pmlc/dialect/xsmm/ir/enums.h.inc"
+
 #define GET_OP_CLASSES
 #include "pmlc/dialect/xsmm/ir/ops.h.inc"
 
