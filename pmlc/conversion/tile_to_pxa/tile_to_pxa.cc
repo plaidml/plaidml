@@ -655,27 +655,32 @@ struct ContractionOpConversion
     auto filled = parallel.getResult(0);
 
     // Determine lower and upper bounds.
-    SmallVector<AffineExpr, 8> ubExprs;
+    SmallVector<AffineMap, 8> lbMaps;
+    SmallVector<AffineMap, 8> ubMaps;
     auto lowerBounds = op.lowerBounds().getValue();
     auto upperBounds = op.upperBounds().getValue();
     assert(lowerBounds.getNumResults() == upperBounds.getNumResults() &&
            "mismatched dims for lower and upper bounds");
     for (unsigned i = 0; i < lowerBounds.getNumResults(); i++) {
-      auto ubExpr = upperBounds.getResult(i) + 1;
-      auto upper = ubExpr.cast<AffineConstantExpr>().getValue();
-      ubExprs.push_back(rewriter.getAffineConstantExpr(upper));
+      AffineExpr ubExpr = upperBounds.getResult(i) + 1;
+      int64_t upper = ubExpr.cast<AffineConstantExpr>().getValue();
+      lbMaps.push_back(AffineMap::get(lowerBounds.getNumDims(),
+                                      lowerBounds.getNumSymbols(),
+                                      lowerBounds.getResult(i)));
+      ubMaps.push_back(AffineMap::getConstantMap(upper, op.getContext()));
     }
 
-    auto ubMap = AffineMap::get(0, 0, {ubExprs}, op.getContext());
     // Make the outer loops
+    SmallVector<int64_t, 8> steps(lbMaps.size(), 1);
     auto forOp = rewriter.create<AffineParallelOp>(
         loc,
         /*resultTypes=*/ArrayRef<Type>{alloc.memRefType},
         /*reductions=*/ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign},
-        /*lbMap=*/op.lowerBounds().getValue(),
+        /*lbMaps=*/lbMaps,
         /*lbArgs=*/ArrayRef<Value>{},
-        /*ubMap=*/ubMap,
-        /*ubArgs=*/ArrayRef<Value>{});
+        /*ubMaps=*/ubMaps,
+        /*ubArgs=*/ArrayRef<Value>{},
+        /*steps=*/steps);
 
     auto body = forOp.getBody();
     rewriter.setInsertionPointToStart(body);

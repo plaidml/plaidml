@@ -4,12 +4,14 @@
 
 #include <list>
 
+#include "llvm/ADT/TypeSwitch.h"
+
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/util/tags.h"
-#include "llvm/ADT/TypeSwitch.h"
+#include "pmlc/util/util.h"
 
 namespace pmlc::dialect::pxa {
 
@@ -298,9 +300,12 @@ void LayoutConverter::convertYieldOp(mlir::AffineYieldOp yieldOp,
           mlir::symbolizeAtomicRMWKind(intAttr.getInt());
       reductions.push_back(optReduction.getValue());
     }
+    mlir::SmallVector<mlir::AffineMap> lbMaps, ubMaps;
+    util::splitAffineMaps(parallelOp.lowerBoundsMap(), lbMaps);
+    util::splitAffineMaps(parallelOp.upperBoundsMap(), ubMaps);
     auto newParallel = builder.create<mlir::AffineParallelOp>(
-        parallelOp.getLoc(), newTypes, reductions, parallelOp.lowerBoundsMap(),
-        parallelOp.getLowerBoundsOperands(), parallelOp.upperBoundsMap(),
+        parallelOp.getLoc(), newTypes, reductions, lbMaps,
+        parallelOp.getLowerBoundsOperands(), ubMaps,
         parallelOp.getUpperBoundsOperands(), parallelOp.getSteps());
     newParallel.region().takeBody(parallelOp.region());
     if (hasTags(parallelOp))

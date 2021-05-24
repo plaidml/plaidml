@@ -71,18 +71,6 @@ include(xsmm)
 # -------------------------------------------------------------------------------
 if(PML_BUILD_TESTS)
   enable_testing()
-  add_custom_target(check-core
-    COMMAND ${CMAKE_CTEST_COMMAND} -L core --output-on-failure
-    USES_TERMINAL
-  )
-  add_custom_target(check-smoke
-    COMMAND ${CMAKE_CTEST_COMMAND} -L smoke --output-on-failure
-    USES_TERMINAL
-  )
-  add_custom_target(check-test
-    COMMAND ${CMAKE_CTEST_COMMAND} -L test --output-on-failure
-    USES_TERMINAL
-  )
 endif()
 
 # -------------------------------------------------------------------------------
@@ -99,16 +87,7 @@ include(pml_python)
 include(pml_tblgen_library)
 include(pml_whole_archive_link)
 
-get_directory_property(HAS_PARENT PARENT_DIRECTORY)
-if(HAS_PARENT)
-  set(IS_SUBPROJECT TRUE)
-else()
-  add_custom_target(check
-    DEPENDS
-      check-test
-      check-clang-format
-  )
-endif()
+get_directory_property(IS_SUBPROJECT PARENT_DIRECTORY)
 
 # Set general cpack variables for package description
 set(CPACK_GENERATOR "TGZ")
@@ -143,4 +122,16 @@ configure_lit_site_cfg(
 
 if(PML_ENABLE_DEVKIT)
   include(devkit)
+endif()
+
+if(PML_BUILD_TESTS)
+  get_property(_CHECKS GLOBAL PROPERTY GLOBAL_CHECKS)
+  foreach(_CHECK ${_CHECKS})
+    get_property(_CHECK_DEPS GLOBAL PROPERTY GLOBAL_CHECK_DEPS_${_CHECK})
+    add_custom_target(check-${_CHECK}
+      COMMAND ${CMAKE_CTEST_COMMAND} -L ${_CHECK} --output-on-failure
+      USES_TERMINAL
+      DEPENDS ${_CHECK_DEPS}
+    )
+  endforeach()
 endif()

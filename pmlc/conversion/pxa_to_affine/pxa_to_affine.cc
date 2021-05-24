@@ -50,11 +50,14 @@ struct AffineParallelOpConversion
             ArrayRef<int64_t>{1});
       } else {
         // Normal case for parallels with IVs
+        SmallVector<AffineMap> lbMaps, ubMaps;
+        util::splitAffineMaps(op.lowerBoundsMap(), lbMaps);
+        util::splitAffineMaps(op.upperBoundsMap(), ubMaps);
         newOp = rewriter.create<AffineParallelOp>(
-            op.getLoc(),                                      //
-            ArrayRef<Type>{}, ArrayRef<AtomicRMWKind>{},      //
-            op.lowerBoundsMap(), op.getLowerBoundsOperands(), //
-            op.upperBoundsMap(), op.getUpperBoundsOperands(), //
+            op.getLoc(),                                 //
+            ArrayRef<Type>{}, ArrayRef<AtomicRMWKind>{}, //
+            lbMaps, op.getLowerBoundsOperands(),         //
+            ubMaps, op.getUpperBoundsOperands(),         //
             steps);
         for (Value iv : newOp.getIVs()) {
           ivs.push_back(iv);
