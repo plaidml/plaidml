@@ -22,7 +22,11 @@ function(pml_lit_test)
   # Prefix the library with the package name, so we get: pml_package_name
   pml_package_name(_PACKAGE_NAME)
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
-
+  set(LIT_DEPS
+    FileCheck
+    count
+    not
+  )
   set(_COMMAND ${LLVM_BINARY_DIR}/bin/llvm-lit ${CMAKE_CURRENT_BINARY_DIR} -v)
   add_custom_target(${_NAME}
     COMMAND ${_COMMAND}
@@ -30,7 +34,7 @@ function(pml_lit_test)
     USES_TERMINAL
   )
   pml_add_data_dependencies(NAME ${_NAME} DATA ${_RULE_DATA})
-  add_dependencies(${_NAME} ${_RULE_DEPS} FileCheck count not)
+  add_dependencies(${_NAME} ${_RULE_DEPS} ${LIT_DEPS})
 
   string(REPLACE "::" "/" _PACKAGE_PATH ${_PACKAGE_NS})
   set(_TEST_NAME "${_PACKAGE_PATH}/${_RULE_NAME}")
@@ -46,7 +50,7 @@ function(pml_lit_test)
 
   pml_add_checks(
     CHECKS "lit" ${_RULE_CHECKS}
-    DEPS ${_RULE_DEPS}
+    DEPS ${_NAME} ${_RULE_DEPS}
   )
 
   set_target_properties(${_NAME} PROPERTIES FOLDER "Tests")

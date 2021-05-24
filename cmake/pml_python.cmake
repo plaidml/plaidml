@@ -24,6 +24,7 @@ function(pml_py_library)
   pml_package_ns(_PACKAGE_NS)
   # Replace dependencies passed by ::name with ::pml::package::name
   list(TRANSFORM _RULE_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
+  list(TRANSFORM _RULE_DEPS REPLACE "::" "_")
 
   pml_package_name(_PACKAGE_NAME)
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
@@ -76,6 +77,8 @@ function(pml_py_test)
   string(REPLACE "::" "/" _PACKAGE_PATH ${_PACKAGE_NS})
   set(_NAME_PATH "${_PACKAGE_PATH}/${_RULE_NAME}")
   list(APPEND _RULE_LABELS "${_PACKAGE_PATH}")
+  list(TRANSFORM _RULE_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
+  list(TRANSFORM _RULE_DEPS REPLACE "::" "_")
 
   pml_add_installed_test(
     TEST_NAME "${_NAME_PATH}"
