@@ -1,5 +1,5 @@
 pml_cc_test(
-  NAME examples_cc_test
+  NAME cc_test
   SRCS 
     complex_conv_2d.cc
     conv_1d.cc
@@ -33,7 +33,7 @@ pml_py_library(
 )
 
 pml_py_test(
-  NAME examples_py_test
+  NAME py_test
   SRC 
     example_tests.py
   DEPS
