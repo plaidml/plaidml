@@ -2046,8 +2046,8 @@ Tensor compute_iou(std::vector<Tensor> Boxes_coordinates, TensorDim num_batches,
 Value nms(const Value& value) {
   IVLOG(1, "nms");
   auto args = value.as_tuple();
-  if (args.size() != 18) {
-    throw std::runtime_error("nms expects 18 arguments");
+  if (args.size() != 19) {
+    throw std::runtime_error("nms expects 19 arguments");
   }
   auto Boxes = args[0].as_tensor();
   auto Scores = args[1].as_tensor();
@@ -2076,6 +2076,7 @@ Value nms(const Value& value) {
   if (ssd_with_arm_loc) {
     ssd_arm_location = args[17].as_tensor();
   }
+  auto nms_style = validate<NmsStyle>(args[18].as_int());
 
   std::vector<int64_t> scores_shape = Scores.compute_shape().sizes();
   int64_t boxes_count = scores_shape[2];
@@ -2137,9 +2138,48 @@ Value nms(const Value& value) {
   Tensor IOU_threshold_i = edsl::cast(IOU_threshold, box_input_type);
   Tensor New_scores = edsl::select(Scores > Score_threshold_i, Scores, Zero);
 
-  std::vector<TensorDim> Scatter_dims = {num_batches, num_classes, one};
+  // Pre-process:
+  //  OV:    None.
+  //  CAFFE: The only difference between OV and CAFFE NMS is the latter will only get top K scores and set
+  //         others to zero.
+  //  MXNET: Get max scores of every box among all classes and then get top K scores. Do nms with the left
+  //         scores and set others to zero.
+  std::vector<TensorDim> Scatter_dims = {num_batches, num_classes, num_boxes};
   std::vector<TensorIndex> Scatter_idxs(3);
   Tensor Zero_scatter = edsl::Contraction(Scatter_dims, Scatter_idxs).assign(Zero(0));
+  if (nms_style == NmsStyle::CAFFE) {
+    // Only keep the top K scores and set all others to zero.
+    auto topk_result = op::topk(New_scores, num_boxes_per_class).axis(2).build();
+    auto topk_values = topk_result[0];
+    auto topk_indices = topk_result[1];
+    New_scores = edsl::scatter(Zero_scatter, topk_indices, topk_values).axis(2).mode(edsl::ScatterMode::UPDATE_ELT);
+  } else if (nms_style == NmsStyle::MXNET) {
+    // Record the class indices of max scores of every box. N class indices for N boxes.
+    Tensor class_idxs = edsl::gather(edsl::argsort(New_scores, 1, edsl::SortDirection::DESC), Zero_int).axis(1);
+    class_idxs = op::squeeze(class_idxs, {1});
+    // Get the max scores of every box.
+    Tensor box_scores = edsl::gather(op::sort(New_scores, 1, edsl::SortDirection::DESC), Zero_int).axis(1);
+    box_scores = op::squeeze(box_scores, {1});
+    auto topk_result = op::topk(box_scores, num_boxes_per_class).axis(1).sort_type(op::TopKSortType::INDEX).build();
+    auto topk_scores = topk_result[0];
+    auto topk_box_idxs = topk_result[1];
+    Tensor topk_class_idxs =
+        edsl::gather(class_idxs, op::unsqueeze(topk_box_idxs, {-1})).mode(GatherMode::ND).batchDims(1);
+    // Shape of batch_idxs -> {num_batches, num_boxes}
+    std::vector<TensorDim> dims(2);
+    topk_class_idxs.bind_dims(dims);
+    Tensor topk_batch_idxs = edsl::index(dims, 0);
+    topk_batch_idxs = op::unsqueeze(topk_batch_idxs, {-1});
+    topk_box_idxs = op::unsqueeze(topk_box_idxs, {-1});
+    topk_class_idxs = op::unsqueeze(topk_class_idxs, {-1});
+    // topk_class_idxs - 1 to remove the background id.
+    auto scatter_idxs = op::concatenate({topk_batch_idxs, topk_class_idxs - 1, topk_box_idxs}, -1);
+    // Update the scores back to the original tensor and sent all others to zero.
+    New_scores = edsl::scatter(Zero_scatter, scatter_idxs, topk_scores).mode(edsl::ScatterMode::UPDATE_ND);
+  }
+
+  Scatter_dims[2] = one;
+  Zero_scatter = edsl::Contraction(Scatter_dims, Scatter_idxs).assign(Zero(0));
   // Select box
   for (int64_t k = 0; k < num_boxes_per_class; k++) {
     // Select the box with largest score
