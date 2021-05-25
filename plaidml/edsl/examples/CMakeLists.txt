@@ -28,12 +28,16 @@ pml_py_library(
     gemv.py
     max_pool_1d.py
     quantize.py
+  DEPS
+    plaidml::py
 )
 
 pml_py_test(
   NAME examples_py_test
   SRC 
     example_tests.py
+  DEPS
+    ::py
   CHECKS
     core
     smoke
