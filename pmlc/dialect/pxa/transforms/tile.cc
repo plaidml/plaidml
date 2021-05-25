@@ -7,39 +7,37 @@ using namespace mlir; // NOLINT
 namespace pmlc::dialect::pxa {
 
 AffineParallelOp performTiling(AffineParallelOp op,
-                               llvm::ArrayRef<int64_t> tileSizes) {
+                               ArrayRef<int64_t> tileSizes) {
   // Make builder
   OpBuilder builder(op.getBody(), op.getBody()->begin());
   Block *outerBody = op.getBody();
   // Verify sizes match
-  size_t dimCount = tileSizes.size();
-  assert(op.lowerBoundsMap().getNumResults() == dimCount);
+  size_t rank = tileSizes.size();
+  assert(op.lowerBoundsMap().getNumResults() == rank);
   // Check that tile sizes is a multiple of original steps
   auto steps = op.getSteps();
-  for (size_t i = 0; i < dimCount; i++) {
+  for (size_t i = 0; i < rank; i++) {
     assert(tileSizes[i] % steps[i] == 0);
   }
   // Make the maps for the inner parallel
-  llvm::SmallVector<AffineExpr, 8> lbExprs;
-  llvm::SmallVector<AffineExpr, 8> ubExprs;
-  for (size_t i = 0; i < dimCount; i++) {
-    auto outerDim = builder.getAffineDimExpr(i);
-    auto tileSize = builder.getAffineConstantExpr(tileSizes[i]);
-    lbExprs.push_back(outerDim);
-    ubExprs.push_back(outerDim + tileSize);
+  SmallVector<AffineMap, 8> lbMaps;
+  SmallVector<AffineMap, 8> ubMaps;
+  for (size_t i = 0; i < rank; i++) {
+    AffineExpr outerExpr = builder.getAffineDimExpr(i);
+    AffineExpr tileExpr = builder.getAffineConstantExpr(tileSizes[i]);
+    lbMaps.push_back(AffineMap::get(rank, 0, outerExpr));
+    ubMaps.push_back(AffineMap::get(rank, 0, outerExpr + tileExpr));
   }
-  auto lbMap = AffineMap::get(dimCount, 0, lbExprs, op.getContext());
-  auto ubMap = AffineMap::get(dimCount, 0, ubExprs, op.getContext());
   auto outerIdxs = outerBody->getArguments();
   // Make the inner parallel for (above all other code);
-  llvm::SmallVector<AtomicRMWKind, 8> reductions;
+  SmallVector<AtomicRMWKind, 8> reductions;
   for (Attribute attr : op.reductions()) {
     auto intAttr = attr.dyn_cast<IntegerAttr>();
     reductions.push_back(*symbolizeAtomicRMWKind(intAttr.getInt()));
   }
   auto inner = builder.create<AffineParallelOp>(
-      op.getLoc(), op.getResultTypes(), reductions, lbMap, outerIdxs, ubMap,
-      outerIdxs);
+      op.getLoc(), op.getResultTypes(), reductions, lbMaps, outerIdxs, ubMaps,
+      outerIdxs, steps);
   // Splice instructions into the interior
   auto &innerLoopOps = inner.getBody()->getOperations();
   auto &outerLoopOps = outerBody->getOperations();
@@ -59,13 +57,11 @@ AffineParallelOp performTiling(AffineParallelOp op,
   builder.setInsertionPointToEnd(op.getBody());
   builder.create<AffineYieldOp>(op.getLoc(), inner.getResults());
   // Update outer step size
-  inner.setSteps(steps);
   op.setSteps(tileSizes);
   return inner;
 }
 
-AffineParallelOp undoTiling(AffineParallelOp op,
-                            llvm::ArrayRef<int64_t> tileSizes) {
+AffineParallelOp undoTiling(AffineParallelOp op, ArrayRef<int64_t> tileSizes) {
   // Make builder
   OpBuilder builder(op.getBody(), op.getBody()->begin());
   Block *outerBody = op.getBody();

@@ -35,6 +35,13 @@ pml_cc_library(
     MLIRStandardOpsTransforms
     MLIRStandardToLLVM
     omp
+    xsmm
+)
+
+set_property(SOURCE xsmm_lowering.cc
+  PROPERTY COMPILE_DEFINITIONS
+    __BLAS=0
+    LIBXSMM_DEFAULT_CONFIG
 )
 
 pml_tblgen_library(

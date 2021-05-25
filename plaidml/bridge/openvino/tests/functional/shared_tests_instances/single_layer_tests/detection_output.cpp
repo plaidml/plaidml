@@ -20,7 +20,7 @@ const float nmsThreshold = 0.5f;
 const float confidenceThreshold = 0.3f;
 const std::vector<bool> clipAfterNms = {true, false};
 const std::vector<bool> clipBeforeNms = {true, false};
-const std::vector<bool> decreaseLabelId = {false};
+const std::vector<bool> decreaseLabelId = {true, false};
 const float objectnessScore = 0.4f;
 const std::vector<size_t> numberBatch = {1};
 
@@ -51,6 +51,8 @@ const auto smokeAttributes = ::testing::Combine(                                
 /* =============== 3 inputs cases =============== */
 
 const std::vector<ParamsWhichSizeDepends> specificParams3In = {
+    // variance_encoded_in_target, share_location, normalized, input_height, input_weight,
+    // Location, Confidence, Priors, ArmConfidence, ArmLocation.
     ParamsWhichSizeDepends{true, true, true, 1, 1, {1, 60}, {1, 165}, {1, 1, 60}, {}, {}},
     ParamsWhichSizeDepends{false, true, true, 1, 1, {1, 60}, {1, 165}, {1, 2, 60}, {}, {}},
     ParamsWhichSizeDepends{true, true, false, 10, 10, {1, 60}, {1, 165}, {1, 1, 75}, {}, {}},
