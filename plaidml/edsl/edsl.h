@@ -1104,6 +1104,10 @@ inline Tensor reshape(const Tensor& x, const std::vector<TensorDim>& dims,
   return intrinsicCall(loc, "reshape", args);
 }
 
+inline Tensor relu(const Tensor& x, edsl_source_location loc = edsl_source_location::current()) {
+  return intrinsicCall(loc, "relu", {x});
+}
+
 ///
 /// Rounds `x` elementwise.
 /// \param x Tensor
@@ -1702,7 +1706,8 @@ inline TensorVec layer(const std::string& op, const TensorVec& operands, const D
 
 inline Tensor layer(const std::string& op, const TensorVec& operands, const Dictionary& attrs,
                     const LayerBodySingleFn& fn, edsl_source_location loc = edsl_source_location::current()) {
-  return layer(op, operands, attrs, [&]() { return TensorVec{fn()}; }, loc)[0];
+  return layer(
+      op, operands, attrs, [&]() { return TensorVec{fn()}; }, loc)[0];
 }
 
 inline Tensor layer(const std::string& op, const TensorVec& operands, const LayerBodySingleFn& fn,

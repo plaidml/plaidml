@@ -225,6 +225,103 @@ struct PxaGemmOpConversion : public OpConversionPattern<pxa::PxaGemmOp> {
   }
 };
 
+struct DispatchHelper {
+  SmallVector<util::StrideArray> strides;
+  SmallVector<uint64_t> leadingDims;
+
+  DispatchHelper(ValueRange operands, ArrayAttr tileMapsAttr) {
+    for (auto tuple : llvm::zip(operands, tileMapsAttr)) {
+      Value operand;
+      Attribute tileMapAttr;
+      std::tie(operand, tileMapAttr) = tuple;
+      AffineMap tileMap = tileMapAttr.cast<AffineMapAttr>().getValue();
+      util::StrideArray strideArray = getStrideArray(operand, tileMap);
+      strides.push_back(strideArray);
+      leadingDims.push_back(strideArray.strides[0]);
+    }
+  }
+};
+
+struct IndicesCollector {
+  pxa::PxaGenericOp op;
+  ConversionPatternRewriter &rewriter;
+  pxa::PxaGenericOp::Adaptor &adaptor;
+  SmallVector<Value> indices;
+  unsigned prefix = 0;
+
+  IndicesCollector(pxa::PxaGenericOp op, ConversionPatternRewriter &rewriter,
+                   pxa::PxaGenericOp::Adaptor &adaptor)
+      : op(op), rewriter(rewriter), adaptor(adaptor) {}
+
+  bool collect(ArrayAttr arrayAttr) {
+    for (Attribute attr : arrayAttr) {
+      AffineMap accessMap = attr.cast<AffineMapAttr>().getValue();
+      auto operands = adaptor.indices().slice(prefix, accessMap.getNumInputs());
+      auto expanded =
+          expandAffineMap(rewriter, op.getLoc(), accessMap, operands);
+      if (!expanded)
+        return false;
+      indices.append(expanded->begin(), expanded->end());
+      prefix += accessMap.getNumInputs();
+    }
+    return true;
+  }
+};
+
+struct UnaryPxaGenericOpConversion
+    : public OpConversionPattern<pxa::PxaGenericOp> {
+  StringRef kernelName;
+  xsmm::UnaryKind kind;
+
+  UnaryPxaGenericOpConversion(MLIRContext *context, StringRef kernelName,
+                              xsmm::UnaryKind kind)
+      : OpConversionPattern(context), kernelName(kernelName), kind(kind) {}
+
+  LogicalResult
+  matchAndRewrite(pxa::PxaGenericOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
+    if (op.kernel() != kernelName)
+      return failure();
+    if (op.outputs().size() != 1 || op.inputs().size() != 1)
+      return failure();
+
+    Location loc = op.getLoc();
+    pxa::PxaGenericOp::Adaptor adaptor(operands, op->getAttrDictionary());
+    Type resultType = rewriter.getI64Type();
+    DispatchHelper inputs(adaptor.inputs(), op.input_tile_maps());
+    DispatchHelper outputs(adaptor.outputs(), op.output_tile_maps());
+    IndicesCollector collector(op, rewriter, adaptor);
+    if (!collector.collect(op.output_access_maps()) ||
+        !collector.collect(op.input_access_maps()))
+      return failure();
+
+    Type computeType =
+        op.outputs().getTypes()[0]; // just use the output type for now
+    FunctionType funcType = rewriter.getFunctionType(op.inputs().getTypes(),
+                                                     op.outputs().getTypes());
+
+    auto dispatchOp =
+        rewriter.create<xsmm::UnaryDispatchOp>(loc, resultType,
+                                               /*kind=*/kind,
+                                               /*compute_type=*/computeType,
+                                               /*tile=*/op.tile(),
+                                               /*ldi=*/inputs.leadingDims[0],
+                                               /*ldo=*/outputs.leadingDims[0],
+                                               /*func_type=*/funcType);
+
+    rewriter.create<xsmm::UnaryInvokeOp>(loc, ArrayRef<Type>(),
+                                         /*ptr=*/dispatchOp,
+                                         /*output=*/adaptor.outputs()[0],
+                                         /*input=*/adaptor.inputs()[0],
+                                         /*indices=*/collector.indices);
+
+    op.replaceAllUsesWith(adaptor.outputs());
+    rewriter.eraseOp(op);
+
+    return success();
+  }
+};
+
 struct XSMMGemmDispatchF32Lowering
     : public ConvertOpToLLVMPattern<xsmm::GemmDispatchF32Op> {
   using ConvertOpToLLVMPattern<xsmm::GemmDispatchF32Op>::ConvertOpToLLVMPattern;
@@ -815,7 +912,10 @@ struct XSMMUnaryInvokeLowering
 } // namespace
 
 void populatePXAGemmToXSMMConversionPatterns(RewritePatternSet &patterns) {
-  patterns.insert<PxaGemmOpConversion>(patterns.getContext());
+  MLIRContext *context = patterns.getContext();
+  patterns.insert<PxaGemmOpConversion>(context);
+  patterns.insert<UnaryPxaGenericOpConversion>(context, "tpp_relu",
+                                               xsmm::UnaryKind::RELU);
 }
 
 void populateXSMMToLLVMConversionPatterns(LLVMTypeConverter &converter,
@@ -830,4 +930,5 @@ void populateXSMMToLLVMConversionPatterns(LLVMTypeConverter &converter,
                   XSMMUnaryInvokeLowering            //
                   >(converter);
 }
+
 } // namespace pmlc::target::x86
