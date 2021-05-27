@@ -72,10 +72,10 @@ void registerStridedSlice() {
       }
 
       if (std::abs(starts[i]) > input_sizes[i]) {
-        starts[i] = starts[i] < 0 ? -1 * input_sizes[i] : input_sizes[i];
+        starts[i] = starts[i] < 0 ? -1 * input_sizes[i] : input_sizes[i] - 1;
       }
       if (std::abs(stops[i]) > input_sizes[i]) {
-        stops[i] = stops[i] < 0 ? -1 * input_sizes[i] : input_sizes[i];
+        stops[i] = stops[i] < 0 ? -1 * input_sizes[i] - 1 : input_sizes[i];
       }
 
       if (!begin_mask[i] && !end_mask[i]) {
