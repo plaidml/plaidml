@@ -71,6 +71,9 @@ void registerStridedSlice() {
         continue;
       }
 
+      // The abs bounds in different direction are not equal sine SliceOp uses 0 vs -1 as begin
+      // The slice region is a half-open interval [...), out-of-bounds values are clamped in differnt way
+      // TODO: Check sign of "steps" when zero dimension is allowed in openvino
       if (std::abs(starts[i]) > input_sizes[i]) {
         starts[i] = starts[i] < 0 ? -1 * input_sizes[i] : input_sizes[i] - 1;
       }
