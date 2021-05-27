@@ -248,7 +248,7 @@ struct StdOp {
     auto attrs = ArrayRef<NamedAttribute>{};
     auto resultTypes = llvm::makeArrayRef(resultType);
     auto op = rewriter.create<OpType>(loc, resultTypes, promoted, attrs);
-    return op.getOperation()->getResult(0);
+    return op->getResult(0);
   }
 };
 
@@ -335,7 +335,7 @@ struct LogicalOp {
     Type boolType = rewriter.getI1Type();
     auto resultTypes = llvm::makeArrayRef(boolType);
     auto op = rewriter.create<OpType>(loc, resultTypes, promoted, attrs);
-    return op.getOperation()->getResult(0);
+    return op->getResult(0);
   }
 };
 
@@ -570,8 +570,8 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
     // Create the loads
     SmallVector<Value, 4> scalars;
     for (size_t i = 0; i < operands.size(); i++) {
-      auto maybePadding = tile::getPaddingInfo(
-          op.getOperation()->getOperand(i).getDefiningOp());
+      auto maybePadding =
+          tile::getPaddingInfo(op->getOperand(i).getDefiningOp());
       scalars.push_back(buildBroadcastLoad(rewriter, loc, operands[i],
                                            alloc.memRefType.getRank(),
                                            maybePadding));
@@ -579,7 +579,7 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
 
     // Create the standard op
     SmallVector<Type, 4> operandTypes;
-    for (auto type : op.getOperation()->getOperandTypes()) {
+    for (auto type : op->getOperandTypes()) {
       operandTypes.push_back(getElementType(type));
     }
     IntoOpBuilder intoOpBuilder;
@@ -691,7 +691,7 @@ struct ContractionOpConversion
       auto cons = op.cons().getValue();
       auto ifOp = rewriter.create<AffineIfOp>(loc, TypeRange{alloc.memRefType},
                                               cons, idxs, true);
-      rewriter.create<AffineYieldOp>(loc, ifOp.getOperation()->getResults());
+      rewriter.create<AffineYieldOp>(loc, ifOp->getResults());
       rewriter.setInsertionPointToStart(&ifOp.elseRegion().front());
       rewriter.create<AffineYieldOp>(loc, filled);
       rewriter.setInsertionPointToStart(&ifOp.thenRegion().front());
@@ -1087,7 +1087,7 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
     // argument, a constant value, or a reshape op.
     getOperation().walk([&](ReturnOp op) {
       OpBuilder builder(op);
-      for (OpOperand &operand : op.getOperation()->getOpOperands()) {
+      for (OpOperand &operand : op->getOpOperands()) {
         Value value = operand.get();
         bool needsIdent =                                  //
             value.isa<BlockArgument>() ||                  // Block arguemnt
@@ -1105,14 +1105,14 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
     // Set up target (i.e. what is legal)
     ConversionTarget target(getContext());
     TileToPXATypeConverter converter;
-    target.addLegalDialect<mlir::AffineDialect,          //
-                           mlir::StandardOpsDialect,     //
-                           mlir::math::MathDialect,      //
-                           mlir::memref::MemRefDialect,  //
-                           mlir::scf::SCFDialect,        //
-                           dialect::layer::LayerDialect, //
-                           dialect::pxa::PXADialect,     //
-                           dialect::stdx::StdXDialect>();
+    target.addLegalDialect<mlir::AffineDialect,         //
+                           mlir::StandardOpsDialect,    //
+                           mlir::math::MathDialect,     //
+                           mlir::memref::MemRefDialect, //
+                           mlir::scf::SCFDialect,       //
+                           layer::LayerDialect,         //
+                           pxa::PXADialect,             //
+                           stdx::StdXDialect>();
     target.addLegalOp<scf::ForOp,   //
                       scf::YieldOp, //
                       scf::IfOp>();
