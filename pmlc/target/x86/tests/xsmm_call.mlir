@@ -1,21 +1,39 @@
-// RUN: pmlc-opt -convert-linalg-to-loops -x86-convert-pxa-to-affine -lower-affine \
-// RUN:     -canonicalize -convert-scf-to-std -x86-convert-std-to-llvm \
-// RUN:     -x86-openmp-workaround %s | \
+// RUN: pmlc-opt %s \
+// RUN:     -convert-linalg-to-loops \
+// RUN:     -x86-convert-pxa-to-affine \
+// RUN:     -lower-affine \
+// RUN:     -canonicalize \
+// RUN:     -convert-scf-to-std \
+// RUN:     -x86-convert-std-to-llvm \
+// RUN:     -x86-openmp-workaround | \
 // RUN:   pmlc-jit -e baseline | FileCheck %s
-// RUN: pmlc-opt -convert-linalg-to-loops -x86-convert-pxa-to-affine -lower-affine \
-// RUN:     -canonicalize -convert-scf-to-std -x86-convert-std-to-llvm \
-// RUN:     -x86-openmp-workaround %s | \
+// RUN: pmlc-opt %s \
+// RUN:     -convert-linalg-to-loops \
+// RUN:     -x86-convert-pxa-to-affine \
+// RUN:     -lower-affine \
+// RUN:     -canonicalize \
+// RUN:     -convert-scf-to-std \
+// RUN:     -x86-convert-std-to-llvm \
+// RUN:     -x86-openmp-workaround | \
 // RUN:   pmlc-jit -e tiled | FileCheck %s
-// RUN: pmlc-opt -convert-linalg-to-loops -x86-convert-pxa-to-affine -lower-affine \
-// RUN:     -canonicalize -convert-scf-to-std -x86-convert-std-to-llvm \
-// RUN:     -x86-openmp-workaround %s | \
+// RUN: pmlc-opt %s \
+// RUN:     -convert-linalg-to-loops \
+// RUN:     -x86-convert-pxa-to-affine \
+// RUN:     -lower-affine \
+// RUN:     -canonicalize \
+// RUN:     -convert-scf-to-std \
+// RUN:     -x86-convert-std-to-llvm \
+// RUN:     -x86-openmp-workaround | \
 // RUN:   pmlc-jit -e xsmm | FileCheck %s
-// RUN: pmlc-opt -convert-linalg-to-loops \
-// RUN:     --pass-pipeline='func(x86-affine-stencil-xsmm{batched=true})' \
-// RUN:     -x86-convert-pxa-to-affine -lower-affine \
-// RUN:     -canonicalize -convert-scf-to-std -x86-convert-std-to-llvm \
-// RUN:     -x86-openmp-workaround %s | \
-// RUN:   pmlc-jit -e baseline | FileCheck %s
+// RUN: pmlc-opt %s \
+// RUN:     -convert-linalg-to-loops \
+// RUN:     -x86-convert-pxa-to-affine \
+// RUN:     -lower-affine \
+// RUN:     -canonicalize \
+// RUN:     -convert-scf-to-std \
+// RUN:     -x86-convert-std-to-llvm \
+// RUN:     -x86-openmp-workaround | \
+// RUN:   pmlc-jit -e xsmm_brgemm_offs | FileCheck %s
 
 !I_memref = type memref<1x6x5x7xf32>
 !K_memref = type memref<1x1x7x11xf32>
@@ -48,6 +66,16 @@ func @xsmm() {
   call @test_dot(%dot) : ((memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()) -> ()
 
   %conv2 = constant @conv2_xsmm : (!I_memref, !K_memref, !O_memref) -> ()
+  call @test_conv2(%conv2) : ((!I_memref, !K_memref, !O_memref) -> ()) -> ()
+
+  return
+}
+
+func @xsmm_brgemm_offs() {
+  %dot = constant @dot : (memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()
+  call @test_dot(%dot) : ((memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()) -> ()
+
+  %conv2 = constant @conv2_xsmm_brgemm_offs : (!I_memref, !K_memref, !O_memref) -> ()
   call @test_conv2(%conv2) : ((!I_memref, !K_memref, !O_memref) -> ()) -> ()
 
   return
@@ -272,6 +300,24 @@ func @conv2_xsmm(%I: !I_memref, %K: !K_memref, %O: !O_memref) {
   affine.parallel (%x, %y) = (0, 0) to (%X, %Y) step (2, 1) {
     xsmm.gemm.invoke.f32 %ptr, %O[%c0, %x, %y, %c0] = %I[%c0, %x, %y, %c0], %K[%c0, %c0, %c0, %c0]
       : (!I_memref, !K_memref) -> !O_memref
+  }
+  return
+}
+
+func @conv2_xsmm_brgemm_offs(%I: !I_memref, %K: !K_memref, %O: !O_memref) {
+  %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  %c2 = constant 2 : index
+  %c3 = constant 3 : index
+  %X = memref.dim %I, %c1 : !I_memref
+  %Y = memref.dim %I, %c2 : !I_memref
+  %CI = memref.dim %I, %c3 : !I_memref
+  %CO = memref.dim %O, %c3 : !O_memref
+  %ptr = xsmm.brgemm.offs.dispatch.f32 [2, 11, 1], [35, 11, 55]
+  affine.parallel (%x, %y) = (0, 0) to (%X, %Y) step (2, 1) {
+    xsmm.brgemm.offs.invoke.f32 %ptr, %O[%c0, %x, %y, %c0] = %I[%c0, %x, %y, %c0], %K[%c0, %c0, %c0, %c0], 7,
+      [0,  4,  8,  12,  16,  20,  24],
+      [0, 44, 88, 132, 176, 220, 264] : (!I_memref, !K_memref) -> !O_memref
   }
   return
 }
