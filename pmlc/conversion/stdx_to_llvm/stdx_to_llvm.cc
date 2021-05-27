@@ -29,7 +29,6 @@ struct LibMCallLowering : public ConvertOpToLLVMPattern<OpType> {
   matchAndRewrite(OpType op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
     auto resType = op.getResult().getType();
-
     SmallVector<Type, 2> argTypes(getArity(), resType);
     auto funcType =
         LLVM::LLVMFunctionType::get(resType, argTypes, /*isVarArg=*/false);
