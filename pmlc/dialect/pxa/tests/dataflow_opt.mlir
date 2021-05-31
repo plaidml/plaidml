@@ -18,12 +18,14 @@ func @simple(%out : memref<2xf32>) -> memref<2xf32> {
 
 // CHECK-LABEL: func @grn
 func @grn(%arg0: memref<1x4x4x3xf16>) -> memref<1x4x4x3xf16> {
-  // CHECK: constant 1.001360e-05
   %cst = constant 1.001360e-05 : f16
-  // CHECK-NEXT: constant 0.0
   %cst_0 = constant 0.000000e+00 : f16
-  // CHECK-NEXT: constant 1.0
   %cst_1 = constant 1.000000e+00 : f16
+
+  // CHECK-DAG: constant 1.001360e-05
+  // CHECK-DAG: constant 0.0
+  // CHECK-DAG: constant 1.0
+
   // CHECK-NEXT: memref.alloc() : memref<1x4x4x1xf16>
   // CHECK-NEXT: memref.alloc() : memref<1x4x4x3xf16>
   %0 = memref.alloc() : memref<1x4x4x3xf16>
