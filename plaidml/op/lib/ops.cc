@@ -1938,10 +1938,10 @@ std::vector<Tensor> decode_boxes(Tensor boxes, Tensor prior_variances, Tensor lo
     switch (mode) {
       case BoxesDecodeMode::NMS: {
         // The box data is [x, y, width, height] in center mode.
-        boxes_xcenter = edsl::gather(boxes, zero_int).axis(2);
-        boxes_ycenter = edsl::gather(boxes, zero_int + 1).axis(2);
-        boxes_width_half = edsl::gather(boxes, zero_int + 2).axis(2) / 2.0f;
-        boxes_height_half = edsl::gather(boxes, zero_int + 3).axis(2) / 2.0f;
+        boxes_xcenter = edsl::gather(boxes, zero_int).axis(3);
+        boxes_ycenter = edsl::gather(boxes, zero_int + 1).axis(3);
+        boxes_width_half = edsl::gather(boxes, zero_int + 2).axis(3) / 2.0f;
+        boxes_height_half = edsl::gather(boxes, zero_int + 3).axis(3) / 2.0f;
       } break;
       case BoxesDecodeMode::SSD: {
         Tensor prior_x1 = edsl::gather(boxes, zero_int).axis(3) / input_width;
@@ -1976,10 +1976,10 @@ std::vector<Tensor> decode_boxes(Tensor boxes, Tensor prior_variances, Tensor lo
     switch (mode) {
       case BoxesDecodeMode::NMS: {
         // The box data is [y1, x1, y2, x2] in corner mode
-        Tensor boxes_y1_i = edsl::gather(boxes, zero_int).axis(2);
-        Tensor boxes_x1_i = edsl::gather(boxes, zero_int + 1).axis(2);
-        Tensor boxes_y2_i = edsl::gather(boxes, zero_int + 2).axis(2);
-        Tensor boxes_x2_i = edsl::gather(boxes, zero_int + 3).axis(2);
+        Tensor boxes_y1_i = edsl::gather(boxes, zero_int).axis(3);
+        Tensor boxes_x1_i = edsl::gather(boxes, zero_int + 1).axis(3);
+        Tensor boxes_y2_i = edsl::gather(boxes, zero_int + 2).axis(3);
+        Tensor boxes_x2_i = edsl::gather(boxes, zero_int + 3).axis(3);
         // Convert to [ymin, xmin, ymax, xmax]
         boxes_y1 = op::minimum(boxes_y1_i, boxes_y2_i);
         boxes_x1 = op::minimum(boxes_x1_i, boxes_x2_i);
@@ -2109,8 +2109,8 @@ Value nms(const Value& value) {
   Tensor valid_outputs = zero;
   std::vector<Tensor> boxes_coordinates;
   Boxes = op::unsqueeze(Boxes, {1});
-  ssd_variances = op::unsqueeze(ssd_variances, {1});
   if (ssd_with_arm_loc) {
+    ssd_variances = op::unsqueeze(ssd_variances, {1});
     auto prior_coordinates = decode_boxes(Boxes, ssd_variances, ssd_arm_location, boxes_decode_mode, ssd_input_height,
                                           ssd_input_width, clip_before_nms, center_point_box);
     Tensor prior_boxes =
@@ -2119,6 +2119,9 @@ Value nms(const Value& value) {
     boxes_coordinates = decode_boxes(prior_boxes, ssd_variances, ssd_location, boxes_decode_mode, ssd_input_height,
                                      ssd_input_width, clip_before_nms, center_point_box);
   } else {
+    if (boxes_decode_mode == BoxesDecodeMode::SSD) {
+      ssd_variances = op::unsqueeze(ssd_variances, {1});
+    }
     boxes_coordinates = decode_boxes(Boxes, ssd_variances, ssd_location, boxes_decode_mode, ssd_input_height,
                                      ssd_input_width, clip_before_nms, center_point_box);
   }
