@@ -82,6 +82,8 @@ const std::vector<std::vector<float>> defaultScales = {
     {1.0f, 1.0f, 1.33333f, 1.33333f},
 };
 
+const std::map<std::string, std::string> additional_config = {};
+
 const auto interpolateCasesWithoutNearest = ::testing::Combine(  //
     ::testing::ValuesIn(modesWithoutNearest),                    //
     ::testing::ValuesIn(shapeCalculationMode),                   //
@@ -118,7 +120,8 @@ INSTANTIATE_TEST_CASE_P(Interpolate_Basic, InterpolateLayerTest,
                             ::testing::Values(InferenceEngine::Layout::ANY),             //
                             ::testing::ValuesIn(inShapes),                               //
                             ::testing::ValuesIn(targetShapes),                           //
-                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),         //
+                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML),          //
+                            ::testing::Values(additional_config)),                       //
                         InterpolateLayerTest::getTestCaseName);
 
 INSTANTIATE_TEST_CASE_P(Interpolate_Nearest, InterpolateLayerTest,
@@ -131,7 +134,8 @@ INSTANTIATE_TEST_CASE_P(Interpolate_Nearest, InterpolateLayerTest,
                             ::testing::Values(InferenceEngine::Layout::ANY),             //
                             ::testing::ValuesIn(inShapes),                               //
                             ::testing::ValuesIn(targetShapes),                           //
-                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),         //
+                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML),          //
+                            ::testing::Values(additional_config)),                       //
                         InterpolateLayerTest::getTestCaseName);
 
 const std::vector<std::vector<size_t>> targetShapesTailTest = {
@@ -178,7 +182,8 @@ INSTANTIATE_TEST_CASE_P(Interpolate_Basic_2, InterpolateLayerTest,
                             ::testing::Values(InferenceEngine::Layout::ANY),             //
                             ::testing::ValuesIn(inShapes),                               //
                             ::testing::ValuesIn(targetShapesTailTest),                   //
-                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),         //
+                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML),          //
+                            ::testing::Values(additional_config)),                       //
                         InterpolateLayerTest::getTestCaseName);
 
 INSTANTIATE_TEST_CASE_P(Interpolate_Nearest_2, InterpolateLayerTest,
@@ -191,7 +196,8 @@ INSTANTIATE_TEST_CASE_P(Interpolate_Nearest_2, InterpolateLayerTest,
                             ::testing::Values(InferenceEngine::Layout::ANY),             //
                             ::testing::ValuesIn(inShapes),                               //
                             ::testing::ValuesIn(targetShapesTailTest),                   //
-                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),         //
+                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML),          //
+                            ::testing::Values(additional_config)),                       //
                         InterpolateLayerTest::getTestCaseName);
 
 const auto smokeArgs = ::testing::Combine(                                                //
@@ -217,6 +223,7 @@ INSTANTIATE_TEST_CASE_P(smoke, InterpolateLayerTest,
                             ::testing::Values(InferenceEngine::Layout::ANY),             //
                             ::testing::ValuesIn(inShapes),                               //
                             ::testing::ValuesIn(targetShapes),                           //
-                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),         //
+                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML),          //
+                            ::testing::Values(additional_config)),                       //
                         InterpolateLayerTest::getTestCaseName);
 }  // namespace
