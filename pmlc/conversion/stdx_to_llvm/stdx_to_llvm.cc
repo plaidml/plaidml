@@ -28,7 +28,8 @@ struct LibMCallLowering : public ConvertOpToLLVMPattern<OpType> {
   LogicalResult
   matchAndRewrite(OpType op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
-    auto resType = getType(op);
+    auto typeConverter = this->getTypeConverter();
+    auto resType = typeConverter->convertType(op.getResult().getType());
     if (!resType) {
       return failure();
     }
@@ -57,9 +58,6 @@ struct LibMCallLowering : public ConvertOpToLLVMPattern<OpType> {
 protected:
   virtual std::string getFuncName() const = 0;
   virtual size_t getArity() const { return 1; }
-  virtual mlir::Type getType(OpType op) const {
-    return op.getResult().getType();
-  }
 };
 
 struct ACosLowering : public LibMCallLowering<stdx::ACosOp> {
@@ -111,9 +109,6 @@ struct PowLowering : public LibMCallLowering<stdx::PowOp> {
   using LibMCallLowering<stdx::PowOp>::LibMCallLowering;
   std::string getFuncName() const override { return "powf"; }
   size_t getArity() const override { return 2; }
-  mlir::Type getType(stdx::PowOp op) const override {
-    return typeConverter->convertType(op.getResult().getType());
-  }
 };
 
 struct RoundLowering : public LibMCallLowering<stdx::RoundOp> {
