@@ -2,15 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-// NB: IE_SET_METRIC_RETURN requires this header to be included first
-#include "plaidml_plugin.hpp"
-
 #include <memory>
+
+// NB: IE_SET_METRIC_RETURN requires this header to be included first
+#include "ie_metric_helpers.hpp"
+
+#include "plaidml_plugin.hpp"
 
 // #include "cpp_interfaces/base/ie_plugin_base.hpp" // TODO
 // #include "details/caseless.hpp"
 // #include "details/ie_cnn_network_tools.h"
-#include "ie_metric_helpers.hpp"
 #include "ie_plugin_config.hpp"
 #include "inference_engine.hpp"
 

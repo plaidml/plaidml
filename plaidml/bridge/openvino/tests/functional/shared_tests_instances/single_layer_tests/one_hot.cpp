@@ -126,7 +126,7 @@ const auto oneHotParams_T = testing::Combine(         //
     testing::Values(CommonTestUtils::DEVICE_PLAIDML)  //
 );
 
-// INSTANTIATE_TEST_CASE_P(              //
+// INSTANTIATE_TEST_CASE_P(             //
 //    smoke_OneHotArgType,              //
 //    OneHotLayerTest,                  //
 //    oneHotParams_T,                   //
