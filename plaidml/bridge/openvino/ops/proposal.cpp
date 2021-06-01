@@ -251,7 +251,7 @@ void registerProposal() {
     IE_ASSERT(ctx.operands.size() == 3);
     auto class_probs = ctx.operands.at(0);
     auto class_logits = ctx.operands.at(1);
-    auto image_info = get_axis_vector_from_constant_operand(2, layer);
+    auto image_info = cast_constant_operand<float>(2, layer);
     IE_ASSERT(image_info.size() == 3 || image_info.size() == 4);
     auto proposal_attrs = layer->get_attrs();
 
