@@ -18,3 +18,20 @@ pml_py_test(
       smoke
       test
 )
+
+# the rules below are used to generate graphs for torus and hypersphere experiemnts. 
+# these are disables because they take a while to genrate and are onyl useful when the graphs need to be analyzed. 
+
+# pml_py_test(
+#   NAME torus
+#   SRC torus.py
+#   DEPS
+#     plaidml::py
+# )
+
+# pml_py_test(
+#   NAME hypersphere
+#   SRC hypersphere.py
+#   DEPS
+#     plaidml::py
+# )

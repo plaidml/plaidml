@@ -100,7 +100,7 @@ def main(
     ax1.plot(x3, y_line3, label=label3)
     plt.legend(loc='lower left')
 
-    plt.show()
+    plt.savefig('torus_integral_graph.pdf')
 
 
 if __name__ == '__main__':
