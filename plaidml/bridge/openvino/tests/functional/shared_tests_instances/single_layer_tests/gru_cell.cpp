@@ -24,10 +24,8 @@ std::vector<size_t> input_size{
     30,
 };
 std::vector<std::vector<std::string>> activations = {
-    {"relu", "tanh"},
-    {"tanh", "sigmoid"},
-    {"sigmoid", "tanh"},
-    {"tanh", "relu"},
+    {"relu", "tanh"}, {"tanh", "sigmoid"}, {"sigmoid", "tanh"},
+    // {"tanh", "relu"},
 };
 std::vector<float> clips = {
     0.0f,
