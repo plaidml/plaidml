@@ -765,10 +765,10 @@ TEST_F(CppEdsl, LarsMomentum4d) {
   // clang-format off
   // CHECK-LABEL: CppEdsl.LarsMomentum4d
   // CHECK: module @lars_momentum4d
-  // CHECK: tile.constant(0.000000e+00 : f64) : tensor<f32>
-  // CHECK: tile.constant(1.250000e-01 : f64) : tensor<f32>
-  // CHECK: tile.constant(9.765625E-4 : f64) : tensor<f32>
-  // CHECK: tile.constant(4.8828125E-4 : f64) : tensor<f32>
+  // CHECK-DAG: tile.constant(0.000000e+00 : f64) : tensor<f32>
+  // CHECK-DAG: tile.constant(1.250000e-01 : f64) : tensor<f32>
+  // CHECK-DAG: tile.constant(9.765625E-4 : f64) : tensor<f32>
+  // CHECK-DAG: tile.constant(4.8828125E-4 : f64) : tensor<f32>
   // CHECK: tile.mul %{{.*}}, %{{.*}} : (tensor<4x7x3x9xf32>, tensor<f32>) -> tensor<4x7x3x9xf32>
   // CHECK: tile.mul %{{.*}}, %{{.*}} : (tensor<f32>, tensor<f32>) -> tensor<f32>
   // CHECK: tile.mul %{{.*}}, %{{.*}} : (tensor<4x7x3x9xf32>, tensor<4x7x3x9xf32>) -> tensor<4x7x3x9xf32>
