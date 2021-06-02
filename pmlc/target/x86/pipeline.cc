@@ -241,8 +241,8 @@ std::unique_ptr<Pass> createOpenMPWorkaroundPass() {
 void pipelineBuilder(OpPassManager &pm) {
   pm.addNestedPass<FuncOp>(layer::createInlineLayersPass());
   pm.addNestedPass<FuncOp>(tile::createComputeBoundsPass());
-  // pm.addPass(tile::createSplitMainPass());
-  // pm.addPass(transforms::createHoistingPass());
+  pm.addPass(tile::createSplitMainPass());
+  pm.addPass(transforms::createHoistingPass());
   pm.addNestedPass<FuncOp>(tile::createPadConstraintsPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());

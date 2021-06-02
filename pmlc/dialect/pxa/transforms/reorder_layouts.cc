@@ -177,7 +177,7 @@ void createBlockedLayoutForInputTensor(
         newMap.getNumResults(), 0, expansionExprs, context);
     IVLOG(4, "newBlockedMap: " << mlir::debugString(newBlockedMap));
 
-    memLayoutMaps.insert({loadOp.getMemRef(), newBlockedMap});
+    memLayoutMaps.insert({indirectDef, newBlockedMap});
   }
 }
 
@@ -228,8 +228,9 @@ bool createBlockedLayoutForFilterTensor(
     mlir::AffineMap newBlockedMap = mlir::AffineMap::get(
         newMap.getNumResults(), 0, expansionExprs, context);
     IVLOG(4, "newBlockedMap: " << mlir::debugString(newBlockedMap));
-
-    memLayoutMaps.insert({loadOp.getMemRef(), newBlockedMap});
+    auto memRef = loadOp.getMemRef();
+    IVLOG(4, "loadOp.getMemRef: " << mlir::debugString(memRef));
+    memLayoutMaps.insert({indirectDef, newBlockedMap});
     return true;
   }
 
@@ -1061,6 +1062,7 @@ gatherGlobalMemoryDescs(mlir::FuncOp func, const ScheduleModel &model) {
   auto getOrCreateGlobalDesc = [&](mlir::Value memory) -> MemoryUsageDesc & {
     auto memoryIt = globalMemory.find(memory);
     if (memoryIt == globalMemory.end()) {
+      IVLOG(4, "Inserting into globalMemory: " << mlir::debugString(memory));
       MemoryUsageDesc memoryDesc = getEmptyUsageDesc(memory);
       memoryIt = globalMemory.insert({memory, memoryDesc}).first;
     }
@@ -1073,6 +1075,8 @@ gatherGlobalMemoryDescs(mlir::FuncOp func, const ScheduleModel &model) {
       // Skip memory local to `affine.parallel`.
       if (!parallelOp.isDefinedOutsideOfLoop(indirectDef))
         return;
+
+      IVLOG(4, "indirectDef: " << mlir::debugString(indirectDef));
       MemoryUsageDesc &memoryDesc = getOrCreateGlobalDesc(indirectDef);
       memoryDesc.reads.emplace_back(gatherReadDesc(read, model));
       memoryDesc.parallelOp = parallelOp;
@@ -1210,31 +1214,37 @@ mlir::Optional<ReorderDesc> chooseUserProvidedTargetLayout(
   mlir::Optional<ReorderDesc> selectedReorder = llvm::None;
 
   if (memoryDesc.reads.size() > 0) {
-    MemoryReadDesc &readDesc = memoryDesc.reads.front();
+    /*
+     IVLOG(4, "memoryDesc.reads.size(): " << memoryDesc.reads.size());
+     MemoryReadDesc &readDesc = memoryDesc.reads.front();
 
-    PxaReadOpInterface readOp = readDesc.readOp;
-    mlir::Value readMem = readOp.getMemRef();
-    IVLOG(3, "readMem: " << mlir::debugString(readMem));
+     PxaReadOpInterface readOp = readDesc.readOp;
+     mlir::Value readMem = readOp.getMemRef();
 
-    mlir::MemRefType memrefType = readOp.getMemRefType();
-
+     mlir::MemRefType memrefType = readOp.getMemRefType();
+    */
+    mlir::MemRefType memrefType =
+        memoryDesc.reads.front().readOp.getMemRefType();
     bool layoutSet = false;
     mlir::AffineMap layoutMap;
 
+    /*
     // First we check if a layout is set with the memref itself
     if (memrefType.getAffineMaps().size() > 0) {
       layoutMap = memrefType.getAffineMaps().front();
       IVLOG(3, "layoutMap: " << mlir::debugString(layoutMap));
       layoutSet = true;
     }
+    */
 
     // Then we check if a layout is set by any of the pattern recognizers
     // such as convolution recognizers
     if (!layoutSet) {
-      auto memLayoutMapsIt = memLayoutMaps.find(readMem);
+      auto memLayoutMapsIt = memLayoutMaps.find(memoryDesc.value);
       if (memLayoutMapsIt != memLayoutMaps.end()) {
         layoutMap = memLayoutMapsIt->second;
         layoutSet = true;
+        // IVLOG(3, "readMem: " << mlir::debugString(readMem));
         IVLOG(4, "layoutMap for conv2d: " << mlir::debugString(layoutMap));
       }
     }

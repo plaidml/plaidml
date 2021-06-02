@@ -1788,7 +1788,7 @@ def variable(value, dtype=None, name=None, constraint=None):
         if (str(name) == 'kernel'):
             global count
             count += 1
-            if (count < 56):
+            if (count < 1):
                 return _KerasNode('constant', name=name, const=value)
             else:
                 return _KerasNode('variable', name=name, var=value)
