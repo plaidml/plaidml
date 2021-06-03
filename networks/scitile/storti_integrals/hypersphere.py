@@ -85,7 +85,7 @@ def main(
     ax1.plot(x2, y_line2, label=label2)
 
     plt.legend(loc='lower left')
-    plt.savefig('hypershere_integral_graph.pdf')
+    plt.savefig('hypersphere_integral_graph.pdf')
 
 
 if __name__ == '__main__':
