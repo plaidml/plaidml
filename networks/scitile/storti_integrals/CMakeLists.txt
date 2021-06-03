@@ -1,7 +1,7 @@
 pml_py_library(
   NAME py
   SRC
-    hypershere.py
+    hypersphere.py
     op.py
     torus.py
   DEPS
