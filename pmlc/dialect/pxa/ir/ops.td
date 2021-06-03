@@ -303,17 +303,40 @@ def PxaStoreOp : PXA_OpWithPP<"store", [MemRefsNormalizable]> {
   ];
 }
 
-// def AffineGreyboxOp : PXA_OpWithPP<"greybox", [
-//     AttrSizedOperandSegments,
-//     IsolatedFromAbove]> {
-//   let summary = "affine greybox operation";
-//   let arguments = (ins
-//     Variadic<AnyMemRef>:$reads,
-//     Variadic<AnyMemRef>:$writes,
-//     Variadic<AnyType>:$operands
-//   );
-//   let results = (outs Variadic<AnyMemRef>:$results);
-// }
+def PxaGenericOp : PXA_OpWithPP<"generic", [
+    AttrSizedOperandSegments,
+    IsolatedFromAbove]> {
+  let summary = "PXA generic operation";
+  let arguments = (ins
+    Variadic<AnyMemRef>:$inputs,
+    Variadic<AnyMemRef>:$outputs,
+    Variadic<Index>:$indices,
+    AffineMapArrayAttr:$input_access_maps,
+    AffineMapArrayAttr:$input_tile_maps,
+    AffineMapArrayAttr:$output_access_maps,
+    AffineMapArrayAttr:$output_tile_maps,
+    StrAttr:$kernel,
+    I64ArrayAttr:$tile
+  );
+  let results = (outs Variadic<AnyMemRef>:$results);
+
+  let extraClassDeclaration = [{
+    static mlir::StringRef getInputAccessMapsAttrName() {
+      return "input_access_maps";
+    }
+    static mlir::StringRef getInputTileMapsAttrName() {
+      return "input_tile_maps";
+    }
+    static mlir::StringRef getOutputAccessMapsAttrName() {
+      return "output_access_maps";
+    }
+    static mlir::StringRef getOutputTileMapsAttrName() {
+      return "output_tile_maps";
+    }
+    static mlir::StringRef getKernelAttrName() { return "kernel"; }
+    static mlir::StringRef getTileAttrName() { return "tile"; }
+  }];
+}
 
 // TODO: replace PrngOp with an AffineGreyboxOp
 def PrngOp : PXA_Op<"prng"> {

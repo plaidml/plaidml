@@ -161,6 +161,7 @@ void Program::compile(StringRef targetNameAndOptions, bool collectPasses,
     pm.enableIRPrinting(shouldPrintBeforePass, shouldPrintAfterPass,
                         /*printModuleScope=*/true,
                         /*printAfterOnlyOnChange=*/false,
+                        /*printAfterOnlyOnFailure=*/false,
                         /*out=*/llvm::errs());
   }
 

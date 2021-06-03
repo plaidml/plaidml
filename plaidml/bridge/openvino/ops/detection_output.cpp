@@ -49,8 +49,6 @@ void registerDetectionOutput() {
     auto input_width = layer->get_attrs().input_width;
     auto objectness_score = layer->get_attrs().objectness_score;
 
-    // TODO: support decrease_label_id, keep_top_k with multiple batches in NMS.
-    IE_ASSERT(decrease_label_id == false);
     // TODO: support share_location = false which is not
     // sharing bounding boxes among different classes.
     IE_ASSERT(share_location == true);
@@ -142,6 +140,7 @@ void registerDetectionOutput() {
                                            .ssd_location(location)
                                            .ssd_with_arm_loc(with_add_pred)
                                            .ssd_arm_location(arm_loc)
+                                           .nms_style(decrease_label_id ? op::NmsStyle::MXNET : op::NmsStyle::CAFFE)
                                            .build();
     edsl::Tensor selected_indices = result[0];
     auto selected_indices_shape = selected_indices.compute_shape().sizes();
