@@ -40,8 +40,8 @@ Tensor GatherTree(Tensor step_ids, Tensor parent_idx, Tensor max_seq_len, Tensor
   // Add padding to update the whole PARENT_IDX value.
   Tensor index_time =
       edsl::index({edsl::TensorDim(MaxTime), edsl::TensorDim(BatchSize), edsl::TensorDim(BeamWidth)}, 0);
-  Tensor max_time = edsl::cast(Tensor(MaxTime), max_seq_len.dtype());
-  Tensor max_seq_len_in_beam = op::minimum(max_seq_len, max_time);
+  Tensor max_time = edsl::cast(Tensor(MaxTime), DType::INT32);
+  Tensor max_seq_len_in_beam = op::minimum(edsl::cast(max_seq_len, DType::INT32), max_time);
   Tensor parent_idx_filter = index_time - edsl::reshape(max_seq_len_in_beam, {1, BatchSize, 1});
   // Set padding value to unused index.
   Tensor index_beam = edsl::index({edsl::TensorDim(BatchSize), edsl::TensorDim(BeamWidth)}, 1);
