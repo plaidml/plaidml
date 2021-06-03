@@ -19,8 +19,10 @@ const std::vector<InferenceEngine::Precision> netPrecisions = {
 };
 
 const std::vector<std::vector<size_t>> inputShapes = {
-    {5, 1, 10}, {1, 1, 10}, {20, 1, 10},
-    // {20, 20, 10},
+    {5, 1, 10},
+    {1, 1, 10},
+    {20, 1, 10},
+    {20, 20, 10},
 };
 
 const std::vector<ngraph::helpers::InputLayerType> secondaryInputTypes = {
