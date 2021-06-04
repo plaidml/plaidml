@@ -91,7 +91,7 @@ unsigned ContractionOp::getNumTensors(CombinationKind combo) {
 }
 
 void ContractionOp::build(OpBuilder &builder, OperationState &result,
-                          Type resultType, Value init, ArrayRef<Value> tensors,
+                          Type resultType, Value init, ValueRange tensors,
                           AggregationKind agg, CombinationKind combo,
                           AffineMap sink, ArrayRef<AffineMap> srcs,
                           IntegerSet cons, StringRef name) {
