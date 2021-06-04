@@ -22,7 +22,6 @@ target_link_libraries(edsl_test
   gflags
   gtest_main
   gmock
-  half
 )
 
 target_include_directories(edsl_test PUBLIC include)
