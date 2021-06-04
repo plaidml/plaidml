@@ -47,7 +47,7 @@ func @res2a_branch2a(%I: memref<1x56x56x64xf32>, %K: memref<1x1x64x64xf32>, %O: 
 // CHECK-LABEL: func @relu
 func @relu(%I: memref<1x56x56x64xf32>, %O: memref<1x56x56x64xf32>) -> memref<1x56x56x64xf32> {
   %0 = affine.parallel (%x, %y) = (0, 0) to (56, 56) step (14, 1) reduce ("assign") -> (memref<1x56x56x64xf32>) {
-    // CHECK: xsmm.unary.dispatch RELU(memref<1x56x56x64xf32>, [4, 64], 3584, 3584) : (memref<1x56x56x64xf32>) -> memref<1x56x56x64xf32>
+    // CHECK: xsmm.unary.dispatch RELU(f32, [4, 64], 3584, 3584) : (f32) -> f32
     // CHECK: affine.for
     // CHECK:   affine.for
     // CHECK:     xsmm.unary.invoke

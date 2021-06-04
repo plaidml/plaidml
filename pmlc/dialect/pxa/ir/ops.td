@@ -34,15 +34,11 @@ class PxaReduceOpBase<string mnemonic, list<OpTrait> traits = []> :
 
   code extraClassDeclarationBase = [{
     mlir::Value getMemRef() { return memref(); }
-    unsigned getMemRefOperandIndex() { return 1; }
-    void setMemRef(mlir::Value value) { setOperand(getMemRefOperandIndex(), value); }
     mlir::MemRefType getMemRefType() { return memref().getType().cast<mlir::MemRefType>(); }
     mlir::AffineMap getAffineMap() { return map(); }
     operand_range getMapOperands() { return idxs(); }
     static mlir::StringRef getMapAttrName() { return "map"; }
-    mlir::AffineMapAttr getAffineMapAttr() {
-      return (*this)->getAttr(getMapAttrName()).cast<mlir::AffineMapAttr>();
-    }
+    mlir::AffineMapAttr getAffineMapAttr() { return mapAttr(); }
     mlir::AtomicRMWKind getAgg() { return agg(); }
   }];
 }
@@ -144,19 +140,15 @@ class PxaLoadOpBase<string mnemonic, list<OpTrait> traits = []> :
         MemRefsNormalizable])> {
   let arguments = (ins
     AnyMemRef:$memref,
-    Variadic<Index>:$indices
+    AffineMapAttr:$map,
+    Variadic<Index>:$idxs
   );
 
   code extraClassDeclarationBase = [{
-    /// Returns the operand index of the memref.
-    unsigned getMemRefOperandIndex() { return 0; }
-
-    void setMemRef(mlir::Value value) { setOperand(getMemRefOperandIndex(), value); }
+    mlir::Value getMemRef() { return memref(); }
 
     /// Returns the affine map used to index the memref for this operation.
-    mlir::AffineMapAttr getAffineMapAttr() {
-      return (*this)->getAttr(getMapAttrName()).cast<mlir::AffineMapAttr>();
-    }
+    mlir::AffineMapAttr getAffineMapAttr() { return mapAttr(); }
 
     static mlir::StringRef getMapAttrName() { return "map"; }
   }];

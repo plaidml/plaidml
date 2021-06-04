@@ -32,6 +32,11 @@ def PRNGLinking : Pass<"x86-prng-linking", "mlir::ModuleOp"> {
   let constructor = "pmlc::target::x86::createPRNGLinkingPass()";
 }
 
+def TppPatterns : FunctionPass<"x86-tpp-patterns"> {
+  let summary = "Convert TPP patterns to pxa.generic ops";
+  let constructor = "pmlc::target::x86::createTppPatternsPass()";
+}
+
 def TraceLinking : Pass<"x86-trace-linking", "mlir::ModuleOp"> {
   let summary = "Link trace ops to runtime functions";
   let constructor = "pmlc::target::x86::createTraceLinkingPass()";

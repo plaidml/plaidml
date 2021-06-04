@@ -44,6 +44,8 @@ pml_py_library(
     plaidbench/networks/ops/conv2d.py
     plaidbench/networks/ops/dense.py
     plaidbench/networks/ops/op.py
+  DEPS
+    plaidml::bridge::keras::py
 )
 
 pml_py_wheel(

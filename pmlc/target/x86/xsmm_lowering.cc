@@ -5,19 +5,27 @@
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "libxsmm.h" // NOLINT [build/include_subdir]
 
+#include "pmlc/dialect/pxa/analysis/strides.h"
+#include "pmlc/dialect/pxa/ir/matchers.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
+#include "pmlc/dialect/stdx/ir/ops.h"
 #include "pmlc/dialect/xsmm/ir/ops.h"
+#include "pmlc/target/x86/pass_detail.h"
 #include "pmlc/util/logging.h"
+#include "pmlc/util/matchers.h"
 #include "pmlc/util/strides.h"
+#include "pmlc/util/util.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
 
 namespace pmlc::target::x86 {
 
 namespace pxa = dialect::pxa;
+namespace stdx = dialect::stdx;
 namespace xsmm = dialect::xsmm;
 
 namespace {
@@ -268,6 +276,14 @@ struct IndicesCollector {
   }
 };
 
+static SmallVector<Type> getElementTypes(TypeRange types) {
+  SmallVector<Type> ret;
+  for (Type type : types) {
+    ret.push_back(type.cast<MemRefType>().getElementType());
+  }
+  return ret;
+}
+
 struct UnaryPxaGenericOpConversion
     : public OpConversionPattern<pxa::PxaGenericOp> {
   StringRef kernelName;
@@ -295,10 +311,10 @@ struct UnaryPxaGenericOpConversion
         !collector.collect(op.input_access_maps()))
       return failure();
 
-    Type computeType =
-        op.outputs().getTypes()[0]; // just use the output type for now
-    FunctionType funcType = rewriter.getFunctionType(op.inputs().getTypes(),
-                                                     op.outputs().getTypes());
+    SmallVector<Type> inputTypes = getElementTypes(op.inputs().getTypes());
+    SmallVector<Type> outputTypes = getElementTypes(op.outputs().getTypes());
+    Type computeType = outputTypes[0]; // just use the output type for now
+    FunctionType funcType = rewriter.getFunctionType(inputTypes, outputTypes);
 
     auto dispatchOp =
         rewriter.create<xsmm::UnaryDispatchOp>(loc, resultType,
@@ -909,6 +925,118 @@ struct XSMMUnaryInvokeLowering
   }
 };
 
+struct TppAccess {
+  AffineMap accessMap;
+  AffineMap tileMap;
+};
+
+template <typename T>
+static Optional<TppAccess> getTppAccess(MLIRContext *context, T op,
+                                        Block *block,
+                                        SmallVectorImpl<Value> &mapOperands) {
+  Optional<pxa::RelativeAccessPattern> rap =
+      pxa::computeRelativeAccess(op, block);
+  if (!rap)
+    return {};
+
+  AffineValueMap innerValueMap;
+  AffineValueMap outerValueMap = pxa::convertToValueMap(context, rap->outer);
+  AffineValueMap accessValueMap(op.map(), op.idxs());
+  AffineValueMap::difference(accessValueMap, outerValueMap, &innerValueMap);
+
+  mapOperands.append(outerValueMap.getOperands().begin(),
+                     outerValueMap.getOperands().end());
+
+  return TppAccess{outerValueMap.getAffineMap(), innerValueMap.getAffineMap()};
+}
+
+struct TppReluPattern : public OpRewritePattern<AffineParallelOp> {
+  using OpRewritePattern<AffineParallelOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(AffineParallelOp op,
+                                PatternRewriter &rewriter) const {
+    using matchers::m_Any;
+
+    if (op.getIVs().size() != 2)
+      return failure();
+
+    Value load, reduce;
+    auto pattern = m_Op<AffineYieldOp>(m_Capture(
+        &reduce, pxa::m_PxaReduceOp(AtomicRMWKind::assign,
+                                    m_Op<stdx::ReluOp>(m_Capture(
+                                        &load, m_Op<pxa::PxaLoadOp>())),
+                                    m_Any())));
+    Operation *yield = op.getBody()->getTerminator();
+    if (!matchPattern(yield, pattern)) {
+      IVLOG(3, "TppReluPattern: Pattern not found");
+      return failure();
+    }
+
+    MLIRContext *context = rewriter.getContext();
+    SmallVector<Value> indices;
+
+    auto reduceOp = cast<pxa::PxaReduceOp>(reduce.getDefiningOp());
+    Optional<TppAccess> output =
+        getTppAccess(context, reduceOp, op->getBlock(), indices);
+    if (!output) {
+      IVLOG(3, "TppReluPattern: Failed due to a non-strided access");
+      return failure();
+    }
+
+    auto loadOp = cast<pxa::PxaLoadOp>(load.getDefiningOp());
+    Optional<TppAccess> input =
+        getTppAccess(context, loadOp, op->getBlock(), indices);
+    if (!input) {
+      IVLOG(3, "TppReluPattern: Failed due to a non-strided access");
+      return failure();
+    }
+
+    ArrayAttr outputAccessMaps =
+        rewriter.getAffineMapArrayAttr({output->accessMap});
+    ArrayAttr outputTileMaps =
+        rewriter.getAffineMapArrayAttr({output->tileMap});
+
+    ArrayAttr inputAccessMaps =
+        rewriter.getAffineMapArrayAttr({input->accessMap});
+    ArrayAttr inputTileMaps = rewriter.getAffineMapArrayAttr({input->tileMap});
+
+    SmallVector<int64_t, 2> ranges;
+    for (BlockArgument iv : op.getIVs()) {
+      pxa::StrideInfo info(iv);
+      ranges.push_back(info.range().count());
+    }
+
+    ArrayAttr tile = rewriter.getI64ArrayAttr(ranges);
+
+    rewriter.replaceOpWithNewOp<pxa::PxaGenericOp>(
+        op, reduce.getType(),
+        /*inputs=*/ArrayRef<Value>{loadOp.memref()},
+        /*outputs=*/ArrayRef<Value>{reduceOp.memref()},
+        /*indices=*/indices,
+        /*input_access_maps=*/inputAccessMaps,
+        /*input_tile_maps=*/inputTileMaps,
+        /*output_access_maps=*/outputAccessMaps,
+        /*output_tile_maps=*/outputTileMaps,
+        /*kernel=*/rewriter.getStringAttr("tpp_relu"),
+        /*tile=*/tile);
+
+    return success();
+  }
+};
+
+struct TppPatternsPass : public TppPatternsBase<TppPatternsPass> {
+  void runOnFunction() override {
+    MLIRContext *context = &getContext();
+
+    RewritePatternSet patterns(context);
+    patterns.insert<TppReluPattern>(context);
+
+    if (failed(
+            applyPatternsAndFoldGreedily(getOperation(), std::move(patterns))))
+      signalPassFailure();
+  }
+};
+
 } // namespace
 
 void populatePXAGemmToXSMMConversionPatterns(RewritePatternSet &patterns) {
@@ -929,6 +1057,10 @@ void populateXSMMToLLVMConversionPatterns(LLVMTypeConverter &converter,
                   XSMMUnaryDispatchLowering,         //
                   XSMMUnaryInvokeLowering            //
                   >(converter);
+}
+
+std::unique_ptr<mlir::Pass> createTppPatternsPass() {
+  return std::make_unique<TppPatternsPass>();
 }
 
 } // namespace pmlc::target::x86
