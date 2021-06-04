@@ -288,6 +288,8 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(createCSEPass());
 
   pm.addPass(createPRNGLinkingPass());
+  pm.addNestedPass<FuncOp>(createTppPatternsPass());
+
   pm.addPass(createLowerPXAToAffinePass());
   pm.addPass(createLoopInvariantCodeMotionPass());
   pm.addPass(createCanonicalizerPass());
