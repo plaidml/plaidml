@@ -14,14 +14,14 @@ steps:
     artifact_paths:
       - "logs/*.log"
 {{/variants}}
-  
+
   - label: 'IRv10 models'
     trigger: irv10
     async: false
     depends_on: linux_x86_64
     build:
       message: "${BUILDKITE_MESSAGE}"
-      commit: 85b1add931d04a6cdfaaf4fc3b7ddfc21bc75580
+      commit: 981d0b918fd138110d8c11e7be3cdeb4e36ac06d
       env:
         PLAIDML_COMMIT: "${BUILDKITE_COMMIT}"
         BUILDKITE_PULL_REQUEST: "${BUILDKITE_PULL_REQUEST}"

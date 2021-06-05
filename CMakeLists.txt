@@ -63,8 +63,9 @@ if(NOT InferenceEngineDeveloperPackage_FOUND)
   include(gflags)
 endif()
 include(googletest)
-include(half)
 include(xsmm)
+
+add_subdirectory(vendor)
 
 # -------------------------------------------------------------------------------
 # Enable testing

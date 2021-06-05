@@ -217,7 +217,7 @@ def pool(
     ]).as_tensor()
 
 
-def relu(x, alpha=None, max_value=None, threshold=0.):
+def relu(x, alpha=None, max_value=None, threshold=None):
     return op('relu', [x, alpha, max_value, threshold]).as_tensor()
 
 
@@ -258,8 +258,10 @@ def slice_of(x, slices):
 def softmax(x, axis=None):
     return op('softmax', [x, axis]).as_tensor()
 
+
 def sort(x, axis=None, direction=edsl.SortDirection.ASC):
-    return op('sort', [x, axis]).as_tensor()
+    return op('sort', [x, axis, direction]).as_tensor()
+
 
 def spatial_padding(x, lo_pads, hi_pads, data_layout):
     return op("spatial_padding", [x, lo_pads, hi_pads, data_layout]).as_tensor()

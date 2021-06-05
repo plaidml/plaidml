@@ -11,7 +11,6 @@ find_package(PlaidML REQUIRED PATHS "${CMAKE_CURRENT_LIST_DIR}/cmake")
 include(FetchContent)
 include("cmake/gflags.cmake")
 include("cmake/googletest.cmake")
-include("cmake/half.cmake")
 
 add_executable(edsl_test
   src/edsl_test.cc
@@ -23,7 +22,6 @@ target_link_libraries(edsl_test
   gflags
   gtest_main
   gmock
-  half
 )
 
 target_include_directories(edsl_test PUBLIC include)

@@ -37,7 +37,6 @@ install(
     "${PROJECT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
     "${PROJECT_SOURCE_DIR}/cmake/third_party/gflags.cmake"
     "${PROJECT_SOURCE_DIR}/cmake/third_party/googletest.cmake"
-    "${PROJECT_SOURCE_DIR}/cmake/third_party/half.cmake"
   DESTINATION "cmake"
   COMPONENT devkit
 )

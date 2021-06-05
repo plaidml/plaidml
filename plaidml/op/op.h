@@ -815,7 +815,7 @@ class relu {
   }
 
   relu& threshold(double threshold) {
-    threshold_ = threshold;
+    threshold_ = edsl::Value(threshold);
     return *this;
   }
 
@@ -828,7 +828,7 @@ class relu {
   edsl::Tensor I_;
   edsl::Tensor alpha_;
   edsl::Tensor max_value_;
-  double threshold_ = 0.0;
+  edsl::Value threshold_;
 };
 
 inline edsl::Tensor reorg_yolo(const edsl::Tensor& I, int stride, bool decrease, const std::string& layout = "NCHW") {
