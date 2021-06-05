@@ -134,7 +134,7 @@ struct PxaLoadOpConversion : public OpConversionPattern<pxa::PxaLoadOp> {
   matchAndRewrite(pxa::PxaLoadOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
     rewriter.replaceOpWithNewOp<AffineLoadOp>(op, op.memref(),
-                                              op.getAffineMap(), op.indices());
+                                              op.getAffineMap(), op.idxs());
     return success();
   }
 };
@@ -147,7 +147,7 @@ struct PxaVectorLoadOpConversion
   matchAndRewrite(pxa::PxaVectorLoadOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
     rewriter.replaceOpWithNewOp<AffineVectorLoadOp>(
-        op, op.getVectorType(), op.memref(), op.getAffineMap(), op.indices());
+        op, op.getVectorType(), op.memref(), op.getAffineMap(), op.idxs());
     return success();
   }
 };
@@ -291,6 +291,35 @@ struct FuncOpConversion : public OpConversionPattern<FuncOp> {
   }
 };
 
+static llvm::APFloat convertFloatUsingType(llvm::APFloat value,
+                                           FloatType type) {
+  bool losesInfo = false;
+  value.convert(type.getFloatSemantics(), APFloat::rmNearestTiesToEven,
+                &losesInfo);
+  return value;
+}
+
+struct ReluOpConversion : public OpConversionPattern<stdx::ReluOp> {
+  using OpConversionPattern<stdx::ReluOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(stdx::ReluOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
+    stdx::ReluOp::Adaptor adaptor(operands);
+    Location loc = op->getLoc();
+
+    auto floatType = adaptor.value().getType().cast<FloatType>();
+    llvm::APFloat value = convertFloatUsingType(llvm::APFloat(0.0), floatType);
+    auto zero = rewriter.create<ConstantFloatOp>(loc, value, floatType);
+    auto cmpOp =
+        rewriter.create<CmpFOp>(loc, CmpFPredicate::OLT, adaptor.value(), zero)
+            .getResult();
+    rewriter.replaceOpWithNewOp<SelectOp>(op, cmpOp, zero, adaptor.value());
+
+    return success();
+  }
+};
+
 struct ReturnOpConversion : public OpConversionPattern<ReturnOp> {
   using OpConversionPattern<ReturnOp>::OpConversionPattern;
 
@@ -357,6 +386,7 @@ void populatePXAToAffineConversionPatterns(RewritePatternSet &patterns) {
       PxaVectorLoadOpConversion,   //
       PxaVectorReduceOpConversion, //
       PxaStoreOpConversion,        //
+      ReluOpConversion,            //
       ReturnOpConversion>(patterns.getContext());
 }
 

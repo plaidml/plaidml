@@ -2595,19 +2595,18 @@ Value relu(const Value& value) {
   if (args.size() != 4) {
     throw std::runtime_error("relu expects 4 arguments");
   }
-  auto I = args[0].as_tensor();
-  auto alpha = args[1];
-  auto max_value = args[2];
-  auto threshold = args[3].as_float();
-  Tensor A;
-  if (alpha.is_none()) {
-    A = Tensor(0.0);
-  } else {
-    A = alpha.as_tensor();
+  Tensor I = args[0].as_tensor();
+  Value alpha = args[1];
+  Value max_value = args[2];
+  Value threshold = args[3];
+  double T = threshold.is_none() ? 0.0 : threshold.as_float();
+  if ((alpha.is_none() || (alpha.is_float() && alpha.as_float() == 0.0)) && max_value.is_none() && T == 0.0) {
+    return Value{edsl::relu(I)};
   }
-  auto O = select(I < threshold, edsl::cast(A * (I - threshold), I.dtype()), I);
+  Tensor A = alpha.is_none() ? Tensor(0.0) : alpha.as_tensor();
+  Tensor O = select(I < T, edsl::cast(A * (I - T), I.dtype()), I);
   if (!max_value.is_none()) {
-    auto M = cast(max_value.as_tensor(), I.dtype());
+    Tensor M = cast(max_value.as_tensor(), I.dtype());
     O = select(O < M, O, M);
   }
   return Value{O};

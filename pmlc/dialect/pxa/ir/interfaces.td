@@ -21,10 +21,10 @@ def PxaReadOpInterface : PxaOpInterface<"PxaReadOpInterface"> {
       /*retTy=*/"::mlir::Value",
       /*methodName=*/"getMemRef",
       /*args=*/(ins),
-      /*methodBody*/[{}],
-      /*defaultImplementation=*/ [{
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
         ConcreteOp op = ::mlir::cast<ConcreteOp>(this->getOperation());
-        return op.getOperand(op.getMemRefOperandIndex());
+        return op.getMemRef();
       }]
     >,
     InterfaceMethod<
@@ -90,7 +90,7 @@ def PxaReduceOpInterface : PxaOpInterface<"PxaReduceOpInterface"> {
       /*methodBody=*/[{}],
       /*defaultImplementation=*/[{
         ConcreteOp op = ::mlir::cast<ConcreteOp>(this->getOperation());
-        return op.getOperand(op.getMemRefOperandIndex());
+        return op.getMemRef();
       }]
     >,
     InterfaceMethod<
@@ -122,7 +122,7 @@ def PxaReduceOpInterface : PxaOpInterface<"PxaReduceOpInterface"> {
       /*retTy=*/"::mlir::AffineMap",
       /*methodName=*/"getAffineMap",
       /*args=*/(ins),
-      /*methodName=*/[{}],
+      /*methodBody=*/[{}],
       /*defaultImplementation=*/[{
         ConcreteOp op = ::mlir::cast<ConcreteOp>(this->getOperation());
         return op.getAffineMapAttr().getValue();

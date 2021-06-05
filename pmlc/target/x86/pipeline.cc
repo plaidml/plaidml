@@ -264,9 +264,8 @@ void pipelineBuilder(OpPassManager &pm) {
   // Use OMP thread count
   unsigned maxThreads = omp_get_max_threads();
   unsigned physCores = getPhysicalCoreNumber();
-  if (0 != physCores) {
+  if (physCores)
     maxThreads = std::min(physCores, maxThreads);
-  }
 
   pm.addNestedPass<FuncOp>(pxa::createCPUThreadPass(maxThreads));
 
@@ -288,6 +287,9 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(createCSEPass());
 
   pm.addPass(createPRNGLinkingPass());
+  if (pmlc::util::getEnvVar("PLAIDML_ENABLE_TPP") == "1")
+    pm.addNestedPass<FuncOp>(createTppPatternsPass());
+
   pm.addPass(createLowerPXAToAffinePass());
   pm.addPass(createLoopInvariantCodeMotionPass());
   pm.addPass(createCanonicalizerPass());
@@ -302,9 +304,8 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(createCSEPass());
 
   pm.addPass(createLowerToCFGPass());
-  if (pmlc::util::getEnvVar("PLAIDML_BOUNDS_CHECK") == "1") {
+  if (pmlc::util::getEnvVar("PLAIDML_BOUNDS_CHECK") == "1")
     pm.addNestedPass<FuncOp>(stdx::createBoundsCheckPass());
-  }
 
   pm.addPass(createLowerToLLVMPass());
   pm.addPass(createTraceLinkingPass());

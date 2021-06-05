@@ -40,7 +40,7 @@ def ContractionOp : TileOp<"contract", [
     OpBuilder<(ins
       "mlir::Type":$resultType,
       "mlir::Value":$init,
-      "mlir::ArrayRef<mlir::Value>":$tensors,
+      "mlir::ValueRange":$tensors,
       "util::AggregationKind":$agg,
       "util::CombinationKind":$combo,
       "mlir::AffineMap":$sink,

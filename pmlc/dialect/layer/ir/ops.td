@@ -30,8 +30,8 @@ def BoxOp : LayerOp<"box", [IsolatedFromAbove]> {
   let builders = [
     OpBuilder<(ins
       "mlir::StringRef":$op,
-      "mlir::ArrayRef<mlir::Value>":$operands,
-      "mlir::ArrayRef<mlir::Type>":$resultTypes,
+      "mlir::ValueRange":$operands,
+      "mlir::TypeRange":$resultTypes,
       "mlir::DictionaryAttr":$attrs
     )>
   ];

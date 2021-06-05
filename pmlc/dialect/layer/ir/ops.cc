@@ -18,11 +18,9 @@ using llvm::SmallVector;
 Block *BoxOp::getBody() { return &body().front(); }
 
 void BoxOp::build(OpBuilder &builder, OperationState &result, StringRef op,
-                  ArrayRef<Value> operands, ArrayRef<Type> resultTypes,
+                  ValueRange operands, TypeRange resultTypes,
                   DictionaryAttr attrs) {
-  for (Type type : resultTypes) {
-    result.types.push_back(type);
-  }
+  result.addTypes(resultTypes);
   result.addOperands(operands);
   result.addAttribute("op", builder.getStringAttr(op));
   result.addAttribute("attrs", attrs);
@@ -61,7 +59,7 @@ ParseResult parseBoxOp(OpAsmParser &parser, OperationState &result) {
   auto loc = parser.getCurrentLocation();
   if (parser.parseAttribute(opName, "op", result.attributes) ||
       parser.parseRegionArgumentList(inner, OpAsmParser::Delimiter::Paren) ||
-      parser.parseEqual() || //
+      parser.parseEqual() ||
       parser.parseOperandList(outer, OpAsmParser::Delimiter::Paren) ||
       parser.parseColonType(funcType) ||
       parser.resolveOperands(outer, funcType.getInputs(), loc,
