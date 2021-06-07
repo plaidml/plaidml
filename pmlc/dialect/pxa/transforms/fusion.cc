@@ -178,7 +178,6 @@ struct FusionInfo {
       BlockArgument argB = pickUniqueTop(sb.strides);
 
       if (!argA || !argB) {
-        IVLOG(3, "FAIL1");
         opB.emitRemark(
             "Failed to fuse with def due to multiple high stride indexes");
         return false;
@@ -192,7 +191,6 @@ struct FusionInfo {
 
       // Fail if the total range of the two arguments doesn't match
       if (mulA * sizeA != mulB * sizeB) {
-        IVLOG(3, "FAIL2");
         opB.emitRemark("Failed to fuse with def due to mismatched ranges, i = ")
             << i << ": " << mulA * sizeA << " vs " << mulB * sizeB;
         return false;
@@ -218,7 +216,6 @@ struct FusionInfo {
       AffineValueMap::difference(lowerA, lowerB, &diff);
       if (!diff.getAffineMap().isSingleConstant() ||
           diff.getAffineMap().getSingleConstantResult() != 0) {
-        IVLOG(3, "FAIL3");
         bInfo.op.emitRemark("Lower bounds mismatch");
         return false;
       }
@@ -231,7 +228,6 @@ struct FusionInfo {
         IVLOG(3, "Failed, bToA.count(" << argB.getArgNumber()
                                        << ") = " << bToA.count(argB));
         bInfo.op.emitRemark("Mapping is not 1 to 1");
-        IVLOG(3, "FAIL4");
         return false;
       }
       aToB[argA] = argB;
@@ -240,14 +236,12 @@ struct FusionInfo {
 
     if (aToB.size() == 0) {
       bInfo.op.emitRemark("No index matches");
-      IVLOG(3, "FAIL5");
       return false;
     }
 
     if (exactlyMatch && (aToB.size() != aInfo.sizes.size() ||
                          bToA.size() != bInfo.sizes.size())) {
       bInfo.op.emitRemark("Loops do not match exactly.");
-      IVLOG(3, "FAIL6");
       return false;
     }
 
@@ -258,7 +252,7 @@ struct FusionInfo {
         performTiling(aInfo.op, aInfo.tileSizes);
       }
       if (bInfo.needsTiling) {
-        IVLOG(3, "Tiling B");
+        IVLOG(3, "Tiling B on " << bInfo.tileSizes);
         performTiling(bInfo.op, bInfo.tileSizes);
       }
     }
@@ -569,14 +563,11 @@ struct FusionInfo {
     fixupLoops(aInfo.op, aToNew);
     fixupLoops(bInfo.op, bToNew);
 
-    IVLOG(3, "apC = " << debugString(apC));
     if (tiledFusion && (aInfo.needsTiling || bInfo.needsTiling)) {
-      IVLOG(3, "Fixy");
       // Affine normalizations
       apC.walk(normalizeAffineParallel);
       apC.walk(elideSingleIterationIndexes);
       apC.walk(promoteIfEmptyIVs);
-      IVLOG(3, "apC = " << debugString(apC));
     }
 
     return apC;
