@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 
-#include "cpp_interfaces/impl/ie_infer_request_internal.hpp"
+#include "cpp_interfaces/interface/ie_iinfer_request_internal.hpp"
 
 #include "ngraph/descriptor/tensor.hpp"
 
@@ -18,7 +18,7 @@
 
 namespace PlaidMLPlugin {
 
-class PlaidMLInferRequest : public InferenceEngine::InferRequestInternal {
+class PlaidMLInferRequest : public InferenceEngine::IInferRequestInternal {
  public:
   using Ptr = std::shared_ptr<PlaidMLInferRequest>;
 
@@ -27,7 +27,7 @@ class PlaidMLInferRequest : public InferenceEngine::InferRequestInternal {
 
   void InferImpl() override;
 
-  void GetPerformanceCounts(std::map<std::string, InferenceEngine::InferenceEngineProfileInfo>& perfMap) const override;
+  std::map<std::string, InferenceEngine::InferenceEngineProfileInfo> GetPerformanceCounts() const override;
 
  private:
   void AllocateInputs();

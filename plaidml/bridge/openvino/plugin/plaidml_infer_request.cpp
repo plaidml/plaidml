@@ -36,7 +36,7 @@ namespace PlaidMLPlugin {
 
 PlaidMLInferRequest::PlaidMLInferRequest(const InputsDataMap& networkInputs, const OutputsDataMap& networkOutputs,
                                          const Program& program)
-    : InferRequestInternal(networkInputs, networkOutputs), program_(program) {
+    : IInferRequestInternal(networkInputs, networkOutputs), program_(program) {
   AllocateInputs();
   AllocateOutputs();
   exec_ = std::make_shared<exec::Executable>(program);
@@ -50,7 +50,7 @@ void PlaidMLInferRequest::InferImpl() {
   SyncOutput();
 }
 
-void PlaidMLInferRequest::GetPerformanceCounts(std::map<std::string, InferenceEngineProfileInfo>& perfMap) const {
+std::map<std::string, InferenceEngine::InferenceEngineProfileInfo> PlaidMLInferRequest::GetPerformanceCounts() const {
   throw std::logic_error("PlaidMLInferRequest::GetPerformanceCounts not implemented");
 }
 

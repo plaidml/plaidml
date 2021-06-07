@@ -13,7 +13,6 @@ const int backgroundLabelId = 0;
 const std::vector<int> topK = {75};
 const std::vector<std::vector<int>> keepTopK = {
     {50},
-    {100},
 };
 const std::vector<std::string> codeType = {"caffe.PriorBoxParameter.CORNER", "caffe.PriorBoxParameter.CENTER_SIZE"};
 const float nmsThreshold = 0.5f;
@@ -108,8 +107,8 @@ const auto params5Inputs = ::testing::Combine(  //
     ::testing::Values(objectnessScore),         //
     ::testing::Values(CommonTestUtils::DEVICE_PLAIDML));
 
-INSTANTIATE_TEST_CASE_P(DetectionOutput5In, DetectionOutputLayerTest, params5Inputs,
-                        DetectionOutputLayerTest::getTestCaseName);
+// INSTANTIATE_TEST_CASE_P(DetectionOutput5In, DetectionOutputLayerTest, params5Inputs,
+//                        DetectionOutputLayerTest::getTestCaseName);
 
 const std::vector<ParamsWhichSizeDepends> smokeParams5In = {
     ParamsWhichSizeDepends{true, true, true, 1, 1, {1, 60}, {1, 165}, {1, 1, 60}, {1, 30}, {1, 60}},
