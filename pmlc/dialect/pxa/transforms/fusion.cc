@@ -54,13 +54,10 @@ struct FusionInfo {
   int64_t memoryActivityThreshold;
   // Fuse the ops with exactly matched idxs
   bool exactlyMatch;
-  // Perform tiled fusions, including additional loop transformations from
-  // subgroups pass
+  // Perform tiled fusions
   bool tiledFusion;
   // Allow single output only
   bool singleOutput;
-
-  bool reverseFusion;
 
   FusionInfo(AffineParallelOp aBand, AffineParallelOp bBand,
              int64_t memoryActivityThreshold, bool exactlyMatch,
@@ -68,7 +65,7 @@ struct FusionInfo {
       : aInfo{aBand}, bInfo{bBand}, hasPlan(false),
         memoryActivityThreshold(memoryActivityThreshold),
         exactlyMatch(exactlyMatch), tiledFusion(tiledFusion),
-        singleOutput(singleOutput), reverseFusion(false) {}
+        singleOutput(singleOutput) {}
 
   // Helper method to find the original source write of a state update.
   static PxaReduceOpInterface findSourceWrite(Value val) {
@@ -100,34 +97,6 @@ struct FusionInfo {
         undoTiling(aInfo.op, aInfo.tileSizes);
       if (bInfo.needsTiling)
         undoTiling(bInfo.op, bInfo.tileSizes);
-    }
-  }
-
-  // Helper to perform loop transformations, so the loops can be fused
-  void loopTransformations(AffineParallelOp outer, AffineParallelOp inner,
-                           bool needsTiling, int64_t vectorWidth) {
-    if (tiledFusion && needsTiling) {
-      inner.walk([&](AffineParallelOp par) {
-        // TODO: check LogicalResult
-        (void)vectorizeOverOutputs(par, vectorWidth);
-      });
-
-      // Try to 'vector cache' any remaining innermost loads
-      outer.walk([&](PxaLoadOp load) {
-        // TODO: check LogicalResult
-        (void)cacheLoadAsVector(inner, load, vectorWidth);
-      });
-
-      // Convert local allocations to vector types
-      outer.walk([&](memref::AllocOp alloc) {
-        // TODO: check LogicalResult
-        (void)vectorizeBuffer(alloc);
-      });
-
-      // Affine normalizations
-      outer.walk(normalizeAffineParallel);
-      outer.walk(elideSingleIterationIndexes);
-      outer.walk(promoteIfEmptyIVs);
     }
   }
 
@@ -168,18 +137,6 @@ struct FusionInfo {
     if (!getStrides(stridesB, opB, bInfo.op))
       return false;
 
-    // Get subgroup sizes for both loop candidates
-    auto subgroupSizeA = 1;
-    auto subgroupSizeB = 1;
-    if (hasIntegerTag(aInfo.op, "subgroupSize"))
-      subgroupSizeA = pmlc::getIntegerTag(aInfo.op, "subgroupSize", 1);
-    if (hasIntegerTag(bInfo.op, "subgroupSize"))
-      subgroupSizeB = pmlc::getIntegerTag(bInfo.op, "subgroupSize", 1);
-
-    // Set reverse fusion only in case when second loop was subgrouped
-    if (subgroupSizeA == 1 && subgroupSizeB != 1)
-      reverseFusion = true;
-
     assert(stridesA.size() == stridesB.size() &&
            "Fusion ops should read/write the same memref and thus have the "
            "same rank");
@@ -192,52 +149,62 @@ struct FusionInfo {
         opB.emitRemark("Failed to fuse with def due to offsets, i = ") << i;
         return false;
       }
-      // If both are empty, nothing to do
-      if (sa.strides.size() == 0 && sb.strides.size() == 0)
+      // If either are empty, nothing to do
+      if (sa.strides.size() == 0 || sb.strides.size() == 0)
         continue;
+
       // If there are multiple indexes, give up
       IVLOG(3, "sa: " << debugString(sa));
       IVLOG(3, "sb: " << debugString(sb));
-      if (sa.strides.size() != 1 || sb.strides.size() != 1) {
-        opB.emitRemark("Failed to fuse with def due to multiple indexes, i = ")
-            << i;
+
+      // Pick the largest unique stride from each side
+      auto pickUniqueTop = [&](const auto &options) {
+        BlockArgument out;
+        int64_t mul = 0;
+        for (const auto &kvp : options) {
+          if (kvp.second > mul) {
+            out = kvp.first;
+            mul = kvp.second;
+          } else if (kvp.second == mul) {
+            out = BlockArgument();
+            break;
+          }
+        }
+        return out;
+      };
+
+      // Pick some indexes
+      BlockArgument argA = pickUniqueTop(sa.strides);
+      BlockArgument argB = pickUniqueTop(sb.strides);
+
+      if (!argA || !argB) {
+        IVLOG(3, "FAIL1");
+        opB.emitRemark(
+            "Failed to fuse with def due to multiple high stride indexes");
         return false;
       }
 
       // Extract the details we care about
-      BlockArgument argA = sa.strides.begin()->first;
-      int64_t mulA = sa.strides.begin()->second;
+      int64_t mulA = sa.strides.find(argA)->second;
       int64_t sizeA = aInfo.sizes[argA.getArgNumber()];
-      BlockArgument argB = sb.strides.begin()->first;
-      int64_t mulB = sb.strides.begin()->second;
+      int64_t mulB = sb.strides.find(argB)->second;
       int64_t sizeB = bInfo.sizes[argB.getArgNumber()];
 
       // Fail if the total range of the two arguments doesn't match
       if (mulA * sizeA != mulB * sizeB) {
+        IVLOG(3, "FAIL2");
         opB.emitRemark("Failed to fuse with def due to mismatched ranges, i = ")
             << i << ": " << mulA * sizeA << " vs " << mulB * sizeB;
         return false;
       }
 
-      // If sizes do not match, apply tiling later, scale to the
-      // loop with subgroupSize != attribute if present
-      auto sameSubgroups = subgroupSizeA == subgroupSizeB;
-      if (mulA != mulB) {
-        auto tileSize = reverseFusion ? sizeA / sizeB : sizeB / sizeA;
-        if (!tileSize)
-          return false;
-        if (reverseFusion && (subgroupSizeA == 1 || sameSubgroups)) {
-          aInfo.tileSizes.push_back(tileSize);
-          aInfo.needsTiling = true;
-        } else if (subgroupSizeB == 1 || sameSubgroups) {
-          bInfo.tileSizes.push_back(tileSize);
-          bInfo.needsTiling = true;
-        }
-      } else {
-        if (reverseFusion)
-          aInfo.tileSizes.push_back(1);
-        else
-          bInfo.tileSizes.push_back(1);
+      // If sizes do not match, apply tiling later.
+      if (mulA > mulB) {
+        bInfo.tileSizes[argB.getArgNumber()] = (mulA / mulB);
+        bInfo.needsTiling = true;
+      } else if (mulB > mulA) {
+        aInfo.tileSizes[argA.getArgNumber()] = (mulB / mulA);
+        aInfo.needsTiling = true;
       }
 
       // Also fail if the AP's don't have the same lower bound
@@ -251,6 +218,7 @@ struct FusionInfo {
       AffineValueMap::difference(lowerA, lowerB, &diff);
       if (!diff.getAffineMap().isSingleConstant() ||
           diff.getAffineMap().getSingleConstantResult() != 0) {
+        IVLOG(3, "FAIL3");
         bInfo.op.emitRemark("Lower bounds mismatch");
         return false;
       }
@@ -263,6 +231,7 @@ struct FusionInfo {
         IVLOG(3, "Failed, bToA.count(" << argB.getArgNumber()
                                        << ") = " << bToA.count(argB));
         bInfo.op.emitRemark("Mapping is not 1 to 1");
+        IVLOG(3, "FAIL4");
         return false;
       }
       aToB[argA] = argB;
@@ -271,34 +240,29 @@ struct FusionInfo {
 
     if (aToB.size() == 0) {
       bInfo.op.emitRemark("No index matches");
+      IVLOG(3, "FAIL5");
       return false;
     }
 
     if (exactlyMatch && (aToB.size() != aInfo.sizes.size() ||
                          bToA.size() != bInfo.sizes.size())) {
       bInfo.op.emitRemark("Loops do not match exactly.");
+      IVLOG(3, "FAIL6");
       return false;
     }
 
     // Add tilings if needed
     if (tiledFusion) {
       if (aInfo.needsTiling) {
-        if (aInfo.op.lowerBoundsMap().getNumResults() !=
-            aInfo.tileSizes.size()) {
-          bInfo.op.emitRemark("Tile sizes do not match.");
-          return false;
-        }
+        IVLOG(3, "Tiling A on " << aInfo.tileSizes);
         performTiling(aInfo.op, aInfo.tileSizes);
       }
       if (bInfo.needsTiling) {
-        if (bInfo.op.lowerBoundsMap().getNumResults() !=
-            bInfo.tileSizes.size()) {
-          bInfo.op.emitRemark("Tile sizes do not match.");
-          return false;
-        }
+        IVLOG(3, "Tiling B");
         performTiling(bInfo.op, bInfo.tileSizes);
       }
     }
+    IVLOG(3, "Tiling done");
 
     // Over-fusion prevention:
     // Compute the amount of memory activity, defined as the amount of memory
@@ -356,6 +320,17 @@ struct FusionInfo {
       }
     }
 
+    // Now that fusion is locked in, normalize tiled loops
+    if (aInfo.needsTiling) {
+      aInfo.op.walk(normalizeAffineParallel);
+      aInfo.op.walk(elideSingleIterationIndexes);
+      aInfo.op.walk(promoteIfEmptyIVs);
+    }
+    if (bInfo.needsTiling) {
+      bInfo.op.walk(normalizeAffineParallel);
+      bInfo.op.walk(elideSingleIterationIndexes);
+      bInfo.op.walk(promoteIfEmptyIVs);
+    }
     hasPlan = true;
     return true;
   }
@@ -399,12 +374,14 @@ struct FusionInfo {
       return false;
     }
     std::swap(aInfo.sizes, *rangesA);
+    aInfo.tileSizes = SmallVector<int64_t, 8>(aInfo.sizes.size(), 1);
     auto rangesB = bInfo.op.getConstantRanges();
     if (!rangesB) {
       bInfo.op.emitRemark("Op does not have constant ranges");
       return false;
     }
     std::swap(bInfo.sizes, *rangesB);
+    bInfo.tileSizes = SmallVector<int64_t, 8>(bInfo.sizes.size(), 1);
     // First, we find all the write/read and write/write pairs, where block A
     // writes to a value that block B reads from or writes into.
     IVLOG(3, "Collecting read/write information");
@@ -516,34 +493,17 @@ struct FusionInfo {
         /*steps=*/stepsC);
 
     // Copy across any tags, prefer A's.
-    if (!reverseFusion) {
-      if (hasTags(aInfo.op)) {
-        copyTags(apC, aInfo.op);
-      } else if (hasTags(bInfo.op)) {
-        copyTags(apC, bInfo.op);
-      }
-    } else {
-      if (hasTags(bInfo.op)) {
-        copyTags(apC, bInfo.op);
-      } else if (hasTags(aInfo.op)) {
-        copyTags(apC, aInfo.op);
-      }
+    if (hasTags(aInfo.op)) {
+      copyTags(apC, aInfo.op);
+    } else if (hasTags(bInfo.op)) {
+      copyTags(apC, bInfo.op);
     }
     clearTags(aInfo.op);
     clearTags(bInfo.op);
 
-    auto subgroupSize = pmlc::getIntegerTag(apC, "subgroupSize", 1);
     // Move the two parallel for's inside the new op
-    if (reverseFusion) {
-      aInfo.op.getOperation()->moveBefore(apC.getBody(), apC.getBody()->end());
-      loopTransformations(apC, aInfo.op, aInfo.needsTiling, subgroupSize);
-      bInfo.op.getOperation()->moveBefore(apC.getBody(), apC.getBody()->end());
-    } else {
-      bInfo.op.getOperation()->moveBefore(apC.getBody(), apC.getBody()->end());
-      loopTransformations(apC, bInfo.op, bInfo.needsTiling, subgroupSize);
-      aInfo.op.getOperation()->moveBefore(apC.getBody(),
-                                          apC.getBody()->begin());
-    }
+    aInfo.op.getOperation()->moveBefore(apC.getBody(), apC.getBody()->end());
+    bInfo.op.getOperation()->moveBefore(apC.getBody(), apC.getBody()->end());
 
     // Fixup uses of A's return values.  These uses are either in B (and thus
     // local to C now) or some other op (and thus need to be moved to a return
@@ -609,11 +569,14 @@ struct FusionInfo {
     fixupLoops(aInfo.op, aToNew);
     fixupLoops(bInfo.op, bToNew);
 
+    IVLOG(3, "apC = " << debugString(apC));
     if (tiledFusion && (aInfo.needsTiling || bInfo.needsTiling)) {
+      IVLOG(3, "Fixy");
       // Affine normalizations
       apC.walk(normalizeAffineParallel);
       apC.walk(elideSingleIterationIndexes);
       apC.walk(promoteIfEmptyIVs);
+      IVLOG(3, "apC = " << debugString(apC));
     }
 
     return apC;
