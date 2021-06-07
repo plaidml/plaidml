@@ -144,6 +144,7 @@ void registerDetectionOutput() {
                                            .ssd_arm_location(arm_loc)
                                            .nms_style(decrease_label_id ? op::NmsStyle::MXNET : op::NmsStyle::CAFFE)
                                            .share_location(share_location)
+                                           .hard_suppression(false)
                                            .build();
     edsl::Tensor selected_indices = result[0];
     auto selected_indices_shape = selected_indices.compute_shape().sizes();
