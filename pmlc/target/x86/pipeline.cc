@@ -287,8 +287,7 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(createCSEPass());
 
   pm.addPass(createPRNGLinkingPass());
-  if (pmlc::util::getEnvVar("PLAIDML_ENABLE_TPP") == "1")
-    pm.addNestedPass<FuncOp>(createTppPatternsPass());
+  pm.addNestedPass<FuncOp>(createTppPatternsPass());
 
   pm.addPass(createLowerPXAToAffinePass());
   pm.addPass(createLoopInvariantCodeMotionPass());

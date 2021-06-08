@@ -928,6 +928,7 @@ struct XSMMUnaryInvokeLowering
 struct TppAccess {
   AffineMap accessMap;
   AffineMap tileMap;
+  BlockArgument strideOneIV;
 };
 
 template <typename T>
@@ -937,7 +938,22 @@ static Optional<TppAccess> getTppAccess(MLIRContext *context, T op,
   Optional<pxa::RelativeAccessPattern> rap =
       pxa::computeRelativeAccess(op, block);
   if (!rap)
-    return {};
+    return None;
+
+  Optional<pxa::StrideInfo> flatInner = rap->flatInner();
+  if (!flatInner)
+    return None;
+
+  BlockArgument strideOneIV;
+  for (auto &info : flatInner->strides) {
+    if (info.second == 1) {
+      strideOneIV = info.first;
+      break;
+    }
+  }
+
+  if (!strideOneIV)
+    return None;
 
   AffineValueMap innerValueMap;
   AffineValueMap outerValueMap = pxa::convertToValueMap(context, rap->outer);
@@ -947,7 +963,8 @@ static Optional<TppAccess> getTppAccess(MLIRContext *context, T op,
   mapOperands.append(outerValueMap.getOperands().begin(),
                      outerValueMap.getOperands().end());
 
-  return TppAccess{outerValueMap.getAffineMap(), innerValueMap.getAffineMap()};
+  return TppAccess{outerValueMap.getAffineMap(), innerValueMap.getAffineMap(),
+                   strideOneIV};
 }
 
 struct TppReluPattern : public OpRewritePattern<AffineParallelOp> {
@@ -972,6 +989,10 @@ struct TppReluPattern : public OpRewritePattern<AffineParallelOp> {
       return failure();
     }
 
+    if (!load.getType().isF32() ||
+        !reduce.getType().cast<MemRefType>().getElementType().isF32())
+      return failure();
+
     MLIRContext *context = rewriter.getContext();
     SmallVector<Value> indices;
 
@@ -991,6 +1012,17 @@ struct TppReluPattern : public OpRewritePattern<AffineParallelOp> {
       return failure();
     }
 
+    if (output->strideOneIV != input->strideOneIV) {
+      IVLOG(3, "TppReluPattern: could not find compatible stride 1 IV");
+      return failure();
+    }
+
+    Optional<SmallVector<int64_t, 8>> ranges = op.getConstantRanges();
+    if (!ranges)
+      return failure();
+
+    ArrayAttr tile = rewriter.getI64ArrayAttr(*ranges);
+
     ArrayAttr outputAccessMaps =
         rewriter.getAffineMapArrayAttr({output->accessMap});
     ArrayAttr outputTileMaps =
@@ -999,14 +1031,6 @@ struct TppReluPattern : public OpRewritePattern<AffineParallelOp> {
     ArrayAttr inputAccessMaps =
         rewriter.getAffineMapArrayAttr({input->accessMap});
     ArrayAttr inputTileMaps = rewriter.getAffineMapArrayAttr({input->tileMap});
-
-    SmallVector<int64_t, 2> ranges;
-    for (BlockArgument iv : op.getIVs()) {
-      pxa::StrideInfo info(iv);
-      ranges.push_back(info.range().count());
-    }
-
-    ArrayAttr tile = rewriter.getI64ArrayAttr(ranges);
 
     rewriter.replaceOpWithNewOp<pxa::PxaGenericOp>(
         op, reduce.getType(),
