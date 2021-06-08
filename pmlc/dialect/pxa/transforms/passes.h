@@ -11,7 +11,8 @@
 namespace pmlc::dialect::pxa {
 
 std::unique_ptr<mlir::Pass> createAffineNormalizePass();
-std::unique_ptr<mlir::Pass> createAffineNormalizePass(bool promote);
+std::unique_ptr<mlir::Pass> createAffineNormalizePass(bool promote,
+                                                      bool denest = false);
 
 std::unique_ptr<mlir::Pass> createAutoTileExamplePass();
 
