@@ -12,4 +12,8 @@ void promoteIfEmptyIVs(mlir::AffineParallelOp op);
 
 void elideSingleIterationIndexes(mlir::AffineParallelOp op);
 
+// Combine perfectly nested loops into a single loop with all induction
+// variables
+void denestLoops(mlir::AffineParallelOp op);
+
 } // namespace pmlc::dialect::pxa

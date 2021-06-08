@@ -9,7 +9,10 @@ def AffineNormalize : FunctionPass<"pxa-normalize"> {
   let options = [
     Option<"promote", "promote", "bool",
            /*default=*/"true",
-           "Promote the body of 1 trip loops">
+           "Promote the body of 1 trip loops">,
+    Option<"denest", "denest", "bool",
+           /*default=*/"false",
+           "Combine perfectly nested loops">
   ];
 }
 
