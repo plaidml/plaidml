@@ -25,7 +25,6 @@ void registerLstmCell() {
     auto R = ctx.operands.at(4);     // recurrence weight tensor [4 * hidden_size, input_size]
     auto B = ctx.operands.at(5);     // bias tensor [4 * hidden_size]
 
-    auto input_size = Xt.compute_shape().sizes().back();
     auto* layer = ngraph::as_type<ngraph::opset4::LSTMCell>(ctx.layer);
     auto hidden_size = layer->get_hidden_size();
 
@@ -41,29 +40,16 @@ void registerLstmCell() {
     auto clip = layer->get_clip();
     auto should_clip = (clip > 0.f) && (clip != std::numeric_limits<float>::infinity());
 
-    auto Wf = op::slice(W).add_dim(0, hidden_size).add_dim(0, input_size);
-    auto Rf = op::slice(R).add_dim(0, hidden_size).add_dim(0, hidden_size);
-    auto Bf = op::slice(B).add_dim(0, hidden_size);
-    auto Tf = op::dot(Xt, op::transpose(Wf)) + op::dot(Ht_1, op::transpose(Rf)) + Bf;
-    auto ft = clip_activation(activation_f, should_clip, clip, Tf);
-
-    auto Wi = op::slice(W).add_dim(hidden_size, 2 * hidden_size).add_dim(0, input_size);
-    auto Ri = op::slice(R).add_dim(hidden_size, 2 * hidden_size).add_dim(0, hidden_size);
-    auto Bi = op::slice(B).add_dim(hidden_size, 2 * hidden_size);
-    auto Ti = op::dot(Xt, op::transpose(Wi)) + op::dot(Ht_1, op::transpose(Ri)) + Bi;
-    auto it = clip_activation(activation_f, should_clip, clip, Ti);
-
-    auto Wc = op::slice(W).add_dim(2 * hidden_size, 3 * hidden_size).add_dim(0, input_size);
-    auto Rc = op::slice(R).add_dim(2 * hidden_size, 3 * hidden_size).add_dim(0, hidden_size);
-    auto Bc = op::slice(B).add_dim(2 * hidden_size, 3 * hidden_size);
-    auto Tc = op::dot(Xt, op::transpose(Wc)) + op::dot(Ht_1, op::transpose(Rc)) + Bc;
-    auto ct = clip_activation(activation_g, should_clip, clip, Tc);
-
-    auto Wo = op::slice(W).add_dim(3 * hidden_size, 4 * hidden_size).add_dim(0, input_size);
-    auto Ro = op::slice(R).add_dim(3 * hidden_size, 4 * hidden_size).add_dim(0, hidden_size);
-    auto Bo = op::slice(B).add_dim(3 * hidden_size, 4 * hidden_size);
-    auto To = op::dot(Xt, op::transpose(Wo)) + op::dot(Ht_1, op::transpose(Ro)) + Bo;
-    auto ot = clip_activation(activation_f, should_clip, clip, To);
+    auto gates_output = op::dot(Xt, op::transpose(W)) + op::dot(Ht_1, op::transpose(R)) + op::unsqueeze(B, {0});
+    auto hidden_indices = edsl::index({edsl::TensorDim(hidden_size)}, 0);
+    edsl::Tensor ft = edsl::gather(gates_output, hidden_indices).axis(1);
+    edsl::Tensor it = edsl::gather(gates_output, hidden_indices + hidden_size).axis(1);
+    edsl::Tensor ct = edsl::gather(gates_output, hidden_indices + 2 * hidden_size).axis(1);
+    edsl::Tensor ot = edsl::gather(gates_output, hidden_indices + 3 * hidden_size).axis(1);
+    ft = clip_activation(activation_f, should_clip, clip, ft);
+    it = clip_activation(activation_f, should_clip, clip, it);
+    ct = clip_activation(activation_g, should_clip, clip, ct);
+    ot = clip_activation(activation_f, should_clip, clip, ot);
 
     auto Ct = ft * Ct_1 + it * ct;
     auto Ht = ot * clip_activation(activation_h, should_clip, clip, Ct);

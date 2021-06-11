@@ -2,12 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-#include <limits>
-
 #include "ngraph/opsets/opset4.hpp"
 #include "plaidml/op/op.h"
 #include "plaidml_ops.hpp"
 #include "plaidml_util.hpp"
+#include <limits>
 
 using namespace plaidml;          // NOLINT[build/namespaces]
 using namespace InferenceEngine;  // NOLINT[build/namespaces]
@@ -61,7 +60,7 @@ void registerGruCell() {
       Th = op::dot(Xt, op::transpose(Wh)) + rt * (op::dot(Ht_1, op::transpose(Rh)) + Bhr) + Bhw;
     } else {
       auto Bh = op::slice(B).add_dim(2 * hidden_size, 3 * hidden_size);
-      Th = op::dot(Xt, op::transpose(Wh)) + op::dot(rt * Ht_1, op::transpose(Rh) + Bh);
+      Th = op::dot(Xt, op::transpose(Wh)) + op::dot(rt * Ht_1, op::transpose(Rh)) + Bh;
     }
     auto ht_tilde = clip_activation(activation_g, should_clip, clip, Th);
     auto Ht = (1 - zt) * ht_tilde + zt * Ht_1;
