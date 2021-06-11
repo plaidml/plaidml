@@ -11,8 +11,9 @@ using namespace LayerTestsDefinitions;
 
 namespace {
 std::vector<bool> should_decompose{
-    // false,
-    true,
+    // true will decompose rnn cell to component ops and
+    // skip plaidml plugin implementation, only set to false here
+    false,
 };
 std::vector<size_t> batch{5};
 std::vector<size_t> hidden_size{
@@ -24,8 +25,10 @@ std::vector<size_t> input_size{
     30,
 };
 std::vector<std::vector<std::string>> activations = {
-    {"relu", "tanh"}, {"tanh", "sigmoid"}, {"sigmoid", "tanh"},
-    // {"tanh", "relu"},
+    {"relu", "tanh"},
+    {"tanh", "sigmoid"},
+    {"sigmoid", "tanh"},
+    {"tanh", "relu"},
 };
 std::vector<float> clips = {
     0.0f,
@@ -55,7 +58,7 @@ INSTANTIATE_TEST_CASE_P(GRUCellCommon, GRUCellTest,
 
 INSTANTIATE_TEST_CASE_P(smoke, GRUCellTest,
                         ::testing::Combine(                                                 //
-                            ::testing::Values(true),                                        //
+                            ::testing::Values(false),                                       //
                             ::testing::Values(3),                                           //
                             ::testing::Values(32),                                          //
                             ::testing::Values(16),                                          //
