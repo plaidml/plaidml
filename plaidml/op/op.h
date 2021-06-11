@@ -398,6 +398,32 @@ inline edsl::Tensor flip(const edsl::Tensor& I, int axis) {
   return details::op("flip", args).as_tensor();
 }
 
+class gatherND {
+ public:
+  explicit gatherND(const edsl::Tensor& x, const edsl::Tensor& y) : x_(x), y_(y) {}
+
+  gatherND& interpolationMode(edsl::InterpolationMode mode) {
+    interpolation_mode_ = mode;
+    return *this;
+  }
+
+  gatherND& batchDims(int batch_dims) {
+    batch_dims_ = batch_dims;
+    return *this;
+  }
+
+  operator edsl::Tensor() {
+    auto args = edsl::make_tuple(x_, y_, batch_dims_, static_cast<int>(interpolation_mode_));
+    return details::op("gatherND", args).as_tensor();
+  }
+
+ private:
+  edsl::Tensor x_;
+  edsl::Tensor y_;
+  uint64_t batch_dims_ = 0;
+  edsl::InterpolationMode interpolation_mode_ = edsl::InterpolationMode::NONE;
+};
+
 inline edsl::Tensor hard_sigmoid(const edsl::Tensor& I, double slope) {
   auto args = edsl::make_tuple(I, slope);
   return details::op("hard_sigmoid", args).as_tensor();

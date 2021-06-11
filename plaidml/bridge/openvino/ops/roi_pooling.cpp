@@ -94,8 +94,8 @@ edsl::Tensor bilinear_pooling(edsl::Tensor I, const std::vector<edsl::Tensor>& c
               roi_h_start * (height - 1);
   auto in_w =
       edsl::cast(edsl::index({edsl::TensorDim(pooled_w)}, 0), DType::FLOAT32) * roi_w_scale + roi_w_start * (width - 1);
-  auto I_gathered_h = edsl::gather(I, in_h).axis(2);
-  return edsl::gather(I_gathered_h, in_w).axis(3);
+  auto I_gathered_h = edsl::gather(I, in_h).interpolationMode(edsl::InterpolationMode::LINEAR).axis(2);
+  return edsl::gather(I_gathered_h, in_w).interpolationMode(edsl::InterpolationMode::LINEAR).axis(3);
 }
 
 }  // namespace
@@ -127,15 +127,13 @@ void registerROIPooling() {
     edsl::Tensor ZERO = edsl::index({edsl::TensorDim(1)}, 0);
     // 2D input tensor of shape [NUM_ROIS, 5] describing box
     for (int i = 0; i < box_shape[0]; i++) {
-      auto i_tensor = ZERO + i;
-      edsl::Tensor box = edsl::gather(coords_box, i_tensor);
+      edsl::Tensor box = edsl::gather(coords_box, i);
       box = edsl::reshape(box, std::vector<int64_t>{BOX_ELEMENT_SIZE});
-      auto batch_id = edsl::gather(box, ZERO);
+      auto batch_id = edsl::gather(box, 0);
       auto slice_I = edsl::gather(I, batch_id).axis(0);
-
       std::vector<edsl::Tensor> coord;
       for (int j = 1; j < BOX_ELEMENT_SIZE; j++) {
-        coord.push_back(edsl::gather(box, ZERO + j));
+        coord.push_back(edsl::gather(box, j));
       }
 
       edsl::Tensor pooled_tensor;

@@ -15,6 +15,7 @@ using namespace mlir; // NOLINT
 using util::GatherMode;
 using util::InterpolationMode;
 using util::NearestMode;
+using util::OutOfBoundsMode;
 using util::ScatterMode;
 
 namespace {
@@ -313,6 +314,7 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
     Type resultType = typeConverter.convertType(op.result().getType());
     auto memrefType = resultType.cast<MemRefType>();
 
+    auto elementType = memrefType.getElementType();
     // Make an allocation for the output
     auto resultMemRef =
         rewriter.create<memref::AllocOp>(loc, memrefType).getResult();
@@ -353,22 +355,34 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
 
       // Create std ops for 1D interpolation
       if (idx.getType().isa<FloatType>()) {
-        switch (op.interpolationMode()) {
-        case InterpolationMode::nearest:
-          interpVal = buildNearestInterpolationOps(
-              loc, rewriter, tensor, idx, srcOps, axis, op.nearestMode());
-          break;
-        case InterpolationMode::linear:
-          interpVal = buildLinearInterpolationOps(loc, rewriter, tensor, idx,
-                                                  srcOps, axis);
-          break;
-        case InterpolationMode::cubic:
-          interpVal = buildCubicInterpolationOps(
-              loc, rewriter, tensor, idx, srcOps, axis,
-              op.cubeCoeffAttr().getValueAsDouble());
-          break;
-        default:
-          llvm_unreachable("Unsupported InterpolationMode");
+        if (elementType.isa<IntegerType>()) {
+          idx = rewriter.create<mlir::FPToSIOp>(loc, idx, rewriter.getI32Type())
+                    .getResult();
+          IndexType indexType = rewriter.getIndexType();
+          // Cast from whatever integer type it has to index type
+          idx = rewriter.create<mlir::IndexCastOp>(loc, idx, indexType)
+                    .getResult();
+          srcOps.at(axis) = idx;
+          interpVal = rewriter.create<memref::LoadOp>(loc, tensor, srcOps);
+        } else {
+          switch (op.interpolationMode()) {
+          case InterpolationMode::nearest:
+            interpVal = buildNearestInterpolationOps(
+                loc, rewriter, tensor, idx, srcOps, axis, op.nearestMode(),
+                op.OutOfBoundsMode());
+            break;
+          case InterpolationMode::linear:
+            interpVal = buildLinearInterpolationOps(
+                loc, rewriter, tensor, idx, srcOps, axis, op.OutOfBoundsMode());
+            break;
+          case InterpolationMode::cubic:
+            interpVal = buildCubicInterpolationOps(
+                loc, rewriter, tensor, idx, srcOps, axis,
+                op.cubeCoeffAttr().getValueAsDouble(), op.OutOfBoundsMode());
+            break;
+          default:
+            llvm_unreachable("Unsupported InterpolationMode");
+          }
         }
       } else {
         if (!idx.getType().isa<IndexType>()) {
@@ -427,9 +441,11 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
                                      ConversionPatternRewriter &rewriter,
                                      Value tensor, Value idx,
                                      std::vector<Value> &srcOps, size_t axis,
-                                     NearestMode nearestMode) const {
+                                     NearestMode nearestMode,
+                                     OutOfBoundsMode outOfBoundsMode) const {
     IndexType idxType = rewriter.getIndexType();
     IntegerType i32Type = rewriter.getI32Type();
+    Type elementType = tensor.getType().cast<MemRefType>().getElementType();
     IndexBounds bounds = getIndexBounds(loc, rewriter, tensor, axis, i32Type);
     switch (nearestMode) {
     case NearestMode::round_prefer_floor: {
@@ -459,14 +475,17 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
     idx = checkIntOutOfBounds(loc, rewriter, idx, bounds);
     idx = rewriter.create<mlir::IndexCastOp>(loc, idx, idxType).getResult();
     srcOps.at(axis) = idx;
-    return rewriter.create<memref::LoadOp>(loc, tensor, srcOps);
+    Value result = rewriter.create<memref::LoadOp>(loc, tensor, srcOps);
+    result = processOutOfBoundsMode(loc, rewriter, result, idx, bounds,
+                                    elementType, outOfBoundsMode);
+    return result;
   }
 
   Value buildLinearInterpolationOps(Location loc,
                                     ConversionPatternRewriter &rewriter,
                                     Value tensor, Value idx,
-                                    std::vector<Value> &srcOps,
-                                    size_t axis) const {
+                                    std::vector<Value> &srcOps, size_t axis,
+                                    OutOfBoundsMode outOfBoundsMode) const {
     IndexType idxType = rewriter.getIndexType();
     IntegerType i32Type = rewriter.getI32Type();
     Type elementType = tensor.getType().cast<MemRefType>().getElementType();
@@ -500,14 +519,18 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
     // Return interpolation result (result = c0*g0 + c1*g1)
     Value p0 = rewriter.create<mlir::MulFOp>(loc, c0, g0).getResult();
     Value p1 = rewriter.create<mlir::MulFOp>(loc, c1, g1).getResult();
-    return rewriter.create<mlir::AddFOp>(loc, p0, p1).getResult();
+    Value result = rewriter.create<mlir::AddFOp>(loc, p0, p1).getResult();
+    result = processOutOfBoundsMode(loc, rewriter, result, idx, bounds,
+                                    elementType, outOfBoundsMode);
+    return result;
   }
 
   Value buildCubicInterpolationOps(Location loc,
                                    ConversionPatternRewriter &rewriter,
                                    Value tensor, Value idx,
                                    std::vector<Value> &srcOps, size_t axis,
-                                   double cubicCoeff) const {
+                                   double cubicCoeff,
+                                   OutOfBoundsMode outOfBoundsMode) const {
     // Follow the algorithm used in ngraph cubic interpolation (also see, e.g.
     // [article](https://ieeexplore.ieee.org/document/1163711/).
 
@@ -598,9 +621,13 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
     }
 
     // Return interpolation result (result = p0 + p1 + p2 + p3)
-    Value r = rewriter.create<mlir::AddFOp>(loc, p[0], p[1]).getResult();
-    r = rewriter.create<mlir::AddFOp>(loc, r, p[2]).getResult();
-    return rewriter.create<mlir::AddFOp>(loc, r, p[3]).getResult();
+    Value result = rewriter.create<mlir::AddFOp>(loc, p[0], p[1]).getResult();
+    result = rewriter.create<mlir::AddFOp>(loc, result, p[2]).getResult();
+    result = rewriter.create<mlir::AddFOp>(loc, result, p[3]).getResult();
+
+    result = processOutOfBoundsMode(loc, rewriter, result, idx, bounds,
+                                    elementType, outOfBoundsMode);
+    return result;
   }
 
   struct IndexBounds {
@@ -674,6 +701,41 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
         loc, floatType, rewriter.getFloatAttr(floatType, 0.5));
     auto valuePlusHalf = rewriter.create<mlir::AddFOp>(loc, value, half);
     return floorFPToSI(loc, rewriter, valuePlusHalf, integerType);
+  }
+
+  Value processOutOfBoundsMode(Location loc,
+                               ConversionPatternRewriter &rewriter,
+                               Value result, Value idx, IndexBounds bounds,
+                               Type elementType,
+                               OutOfBoundsMode outOfBoundsMode) const {
+    switch (outOfBoundsMode) {
+    case OutOfBoundsMode::gather_edge_padded_input:
+      break;
+    case OutOfBoundsMode::return_zero: {
+      auto zero =
+          rewriter
+              .create<mlir::ConstantOp>(loc, elementType,
+                                        rewriter.getFloatAttr(elementType, 0.0))
+              .getResult();
+      auto bound_upper =
+          rewriter.create<mlir::SIToFPOp>(loc, bounds.upper, elementType)
+              .getResult();
+      auto bound_lower =
+          rewriter.create<mlir::SIToFPOp>(loc, bounds.lower, elementType)
+              .getResult();
+      auto cmp_upper = rewriter.create<mlir::CmpFOp>(loc, CmpFPredicate::OGT,
+                                                     idx, bound_upper);
+      auto cmp_lower = rewriter.create<mlir::CmpFOp>(loc, CmpFPredicate::OLT,
+                                                     idx, bound_lower);
+      result = rewriter.create<mlir::SelectOp>(loc, cmp_upper, zero, result)
+                   .result();
+      result = rewriter.create<mlir::SelectOp>(loc, cmp_lower, zero, result)
+                   .result();
+    } break;
+    default:
+      llvm_unreachable("Unsupported OutOfBoundsMode");
+    }
+    return result;
   }
 };
 
