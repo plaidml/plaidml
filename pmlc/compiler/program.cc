@@ -26,13 +26,13 @@ namespace pmlc::compiler {
 namespace {
 
 static bool isHiddenPass(Pass *pass, Operation *op) {
-  if (pass->getName().startswith("mlir::detail::")) {
+  if (pass->getName().startswith("mlir::detail::"))
     return true;
-  }
   if (auto funcOp = dyn_cast<FuncOp>(op)) {
-    if (funcOp.isExternal()) {
+    if (funcOp.isExternal())
       return true;
-    }
+    if (funcOp.getName() != "main")
+      return true;
   }
   return false;
 }
