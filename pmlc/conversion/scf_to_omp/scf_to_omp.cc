@@ -23,8 +23,7 @@ namespace {
 
 const char *kThreadFuncName = "plaidml_rt_thread_num";
 
-LogicalResult convertSCPParallel(scf::ParallelOp op) {
-  IVLOG(2, "convertSCPParallel");
+LogicalResult convertSCFParallel(scf::ParallelOp op) {
   OpBuilder builder(op);
   auto loc = op.getLoc();
 
@@ -130,7 +129,7 @@ struct LowerSCFToOpenMPPass
   void runOnOperation() final {
     Operation *op = getOperation();
     op->walk([&](scf::ParallelOp op) {
-      if (failed(convertSCPParallel(op))) {
+      if (failed(convertSCFParallel(op))) {
         signalPassFailure();
         return;
       }

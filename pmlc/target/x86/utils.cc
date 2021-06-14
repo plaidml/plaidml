@@ -43,9 +43,9 @@ unsigned getPhysicalCoreNumber() {
     // Get DCP cache info
     cpuId(4, regs);
     unsigned dpcCores = ((regs[0] >> 26) & 0x3f) + 1; // EAX[31:26] + 1
-    bool hyperthreading = cpuFeatures & (1 << 28) && dpcCores < logical;
+    bool hyperThreading = cpuFeatures & (1 << 28) && dpcCores < logical;
     // If HT is enabled, divide the logical cores by 2.
-    if (hyperthreading) {
+    if (hyperThreading) {
       cores = logical / 2;
     }
   } else if (cpuManufacturer == "AuthenticAMD") {

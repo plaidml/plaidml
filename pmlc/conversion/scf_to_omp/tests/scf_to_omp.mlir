@@ -4,7 +4,7 @@ module @get_value {
   // CHECK-LABEL: func @main
   func @main(%arg0: memref<1x1x64x64xf32>, %arg1: memref<1x56x56x64xf32>,
              %arg2: memref<1x56x56x64xf32>) {
-    %cst = constant 0.000000e+00 : f32
+    %cst = constant 0.0 : f32
     %c28 = constant 28 : index
     %c64 = constant 64 : index
     %c56 = constant 56 : index
@@ -26,9 +26,9 @@ module @get_value {
     scf.parallel (%arg3) = (%c0) to (%c56) step (%c1) {
       scf.for %arg4 = %c0 to %c2 step %c1 {
         %1 = muli %arg4, %c28 : index
-        xsmm.gemm.invoke.f32 %0, %arg2[%c0, %1, %arg3, %c0] = 
-          %arg1[%c0, %1, %arg3, %c0], %arg0[%c0, %c0, %c0, %c0] : 
-          (memref<1x56x56x64xf32>, memref<1x1x64x64xf32>) -> 
+        xsmm.gemm.invoke.f32 %0, %arg2[%c0, %1, %arg3, %c0] =
+          %arg1[%c0, %1, %arg3, %c0], %arg0[%c0, %c0, %c0, %c0] :
+          (memref<1x56x56x64xf32>, memref<1x1x64x64xf32>) ->
           memref<1x56x56x64xf32>
       }
       // CHECK: omp.terminator

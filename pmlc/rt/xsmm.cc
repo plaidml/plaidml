@@ -7,14 +7,7 @@
 #include "pmlc/rt/symbol_registry.h"
 #include "pmlc/util/logging.h"
 
-using FunctionPtr = void (*)(const void *, const void *, void *, ...);
-
-extern "C" void plaidml_rt_xsmm_gemm_invoke_f32(int64_t funcAddr, float *a,
-                                                float *b, float *c) {
-  libxsmm_xmmfunction sgemm;
-  sgemm.xmm = reinterpret_cast<FunctionPtr>(funcAddr);
-  sgemm.smm(b, a, c);
-}
+using XmmFunction = void (*)(const void *, const void *, void *, ...);
 
 extern "C" int64_t plaidml_rt_xsmm_gemm_dispatch_f32(int32_t lda, int32_t ldb,
                                                      int32_t ldc, int32_t m,
@@ -34,13 +27,11 @@ extern "C" int64_t plaidml_rt_xsmm_gemm_dispatch_f32(int32_t lda, int32_t ldb,
   return reinterpret_cast<int64_t>(sgemm);
 }
 
-extern "C" void plaidml_rt_xsmm_brgemm_invoke_f32(int64_t funcAddr, float *a,
-                                                  float *b, float *c,
-                                                  int64_t numBatches) {
+extern "C" void plaidml_rt_xsmm_gemm_invoke_f32(int64_t funcAddr, float *a,
+                                                float *b, float *c) {
   libxsmm_xmmfunction sgemm;
-  sgemm.xmm = reinterpret_cast<FunctionPtr>(funcAddr);
-  unsigned long long numBatchesVar = numBatches; // NOLINT
-  sgemm.smrs(b, a, c, &numBatchesVar);
+  sgemm.xmm = reinterpret_cast<XmmFunction>(funcAddr);
+  sgemm.smm(b, a, c);
 }
 
 extern "C" int64_t plaidml_rt_xsmm_brgemm_dispatch_f32(int32_t lda, int32_t ldb,
@@ -63,16 +54,13 @@ extern "C" int64_t plaidml_rt_xsmm_brgemm_dispatch_f32(int32_t lda, int32_t ldb,
   return reinterpret_cast<int64_t>(sgemm);
 }
 
-extern "C" void plaidml_rt_xsmm_brgemm_offs_invoke_f32(
-    int64_t funcAddr, float *a, float *b, float *c, int64_t numBatches,
-    uint64_t *a_offsets, uint64_t *b_offsets) {
+extern "C" void plaidml_rt_xsmm_brgemm_invoke_f32(int64_t funcAddr, float *a,
+                                                  float *b, float *c,
+                                                  int64_t numBatches) {
   libxsmm_xmmfunction sgemm;
-  sgemm.xmm = reinterpret_cast<FunctionPtr>(funcAddr);
-  unsigned long long numBatchesVar = numBatches;                      // NOLINT
-  auto *l_a_offs = reinterpret_cast<unsigned long long *>(a_offsets); // NOLINT
-  auto *l_b_offs = reinterpret_cast<unsigned long long *>(b_offsets); // NOLINT
-
-  sgemm.smro(b, a, c, &numBatchesVar, l_b_offs, l_a_offs);
+  sgemm.xmm = reinterpret_cast<XmmFunction>(funcAddr);
+  unsigned long long numBatchesVar = numBatches; // NOLINT
+  sgemm.smrs(b, a, c, &numBatchesVar);
 }
 
 extern "C" int64_t
@@ -91,6 +79,18 @@ plaidml_rt_xsmm_brgemm_offs_dispatch_f32(int32_t lda, int32_t ldb, int32_t ldc,
       /*flags=*/nullptr, /*prefetch=*/nullptr);
 
   return reinterpret_cast<int64_t>(sgemm);
+}
+
+extern "C" void plaidml_rt_xsmm_brgemm_offs_invoke_f32(
+    int64_t funcAddr, float *a, float *b, float *c, int64_t numBatches,
+    uint64_t *a_offsets, uint64_t *b_offsets) {
+  libxsmm_xmmfunction sgemm;
+  sgemm.xmm = reinterpret_cast<XmmFunction>(funcAddr);
+  unsigned long long numBatchesVar = numBatches;                      // NOLINT
+  auto *l_a_offs = reinterpret_cast<unsigned long long *>(a_offsets); // NOLINT
+  auto *l_b_offs = reinterpret_cast<unsigned long long *>(b_offsets); // NOLINT
+
+  sgemm.smro(b, a, c, &numBatchesVar, l_b_offs, l_a_offs);
 }
 
 extern "C" int64_t

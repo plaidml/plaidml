@@ -39,7 +39,7 @@ void promoteIfEmptyIVs(AffineParallelOp op) {
   // Move the loop body operations, except for its terminator, to the loop's
   // containing block.
   yield.erase();
-  auto &parentOps = op.getOperation()->getBlock()->getOperations();
+  auto &parentOps = op->getBlock()->getOperations();
   parentOps.splice(Block::iterator(op), body->getOperations());
   op.erase();
 }
@@ -97,26 +97,30 @@ void elideSingleIterationIndexes(AffineParallelOp op) {
   op.setSteps(newSteps);
 }
 
-void denestLoops(mlir::AffineParallelOp op) {
-  auto *body = op.getBody();
+void denestLoops(AffineParallelOp op) {
+  Block *body = op.getBody();
+
+  // Only perfectly-nested loops are supported.
   auto inner = dyn_cast<AffineParallelOp>(body->front());
-  if (!inner) {
-    // First op isn't another AffineParallel
+  if (!inner)
     return;
-  }
+
+  // Don't de-nest any affine.parallel loop with tags.
+  if (hasTags(op) || hasTags(inner))
+    return;
+
+  // Fail if inner results is not equal to yield operands.
+  // It would be more robust to handle the case where the order was permuted,
+  // but it's more complicated and not commonly useful.
   auto yield = cast<AffineYieldOp>(body->back());
-  if (yield.operands() != inner.results()) {
-    // Fail if inner results is not equal to yield operands.
-    // It would be more robust to handle the case where the order was permuted,
-    // but it's more complicated and not commonly useful.
+  if (yield.operands() != inner.results())
     return;
-  }
-  if (inner.reductions() != op.reductions()) {
-    // Verify reductions match (sum of max is cannont be denested)
+
+  // Verify reductions match (sum of max is cannont be denested)
+  if (inner.reductions() != op.reductions())
     return;
-  }
-  // Because we have already normalized things, we can presume upper bounds are
-  // simple constant values.  Gather them
+
+  // We can assume normalization has converted upper bounds to constant values.
   auto outerRanges = op.upperBoundsMap().getConstantResults();
   auto innerRanges = inner.upperBoundsMap().getConstantResults();
   // Merge them together
@@ -126,7 +130,7 @@ void denestLoops(mlir::AffineParallelOp op) {
   // Extract reductions
   SmallVector<AtomicRMWKind, 8> reductions;
   for (Attribute attr : op.reductions()) {
-    auto intAttr = attr.dyn_cast<IntegerAttr>();
+    auto intAttr = attr.cast<IntegerAttr>();
     reductions.push_back(*symbolizeAtomicRMWKind(intAttr.getInt()));
   }
   // Make a new AffineParallel right before the current op
@@ -166,10 +170,6 @@ struct AffineNormalizePass : public AffineNormalizeBase<AffineNormalizePass> {
     }
   }
 };
-
-std::unique_ptr<Pass> createAffineNormalizePass() {
-  return std::make_unique<AffineNormalizePass>();
-}
 
 std::unique_ptr<Pass> createAffineNormalizePass(bool promote, bool denest) {
   return std::make_unique<AffineNormalizePass>(promote, denest);

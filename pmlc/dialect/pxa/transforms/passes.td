@@ -84,7 +84,7 @@ def Fusion : FunctionPass<"pxa-fusion"> {
 }
 
 def GPUThread : FunctionPass<"pxa-gpu-thread"> {
-  let summary = "Tile outmost loops for GPU threading";
+  let summary = "Tile outermost loops for GPU threading";
   let constructor = "pmlc::dialect::pxa::createGPUThreadPass()";
   let options = [
     Option<"maxThreads", "max-threads", "unsigned", /*default=*/"64",
@@ -93,7 +93,7 @@ def GPUThread : FunctionPass<"pxa-gpu-thread"> {
 }
 
 def CPUThread : FunctionPass<"pxa-cpu-thread"> {
-  let summary = "Tile outmost loops for CPU threading";
+  let summary = "Tile outermost loops for CPU threading";
   let constructor = "pmlc::dialect::pxa::createCPUThreadPass()";
   let options = [
     Option<"threads", "threads", "unsigned",

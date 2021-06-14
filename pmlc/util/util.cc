@@ -2,14 +2,15 @@
 
 #include "pmlc/util/util.h"
 
-#include "mlir/IR/Builders.h"
-#include "mlir/IR/BuiltinOps.h"
+// #include "mlir/IR/BuiltinOps.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/Support/Process.h"
 
 using namespace mlir; // NOLINT
 
 namespace pmlc::util {
+
+static constexpr StringLiteral kTagAttribute = "tags";
 
 uint64_t getByteSize(MemRefType type) {
   int64_t offset;
@@ -29,50 +30,6 @@ uint64_t getByteSize(MemRefType type) {
   }
   unsigned elem_bytes = llvm::divideCeil(type.getElementTypeBitWidth(), 8);
   return (total + 1) * elem_bytes;
-}
-
-// Check if all tags exist
-bool hasAllTags(Operation *op, ArrayRef<StringRef> tags) {
-  if (tags.empty()) {
-    return true;
-  }
-  DictionaryAttr opTagsAttr = op->getAttrOfType<DictionaryAttr>(kTagAttribute);
-  if (!opTagsAttr) {
-    return false;
-  }
-  for (StringRef tag : tags) {
-    if (!opTagsAttr.get(tag)) {
-      return false;
-    }
-  }
-  return true;
-}
-
-bool hasTag(Operation *op, StringRef tag) {
-  DictionaryAttr opTagsAttr = op->getAttrOfType<DictionaryAttr>(kTagAttribute);
-  if (!opTagsAttr) {
-    return false;
-  }
-  return opTagsAttr.get(tag) != nullptr;
-}
-
-// Set tags in op
-void setTags(Operation *op, ArrayRef<StringRef> tags) {
-  if (tags.empty()) {
-    return;
-  }
-  OpBuilder builder(op);
-  DictionaryAttr opTagsAttr = op->getAttrOfType<DictionaryAttr>(kTagAttribute);
-  SmallVector<NamedAttribute, 4> newTags;
-  if (opTagsAttr) {
-    newTags.append(opTagsAttr.begin(), opTagsAttr.end());
-  }
-  for (StringRef tag : tags) {
-    if (!opTagsAttr || !opTagsAttr.get(tag)) {
-      newTags.emplace_back(builder.getNamedAttr(tag, builder.getUnitAttr()));
-    }
-  }
-  op->setAttr(kTagAttribute, builder.getDictionaryAttr(newTags));
 }
 
 DiagnosticCounter::DiagnosticCounter() : counter(0), threshold(0) {

@@ -1,9 +1,7 @@
 // RUN: pmlc-opt -pxa-fusion="tiled-fusion=true" -pxa-normalize -canonicalize %s | FileCheck %s
 
-#map0 = affine_map<(d0, d1) -> (0, d0, 0, d1)>
-#map1 = affine_map<(d0, d1) -> (0, 0, d0, d1)>
-func @main(%arg0: memref<1x56x56x64xf32>, %arg1: memref<1x1x64x64xf32>, %arg2: memref<64xf32>) -> memref<1x58x58x64xf32> {
-  %cst = constant 0.000000e+00 : f32
+func @resnet_layer(%arg0: memref<1x56x56x64xf32>, %arg1: memref<1x1x64x64xf32>, %arg2: memref<64xf32>) -> memref<1x58x58x64xf32> {
+  %cst = constant 0.0 : f32
   %0 = memref.alloc() : memref<1x56x56x64xf32>
   %1 = affine.parallel (%arg3, %arg4, %arg5) = (0, 0, 0) to (56, 56, 64) reduce ("assign") -> (memref<1x56x56x64xf32>) {
     %8 = pxa.reduce assign %cst, %0[0, %arg3, %arg4, %arg5] : memref<1x56x56x64xf32>
@@ -40,7 +38,13 @@ func @main(%arg0: memref<1x56x56x64xf32>, %arg1: memref<1x1x64x64xf32>, %arg2: m
   }
   return %7 : memref<1x58x58x64xf32>
 }
-
-// CHECK: affine.parallel ({{.*}}, {{.*}}, {{.*}}) = (0, 0, 0) to (58, 58, 64)
-// CHECK: affine.parallel ({{.*}}, {{.*}}) = (0, 0) to (56, 2)
-
+// CHECK-LABEL: func @resnet_layer
+//       CHECK:   affine.parallel ({{.*}}, {{.*}}, {{.*}}) = (0, 0, 0) to (58, 58, 64)
+//       CHECK:   affine.parallel ({{.*}}, {{.*}}) = (0, 0) to (56, 2)
+//       CHECK:     affine.parallel ({{.*}}) = (0) to (56)
+//       CHECK:       affine.parallel ({{.*}}) = (0) to (32)
+//       CHECK:     affine.parallel ({{.*}}, {{.*}}, {{.*}}) = (0, 0, 0) to (56, 32, 64)
+//       CHECK:     affine.parallel ({{.*}}) = (0) to (56)
+//       CHECK:       affine.parallel ({{.*}}) = (0) to (32)
+//       CHECK:     affine.parallel ({{.*}}) = (0) to (56)
+//       CHECK:       affine.parallel ({{.*}}) = (0) to (32)
