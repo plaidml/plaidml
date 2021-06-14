@@ -1,5 +1,5 @@
-// RUN: pmlc-opt -convert-tile-to-pxa -target-llvm_cpu %s | FileCheck %s
-// RUN: pmlc-opt -convert-tile-to-pxa -target-llvm_cpu %s | pmlc-jit | FileCheck %s --check-prefix=JIT
+// RUN: pmlc-opt -convert-tile-to-pxa -target-x86 %s | FileCheck %s
+// RUN: pmlc-opt -convert-tile-to-pxa -target-x86 %s | pmlc-jit | FileCheck %s --check-prefix=JIT
 
 func @main() {
   %c1 = constant 1.0 : f32

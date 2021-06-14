@@ -95,7 +95,7 @@
 //  * `getCost`:
 //    Determine the cost of a proposed tiling. The tiling is provided as
 //    parameters to `getCost` (same as for `transform`):
-//     * `perm`: A `TensorAndIndexPermutation` which gives the IO ops and the
+//     * `perm`: A `StencilPermutation` which gives the IO ops and the
 //       indexes in the same order as `requirements` uses. In particular, this
 //       means all store ops will precede all load ops.
 //     * `tileSizes`: An `ArrayRef<int64_t>` which gives the size of each index
@@ -105,8 +105,8 @@
 //    `std::numeric_limits<double>::infinity()` should be returned.
 //  * `transform`:
 //    Transform `op` based on the already-determined optimal tiling. The tiling
-//    is provided as paramters to `transform` (same as for `getCost`):
-//     * `perm`: A `TensorAndIndexPermutation` which gives the IO ops and the
+//    is provided as parameters to `transform` (same as for `getCost`):
+//     * `perm`: A `StencilPermutation` which gives the IO ops and the
 //       indexes in the same order `requirements` uses. In particular, this
 //       means all store ops will precede all load ops.
 //     * `tileSizes`: An `ArrayRef<int64_t>` which gives the size of each index
@@ -135,15 +135,15 @@ using BlockArgumentSet = llvm::SmallPtrSet<mlir::BlockArgument, 8>;
 // For an index, verifiers for each tensor that the index's strides match it
 using IdxStrideReqs = llvm::SmallVector<std::function<bool(int64_t)>, 3>;
 
-struct TensorAndIndexPermutation {
+struct StencilPermutation {
   // An order of the Tensors and indicies used in an operation
   llvm::SmallVector<mlir::Value, 3> values;
   llvm::SmallVector<mlir::BlockArgument, 8> indexes;
 
-  TensorAndIndexPermutation() = default;
+  StencilPermutation() = default;
 
-  TensorAndIndexPermutation(llvm::ArrayRef<mlir::Value> values,
-                            llvm::ArrayRef<mlir::BlockArgument> indexes)
+  StencilPermutation(llvm::ArrayRef<mlir::Value> values,
+                     llvm::ArrayRef<mlir::BlockArgument> indexes)
       : values(values.begin(), values.end()),
         indexes(indexes.begin(), indexes.end()) {}
 };
@@ -186,10 +186,10 @@ protected:
   // Determine if `op` is eligible for stenciling and capture the IO ops if so
   virtual llvm::Optional<LoadStoreOps> capture() = 0;
   // Determine the cost of the specified stencil
-  virtual double getCost(TensorAndIndexPermutation perm,
+  virtual double getCost(StencilPermutation perm,
                          llvm::ArrayRef<int64_t> tileSize) = 0;
   // Rewrite `op` by applying the specified stencil
-  virtual void transform(TensorAndIndexPermutation perm,
+  virtual void transform(StencilPermutation perm,
                          llvm::ArrayRef<int64_t> tileSize) = 0;
 
   // Get the range of the `idx`th BlockArg
@@ -213,10 +213,10 @@ protected:
   mlir::AffineParallelOp op;
 
 private:
-  void BindIndexes(llvm::ArrayRef<mlir::Value> values);
-  void RecursiveBindIndex(llvm::SmallVector<mlir::BlockArgument, 8> &bound_idxs,
+  void bindIndexes(llvm::ArrayRef<mlir::Value> values);
+  void recursiveBindIndex(llvm::SmallVector<mlir::BlockArgument, 8> &bound_idxs,
                           llvm::ArrayRef<mlir::Value> values);
-  void RecursiveTileIndex(const TensorAndIndexPermutation &perm,
+  void recursiveTileIndex(const StencilPermutation &perm,
                           llvm::MutableArrayRef<int64_t> tileSize,
                           int64_t currIdx);
 
@@ -254,7 +254,7 @@ private:
   // Note: The bestCost, bestPermutation, and bestTiling all must refer to the
   // same permutation & tiling choices and should only be modified together
   double bestCost;
-  TensorAndIndexPermutation bestPermutation;
+  StencilPermutation bestPermutation;
   llvm::SmallVector<int64_t, 8> bestTiling;
 };
 

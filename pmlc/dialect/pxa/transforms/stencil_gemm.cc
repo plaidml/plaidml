@@ -17,9 +17,13 @@
 #include "pmlc/util/matchers.h"
 #include "pmlc/util/tags.h"
 
+// #define ONLY_TILE
+
 using namespace mlir; // NOLINT
 
 namespace pmlc::dialect::pxa {
+
+#ifndef ONLY_TILE
 
 static AffineMap makeTileMap(MLIRContext *context, AffineMap map,
                              ValueRange operands,
@@ -56,6 +60,8 @@ struct GemmOperand {
   }
 };
 
+#endif
+
 class StencilGEMM : public StencilBase {
 private:
   unsigned numThreads;
@@ -88,6 +94,7 @@ private:
     return llvm::None;
   }
 
+#ifndef ONLY_TILE
   // Requirements for additional reduction indices
   // that do not appear in output tensor
   IdxStrideReqs additionalReductionIdxReqs = IdxStrideReqs{
@@ -96,8 +103,7 @@ private:
       [](int64_t stride) { return stride != 0; }, // input1
   };
 
-  bool isAdditionalReductionIndex(const BlockArgument &index,
-                                  ArrayRef<Value> tensor) {
+  bool isAdditionalReductionIndex(BlockArgument index, ArrayRef<Value> tensor) {
     for (size_t i = 0; i < tensor.size(); i++) {
       auto strideInfo = getStrideInfo(tensor[i]);
       auto stride = strideInfo->strides[index];
@@ -107,8 +113,15 @@ private:
     }
     return true;
   }
+#endif
 
-  double getCost(TensorAndIndexPermutation perm, ArrayRef<int64_t> tileSize) {
+  double getCost(StencilPermutation perm, ArrayRef<int64_t> tileSize) {
+#ifdef ONLY_TILE
+    for (int64_t tile : tileSize) {
+      if (tile == 1)
+        return std::numeric_limits<double>::infinity();
+    }
+#endif
     unsigned tot_inner_loop = tileSize[0] * tileSize[1] * tileSize[2];
 
     SmallVector<Type, 3> types;
@@ -232,26 +245,35 @@ private:
         outer_batches * tot_middle_loop * (cost.startupCost + inner_time);
 
     IVLOG(3, "Tile Information:");
-    IVLOG(3, " tile:         "
-                 << "[" << tileSize[0] << " " << tileSize[1] << " "
-                 << tileSize[2] << "]");
-    IVLOG(3, " outer count:  " << outer_batches);
-    IVLOG(3, " middle count: " << tot_middle_loop);
-    IVLOG(3, " startup cost: " << cost.startupCost);
-    IVLOG(3, " inner time:   " << inner_time);
+    IVLOG(3, "  outer count:  " << outer_batches);
+    IVLOG(3, "  middle count: " << tot_middle_loop);
+    IVLOG(3, "  startup cost: " << cost.startupCost);
+    IVLOG(3, "  inner time:   " << inner_time);
     return perf;
   }
 
-  void transform(TensorAndIndexPermutation perm, ArrayRef<int64_t> tileSize) {
+  void transform(StencilPermutation perm, ArrayRef<int64_t> tileSize) {
+#ifdef ONLY_TILE
+
+    SmallVector<int64_t> allTileSizes(op.getNumDims(), 1);
+    for (auto tuple : llvm::zip(perm.indexes, tileSize)) {
+      BlockArgument idx;
+      int64_t size;
+      std::tie(idx, size) = tuple;
+      allTileSizes[idx.getArgNumber()] = size;
+    }
+
+    AffineParallelOp inner = performTiling(op, allTileSizes);
+    setIntegerArrayTag(inner, "stencil", tileSize);
+
+#else
+
     int64_t numBatches = 1;
     int64_t kRange = getIdxRange(perm.indexes[2]);
     IVLOG(3, "kRange: " << kRange);
-    SmallVector<BlockArgument, 4> Aindices, Bindices;
+    SmallVector<BlockArgument, 4> aIndices{perm.indexes[0], perm.indexes[2]};
+    SmallVector<BlockArgument, 4> bIndices{perm.indexes[2], perm.indexes[1]};
     SmallVector<int64_t> numBatchesArr;
-    Aindices.emplace_back(perm.indexes[0]);
-    Aindices.emplace_back(perm.indexes[2]);
-    Bindices.emplace_back(perm.indexes[2]);
-    Bindices.emplace_back(perm.indexes[1]);
 
     // Generate the GEMM op; select inputs based on permutation order
     auto opC = cast<PxaReduceOp>(perm.values[0].getDefiningOp());
@@ -271,16 +293,14 @@ private:
           if (doBatch && j == 2) {
             // We want to transform "regular" pxa.gemm where numBatches is 1:
             // affine.parallel (i, j, k) = (..., 0) to (..., kRange)
-            //                             step (kStep) {
+            //                             step (kStep)
             //   pxa.gemm C[i, j] = A[i, k], B[k, j]: [..., kStep], 1
-            // }
             //
             // to
             //
-            // affine.parallel (i, j, k) = (..., 0) to (..., kRange) step (..,
-            //                             step (kRange) {
-            // pxa.gemm C[i, j] = A[i, k], B[k, j]: [..., kStep], (kRange/64)
-            // }
+            // affine.parallel (i, j, k) = (..., 0) to (..., kRange)
+            //                             step (kRange)
+            //   pxa.gemm C[i, j] = A[i, k], B[k, j]: [..., kStep], (kRange/64)
             //
             // where the number of batches of A and B matrices to multiply is
             // the k loop's range divided by the original step size for the k
@@ -306,8 +326,8 @@ private:
         auto index = op.getBody()->getArgument(i);
         int64_t indexRange = getIdxRange(index);
 
-        Aindices.emplace_back(index);
-        Bindices.emplace_back(index);
+        aIndices.emplace_back(index);
+        bIndices.emplace_back(index);
 
         numBatchesArr.emplace_back(indexRange);
         foundBlockArg = true;
@@ -316,9 +336,8 @@ private:
     }
     op.setSteps(steps);
 
-    // The numbatches array's first element corresponds to the 'k'
-    // index of GEMM. The other reduction indices follow 'k'.
-
+    // The first element of numBatchesArr corresponds to the 'k' index of GEMM.
+    // The other reduction indices follow 'k'.
     numBatchesArr.insert(numBatchesArr.begin(), numBatches);
 
     auto bodyBuilder = op.getBodyBuilder();
@@ -329,8 +348,8 @@ private:
 
     SmallVector<Value, 8> mapOperands;
     GemmOperand c(opC, {perm.indexes[0], perm.indexes[1]}, mapOperands);
-    GemmOperand a(opA, ArrayRef<BlockArgument>(Aindices), mapOperands);
-    GemmOperand b(opB, ArrayRef<BlockArgument>(Bindices), mapOperands);
+    GemmOperand a(opA, aIndices, mapOperands);
+    GemmOperand b(opB, bIndices, mapOperands);
 
     auto brgemm = bodyBuilder.create<pxa::PxaGemmOp>(
         op.getLoc(), c.memref.getType(), //
@@ -344,6 +363,7 @@ private:
 
     opC.result().replaceAllUsesWith(brgemm);
     opC.erase();
+#endif
   }
 
 public:

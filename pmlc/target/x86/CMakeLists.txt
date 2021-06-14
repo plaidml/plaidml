@@ -7,7 +7,6 @@ pml_cc_library(
     heatmap.cc
     heatmap_impl.cc
     pipeline.cc
-    register.cc
     trace_linking.cc
     xsmm_lowering.cc
     utils.cc

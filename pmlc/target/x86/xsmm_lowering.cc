@@ -18,6 +18,7 @@
 #include "pmlc/util/logging.h"
 #include "pmlc/util/matchers.h"
 #include "pmlc/util/strides.h"
+#include "pmlc/util/tags.h"
 #include "pmlc/util/util.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
@@ -27,6 +28,7 @@ namespace pmlc::target::x86 {
 namespace pxa = dialect::pxa;
 namespace stdx = dialect::stdx;
 namespace xsmm = dialect::xsmm;
+using matchers::m_Any;
 
 namespace {
 
@@ -235,7 +237,7 @@ struct PxaGemmOpConversion : public OpConversionPattern<pxa::PxaGemmOp> {
 
 struct DispatchHelper {
   SmallVector<util::StrideArray> strides;
-  SmallVector<uint64_t> leadingDims;
+  SmallVector<int64_t> leadingDims;
 
   DispatchHelper(ValueRange operands, ArrayAttr tileMapsAttr) {
     for (auto tuple : llvm::zip(operands, tileMapsAttr)) {
@@ -283,6 +285,48 @@ static SmallVector<Type> getElementTypes(TypeRange types) {
   }
   return ret;
 }
+
+struct GemmPxaGenericOpConversion
+    : public OpConversionPattern<pxa::PxaGenericOp> {
+  using OpConversionPattern<pxa::PxaGenericOp>::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(pxa::PxaGenericOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
+    if (op.kernel() != "tpp_gemm")
+      return failure();
+    if (op.outputs().size() != 1 || op.inputs().size() != 2)
+      return failure();
+
+    Location loc = op.getLoc();
+    pxa::PxaGenericOp::Adaptor adaptor(operands, op->getAttrDictionary());
+    Type resultType = rewriter.getI64Type();
+    DispatchHelper inputs(adaptor.inputs(), op.input_tile_maps());
+    DispatchHelper outputs(adaptor.outputs(), op.output_tile_maps());
+    IndicesCollector collector(op, rewriter, adaptor);
+    if (!collector.collect(op.output_access_maps()) ||
+        !collector.collect(op.input_access_maps()))
+      return failure();
+
+    ArrayAttr leadingDimsAttr = rewriter.getI64ArrayAttr(ArrayRef<int64_t>{
+        inputs.leadingDims[0], inputs.leadingDims[1], outputs.leadingDims[0]});
+    auto dispatch = rewriter.create<xsmm::GemmDispatchF32Op>(
+        loc, resultType,
+        /*tile=*/op.tile(),
+        /*leadingDims=*/leadingDimsAttr);
+
+    rewriter.create<xsmm::GemmInvokeF32Op>(loc, ArrayRef<Type>(),
+                                           /*ptr=*/dispatch,
+                                           /*c=*/adaptor.outputs()[0],
+                                           /*a=*/adaptor.inputs()[0],
+                                           /*b=*/adaptor.inputs()[1],
+                                           /*indices=*/collector.indices);
+
+    op.replaceAllUsesWith(adaptor.outputs());
+    rewriter.eraseOp(op);
+
+    return success();
+  }
+};
 
 struct UnaryPxaGenericOpConversion
     : public OpConversionPattern<pxa::PxaGenericOp> {
@@ -352,7 +396,7 @@ struct XSMMGemmDispatchF32Lowering
     SmallVector<Value, 6> callOperands;
 
     // lda, ldb, ldc
-    for (auto attr : op.tileld().getValue()) {
+    for (auto attr : op.leadingDims().getValue()) {
       callOperands.push_back(
           rewriter.create<LLVM::ConstantOp>(op->getLoc(), int32Type, attr));
     }
@@ -468,7 +512,7 @@ struct XSMMBRGemmDispatchF32Lowering
     SmallVector<Value, 8> callOperands;
 
     // lda, ldb, ldc
-    for (auto attr : op.tileld().getValue()) {
+    for (auto attr : op.leadingDims().getValue()) {
       callOperands.push_back(
           rewriter.create<LLVM::ConstantOp>(op->getLoc(), int32Type, attr));
     }
@@ -590,7 +634,7 @@ struct XSMMBRGemmOffsDispatchF32Lowering
     SmallVector<Value, 8> callOperands;
 
     // lda, ldb, ldc
-    for (auto attr : op.tileld().getValue()) {
+    for (auto attr : op.leadingDims().getValue()) {
       callOperands.push_back(
           rewriter.create<LLVM::ConstantOp>(op->getLoc(), int32Type, attr));
     }
@@ -931,9 +975,28 @@ struct TppAccess {
   BlockArgument strideOneIV;
 };
 
+static AffineMap makeTileMap(MLIRContext *context, AffineValueMap valueMap,
+                             ArrayRef<BlockArgument> idxs) {
+  SmallVector<AffineExpr, 8> exprs;
+  for (auto value : valueMap.getOperands()) {
+    bool found = false;
+    for (size_t i = 0; i < idxs.size(); i++) {
+      if (value == idxs[i]) {
+        exprs.push_back(getAffineDimExpr(i, context));
+        found = true;
+      }
+    }
+    if (!found) {
+      exprs.push_back(getAffineConstantExpr(0, context));
+    }
+  }
+  auto toIdxs = AffineMap::get(idxs.size(), 0, exprs, context);
+  return valueMap.getAffineMap().compose(toIdxs);
+}
+
 template <typename T>
-static Optional<TppAccess> getTppAccess(MLIRContext *context, T op,
-                                        Block *block,
+static Optional<TppAccess> getTppAccess(T op, Block *block,
+                                        ArrayRef<BlockArgument> tileIdxs,
                                         SmallVectorImpl<Value> &mapOperands) {
   Optional<pxa::RelativeAccessPattern> rap =
       pxa::computeRelativeAccess(op, block);
@@ -955,25 +1018,116 @@ static Optional<TppAccess> getTppAccess(MLIRContext *context, T op,
   if (!strideOneIV)
     return None;
 
-  AffineValueMap innerValueMap;
+  MLIRContext *context = op->getContext();
   AffineValueMap outerValueMap = pxa::convertToValueMap(context, rap->outer);
-  AffineValueMap accessValueMap(op.map(), op.idxs());
-  AffineValueMap::difference(accessValueMap, outerValueMap, &innerValueMap);
+  AffineValueMap innerValueMap = pxa::convertToValueMap(context, rap->inner);
+  AffineMap tileMap = makeTileMap(context, innerValueMap, tileIdxs);
 
   mapOperands.append(outerValueMap.getOperands().begin(),
                      outerValueMap.getOperands().end());
 
-  return TppAccess{outerValueMap.getAffineMap(), innerValueMap.getAffineMap(),
-                   strideOneIV};
+  return TppAccess{outerValueMap.getAffineMap(), tileMap, strideOneIV};
 }
+
+struct TppGemmPattern : public OpRewritePattern<AffineParallelOp> {
+  using OpRewritePattern<AffineParallelOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(AffineParallelOp op,
+                                PatternRewriter &rewriter) const {
+    SmallVector<int64_t> stencil;
+    if (!getIntegerArrayTag(op, "stencil", stencil))
+      return failure();
+
+    IVLOG(1, "stencil: " << stencil);
+
+    Value load1, load2, reduce;
+    Operation *yield = op.getBody()->getTerminator();
+    if (!matchPattern(
+            yield,
+            m_Op<AffineYieldOp>(m_Capture(
+                &reduce,
+                m_PxaReduceOp(
+                    AtomicRMWKind::addf,
+                    m_Op<MulFOp>(m_Capture(&load1, m_Op<pxa::PxaLoadOp>()),
+                                 m_Capture(&load2, m_Op<pxa::PxaLoadOp>())),
+                    m_Any())))) &&
+        !matchPattern(
+            yield,
+            m_Op<AffineYieldOp>(m_Capture(
+                &reduce,
+                m_PxaReduceOp(
+                    AtomicRMWKind::addi,
+                    m_Op<MulIOp>(m_Capture(&load1, m_Op<pxa::PxaLoadOp>()),
+                                 m_Capture(&load2, m_Op<pxa::PxaLoadOp>())),
+                    m_Any()))))) {
+      IVLOG(3, "TppGemmPattern: Pattern not found");
+      return failure();
+    }
+
+    ArrayRef<BlockArgument> ivs = op.getIVs();
+    SmallVector<Value> indices;
+
+    auto reduceOp = cast<pxa::PxaReduceOp>(reduce.getDefiningOp());
+    Optional<TppAccess> output =
+        getTppAccess(reduceOp, op->getBlock(), {ivs[0], ivs[1]}, indices);
+    if (!output) {
+      IVLOG(3, "TppGemmPattern: Failed due to a non-strided access");
+      return failure();
+    }
+
+    auto loadOp1 = cast<pxa::PxaLoadOp>(load1.getDefiningOp());
+    Optional<TppAccess> input1 =
+        getTppAccess(loadOp1, op->getBlock(), {ivs[0], ivs[2]}, indices);
+    if (!input1) {
+      IVLOG(3, "TppGemmPattern: Failed due to a non-strided access");
+      return failure();
+    }
+
+    auto loadOp2 = cast<pxa::PxaLoadOp>(load2.getDefiningOp());
+    Optional<TppAccess> input2 =
+        getTppAccess(loadOp2, op->getBlock(), {ivs[2], ivs[1]}, indices);
+    if (!input2) {
+      IVLOG(3, "TppReluPattern: Failed due to a non-strided access");
+      return failure();
+    }
+
+    // Optional<SmallVector<int64_t, 8>> ranges = op.getConstantRanges();
+    // if (!ranges)
+    //   return failure();
+
+    ArrayAttr tile = rewriter.getI64ArrayAttr(stencil);
+
+    ArrayAttr outputAccessMaps =
+        rewriter.getAffineMapArrayAttr({output->accessMap});
+    ArrayAttr outputTileMaps =
+        rewriter.getAffineMapArrayAttr({output->tileMap});
+
+    ArrayAttr inputAccessMaps =
+        rewriter.getAffineMapArrayAttr({input1->accessMap, input2->accessMap});
+    ArrayAttr inputTileMaps =
+        rewriter.getAffineMapArrayAttr({input1->tileMap, input2->tileMap});
+
+    rewriter.replaceOpWithNewOp<pxa::PxaGenericOp>(
+        op, reduce.getType(),
+        /*inputs=*/ArrayRef<Value>{loadOp1.memref(), loadOp2.memref()},
+        /*outputs=*/ArrayRef<Value>{reduceOp.memref()},
+        /*indices=*/indices,
+        /*input_access_maps=*/inputAccessMaps,
+        /*input_tile_maps=*/inputTileMaps,
+        /*output_access_maps=*/outputAccessMaps,
+        /*output_tile_maps=*/outputTileMaps,
+        /*kernel=*/rewriter.getStringAttr("tpp_gemm"),
+        /*tile=*/tile);
+
+    return success();
+  }
+};
 
 struct TppReluPattern : public OpRewritePattern<AffineParallelOp> {
   using OpRewritePattern<AffineParallelOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(AffineParallelOp op,
                                 PatternRewriter &rewriter) const {
-    using matchers::m_Any;
-
     if (op.getIVs().size() != 2)
       return failure();
 
@@ -998,7 +1152,7 @@ struct TppReluPattern : public OpRewritePattern<AffineParallelOp> {
 
     auto reduceOp = cast<pxa::PxaReduceOp>(reduce.getDefiningOp());
     Optional<TppAccess> output =
-        getTppAccess(context, reduceOp, op->getBlock(), indices);
+        getTppAccess(reduceOp, op->getBlock(), op.getIVs(), indices);
     if (!output) {
       IVLOG(3, "TppReluPattern: Failed due to a non-strided access");
       return failure();
@@ -1006,7 +1160,7 @@ struct TppReluPattern : public OpRewritePattern<AffineParallelOp> {
 
     auto loadOp = cast<pxa::PxaLoadOp>(load.getDefiningOp());
     Optional<TppAccess> input =
-        getTppAccess(context, loadOp, op->getBlock(), indices);
+        getTppAccess(loadOp, op->getBlock(), op.getIVs(), indices);
     if (!input) {
       IVLOG(3, "TppReluPattern: Failed due to a non-strided access");
       return failure();
@@ -1053,7 +1207,9 @@ struct TppPatternsPass : public TppPatternsBase<TppPatternsPass> {
     MLIRContext *context = &getContext();
 
     RewritePatternSet patterns(context);
-    patterns.insert<TppReluPattern>(context);
+    patterns.insert<TppGemmPattern, //
+                    TppReluPattern  //
+                    >(context);
 
     if (failed(
             applyPatternsAndFoldGreedily(getOperation(), std::move(patterns))))
@@ -1065,7 +1221,7 @@ struct TppPatternsPass : public TppPatternsBase<TppPatternsPass> {
 
 void populatePXAGemmToXSMMConversionPatterns(RewritePatternSet &patterns) {
   MLIRContext *context = patterns.getContext();
-  patterns.insert<PxaGemmOpConversion>(context);
+  patterns.insert<GemmPxaGenericOpConversion, PxaGemmOpConversion>(context);
   patterns.insert<UnaryPxaGenericOpConversion>(context, "tpp_relu",
                                                xsmm::UnaryKind::RELU);
 }

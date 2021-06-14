@@ -72,16 +72,14 @@ class XSMM_Op<string mnemonic, list<OpTrait> traits = []>
 }
 
 def XSMM_GemmDispatchF32Op : XSMM_Op<"gemm.dispatch.f32", [NoSideEffect]> {
-  let summary = "query LIBXSMM's code registry based on GEMM shape";
-  let arguments = (ins I64ArrayAttr:$tile, I64ArrayAttr:$tileld);
+  let summary = "Generate a SGEMM kernel for a specific tile shape.";
+  let arguments = (ins I64ArrayAttr:$tile, I64ArrayAttr:$leadingDims);
   let results = (outs I64:$ptr);
-  let printer = ?;
-  let parser = ?;
-  let assemblyFormat = "$tile `,` $tileld attr-dict";
+  let assemblyFormat = "$tile `,` $leadingDims attr-dict";
 }
 
 def XSMM_GemmInvokeF32Op : XSMM_Op<"gemm.invoke.f32"> {
-  let summary = "invoke a previously queried LIBXSMM kernel";
+  let summary = "Invoke a previously generated SGEMM kernel.";
   let arguments = (ins I64:$ptr,
     Arg<F32MemRef, "the C memref to store to", [MemWrite]>:$c,
     Arg<F32MemRef, "the A memref to load from", [MemRead]>:$a,
@@ -98,11 +96,9 @@ def XSMM_GemmInvokeF32Op : XSMM_Op<"gemm.invoke.f32"> {
 
 def XSMM_BRGemmDispatchF32Op : XSMM_Op<"brgemm.dispatch.f32", [NoSideEffect]> {
   let summary = "query LIBXSMM's code registry based on GEMM shape";
-  let arguments = (ins I64ArrayAttr:$tile, I64ArrayAttr:$tileld);
+  let arguments = (ins I64ArrayAttr:$tile, I64ArrayAttr:$leadingDims);
   let results = (outs I64:$ptr);
-  let printer = ?;
-  let parser =  ?;
-  let assemblyFormat = "$tile `,` $tileld attr-dict";
+  let assemblyFormat = "$tile `,` $leadingDims attr-dict";
 }
 
 def XSMM_BRGemmInvokeF32Op : XSMM_Op<"brgemm.invoke.f32"> {
@@ -126,11 +122,9 @@ def XSMM_BRGemmInvokeF32Op : XSMM_Op<"brgemm.invoke.f32"> {
 
 def XSMM_BRGemmOffsDispatchF32Op : XSMM_Op<"brgemm.offs.dispatch.f32", [NoSideEffect]> {
   let summary = "query LIBXSMM's code registry based on GEMM shape";
-  let arguments = (ins I64ArrayAttr:$tile, I64ArrayAttr:$tileld);
+  let arguments = (ins I64ArrayAttr:$tile, I64ArrayAttr:$leadingDims);
   let results = (outs I64:$ptr);
-  let printer = ?;
-  let parser =  ?;
-  let assemblyFormat = "$tile `,` $tileld attr-dict";
+  let assemblyFormat = "$tile `,` $leadingDims attr-dict";
 }
 
 def XSMM_BRGemmOffsInvokeF32Op : XSMM_Op<"brgemm.offs.invoke.f32"> {
@@ -154,7 +148,7 @@ def XSMM_BRGemmOffsInvokeF32Op : XSMM_Op<"brgemm.offs.invoke.f32"> {
 }
 
 def XSMM_UnaryDispatchOp : XSMM_Op<"unary.dispatch", [NoSideEffect]> {
-  let summary = "Generate a unary kernel for a specific tile size.";
+  let summary = "Generate a unary kernel for a specific tile shape.";
   let arguments = (ins
     XSMM_UnaryKind:$kind,
     TypeAttr:$compute_type,

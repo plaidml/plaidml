@@ -5,8 +5,7 @@
 // RUN:     -canonicalize \
 // RUN:     -convert-scf-to-std \
 // RUN:     -x86-convert-std-to-llvm \
-// RUN:     -x86-openmp-workaround | \
-// RUN:   pmlc-jit -e baseline | FileCheck %s
+// RUN:   | pmlc-jit -e baseline | FileCheck %s
 // RUN: pmlc-opt %s \
 // RUN:     -convert-linalg-to-loops \
 // RUN:     -x86-convert-pxa-to-affine \
@@ -14,8 +13,7 @@
 // RUN:     -canonicalize \
 // RUN:     -convert-scf-to-std \
 // RUN:     -x86-convert-std-to-llvm \
-// RUN:     -x86-openmp-workaround | \
-// RUN:   pmlc-jit -e tiled | FileCheck %s
+// RUN:   | pmlc-jit -e tiled | FileCheck %s
 // RUN: pmlc-opt %s \
 // RUN:     -convert-linalg-to-loops \
 // RUN:     -x86-convert-pxa-to-affine \
@@ -23,8 +21,7 @@
 // RUN:     -canonicalize \
 // RUN:     -convert-scf-to-std \
 // RUN:     -x86-convert-std-to-llvm \
-// RUN:     -x86-openmp-workaround | \
-// RUN:   pmlc-jit -e xsmm | FileCheck %s
+// RUN:   | pmlc-jit -e xsmm | FileCheck %s
 // RUN: pmlc-opt %s \
 // RUN:     -convert-linalg-to-loops \
 // RUN:     -x86-convert-pxa-to-affine \
@@ -32,8 +29,7 @@
 // RUN:     -canonicalize \
 // RUN:     -convert-scf-to-std \
 // RUN:     -x86-convert-std-to-llvm \
-// RUN:     -x86-openmp-workaround | \
-// RUN:   pmlc-jit -e xsmm_brgemm_offs | FileCheck %s
+// RUN:   | pmlc-jit -e xsmm_brgemm_offs | FileCheck %s
 
 !I_memref = type memref<1x6x5x7xf32>
 !K_memref = type memref<1x1x7x11xf32>
