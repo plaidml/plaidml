@@ -2,11 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
+#include <limits>
+
+#include "ngraph/opsets/opset.hpp"
 #include "ngraph/opsets/opset4.hpp"
 #include "plaidml/op/op.h"
 #include "plaidml_ops.hpp"
 #include "plaidml_util.hpp"
-#include <limits>
 
 using namespace plaidml;          // NOLINT[build/namespaces]
 using namespace InferenceEngine;  // NOLINT[build/namespaces]
@@ -16,13 +18,12 @@ namespace PlaidMLPlugin {
 void registerGruCell() {
   registerOp("GruCell", [](const Context& ctx) {
     IE_ASSERT(ctx.operands.size() == 5);
-    auto Xt = ctx.operands.at(0);    // input tensor
-    auto Ht_1 = ctx.operands.at(1);  // hidden state tensor
+    auto xt = ctx.operands.at(0);    // input tensor
+    auto ht_1 = ctx.operands.at(1);  // hidden state tensor
     auto W = ctx.operands.at(2);     // weight tensor [3*hidden_size, input_size]
     auto R = ctx.operands.at(3);     // recurrence weight tensor [3*hidden_size, input_size]
     auto B = ctx.operands.at(4);     // bias tensor linear_before_reset ? [4*hidden_size] : [3*hidden_size]
 
-    auto input_size = Xt.compute_shape().sizes().back();
     auto* layer = ngraph::as_type<ngraph::opset4::GRUCell>(ctx.layer);
     auto hidden_size = layer->get_hidden_size();
 
@@ -36,36 +37,38 @@ void registerGruCell() {
 
     auto clip = layer->get_clip();
     auto should_clip = (clip > 0.f) && (clip != std::numeric_limits<float>::infinity());
-
     auto linear_before_reset = layer->get_linear_before_reset();
 
-    auto Wz = op::slice(W).add_dim(0, hidden_size).add_dim(0, input_size);
-    auto Rz = op::slice(R).add_dim(0, hidden_size).add_dim(0, hidden_size);
-    auto Bz = op::slice(B).add_dim(0, hidden_size);
-    auto Tz = op::dot(Xt, op::transpose(Wz)) + op::dot(Ht_1, op::transpose(Rz)) + Bz;
-    auto zt = clip_activation(activation_f, should_clip, clip, Tz);
+    auto hidden_indices = edsl::index({edsl::TensorDim(hidden_size)}, 0);
+    auto xt_w = op::dot(xt, op::transpose(W));
+    auto ht_r = op::dot(ht_1, op::transpose(R));
 
-    auto Wr = op::slice(W).add_dim(hidden_size, 2 * hidden_size).add_dim(0, input_size);
-    auto Rr = op::slice(R).add_dim(hidden_size, 2 * hidden_size).add_dim(0, hidden_size);
-    auto Br = op::slice(B).add_dim(hidden_size, 2 * hidden_size);
-    auto Tr = op::dot(Xt, op::transpose(Wr)) + op::dot(Ht_1, op::transpose(Rr)) + Br;
-    auto rt = clip_activation(activation_f, should_clip, clip, Tr);
+    auto xt_wz = edsl::gather(xt_w, hidden_indices).axis(1);
+    auto ht_rz = edsl::gather(ht_r, hidden_indices).axis(1);
+    auto bz = edsl::gather(B, hidden_indices).axis(0);
+    auto zt = xt_wz + ht_rz + bz;
+    zt = clip_activation(activation_f, should_clip, clip, zt);
 
-    auto Wh = op::slice(W).add_dim(2 * hidden_size, 3 * hidden_size).add_dim(0, input_size);
-    auto Rh = op::slice(R).add_dim(2 * hidden_size, 3 * hidden_size).add_dim(0, hidden_size);
-    edsl::Tensor Th;
+    auto xt_wr = edsl::gather(xt_w, hidden_indices + hidden_size).axis(1);
+    auto ht_rr = edsl::gather(ht_r, hidden_indices + hidden_size).axis(1);
+    auto br = edsl::gather(B, hidden_indices + hidden_size).axis(0);
+    auto rt = xt_wr + ht_rr + br;
+    rt = clip_activation(activation_f, should_clip, clip, rt);
+
+    auto xt_wh = edsl::gather(xt_w, hidden_indices + 2 * hidden_size).axis(1);
+    auto bhw = edsl::gather(B, hidden_indices + 2 * hidden_size).axis(0);
+    edsl::Tensor ht;
     if (linear_before_reset) {
-      auto Bhw = op::slice(B).add_dim(2 * hidden_size, 3 * hidden_size);
-      auto Bhr = op::slice(B).add_dim(3 * hidden_size, 4 * hidden_size);
-      Th = op::dot(Xt, op::transpose(Wh)) + rt * (op::dot(Ht_1, op::transpose(Rh)) + Bhr) + Bhw;
+      auto ht_rh = edsl::gather(ht_r, hidden_indices + 2 * hidden_size).axis(1);
+      auto bhr = edsl::gather(B, hidden_indices + 3 * hidden_size).axis(0);
+      ht = xt_wh + rt * (ht_rh + bhr) + bhw;
     } else {
-      auto Bh = op::slice(B).add_dim(2 * hidden_size, 3 * hidden_size);
-      Th = op::dot(Xt, op::transpose(Wh)) + op::dot(rt * Ht_1, op::transpose(Rh)) + Bh;
+      auto rh = edsl::gather(R, hidden_indices + 2 * hidden_size).axis(0);
+      ht = xt_wh + op::dot(rt * ht_1, op::transpose(rh)) + bhw;
     }
-    auto ht_tilde = clip_activation(activation_g, should_clip, clip, Th);
-    auto Ht = (1 - zt) * ht_tilde + zt * Ht_1;
-
-    return edsl::make_tuple(Ht);
+    ht = clip_activation(activation_g, should_clip, clip, ht);
+    ht = (1 - zt) * ht + zt * ht_1;
+    return edsl::make_tuple(ht);
   });
 }
 

@@ -18,9 +18,9 @@ namespace PlaidMLPlugin {
 void registerLstmCell() {
   registerOp("LstmCell", [](const Context& ctx) {
     IE_ASSERT(ctx.operands.size() == 6);
-    auto Xt = ctx.operands.at(0);    // input tensor
-    auto Ht_1 = ctx.operands.at(1);  // hidden state tensor
-    auto Ct_1 = ctx.operands.at(2);  // cell state tensor
+    auto xt = ctx.operands.at(0);    // input tensor
+    auto ht_1 = ctx.operands.at(1);  // hidden state tensor
+    auto ct_1 = ctx.operands.at(2);  // cell state tensor
     auto W = ctx.operands.at(3);     // weight tensor [4 * hidden_size, input_size]
     auto R = ctx.operands.at(4);     // recurrence weight tensor [4 * hidden_size, input_size]
     auto B = ctx.operands.at(5);     // bias tensor [4 * hidden_size]
@@ -40,7 +40,7 @@ void registerLstmCell() {
     auto clip = layer->get_clip();
     auto should_clip = (clip > 0.f) && (clip != std::numeric_limits<float>::infinity());
 
-    auto gates_output = op::dot(Xt, op::transpose(W)) + op::dot(Ht_1, op::transpose(R)) + op::unsqueeze(B, {0});
+    auto gates_output = op::dot(xt, op::transpose(W)) + op::dot(ht_1, op::transpose(R)) + op::unsqueeze(B, {0});
     auto hidden_indices = edsl::index({edsl::TensorDim(hidden_size)}, 0);
     edsl::Tensor ft = edsl::gather(gates_output, hidden_indices).axis(1);
     edsl::Tensor it = edsl::gather(gates_output, hidden_indices + hidden_size).axis(1);
@@ -51,10 +51,10 @@ void registerLstmCell() {
     ct = clip_activation(activation_g, should_clip, clip, ct);
     ot = clip_activation(activation_f, should_clip, clip, ot);
 
-    auto Ct = ft * Ct_1 + it * ct;
-    auto Ht = ot * clip_activation(activation_h, should_clip, clip, Ct);
+    auto Ct = ft * ct_1 + it * ct;
+    auto Ht = ot * clip_activation(activation_h, false, clip, Ct);
 
-    return edsl::make_tuple(Ct, Ht);
+    return edsl::make_tuple(Ht, Ct);
   });
 }
 
