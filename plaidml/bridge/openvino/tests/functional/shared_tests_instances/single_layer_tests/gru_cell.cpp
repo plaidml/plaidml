@@ -21,9 +21,11 @@ std::vector<size_t> hidden_size{
     10,
 };
 std::vector<size_t> input_size{
-    1,
+    3,
     30,
 };
+// When set `relu` as Gate gate activation and forbid clip, it
+// potentially will get a big error.
 std::vector<std::vector<std::string>> activations = {
     {"relu", "tanh"},
     {"tanh", "sigmoid"},
