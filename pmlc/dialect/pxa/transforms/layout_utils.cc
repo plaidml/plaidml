@@ -275,7 +275,7 @@ void LayoutConverter::convertPxaVectorReduceOp(PxaVectorReduceOp reduceOp) {
 
   mlir::AffineMap newMap = transformAffineMap(reduceOp.getAffineMap());
   mlir::Value reduceRes = builder.create<PxaVectorReduceOp>(
-      reduceOp.getLoc(), reduceOp.getAgg(), reduceOp.vector(),
+      reduceOp.getLoc(), reduceOp.getAgg(), reduceOp.val(),
       reduceOp.getMemRef(), newMap, reduceOp.getMapOperands());
   reduceOp.replaceAllUsesWith(reduceRes);
   workQueue.push_back({reduceRes});

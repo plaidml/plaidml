@@ -223,7 +223,7 @@ struct PxaVectorReduceOpConversion
         op.getLoc(), op.getVectorType(), op.memref(), op.getAffineMap(),
         op.idxs());
     auto reduce =
-        createReduction(rewriter, op.getLoc(), op.agg(), source, op.vector());
+        createReduction(rewriter, op.getLoc(), op.agg(), source, op.val());
     rewriter.create<AffineVectorStoreOp>(op.getLoc(), reduce, op.memref(),
                                          op.getAffineMap(), op.idxs());
     rewriter.replaceOp(op, op.memref());
