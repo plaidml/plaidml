@@ -40,9 +40,11 @@ namespace pmlc::dialect::pxa {
 class ReorderLayoutsPass final : public ReorderLayoutsBase<ReorderLayoutsPass> {
 public:
   ReorderLayoutsPass() = default;
-  explicit ReorderLayoutsPass(bool allowReorder, bool makeUserLayoutsExplicit) {
+  explicit ReorderLayoutsPass(bool allowReorder, bool makeUserLayoutsExplicit,
+                              int64_t datatileSize) {
     this->allowReorder = allowReorder;
     this->makeUserLayoutsExplicit = makeUserLayoutsExplicit;
+    this->datatileSize = datatileSize;
   }
 
   void runOnFunction() {
@@ -52,7 +54,7 @@ public:
 
     if (recognizeConvsAndInsertBlockedDataLayouts) {
       recognizeConvsAndInsertBlockedDataLayouts(func, memLayoutMaps,
-                                                parallelOps);
+                                                parallelOps, datatileSize);
     }
 
     IVLOG(4, "Size of memLayoutMaps after Convolutions are recognized: "
@@ -133,7 +135,8 @@ int intersectTwoSets(llvm::SmallVector<mlir::Value, 4> vec1,
 
 void createBlockedLayoutForInputTensor(
     PxaLoadOp loadOp,
-    mlir::DenseMap<mlir::Value, mlir::AffineMap> &memLayoutMaps) {
+    mlir::DenseMap<mlir::Value, mlir::AffineMap> &memLayoutMaps,
+    int64_t datatileSize) {
   mlir::Value indirectDef = getIndirectDef(loadOp.getMemRef());
   IVLOG(4, "indirectDef: " << mlir::debugString(indirectDef));
 
@@ -142,7 +145,7 @@ void createBlockedLayoutForInputTensor(
   mlir::AffineMap map = loadOp.getAffineMap();
   mlir::MLIRContext *context = map.getContext();
 
-  int64_t blockSize = 16;
+  int64_t blockSize = datatileSize;
   if (shape[3] % blockSize == 0) {
     //
     // *NHWC -> NCHW: newMap: (d0 d1 d2 d3) -> (d0 d3 d1 d2)
@@ -183,7 +186,8 @@ void createBlockedLayoutForInputTensor(
 
 bool createBlockedLayoutForFilterTensor(
     PxaLoadOp loadOp,
-    mlir::DenseMap<mlir::Value, mlir::AffineMap> &memLayoutMaps) {
+    mlir::DenseMap<mlir::Value, mlir::AffineMap> &memLayoutMaps,
+    int64_t datatileSize) {
   mlir::Value indirectDef = getIndirectDef(loadOp.getMemRef());
   IVLOG(4, "indirectDef for filter: " << mlir::debugString(indirectDef));
 
@@ -192,7 +196,7 @@ bool createBlockedLayoutForFilterTensor(
   mlir::AffineMap map = loadOp.getAffineMap();
   mlir::MLIRContext *context = map.getContext();
 
-  int64_t blockSize = 16;
+  int64_t blockSize = datatileSize;
   if (shape[2] % blockSize == 0 && shape[3] % blockSize == 0) {
     // RSCK -> C floordiv 16, K floordiv 16, R, S, C mod 16, K mod 16
     // RSCK -> CKRS (d0 d1 d2 d3) -> (d2 d3 d0 d1)
@@ -240,7 +244,8 @@ bool createBlockedLayoutForFilterTensor(
 void recognizeConvsAndInsertBlockedDataLayouts(
     mlir::FuncOp func,
     mlir::DenseMap<mlir::Value, mlir::AffineMap> &memLayoutMaps,
-    llvm::SmallSet<mlir::AffineParallelOp, 4> &parallelOps) {
+    llvm::SmallSet<mlir::AffineParallelOp, 4> &parallelOps,
+    int64_t datatileSize) {
   IVLOG(4, "Looking for Conv2ds");
   func.walk([&](mlir::AffineParallelOp parallelOp) {
     size_t numLoopsInConv2d = 7;
@@ -322,8 +327,10 @@ void recognizeConvsAndInsertBlockedDataLayouts(
 
           static int count = 0;
           /* if (count < 1) */ {
-            if (createBlockedLayoutForFilterTensor(filter, memLayoutMaps)) {
-              createBlockedLayoutForInputTensor(input, memLayoutMaps);
+            if (createBlockedLayoutForFilterTensor(filter, memLayoutMaps,
+                                                   datatileSize)) {
+              createBlockedLayoutForInputTensor(input, memLayoutMaps,
+                                                datatileSize);
             }
           }
 
@@ -1655,9 +1662,10 @@ std::unique_ptr<mlir::Pass> createReorderLayoutsPass() {
 }
 
 std::unique_ptr<mlir::Pass>
-createReorderLayoutsPass(bool allowReorder, bool makeUserLayoutsExplicit) {
-  return std::make_unique<ReorderLayoutsPass>(allowReorder,
-                                              makeUserLayoutsExplicit);
+createReorderLayoutsPass(bool allowReorder, bool makeUserLayoutsExplicit,
+                         int64_t datatileSize) {
+  return std::make_unique<ReorderLayoutsPass>(
+      allowReorder, makeUserLayoutsExplicit, datatileSize);
 }
 
 } // namespace pmlc::dialect::pxa

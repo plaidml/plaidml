@@ -254,7 +254,8 @@ void pipelineBuilder(OpPassManager &pm) {
 
   pm.addNestedPass<FuncOp>(
       pxa::createReorderLayoutsPass(/*allowReorder*/ true,
-                                    /*makeUserLayoutsExplicit*/ true));
+                                    /*makeUserLayoutsExplicit*/ true,
+                                    /*datatileSize*/ 16));
   pm.addNestedPass<FuncOp>(
       createXSMMStencilPass(/*numThreads=*/1, /*isBatched=*/true));
   pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());

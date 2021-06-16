@@ -65,7 +65,8 @@ std::unique_ptr<mlir::Pass> createSimplifyWithConstraintsPass();
 std::unique_ptr<mlir::Pass> createReorderLayoutsPass();
 std::unique_ptr<mlir::Pass> createReorderLayoutsPass(bool allowReorder);
 std::unique_ptr<mlir::Pass>
-createReorderLayoutsPass(bool allowReorder, bool makeUserLayoutsExplicit);
+createReorderLayoutsPass(bool allowReorder, bool makeUserLayoutsExplicit,
+                         int64_t datatileSize);
 
 std::unique_ptr<mlir::Pass> createVectorizeMemPass();
 
