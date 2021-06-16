@@ -214,7 +214,7 @@ void SimplifyAffineOp<PxaVectorReduceOp>::replaceAffineOp(
     PatternRewriter &rewriter, PxaVectorReduceOp op, AffineMap map,
     ArrayRef<Value> mapOperands) const {
   rewriter.replaceOpWithNewOp<PxaVectorReduceOp>(op, op.getMemRefType(),
-                                                 op.agg(), op.vector(),
+                                                 op.agg(), op.val(),
                                                  op.memref(), map, mapOperands);
 }
 
@@ -441,8 +441,8 @@ void printPxaReduceOp(OpAsmPrinter &p, PxaReduceOp op) {
 // <operation> ::= `pxa.reduce` keyword ssa-use `,` ssa-use `[` ssa-use-list `]`
 //                 attribute-dict? `:` type
 ParseResult parsePxaReduceOp(OpAsmParser &parser, OperationState &result) {
-  auto indexTy = parser.getBuilder().getIndexType();
-  auto i64Ty = parser.getBuilder().getIntegerType(64);
+  IndexType indexTy = parser.getBuilder().getIndexType();
+  IntegerType i64Ty = parser.getBuilder().getIntegerType(64);
   MemRefType type;
   AffineMapAttr mapAttr;
   OpAsmParser::OperandType val, out;
@@ -575,7 +575,7 @@ ParseResult parsePxaGemmOp(OpAsmParser &parser, OperationState &result) {
 void printPxaVectorReduceOp(OpAsmPrinter &p, PxaVectorReduceOp op) {
   p << op->getName() << ' ';
   p << stringifyAtomicRMWKind(op.agg()) << ' ';
-  p << op.vector() << ", ";
+  p << op.val() << ", ";
   p << op.memref() << '[';
   auto mapAttr = op->getAttrOfType<AffineMapAttr>("map");
   p.printAffineMapOfSSAIds(mapAttr, op.idxs());
@@ -584,7 +584,7 @@ void printPxaVectorReduceOp(OpAsmPrinter &p, PxaVectorReduceOp op) {
   p << " : ";
   p.printType(op.memref().getType());
   p << ", ";
-  p.printType(op.vector().getType());
+  p.printType(op.val().getType());
 }
 
 // <operation> ::= `pxa.vector_reduce` keyword ssa-use `,` ssa-use `[`
@@ -654,47 +654,84 @@ void PXADialect::initialize() {
 // ---- PxaGenericOp ----
 //
 
-template <typename Container, typename UnaryFunctor, typename StreamT>
-inline void interleaveComma(Container &c, StreamT &os, UnaryFunctor each_fn) {
-  llvm::interleave(c.begin(), c.end(), each_fn, [&] { os << ", "; });
+void PxaGenericOp::getReads(SmallVectorImpl<PxaReadMemAccess> &reads) {
+  size_t prefix = 0;
+  for (const auto &it : llvm::zip(inputs(), inputAccessMapsAttr())) {
+    Value input;
+    Attribute accessMapAttr;
+    std::tie(input, accessMapAttr) = it;
+    AffineMap accessMap = accessMapAttr.cast<AffineMapAttr>().getValue();
+    size_t count = accessMap.getNumInputs();
+    auto indices = inputIndices().slice(prefix, count);
+    prefix += count;
+    AffineValueMap valueMap(accessMap, indices);
+    reads.emplace_back(PxaReadMemAccess{
+        /*source=*/input,
+        /*target=*/nullptr,
+        /*valueMap=*/valueMap,
+    });
+  }
 }
 
-static size_t printPxaGenericOperands(PxaGenericOp op, OpAsmPrinter &p,
-                                      OperandRange operands,
-                                      ArrayAttr accessMapsAttr,
-                                      ArrayAttr tileMapsAttr, size_t prefix) {
-  auto items =
-      llvm::enumerate(llvm::zip(operands, accessMapsAttr, tileMapsAttr));
-  interleaveComma(items, p, [&](auto it) {
+void PxaGenericOp::getWrites(SmallVectorImpl<PxaWriteMemAccess> &writes) {
+  size_t prefix = 0;
+  for (const auto &it :
+       llvm::zip(outputs(), results(), outputAccessMapsAttr())) {
+    Value output, result;
+    Attribute accessMapAttr;
+    std::tie(output, result, accessMapAttr) = it;
+    AffineMap accessMap = accessMapAttr.cast<AffineMapAttr>().getValue();
+    size_t count = accessMap.getNumInputs();
+    auto indices = outputIndices().slice(prefix, count);
+    prefix += count;
+    AffineValueMap valueMap(accessMap, indices);
+    writes.emplace_back(PxaWriteMemAccess{
+        /*source=*/nullptr,
+        /*target=*/output,
+        /*result=*/result,
+        /*valueMap=*/valueMap,
+        /*reduction=*/AtomicRMWKind::assign, // TODO
+    });
+  }
+}
+
+static void printPxaGenericOperands(OpAsmPrinter &p, OperandRange operands,
+                                    OperandRange indices,
+                                    ArrayAttr accessMapsAttr,
+                                    ArrayAttr tileMapsAttr) {
+  auto items = llvm::zip(operands, accessMapsAttr, tileMapsAttr);
+  size_t prefix = 0;
+  llvm::interleaveComma(items, p, [&](auto it) {
     Value operand;
     Attribute accessMap, tileMap;
-    std::tie(operand, accessMap, tileMap) = it.value();
+    std::tie(operand, accessMap, tileMap) = it;
     p << operand << '[';
     AffineMapAttr accessMapAttr = accessMap.cast<AffineMapAttr>();
     size_t count = accessMapAttr.getValue().getNumInputs();
-    p.printAffineMapOfSSAIds(accessMapAttr,
-                             op.getOperands().slice(prefix, count));
+    p.printAffineMapOfSSAIds(accessMapAttr, indices.slice(prefix, count));
     prefix += count;
     p << "]: " << tileMap;
   });
-  return prefix;
 }
 
 static void printPxaGenericOp(OpAsmPrinter &p, PxaGenericOp op) {
   auto funcType = FunctionType::get(op.getContext(), op.inputs().getTypes(),
                                     op.outputs().getTypes());
-  size_t prefix = op.outputs().size() + op.inputs().size();
   p << op->getName() << ' ';
   p << '(';
-  prefix =
-      printPxaGenericOperands(op, p, op.outputs(), op.output_access_mapsAttr(),
-                              op.output_tile_mapsAttr(), prefix);
-  p << ')';
-  p << " = ";
+  printPxaGenericOperands(p, op.outputs(), op.outputIndices(),
+                          op.outputAccessMapsAttr(), op.outputTileMapsAttr());
+  p << ") <";
+  llvm::interleaveComma(op.reductions(), p, [&](Attribute attr) {
+    Optional<AtomicRMWKind> kind =
+        symbolizeAtomicRMWKind(attr.cast<IntegerAttr>().getInt());
+    p << stringifyAtomicRMWKind(*kind);
+  });
+  p << "> ";
   p.printSymbolName(op.kernel());
   p << '(';
-  printPxaGenericOperands(op, p, op.inputs(), op.input_access_mapsAttr(),
-                          op.input_tile_mapsAttr(), prefix);
+  printPxaGenericOperands(p, op.inputs(), op.inputIndices(),
+                          op.inputAccessMapsAttr(), op.inputTileMapsAttr());
   p << ") tile: " << op.tile();
   p.printOptionalAttrDict(op->getAttrs(),
                           /*elidedAttrs=*/{
@@ -705,6 +742,7 @@ static void printPxaGenericOp(OpAsmPrinter &p, PxaGenericOp op) {
                               PxaGenericOp::getOutputTileMapsAttrName(),
                               PxaGenericOp::getKernelAttrName(),
                               PxaGenericOp::getTileAttrName(),
+                              PxaGenericOp::getReductionsAttrName(),
                           });
   p << " : " << funcType;
 }
@@ -757,6 +795,34 @@ struct GenericOperands {
   }
 };
 
+static ParseResult parseReductions(OpAsmParser &parser,
+                                   OperationState &result) {
+  if (failed(parser.parseLess()))
+    return failure();
+
+  SmallVector<int64_t> reductions;
+  do {
+    llvm::SMLoc loc;
+    StringRef str;
+    if (parser.getCurrentLocation(&loc) || parser.parseKeyword(&str))
+      return failure();
+
+    Optional<AtomicRMWKind> kind = symbolizeAtomicRMWKind(str);
+    if (!kind)
+      return parser.emitError(loc) << "expected valid AtomicRMWKind value";
+
+    reductions.push_back(static_cast<int64_t>(*kind));
+  } while (succeeded(parser.parseOptionalComma()));
+
+  if (failed(parser.parseGreater()))
+    return failure();
+
+  Builder &builder = parser.getBuilder();
+  result.addAttribute(PxaGenericOp::getReductionsAttrName(),
+                      builder.getI64ArrayAttr(reductions));
+  return success();
+}
+
 static ParseResult parsePxaGenericOp(OpAsmParser &parser,
                                      OperationState &result) {
   Builder &builder = parser.getBuilder();
@@ -769,7 +835,7 @@ static ParseResult parsePxaGenericOp(OpAsmParser &parser,
   StringRef tileKeyword = "tile";
   if (outputs.parse(parser, PxaGenericOp::getOutputAccessMapsAttrName(),
                     PxaGenericOp::getOutputTileMapsAttrName(), result) ||
-      parser.parseEqual() ||
+      parseReductions(parser, result) ||
       parser.parseSymbolName(kernel, PxaGenericOp::getKernelAttrName(),
                              result.attributes) ||
       inputs.parse(parser, PxaGenericOp::getInputAccessMapsAttrName(),
@@ -781,20 +847,20 @@ static ParseResult parsePxaGenericOp(OpAsmParser &parser,
       parser.parseColonType(funcType) ||
       parser.resolveOperands(inputs.operands, funcType.getInputs(),
                              parser.getNameLoc(), result.operands) ||
+      parser.resolveOperands(inputs.indices, indexType, result.operands) ||
       parser.resolveOperands(outputs.operands, funcType.getResults(),
                              parser.getNameLoc(), result.operands) ||
       parser.resolveOperands(outputs.indices, indexType, result.operands) ||
-      parser.resolveOperands(inputs.indices, indexType, result.operands) ||
       parser.addTypesToList(funcType.getResults(), result.types))
     return failure();
 
-  result.addAttribute(
-      PxaGenericOp::getOperandSegmentSizeAttr(),
-      builder.getI32VectorAttr({
-          static_cast<int32_t>(inputs.operands.size()),
-          static_cast<int32_t>(outputs.operands.size()),
-          static_cast<int32_t>(inputs.indices.size() + outputs.indices.size()),
-      }));
+  result.addAttribute(PxaGenericOp::getOperandSegmentSizeAttr(),
+                      builder.getI32VectorAttr({
+                          static_cast<int32_t>(inputs.operands.size()),
+                          static_cast<int32_t>(inputs.indices.size()),
+                          static_cast<int32_t>(outputs.operands.size()),
+                          static_cast<int32_t>(outputs.indices.size()),
+                      }));
   return success();
 }
 

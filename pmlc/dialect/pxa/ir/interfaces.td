@@ -5,9 +5,32 @@
 
 include "mlir/IR/OpBase.td"
 
-class PxaOpInterface<string name> : OpInterface<name>;
+def PxaMemoryAccessInterface : OpInterface<"PxaMemoryAccessInterface"> {
+  let description = [{}];
 
-def PxaReadOpInterface : PxaOpInterface<"PxaReadOpInterface"> {
+  let cppNamespace = "pmlc::dialect::pxa";
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/"TBD",
+      /*retTy=*/"void",
+      /*methodName=*/"getReads",
+      /*args=*/(ins "mlir::SmallVectorImpl<PxaReadMemAccess> &":$reads),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{/*no-op*/}]
+    >,
+    InterfaceMethod<
+      /*desc=*/"TBD",
+      /*retTy=*/"void",
+      /*methodName=*/"getWrites",
+      /*args=*/(ins "mlir::SmallVectorImpl<PxaWriteMemAccess> &":$writes),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{/*no-op*/}]
+    >,
+  ];
+}
+
+def PxaReadOpInterface : OpInterface<"PxaReadOpInterface"> {
   let description = [{
       Interface to query characteristics of read-like ops with affine
       restrictions.
@@ -75,7 +98,7 @@ def PxaReadOpInterface : PxaOpInterface<"PxaReadOpInterface"> {
   ];
 }
 
-def PxaReduceOpInterface : PxaOpInterface<"PxaReduceOpInterface"> {
+def PxaReduceOpInterface : OpInterface<"PxaReduceOpInterface"> {
   let description = [{
       Interface to query characteristics of write-like ops with affine
       restrictions.

@@ -232,7 +232,7 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
         } else if (auto ropOp =
                        dyn_cast<PxaVectorReduceOp>(rop.getOperation())) {
           auto nrop = replace.create<PxaVectorReduceOp>(
-              ropOp.getLoc(), ropOp.agg(), ropOp.vector(), ropOp.getMemRef(),
+              ropOp.getLoc(), ropOp.agg(), ropOp.val(), ropOp.getMemRef(),
               vm.getAffineMap(), vm.getOperands());
           ropOp.replaceAllUsesWith(nrop.result());
         }

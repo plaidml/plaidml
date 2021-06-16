@@ -4,7 +4,7 @@
 func @relu(%I: memref<10x20xf32>, %O: memref<10x20xf32>) -> memref<10x20xf32> {
   // CHECK: affine.parallel
   %0 = affine.parallel (%ox, %oy) = (0, 0) to (5, 10) reduce ("assign") -> (memref<10x20xf32>) {
-    // CHECK: pxa.generic (%{{.*}}[%{{.*}} * 2, %{{.*}} * 2]: #{{.*}}) = @tpp_relu(%{{.*}}[%{{.*}} * 2, %{{.*}} * 2]: #{{.*}}) tile: [2, 2] : (memref<10x20xf32>) -> memref<10x20xf32>
+    // CHECK: pxa.generic (%{{.*}}[%{{.*}} * 2, %{{.*}} * 2]: #{{.*}}) <assign> @tpp_relu(%{{.*}}[%{{.*}} * 2, %{{.*}} * 2]: #{{.*}}) tile: [2, 2] : (memref<10x20xf32>) -> memref<10x20xf32>
     %1 = affine.parallel (%ix, %iy) = (0, 0) to (2, 2) reduce ("assign") -> (memref<10x20xf32>) {
       %2 = pxa.load %I[%ix + %ox * 2, %iy + %oy * 2] : memref<10x20xf32>
       %3 = stdx.relu(%2) : (f32) -> f32
@@ -20,7 +20,7 @@ func @relu(%I: memref<10x20xf32>, %O: memref<10x20xf32>) -> memref<10x20xf32> {
 func @resnet_2d(%I: memref<1x7x1x64xf32>, %O: memref<1x7x7x512xf32>) -> memref<1x7x7x512xf32> {
   // CHECK: affine.parallel
   %257 = affine.parallel (%arg3, %arg4) = (0, 0) to (7, 8) reduce ("assign") -> (memref<1x7x7x512xf32>) {
-    // CHECK: pxa.generic (%{{.*}}[0, 0, %{{.*}}, %{{.*}} * 64]: #{{.*}}) = @tpp_relu(%{{.*}}[0, 0, 0, 0]: #{{.*}}) tile: [7, 64] : (memref<1x7x1x64xf32>) -> memref<1x7x7x512xf32>
+    // CHECK: pxa.generic (%{{.*}}[0, 0, %{{.*}}, %{{.*}} * 64]: #{{.*}}) <assign> @tpp_relu(%{{.*}}[0, 0, 0, 0]: #{{.*}}) tile: [7, 64] : (memref<1x7x1x64xf32>) -> memref<1x7x7x512xf32>
     %297 = affine.parallel (%arg113, %arg114) = (0, 0) to (7, 64) reduce ("assign") -> (memref<1x7x7x512xf32>) {
       %298 = pxa.load %I[0, %arg113, 0, %arg114] : memref<1x7x1x64xf32>
       %299 = stdx.relu(%298) : (f32) -> f32
