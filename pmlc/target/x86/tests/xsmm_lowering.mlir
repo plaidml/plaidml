@@ -51,7 +51,7 @@ func @relu(%I: memref<1x56x56x64xf32>, %O: memref<1x56x56x64xf32>) -> memref<1x5
     // CHECK: affine.for
     // CHECK:   affine.for
     // CHECK:     xsmm.unary.invoke
-    %1 = pxa.generic (%O[0, %x, %y, 0]: #tile) = @tpp_relu(%I[0, %x, %y, 0]: #tile) tile: [4, 64]
+    %1 = pxa.generic (%O[0, %x, %y, 0]: #tile) <assign> @tpp_relu(%I[0, %x, %y, 0]: #tile) tile: [4, 64]
       : (memref<1x56x56x64xf32>) -> memref<1x56x56x64xf32>
     affine.yield %1 : memref<1x56x56x64xf32>
   }
