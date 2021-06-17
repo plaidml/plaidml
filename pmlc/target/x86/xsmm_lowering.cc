@@ -251,26 +251,24 @@ struct DispatchHelper {
 };
 
 struct IndicesCollector {
-  pxa::PxaGenericOp op;
+  Location loc;
   ConversionPatternRewriter &rewriter;
-  pxa::PxaGenericOp::Adaptor &adaptor;
   SmallVector<Value> indices;
-  unsigned prefix = 0;
 
-  IndicesCollector(pxa::PxaGenericOp op, ConversionPatternRewriter &rewriter,
-                   pxa::PxaGenericOp::Adaptor &adaptor)
-      : op(op), rewriter(rewriter), adaptor(adaptor) {}
+  IndicesCollector(Location loc, ConversionPatternRewriter &rewriter)
+      : loc(loc), rewriter(rewriter) {}
 
-  bool collect(ArrayAttr arrayAttr) {
+  bool collect(ArrayAttr arrayAttr, ValueRange mapIndices) {
+    unsigned prefix = 0;
     for (Attribute attr : arrayAttr) {
       AffineMap accessMap = attr.cast<AffineMapAttr>().getValue();
-      auto operands = adaptor.indices().slice(prefix, accessMap.getNumInputs());
-      auto expanded =
-          expandAffineMap(rewriter, op.getLoc(), accessMap, operands);
+      size_t count = accessMap.getNumInputs();
+      auto operands = mapIndices.slice(prefix, count);
+      auto expanded = expandAffineMap(rewriter, loc, accessMap, operands);
       if (!expanded)
         return false;
       indices.append(expanded->begin(), expanded->end());
-      prefix += accessMap.getNumInputs();
+      prefix += count;
     }
     return true;
   }
@@ -304,11 +302,11 @@ struct UnaryPxaGenericOpConversion
     Location loc = op.getLoc();
     pxa::PxaGenericOp::Adaptor adaptor(operands, op->getAttrDictionary());
     Type resultType = rewriter.getI64Type();
-    DispatchHelper inputs(adaptor.inputs(), op.input_tile_maps());
-    DispatchHelper outputs(adaptor.outputs(), op.output_tile_maps());
-    IndicesCollector collector(op, rewriter, adaptor);
-    if (!collector.collect(op.output_access_maps()) ||
-        !collector.collect(op.input_access_maps()))
+    DispatchHelper inputs(adaptor.inputs(), op.inputTileMaps());
+    DispatchHelper outputs(adaptor.outputs(), op.outputTileMaps());
+    IndicesCollector collector(loc, rewriter);
+    if (!collector.collect(op.outputAccessMaps(), adaptor.outputIndices()) ||
+        !collector.collect(op.inputAccessMaps(), adaptor.inputIndices()))
       return failure();
 
     SmallVector<Type> inputTypes = getElementTypes(op.inputs().getTypes());
@@ -1032,17 +1030,22 @@ struct TppReluPattern : public OpRewritePattern<AffineParallelOp> {
         rewriter.getAffineMapArrayAttr({input->accessMap});
     ArrayAttr inputTileMaps = rewriter.getAffineMapArrayAttr({input->tileMap});
 
+    ArrayAttr reductions =
+        rewriter.getI64ArrayAttr({static_cast<int64_t>(AtomicRMWKind::assign)});
+
     rewriter.replaceOpWithNewOp<pxa::PxaGenericOp>(
         op, reduce.getType(),
         /*inputs=*/ArrayRef<Value>{loadOp.memref()},
+        /*inputIndices=*/indices,
         /*outputs=*/ArrayRef<Value>{reduceOp.memref()},
-        /*indices=*/indices,
-        /*input_access_maps=*/inputAccessMaps,
-        /*input_tile_maps=*/inputTileMaps,
-        /*output_access_maps=*/outputAccessMaps,
-        /*output_tile_maps=*/outputTileMaps,
+        /*outputIndices=*/indices,
+        /*inputAccessMaps=*/inputAccessMaps,
+        /*inputTileMaps=*/inputTileMaps,
+        /*outputAccessMaps=*/outputAccessMaps,
+        /*outputTileMaps=*/outputTileMaps,
         /*kernel=*/rewriter.getStringAttr("tpp_relu"),
-        /*tile=*/tile);
+        /*tile=*/tile,
+        /*reductions=*/reductions);
 
     return success();
   }
