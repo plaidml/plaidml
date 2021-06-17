@@ -649,6 +649,18 @@ TEST_F(CppEdsl, Convolution) {
   runProgram(program);
 }
 
+TEST_F(CppEdsl, Convolution_NCHW) {
+  auto I = Placeholder(DType::FLOAT32, {1, 64, 56, 56});
+  auto K = Placeholder(DType::FLOAT32, {64, 64, 3, 3});
+  auto program =
+      makeProgram("convolution_nchw", {I, K}, {Convolution2(I, K, /*I_layout=*/"NCHW", /*K_layout=*/"CKHW")});
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.Convolution_NCHW
+  // CHECK: module @convolution
+  // clang-format on
+  runProgram(program);
+}
+
 TEST_F(CppEdsl, ConvolutionConstWeight) {
   auto I = Placeholder(DType::FLOAT32, {1, 56, 56, 64});
 
