@@ -52,10 +52,8 @@ public:
     mlir::DenseMap<mlir::Value, mlir::AffineMap> memLayoutMaps;
     llvm::SmallSet<mlir::AffineParallelOp, 4> parallelOps;
 
-    if (recognizeConvsAndInsertBlockedDataLayouts) {
-      recognizeConvsAndInsertBlockedDataLayouts(func, memLayoutMaps,
-                                                parallelOps, datatileSize);
-    }
+    recognizeConvsAndInsertBlockedDataLayouts(func, memLayoutMaps, parallelOps,
+                                              datatileSize);
 
     IVLOG(4, "Size of memLayoutMaps after Convolutions are recognized: "
                  << memLayoutMaps.size());
