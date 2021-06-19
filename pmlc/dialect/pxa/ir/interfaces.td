@@ -144,7 +144,7 @@ def PxaReadOpInterface : OpInterface<"PxaReadOpInterface"> {
       /*args=*/(ins),
       /*methodBody=*/[{}],
       /*defaultImplementation=*/[{
-        return $_op;
+        return $_op.result();
       }]
     >,
   ];

@@ -33,6 +33,7 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
                                       Block *block) {
     SmallVector<StrideInfo> strides;
     LogicalResult ok = computeMultiDimStrideInfo(orig, operands, strides);
+    (void)ok; // Silence warning in release builds
     assert(succeeded(ok) && "Could not compute stride info");
     SmallVector<StrideInfo, 4> inner;
     for (size_t i = 0; i < strides.size(); i++) {

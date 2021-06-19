@@ -86,11 +86,17 @@ struct FusionInfo {
 
   // Helper method to find the original source write of a state update.
   static Optional<MemAccessOperand> findSourceWrite(Value value) {
-    if (auto op = dyn_cast<PxaGenericOpInterface>(getPrevWriter(value))) {
+    auto opResult = value.cast<OpResult>();
+    Operation *owner = opResult.getOwner();
+    if (auto op = dyn_cast<PxaGenericOpInterface>(owner)) {
       OpOperandVector outputs = op.getOutputOperands();
       if (outputs.size() != 1)
         return None;
       return MemAccessOperand{outputs[0]};
+    }
+    if (auto op = dyn_cast<AffineParallelOp>(owner)) {
+      auto yieldOp = cast<AffineYieldOp>(op.getBody()->getTerminator());
+      return findSourceWrite(yieldOp.getOperand(opResult.getResultNumber()));
     }
     return None;
   }
@@ -444,7 +450,7 @@ struct FusionInfo {
             writeAfterWrites.emplace_back(*write, MemAccessOperand{opOperand});
           }
         } else {
-          user->emitRemark("Op does not implmenet PxaMemoryAccessInterface");
+          user->emitRemark("Op does not implement PxaGenericOpInterface");
           return false;
         }
       }
