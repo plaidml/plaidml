@@ -117,8 +117,9 @@ class Configure:
     def configure_cmake(self, args):
         build_dir = pathlib.Path(f'build-{args.target}').resolve() / args.type
         openvino_dir = build_dir / '_deps/openvino-build'
-        temp_dir = args.temp / args.target
-        fc_dir = temp_dir / 'fc'
+        if args.temp:
+            temp_dir = args.temp / args.target
+            fc_dir = temp_dir / 'fc'
 
         cmd = [
             'cmake',
@@ -139,10 +140,11 @@ class Configure:
             '-DENABLE_SPEECH_DEMO=OFF',
             '-DENABLE_TESTS=ON',
             '-DENABLE_VPU=OFF',
-            f'-DFETCHCONTENT_BASE_DIR={fc_dir}',
             '-DFETCHCONTENT_QUIET=OFF',
             f'-DOUTPUT_ROOT={build_dir}',
         ]
+        if args.temp:
+            cmd.append(f'-DFETCHCONTENT_BASE_DIR={fc_dir}')
         run(cmd, check=True)
 
         run(['ninja', '-C', openvino_dir], check=True)
@@ -155,11 +157,11 @@ class Configure:
             f'-DCMAKE_BUILD_TYPE={args.type}',
             '-DCMAKE_C_COMPILER_LAUNCHER=ccache',
             '-DCMAKE_CXX_COMPILER_LAUNCHER=ccache',
-            f'-DCPM_SOURCE_CACHE={temp_dir / "cpm"}',
-            f'-DFETCHCONTENT_BASE_DIR={fc_dir}',
             '-DFETCHCONTENT_QUIET=OFF',
             f'-DInferenceEngineDeveloperPackage_DIR={openvino_dir}',
         ]
+        if args.temp:
+            cmd.append(f'-DFETCHCONTENT_BASE_DIR={fc_dir}')
         if args.local_llvm:
             cmd.append('-DLOCAL_LLVM_DIR={}'.format(args.local_llvm))
         else:
@@ -187,7 +189,6 @@ def main():
                         help='set the target')
     parser.add_argument('--temp',
                         type=pathlib.Path,
-                        default='/tmp/plaidml',
                         help='Configures the temporary directory for cached assets.')
     args = parser.parse_args()
 

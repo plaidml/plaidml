@@ -11,8 +11,8 @@ func @main(%arg0: memref<1x56x56x64xf32>, %arg1: memref<1x1x64x64xf32>, %arg2: m
   }
   %2 = affine.parallel (%arg3, %arg4) = (0, 0) to (56, 2) reduce ("assign") -> (memref<1x56x56x64xf32>) {
     %8 = affine.parallel (%i, %j, %k) = (0, 0, 0) to (56, 32, 64) reduce ("assign") -> memref<1x56x56x64xf32> {
-      %a = affine.load %arg0[0, %i, %arg3, %k] : memref<1x56x56x64xf32>
-      %b = affine.load %arg1[0, 0, %k, %j + %arg4 * 32] : memref<1x1x64x64xf32>
+      %a = pxa.load %arg0[0, %i, %arg3, %k] : memref<1x56x56x64xf32>
+      %b = pxa.load %arg1[0, 0, %k, %j + %arg4 * 32] : memref<1x1x64x64xf32>
       %c = mulf %a, %b : f32
       %d = pxa.reduce addf %c, %1[0, %i, %arg3, %j + %arg4 * 32] : memref<1x56x56x64xf32>
       affine.yield %d : memref<1x56x56x64xf32>
@@ -43,4 +43,3 @@ func @main(%arg0: memref<1x56x56x64xf32>, %arg1: memref<1x1x64x64xf32>, %arg2: m
 
 // CHECK: affine.parallel ({{.*}}, {{.*}}, {{.*}}) = (0, 0, 0) to (58, 58, 64)
 // CHECK: affine.parallel ({{.*}}, {{.*}}) = (0, 0) to (56, 2)
-
