@@ -285,6 +285,65 @@ struct SimplifyPxaGemmOp : public OpRewritePattern<PxaGemmOp> {
     return success();
   }
 };
+
+struct SimplifyPxaGenericOp : public OpRewritePattern<PxaGenericOp> {
+  using OpRewritePattern<PxaGenericOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(PxaGenericOp op,
+                                PatternRewriter &rewriter) const override {
+    bool needsRewrite = false;
+
+    SmallVector<Value> inputIndices;
+    SmallVector<AffineMap> inputAccessMaps;
+    SmallVector<AffineValueMap> inputValueMaps;
+    inputValueMaps.reserve(op.getNumInputs());
+    op.getAffineValueMaps(op.inputAccessMapsAttr(), op.inputIndices(),
+                          inputValueMaps);
+
+    for (AffineValueMap &valueMap : inputValueMaps) {
+      if (succeeded(valueMap.canonicalize()))
+        needsRewrite = true;
+      inputAccessMaps.push_back(valueMap.getAffineMap());
+      inputIndices.append(valueMap.getOperands().begin(),
+                          valueMap.getOperands().end());
+    }
+
+    SmallVector<Value> outputIndices;
+    SmallVector<AffineMap> outputAccessMaps;
+    SmallVector<AffineValueMap> outputValueMaps;
+    outputValueMaps.reserve(op.getNumOutputs());
+    op.getAffineValueMaps(op.outputAccessMapsAttr(), op.outputIndices(),
+                          outputValueMaps);
+
+    for (AffineValueMap &valueMap : outputValueMaps) {
+      if (succeeded(valueMap.canonicalize()))
+        needsRewrite = true;
+      outputAccessMaps.push_back(valueMap.getAffineMap());
+      outputIndices.append(valueMap.getOperands().begin(),
+                           valueMap.getOperands().end());
+    }
+
+    if (!needsRewrite)
+      return failure();
+
+    rewriter.replaceOpWithNewOp<pxa::PxaGenericOp>(
+        op, op.outputs().getTypes(),
+        /*inputs=*/op.inputs(),
+        /*outputs=*/op.outputs(),
+        /*inputIndices=*/inputIndices,
+        /*outputIndices=*/outputIndices,
+        /*inputAccessMaps=*/rewriter.getAffineMapArrayAttr(inputAccessMaps),
+        /*inputTileMaps=*/op.inputTileMaps(),
+        /*outputAccessMaps=*/rewriter.getAffineMapArrayAttr(outputAccessMaps),
+        /*outputTileMaps=*/op.outputTileMaps(),
+        /*kernel=*/op.kernel(),
+        /*tile=*/op.tile(),
+        /*reductions=*/op.reductions());
+
+    return success();
+  }
+};
+
 } // namespace
 
 // ---- PxaLoadOp ----
@@ -707,6 +766,11 @@ SmallVector<AffineValueMap> PxaGenericOp::getAffineValueMaps() {
 AffineValueMap PxaGenericOp::getTiedAffineValueMap(OpOperand *opOperand) {
   assert(opOperand->getOwner() == this->getOperation());
   return getAffineValueMaps()[opOperand->getOperandNumber()];
+}
+
+void PxaGenericOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
+                                               MLIRContext *context) {
+  patterns.insert<SimplifyPxaGenericOp>(patterns.getContext());
 }
 
 static void printPxaGenericOperands(OpAsmPrinter &p, OperandRange operands,

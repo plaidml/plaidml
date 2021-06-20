@@ -234,8 +234,7 @@ struct PxaGemmOpConversion : public OpConversionPattern<pxa::PxaGemmOp> {
 };
 
 struct DispatchHelper {
-  SmallVector<util::StrideArray> strides;
-  SmallVector<uint64_t> leadingDims;
+  SmallVector<int64_t> leadingDims;
 
   DispatchHelper(ValueRange operands, ArrayAttr tileMapsAttr) {
     for (auto tuple : llvm::zip(operands, tileMapsAttr)) {
@@ -244,7 +243,6 @@ struct DispatchHelper {
       std::tie(operand, tileMapAttr) = tuple;
       AffineMap tileMap = tileMapAttr.cast<AffineMapAttr>().getValue();
       util::StrideArray strideArray = getStrideArray(operand, tileMap);
-      strides.push_back(strideArray);
       leadingDims.push_back(strideArray.strides[0]);
     }
   }
@@ -281,6 +279,49 @@ static SmallVector<Type> getElementTypes(TypeRange types) {
   }
   return ret;
 }
+
+struct GemmPxaGenericOpConversion
+    : public OpConversionPattern<pxa::PxaGenericOp> {
+  using OpConversionPattern<pxa::PxaGenericOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(pxa::PxaGenericOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
+    if (op.kernel() != "tpp_gemm")
+      return failure();
+    if (op.outputs().size() != 1 || op.inputs().size() != 2)
+      return failure();
+
+    Location loc = op.getLoc();
+    pxa::PxaGenericOp::Adaptor adaptor(operands, op->getAttrDictionary());
+    Type resultType = rewriter.getI64Type();
+    DispatchHelper inputs(adaptor.inputs(), op.inputTileMaps());
+    DispatchHelper outputs(adaptor.outputs(), op.outputTileMaps());
+    IndicesCollector collector(loc, rewriter);
+    if (!collector.collect(op.outputAccessMaps(), adaptor.outputIndices()) ||
+        !collector.collect(op.inputAccessMaps(), adaptor.inputIndices()))
+      return failure();
+
+    ArrayAttr leadingDimsAttr = rewriter.getI64ArrayAttr(ArrayRef<int64_t>{
+        inputs.leadingDims[0], inputs.leadingDims[1], outputs.leadingDims[0]});
+    auto dispatch = rewriter.create<xsmm::GemmDispatchF32Op>(
+        loc, resultType,
+        /*tile=*/op.tile(),
+        /*leadingDims=*/leadingDimsAttr);
+
+    rewriter.create<xsmm::GemmInvokeF32Op>(loc, ArrayRef<Type>(),
+                                           /*ptr=*/dispatch,
+                                           /*c=*/adaptor.outputs()[0],
+                                           /*a=*/adaptor.inputs()[0],
+                                           /*b=*/adaptor.inputs()[1],
+                                           /*indices=*/collector.indices);
+
+    op.replaceAllUsesWith(adaptor.outputs());
+    rewriter.eraseOp(op);
+
+    return success();
+  }
+};
 
 struct UnaryPxaGenericOpConversion
     : public OpConversionPattern<pxa::PxaGenericOp> {
@@ -1068,7 +1109,7 @@ struct TppPatternsPass : public TppPatternsBase<TppPatternsPass> {
 
 void populatePXAGemmToXSMMConversionPatterns(RewritePatternSet &patterns) {
   MLIRContext *context = patterns.getContext();
-  patterns.insert<PxaGemmOpConversion>(context);
+  patterns.insert<GemmPxaGenericOpConversion, PxaGemmOpConversion>(context);
   patterns.insert<UnaryPxaGenericOpConversion>(context, "tpp_relu",
                                                xsmm::UnaryKind::RELU);
 }

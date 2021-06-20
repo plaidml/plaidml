@@ -377,6 +377,8 @@ def PxaGenericOp : PXA_OpWithPP<"generic", [
   );
   let results = (outs Variadic<AnyMemRef>:$results);
 
+  let hasCanonicalizer = 1;
+
   let extraClassDeclaration = [{
     void getAffineValueMaps(
       mlir::ArrayAttr accessMaps,

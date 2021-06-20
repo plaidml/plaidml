@@ -17,6 +17,7 @@
 #include "mlir/Support/FileUtilities.h"
 
 #include "pmlc/compiler/registry.h"
+#include "pmlc/util/env.h"
 #include "pmlc/util/logging.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
@@ -26,13 +27,14 @@ namespace pmlc::compiler {
 namespace {
 
 static bool isHiddenPass(Pass *pass, Operation *op) {
-  if (pass->getName().startswith("mlir::detail::")) {
+  if (pass->getName().startswith("mlir::detail::"))
     return true;
-  }
   if (auto funcOp = dyn_cast<FuncOp>(op)) {
-    if (funcOp.isExternal()) {
+    if (funcOp.isExternal())
       return true;
-    }
+    std::string filter = pmlc::util::getEnvVar("PLAIDML_FUNC_FILTER");
+    if (!filter.empty() && funcOp.getName() != filter)
+      return true;
   }
   return false;
 }

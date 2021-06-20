@@ -104,6 +104,11 @@ void denestLoops(mlir::AffineParallelOp op) {
     // First op isn't another AffineParallel
     return;
   }
+
+  // Don't de-nest any affine.parallel loop with tags.
+  if (hasTags(op) || hasTags(inner))
+    return;
+
   auto yield = cast<AffineYieldOp>(body->back());
   if (yield.operands() != inner.results()) {
     // Fail if inner results is not equal to yield operands.
@@ -126,7 +131,7 @@ void denestLoops(mlir::AffineParallelOp op) {
   // Extract reductions
   SmallVector<AtomicRMWKind, 8> reductions;
   for (Attribute attr : op.reductions()) {
-    auto intAttr = attr.dyn_cast<IntegerAttr>();
+    auto intAttr = attr.cast<IntegerAttr>();
     reductions.push_back(*symbolizeAtomicRMWKind(intAttr.getInt()));
   }
   // Make a new AffineParallel right before the current op
