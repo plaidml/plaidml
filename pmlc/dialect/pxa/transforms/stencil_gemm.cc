@@ -243,12 +243,12 @@ private:
   }
 
   void transform(TensorAndIndexPermutation perm, ArrayRef<int64_t> tileSize) {
-    // int64_t numBatches = 1;
+    int64_t kBatches = 1;
     int64_t kRange = getIdxRange(perm.indexes[2]);
     IVLOG(3, "kRange: " << kRange);
     SmallVector<BlockArgument> aIndices{perm.indexes[0], perm.indexes[2]};
     SmallVector<BlockArgument> bIndices{perm.indexes[2], perm.indexes[1]};
-    // SmallVector<int64_t> numBatchesArr;
+    SmallVector<int64_t> batches;
 
     // Generate the GEMM op; select inputs based on permutation order
     auto opC = cast<PxaReduceOp>(perm.values[0].getDefiningOp());
@@ -258,73 +258,65 @@ private:
     // First, modify step size of all tiled indexes
     auto steps = op.getSteps();
     for (size_t i = 0; i < getBlockArgsAsSet().size(); i++) {
-      // bool foundBlockArg = false;
+      bool foundBlockArg = false;
       for (size_t j = 0; j < getTiledIdxCount(); j++) {
         if (perm.indexes[j] == op.getBody()->getArgument(i)) {
           steps[i] *= tileSize[j];
-          // foundBlockArg = true;
+          foundBlockArg = true;
 
           // K index (reduction dimension)
-          // if (doBatch && j == 2) {
-          //   // We want to transform "regular" pxa.gemm where numBatches is 1:
-          //   // affine.parallel (i, j, k) = (..., 0) to (..., kRange)
-          //   //                             step (kStep) {
-          //   //   pxa.gemm C[i, j] = A[i, k], B[k, j]: [..., kStep], 1
-          //   // }
-          //   //
-          //   // to
-          //   //
-          //   // affine.parallel (i, j, k) = (..., 0) to (..., kRange) step
-          //   (..,
-          //   //                             step (kRange) {
-          //   // pxa.gemm C[i, j] = A[i, k], B[k, j]: [..., kStep], (kRange/64)
-          //   // }
-          //   //
-          //   // where the number of batches of A and B matrices to multiply is
-          //   // the k loop's range divided by the original step size for the k
-          //   // loop.
-          //   //
-          //   // Subsequently, kStep is set to kRange. That is, in one step, a
-          //   // block of C is completely computed through reduction of batches
-          //   of
-          //   // A and B matrix multiplies.
-          //   numBatches = kRange / steps[i];
-          //   steps[i] = kRange;
+          if (doBatch && j == 2) {
+            // We want to transform "regular" pxa.generic where kBatches is 1:
+            // affine.parallel (i, j, k) = (..., 0) to (..., kRange)
+            //                             step (kStep)
+            //   pxa.generic C[i, j] = A[i, k], B[k, j]: [..., kStep], 1
+            //
+            // to
+            //
+            // affine.parallel (i, j, k) = (..., 0) to (..., kRange)
+            //                             step (kRange)
+            //   pxa.generic C[i, j] = A[i, k], B[k, j]: [..., kStep],
+            //    (kRange/64)
+            //
+            // where the number of batches of A and B matrices to multiply
+            // is the k loop's range divided by the original step size for
+            // the k loop.
+            //
+            // Subsequently, kStep is set to kRange. That is, in one step, a
+            // block of C is completely computed through reduction of
+            // batches of A and B matrix multiplies.
+            kBatches = kRange / steps[i];
+            steps[i] = kRange;
 
-          //   IVLOG(3, "steps[" << i << "] = " << steps[i]);
-          //   IVLOG(3, "numBatches: " << numBatches);
-          // }
+            IVLOG(3, "steps[" << i << "] = " << steps[i]);
+            IVLOG(3, "kBatches: " << kBatches);
+          }
         }
       }
 
       // Check for additional reduction indices with a range greater than 1
-      // if (doBatch && !foundBlockArg && steps[i] == 1 &&
-      //     getIdxRange(op.getBody()->getArgument(i)) > 1 &&
-      //     isAdditionalReductionIndex(op.getBody()->getArgument(i),
-      //                                ArrayRef<Value>{opC, opA, opB})) {
-      //   auto index = op.getBody()->getArgument(i);
-      //   int64_t indexRange = getIdxRange(index);
+      if (doBatch && !foundBlockArg && steps[i] == 1 &&
+          getIdxRange(op.getBody()->getArgument(i)) > 1 &&
+          isAdditionalReductionIndex(op.getBody()->getArgument(i),
+                                     ArrayRef<Value>{opC, opA, opB})) {
+        auto index = op.getBody()->getArgument(i);
+        int64_t indexRange = getIdxRange(index);
 
-      //   aIndices.emplace_back(index);
-      //   bIndices.emplace_back(index);
+        aIndices.emplace_back(index);
+        bIndices.emplace_back(index);
 
-      //   numBatchesArr.emplace_back(indexRange);
-      //   foundBlockArg = true;
-      //   steps[i] = indexRange;
-      // }
+        batches.emplace_back(indexRange);
+        foundBlockArg = true;
+        steps[i] = indexRange;
+      }
     }
     op.setSteps(steps);
 
-    // The numbatches array's first element corresponds to the 'k'
-    // index of GEMM. The other reduction indices follow 'k'.
-
-    // numBatchesArr.insert(numBatchesArr.begin(), numBatches);
+    // The first element of `batches` corresponds to the GEMM's 'k' index.
+    // Additional reduction indices follow 'k'.
+    batches.insert(batches.begin(), kBatches);
 
     OpBuilder builder = op.getBodyBuilder();
-
-    auto tileAttr = builder.getI64ArrayAttr(tileSize);
-    // auto numBatchesAttr =
-    //     builder.getI64ArrayAttr(ArrayRef<int64_t>(numBatchesArr));
 
     SmallVector<Value> inputIndices, outputIndices;
     GemmOperand c(opC, {perm.indexes[0], perm.indexes[1]}, outputIndices);
@@ -353,7 +345,8 @@ private:
         /*outputAccessMaps=*/outputAccessMaps,
         /*outputTileMaps=*/outputTileMaps,
         /*kernel=*/builder.getStringAttr("tpp_gemm"),
-        /*tile=*/tileAttr,
+        /*tile=*/builder.getI64ArrayAttr(tileSize),
+        /*batches=*/builder.getI64ArrayAttr(batches),
         /*reductions=*/reductions);
 
     opC.result().replaceAllUsesWith(genericOp.getResult(0));

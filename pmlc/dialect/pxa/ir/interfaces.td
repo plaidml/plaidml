@@ -82,7 +82,33 @@ def PxaGenericOpInterface : OpInterface<"PxaGenericOpInterface"> {
       /*retTy=*/"::mlir::AffineValueMap",
       /*methodName=*/"getTiedAffineValueMap",
       /*args=*/(ins "::mlir::OpOperand *":$opOperand)
-    >
+    >,
+    InterfaceMethod<
+      /*desc=*/"Return the input PxaMemAccessOperands.",
+      /*retTy=*/"::mlir::SmallVector<pmlc::dialect::pxa::PxaMemAccessOperand>",
+      /*methodName=*/"getInputMemAccesses",
+      /*args=*/(ins),
+      /*methodBody=*/[{
+        ::mlir::SmallVector<pmlc::dialect::pxa::PxaMemAccessOperand> result;
+        result.reserve($_op.getNumInputs());
+        for (::mlir::OpOperand *operand : $_op.getInputOperands())
+          result.emplace_back(operand);
+        return result;
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/"Return the output PxaMemAccessOperands.",
+      /*retTy=*/"::mlir::SmallVector<pmlc::dialect::pxa::PxaMemAccessOperand>",
+      /*methodName=*/"getOutputMemAccesses",
+      /*args=*/(ins),
+      /*methodBody=*/[{
+        ::mlir::SmallVector<pmlc::dialect::pxa::PxaMemAccessOperand> result;
+        result.reserve($_op.getNumOutputs());
+        for (::mlir::OpOperand *operand : $_op.getOutputOperands())
+          result.emplace_back(operand);
+        return result;
+      }]
+    >,
   ];
 }
 

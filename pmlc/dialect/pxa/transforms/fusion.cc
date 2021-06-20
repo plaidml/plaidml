@@ -25,24 +25,7 @@ namespace pmlc::dialect::pxa {
 
 namespace {
 
-struct MemAccessOperand {
-  OpOperand *opOperand;
-
-  Operation *getOperation() const { return opOperand->getOwner(); }
-  Value getMemRef() const { return opOperand->get(); }
-
-  SmallVector<int64_t> getVectorShape() const {
-    auto op = cast<PxaGenericOpInterface>(getOperation());
-    return op.getTiedVectorShape(opOperand);
-  }
-
-  AffineValueMap getAffineValueMap() const {
-    auto op = cast<PxaGenericOpInterface>(getOperation());
-    return op.getTiedAffineValueMap(opOperand);
-  }
-};
-
-using MemAccessPair = std::pair<MemAccessOperand, MemAccessOperand>;
+using MemAccessPair = std::pair<PxaMemAccessOperand, PxaMemAccessOperand>;
 
 struct FusionInfo {
   struct AffineParallelInfo {
@@ -85,14 +68,14 @@ struct FusionInfo {
         singleOutput(singleOutput) {}
 
   // Helper method to find the original source write of a state update.
-  static Optional<MemAccessOperand> findSourceWrite(Value value) {
+  static Optional<PxaMemAccessOperand> findSourceWrite(Value value) {
     auto opResult = value.cast<OpResult>();
     Operation *owner = opResult.getOwner();
     if (auto op = dyn_cast<PxaGenericOpInterface>(owner)) {
-      OpOperandVector outputs = op.getOutputOperands();
+      SmallVector<PxaMemAccessOperand> outputs = op.getOutputMemAccesses();
       if (outputs.size() != 1)
         return None;
-      return MemAccessOperand{outputs[0]};
+      return outputs[0];
     }
     if (auto op = dyn_cast<AffineParallelOp>(owner)) {
       auto yieldOp = cast<AffineYieldOp>(op.getBody()->getTerminator());
@@ -122,7 +105,7 @@ struct FusionInfo {
 
   // Helper to get a clean version of the strides for a specific op (or fail)
   static bool getStrides(SmallVectorImpl<StrideInfo> &out,
-                         MemAccessOperand access, AffineParallelOp ap) {
+                         PxaMemAccessOperand access, AffineParallelOp ap) {
     SmallVector<StrideInfo> strides;
     if (failed(
             computeMultiDimStrideInfo(access.getAffineValueMap(), strides))) {
@@ -136,7 +119,7 @@ struct FusionInfo {
     return true;
   }
 
-  bool considerPlan(MemAccessOperand opA, MemAccessOperand opB) {
+  bool considerPlan(PxaMemAccessOperand opA, PxaMemAccessOperand opB) {
     // Early exit is we already have a plan
     if (hasPlan)
       return true;
@@ -365,7 +348,7 @@ struct FusionInfo {
   }
 
   Optional<RelativeAccessPattern>
-  computeThisRelativeAccess(MemAccessOperand access) {
+  computeThisRelativeAccess(PxaMemAccessOperand access) {
     return computeRelativeAccess(access.getMemRef(), access.getVectorShape(),
                                  access.getAffineValueMap(),
                                  [&](BlockArgument arg) {
@@ -421,7 +404,7 @@ struct FusionInfo {
     // For each output from loop
     for (OpResult result : aInfo.op.results()) {
       // Find the source write
-      Optional<MemAccessOperand> write = findSourceWrite(result);
+      Optional<PxaMemAccessOperand> write = findSourceWrite(result);
       // If it's not a proper affine reduce, give up
       if (!write) {
         aInfo.op.emitRemark("Not all results can be traced to writes");
@@ -443,11 +426,11 @@ struct FusionInfo {
         // Now we make sure it's a read or a write, if not, we can't do fusion,
         // bail.
         if (auto op = dyn_cast<PxaGenericOpInterface>(user)) {
-          for (OpOperand *opOperand : op.getInputOperands()) {
-            readAfterWrites.emplace_back(*write, MemAccessOperand{opOperand});
+          for (const PxaMemAccessOperand &access : op.getInputMemAccesses()) {
+            readAfterWrites.emplace_back(*write, access);
           }
-          for (OpOperand *opOperand : op.getOutputOperands()) {
-            writeAfterWrites.emplace_back(*write, MemAccessOperand{opOperand});
+          for (const PxaMemAccessOperand &access : op.getOutputMemAccesses()) {
+            writeAfterWrites.emplace_back(*write, access);
           }
         } else {
           user->emitRemark("Op does not implement PxaGenericOpInterface");

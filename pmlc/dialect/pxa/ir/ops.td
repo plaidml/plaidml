@@ -108,31 +108,6 @@ def PxaReduceOp : PxaReduceOpBase<"reduce"> {
   }];
 }
 
-def PxaGemmOp : PXA_OpWithPP<"gemm"> {
-  let arguments = (ins
-    Arg<AnyMemRef, "the C memref to store to", [MemWrite]>:$c,
-    AffineMapAttr:$cAccessMap,
-    AffineMapAttr:$cTileMap,
-    Arg<AnyMemRef, "the A memref to load from", [MemRead]>:$a,
-    AffineMapAttr:$aAccessMap,
-    AffineMapAttr:$aTileMap,
-    Arg<AnyMemRef, "the B memref to load from", [MemRead]>:$b,
-    AffineMapAttr:$bAccessMap,
-    AffineMapAttr:$bTileMap,
-    I64ArrayAttr:$tile,
-    I64ArrayAttr:$numBatches,
-    Variadic<Index>:$mapOperands);
-  let results = (outs AnyMemRef:$out);
-
-  let hasCanonicalizer = 1;
-
-  let extraClassDeclaration = [{
-    operand_range getOperandsForA();
-    operand_range getOperandsForB();
-    operand_range getOperandsForC();
-  }];
-}
-
 def PxaVectorReduceOp : PxaReduceOpBase<"vector_reduce"> {
   let summary = "affine vector reduction operation";
   let arguments = (ins
@@ -373,6 +348,7 @@ def PxaGenericOp : PXA_OpWithPP<"generic", [
     AffineMapArrayAttr:$outputTileMaps,
     StrAttr:$kernel,
     I64ArrayAttr:$tile,
+    OptionalAttr<I64ArrayAttr>:$batches,
     I64ArrayAttr:$reductions
   );
   let results = (outs Variadic<AnyMemRef>:$results);
@@ -407,6 +383,7 @@ def PxaGenericOp : PXA_OpWithPP<"generic", [
     }
     static mlir::StringRef getKernelAttrName() { return "kernel"; }
     static mlir::StringRef getTileAttrName() { return "tile"; }
+    static mlir::StringRef getBatchesAttrName() { return "batches"; }
     static mlir::StringRef getReductionsAttrName() { return "reductions"; }
   }];
 }

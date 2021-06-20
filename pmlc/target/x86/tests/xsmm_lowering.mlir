@@ -66,12 +66,15 @@ func @relu(%I: memref<1x56x56x64xf32>, %O: memref<1x56x56x64xf32>) -> memref<1x5
 #map2 = affine_map<(d0, d1, d2, d3) -> (d2, d3, d0, d1)>
 
 // CHECK-LABEL: func @conv_pad
-//       CHECK:   xsmm.gemm.dispatch.f32 [14, 16, 16], [256, 16, 224]
+//       CHECK:   xsmm.brgemm.offs.dispatch.f32 [14, 16, 16], [256, 16, 224]
 //       CHECK:   affine.for
-//       CHECK:     xsmm.gemm.invoke.f32
+//       CHECK:     xsmm.brgemm.offs.invoke.f32
+//  CHECK-SAME:       aOffsets = [0, 1024, 2048, 64, 1088, 2112, 128, 1152, 2176]
+//  CHECK-SAME:       bOffsets = [0, 3072, 6144, 1024, 4096, 7168, 2048, 5120, 8192]
+//  CHECK-SAME:       numBatches = 9
 func @conv_pad(%I: memref<1x16x16x16xf32>, %K: memref<3x3x16x16xf32>, %O: memref<1x14x14x16xf32>) -> memref<1x14x14x16xf32> {
     %1 = affine.parallel (%x) = (0) to (14) reduce ("assign") -> (memref<1x14x14x16xf32>) {
-      %2 = pxa.generic (%O[0, 0, %x, 0]:#map0) <addf> @tpp_gemm(%I[0, 0, %x, 0]:#map1, %K[0, 0, 0, 0]:#map2) tile: [14, 16, 16]
+      %2 = pxa.generic (%O[0, 0, %x, 0]:#map0) <addf> @tpp_gemm(%I[0, 0, %x, 0]:#map1, %K[0, 0, 0, 0]:#map2) tile: [14, 16, 16] batches: [1, 3, 3]
         : (memref<1x16x16x16xf32>, memref<3x3x16x16xf32>) -> memref<1x14x14x16xf32>
       affine.yield %2 : memref<1x14x14x16xf32>
     }

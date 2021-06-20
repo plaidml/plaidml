@@ -38,7 +38,6 @@ Value getPrevIndirectDef(OpResult def) {
       .Case<PxaReduceOp>([&](auto op) { return op.memref(); })
       .Case<PxaStoreOp>([&](auto op) { return op.memref(); })
       .Case<PxaVectorReduceOp>([&](auto op) { return op.memref(); })
-      .Case<PxaGemmOp>([&](auto op) { return op.c(); })
       .Case<PxaGenericOp>(
           [&](auto op) { return op.outputs()[def.getResultNumber()]; })
       .Case<stdx::ReshapeOp>([&](auto op) { return op.tensor(); })
@@ -56,12 +55,6 @@ Value getNextIndirectUse(mlir::OpOperand &use) {
       .Case<PxaReduceOp>([&](auto op) { return op.result(); })
       .Case<PxaStoreOp>([&](auto op) { return op.result(); })
       .Case<PxaVectorReduceOp>([&](auto op) { return op.result(); })
-      .Case<PxaGemmOp>([&](auto op) {
-        if (op.getOperand(use.getOperandNumber()) == op.c()) {
-          return op.out();
-        }
-        return Value();
-      })
       .Case<PxaGenericOp>([&](auto op) {
         if (use.getOperandNumber() >= op.getNumInputs() &&
             use.getOperandNumber() < op.getNumInputs() + op.getNumOutputs())

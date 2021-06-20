@@ -15,3 +15,19 @@ OpOperandVector::operator SmallVector<Value>() {
 }
 
 } // namespace mlir
+
+using namespace mlir; // NOLINT
+
+namespace pmlc::dialect::pxa {
+
+SmallVector<int64_t> PxaMemAccessOperand::getVectorShape() const {
+  auto op = cast<PxaGenericOpInterface>(getOperation());
+  return op.getTiedVectorShape(opOperand);
+}
+
+AffineValueMap PxaMemAccessOperand::getAffineValueMap() const {
+  auto op = cast<PxaGenericOpInterface>(getOperation());
+  return op.getTiedAffineValueMap(opOperand);
+}
+
+} // namespace pmlc::dialect::pxa
