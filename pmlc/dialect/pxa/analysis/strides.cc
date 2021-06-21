@@ -216,7 +216,7 @@ StrideRange StrideInfo::range() const {
 
 AffineValueExpr StrideInfo::toValueExpr(MLIRContext *ctx) const {
   typedef std::pair<unsigned, unsigned> nestedArgNumber;
-  std::map<nestedArgNumber, mlir::BlockArgument> ordered;
+  std::map<nestedArgNumber, BlockArgument> ordered;
 
   for (auto kvp : strides) {
     unsigned loopDepth = 0;
@@ -398,17 +398,22 @@ Optional<StrideInfo> computeStrideInfo(AffineExpr expr, ValueRange args) {
   return None;
 }
 
-Optional<SmallVector<StrideInfo, 4>> computeStrideInfo(AffineMap map,
-                                                       ValueRange args) {
-  SmallVector<StrideInfo, 4> results;
+LogicalResult computeMultiDimStrideInfo(AffineMap map, ValueRange args,
+                                        SmallVectorImpl<StrideInfo> &results) {
   for (auto expr : map.getResults()) {
     auto dimStride = computeStrideInfo(expr, args);
     if (!dimStride) {
-      return None;
+      return failure();
     }
     results.push_back(*dimStride);
   }
-  return results;
+  return success();
+}
+
+LogicalResult computeMultiDimStrideInfo(const AffineValueMap &valueMap,
+                                        SmallVectorImpl<StrideInfo> &out) {
+  return computeMultiDimStrideInfo(valueMap.getAffineMap(),
+                                   valueMap.getOperands(), out);
 }
 
 Optional<StrideInfo> computeStrideInfo(MemRefType memRefType, AffineMap map,
@@ -470,35 +475,79 @@ Optional<StrideInfo> computeStrideInfo(PxaVectorReduceOp op) {
 }
 
 Optional<RelativeAccessPattern>
+computeRelativeAccess(Value memref, ArrayRef<int64_t> vectorShape,
+                      const AffineValueMap &valueMap, Block *block) {
+  return computeRelativeAccess(
+      memref, vectorShape, valueMap, [block](BlockArgument arg) {
+        return getBoundaryRegion(arg.getOwner(), block);
+      });
+}
+
+Optional<RelativeAccessPattern>
+computeRelativeAccess(Value memref, ArrayRef<int64_t> vectorShape,
+                      const AffineValueMap &valueMap,
+                      BlockArgumentBoundaryFn fn) {
+  SmallVector<StrideInfo> strides;
+  if (failed(computeMultiDimStrideInfo(valueMap, strides)))
+    return None;
+
+  RelativeAccessPattern ret(memref);
+  for (auto it : llvm::zip(strides, vectorShape)) {
+    StrideInfo &si = std::get<0>(it);
+    int64_t vectorSize = std::get<1>(it);
+
+    ret.outer.push_back(si.outer(fn));
+    StrideInfo inner = si.inner(fn);
+    ret.inner.push_back(inner);
+
+    StrideRange range = inner.range();
+    if (vectorSize > 1) {
+      range += StrideRange{0, vectorSize - 1, 1};
+    }
+
+    if (!range.valid || range.minVal != 0)
+      return None;
+
+    ret.innerRanges.push_back(range);
+    ret.wholeInnerCount.push_back(range.maxVal - range.minVal + 1);
+    ret.innerCount.push_back(range.count());
+  }
+  return ret;
+}
+
+Optional<RelativeAccessPattern>
 computeRelativeAccess(Operation *op, BlockArgumentBoundaryFn fn) {
   ArrayRef<int64_t> vecSize;
   Value memref;
-  using MaybeStrides = Optional<SmallVector<StrideInfo, 4>>;
-  auto maybeStrides =
-      TypeSwitch<Operation *, MaybeStrides>(op)
+  SmallVector<StrideInfo> strides;
+  LogicalResult ok =
+      TypeSwitch<Operation *, LogicalResult>(op)
           .Case<PxaLoadOp>([&](auto op) {
             memref = op.memref();
-            return computeStrideInfo(op.getAffineMap(), op.getMapOperands());
+            return computeMultiDimStrideInfo(op.getAffineMap(),
+                                             op.getMapOperands(), strides);
           })
           .Case<PxaReduceOp>([&](auto op) {
             memref = op.memref();
-            return computeStrideInfo(op.getAffineMap(), op.getMapOperands());
+            return computeMultiDimStrideInfo(op.getAffineMap(),
+                                             op.getMapOperands(), strides);
           })
           .Case<PxaVectorLoadOp>([&](auto op) {
             memref = op.memref();
             vecSize = op.getVectorType().getShape();
-            return computeStrideInfo(op.getAffineMap(), op.getMapOperands());
+            return computeMultiDimStrideInfo(op.getAffineMap(),
+                                             op.getMapOperands(), strides);
           })
           .Case<PxaVectorReduceOp>([&](auto op) {
             memref = op.memref();
             vecSize = op.getVectorType().getShape();
-            return computeStrideInfo(op.getAffineMap(), op.getMapOperands());
+            return computeMultiDimStrideInfo(op.getAffineMap(),
+                                             op.getMapOperands(), strides);
           })
-          .Default([](auto op) { return None; });
-  if (!maybeStrides) {
+          .Default([](auto op) { return failure(); });
+  if (failed(ok)) {
     return None;
   }
-  auto &strides = *maybeStrides;
   RelativeAccessPattern ret(memref);
   for (size_t i = 0; i < strides.size(); i++) {
     auto outer = strides[i].outer(fn);
