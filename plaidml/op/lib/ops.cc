@@ -3,6 +3,7 @@
 #include "plaidml/op/lib/ops.h"
 
 #include <algorithm>
+#include <cmath>
 #include <functional>
 #include <set>
 #include <utility>
@@ -1721,12 +1722,13 @@ Value gatherND(const Value& value) {
       // When the index is out of bounds, gather the data as if it was zero padded.
       // Pad both upper and lower boundaries for every interpolated dimensions with one zero.
       // TODO: support dynamic padding length and support any out-of-bounds index.
+      int pad_length = 2;
       std::vector<int> pads(I_rank, 0);
       for (auto i = 0; i < idx_shape.back(); i++) {
-        pads[i + batch_dims] = 1;
+        pads[i + batch_dims] = pad_length;
       }
       edsl::Tensor X = op::explicit_padding(I, pads, pads).padval(edsl::Tensor(0));
-      auto Y = idx + 1;
+      auto Y = idx + pad_length;
       if (idx_shape.size() - batch_dims != 2) {
         throw std::runtime_error(
             " Indices dimension should be batch_dims plus two in interpolated gatherND, please reshape indices to "
