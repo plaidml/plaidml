@@ -7,30 +7,12 @@
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/OpDefinition.h"
 
-namespace pmlc::dialect::pxa {
+namespace mlir {
 
-struct PxaReadMemAccess {
-  mlir::Value source;
-  mlir::Value target;
-  mlir::AffineValueMap valueMap;
-
-  mlir::MemRefType getMemRefType() {
-    return source.getType().cast<mlir::MemRefType>();
-  }
+struct OpOperandVector : public SmallVector<OpOperand *> {
+  operator SmallVector<Value>();
 };
 
-struct PxaWriteMemAccess {
-  mlir::Value source;
-  mlir::Value target;
-  mlir::Value result;
-  mlir::AffineValueMap valueMap;
-  mlir::AtomicRMWKind reduction;
-
-  mlir::MemRefType getMemRefType() {
-    return target.getType().cast<mlir::MemRefType>();
-  }
-};
-
-} // namespace pmlc::dialect::pxa
+} // namespace mlir
 
 #include "pmlc/dialect/pxa/ir/interfaces.h.inc"

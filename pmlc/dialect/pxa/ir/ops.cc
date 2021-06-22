@@ -654,45 +654,59 @@ void PXADialect::initialize() {
 // ---- PxaGenericOp ----
 //
 
-void PxaGenericOp::getReads(SmallVectorImpl<PxaReadMemAccess> &reads) {
+OpOperandVector PxaGenericOp::getInputOperands() {
+  int64_t numInputs = getNumInputs();
+  OpOperandVector result;
+  result.reserve(numInputs);
+  for (OpOperand &opOperand :
+       getOperation()->getOpOperands().take_front(numInputs)) {
+    result.push_back(&opOperand);
+  }
+  return result;
+}
+
+OpOperandVector PxaGenericOp::getOutputOperands() {
+  int64_t numOutputs = getNumOutputs();
+  OpOperandVector result;
+  result.reserve(numOutputs);
+  MutableArrayRef<OpOperand> opOperands = getOperation()->getOpOperands();
+  for (OpOperand &opOperand :
+       opOperands.drop_front(getNumInputs()).take_front(numOutputs)) {
+    result.push_back(&opOperand);
+  }
+  return result;
+}
+
+SmallVector<int64_t> PxaGenericOp::getTiedVectorShape(OpOperand *opOperand) {
+  assert(opOperand->getOwner() == this->getOperation());
+  auto type = opOperand->get().getType().cast<MemRefType>();
+  return SmallVector<int64_t>{type.getRank(), 1};
+}
+
+void PxaGenericOp::getAffineValueMaps(
+    ArrayAttr accessMaps, OperandRange mapOperands,
+    SmallVectorImpl<AffineValueMap> &results) {
   size_t prefix = 0;
-  for (const auto &it : llvm::zip(inputs(), inputAccessMapsAttr())) {
-    Value input;
-    Attribute accessMapAttr;
-    std::tie(input, accessMapAttr) = it;
+  for (Attribute accessMapAttr : accessMaps) {
     AffineMap accessMap = accessMapAttr.cast<AffineMapAttr>().getValue();
     size_t count = accessMap.getNumInputs();
-    auto indices = inputIndices().slice(prefix, count);
+    AffineValueMap valueMap(accessMap, mapOperands.slice(prefix, count));
+    results.emplace_back(valueMap);
     prefix += count;
-    AffineValueMap valueMap(accessMap, indices);
-    reads.emplace_back(PxaReadMemAccess{
-        /*source=*/input,
-        /*target=*/nullptr,
-        /*valueMap=*/valueMap,
-    });
   }
 }
 
-void PxaGenericOp::getWrites(SmallVectorImpl<PxaWriteMemAccess> &writes) {
-  size_t prefix = 0;
-  for (const auto &it :
-       llvm::zip(outputs(), results(), outputAccessMapsAttr())) {
-    Value output, result;
-    Attribute accessMapAttr;
-    std::tie(output, result, accessMapAttr) = it;
-    AffineMap accessMap = accessMapAttr.cast<AffineMapAttr>().getValue();
-    size_t count = accessMap.getNumInputs();
-    auto indices = outputIndices().slice(prefix, count);
-    prefix += count;
-    AffineValueMap valueMap(accessMap, indices);
-    writes.emplace_back(PxaWriteMemAccess{
-        /*source=*/nullptr,
-        /*target=*/output,
-        /*result=*/result,
-        /*valueMap=*/valueMap,
-        /*reduction=*/AtomicRMWKind::assign, // TODO
-    });
-  }
+SmallVector<AffineValueMap> PxaGenericOp::getAffineValueMaps() {
+  SmallVector<AffineValueMap> result;
+  result.reserve(inputs().size() + outputs().size());
+  getAffineValueMaps(inputAccessMapsAttr(), inputIndices(), result);
+  getAffineValueMaps(outputAccessMapsAttr(), outputIndices(), result);
+  return result;
+}
+
+AffineValueMap PxaGenericOp::getTiedAffineValueMap(OpOperand *opOperand) {
+  assert(opOperand->getOwner() == this->getOperation());
+  return getAffineValueMaps()[opOperand->getOperandNumber()];
 }
 
 static void printPxaGenericOperands(OpAsmPrinter &p, OperandRange operands,
@@ -847,9 +861,9 @@ static ParseResult parsePxaGenericOp(OpAsmParser &parser,
       parser.parseColonType(funcType) ||
       parser.resolveOperands(inputs.operands, funcType.getInputs(),
                              parser.getNameLoc(), result.operands) ||
-      parser.resolveOperands(inputs.indices, indexType, result.operands) ||
       parser.resolveOperands(outputs.operands, funcType.getResults(),
                              parser.getNameLoc(), result.operands) ||
+      parser.resolveOperands(inputs.indices, indexType, result.operands) ||
       parser.resolveOperands(outputs.indices, indexType, result.operands) ||
       parser.addTypesToList(funcType.getResults(), result.types))
     return failure();
@@ -857,8 +871,8 @@ static ParseResult parsePxaGenericOp(OpAsmParser &parser,
   result.addAttribute(PxaGenericOp::getOperandSegmentSizeAttr(),
                       builder.getI32VectorAttr({
                           static_cast<int32_t>(inputs.operands.size()),
-                          static_cast<int32_t>(inputs.indices.size()),
                           static_cast<int32_t>(outputs.operands.size()),
+                          static_cast<int32_t>(inputs.indices.size()),
                           static_cast<int32_t>(outputs.indices.size()),
                       }));
   return success();

@@ -992,11 +992,11 @@ struct TppReluPattern : public OpRewritePattern<AffineParallelOp> {
       return failure();
 
     MLIRContext *context = rewriter.getContext();
-    SmallVector<Value> indices;
+    SmallVector<Value> inputIndices, outputIndices;
 
     auto reduceOp = cast<pxa::PxaReduceOp>(reduce.getDefiningOp());
     Optional<TppAccess> output =
-        getTppAccess(context, reduceOp, op->getBlock(), indices);
+        getTppAccess(context, reduceOp, op->getBlock(), outputIndices);
     if (!output) {
       IVLOG(3, "TppReluPattern: Failed due to a non-strided access");
       return failure();
@@ -1004,7 +1004,7 @@ struct TppReluPattern : public OpRewritePattern<AffineParallelOp> {
 
     auto loadOp = cast<pxa::PxaLoadOp>(load.getDefiningOp());
     Optional<TppAccess> input =
-        getTppAccess(context, loadOp, op->getBlock(), indices);
+        getTppAccess(context, loadOp, op->getBlock(), inputIndices);
     if (!input) {
       IVLOG(3, "TppReluPattern: Failed due to a non-strided access");
       return failure();
@@ -1036,9 +1036,9 @@ struct TppReluPattern : public OpRewritePattern<AffineParallelOp> {
     rewriter.replaceOpWithNewOp<pxa::PxaGenericOp>(
         op, reduce.getType(),
         /*inputs=*/ArrayRef<Value>{loadOp.memref()},
-        /*inputIndices=*/indices,
         /*outputs=*/ArrayRef<Value>{reduceOp.memref()},
-        /*outputIndices=*/indices,
+        /*inputIndices=*/inputIndices,
+        /*outputIndices=*/outputIndices,
         /*inputAccessMaps=*/inputAccessMaps,
         /*inputTileMaps=*/inputTileMaps,
         /*outputAccessMaps=*/outputAccessMaps,
