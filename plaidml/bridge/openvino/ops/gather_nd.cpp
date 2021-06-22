@@ -19,7 +19,7 @@ void registerGatherND() {
     auto IX = ctx.operands.at(1);
     auto batchDims = layer->get_batch_dims();
 
-    edsl::Tensor O = edsl::gather(I, IX).mode(edsl::GatherMode::ND).batchDims(batchDims);
+    edsl::Tensor O = op::gatherND(I, IX).batchDims(batchDims);
     // Reshape leading 'batchDims' into one by multiplying them.
     auto shape = O.compute_shape().sizes();
     size_t firstDim = 1;

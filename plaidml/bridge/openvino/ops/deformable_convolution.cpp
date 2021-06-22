@@ -166,7 +166,7 @@ edsl::Tensor compute_deformable_convolution(edsl::Tensor I,                  //
     }
     deformed_index_coord_vec[i] = op::concatenate(concat_vec, rank);
     deformed_index_coord_vec[i] = edsl::cast(deformed_index_coord_vec[i], DType::INT32);
-    deformed_input_vec[i] = edsl::gather(I, deformed_index_coord_vec[i]).mode(edsl::GatherMode::ND).batchDims(2);
+    deformed_input_vec[i] = op::gatherND(I, deformed_index_coord_vec[i]).batchDims(2);
   }
   for (auto i = 0; i < rank - 2; ++i) {
     deformed_index_vec_ceil[i] = op::squeeze(deformed_index_vec_ceil[i], {-1});

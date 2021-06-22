@@ -102,16 +102,11 @@ struct GatherOp : Intrinsic {
   TensorShapes getShapes(Evaluator *evaluator, ArrayRef<ExprNodePtr> operands,
                          ArrayRef<TensorShape> shapes) const final {
     auto operands_size = operands.size();
-    if (operands_size != 8) {
-      throw std::runtime_error("'gather' requires eight arguments.");
+    if (operands_size != 9) {
+      throw std::runtime_error("'gather' requires nine arguments.");
     }
     auto tensor = shapes[0];
     auto idxs = shapes[1];
-    if (isDataTypeFloat(idxs.elementType) &&
-        !isDataTypeFloat(tensor.elementType)) {
-      throw std::runtime_error("'gather' interpolation modes require tensor "
-                               "elements to be floats.");
-    }
     int64_t rank = tensor.getRank();
     if (!rank) {
       throw std::runtime_error(
@@ -157,6 +152,13 @@ struct GatherOp : Intrinsic {
     if (!batchDims) {
       throw std::runtime_error(
           "'gather' primitive expects the 'batchDims' argument "
+          "to be a constant integer");
+    }
+
+    auto outOfBoundsMode = getIntegerValue(evaluator, operands[8]);
+    if (!outOfBoundsMode) {
+      throw std::runtime_error(
+          "'gather' primitive expects the 'outOfBoundsMode' argument "
           "to be a constant integer");
     }
 
