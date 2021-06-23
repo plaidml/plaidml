@@ -11,8 +11,8 @@ using namespace LayerTestsDefinitions;
 
 namespace {
 std::vector<bool> should_decompose{
-    // true will decompose rnn cell to component ops and
-    // skip plaidml plugin implementation, only set to false here
+    // true will decompose GRUCell to component ops and skip plaidml GRUCell implementation
+    true,
     false,
 };
 std::vector<size_t> batch{5};
@@ -21,7 +21,7 @@ std::vector<size_t> hidden_size{
     10,
 };
 std::vector<size_t> input_size{
-    3,
+    1,
     30,
 };
 // When set `relu` as Gate gate activation and forbid clip, it
@@ -33,7 +33,7 @@ std::vector<std::vector<std::string>> activations = {
     {"tanh", "relu"},
 };
 std::vector<float> clips = {
-    0.0f,
+//    0.0f,
     0.7f,
 };
 std::vector<bool> linear_before_reset = {

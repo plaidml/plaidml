@@ -4,7 +4,6 @@
 
 #include <limits>
 
-#include "ngraph/opsets/opset.hpp"
 #include "ngraph/opsets/opset4.hpp"
 #include "plaidml/op/op.h"
 #include "plaidml_ops.hpp"

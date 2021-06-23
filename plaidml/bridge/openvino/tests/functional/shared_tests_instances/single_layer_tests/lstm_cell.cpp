@@ -11,8 +11,8 @@ using namespace LayerTestsDefinitions;
 
 namespace {
 std::vector<bool> should_decompose{
-    // true will decompose lstm cell to component ops and
-    // skip plaidml plugin implementation, only set to false here
+    // true will decompose LSTMCell to component ops and skip plaidml LSTMCell implementation
+    true,
     false,
 };
 std::vector<size_t> batch{5};

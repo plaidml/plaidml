@@ -11,8 +11,8 @@ using namespace LayerTestsDefinitions;
 
 namespace {
 std::vector<bool> should_decompose{
-    // true will decompose rnn cell to component ops and
-    // skip plaidml plugin implementation, only set to false here
+    // true will decompose RNNCell to component ops and skip plaidml RNNCell implementation
+    true,
     false,
 };
 std::vector<size_t> batch{1, 5};
