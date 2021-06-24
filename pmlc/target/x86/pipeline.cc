@@ -278,17 +278,17 @@ void pipelineBuilderStage1(OpPassManager &pm, const Options &options) {
   pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
 
+  pm.addNestedPass<FuncOp>(pxa::createFusionPass(/*memoryActivityThreshold=*/0,
+                                                 /*exactlyMatch=*/false,
+                                                 /*tiledFusion=*/true));
+  pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
+  pm.addPass(createCanonicalizerPass());
+
   pm.addNestedPass<FuncOp>(pxa::createTileAccumulatePass());
   pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass(/*promote=*/false));
   pm.addPass(createCanonicalizerPass());
 
   pm.addNestedPass<FuncOp>(pxa::createCPUThreadPass(maxThreads));
-  pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
-  pm.addPass(createCanonicalizerPass());
-
-  pm.addNestedPass<FuncOp>(pxa::createFusionPass(/*memoryActivityThreshold=*/0,
-                                                 /*exactlyMatch=*/false,
-                                                 /*tiledFusion=*/true));
   pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
 
@@ -304,7 +304,7 @@ void pipelineBuilderStage1(OpPassManager &pm, const Options &options) {
   pm.addPass(createCSEPass());
 
   pm.addPass(createPRNGLinkingPass());
-  pm.addNestedPass<FuncOp>(createTppPatternsPass());
+  // pm.addNestedPass<FuncOp>(createTppPatternsPass());
 }
 
 void pipelineBuilderStage2(OpPassManager &pm) {

@@ -85,19 +85,13 @@ private:
 Program::Program(ModuleOp module)
     : context(std::make_unique<MLIRContext>()), module(module) {}
 
-Program::Program(llvm::StringRef name)
+Program::Program(StringRef name)
     : context(std::make_unique<MLIRContext>()),
       module(ModuleOp::create(UnknownLoc::get(context.get()), name)) {}
 
-std::unique_ptr<Program>
-Program::fromSource(std::unique_ptr<MLIRContext> context, StringRef source) {
-  return std::make_unique<Program>(std::move(context),
-                                   llvm::MemoryBuffer::getMemBuffer(source));
-}
-
 Program::Program(std::unique_ptr<MLIRContext> context,
-                 std::unique_ptr<llvm::MemoryBuffer> buffer)
-    : context(std::move(context)) {
+                 std::unique_ptr<llvm::MemoryBuffer> buffer, StringRef entry)
+    : context(std::move(context)), entry(entry) {
   llvm::SourceMgr sourceMgr;
   sourceMgr.AddNewSourceBuffer(std::move(buffer), llvm::SMLoc());
   module = parseSourceFile(sourceMgr, this->context.get());
@@ -212,6 +206,25 @@ Program::save(const std::unordered_map<std::string, std::string> &config) {
     throw std::runtime_error("Program must be compiled to be saved.");
   }
   return target->save(*this, config);
+}
+
+void Program::parseIOTypes(std::unique_ptr<llvm::MemoryBuffer> buffer) {
+  llvm::SourceMgr sourceMgr;
+  sourceMgr.AddNewSourceBuffer(std::move(buffer), llvm::SMLoc());
+  OwningModuleRef sourceModule = parseSourceFile(sourceMgr, context.get());
+
+  auto op = dyn_cast_or_null<FuncOp>(sourceModule->lookupSymbol(entry));
+  if (!op)
+    throw std::runtime_error("Could not find FuncOp: " + entry);
+
+  FunctionType funcType = op.getType();
+  for (Type type : funcType.getInputs()) {
+    inputs.push_back(type);
+  }
+
+  for (Type type : funcType.getResults()) {
+    outputs.push_back(type);
+  }
 }
 
 } // namespace pmlc::compiler
