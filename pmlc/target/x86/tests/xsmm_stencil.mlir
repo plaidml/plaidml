@@ -1,11 +1,9 @@
-// RUN: pmlc-opt --pass-pipeline='func(x86-affine-stencil-xsmm{threads=4 batched=true})' %s | FileCheck %s
-// RUN: pmlc-opt --pass-pipeline='func(x86-affine-stencil-xsmm{threads=4 batched=false})' %s | FileCheck %s
+// RUN: pmlc-opt -x86-affine-stencil-xsmm='threads=4 batched=true' %s | FileCheck %s
+// RUN: pmlc-opt -x86-affine-stencil-xsmm='threads=4 batched=false' %s | FileCheck %s
 
-#map0 = affine_map<(d0, d1) -> (d0, d1)>
-#map1 = affine_map<() -> (0, 0, 0)>
-#map2 = affine_map<() -> (100, 100, 100)>
-
-// CHECK-LABEL: @no_gemm_mul_reduce_operation
+// CHECK-LABEL: func @no_gemm_mul_reduce_operation
+//       CHECK:   affine.parallel
+//   CHECK-NOT:     pxa.generic
 func @no_gemm_mul_reduce_operation(%arg0: memref<100x100xf32>, %arg1: memref<100x100xf32>) -> memref<100x100xf32> {
   %out = memref.alloc() : memref<100x100xf32>
   %ret = affine.parallel (%i, %j, %k) = (0, 0, 0) to (100, 100, 100) reduce ("assign") -> (memref<100x100xf32>) {
@@ -17,10 +15,12 @@ func @no_gemm_mul_reduce_operation(%arg0: memref<100x100xf32>, %arg1: memref<100
   }
   return %ret : memref<100x100xf32>
 }
-// CHECK: affine.parallel
-// CHECK-NOT: pxa.gemm
 
-// CHECK-LABEL: @no_gemm_no_mul_before_reduce_operation
+// -----
+
+// CHECK-LABEL: func @no_gemm_no_mul_before_reduce_operation
+//       CHECK:   affine.parallel
+//   CHECK-NOT:     pxa.generic
 func @no_gemm_no_mul_before_reduce_operation(%arg0: memref<100x100xf32>, %arg1: memref<100x100xf32>) -> memref<100x100xf32> {
   %out = memref.alloc() : memref<100x100xf32>
   %ret = affine.parallel (%i, %j, %k) = (0, 0, 0) to (100, 100, 100) reduce ("assign") -> (memref<100x100xf32>) {
@@ -32,10 +32,12 @@ func @no_gemm_no_mul_before_reduce_operation(%arg0: memref<100x100xf32>, %arg1: 
   }
   return %ret : memref<100x100xf32>
 }
-// CHECK: affine.parallel
-// CHECK-NOT: pxa.gemm
 
-// CHECK-LABEL: @no_gemm_mul_params_not_affine_loads
+// -----
+
+// CHECK-LABEL: func @no_gemm_mul_params_not_affine_loads
+//       CHECK:   affine.parallel
+//   CHECK-NOT:     pxa.generic
 func @no_gemm_mul_params_not_affine_loads(%arg0: memref<100x100xf32>, %arg1: memref<100x100xf32>) -> memref<100x100xf32> {
   %out = memref.alloc() : memref<100x100xf32>
   %ret = affine.parallel (%i, %j, %k) = (0, 0, 0) to (100, 100, 100) reduce ("assign") -> (memref<100x100xf32>) {
@@ -48,10 +50,12 @@ func @no_gemm_mul_params_not_affine_loads(%arg0: memref<100x100xf32>, %arg1: mem
   }
   return %ret : memref<100x100xf32>
 }
-// CHECK: affine.parallel
-// CHECK-NOT: pxa.gemm
 
-// CHECK-LABEL: @no_gemm_no_stride_one_1
+// -----
+
+// CHECK-LABEL: func @no_gemm_no_stride_one_1
+//       CHECK:   affine.parallel
+//   CHECK-NOT:     pxa.generic
 func @no_gemm_no_stride_one_1(%arg0: memref<100x100xf32>, %arg1: memref<100x100xf32>) -> memref<100x100xf32> {
   %out = memref.alloc() : memref<100x100xf32>
   %ret = affine.parallel (%i, %j, %k) = (0, 0, 0) to (100, 100, 100) reduce ("assign") -> (memref<100x100xf32>) {
@@ -64,10 +68,12 @@ func @no_gemm_no_stride_one_1(%arg0: memref<100x100xf32>, %arg1: memref<100x100x
   }
   return %ret : memref<100x100xf32>
 }
-// CHECK: affine.parallel
-// CHECK-NOT: pxa.gemm
 
-// CHECK-LABEL: @no_gemm_no_stride_one_2
+// -----
+
+// CHECK-LABEL: func @no_gemm_no_stride_one_2
+//       CHECK:   affine.parallel
+//   CHECK-NOT:     pxa.generic
 func @no_gemm_no_stride_one_2(%arg0: memref<100x100xf32>, %arg1: memref<100x100xf32>) -> memref<100x100xf32> {
   %out = memref.alloc() : memref<100x100xf32>
   %ret = affine.parallel (%i, %j, %k) = (0, 0, 0) to (100, 100, 100) reduce ("assign") -> (memref<100x100xf32>) {
@@ -80,10 +86,12 @@ func @no_gemm_no_stride_one_2(%arg0: memref<100x100xf32>, %arg1: memref<100x100x
   }
   return %ret : memref<100x100xf32>
 }
-// CHECK: affine.parallel
-// CHECK-NOT: pxa.gemm 
 
-// CHECK-LABEL: @gemm_operation_rewrite_f32
+// -----
+
+// CHECK-LABEL: func @gemm_operation_rewrite_f32
+//       CHECK:   affine.parallel
+//       CHECK:     pxa.generic
 func @gemm_operation_rewrite_f32(%arg0: memref<100x100xf32>, %arg1: memref<100x100xf32>) -> memref<100x100xf32> {
   %out = memref.alloc() : memref<100x100xf32>
   %ret = affine.parallel (%i, %j, %k) = (0, 0, 0) to (100, 100, 100) reduce ("assign") -> (memref<100x100xf32>) {
@@ -95,5 +103,35 @@ func @gemm_operation_rewrite_f32(%arg0: memref<100x100xf32>, %arg1: memref<100x1
   }
   return %ret : memref<100x100xf32>
 }
-// CHECK: affine.parallel
-// CHECK: pxa.gemm
+
+// -----
+
+// CHECK-LABEL: func @conv1
+//       CHECK:   affine.parallel
+//       CHECK:     pxa.generic
+func @conv1(%arg0: memref<1x230x230x3xf32>, %arg1: memref<7x7x3x64xf32>, %arg2: memref<1x112x112x64xf32>) -> memref<1x112x112x64xf32> {
+  %2 = affine.parallel (%arg5, %arg6, %arg7, %arg8, %arg9, %arg10, %arg11) = (0, 0, 0, 0, 0, 0, 0) to (1, 112, 112, 64, 7, 7, 3) reduce ("assign") -> (memref<1x112x112x64xf32>) {
+    %6 = pxa.load %arg0[%arg5, %arg6 * 2 + %arg9, %arg7 * 2 + %arg10, %arg11] : memref<1x230x230x3xf32>
+    %7 = pxa.load %arg1[%arg9, %arg10, %arg11, %arg8] : memref<7x7x3x64xf32>
+    %8 = mulf %6, %7 : f32
+    %9 = pxa.reduce addf %8, %arg2[%arg5, %arg6, %arg7, %arg8] : memref<1x112x112x64xf32>
+    affine.yield %9 : memref<1x112x112x64xf32>
+  }
+  return %2 : memref<1x112x112x64xf32>
+}
+
+// -----
+
+// CHECK-LABEL: func @res2a_branch2a
+//       CHECK:   affine.parallel
+//       CHECK:     pxa.generic
+func @res2a_branch2a(%arg0: memref<1x56x56x64xf32>, %arg1: memref<1x1x64x64xf32>, %arg2: memref<1x56x56x64xf32>) -> memref<1x56x56x64xf32> {
+  %2 = affine.parallel (%arg5, %arg6, %arg7, %arg8, %arg9, %arg10, %arg11) = (0, 0, 0, 0, 0, 0, 0) to (1, 56, 56, 64, 1, 1, 64) reduce ("assign") -> (memref<1x56x56x64xf32>) {
+    %6 = pxa.load %arg0[%arg5, %arg6 + %arg9, %arg7 + %arg10, %arg11] : memref<1x56x56x64xf32>
+    %7 = pxa.load %arg1[%arg9, %arg10, %arg11, %arg8] : memref<1x1x64x64xf32>
+    %8 = mulf %6, %7 : f32
+    %9 = pxa.reduce addf %8, %arg2[%arg5, %arg6, %arg7, %arg8] : memref<1x56x56x64xf32>
+    affine.yield %9 : memref<1x56x56x64xf32>
+  }
+  return %2 : memref<1x56x56x64xf32>
+}

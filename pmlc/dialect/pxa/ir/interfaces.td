@@ -69,10 +69,26 @@ def PxaGenericOpInterface : OpInterface<"PxaGenericOpInterface"> {
     >,
     InterfaceMethod<
       /*desc=*/[{
-        Return the value type for `opOperand`.
+        Return whether the operand is a read.
       }],
-      /*retTy=*/"::mlir::SmallVector<int64_t>",
-      /*methodName=*/"getTiedVectorShape",
+      /*retTy=*/"bool",
+      /*methodName=*/"isReadOperand",
+      /*args=*/(ins "::mlir::OpOperand *":$opOperand)
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Return whether the operand is a write.
+      }],
+      /*retTy=*/"bool",
+      /*methodName=*/"isWriteOperand",
+      /*args=*/(ins "::mlir::OpOperand *":$opOperand)
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Return the internal StrideRanges for `opOperand`.
+      }],
+      /*retTy=*/"::mlir::SmallVector<pmlc::dialect::pxa::StrideRange>",
+      /*methodName=*/"getTiedInternalRanges",
       /*args=*/(ins "::mlir::OpOperand *":$opOperand)
     >,
     InterfaceMethod<
@@ -82,7 +98,33 @@ def PxaGenericOpInterface : OpInterface<"PxaGenericOpInterface"> {
       /*retTy=*/"::mlir::AffineValueMap",
       /*methodName=*/"getTiedAffineValueMap",
       /*args=*/(ins "::mlir::OpOperand *":$opOperand)
-    >
+    >,
+    InterfaceMethod<
+      /*desc=*/"Return the input PxaMemAccessOperands.",
+      /*retTy=*/"::mlir::SmallVector<pmlc::dialect::pxa::PxaMemAccessOperand>",
+      /*methodName=*/"getInputMemAccesses",
+      /*args=*/(ins),
+      /*methodBody=*/[{
+        ::mlir::SmallVector<pmlc::dialect::pxa::PxaMemAccessOperand> result;
+        result.reserve($_op.getNumInputs());
+        for (::mlir::OpOperand *operand : $_op.getInputOperands())
+          result.emplace_back(operand);
+        return result;
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/"Return the output PxaMemAccessOperands.",
+      /*retTy=*/"::mlir::SmallVector<pmlc::dialect::pxa::PxaMemAccessOperand>",
+      /*methodName=*/"getOutputMemAccesses",
+      /*args=*/(ins),
+      /*methodBody=*/[{
+        ::mlir::SmallVector<pmlc::dialect::pxa::PxaMemAccessOperand> result;
+        result.reserve($_op.getNumOutputs());
+        for (::mlir::OpOperand *operand : $_op.getOutputOperands())
+          result.emplace_back(operand);
+        return result;
+      }]
+    >,
   ];
 }
 
