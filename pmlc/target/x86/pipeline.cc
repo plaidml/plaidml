@@ -238,7 +238,28 @@ std::unique_ptr<Pass> createOpenMPWorkaroundPass() {
   return std::make_unique<OpenMPWorkaroundPass>();
 }
 
-void pipelineBuilder(OpPassManager &pm) {
+struct Options : public PassPipelineOptions<Options> {
+  Option<unsigned> numThreads{*this, "threads",
+                              llvm::cl::desc("Number of threads")};
+
+  unsigned getNumThreads() const {
+    if (numThreads)
+      return numThreads.getValue();
+
+    unsigned numProcs = omp_get_num_procs();
+    unsigned physCores = getPhysicalCoreNumber();
+    IVLOG(3, "numProcs: " << numProcs);
+    IVLOG(3, "physCores: " << physCores);
+    if (physCores)
+      numProcs = std::min(physCores, numProcs);
+    return numProcs;
+  }
+};
+
+void pipelineBuilderStage1(OpPassManager &pm, const Options &options) {
+  unsigned maxThreads = options.getNumThreads();
+  IVLOG(1, "Number of threads: " << maxThreads);
+
   pm.addNestedPass<FuncOp>(layer::createInlineLayersPass());
   pm.addNestedPass<FuncOp>(tile::createComputeBoundsPass());
   pm.addPass(tile::createSplitMainPass());
@@ -252,8 +273,8 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(createCSEPass());
   pm.addNestedPass<FuncOp>(layer::createInlineLayersPass());
 
-  pm.addNestedPass<FuncOp>(
-      createXSMMStencilPass(/*numThreads=*/1, /*isBatched=*/true));
+  pm.addNestedPass<FuncOp>(createXSMMStencilPass(/*numThreads=*/maxThreads,
+                                                 /*isBatched=*/true));
   pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
 
@@ -261,18 +282,13 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass(/*promote=*/false));
   pm.addPass(createCanonicalizerPass());
 
-  // Use OMP thread count
-  unsigned maxThreads = omp_get_max_threads();
-  unsigned physCores = getPhysicalCoreNumber();
-  if (physCores)
-    maxThreads = std::min(physCores, maxThreads);
-
   pm.addNestedPass<FuncOp>(pxa::createCPUThreadPass(maxThreads));
-
   pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
 
-  pm.addNestedPass<FuncOp>(pxa::createFusionPass());
+  pm.addNestedPass<FuncOp>(pxa::createFusionPass(/*memoryActivityThreshold=*/0,
+                                                 /*exactlyMatch=*/false,
+                                                 /*tiledFusion=*/true));
   pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
 
@@ -280,15 +296,18 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
 
   pm.addNestedPass<FuncOp>(pxa::createLocalizePass());
-  pm.addNestedPass<FuncOp>(pxa::createResizeTmpsPass());
+  // pm.addNestedPass<FuncOp>(pxa::createResizeTmpsPass());
   pm.addPass(pxa::createDeallocPlacementPass());
-  pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
+  pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass(/*promote=*/true,
+                                                          /*denest=*/true));
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
   pm.addPass(createPRNGLinkingPass());
   pm.addNestedPass<FuncOp>(createTppPatternsPass());
+}
 
+void pipelineBuilderStage2(OpPassManager &pm) {
   pm.addPass(createLowerPXAToAffinePass());
   pm.addPass(createLoopInvariantCodeMotionPass());
   pm.addPass(createCanonicalizerPass());
@@ -301,14 +320,34 @@ void pipelineBuilder(OpPassManager &pm) {
   pm.addPass(pmlc::conversion::scf_to_omp::createLowerSCFToOpenMPPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
+}
 
+void pipelineBuilderStage3(OpPassManager &pm) {
   pm.addPass(createLowerToCFGPass());
   if (pmlc::util::getEnvVar("PLAIDML_BOUNDS_CHECK") == "1")
     pm.addNestedPass<FuncOp>(stdx::createBoundsCheckPass());
 
   pm.addPass(createLowerToLLVMPass());
   pm.addPass(createTraceLinkingPass());
-  pm.addNestedPass<LLVM::LLVMFuncOp>(createOpenMPWorkaroundPass());
 }
+
+void pipelineBuilder(OpPassManager &pm) {
+  Options options;
+  pipelineBuilderStage1(pm, options);
+  pipelineBuilderStage2(pm);
+  pipelineBuilderStage3(pm);
+}
+
+static PassPipelineRegistration<Options>
+    registerStage1Pipeline("x86-stage1", "x86 Stage1 Pipeline",
+                           pipelineBuilderStage1);
+
+static PassPipelineRegistration<> registerStage2Pipeline("x86-stage2",
+                                                         "x86 Stage2 Pipeline",
+                                                         pipelineBuilderStage2);
+
+static PassPipelineRegistration<> registerStage3Pipeline("x86-stage3",
+                                                         "x86 Stage3 Pipeline",
+                                                         pipelineBuilderStage3);
 
 } // namespace pmlc::target::x86

@@ -21,7 +21,7 @@ steps:
     depends_on: linux_x86_64
     build:
       message: "${BUILDKITE_MESSAGE}"
-      commit: d5733fa7ebe31c2cb959e0dd22737d7c37ecbe8c
+      commit: c08ae272c697c40082eb7776fd6fe1eff22c25fa
       env:
         PLAIDML_COMMIT: "${BUILDKITE_COMMIT}"
         BUILDKITE_PULL_REQUEST: "${BUILDKITE_PULL_REQUEST}"

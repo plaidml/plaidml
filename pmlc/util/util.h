@@ -79,4 +79,9 @@ inline std::ostream &operator<<(std::ostream &os, const SmallVectorImpl<T> &x) {
   return stringify_collection(os, x.begin(), x.end());
 }
 
+template <class T>
+inline std::ostream &operator<<(std::ostream &os, ArrayRef<T> x) {
+  return stringify_collection(os, x.begin(), x.end());
+}
+
 } // namespace llvm

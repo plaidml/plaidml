@@ -12,6 +12,11 @@ func @gemm(%I: memref<1x56x56x64xf32>, %K: memref<1x1x64x64xf32>, %O: memref<1x5
     // CHECK-SAME: : (memref<1x56x56x64xf32>, memref<1x1x64x64xf32>) -> memref<1x56x56x64xf32>
     %1 = pxa.generic (%O[0, %x, %y, 0]: #O_tile) <addf> @tpp_gemm(%I[0, %x, %y, 0]: #I_tile, %K[0, %x, %y, 0]: #K_tile)
       tile: [14, 64, 64] : (memref<1x56x56x64xf32>, memref<1x1x64x64xf32>) -> memref<1x56x56x64xf32>
+    //      CHECK: pxa.generic (%{{.*}}[0, %{{.*}}, %{{.*}}, 0]: #{{.*}}) <addf>
+    // CHECK-SAME: @tpp_gemm(%{{.*}}[0, %{{.*}}, %{{.*}}, 0]: #{{.*}}, %{{.*}}[{{.*}}, %{{.*}}, %{{.*}}, 0]: #{{.*}}) tile: [14, 64, 64, 1, 7, 7]
+    // CHECK-SAME: : (memref<1x56x56x64xf32>, memref<1x1x64x64xf32>) -> memref<1x56x56x64xf32>
+    %2 = pxa.generic (%O[0, %x, %y, 0]: #O_tile) <addf> @tpp_gemm(%I[0, %x, %y, 0]: #I_tile, %K[0, %x, %y, 0]: #K_tile)
+      tile: [14, 64, 64, 1, 7, 7] : (memref<1x56x56x64xf32>, memref<1x1x64x64xf32>) -> memref<1x56x56x64xf32>
     affine.yield %1 : memref<1x56x56x64xf32>
   }
   return %0 : memref<1x56x56x64xf32>

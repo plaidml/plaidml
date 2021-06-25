@@ -35,8 +35,6 @@ void populatePXAGemmToXSMMConversionPatterns(mlir::RewritePatternSet &patterns);
 void populateXSMMToLLVMConversionPatterns(mlir::LLVMTypeConverter &converter,
                                           mlir::RewritePatternSet &patterns);
 
-void pipelineBuilder(mlir::OpPassManager &pm);
-
 /// Generate the code for registering passes.
 #define GEN_PASS_REGISTRATION
 #include "pmlc/target/x86/passes.h.inc"
