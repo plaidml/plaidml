@@ -10,6 +10,7 @@
 #include "pmlc/dialect/pxa/analysis/strides.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/util/logging.h"
+#include "pmlc/util/util.h"
 
 using namespace mlir; // NOLINT
 
@@ -60,34 +61,19 @@ void swap(Orderer<V> &v1, Orderer<V> &v2) {
 
 void StencilBase::reportBestStencil(unsigned logLevel) {
   if (VLOG_IS_ON(logLevel)) {
-    std::stringstream bestReport;
-    bestReport << "Stencil Selection Report:\n";
-    bestReport << "    Best Perf: " << bestCost << "\n";
-    std::stringstream tensorPermStr;
-    tensorPermStr << "[\n";
-    for (auto value : bestPermutation.values) {
-      tensorPermStr << "        " << debugString(value) << "\n";
+    SmallVector<unsigned, 3> idxs = llvm::to_vector<3>(
+        llvm::map_range(bestPermutation.indexes,
+                        [](BlockArgument idx) { return idx.getArgNumber(); }));
+    std::stringstream ss;
+    ss << "Stencil Selection Report:\n";
+    ss << "    Best Perf: " << bestCost << "\n";
+    ss << "    Best Tensor Permutation:\n";
+    for (Value value : bestPermutation.values) {
+      ss << "        " << debugString(value) << "\n";
     }
-    tensorPermStr << "    ]";
-    bestReport << "    Best Tensor Permutation: " << tensorPermStr.str()
-               << "\n";
-    std::stringstream indexPermStr;
-    indexPermStr << "[ ";
-    for (auto ind : bestPermutation.indexes) {
-      assert(getBlockArgsAsSet().count(ind) &&
-             "All tiled indexes must be introduced in current loop");
-      indexPermStr << ind.getArgNumber() << " ";
-    }
-    indexPermStr << "]";
-    bestReport << "    Best Index Permutation: " << indexPermStr.str() << "\n";
-    std::stringstream bestTilingStr;
-    bestTilingStr << "[ ";
-    for (const auto &sz : bestTiling) {
-      bestTilingStr << sz << " ";
-    }
-    bestTilingStr << "]";
-    bestReport << "    Best Tiling: " << bestTilingStr.str();
-    IVLOG(logLevel, bestReport.str());
+    ss << "    Best Index Permutation: " << idxs << '\n';
+    ss << "    Best Tiling: " << bestTiling;
+    IVLOG(logLevel, ss.str());
   }
 }
 
@@ -115,27 +101,26 @@ Optional<StrideInfo> StencilBase::getStrideInfo(Value value) {
     return cached->second;
   }
   auto maybeInfo =
-      llvm::TypeSwitch<Operation *, Optional<StrideInfo>>(value.getDefiningOp())
+      TypeSwitch<Operation *, Optional<StrideInfo>>(value.getDefiningOp())
           .Case<PxaLoadOp>([&](PxaLoadOp op) { return computeStrideInfo(op); })
           .Case<PxaReduceOp>(
               [&](PxaReduceOp op) { return computeStrideInfo(op); })
-          .Default([](Operation *) { return llvm::None; });
+          .Default([](Operation *) { return None; });
   strideInfoCache[value] = maybeInfo;
   return maybeInfo;
 }
 
-void StencilBase::BindIndexes(llvm::ArrayRef<Value> values) {
-  llvm::SmallVector<BlockArgument, 8> emptyBoundIdxsVector;
+void StencilBase::BindIndexes(ArrayRef<Value> values) {
+  SmallVector<BlockArgument, 8> emptyBoundIdxsVector;
   RecursiveBindIndex(emptyBoundIdxsVector, values);
 }
 
-void StencilBase::RecursiveBindIndex(
-    llvm::SmallVector<BlockArgument, 8> &boundIdxs,
-    llvm::ArrayRef<Value> values) {
+void StencilBase::RecursiveBindIndex(SmallVector<BlockArgument, 8> &boundIdxs,
+                                     ArrayRef<Value> values) {
   auto currIdx = boundIdxs.size();
   if (currIdx == tiledIdxCount) {
     // This is a legal binding, go find a tiling for it
-    llvm::SmallVector<int64_t, 8> currTileSize(tiledIdxCount);
+    SmallVector<int64_t, 8> currTileSize(tiledIdxCount);
     RecursiveTileIndex(TensorAndIndexPermutation(values, boundIdxs),
                        currTileSize, 0);
   } else {
@@ -174,21 +159,13 @@ void StencilBase::RecursiveBindIndex(
   }
 }
 
-void StencilBase::RecursiveTileIndex(        //
-    const TensorAndIndexPermutation &perm,   //
-    llvm::MutableArrayRef<int64_t> tileSize, //
+void StencilBase::RecursiveTileIndex(      //
+    const TensorAndIndexPermutation &perm, //
+    MutableArrayRef<int64_t> tileSize,     //
     int64_t currIdx) {
   assert(tileSize.size() == tiledIdxCount);
   if (currIdx == tiledIdxCount) {
-    if (VLOG_IS_ON(3)) {
-      std::stringstream currTilingStr;
-      currTilingStr << "[ ";
-      for (const auto &sz : tileSize) {
-        currTilingStr << sz << " ";
-      }
-      currTilingStr << "]";
-      IVLOG(3, "Considering Tile " << currTilingStr.str());
-    }
+    IVLOG(3, "Considering Tile " << tileSize);
     auto cost = getCost(perm, tileSize);
     IVLOG(3, "Tile cost = " << cost);
     if (cost < bestCost) {
@@ -228,7 +205,7 @@ void StencilBase::DoStenciling() {
   // are iterated through deterministic (the "sorted" order of the IO ops is the
   // order they were returned by `capture`) -- without this, the sorted order
   // would be however the pointers were ordered in memory.
-  llvm::SmallVector<Orderer<Value>, 3> ordered;
+  SmallVector<Orderer<Value>, 3> ordered;
   unsigned ord = 0;
   for (auto &storeOp : loadsAndStores.stores) {
     ordered.push_back(Orderer<Value>(ord++, storeOp));
@@ -242,7 +219,7 @@ void StencilBase::DoStenciling() {
   do { // Each store tensor permutation
     std::sort(itLastStoreFirstLoad, ordered.end());
     do { // Each load tensor permutation
-      llvm::SmallVector<Value, 3> values;
+      SmallVector<Value, 3> values;
       for (const auto &ioOp : ordered) {
         values.push_back(*ioOp);
       }
