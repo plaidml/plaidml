@@ -1,4 +1,4 @@
-// Copyright (C) 2019 Intel Corporation
+// Copyright (C) 2018-2021 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 //
 
@@ -149,10 +149,11 @@ const auto explicitBroadcastParams1 = ::testing::Combine(    //
     ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)       //
 );
 
-INSTANTIATE_TEST_CASE_P(smoke_TestExplicitBroadcast1,        //
-                        BroadcastLayerTest,                  //
-                        explicitBroadcastParams1,            //
-                        BroadcastLayerTest::getTestCaseName  //
+INSTANTIATE_TEST_CASE_P(                 //
+    smoke_TestExplicitBroadcast1,        //
+    BroadcastLayerTest,                  //
+    explicitBroadcastParams1,            //
+    BroadcastLayerTest::getTestCaseName  //
 );
 
 const auto explicitBroadcastParams2 = ::testing::Combine(    //
