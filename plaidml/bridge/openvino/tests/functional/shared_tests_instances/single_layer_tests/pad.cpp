@@ -19,7 +19,12 @@ const std::vector<InferenceEngine::Precision> netPrecisions = {
     InferenceEngine::Precision::U8,    //
 };
 
-const std::vector<float> argPadValue = {0.f, 1.f, -1.f, 2.5f};
+const std::vector<float> argPadValue = {
+    0.f,
+    1.f,
+    -1.f,
+    2.5f,
+};
 
 const std::vector<ngraph::helpers::PadMode> padMode = {
     ngraph::helpers::PadMode::CONSTANT,
@@ -28,8 +33,16 @@ const std::vector<ngraph::helpers::PadMode> padMode = {
     //    ngraph::helpers::PadMode::SYMMETRIC,
 };
 
-const std::vector<std::vector<int64_t>> padsBegin1D = {{0}, {1}, {2}};
-const std::vector<std::vector<int64_t>> padsEnd1D = {{0}, {1}, {2}};
+const std::vector<std::vector<int64_t>> padsBegin1D = {
+    {0},
+    {1},
+    {2},
+};
+const std::vector<std::vector<int64_t>> padsEnd1D = {
+    {0},
+    {1},
+    {2},
+};
 
 const auto pad1DConstparams = testing::Combine(                //
     testing::ValuesIn(padsBegin1D),                            //
@@ -70,8 +83,18 @@ INSTANTIATE_TEST_CASE_P(           //
     PadLayerTest::getTestCaseName  //
 );
 
-const std::vector<std::vector<int64_t>> padsBegin2D = {{0, 0}, {1, 1}, {2, 0}, {0, 3}};
-const std::vector<std::vector<int64_t>> padsEnd2D = {{0, 0}, {1, 1}, {0, 1}, {3, 2}};
+const std::vector<std::vector<int64_t>> padsBegin2D = {
+    {0, 0},
+    {1, 1},
+    {2, 0},
+    {0, 3},
+};
+const std::vector<std::vector<int64_t>> padsEnd2D = {
+    {0, 0},
+    {1, 1},
+    {0, 1},
+    {3, 2},
+};
 
 const auto pad2DConstparams = testing::Combine(                //
     testing::ValuesIn(padsBegin2D),                            //
@@ -113,10 +136,22 @@ INSTANTIATE_TEST_CASE_P(           //
     PadLayerTest::getTestCaseName  //
 );
 
-const std::vector<std::vector<int64_t>> padsBegin4D = {{0, 0, 0, 0}, {0, 3, 0, 0}, {0, 0, 0, 1},
-                                                       {0, 0, 1, 1}, {2, 0, 0, 0}, {0, 3, 0, 1}};
-const std::vector<std::vector<int64_t>> padsEnd4D = {{0, 0, 0, 0}, {0, 3, 0, 0}, {1, 0, 0, 0},
-                                                     {0, 0, 0, 2}, {1, 3, 0, 0}, {0, 3, 0, 1}};
+const std::vector<std::vector<int64_t>> padsBegin4D = {
+    {0, 0, 0, 0},  //
+    {0, 3, 0, 0},  //
+    {0, 0, 0, 1},  //
+    {0, 0, 1, 1},  //
+    {2, 0, 0, 0},  //
+    {0, 3, 0, 1},  //
+};
+const std::vector<std::vector<int64_t>> padsEnd4D = {
+    {0, 0, 0, 0},  //
+    {0, 3, 0, 0},  //
+    {1, 0, 0, 0},  //
+    {0, 0, 0, 2},  //
+    {1, 3, 0, 0},  //
+    {0, 3, 0, 1},  //
+};
 
 const auto pad4DConstparams = testing::Combine(                //
     testing::ValuesIn(padsBegin4D),                            //

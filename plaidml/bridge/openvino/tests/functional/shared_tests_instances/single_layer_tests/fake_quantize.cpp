@@ -17,12 +17,29 @@ const std::vector<InferenceEngine::Precision> netPrecisions = {
 };
 
 const std::vector<std::vector<size_t>> inputShapes = {
-    {1, 1},           {2, 6},           {1, 1, 1},         {2, 6, 13},       {1, 1, 1, 1},
-    {3, 10, 5, 6},    {2, 8, 5, 18},    {2, 16, 3, 18},    {3, 49, 5, 6},    {1, 1, 1, 1, 1},
-    {3, 10, 2, 5, 6}, {2, 8, 1, 5, 18}, {2, 16, 4, 3, 18}, {3, 49, 7, 5, 6},
+    {1, 1},             //
+    {2, 6},             //
+    {1, 1, 1},          //
+    {2, 6, 13},         //
+    {1, 1, 1, 1},       //
+    {3, 10, 5, 6},      //
+    {2, 8, 5, 18},      //
+    {2, 16, 3, 18},     //
+    {3, 49, 5, 6},      //
+    {1, 1, 1, 1, 1},    //
+    {3, 10, 2, 5, 6},   //
+    {2, 8, 1, 5, 18},   //
+    {2, 16, 4, 3, 18},  //
+    {3, 49, 7, 5, 6},   //
 };
-const std::vector<std::vector<size_t>> constShapes = {{1}};
-const std::vector<size_t> levels = {16, 255, 256};
+const std::vector<std::vector<size_t>> constShapes = {
+    {1},
+};
+const std::vector<size_t> levels = {
+    16,
+    255,
+    256,
+};
 
 const std::pair<std::string, std::map<std::string, std::string>> config = {};
 const std::vector<float> fqArgs = {};
@@ -48,9 +65,16 @@ INSTANTIATE_TEST_CASE_P(smoke_FakeQuantize, FakeQuantizeLayerTest,              
                             ::testing::Values(config)),                                  //
                         FakeQuantizeLayerTest::getTestCaseName);
 
-const std::vector<std::vector<size_t>> inputShapesPerChannel = {{11, 10, 22, 19}, {11, 10, 5, 6}};
-const std::vector<std::vector<size_t>> constShapesPerChannelAxis0 = {{11, 1, 1, 1}};
-const std::vector<std::vector<size_t>> constShapesPerChannelAxis1 = {{1, 10, 1, 1}};
+const std::vector<std::vector<size_t>> inputShapesPerChannel = {
+    {11, 10, 22, 19},
+    {11, 10, 5, 6},
+};
+const std::vector<std::vector<size_t>> constShapesPerChannelAxis0 = {
+    {11, 1, 1, 1},
+};
+const std::vector<std::vector<size_t>> constShapesPerChannelAxis1 = {
+    {1, 10, 1, 1},
+};
 
 const auto fqParamsPerChannelAxis0 = ::testing::Combine(  //
     ::testing::ValuesIn(levels),                          //
@@ -92,8 +116,14 @@ INSTANTIATE_TEST_CASE_P(smoke_FakeQuantizePerChannelAxis1, FakeQuantizeLayerTest
                             ::testing::Values(config)),                                  //
                         FakeQuantizeLayerTest::getTestCaseName);
 
-const std::vector<std::vector<size_t>> inputShapesPerChannel2D = {{1, 10}};
-const std::vector<std::vector<size_t>> constShapesPerChannel2D = {{10}, {1, 10}, {1}};
+const std::vector<std::vector<size_t>> inputShapesPerChannel2D = {
+    {1, 10},
+};
+const std::vector<std::vector<size_t>> constShapesPerChannel2D = {
+    {10},
+    {1, 10},
+    {1},
+};
 const auto fqParamsPerChannel2D = ::testing::Combine(  //
     ::testing::ValuesIn(levels),                       //
     ::testing::ValuesIn(constShapesPerChannel2D),      //
