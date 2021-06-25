@@ -91,14 +91,14 @@ INSTANTIATE_TEST_CASE_P(                 //
     BroadcastLayerTest::getTestCaseName  //
 );
 
-const auto bidirectionalBroadcastParams2 =
-    ::testing::Combine(::testing::Values(targetShapesBidi[1]),                       //
-                       ::testing::Values(ngraph::AxisSet{}),                         // not used in bidirectional mode
-                       ::testing::Values(ngraph::op::BroadcastType::BIDIRECTIONAL),  //
-                       ::testing::Values(inShapesBidi[1]),                           //
-                       ::testing::ValuesIn(inputPrecisions),                         //
-                       ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)            //
-    );
+const auto bidirectionalBroadcastParams2 = ::testing::Combine(    //
+    ::testing::Values(targetShapesBidi[1]),                       //
+    ::testing::Values(ngraph::AxisSet{}),                         // not used in bidirectional mode
+    ::testing::Values(ngraph::op::BroadcastType::BIDIRECTIONAL),  //
+    ::testing::Values(inShapesBidi[1]),                           //
+    ::testing::ValuesIn(inputPrecisions),                         //
+    ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)            //
+);
 
 INSTANTIATE_TEST_CASE_P(                 //
     smoke_TestBidirectionalBroadcast2,   //

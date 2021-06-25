@@ -25,8 +25,8 @@ void registerNormalizeL2() {
     auto eps_mode = layer->get_eps_mode();
 
     if (axes.empty()) {
-      auto N = I + eps;
-      return edsl::make_tuple(I / N);
+      axes = std::vector<size_t>(I.compute_shape().sizes().size());
+      std::iota(axes.begin(), axes.end(), 0);
     }
 
     plaidml::op::EpsMode edsl_eps_mode;

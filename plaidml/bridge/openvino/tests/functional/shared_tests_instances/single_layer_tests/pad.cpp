@@ -38,10 +38,12 @@ const std::vector<float> argPadValue = {
     2.5f,
 };
 
+// Currently only CONSTANT pad mode is supported
 const std::vector<ngraph::helpers::PadMode> padMode = {
-    ngraph::helpers::PadMode::EDGE,
-    ngraph::helpers::PadMode::REFLECT,
-    ngraph::helpers::PadMode::SYMMETRIC,
+    ngraph::helpers::PadMode::CONSTANT,
+    //    ngraph::helpers::PadMode::EDGE,
+    //    ngraph::helpers::PadMode::REFLECT,
+    //    ngraph::helpers::PadMode::SYMMETRIC,
 };
 
 const auto pad2DConstparams = testing::Combine(                //
