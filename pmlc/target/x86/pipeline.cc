@@ -303,8 +303,11 @@ void pipelineBuilderStage1(OpPassManager &pm, const Options &options) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
+  pm.addNestedPass<FuncOp>(createStencilTppUnaryPass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+
   pm.addPass(createPRNGLinkingPass());
-  pm.addNestedPass<FuncOp>(createTppPatternsPass());
 }
 
 void pipelineBuilderStage2(OpPassManager &pm) {

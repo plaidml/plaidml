@@ -14,8 +14,6 @@
 #include <memory>
 #include <stdexcept>
 
-#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
-#include "mlir/Dialect/OpenMP/OpenMPDialect.h"
 #include "mlir/ExecutionEngine/OptUtils.h"
 #include "mlir/Support/FileUtilities.h"
 
@@ -39,6 +37,7 @@ using pmlc::rt::Executable;
 using pmlc::util::BufferPtr;
 
 namespace {
+
 /// This options struct prevents the need for global static initializers, and
 /// is only initialized if the JITRunner is invoked.
 struct Options {
@@ -47,15 +46,16 @@ struct Options {
                                            llvm::cl::init("-")};
   llvm::cl::opt<std::string> mainFuncName{
       "e", llvm::cl::desc("The function to be called"),
-      llvm::cl::value_desc("<function name>"), llvm::cl::init("main")};
+      llvm::cl::value_desc("function name"), llvm::cl::init("main")};
 
-  llvm::cl::opt<bool> optMCJIT{"mcjit", llvm::cl::desc("Use MCJIT")};
-  llvm::cl::opt<bool> optOrc{"orc", llvm::cl::desc("Use OrcJIT")};
+  llvm::cl::opt<std::string> sourceFilename{
+      "source", llvm::cl::value_desc("source file")};
 
   llvm::cl::opt<std::string> optDeviceID{
       "device", llvm::cl::desc("The device to use"),
-      llvm::cl::value_desc("<device_id>"), llvm::cl::init("llvm_cpu.0")};
+      llvm::cl::value_desc("device_id"), llvm::cl::init("llvm_cpu.0")};
 };
+
 } // namespace
 
 int JitRunnerMain(int argc, char **argv) {
@@ -73,14 +73,25 @@ int JitRunnerMain(int argc, char **argv) {
   }
 
   DialectRegistry registry;
-  registry.insert<LLVM::LLVMDialect, omp::OpenMPDialect>();
+  registerAllDialects(registry);
 
   auto context = std::make_unique<MLIRContext>(registry);
-  auto program = std::make_shared<Program>(std::move(context), std::move(file));
-  program->entry = options.mainFuncName.getValue();
+  auto program = std::make_shared<Program>(std::move(context), std::move(file),
+                                           options.mainFuncName.getValue());
+
+  if (!options.sourceFilename.empty()) {
+    auto sourceFile = openInputFile(options.sourceFilename, &errorMessage);
+    if (!sourceFile) {
+      llvm::errs() << errorMessage << "\n";
+      return EXIT_FAILURE;
+    }
+
+    program->parseIOTypes(std::move(sourceFile));
+  }
+
   auto executable =
       Executable::fromProgram(program, options.optDeviceID.getValue());
-  executable->invoke(ArrayRef<BufferPtr>{}, ArrayRef<BufferPtr>{});
+  executable->invoke();
 
   return EXIT_SUCCESS;
 }

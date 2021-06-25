@@ -18,6 +18,8 @@ public:
 
   virtual ~Executable() = default;
 
+  virtual double invoke() = 0;
+
   virtual double invoke(mlir::ArrayRef<util::BufferPtr> inputBuffers,
                         mlir::ArrayRef<util::BufferPtr> outputBuffers) = 0;
 };
