@@ -74,10 +74,6 @@ public:
       ReorderDesc &reorder = optReorder.getValue();
       IVLOG(3, "Optimized layout: " << mlir::debugString(reorder.reorderMap));
       if (mlir::succeeded(convertMemoryLayout(memoryDesc.value, reorder))) {
-        if (memoryDesc.parallelOp.hasValue()) {
-          // parallelOps.insert(memoryDesc.parallelOp.getValue());
-        }
-
         continue;
       }
 
@@ -91,14 +87,14 @@ public:
       IVLOG(3, "Failed to change layout in-place, inserting reorder");
       reorderMemoryReads(createReorder, reorder, memoryDesc, moduleOp,
                          toRemove);
-      if (memoryDesc.parallelOp.hasValue()) {
-        // parallelOps.insert(memoryDesc.parallelOp.getValue());
-      }
     }
 
+    tileLoopNestsToAlignWithDataMaps(func);
     static int count = 0;
     for (auto parallelOp : parallelOps) {
-      /* if (count < 10) */ { tileLoopNestsToAlignWithDataMaps(parallelOp); }
+      /* if (count < 10) */ {
+        // tileLoopNestsToAlignWithDataMaps(func);
+      }
       count++;
     }
 
@@ -182,6 +178,56 @@ void createBlockedLayoutForInputTensor(
   }
 }
 
+void createBlockedLayoutForInputTensor_NCHW(
+    PxaLoadOp loadOp,
+    mlir::DenseMap<mlir::Value, mlir::AffineMap> &memLayoutMaps,
+    int64_t datatileSize) {
+  mlir::Value indirectDef = getIndirectDef(loadOp.getMemRef());
+  IVLOG(4, "indirectDef: " << mlir::debugString(indirectDef));
+
+  auto srcMemType = loadOp.getMemRef().getType().cast<mlir::MemRefType>();
+  mlir::ArrayRef<int64_t> shape = srcMemType.getShape();
+  mlir::AffineMap map = loadOp.getAffineMap();
+  mlir::MLIRContext *context = map.getContext();
+
+  int64_t blockSize = datatileSize;
+  if (shape[1] % blockSize == 0) {
+    //
+    // NCHW -> NCHWc16: newBlockedMap: (d0 d1 d2 d3) -> (d0 d1 floordiv 16, d2,
+    // d3, d1 mod 16)
+    //
+    mlir::SmallVector<unsigned, 4> permutationMap;
+    permutationMap.push_back(0);
+    permutationMap.push_back(1);
+    permutationMap.push_back(2);
+    permutationMap.push_back(3);
+    mlir::AffineMap newMap =
+        mlir::AffineMap::getPermutationMap(permutationMap, context);
+    IVLOG(4, "newMap: " << mlir::debugString(newMap));
+
+    mlir::SmallVector<mlir::AffineExpr, 5> expansionExprs;
+    for (unsigned idx = 0; idx < newMap.getNumResults(); ++idx) {
+      mlir::AffineExpr expr;
+      if (idx == 1) {
+        expr = newMap.getResult(idx).floorDiv(blockSize);
+      } else {
+        expr = newMap.getResult(idx);
+      }
+
+      expansionExprs.push_back(expr);
+      if (idx == newMap.getNumResults() - 1) {
+        expansionExprs.push_back(newMap.getResult(1) % blockSize);
+      }
+    }
+
+    mlir::AffineMap newBlockedMap = mlir::AffineMap::get(
+        newMap.getNumResults(), 0, expansionExprs, context);
+    IVLOG(4, "newBlockedMap: " << mlir::debugString(newBlockedMap));
+
+    memLayoutMaps.insert({indirectDef, newBlockedMap});
+  }
+}
+
 bool createBlockedLayoutForFilterTensor(
     PxaLoadOp loadOp,
     mlir::DenseMap<mlir::Value, mlir::AffineMap> &memLayoutMaps,
@@ -224,6 +270,111 @@ bool createBlockedLayoutForFilterTensor(
       if (idx == newMap.getNumResults() - 1) {
         expansionExprs.push_back(newMap.getResult(0) % blockSize);
         expansionExprs.push_back(newMap.getResult(1) % blockSize);
+      }
+    }
+
+    mlir::AffineMap newBlockedMap = mlir::AffineMap::get(
+        newMap.getNumResults(), 0, expansionExprs, context);
+    IVLOG(4, "newBlockedMap: " << mlir::debugString(newBlockedMap));
+    auto memRef = loadOp.getMemRef();
+    IVLOG(4, "loadOp.getMemRef: " << mlir::debugString(memRef));
+    memLayoutMaps.insert({indirectDef, newBlockedMap});
+    return true;
+  }
+
+  return false;
+}
+
+void createBlockedLayoutForOutputTensor_NCHW(
+    PxaReduceOp reduceOp,
+    mlir::DenseMap<mlir::Value, mlir::AffineMap> &memLayoutMaps,
+    int64_t datatileSize) {
+  mlir::Value indirectDef = getIndirectDef(reduceOp.getMemRef());
+  IVLOG(4, "indirectDef: " << mlir::debugString(indirectDef));
+
+  auto srcMemType = reduceOp.getMemRef().getType().cast<mlir::MemRefType>();
+  mlir::ArrayRef<int64_t> shape = srcMemType.getShape();
+  mlir::AffineMap map = reduceOp.getAffineMap();
+  mlir::MLIRContext *context = map.getContext();
+
+  int64_t blockSize = datatileSize;
+  if (shape[1] % blockSize == 0) {
+    //
+    // NCHW -> NCHWc16: newBlockedMap: (d0 d1 d2 d3) -> (d0 d1 floordiv 16, d2,
+    // d3, d1 mod 16)
+    //
+    mlir::SmallVector<unsigned, 4> permutationMap;
+    permutationMap.push_back(0);
+    permutationMap.push_back(1);
+    permutationMap.push_back(2);
+    permutationMap.push_back(3);
+    mlir::AffineMap newMap =
+        mlir::AffineMap::getPermutationMap(permutationMap, context);
+    IVLOG(4, "newMap: " << mlir::debugString(newMap));
+
+    mlir::SmallVector<mlir::AffineExpr, 5> expansionExprs;
+    for (unsigned idx = 0; idx < newMap.getNumResults(); ++idx) {
+      mlir::AffineExpr expr;
+      if (idx == 1) {
+        expr = newMap.getResult(idx).floorDiv(blockSize);
+      } else {
+        expr = newMap.getResult(idx);
+      }
+
+      expansionExprs.push_back(expr);
+      if (idx == newMap.getNumResults() - 1) {
+        expansionExprs.push_back(newMap.getResult(1) % blockSize);
+      }
+    }
+
+    mlir::AffineMap newBlockedMap = mlir::AffineMap::get(
+        newMap.getNumResults(), 0, expansionExprs, context);
+    IVLOG(4, "newBlockedMap: " << mlir::debugString(newBlockedMap));
+
+    memLayoutMaps.insert({indirectDef, newBlockedMap});
+  }
+}
+
+bool createBlockedLayoutForFilterTensor_KCHW(
+    PxaLoadOp loadOp,
+    mlir::DenseMap<mlir::Value, mlir::AffineMap> &memLayoutMaps,
+    int64_t datatileSize) {
+  mlir::Value indirectDef = getIndirectDef(loadOp.getMemRef());
+  IVLOG(4, "indirectDef for filter: " << mlir::debugString(indirectDef));
+
+  auto srcMemType = loadOp.getMemRef().getType().cast<mlir::MemRefType>();
+  mlir::ArrayRef<int64_t> shape = srcMemType.getShape();
+  mlir::AffineMap map = loadOp.getAffineMap();
+  mlir::MLIRContext *context = map.getContext();
+
+  int64_t blockSize = datatileSize;
+  if (shape[0] % blockSize == 0 && shape[1] % blockSize == 0) {
+    // KCHW -> K floordiv 16, C floordiv 16, H, W, C mod 16, K mod 16
+    // (d0 d1 d2 d3) -> (d0 floordiv 16, d1 floordiv 16, d2, d3, d1 mod 16, d0
+    // mod 16)
+
+    mlir::SmallVector<unsigned, 4> permutationMap;
+    permutationMap.push_back(0);
+    permutationMap.push_back(1);
+    permutationMap.push_back(2);
+    permutationMap.push_back(3);
+    mlir::AffineMap newMap =
+        mlir::AffineMap::getPermutationMap(permutationMap, context);
+    IVLOG(4, "newMap: " << mlir::debugString(newMap));
+
+    mlir::SmallVector<mlir::AffineExpr, 6> expansionExprs;
+    for (unsigned idx = 0; idx < newMap.getNumResults(); ++idx) {
+      mlir::AffineExpr expr;
+      if (idx == 0 || idx == 1) {
+        expr = newMap.getResult(idx).floorDiv(blockSize);
+      } else {
+        expr = newMap.getResult(idx);
+      }
+
+      expansionExprs.push_back(expr);
+      if (idx == newMap.getNumResults() - 1) {
+        expansionExprs.push_back(newMap.getResult(1) % blockSize);
+        expansionExprs.push_back(newMap.getResult(0) % blockSize);
       }
     }
 
@@ -329,6 +480,10 @@ void recognizeConvsAndInsertBlockedDataLayouts(
                                                    datatileSize)) {
               createBlockedLayoutForInputTensor(input, memLayoutMaps,
                                                 datatileSize);
+            } else if (createBlockedLayoutForFilterTensor_KCHW(
+                           filter, memLayoutMaps, datatileSize)) {
+              createBlockedLayoutForInputTensor_NCHW(input, memLayoutMaps,
+                                                     datatileSize);
             }
           }
 
@@ -717,6 +872,15 @@ void simplifyMemrefMapsInInnerLoops(
   });
 
   IVLOG(4, "Returning from simplifyMemrefMapsInInnerLoops()");
+}
+
+void tileLoopNestsToAlignWithDataMaps(mlir::FuncOp func) {
+  func.walk([&](mlir::AffineParallelOp parallelOp) {
+    size_t numLoopsInConv2d = 7;
+    if (parallelOp.getSteps().size() == numLoopsInConv2d) {
+      tileLoopNestsToAlignWithDataMaps(parallelOp);
+    }
+  });
 }
 
 void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {

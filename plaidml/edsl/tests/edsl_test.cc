@@ -649,15 +649,43 @@ TEST_F(CppEdsl, Convolution) {
   runProgram(program);
 }
 
+Tensor Convolution3(Tensor I, Tensor K, const std::string& I_layout = "NCHW", const std::string& K_layout = "KCHW") {
+  TensorLens I_lens(I_layout, "NCHW");
+  TensorLens K_lens(K_layout, "KCHW");
+  I = I.use(I_lens);
+  K = K.use(K_lens);
+  TensorDim CI, CO, K0, K1, N, X0, X1;
+  TensorIndex n, x0, x1, co, ci, k0, k1;
+  I.bind_dims(N, CI, X0, X1);
+  K.bind_dims(CO, CI, K0, K1);
+  return Contraction(I_lens)
+      .outShape(N, CO, X0, X1)
+      .outAccess(n, co, x0, x1)
+      .sum(I(n, ci, x0 + k0 - (K0 / 2), x1 + k1 - (K1 / 2)) * K(co, ci, k0, k1));
+}
+
 TEST_F(CppEdsl, Convolution_NCHW) {
+  std::vector<float> data1, data2;
+  for (int i = 0; i < 3 * 3 * 64 * 64; i++) {
+    data1.push_back(i * 1.0);
+  }
+
+  for (int i = 0; i < 3 * 3 * 64 * 64; i++) {
+    data2.push_back(i * 1.0);
+  }
+
   auto I = Placeholder(DType::FLOAT32, {1, 64, 56, 56});
-  auto K = Placeholder(DType::FLOAT32, {64, 64, 3, 3});
-  auto program =
-      makeProgram("convolution_nchw", {I, K}, {Convolution2(I, K, /*I_layout=*/"NCHW", /*K_layout=*/"CKHW")});
+  auto K1 = Constant(makeBuffer(DType::FLOAT32, {64, 64, 3, 3}, data1), "K1");
+  auto K2 = Constant(makeBuffer(DType::FLOAT32, {64, 64, 3, 3}, data2), "K2");
+  auto conv1 = Convolution3(I, K1);
+  auto conv2 = Convolution3(conv1, K2, "NCHW", "KCHW");
+  auto program = makeProgram("convolution", {I}, {conv2});
+
   // clang-format off
   // CHECK-LABEL: CppEdsl.Convolution_NCHW
   // CHECK: module @convolution
   // clang-format on
+
   runProgram(program);
 }
 

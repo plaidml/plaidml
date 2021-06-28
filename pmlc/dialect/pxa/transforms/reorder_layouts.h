@@ -135,6 +135,7 @@ void reorderMemoryReads(const ReorderCreator &creator, ReorderDesc &reorderDesc,
                         MemoryUsageDesc &memoryDesc, mlir::ModuleOp &moduleOp,
                         llvm::SetVector<mlir::Operation *> &toRemove);
 
+void tileLoopNestsToAlignWithDataMaps(mlir::FuncOp func);
 void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp);
 void simplifyMemrefMaps(mlir::AffineParallelOp &parallelOp);
 void eraseLayoutMapsFromMemRefs(mlir::FuncOp func);
