@@ -20,13 +20,13 @@ std::unique_ptr<mlir::Pass> createLowerToLLVMPass();
 
 std::unique_ptr<mlir::Pass> createPRNGLinkingPass();
 
+std::unique_ptr<mlir::Pass> createStencilTppGemmPass();
+
 std::unique_ptr<mlir::Pass> createStencilTppUnaryPass();
 
 std::unique_ptr<mlir::Pass> createTraceLinkingPass();
 
 std::unique_ptr<mlir::Pass> createXSMMLoweringPass();
-
-std::unique_ptr<mlir::Pass> createXSMMStencilPass();
 
 void populatePXAGemmToXSMMConversionPatterns(mlir::RewritePatternSet &patterns);
 

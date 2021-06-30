@@ -26,26 +26,6 @@ namespace stdx = dialect::stdx;
 
 namespace {
 
-static AffineMap makeTileMap(MLIRContext *context, AffineMap map,
-                             ValueRange operands,
-                             ArrayRef<BlockArgument> idxs) {
-  SmallVector<AffineExpr, 8> exprs;
-  for (Value value : operands) {
-    bool found = false;
-    for (size_t i = 0; i < idxs.size(); i++) {
-      if (value == idxs[i]) {
-        exprs.push_back(getAffineDimExpr(i, context));
-        found = true;
-      }
-    }
-    if (!found) {
-      exprs.push_back(getAffineConstantExpr(0, context));
-    }
-  }
-  auto toIdxs = AffineMap::get(idxs.size(), 0, exprs, context);
-  return map.compose(toIdxs);
-}
-
 struct TppOperand {
   Value memref;
   AffineMap accessMap;
@@ -66,15 +46,15 @@ Optional<TppOperand> getTppOperand(TOp op, Block *block,
   mapOperands.append(outerValueMap.getOperands().begin(),
                      outerValueMap.getOperands().end());
 
-  AffineMap tileMap = makeTileMap(op.getContext(), op.getAffineMap(),
-                                  op.getMapOperands(), idxs);
+  AffineMap tileMap = pxa::makeTileMap(op.getContext(), op.getAffineMap(),
+                                       op.getMapOperands(), idxs);
 
   return TppOperand{op.getMemRef(), outerValueMap.getAffineMap(), tileMap};
 }
 
 class StencilImpl : public pxa::StencilBase {
 private:
-  Optional<pxa::LoadStoreOps> capture() {
+  Optional<pxa::StencilCapture> capture() {
     using matchers::m_Any;
 
     Value load, reduce;
@@ -92,29 +72,29 @@ private:
         !reduce.getType().cast<MemRefType>().getElementType().isF32())
       return None;
 
-    return pxa::LoadStoreOps{{reduce}, {load}};
+    return pxa::StencilCapture{{reduce}, {load}};
   }
 
-  double getCost(pxa::TensorAndIndexPermutation perm,
+  double getCost(const pxa::StencilOption &stencil,
                  ArrayRef<int64_t> tileSizes) {
     return 0.0;
   }
 
-  void transform(pxa::TensorAndIndexPermutation perm,
+  void transform(const pxa::StencilOption &stencil,
                  ArrayRef<int64_t> tileSizes) {
     OpBuilder builder(op);
 
-    auto outputOp = cast<pxa::PxaReduceOp>(perm.values[0].getDefiningOp());
-    auto inputOp = cast<pxa::PxaLoadOp>(perm.values[1].getDefiningOp());
+    auto outputOp = cast<pxa::PxaReduceOp>(stencil.values[0].getDefiningOp());
+    auto inputOp = cast<pxa::PxaLoadOp>(stencil.values[1].getDefiningOp());
 
     SmallVector<Value> inputIndices, outputIndices;
     Optional<TppOperand> output =
-        getTppOperand(outputOp, op->getBlock(), perm.indexes, outputIndices);
+        getTppOperand(outputOp, op->getBlock(), stencil.indexes, outputIndices);
     if (!output)
       return;
 
     Optional<TppOperand> input =
-        getTppOperand(inputOp, op->getBlock(), perm.indexes, inputIndices);
+        getTppOperand(inputOp, op->getBlock(), stencil.indexes, inputIndices);
     if (!input)
       return;
 
@@ -151,22 +131,19 @@ public:
   explicit StencilImpl(AffineParallelOp op)
       : StencilBase(
             op,
-            /*tiledIdxCount=*/2,
-            /*tilingGenerators=*/
             {
-                pxa::ExactRangeGenerator(),
-                pxa::ExactRangeGenerator(),
-            },
-            /*requirements=*/
-            {
-                pxa::IdxStrideReqs{
-                    [](int64_t stride) { return stride > 1; }, // output
-                    [](int64_t stride) { return stride > 1; }, // input
-                },
-                pxa::IdxStrideReqs{
-                    [](int64_t stride) { return stride == 1; }, // output
-                    [](int64_t stride) { return stride == 1; }, // input
-                },
+                pxa::StencilIndexRequirement{
+                    /*tilingGenerator=*/pxa::ExactRangeGenerator(),
+                    /*predicates=*/pxa::IndexStridePredicates{
+                        [](int64_t stride) { return stride > 1; }, // output
+                        [](int64_t stride) { return stride > 1; }, // input
+                    }},
+                pxa::StencilIndexRequirement{
+                    /*tilingGenerator=*/pxa::ExactRangeGenerator(),
+                    /*predicates=*/pxa::IndexStridePredicates{
+                        [](int64_t stride) { return stride == 1; }, // output
+                        [](int64_t stride) { return stride == 1; }, // input
+                    }},
             }) {}
 };
 
@@ -177,7 +154,7 @@ struct StencilTppUnaryPass : public StencilTppUnaryBase<StencilTppUnaryPass> {
     getFunction().walk([](AffineParallelOp op) {
       if (op.getIVs().size() == 2) {
         StencilImpl stencil(op);
-        stencil.DoStenciling();
+        stencil.performStenciling();
       }
     });
   }
