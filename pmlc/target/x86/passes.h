@@ -18,8 +18,6 @@ std::unique_ptr<mlir::Pass> createLowerPXAToAffinePass();
 
 std::unique_ptr<mlir::Pass> createLowerToLLVMPass();
 
-std::unique_ptr<mlir::Pass> createOpenMPWorkaroundPass();
-
 std::unique_ptr<mlir::Pass> createPRNGLinkingPass();
 
 std::unique_ptr<mlir::Pass> createStencilTppUnaryPass();
