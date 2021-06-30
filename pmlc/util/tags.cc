@@ -2,78 +2,111 @@
 
 #include "mlir/IR/BuiltinTypes.h"
 
-namespace pmlc {
-
 using namespace llvm; // NOLINT
 using namespace mlir; // NOLINT
 
-static StringRef tagDict() { return "tags"; }
+namespace pmlc {
 
-bool hasTags(mlir::Operation *op) {
-  return static_cast<bool>(op->getAttrOfType<DictionaryAttr>(tagDict()));
+static constexpr StringLiteral kTagAttribute = "tags";
+
+bool hasTags(Operation *op) {
+  return static_cast<bool>(op->getAttrOfType<DictionaryAttr>(kTagAttribute));
 }
 
-void copyTags(mlir::Operation *dst, mlir::Operation *src) {
-  auto dict = src->getAttrOfType<DictionaryAttr>(tagDict());
-  if (dict) {
-    dst->setAttr(tagDict(), dict);
-  }
+void copyTags(Operation *dst, Operation *src) {
+  NamedAttrList srcDict = src->getAttrOfType<DictionaryAttr>(kTagAttribute);
+  NamedAttrList dstDict = dst->getAttrOfType<DictionaryAttr>(kTagAttribute);
+  dstDict.append(srcDict.begin(), srcDict.end());
+  dst->setAttr(kTagAttribute, dstDict.getDictionary(dst->getContext()));
 }
 
-void clearTags(mlir::Operation *op) { op->removeAttr(tagDict()); }
+void clearTags(Operation *op) { op->removeAttr(kTagAttribute); }
 
-void clearTag(mlir::Operation *op, llvm::StringRef name) {
-  NamedAttrList dict = op->getAttrOfType<DictionaryAttr>(tagDict());
+void clearTag(Operation *op, StringRef name) {
+  NamedAttrList dict = op->getAttrOfType<DictionaryAttr>(kTagAttribute);
   dict.erase(name);
-  if (dict.empty()) {
-    op->removeAttr(tagDict());
-  } else {
-    op->setAttr(tagDict(), dict.getDictionary(op->getContext()));
-  }
+  if (dict.empty())
+    op->removeAttr(kTagAttribute);
+  else
+    op->setAttr(kTagAttribute, dict.getDictionary(op->getContext()));
 }
 
-void setUnitTag(mlir::Operation *op, llvm::StringRef name) {
-  NamedAttrList dict = op->getAttrOfType<DictionaryAttr>(tagDict());
+void setUnitTag(Operation *op, StringRef name) {
+  NamedAttrList dict = op->getAttrOfType<DictionaryAttr>(kTagAttribute);
   dict.set(name, UnitAttr::get(op->getContext()));
-  op->setAttr(tagDict(), dict.getDictionary(op->getContext()));
+  op->setAttr(kTagAttribute, dict.getDictionary(op->getContext()));
 }
 
-void setIntegerTag(mlir::Operation *op, llvm::StringRef name, int64_t val) {
-  NamedAttrList dict = op->getAttrOfType<DictionaryAttr>(tagDict());
+void setIntegerTag(Operation *op, StringRef name, int64_t val) {
+  NamedAttrList dict = op->getAttrOfType<DictionaryAttr>(kTagAttribute);
   auto type = IntegerType::get(op->getContext(), 64);
   dict.set(name, IntegerAttr::get(type, val));
-  op->setAttr(tagDict(), dict.getDictionary(op->getContext()));
+  op->setAttr(kTagAttribute, dict.getDictionary(op->getContext()));
 }
 
-bool hasUnitTag(mlir::Operation *op, llvm::StringRef name) {
-  auto dict = op->getAttrOfType<DictionaryAttr>(tagDict());
-  if (!dict) {
-    return false;
+void setTags(Operation *op, ArrayRef<StringRef> tags) {
+  if (tags.empty())
+    return;
+
+  NamedAttrList dict = op->getAttrOfType<DictionaryAttr>(kTagAttribute);
+  for (StringRef tag : tags) {
+    dict.set(tag, UnitAttr::get(op->getContext()));
   }
+  op->setAttr(kTagAttribute, dict.getDictionary(op->getContext()));
+}
+
+bool hasUnitTag(Operation *op, StringRef name) {
+  auto dict = op->getAttrOfType<DictionaryAttr>(kTagAttribute);
+  if (!dict)
+    return false;
+
   auto attr = dict.get(name).dyn_cast_or_null<UnitAttr>();
-  return static_cast<bool>(attr);
+  return attr != nullptr;
 }
 
-bool hasIntegerTag(mlir::Operation *op, llvm::StringRef name) {
-  auto dict = op->getAttrOfType<DictionaryAttr>(tagDict());
-  if (!dict) {
+bool hasIntegerTag(Operation *op, StringRef name) {
+  auto dict = op->getAttrOfType<DictionaryAttr>(kTagAttribute);
+  if (!dict)
     return false;
-  }
+
   auto attr = dict.get(name).dyn_cast_or_null<IntegerAttr>();
-  return static_cast<bool>(attr);
+  return attr != nullptr;
 }
 
-int64_t getIntegerTag(mlir::Operation *op, llvm::StringRef name,
-                      int64_t defaultVal) {
-  auto dict = op->getAttrOfType<DictionaryAttr>(tagDict());
-  if (!dict) {
+int64_t getIntegerTag(Operation *op, StringRef name, int64_t defaultVal) {
+  auto dict = op->getAttrOfType<DictionaryAttr>(kTagAttribute);
+  if (!dict)
     return defaultVal;
-  }
+
   auto attr = dict.get(name).dyn_cast_or_null<IntegerAttr>();
-  if (attr) {
+  if (attr)
     return attr.getInt();
-  }
+
   return defaultVal;
+}
+
+bool hasAllTags(Operation *op, ArrayRef<StringRef> tags) {
+  if (tags.empty())
+    return true;
+
+  DictionaryAttr dict = op->getAttrOfType<DictionaryAttr>(kTagAttribute);
+  if (!dict)
+    return false;
+
+  for (StringRef tag : tags) {
+    if (!dict.get(tag))
+      return false;
+  }
+
+  return true;
+}
+
+bool hasTag(Operation *op, StringRef tag) {
+  DictionaryAttr dict = op->getAttrOfType<DictionaryAttr>(kTagAttribute);
+  if (!dict)
+    return false;
+
+  return dict.get(tag) != nullptr;
 }
 
 } // namespace pmlc

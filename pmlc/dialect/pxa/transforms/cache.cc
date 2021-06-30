@@ -16,6 +16,7 @@
 #include "pmlc/dialect/pxa/transforms/pass_detail.h"
 #include "pmlc/util/ident.h"
 #include "pmlc/util/logging.h"
+#include "pmlc/util/tags.h"
 #include "pmlc/util/util.h"
 
 using namespace mlir; // NOLINT
@@ -449,19 +450,19 @@ struct CachePass : public CacheBase<CachePass> {
     auto func = getFunction();
 
     func.walk([&](AffineParallelOp inner) {
-      if (!util::hasTag(inner, innerTag)) {
+      if (!hasTag(inner, innerTag)) {
         return;
       }
 
       auto middle = dyn_cast<AffineParallelOp>(inner->getParentOp());
-      if (!middle || !util::hasTag(middle, middleTag)) {
+      if (!middle || !hasTag(middle, middleTag)) {
         middle.emitError("Middle loop does not have tag");
         signalPassFailure();
         return;
       }
 
       auto outer = dyn_cast<AffineParallelOp>(middle->getParentOp());
-      if (!outer || !util::hasTag(outer, outerTag)) {
+      if (!outer || !hasTag(outer, outerTag)) {
         outer.emitError("Outer loop does not have tag");
         signalPassFailure();
         return;
