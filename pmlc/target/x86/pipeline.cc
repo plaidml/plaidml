@@ -107,72 +107,6 @@ struct ConvertStandardToLLVMPass
   }
 };
 
-// OpenMP has issues passing values through to OpenMP blocks.  As a workaround,
-// we have a simple pass to smuggle values that cross the boundary via an
-// alloca()'d struct.
-struct OpenMPWorkaroundPass final
-    : public OpenMPWorkaroundBase<OpenMPWorkaroundPass> {
-  void runOnOperation() final {
-    LLVM::LLVMFuncOp funcOp = getOperation();
-    OpBuilder builder{&getContext()};
-    funcOp.walk([&](omp::ParallelOp parOp) {
-      llvm::SetVector<Value> values;
-
-      visitUsedValuesDefinedAbove({parOp.region()}, [&](OpOperand *opOperand) {
-        Value value = opOperand->get();
-
-        // If it's not an LLVM pointer type, we don't need or want to smuggle
-        // this value in via a struct.
-        Type llvmType = value.getType();
-        if (llvmType.isa<LLVM::LLVMPointerType>()) {
-          return;
-        }
-
-        // Otherwise, we need to smuggle the value through an alloca'd
-        // struct.
-        values.insert(value);
-      });
-
-      if (values.empty()) {
-        return; // Nothing to do.
-      }
-
-      // Build the structure.
-      builder.setInsertionPoint(parOp);
-      SmallVector<Type, 8> types;
-      for (Value value : values) {
-        types.push_back(value.getType());
-      }
-      auto structTy = LLVM::LLVMStructType::getLiteral(&getContext(), types);
-      auto structPtrTy = LLVM::LLVMPointerType::get(structTy);
-      auto numElements = builder.create<LLVM::ConstantOp>(
-          parOp.getLoc(), builder.getI64Type(), builder.getIndexAttr(1));
-      auto structPtr = builder.create<LLVM::AllocaOp>(
-          parOp.getLoc(), structPtrTy, numElements, 0);
-      Value srcStructVal =
-          builder.create<LLVM::UndefOp>(parOp.getLoc(), structTy);
-      for (auto srcIdx : llvm::enumerate(values)) {
-        srcStructVal = builder.create<LLVM::InsertValueOp>(
-            parOp.getLoc(), srcStructVal, srcIdx.value(),
-            builder.getI64ArrayAttr(srcIdx.index()));
-      }
-      builder.create<LLVM::StoreOp>(parOp.getLoc(), srcStructVal, structPtr);
-
-      // Unpack the structure, rewriting the affected values.
-      builder.setInsertionPointToStart(&parOp.region().front());
-      auto dstStructVal =
-          builder.create<LLVM::LoadOp>(parOp.getLoc(), structPtr);
-      for (auto srcIdx : llvm::enumerate(values)) {
-        auto smuggledValue = builder.create<LLVM::ExtractValueOp>(
-            parOp.getLoc(), srcIdx.value().getType(), dstStructVal,
-            builder.getI64ArrayAttr(srcIdx.index()));
-        replaceAllUsesInRegionWith(srcIdx.value(), smuggledValue,
-                                   parOp.region());
-      }
-    });
-  }
-};
-
 } // namespace
 
 // NOTE: the stencil pass uses row-major ordering, the heatmap is
@@ -232,10 +166,6 @@ std::unique_ptr<Pass> createLowerPXAToAffinePass() {
 
 std::unique_ptr<Pass> createLowerToLLVMPass() {
   return std::make_unique<ConvertStandardToLLVMPass>();
-}
-
-std::unique_ptr<Pass> createOpenMPWorkaroundPass() {
-  return std::make_unique<OpenMPWorkaroundPass>();
 }
 
 struct Options : public PassPipelineOptions<Options> {

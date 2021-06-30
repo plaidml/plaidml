@@ -18,15 +18,6 @@ def ConvertStandardToLLVM : Pass<"x86-convert-std-to-llvm", "mlir::ModuleOp"> {
   let dependentDialects = ["mlir::LLVM::LLVMDialect"];
 }
 
-def OpenMPWorkaround : Pass<"x86-openmp-workaround", "mlir::LLVM::LLVMFuncOp"> {
-  let summary = "Packs/unpacks values crossing OpenMP parallel blocks";
-  let constructor = "pmlc::target::x86::createOpenMPWorkaroundPass()";
-  let dependentDialects = [
-    "mlir::LLVM::LLVMDialect",
-    "mlir::omp::OpenMPDialect",
-  ];
-}
-
 def PRNGLinking : Pass<"x86-prng-linking", "mlir::ModuleOp"> {
   let summary = "Link prng ops to runtime functions";
   let constructor = "pmlc::target::x86::createPRNGLinkingPass()";
