@@ -90,13 +90,6 @@ public:
     }
 
     tileLoopNestsToAlignWithDataMaps(func);
-    static int count = 0;
-    for (auto parallelOp : parallelOps) {
-      /* if (count < 10) */ {
-        // tileLoopNestsToAlignWithDataMaps(func);
-      }
-      count++;
-    }
 
     // Cleanup
     for (auto op : toRemove)
@@ -332,6 +325,8 @@ void createBlockedLayoutForOutputTensor_NCHW(
     IVLOG(4, "newBlockedMap: " << mlir::debugString(newBlockedMap));
 
     memLayoutMaps.insert({indirectDef, newBlockedMap});
+    IVLOG(4,
+          "Inserted data layouts in createBlockedLayoutForOutputTensor_NCHW\n");
   }
 }
 
@@ -384,6 +379,8 @@ bool createBlockedLayoutForFilterTensor_KCHW(
     auto memRef = loadOp.getMemRef();
     IVLOG(4, "loadOp.getMemRef: " << mlir::debugString(memRef));
     memLayoutMaps.insert({indirectDef, newBlockedMap});
+    IVLOG(4,
+          "Inserted data layouts in createBlockedLayoutForFilterTensor_KCHW\n");
     return true;
   }
 
@@ -877,8 +874,11 @@ void simplifyMemrefMapsInInnerLoops(
 void tileLoopNestsToAlignWithDataMaps(mlir::FuncOp func) {
   func.walk([&](mlir::AffineParallelOp parallelOp) {
     size_t numLoopsInConv2d = 7;
+    static int count = 0;
+
     if (parallelOp.getSteps().size() == numLoopsInConv2d) {
       tileLoopNestsToAlignWithDataMaps(parallelOp);
+      count++;
     }
   });
 }
@@ -897,6 +897,7 @@ void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {
     IVLOG(4, "index i: " << i << ": " << mlir::debugString(val));
   }
 
+  bool floorDivsPresent = false;
   parallelOp.walk([&](PxaLoadOp op) {
     IVLOG(4, "read load op: " << op);
     mlir::Value memRef = op.getMemRef();
@@ -909,6 +910,7 @@ void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {
       mlir::AffineExpr expr = map.getResult(idx);
 
       if (expr.getKind() == mlir::AffineExprKind::FloorDiv) {
+        floorDivsPresent = true;
         auto divExpr = expr.cast<mlir::AffineBinaryOpExpr>();
         mlir::AffineExpr rhsExpr = divExpr.getRHS();
         mlir::AffineExpr lhsExpr = divExpr.getLHS();
@@ -951,6 +953,10 @@ void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {
 
     IVLOG(4, "PxaLoadOp description ends");
   });
+
+  if (!floorDivsPresent) {
+    return;
+  }
 
   for (unsigned i = 0; i < outerIdxs.size(); ++i) {
     mlir::Value val = outerIdxs[i];
