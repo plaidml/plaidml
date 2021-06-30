@@ -10,6 +10,7 @@
 #include "pmlc/dialect/pxa/analysis/uses.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/dialect/pxa/transforms/cache.h"
+#include "pmlc/dialect/pxa/transforms/gpu_thread.h"
 #include "pmlc/dialect/pxa/transforms/pass_detail.h"
 #include "pmlc/dialect/pxa/transforms/tile.h"
 #include "pmlc/dialect/pxa/transforms/tile_accumulate.h"
@@ -324,7 +325,7 @@ void SubgroupApply(AffineParallelOp op, SubgroupPlan plan) {
     (void)vectorizeBuffer(alloc);
   });
   // Attach subgroup size
-  setIntegerTag(op, subgroupSizeTag(), plan.subgroupSize);
+  setIntegerTag(op, kSubgroupSizeTag, plan.subgroupSize);
 }
 
 struct SubgroupsPass : public SubgroupsBase<SubgroupsPass> {
@@ -346,7 +347,7 @@ struct SubgroupsPass : public SubgroupsBase<SubgroupsPass> {
       // If subgrouping fails, we tile accumulations instead to handle the other
       // cases
       tileAccumulations(op, false);
-      setIntegerTag(op, subgroupSizeTag(), 1);
+      setIntegerTag(op, kSubgroupSizeTag, 1);
       return;
     }
     IVLOG(3, "best plan = " << cm.bestPlan);
