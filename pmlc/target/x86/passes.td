@@ -32,6 +32,17 @@ def PRNGLinking : Pass<"x86-prng-linking", "mlir::ModuleOp"> {
   let constructor = "pmlc::target::x86::createPRNGLinkingPass()";
 }
 
+def StencilTppGemm : FunctionPass<"x86-stencil-tpp-gemm"> {
+  let summary = "Find a stencil for TPP GEMM ops";
+  let constructor = "pmlc::target::x86::createStencilTppGemmPass()";
+  let options = [
+    Option<"numThreads", "threads", "unsigned", /*default=*/"0",
+           "Number of threads">,
+    Option<"isBatched", "batched", "bool", /*default=*/"false",
+           "Enable strided batching over k dimension of GEMM">
+  ];
+}
+
 def StencilTppUnary : FunctionPass<"x86-stencil-tpp-unary"> {
   let summary = "Find a stencil for TPP unary ops";
   let constructor = "pmlc::target::x86::createStencilTppUnaryPass()";
@@ -40,17 +51,6 @@ def StencilTppUnary : FunctionPass<"x86-stencil-tpp-unary"> {
 def TraceLinking : Pass<"x86-trace-linking", "mlir::ModuleOp"> {
   let summary = "Link trace ops to runtime functions";
   let constructor = "pmlc::target::x86::createTraceLinkingPass()";
-}
-
-def XSMMStencil : FunctionPass<"x86-affine-stencil-xsmm"> {
-  let summary = "Find a tiling for extracting 'micro' GEMMs suitable for XSMM";
-  let constructor = "pmlc::target::x86::createXSMMStencilPass()";
-  let options = [
-    Option<"numThreads", "threads", "unsigned", /*default=*/"0",
-           "Number of threads">,
-    Option<"isBatched", "batched", "bool", /*default=*/"false",
-           "Enable strided batching over k dimension of GEMM">
-  ];
 }
 
 #endif // __PMLC_TARGET_X86_PASSES__

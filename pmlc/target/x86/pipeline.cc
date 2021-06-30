@@ -196,9 +196,9 @@ static pxa::StencilCost heatmapCostTransposed(ArrayRef<int64_t> tile,
   return heatmapCost(ArrayRef<int64_t>{tile[1], tile[0], tile[2]});
 }
 
-struct XSMMStencilPass : public XSMMStencilBase<XSMMStencilPass> {
-  XSMMStencilPass() = default;
-  XSMMStencilPass(unsigned numThreads, bool isBatched) {
+struct StencilTppGemmPass : public StencilTppGemmBase<StencilTppGemmPass> {
+  StencilTppGemmPass() = default;
+  StencilTppGemmPass(unsigned numThreads, bool isBatched) {
     this->numThreads = numThreads;
     this->isBatched = isBatched;
   }
@@ -207,8 +207,8 @@ struct XSMMStencilPass : public XSMMStencilBase<XSMMStencilPass> {
     if (!numThreads.getValue()) {
       numThreads = std::thread::hardware_concurrency();
     }
-    IVLOG(3, "XSMMStencilPass> numThreads: " << numThreads.getValue());
-    IVLOG(3, "XSMMStencilPass> isBatched: " << isBatched.getValue());
+    IVLOG(3, "StencilTppGemmPass> numThreads: " << numThreads.getValue());
+    IVLOG(3, "StencilTppGemmPass> isBatched: " << isBatched.getValue());
     getFunction().walk([this](AffineParallelOp op) {
       // TODO: check LogicalResult
       (void)pxa::applyStencilGEMM(op, numThreads.getValue(),
@@ -217,13 +217,13 @@ struct XSMMStencilPass : public XSMMStencilBase<XSMMStencilPass> {
   }
 };
 
-std::unique_ptr<Pass> createXSMMStencilPass(unsigned numThreads,
-                                            bool isBatched) {
-  return std::make_unique<XSMMStencilPass>(numThreads, isBatched);
+std::unique_ptr<Pass> createStencilTppGemmPass(unsigned numThreads,
+                                               bool isBatched) {
+  return std::make_unique<StencilTppGemmPass>(numThreads, isBatched);
 }
 
-std::unique_ptr<Pass> createXSMMStencilPass() {
-  return std::make_unique<XSMMStencilPass>();
+std::unique_ptr<Pass> createStencilTppGemmPass() {
+  return std::make_unique<StencilTppGemmPass>();
 }
 
 std::unique_ptr<Pass> createLowerPXAToAffinePass() {
@@ -273,8 +273,8 @@ void pipelineBuilderStage1(OpPassManager &pm, const Options &options) {
   pm.addPass(createCSEPass());
   pm.addNestedPass<FuncOp>(layer::createInlineLayersPass());
 
-  pm.addNestedPass<FuncOp>(createXSMMStencilPass(/*numThreads=*/maxThreads,
-                                                 /*isBatched=*/true));
+  pm.addNestedPass<FuncOp>(createStencilTppGemmPass(/*numThreads=*/maxThreads,
+                                                    /*isBatched=*/true));
   pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
 
