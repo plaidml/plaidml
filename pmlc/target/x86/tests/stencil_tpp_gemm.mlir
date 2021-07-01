@@ -1,5 +1,5 @@
-// RUN: pmlc-opt -x86-affine-stencil-xsmm='threads=4 batched=true' %s | FileCheck %s
-// RUN: pmlc-opt -x86-affine-stencil-xsmm='threads=4 batched=false' %s | FileCheck %s
+// RUN: pmlc-opt -x86-stencil-tpp-gemm='threads=4 batched=true' %s | FileCheck %s
+// RUN: pmlc-opt -x86-stencil-tpp-gemm='threads=4 batched=false' %s | FileCheck %s
 
 // CHECK-LABEL: func @no_gemm_mul_reduce_operation
 //       CHECK:   affine.parallel

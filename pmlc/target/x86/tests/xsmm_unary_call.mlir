@@ -1,11 +1,10 @@
-// RUN: pmlc-opt \
+// RUN: pmlc-opt %s \
 // RUN:     -x86-convert-pxa-to-affine \
 // RUN:     -lower-affine \
 // RUN:     -canonicalize \
 // RUN:     -convert-scf-to-std \
 // RUN:     -x86-convert-std-to-llvm \
-// RUN:     -x86-openmp-workaround %s | \
-// RUN:   pmlc-jit | FileCheck %s
+// RUN:   | pmlc-jit | FileCheck %s
 
 !eltwise = type memref<8x3xf32>
 

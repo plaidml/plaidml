@@ -27,9 +27,8 @@ using namespace mlir; // NOLINT
 namespace pmlc::dialect::pxa {
 
 namespace {
-using llvm::DenseMap;
-using llvm::DenseSet;
-using llvm::SmallVector;
+
+static constexpr llvm::StringLiteral kCpuThreadTag = "cpuThread";
 
 // Pick the tiling that is as large as possible without going over maxThreads
 struct CostModel {
@@ -69,7 +68,7 @@ struct CPUThreadPass : public CPUThreadBase<CPUThreadPass> {
       }
       // Tile and tag
       performTiling(op, tileSize);
-      setUnitTag(op, cpuThreadTag());
+      setUnitTag(op, kCpuThreadTag);
     }
   }
 };

@@ -107,72 +107,6 @@ struct ConvertStandardToLLVMPass
   }
 };
 
-// OpenMP has issues passing values through to OpenMP blocks.  As a workaround,
-// we have a simple pass to smuggle values that cross the boundary via an
-// alloca()'d struct.
-struct OpenMPWorkaroundPass final
-    : public OpenMPWorkaroundBase<OpenMPWorkaroundPass> {
-  void runOnOperation() final {
-    LLVM::LLVMFuncOp funcOp = getOperation();
-    OpBuilder builder{&getContext()};
-    funcOp.walk([&](omp::ParallelOp parOp) {
-      llvm::SetVector<Value> values;
-
-      visitUsedValuesDefinedAbove({parOp.region()}, [&](OpOperand *opOperand) {
-        Value value = opOperand->get();
-
-        // If it's not an LLVM pointer type, we don't need or want to smuggle
-        // this value in via a struct.
-        Type llvmType = value.getType();
-        if (llvmType.isa<LLVM::LLVMPointerType>()) {
-          return;
-        }
-
-        // Otherwise, we need to smuggle the value through an alloca'd
-        // struct.
-        values.insert(value);
-      });
-
-      if (values.empty()) {
-        return; // Nothing to do.
-      }
-
-      // Build the structure.
-      builder.setInsertionPoint(parOp);
-      SmallVector<Type, 8> types;
-      for (Value value : values) {
-        types.push_back(value.getType());
-      }
-      auto structTy = LLVM::LLVMStructType::getLiteral(&getContext(), types);
-      auto structPtrTy = LLVM::LLVMPointerType::get(structTy);
-      auto numElements = builder.create<LLVM::ConstantOp>(
-          parOp.getLoc(), builder.getI64Type(), builder.getIndexAttr(1));
-      auto structPtr = builder.create<LLVM::AllocaOp>(
-          parOp.getLoc(), structPtrTy, numElements, 0);
-      Value srcStructVal =
-          builder.create<LLVM::UndefOp>(parOp.getLoc(), structTy);
-      for (auto srcIdx : llvm::enumerate(values)) {
-        srcStructVal = builder.create<LLVM::InsertValueOp>(
-            parOp.getLoc(), srcStructVal, srcIdx.value(),
-            builder.getI64ArrayAttr(srcIdx.index()));
-      }
-      builder.create<LLVM::StoreOp>(parOp.getLoc(), srcStructVal, structPtr);
-
-      // Unpack the structure, rewriting the affected values.
-      builder.setInsertionPointToStart(&parOp.region().front());
-      auto dstStructVal =
-          builder.create<LLVM::LoadOp>(parOp.getLoc(), structPtr);
-      for (auto srcIdx : llvm::enumerate(values)) {
-        auto smuggledValue = builder.create<LLVM::ExtractValueOp>(
-            parOp.getLoc(), srcIdx.value().getType(), dstStructVal,
-            builder.getI64ArrayAttr(srcIdx.index()));
-        replaceAllUsesInRegionWith(srcIdx.value(), smuggledValue,
-                                   parOp.region());
-      }
-    });
-  }
-};
-
 } // namespace
 
 // NOTE: the stencil pass uses row-major ordering, the heatmap is
@@ -196,9 +130,9 @@ static pxa::StencilCost heatmapCostTransposed(ArrayRef<int64_t> tile,
   return heatmapCost(ArrayRef<int64_t>{tile[1], tile[0], tile[2]});
 }
 
-struct XSMMStencilPass : public XSMMStencilBase<XSMMStencilPass> {
-  XSMMStencilPass() = default;
-  XSMMStencilPass(unsigned numThreads, bool isBatched) {
+struct StencilTppGemmPass : public StencilTppGemmBase<StencilTppGemmPass> {
+  StencilTppGemmPass() = default;
+  StencilTppGemmPass(unsigned numThreads, bool isBatched) {
     this->numThreads = numThreads;
     this->isBatched = isBatched;
   }
@@ -207,8 +141,8 @@ struct XSMMStencilPass : public XSMMStencilBase<XSMMStencilPass> {
     if (!numThreads.getValue()) {
       numThreads = std::thread::hardware_concurrency();
     }
-    IVLOG(3, "XSMMStencilPass> numThreads: " << numThreads.getValue());
-    IVLOG(3, "XSMMStencilPass> isBatched: " << isBatched.getValue());
+    IVLOG(3, "StencilTppGemmPass> numThreads: " << numThreads.getValue());
+    IVLOG(3, "StencilTppGemmPass> isBatched: " << isBatched.getValue());
     getFunction().walk([this](AffineParallelOp op) {
       // TODO: check LogicalResult
       (void)pxa::applyStencilGEMM(op, numThreads.getValue(),
@@ -217,13 +151,13 @@ struct XSMMStencilPass : public XSMMStencilBase<XSMMStencilPass> {
   }
 };
 
-std::unique_ptr<Pass> createXSMMStencilPass(unsigned numThreads,
-                                            bool isBatched) {
-  return std::make_unique<XSMMStencilPass>(numThreads, isBatched);
+std::unique_ptr<Pass> createStencilTppGemmPass(unsigned numThreads,
+                                               bool isBatched) {
+  return std::make_unique<StencilTppGemmPass>(numThreads, isBatched);
 }
 
-std::unique_ptr<Pass> createXSMMStencilPass() {
-  return std::make_unique<XSMMStencilPass>();
+std::unique_ptr<Pass> createStencilTppGemmPass() {
+  return std::make_unique<StencilTppGemmPass>();
 }
 
 std::unique_ptr<Pass> createLowerPXAToAffinePass() {
@@ -232,10 +166,6 @@ std::unique_ptr<Pass> createLowerPXAToAffinePass() {
 
 std::unique_ptr<Pass> createLowerToLLVMPass() {
   return std::make_unique<ConvertStandardToLLVMPass>();
-}
-
-std::unique_ptr<Pass> createOpenMPWorkaroundPass() {
-  return std::make_unique<OpenMPWorkaroundPass>();
 }
 
 struct Options : public PassPipelineOptions<Options> {
@@ -273,8 +203,8 @@ void pipelineBuilderStage1(OpPassManager &pm, const Options &options) {
   pm.addPass(createCSEPass());
   pm.addNestedPass<FuncOp>(layer::createInlineLayersPass());
 
-  pm.addNestedPass<FuncOp>(createXSMMStencilPass(/*numThreads=*/maxThreads,
-                                                 /*isBatched=*/true));
+  pm.addNestedPass<FuncOp>(createStencilTppGemmPass(/*numThreads=*/maxThreads,
+                                                    /*isBatched=*/true));
   pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
 
@@ -303,8 +233,11 @@ void pipelineBuilderStage1(OpPassManager &pm, const Options &options) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
+  pm.addNestedPass<FuncOp>(createStencilTppUnaryPass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+
   pm.addPass(createPRNGLinkingPass());
-  pm.addNestedPass<FuncOp>(createTppPatternsPass());
 }
 
 void pipelineBuilderStage2(OpPassManager &pm) {
