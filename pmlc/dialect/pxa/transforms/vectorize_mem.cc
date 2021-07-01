@@ -323,7 +323,7 @@ struct VectorizeMemImpl {
 
     auto newInsertMapOp = builder.create<vector::InsertMapOp>(
         vectorReduce.getLoc(),
-        /*vector=*/vectorReduce.vector(),
+        /*val=*/vectorReduce.val(),
         /*dest=*/vectorReduce.memref(),
         /*ids=*/tileSize != loopVectorSize ? const1Result : blockArg);
 

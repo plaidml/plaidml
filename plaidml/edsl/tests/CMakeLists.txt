@@ -13,6 +13,8 @@ pml_cc_test(
 pml_py_test(
   NAME py_test
   SRC edsl_test.py
+  DEPS
+    plaidml::py
   CHECKS
     core
     smoke

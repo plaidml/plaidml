@@ -91,7 +91,7 @@ unsigned ContractionOp::getNumTensors(CombinationKind combo) {
 }
 
 void ContractionOp::build(OpBuilder &builder, OperationState &result,
-                          Type resultType, Value init, ArrayRef<Value> tensors,
+                          Type resultType, Value init, ValueRange tensors,
                           AggregationKind agg, CombinationKind combo,
                           AffineMap sink, ArrayRef<AffineMap> srcs,
                           IntegerSet cons, StringRef name) {
@@ -338,7 +338,7 @@ void GatherOp::build(OpBuilder &builder, OperationState &result,
                      Type resultType, ValueRange operands, IntegerAttr axis,
                      IntegerAttr interpolationMode, IntegerAttr nearestMode,
                      FloatAttr cubeCoeff, IntegerAttr mode,
-                     IntegerAttr batchDims) {
+                     IntegerAttr batchDims, IntegerAttr OutOfBoundsMode) {
   assert(operands.size() == 2u && "mismatched number of parameters");
   result.addOperands(operands);
   result.addAttribute("axis", axis);
@@ -347,6 +347,7 @@ void GatherOp::build(OpBuilder &builder, OperationState &result,
   result.addAttribute("cubeCoeff", cubeCoeff);
   result.addAttribute("mode", mode);
   result.addAttribute("batchDims", batchDims);
+  result.addAttribute("OutOfBoundsMode", OutOfBoundsMode);
   result.addTypes(resultType);
 }
 

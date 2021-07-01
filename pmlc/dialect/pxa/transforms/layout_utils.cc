@@ -4,6 +4,8 @@
 
 #include <list>
 
+#include "llvm/ADT/TypeSwitch.h"
+
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Support/DebugStringHelper.h"
@@ -11,7 +13,7 @@
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/util/logging.h"
 #include "pmlc/util/tags.h"
-#include "llvm/ADT/TypeSwitch.h"
+#include "pmlc/util/util.h"
 
 namespace pmlc::dialect::pxa {
 
@@ -242,7 +244,7 @@ void LayoutConverter::convertPxaLoadOp(PxaLoadOp loadOp) {
 
   mlir::AffineMap newMap = transformAffineMap(loadOp.getAffineMap());
   mlir::Value loadRes = builder.create<PxaLoadOp>(
-      loadOp.getLoc(), loadOp.getMemRef(), newMap, loadOp.indices());
+      loadOp.getLoc(), loadOp.getMemRef(), newMap, loadOp.idxs());
   loadOp.replaceAllUsesWith(loadRes);
   loadOp.erase();
 }
@@ -254,7 +256,7 @@ void LayoutConverter::convertPxaVectorLoadOp(PxaVectorLoadOp loadOp) {
   mlir::VectorType newVectorType = transformVectorType(loadOp.getVectorType());
   mlir::Value loadRes = builder.create<PxaVectorLoadOp>(
       loadOp.getLoc(), newVectorType, loadOp.getMemRef(), newMap,
-      loadOp.indices());
+      loadOp.idxs());
   loadOp.replaceAllUsesWith(loadRes);
   loadOp.erase();
 }
@@ -276,7 +278,7 @@ void LayoutConverter::convertPxaVectorReduceOp(PxaVectorReduceOp reduceOp) {
 
   mlir::AffineMap newMap = transformAffineMap(reduceOp.getAffineMap());
   mlir::Value reduceRes = builder.create<PxaVectorReduceOp>(
-      reduceOp.getLoc(), reduceOp.getAgg(), reduceOp.vector(),
+      reduceOp.getLoc(), reduceOp.getAgg(), reduceOp.val(),
       reduceOp.getMemRef(), newMap, reduceOp.getMapOperands());
   reduceOp.replaceAllUsesWith(reduceRes);
   workQueue.push_back({reduceRes});
@@ -301,9 +303,12 @@ void LayoutConverter::convertYieldOp(mlir::AffineYieldOp yieldOp,
           mlir::symbolizeAtomicRMWKind(intAttr.getInt());
       reductions.push_back(optReduction.getValue());
     }
+    mlir::SmallVector<mlir::AffineMap> lbMaps, ubMaps;
+    util::splitAffineMaps(parallelOp.lowerBoundsMap(), lbMaps);
+    util::splitAffineMaps(parallelOp.upperBoundsMap(), ubMaps);
     auto newParallel = builder.create<mlir::AffineParallelOp>(
-        parallelOp.getLoc(), newTypes, reductions, parallelOp.lowerBoundsMap(),
-        parallelOp.getLowerBoundsOperands(), parallelOp.upperBoundsMap(),
+        parallelOp.getLoc(), newTypes, reductions, lbMaps,
+        parallelOp.getLowerBoundsOperands(), ubMaps,
         parallelOp.getUpperBoundsOperands(), parallelOp.getSteps());
     newParallel.region().takeBody(parallelOp.region());
     if (hasTags(parallelOp))

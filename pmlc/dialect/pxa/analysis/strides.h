@@ -8,6 +8,7 @@
 #include "llvm/ADT/Optional.h"
 
 #include "pmlc/dialect/pxa/analysis/affine_expr.h"
+#include "pmlc/dialect/pxa/analysis/stride_range.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
 
 namespace pmlc::dialect::pxa {
@@ -15,51 +16,6 @@ namespace pmlc::dialect::pxa {
 // Get the step for a block argument as an IV of an affine.for or
 // affine.parallel
 int64_t getIVStep(mlir::BlockArgument arg);
-
-struct StrideRange {
-  bool valid;
-  int64_t minVal;
-  int64_t maxVal;
-  int64_t stride;
-
-  explicit StrideRange(int64_t val)
-      : valid(true), minVal(val), maxVal(val), stride(0) {}
-
-  explicit StrideRange(int64_t min, int64_t max, int64_t stride)
-      : valid(true), minVal(min), maxVal(max), stride(stride) {
-    if (min == max) {
-      stride = 0;
-    }
-  }
-
-  explicit StrideRange(mlir::BlockArgument arg);
-
-  StrideRange &operator*=(int64_t factor);
-  StrideRange operator*(int64_t factor) const {
-    StrideRange ret = *this;
-    ret *= factor;
-    return ret;
-  }
-
-  StrideRange &operator+=(const StrideRange &rhs);
-  StrideRange operator+(const StrideRange &rhs) const {
-    StrideRange ret = *this;
-    ret += rhs;
-    return ret;
-  }
-
-  int64_t count() const {
-    if (!valid) {
-      return 0;
-    }
-    if (stride == 0) {
-      return 1;
-    }
-    return (maxVal - minVal) / stride + 1;
-  }
-
-  void unionEquals(const StrideRange &rhs);
-};
 
 enum class BoundaryRegion {
   Interior,
@@ -150,8 +106,13 @@ mlir::Optional<StrideInfo> computeStrideInfo(mlir::AffineExpr expr,
                                              mlir::ValueRange args);
 
 // Compute 'dimensionalized' strides for a given affine map and arguments
-mlir::Optional<mlir::SmallVector<StrideInfo, 4>>
-computeStrideInfo(mlir::AffineMap map, mlir::ValueRange args);
+mlir::LogicalResult
+computeMultiDimStrideInfo(mlir::AffineMap map, mlir::ValueRange args,
+                          mlir::SmallVectorImpl<StrideInfo> &out);
+
+mlir::LogicalResult
+computeMultiDimStrideInfo(const mlir::AffineValueMap &valueMap,
+                          mlir::SmallVectorImpl<StrideInfo> &out);
 
 // Compute stride info as additionaly applied to a memRef.
 mlir::Optional<StrideInfo> computeStrideInfo(mlir::MemRefType memRef,
@@ -194,7 +155,8 @@ struct RelativeAccessPattern {
   // For each dimension what is the number of accesses
   mlir::SmallVector<int64_t, 4> innerCount;
 
-  // For each dimension what is the number of accesses including skipped elements
+  // For each dimension what is the number of accesses including skipped
+  // elements
   mlir::SmallVector<int64_t, 4> wholeInnerCount;
 
   // For each dimension what is the minimal stride of the access.  Note:
@@ -231,6 +193,15 @@ computeRelativeAccess(mlir::Operation *op, BlockArgumentBoundaryFn fn);
 
 mlir::Optional<RelativeAccessPattern> computeRelativeAccess(mlir::Operation *op,
                                                             mlir::Block *block);
+
+mlir::Optional<RelativeAccessPattern> computeRelativeAccess(
+    mlir::Value memref, mlir::ArrayRef<StrideRange> internalRanges,
+    const mlir::AffineValueMap &valueMap, BlockArgumentBoundaryFn fn);
+
+mlir::Optional<RelativeAccessPattern>
+computeRelativeAccess(mlir::Value memref,
+                      mlir::ArrayRef<StrideRange> internalRanges,
+                      const mlir::AffineValueMap &valueMap, mlir::Block *block);
 
 bool hasPerfectAliasing(
     const RelativeAccessPattern &aRap, RelativeAccessPattern bRap,

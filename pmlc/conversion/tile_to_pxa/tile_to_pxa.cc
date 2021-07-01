@@ -248,7 +248,7 @@ struct StdOp {
     auto attrs = ArrayRef<NamedAttribute>{};
     auto resultTypes = llvm::makeArrayRef(resultType);
     auto op = rewriter.create<OpType>(loc, resultTypes, promoted, attrs);
-    return op.getOperation()->getResult(0);
+    return op->getResult(0);
   }
 };
 
@@ -335,7 +335,7 @@ struct LogicalOp {
     Type boolType = rewriter.getI1Type();
     auto resultTypes = llvm::makeArrayRef(boolType);
     auto op = rewriter.create<OpType>(loc, resultTypes, promoted, attrs);
-    return op.getOperation()->getResult(0);
+    return op->getResult(0);
   }
 };
 
@@ -570,8 +570,8 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
     // Create the loads
     SmallVector<Value, 4> scalars;
     for (size_t i = 0; i < operands.size(); i++) {
-      auto maybePadding = tile::getPaddingInfo(
-          op.getOperation()->getOperand(i).getDefiningOp());
+      auto maybePadding =
+          tile::getPaddingInfo(op->getOperand(i).getDefiningOp());
       scalars.push_back(buildBroadcastLoad(rewriter, loc, operands[i],
                                            alloc.memRefType.getRank(),
                                            maybePadding));
@@ -579,7 +579,7 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
 
     // Create the standard op
     SmallVector<Type, 4> operandTypes;
-    for (auto type : op.getOperation()->getOperandTypes()) {
+    for (auto type : op->getOperandTypes()) {
       operandTypes.push_back(getElementType(type));
     }
     IntoOpBuilder intoOpBuilder;
@@ -655,27 +655,32 @@ struct ContractionOpConversion
     auto filled = parallel.getResult(0);
 
     // Determine lower and upper bounds.
-    SmallVector<AffineExpr, 8> ubExprs;
+    SmallVector<AffineMap, 8> lbMaps;
+    SmallVector<AffineMap, 8> ubMaps;
     auto lowerBounds = op.lowerBounds().getValue();
     auto upperBounds = op.upperBounds().getValue();
     assert(lowerBounds.getNumResults() == upperBounds.getNumResults() &&
            "mismatched dims for lower and upper bounds");
     for (unsigned i = 0; i < lowerBounds.getNumResults(); i++) {
-      auto ubExpr = upperBounds.getResult(i) + 1;
-      auto upper = ubExpr.cast<AffineConstantExpr>().getValue();
-      ubExprs.push_back(rewriter.getAffineConstantExpr(upper));
+      AffineExpr ubExpr = upperBounds.getResult(i) + 1;
+      int64_t upper = ubExpr.cast<AffineConstantExpr>().getValue();
+      lbMaps.push_back(AffineMap::get(lowerBounds.getNumDims(),
+                                      lowerBounds.getNumSymbols(),
+                                      lowerBounds.getResult(i)));
+      ubMaps.push_back(AffineMap::getConstantMap(upper, op.getContext()));
     }
 
-    auto ubMap = AffineMap::get(0, 0, {ubExprs}, op.getContext());
     // Make the outer loops
+    SmallVector<int64_t, 8> steps(lbMaps.size(), 1);
     auto forOp = rewriter.create<AffineParallelOp>(
         loc,
         /*resultTypes=*/ArrayRef<Type>{alloc.memRefType},
         /*reductions=*/ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign},
-        /*lbMap=*/op.lowerBounds().getValue(),
+        /*lbMaps=*/lbMaps,
         /*lbArgs=*/ArrayRef<Value>{},
-        /*ubMap=*/ubMap,
-        /*ubArgs=*/ArrayRef<Value>{});
+        /*ubMaps=*/ubMaps,
+        /*ubArgs=*/ArrayRef<Value>{},
+        /*steps=*/steps);
 
     auto body = forOp.getBody();
     rewriter.setInsertionPointToStart(body);
@@ -686,7 +691,7 @@ struct ContractionOpConversion
       auto cons = op.cons().getValue();
       auto ifOp = rewriter.create<AffineIfOp>(loc, TypeRange{alloc.memRefType},
                                               cons, idxs, true);
-      rewriter.create<AffineYieldOp>(loc, ifOp.getOperation()->getResults());
+      rewriter.create<AffineYieldOp>(loc, ifOp->getResults());
       rewriter.setInsertionPointToStart(&ifOp.elseRegion().front());
       rewriter.create<AffineYieldOp>(loc, filled);
       rewriter.setInsertionPointToStart(&ifOp.thenRegion().front());
@@ -1082,7 +1087,7 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
     // argument, a constant value, or a reshape op.
     getOperation().walk([&](ReturnOp op) {
       OpBuilder builder(op);
-      for (OpOperand &operand : op.getOperation()->getOpOperands()) {
+      for (OpOperand &operand : op->getOpOperands()) {
         Value value = operand.get();
         bool needsIdent =                                  //
             value.isa<BlockArgument>() ||                  // Block arguemnt
@@ -1100,14 +1105,14 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
     // Set up target (i.e. what is legal)
     ConversionTarget target(getContext());
     TileToPXATypeConverter converter;
-    target.addLegalDialect<mlir::AffineDialect,          //
-                           mlir::StandardOpsDialect,     //
-                           mlir::math::MathDialect,      //
-                           mlir::memref::MemRefDialect,  //
-                           mlir::scf::SCFDialect,        //
-                           dialect::layer::LayerDialect, //
-                           dialect::pxa::PXADialect,     //
-                           dialect::stdx::StdXDialect>();
+    target.addLegalDialect<mlir::AffineDialect,         //
+                           mlir::StandardOpsDialect,    //
+                           mlir::math::MathDialect,     //
+                           mlir::memref::MemRefDialect, //
+                           mlir::scf::SCFDialect,       //
+                           layer::LayerDialect,         //
+                           pxa::PXADialect,             //
+                           stdx::StdXDialect>();
     target.addLegalOp<scf::ForOp,   //
                       scf::YieldOp, //
                       scf::IfOp>();
@@ -1277,6 +1282,7 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         EltwiseOpConversion<tile::LogicalNotOp, LogicalNotOp>,
         EltwiseOpConversion<tile::LogicalOrOp, LogicalOp<mlir::OrOp>>,
         EltwiseOpConversion<tile::LogicalXorOp, LogicalOp<mlir::XOrOp>>,
+        EltwiseOpConversion<tile::ReluOp, StdOp<stdx::ReluOp>>,
         EltwiseOpConversion<tile::SelectOp, SelectOp>,
         EltwiseOpConversion<tile::IdentOp, FirstOperand>>(&getContext());
 

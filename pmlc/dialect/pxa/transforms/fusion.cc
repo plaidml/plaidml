@@ -7,6 +7,7 @@
 #include "mlir/Support/DebugStringHelper.h"
 
 #include "pmlc/dialect/pxa/analysis/strides.h"
+#include "pmlc/dialect/pxa/analysis/uses.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/dialect/pxa/transforms/cache.h"
 #include "pmlc/dialect/pxa/transforms/normalize.h"
@@ -24,8 +25,7 @@ namespace pmlc::dialect::pxa {
 
 namespace {
 
-using WriteRead = std::pair<PxaReduceOpInterface, PxaReadOpInterface>;
-using WriteWrite = std::pair<PxaReduceOpInterface, PxaReduceOpInterface>;
+using MemAccessPair = std::pair<PxaMemAccessOperand, PxaMemAccessOperand>;
 
 struct FusionInfo {
   struct AffineParallelInfo {
@@ -42,8 +42,8 @@ struct FusionInfo {
   AffineParallelInfo aInfo;
   AffineParallelInfo bInfo;
   // The load and store ops
-  SmallVector<WriteRead, 4> readAfterWrites;
-  SmallVector<WriteWrite, 4> writeAfterWrites;
+  SmallVector<MemAccessPair, 4> readAfterWrites;
+  SmallVector<MemAccessPair, 4> writeAfterWrites;
   // Current state (whether we have a plan or not)
   bool hasPlan;
   // Specifies the mapping from A's index space into B's index space (post
@@ -54,13 +54,10 @@ struct FusionInfo {
   int64_t memoryActivityThreshold;
   // Fuse the ops with exactly matched idxs
   bool exactlyMatch;
-  // Perform tiled fusions, including additional loop transformations from
-  // subgroups pass
+  // Perform tiled fusions
   bool tiledFusion;
   // Allow single output only
   bool singleOutput;
-
-  bool reverseFusion;
 
   FusionInfo(AffineParallelOp aBand, AffineParallelOp bBand,
              int64_t memoryActivityThreshold, bool exactlyMatch,
@@ -68,20 +65,23 @@ struct FusionInfo {
       : aInfo{aBand}, bInfo{bBand}, hasPlan(false),
         memoryActivityThreshold(memoryActivityThreshold),
         exactlyMatch(exactlyMatch), tiledFusion(tiledFusion),
-        singleOutput(singleOutput), reverseFusion(false) {}
+        singleOutput(singleOutput) {}
 
   // Helper method to find the original source write of a state update.
-  static PxaReduceOpInterface findSourceWrite(Value val) {
-    auto opRes = val.dyn_cast<OpResult>();
-    auto owner = opRes.getOwner();
-    if (isa<PxaReduceOpInterface>(owner)) {
-      return owner;
+  static Optional<PxaMemAccessOperand> findSourceWrite(Value value) {
+    auto opResult = value.cast<OpResult>();
+    Operation *owner = opResult.getOwner();
+    if (auto op = dyn_cast<PxaGenericOpInterface>(owner)) {
+      SmallVector<PxaMemAccessOperand> outputs = op.getOutputMemAccesses();
+      if (outputs.size() != 1)
+        return None;
+      return outputs[0];
     }
     if (auto op = dyn_cast<AffineParallelOp>(owner)) {
-      auto retOp = cast<AffineYieldOp>(op.getBody()->getTerminator());
-      return findSourceWrite(retOp.getOperand(opRes.getResultNumber()));
+      auto yieldOp = cast<AffineYieldOp>(op.getBody()->getTerminator());
+      return findSourceWrite(yieldOp.getOperand(opResult.getResultNumber()));
     }
-    return nullptr;
+    return None;
   }
 
   // Helper method to remove elements from a stride info that are not part of
@@ -103,141 +103,113 @@ struct FusionInfo {
     }
   }
 
-  // Helper to perform loop transformations, so the loops can be fused
-  void loopTransformations(AffineParallelOp outer, AffineParallelOp inner,
-                           bool needsTiling, int64_t vectorWidth) {
-    if (tiledFusion && needsTiling) {
-      inner.walk([&](AffineParallelOp par) {
-        // TODO: check LogicalResult
-        (void)vectorizeOverOutputs(par, vectorWidth);
-      });
-
-      // Try to 'vector cache' any remaining innermost loads
-      outer.walk([&](PxaLoadOp load) {
-        // TODO: check LogicalResult
-        (void)cacheLoadAsVector(inner, load, vectorWidth);
-      });
-
-      // Convert local allocations to vector types
-      outer.walk([&](memref::AllocOp alloc) {
-        // TODO: check LogicalResult
-        (void)vectorizeBuffer(alloc);
-      });
-
-      // Affine normalizations
-      outer.walk(normalizeAffineParallel);
-      outer.walk(elideSingleIterationIndexes);
-      outer.walk(promoteIfEmptyIVs);
-    }
-  }
-
   // Helper to get a clean version of the strides for a specific op (or fail)
-  template <typename OpA>
-  static bool getStrides(SmallVectorImpl<StrideInfo> &out, OpA op,
-                         AffineParallelOp ap) {
-    auto strides = computeStrideInfo(op.getAffineMap(), op.getMapOperands());
-    if (!strides) {
-      op.emitRemark("Failed to compute strides");
+  static bool getStrides(SmallVectorImpl<StrideInfo> &out,
+                         PxaMemAccessOperand access, AffineParallelOp ap) {
+    SmallVector<StrideInfo> strides;
+    if (failed(
+            computeMultiDimStrideInfo(access.getAffineValueMap(), strides))) {
+      access.getOperation()->emitRemark("Failed to compute strides");
       return false;
     }
-    for (auto si : *strides) {
+    for (StrideInfo si : strides) {
       cleanStrideInfo(ap.getBody(), si);
       out.push_back(si);
     }
     return true;
   }
 
-  template <typename OpA, typename OpB>
-  bool considerPlan(OpA opA, OpB opB) {
+  bool considerPlan(PxaMemAccessOperand opA, PxaMemAccessOperand opB) {
     // Early exit is we already have a plan
     if (hasPlan)
       return true;
 
     IVLOG(3, "considerPlan>");
-    IVLOG(3, "  A: " << debugString(*opA));
-    IVLOG(3, "  B: " << debugString(*opB));
+    IVLOG(3, "  A: " << debugString(*opA.getOperation()));
+    IVLOG(3, "  B: " << debugString(*opB.getOperation()));
 
     aToB.clear();
     bToA.clear();
 
-    // Extract the per-dimension strides for the two ops
+    // Extract the per-dimension strides for the two accesses
     SmallVector<StrideInfo, 4> stridesA;
     if (!getStrides(stridesA, opA, aInfo.op))
       return false;
+
     SmallVector<StrideInfo, 4> stridesB;
     if (!getStrides(stridesB, opB, bInfo.op))
       return false;
 
-    // Get subgroup sizes for both loop candidates
-    auto subgroupSizeA = 1;
-    auto subgroupSizeB = 1;
-    if (hasIntegerTag(aInfo.op, "subgroupSize"))
-      subgroupSizeA = pmlc::getIntegerTag(aInfo.op, "subgroupSize", 1);
-    if (hasIntegerTag(bInfo.op, "subgroupSize"))
-      subgroupSizeB = pmlc::getIntegerTag(bInfo.op, "subgroupSize", 1);
-
-    // Set reverse fusion only in case when second loop was subgrouped
-    if (subgroupSizeA == 1 && subgroupSizeB != 1)
-      reverseFusion = true;
-
     assert(stridesA.size() == stridesB.size() &&
            "Fusion ops should read/write the same memref and thus have the "
            "same rank");
+
     // Try to relate the block arguments
     for (size_t i = 0; i < stridesA.size(); i++) {
       const auto &sa = stridesA[i];
       const auto &sb = stridesB[i];
       // If the offsets don't match, bail
       if (sa.offset != sb.offset) {
-        opB.emitRemark("Failed to fuse with def due to offsets, i = ") << i;
+        opB.getOperation()->emitRemark(
+            "Failed to fuse with def offsets mismatch: i = ")
+            << i << ", A: " << debugString(sa) << ", B: " << debugString(sb);
         return false;
       }
-      // If both are empty, nothing to do
-      if (sa.strides.size() == 0 && sb.strides.size() == 0)
+      // If either are empty, nothing to do
+      if (sa.strides.size() == 0 || sb.strides.size() == 0)
         continue;
+
       // If there are multiple indexes, give up
       IVLOG(3, "sa: " << debugString(sa));
       IVLOG(3, "sb: " << debugString(sb));
-      if (sa.strides.size() != 1 || sb.strides.size() != 1) {
-        opB.emitRemark("Failed to fuse with def due to multiple indexes, i = ")
-            << i;
+
+      // Pick the largest unique stride from each side
+      auto pickUniqueTop = [&](const auto &options) {
+        BlockArgument out;
+        int64_t mul = 0;
+        for (const auto &kvp : options) {
+          if (kvp.second > mul) {
+            out = kvp.first;
+            mul = kvp.second;
+          } else if (kvp.second == mul) {
+            out = BlockArgument();
+            break;
+          }
+        }
+        return out;
+      };
+
+      // Pick some indexes
+      BlockArgument argA = pickUniqueTop(sa.strides);
+      BlockArgument argB = pickUniqueTop(sb.strides);
+
+      if (!argA || !argB) {
+        opB.getOperation()->emitRemark(
+            "Failed to fuse with def due to multiple high stride indexes");
         return false;
       }
 
       // Extract the details we care about
-      BlockArgument argA = sa.strides.begin()->first;
-      int64_t mulA = sa.strides.begin()->second;
+      int64_t mulA = sa.strides.find(argA)->second;
       int64_t sizeA = aInfo.sizes[argA.getArgNumber()];
-      BlockArgument argB = sb.strides.begin()->first;
-      int64_t mulB = sb.strides.begin()->second;
+      int64_t mulB = sb.strides.find(argB)->second;
       int64_t sizeB = bInfo.sizes[argB.getArgNumber()];
 
       // Fail if the total range of the two arguments doesn't match
       if (mulA * sizeA != mulB * sizeB) {
-        opB.emitRemark("Failed to fuse with def due to mismatched ranges, i = ")
+        opB.getOperation()->emitRemark(
+            "Failed to fuse with def due to mismatched ranges, i = ")
             << i << ": " << mulA * sizeA << " vs " << mulB * sizeB;
         return false;
       }
 
-      // If sizes do not match, apply tiling later, scale to the
-      // loop with subgroupSize != attribute if present
-      auto sameSubgroups = subgroupSizeA == subgroupSizeB;
-      if (mulA != mulB) {
-        auto tileSize = reverseFusion ? sizeA / sizeB : sizeB / sizeA;
-        if (!tileSize)
-          return false;
-        if (reverseFusion && (subgroupSizeA == 1 || sameSubgroups)) {
-          aInfo.tileSizes.push_back(tileSize);
-          aInfo.needsTiling = true;
-        } else if (subgroupSizeB == 1 || sameSubgroups) {
-          bInfo.tileSizes.push_back(tileSize);
-          bInfo.needsTiling = true;
-        }
-      } else {
-        if (reverseFusion)
-          aInfo.tileSizes.push_back(1);
-        else
-          bInfo.tileSizes.push_back(1);
+      // If sizes do not match, apply tiling later.
+      if (mulA > mulB) {
+        bInfo.tileSizes[argB.getArgNumber()] = (mulA / mulB);
+        bInfo.needsTiling = true;
+      } else if (mulB > mulA) {
+        aInfo.tileSizes[argA.getArgNumber()] = (mulB / mulA);
+        aInfo.needsTiling = true;
       }
 
       // Also fail if the AP's don't have the same lower bound
@@ -283,22 +255,15 @@ struct FusionInfo {
     // Add tilings if needed
     if (tiledFusion) {
       if (aInfo.needsTiling) {
-        if (aInfo.op.lowerBoundsMap().getNumResults() !=
-            aInfo.tileSizes.size()) {
-          bInfo.op.emitRemark("Tile sizes do not match.");
-          return false;
-        }
+        IVLOG(3, "Tiling A on " << aInfo.tileSizes);
         performTiling(aInfo.op, aInfo.tileSizes);
       }
       if (bInfo.needsTiling) {
-        if (bInfo.op.lowerBoundsMap().getNumResults() !=
-            bInfo.tileSizes.size()) {
-          bInfo.op.emitRemark("Tile sizes do not match.");
-          return false;
-        }
+        IVLOG(3, "Tiling B on " << bInfo.tileSizes);
         performTiling(bInfo.op, bInfo.tileSizes);
       }
     }
+    IVLOG(3, "Tiling done");
 
     // Over-fusion prevention:
     // Compute the amount of memory activity, defined as the amount of memory
@@ -310,52 +275,62 @@ struct FusionInfo {
       auto memoryActivity = computeMemoryActivity();
       if (memoryActivity > memoryActivityThreshold) {
         undoTilings();
+        bInfo.op.emitRemark("Over-fusion prevention");
         return false;
       }
     }
 
-    auto aRap = computeThisRelativeAccess(opA);
-    auto bRap = computeThisRelativeAccess(opB);
-    // Fail if getting Rap is unsuccessfull
-    if (!aRap || !bRap) {
-      undoTilings();
-      return false;
-    }
-    auto isAliased = hasPerfectAliasing(*aRap, *bRap, bToA);
-    IVLOG(3, "isAliased: " << isAliased);
-
-    for (const auto &raw : readAfterWrites) {
-      IVLOG(3, "  RAW: " << debugString(*raw.second));
-      auto aRap = computeThisRelativeAccess(raw.first);
-      auto bRap = computeThisRelativeAccess(raw.second);
+    for (const MemAccessPair &raw : readAfterWrites) {
+      IVLOG(3, "  RAW: " << debugString(*raw.second.getOperation()));
+      Optional<RelativeAccessPattern> aRap =
+          computeThisRelativeAccess(raw.first);
+      Optional<RelativeAccessPattern> bRap =
+          computeThisRelativeAccess(raw.second);
       if (!aRap || !bRap) {
         undoTilings();
+        bInfo.op.emitRemark("RelativeAccessPattern computation failure");
         return false;
       }
-      auto ret = hasPerfectAliasing(*aRap, *bRap, bToA);
+      bool ret = hasPerfectAliasing(*aRap, *bRap, bToA);
       IVLOG(3, "  isAliased: " << ret);
       if (!ret) {
         undoTilings();
+        bInfo.op.emitRemark("imperfect aliasing");
         return false;
       }
     }
 
-    for (const auto &waw : writeAfterWrites) {
-      IVLOG(3, "  WAW: " << debugString(*waw.second));
-      auto aRap = computeThisRelativeAccess(waw.first);
-      auto bRap = computeThisRelativeAccess(waw.second);
+    for (const MemAccessPair &waw : writeAfterWrites) {
+      IVLOG(3, "  WAW: " << debugString(*waw.second.getOperation()));
+      Optional<RelativeAccessPattern> aRap =
+          computeThisRelativeAccess(waw.first);
+      Optional<RelativeAccessPattern> bRap =
+          computeThisRelativeAccess(waw.second);
       if (!aRap || !bRap) {
         undoTilings();
+        bInfo.op.emitRemark("RelativeAccessPattern computation failure");
         return false;
       }
-      auto ret = hasPerfectAliasing(*aRap, *bRap, bToA);
+      bool ret = hasPerfectAliasing(*aRap, *bRap, bToA);
       IVLOG(3, "  isAliased: " << ret);
       if (!ret) {
         undoTilings();
+        bInfo.op.emitRemark("imperfect aliasing");
         return false;
       }
     }
 
+    // Now that fusion is locked in, normalize tiled loops
+    if (aInfo.needsTiling) {
+      aInfo.op.walk(normalizeAffineParallel);
+      aInfo.op.walk(elideSingleIterationIndexes);
+      aInfo.op.walk(promoteIfEmptyIVs);
+    }
+    if (bInfo.needsTiling) {
+      bInfo.op.walk(normalizeAffineParallel);
+      bInfo.op.walk(elideSingleIterationIndexes);
+      bInfo.op.walk(promoteIfEmptyIVs);
+    }
     hasPlan = true;
     return true;
   }
@@ -365,6 +340,17 @@ struct FusionInfo {
       return (aToB.count(arg) || bToA.count(arg)) ? BoundaryRegion::Exterior
                                                   : BoundaryRegion::Interior;
     });
+  }
+
+  Optional<RelativeAccessPattern>
+  computeThisRelativeAccess(PxaMemAccessOperand access) {
+    return computeRelativeAccess(access.getMemRef(), access.getInternalRanges(),
+                                 access.getAffineValueMap(),
+                                 [&](BlockArgument arg) {
+                                   return (aToB.count(arg) || bToA.count(arg))
+                                              ? BoundaryRegion::Exterior
+                                              : BoundaryRegion::Interior;
+                                 });
   }
 
   int64_t computeMemoryActivity() {
@@ -395,53 +381,61 @@ struct FusionInfo {
     // Get initial information setup
     auto rangesA = aInfo.op.getConstantRanges();
     if (!rangesA) {
-      aInfo.op.emitRemark("Op does not have constant ranges");
+      IVLOG(3, "A: Op does not have constant ranges");
       return false;
     }
     std::swap(aInfo.sizes, *rangesA);
+    aInfo.tileSizes = SmallVector<int64_t, 8>(aInfo.sizes.size(), 1);
     auto rangesB = bInfo.op.getConstantRanges();
     if (!rangesB) {
-      bInfo.op.emitRemark("Op does not have constant ranges");
+      IVLOG(3, "B: Op does not have constant ranges");
       return false;
     }
     std::swap(bInfo.sizes, *rangesB);
+    bInfo.tileSizes = SmallVector<int64_t, 8>(bInfo.sizes.size(), 1);
     // First, we find all the write/read and write/write pairs, where block A
     // writes to a value that block B reads from or writes into.
     IVLOG(3, "Collecting read/write information");
     // For each output from loop
     for (OpResult result : aInfo.op.results()) {
       // Find the source write
-      auto write = findSourceWrite(result);
+      Optional<PxaMemAccessOperand> write = findSourceWrite(result);
       // If it's not a proper affine reduce, give up
       if (!write) {
-        aInfo.op.emitRemark("Not all results can be traced to writes");
+        IVLOG(3, "Not all results can be traced to writes");
         return false;
       }
-      // For each use of the write:
-      for (Operation *user : result.getUsers()) {
+
+      for (OpOperand &use : result.getUses()) {
         // Check if it is inside B, if not, we don't care, check next use.
-        if (!bInfo.op.getOperation()->isAncestor(user)) {
+        if (!bInfo.op.getOperation()->isAncestor(use.getOwner())) {
           if (singleOutput) {
             // If the use is not inside B, we have to keep the write as an
             // output and the other output in B after fusion. Then there would
             // be multiple outputs
-            aInfo.op.emitRemark("Multiple outputs");
+            IVLOG(3, "Multiple outputs");
             return false;
           }
           continue;
         }
+
         // Now we make sure it's a read or a write, if not, we can't do fusion,
         // bail.
-        if (isa<PxaReadOpInterface>(user)) {
-          readAfterWrites.emplace_back(write, user);
-        } else if (isa<PxaReduceOpInterface>(user)) {
-          writeAfterWrites.emplace_back(write, user);
+        if (auto op = dyn_cast<PxaGenericOpInterface>(use.getOwner())) {
+          PxaMemAccessOperand access(&use);
+          if (access.isRead())
+            readAfterWrites.emplace_back(*write, access);
+          else if (access.isWrite())
+            writeAfterWrites.emplace_back(*write, access);
+          else
+            return false;
         } else {
-          user->emitRemark("Op is not a load or reduce");
+          IVLOG(3, "Op does not implement PxaGenericOpInterface");
           return false;
         }
       }
     }
+
     // For each raw & waw, consider the plan
     for (auto &raw : readAfterWrites)
       considerPlan(raw.first, raw.second);
@@ -482,16 +476,20 @@ struct FusionInfo {
               [](const auto &a, const auto &b) {
                 return a.first.getArgNumber() < b.first.getArgNumber();
               });
-    SmallVector<AffineExpr, 4> lowerExprsC;
-    SmallVector<AffineExpr, 4> upperExprsC;
+    SmallVector<AffineMap, 4> lowerMapsC;
+    SmallVector<AffineMap, 4> upperMapsC;
     SmallVector<int64_t, 4> stepsC;
     DenseMap<BlockArgument, size_t> aToNew;
     auto aSteps = aInfo.op.getSteps();
     for (auto &pair : orderedIVs) {
       aToNew[pair.first] = aToNew.size();
       auto idx = pair.first.getArgNumber();
-      lowerExprsC.push_back(aInfo.op.lowerBoundsMap().getResult(idx));
-      upperExprsC.push_back(aInfo.op.upperBoundsMap().getResult(idx));
+      lowerMapsC.push_back(
+          AffineMap::get(aInfo.op.lowerBoundsMap().getNumDims(), 0,
+                         aInfo.op.lowerBoundsMap().getResult(idx)));
+      upperMapsC.push_back(
+          AffineMap::get(aInfo.op.upperBoundsMap().getNumDims(), 0,
+                         aInfo.op.upperBoundsMap().getResult(idx)));
       stepsC.push_back(aSteps[idx]);
     }
     // Compute B mappings to new
@@ -501,49 +499,28 @@ struct FusionInfo {
     }
 
     // Construct the new outer parallel op
-    auto lowerC = AffineMap::get(aInfo.op.lowerBoundsMap().getNumDims(), 0,
-                                 lowerExprsC, aInfo.op.getContext());
-    auto upperC = AffineMap::get(aInfo.op.upperBoundsMap().getNumDims(), 0,
-                                 upperExprsC, aInfo.op.getContext());
     SmallVector<AtomicRMWKind, 8> reductions(typesC.size(),
                                              AtomicRMWKind::assign);
     auto apC = builder.create<AffineParallelOp>(
         aInfo.op.getLoc(),
         /*resultTypes=*/typesC,
         /*reductions=*/reductions,
-        /*lbMap=*/lowerC, /*lbArgs=*/aInfo.op.getLowerBoundsOperands(),
-        /*ubMap=*/upperC, /*ubArgs=*/aInfo.op.getUpperBoundsOperands(),
+        /*lbMaps=*/lowerMapsC, /*lbArgs=*/aInfo.op.getLowerBoundsOperands(),
+        /*ubMaps=*/upperMapsC, /*ubArgs=*/aInfo.op.getUpperBoundsOperands(),
         /*steps=*/stepsC);
 
     // Copy across any tags, prefer A's.
-    if (!reverseFusion) {
-      if (hasTags(aInfo.op)) {
-        copyTags(apC, aInfo.op);
-      } else if (hasTags(bInfo.op)) {
-        copyTags(apC, bInfo.op);
-      }
-    } else {
-      if (hasTags(bInfo.op)) {
-        copyTags(apC, bInfo.op);
-      } else if (hasTags(aInfo.op)) {
-        copyTags(apC, aInfo.op);
-      }
+    if (hasTags(aInfo.op)) {
+      copyTags(apC, aInfo.op);
+    } else if (hasTags(bInfo.op)) {
+      copyTags(apC, bInfo.op);
     }
     clearTags(aInfo.op);
     clearTags(bInfo.op);
 
-    auto subgroupSize = pmlc::getIntegerTag(apC, "subgroupSize", 1);
     // Move the two parallel for's inside the new op
-    if (reverseFusion) {
-      aInfo.op.getOperation()->moveBefore(apC.getBody(), apC.getBody()->end());
-      loopTransformations(apC, aInfo.op, aInfo.needsTiling, subgroupSize);
-      bInfo.op.getOperation()->moveBefore(apC.getBody(), apC.getBody()->end());
-    } else {
-      bInfo.op.getOperation()->moveBefore(apC.getBody(), apC.getBody()->end());
-      loopTransformations(apC, bInfo.op, bInfo.needsTiling, subgroupSize);
-      aInfo.op.getOperation()->moveBefore(apC.getBody(),
-                                          apC.getBody()->begin());
-    }
+    aInfo.op.getOperation()->moveBefore(apC.getBody(), apC.getBody()->end());
+    bInfo.op.getOperation()->moveBefore(apC.getBody(), apC.getBody()->end());
 
     // Fixup uses of A's return values.  These uses are either in B (and thus
     // local to C now) or some other op (and thus need to be moved to a return
@@ -580,6 +557,7 @@ struct FusionInfo {
       SmallVector<AffineExpr, 6> newLowerBounds;
       SmallVector<AffineExpr, 6> newUpperBounds;
       SmallVector<int64_t, 6> newSteps;
+      SmallVector<int32_t> groups;
       auto apSteps = apOp.getSteps();
       for (size_t i = 0; i < origNumArgs; i++) {
         auto curArg = apOp.getBody()->getArgument(curArgNum);
@@ -592,18 +570,18 @@ struct FusionInfo {
           newUpperBounds.push_back(apOp.upperBoundsMap().getResult(i));
           newSteps.push_back(apSteps[i]);
           curArgNum++;
+          groups.push_back(1);
         }
       }
       auto newLower = AffineMap::get(apOp.lowerBoundsMap().getNumDims(), 0,
                                      newLowerBounds, apOp.getContext());
       auto newUpper = AffineMap::get(apOp.upperBoundsMap().getNumDims(), 0,
                                      newUpperBounds, apOp.getContext());
-      apOp->setAttr(AffineParallelOp::getLowerBoundsMapAttrName(),
-                    AffineMapAttr::get(newLower));
-      apOp->setAttr(AffineParallelOp::getUpperBoundsMapAttrName(),
-                    AffineMapAttr::get(newUpper));
-      apOp->setAttr(AffineParallelOp::getStepsAttrName(),
-                    builder.getI64ArrayAttr(newSteps));
+      apOp.lowerBoundsMapAttr(AffineMapAttr::get(newLower));
+      apOp.lowerBoundsGroupsAttr(builder.getI32TensorAttr(groups));
+      apOp.upperBoundsMapAttr(AffineMapAttr::get(newUpper));
+      apOp.upperBoundsGroupsAttr(builder.getI32TensorAttr(groups));
+      apOp.setSteps(newSteps);
     };
     fixupLoops(aInfo.op, aToNew);
     fixupLoops(bInfo.op, bToNew);
@@ -642,6 +620,7 @@ struct FusionPass : public FusionBase<FusionPass> {
                           exactlyMatch, tiledFusion, singleOutput);
     bool canFuse = fusionInfo.computeFusion();
     if (!canFuse) {
+      IVLOG(3, "Could not fuse");
       return nullptr;
     }
     IVLOG(3, "Found " << fusionInfo.readAfterWrites.size()
@@ -681,6 +660,7 @@ struct FusionPass : public FusionBase<FusionPass> {
           }
         }
       }
+
       // Check if the closest reader is also and affine parallel, in which case,
       // attempt to merge
       if (auto fuseB = dyn_cast_or_null<AffineParallelOp>(nearestReader)) {
@@ -691,6 +671,7 @@ struct FusionPass : public FusionBase<FusionPass> {
         AffineParallelOp newOp = attemptFusion(fuseA, fuseB);
         // If it worked, update positions
         if (newOp) {
+          IVLOG(4, "Fused:\n" << debugString(*newOp));
           opOrder[newOp.getOperation()] = newOpOrder;
           if (merge_immediate) {
             itOp = Block::iterator(newOp.getOperation());

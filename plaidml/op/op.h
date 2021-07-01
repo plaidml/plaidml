@@ -127,6 +127,13 @@ enum class TopKSortType {
   _LAST,
 };
 
+enum class NmsStyle {
+  CAFFE,
+  MXNET,
+  OV,
+  _LAST,
+};
+
 struct Integers {
   Integers(const std::vector<int>& elts)  // NOLINT[runtime/explicit]
       : value(edsl::make_tuple(elts)) {}
@@ -391,6 +398,32 @@ inline edsl::Tensor flip(const edsl::Tensor& I, int axis) {
   return details::op("flip", args).as_tensor();
 }
 
+class gatherND {
+ public:
+  explicit gatherND(const edsl::Tensor& x, const edsl::Tensor& y) : x_(x), y_(y) {}
+
+  gatherND& interpolationMode(edsl::InterpolationMode mode) {
+    interpolation_mode_ = mode;
+    return *this;
+  }
+
+  gatherND& batchDims(int batch_dims) {
+    batch_dims_ = batch_dims;
+    return *this;
+  }
+
+  operator edsl::Tensor() {
+    auto args = edsl::make_tuple(x_, y_, batch_dims_, static_cast<int>(interpolation_mode_));
+    return details::op("gatherND", args).as_tensor();
+  }
+
+ private:
+  edsl::Tensor x_;
+  edsl::Tensor y_;
+  uint64_t batch_dims_ = 0;
+  edsl::InterpolationMode interpolation_mode_ = edsl::InterpolationMode::NONE;
+};
+
 inline edsl::Tensor hard_sigmoid(const edsl::Tensor& I, double slope) {
   auto args = edsl::make_tuple(I, slope);
   return details::op("hard_sigmoid", args).as_tensor();
@@ -527,6 +560,12 @@ class mvn {
   std::string layout_;
 };
 
+// NMS
+// params
+// @nms_style: There are currently 3 styles of nms. OpenVINO, Caffe and MxNet. OV style is the most common one and
+//             the other two are fast versions of NMS which get the top k scores before nms. MxNet style only gets
+//             the max score of each box.
+
 class nms {
  public:
   explicit nms(edsl::Tensor Boxes, edsl::Tensor Scores, edsl::Tensor IOU_threshold, edsl::Tensor Score_threshold,
@@ -545,7 +584,10 @@ class nms {
         clip_after_nms_(false),
         ssd_input_height_(0.0f),
         ssd_input_width_(0.0f),
-        ssd_with_arm_loc_(false) {}
+        ssd_with_arm_loc_(false),
+        nms_style_(NmsStyle::OV),
+        share_location_(true),
+        hard_suppression_(true) {}
 
   nms& soft_nms_sigma(float soft_nms_sigma) {
     soft_nms_sigma_ = soft_nms_sigma;
@@ -612,6 +654,21 @@ class nms {
     return *this;
   }
 
+  nms& nms_style(NmsStyle nms_style) {
+    nms_style_ = nms_style;
+    return *this;
+  }
+
+  nms& share_location(bool share_location) {
+    share_location_ = share_location;
+    return *this;
+  }
+
+  nms& hard_suppression(bool hard_suppression) {
+    hard_suppression_ = hard_suppression;
+    return *this;
+  }
+
   std::vector<edsl::Tensor> build() {
     auto args = edsl::make_tuple(              //
         Boxes_,                                //
@@ -631,7 +688,10 @@ class nms {
         ssd_variances_,                        //
         ssd_location_,                         //
         ssd_with_arm_loc_,                     //
-        ssd_arm_location_);
+        ssd_arm_location_,                     //
+        static_cast<int>(nms_style_),          //
+        share_location_,                       //
+        hard_suppression_);
     auto R = details::op("nms", args).as_tuple();
     auto B = R[0].as_tensor();
     auto S = R[1].as_tensor();
@@ -658,6 +718,9 @@ class nms {
   int ssd_input_height_;
   int ssd_input_width_;
   bool ssd_with_arm_loc_;
+  NmsStyle nms_style_;
+  bool share_location_;
+  bool hard_suppression_;
 };
 
 class topk {
@@ -778,7 +841,7 @@ class relu {
   }
 
   relu& threshold(double threshold) {
-    threshold_ = threshold;
+    threshold_ = edsl::Value(threshold);
     return *this;
   }
 
@@ -791,7 +854,7 @@ class relu {
   edsl::Tensor I_;
   edsl::Tensor alpha_;
   edsl::Tensor max_value_;
-  double threshold_ = 0.0;
+  edsl::Value threshold_;
 };
 
 inline edsl::Tensor reorg_yolo(const edsl::Tensor& I, int stride, bool decrease, const std::string& layout = "NCHW") {

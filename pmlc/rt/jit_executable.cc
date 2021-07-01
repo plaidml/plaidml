@@ -400,6 +400,7 @@ public:
       IVLOG(3, "Jit init complete");
     }
   }
+
   ~JitExecutable() {
     if (jitFini) {
       IVLOG(3, "Doing jit fini");
@@ -408,6 +409,24 @@ public:
       IVLOG(3, "Jit fini complete");
       free(initPack);
     }
+  }
+
+  double invoke() final {
+    std::vector<util::BufferPtr> inputBuffers, outputBuffers;
+
+    for (Type type : program->inputs) {
+      auto shape = util::TensorShape::fromType(type);
+      auto buffer = std::make_shared<util::SimpleBuffer>(shape);
+      inputBuffers.emplace_back(buffer);
+    }
+
+    for (Type type : program->outputs) {
+      auto shape = util::TensorShape::fromType(type);
+      auto buffer = std::make_shared<util::SimpleBuffer>(shape);
+      outputBuffers.emplace_back(buffer);
+    }
+
+    return invoke(inputBuffers, outputBuffers);
   }
 
   double invoke(mlir::ArrayRef<util::BufferPtr> inputBuffers,

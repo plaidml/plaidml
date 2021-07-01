@@ -30,9 +30,6 @@ using namespace mlir; // NOLINT
 namespace pmlc::dialect::pxa {
 
 namespace {
-using llvm::DenseMap;
-using llvm::DenseSet;
-using llvm::SmallVector;
 
 // TODO: More sophisticated cost model
 struct CostModel {
@@ -85,15 +82,15 @@ void gpuThreadParallelOp(unsigned maxThreads, mlir::AffineParallelOp op) {
   // We want 'logical threads' * 'threads per subgroup' (i.e. subgroupSize)
   // to end up beging about 'maxThreads' threads, and the rest we put into
   // the grid
-  unsigned subgroupSize = getIntegerTag(op, subgroupSizeTag(), 1);
+  unsigned subgroupSize = getIntegerTag(op, kSubgroupSizeTag, 1);
   auto goalThreads =
       std::max(1u, static_cast<unsigned>(maxThreads / subgroupSize));
   CostModel model(op, goalThreads);
   auto tileSize = findBestTileSize(EvenTilingGenerator(), model, *maybeRanges);
   auto inner = performTiling(op, tileSize);
-  setUnitTag(op, gpuBlockTag());
-  setUnitTag(inner, gpuThreadTag());
-  setIntegerTag(inner, subgroupSizeTag(), subgroupSize);
+  setUnitTag(op, kGpuBlockTag);
+  setUnitTag(inner, kGpuThreadTag);
+  setIntegerTag(inner, kSubgroupSizeTag, subgroupSize);
 }
 
 std::unique_ptr<mlir::Pass> createGPUThreadPass() {

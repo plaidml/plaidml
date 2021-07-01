@@ -66,8 +66,12 @@ pml_py_library(
     ffi.py
     plaidml_setup.py
   DEPS
+    ::_ffi
     ::plaidml
-    plaidml__ffi
+    plaidml::core::py
+    plaidml::edsl::py
+    plaidml::exec::py
+    plaidml::op::py
 )
 
 pml_py_cffi(

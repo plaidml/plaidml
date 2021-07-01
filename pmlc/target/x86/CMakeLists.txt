@@ -8,6 +8,7 @@ pml_cc_library(
     heatmap_impl.cc
     pipeline.cc
     register.cc
+    stencil_tpp_unary.cc
     trace_linking.cc
     xsmm_lowering.cc
     utils.cc
@@ -35,6 +36,13 @@ pml_cc_library(
     MLIRStandardOpsTransforms
     MLIRStandardToLLVM
     omp
+    xsmm
+)
+
+set_property(SOURCE xsmm_lowering.cc
+  PROPERTY COMPILE_DEFINITIONS
+    __BLAS=0
+    LIBXSMM_DEFAULT_CONFIG
 )
 
 pml_tblgen_library(

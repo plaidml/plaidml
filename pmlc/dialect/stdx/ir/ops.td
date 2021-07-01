@@ -94,6 +94,10 @@ def PowOp : StdX_Op<"pow"> {
   let verifier = ?;
 }
 
+def ReluOp : StdX_UnaryFuncOp<"relu"> {
+  let summary = "ReLU operation";
+}
+
 def RoundOp : StdX_UnaryFuncOp<"round"> {
   let summary = "round to nearest integer";
 }

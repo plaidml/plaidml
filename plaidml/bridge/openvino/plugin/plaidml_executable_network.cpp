@@ -27,12 +27,10 @@ namespace PlaidMLPlugin {
 
 #define IE_SET_METRIC(name, ...) [&] { IE_SET_METRIC_RETURN(name, __VA_ARGS__); }()
 
-static plaidml::Program buildProgram(const ICNNNetwork& network) {
-  InputsDataMap inputsInfo;
-  network.getInputsInfo(inputsInfo);
+static plaidml::Program buildProgram(const CNNNetwork& network) {
+  InputsDataMap inputsInfo = network.getInputsInfo();
 
-  OutputsDataMap outputsInfo;
-  network.getOutputsInfo(outputsInfo);
+  OutputsDataMap outputsInfo = network.getOutputsInfo();
 
   std::shared_ptr<ngraph::Function> func = ngraph::clone_function(*network.getFunction());
   ngraph::pass::Manager manager;
@@ -44,12 +42,12 @@ static plaidml::Program buildProgram(const ICNNNetwork& network) {
   return buildProgram(func, network.getName(), inputsInfo, outputsInfo);
 }
 
-InferRequestInternal::Ptr PlaidMLExecutableNetwork::CreateInferRequestImpl(InputsDataMap networkInputs,
-                                                                           OutputsDataMap networkOutputs) {
+IInferRequestInternal::Ptr PlaidMLExecutableNetwork::CreateInferRequestImpl(InputsDataMap networkInputs,
+                                                                            OutputsDataMap networkOutputs) {
   return std::make_shared<PlaidMLInferRequest>(networkInputs, networkOutputs, program_);
 }
 
-PlaidMLExecutableNetwork::PlaidMLExecutableNetwork(const ICNNNetwork& network, const std::string& device)
+PlaidMLExecutableNetwork::PlaidMLExecutableNetwork(const CNNNetwork& network, const std::string& device)
     : program_(buildProgram(network)) {
   program_.compile();
 }

@@ -50,11 +50,14 @@ struct AffineParallelOpConversion
             ArrayRef<int64_t>{1});
       } else {
         // Normal case for parallels with IVs
+        SmallVector<AffineMap> lbMaps, ubMaps;
+        util::splitAffineMaps(op.lowerBoundsMap(), lbMaps);
+        util::splitAffineMaps(op.upperBoundsMap(), ubMaps);
         newOp = rewriter.create<AffineParallelOp>(
-            op.getLoc(),                                      //
-            ArrayRef<Type>{}, ArrayRef<AtomicRMWKind>{},      //
-            op.lowerBoundsMap(), op.getLowerBoundsOperands(), //
-            op.upperBoundsMap(), op.getUpperBoundsOperands(), //
+            op.getLoc(),                                 //
+            ArrayRef<Type>{}, ArrayRef<AtomicRMWKind>{}, //
+            lbMaps, op.getLowerBoundsOperands(),         //
+            ubMaps, op.getUpperBoundsOperands(),         //
             steps);
         for (Value iv : newOp.getIVs()) {
           ivs.push_back(iv);
@@ -131,7 +134,7 @@ struct PxaLoadOpConversion : public OpConversionPattern<pxa::PxaLoadOp> {
   matchAndRewrite(pxa::PxaLoadOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
     rewriter.replaceOpWithNewOp<AffineLoadOp>(op, op.memref(),
-                                              op.getAffineMap(), op.indices());
+                                              op.getAffineMap(), op.idxs());
     return success();
   }
 };
@@ -144,7 +147,7 @@ struct PxaVectorLoadOpConversion
   matchAndRewrite(pxa::PxaVectorLoadOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
     rewriter.replaceOpWithNewOp<AffineVectorLoadOp>(
-        op, op.getVectorType(), op.memref(), op.getAffineMap(), op.indices());
+        op, op.getVectorType(), op.memref(), op.getAffineMap(), op.idxs());
     return success();
   }
 };
@@ -220,7 +223,7 @@ struct PxaVectorReduceOpConversion
         op.getLoc(), op.getVectorType(), op.memref(), op.getAffineMap(),
         op.idxs());
     auto reduce =
-        createReduction(rewriter, op.getLoc(), op.agg(), source, op.vector());
+        createReduction(rewriter, op.getLoc(), op.agg(), source, op.val());
     rewriter.create<AffineVectorStoreOp>(op.getLoc(), reduce, op.memref(),
                                          op.getAffineMap(), op.idxs());
     rewriter.replaceOp(op, op.memref());
@@ -284,6 +287,35 @@ struct FuncOpConversion : public OpConversionPattern<FuncOp> {
 
     // Finally cause the old func op to be erased
     rewriter.eraseOp(op);
+    return success();
+  }
+};
+
+static llvm::APFloat convertFloatUsingType(llvm::APFloat value,
+                                           FloatType type) {
+  bool losesInfo = false;
+  value.convert(type.getFloatSemantics(), APFloat::rmNearestTiesToEven,
+                &losesInfo);
+  return value;
+}
+
+struct ReluOpConversion : public OpConversionPattern<stdx::ReluOp> {
+  using OpConversionPattern<stdx::ReluOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(stdx::ReluOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
+    stdx::ReluOp::Adaptor adaptor(operands);
+    Location loc = op->getLoc();
+
+    auto floatType = adaptor.value().getType().cast<FloatType>();
+    llvm::APFloat value = convertFloatUsingType(llvm::APFloat(0.0), floatType);
+    auto zero = rewriter.create<ConstantFloatOp>(loc, value, floatType);
+    auto cmpOp =
+        rewriter.create<CmpFOp>(loc, CmpFPredicate::OLT, adaptor.value(), zero)
+            .getResult();
+    rewriter.replaceOpWithNewOp<SelectOp>(op, cmpOp, zero, adaptor.value());
+
     return success();
   }
 };
@@ -354,6 +386,7 @@ void populatePXAToAffineConversionPatterns(RewritePatternSet &patterns) {
       PxaVectorLoadOpConversion,   //
       PxaVectorReduceOpConversion, //
       PxaStoreOpConversion,        //
+      ReluOpConversion,            //
       ReturnOpConversion>(patterns.getContext());
 }
 
