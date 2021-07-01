@@ -40,7 +40,7 @@ def ContractionOp : TileOp<"contract", [
     OpBuilder<(ins
       "mlir::Type":$resultType,
       "mlir::Value":$init,
-      "mlir::ArrayRef<mlir::Value>":$tensors,
+      "mlir::ValueRange":$tensors,
       "util::AggregationKind":$agg,
       "util::CombinationKind":$combo,
       "mlir::AffineMap":$sink,
@@ -114,7 +114,8 @@ def GatherOp : MaterializeOp<"gather"> {
     DefaultValuedAttr<NearestMode, "NearestMode::round_prefer_floor">:$nearestMode,
     DefaultValuedAttr<F64Attr, "-0.75">:$cubeCoeff,
     DefaultValuedAttr<GatherMode, "GatherMode::normal">:$mode,
-    DefaultValuedAttr<IndexAttr, "0">:$batchDims
+    DefaultValuedAttr<IndexAttr, "0">:$batchDims,
+    DefaultValuedAttr<OutOfBoundsMode, "OutOfBoundsMode::gather_edge_padded_input">:$OutOfBoundsMode
   );
   let results = (outs RankedTensorOf<[AnyScalar]>:$result);
   let assemblyFormat = [{
@@ -130,7 +131,8 @@ def GatherOp : MaterializeOp<"gather"> {
       "mlir::IntegerAttr":$nearestMode,
       "mlir::FloatAttr":$cubeCoeff,
       "mlir::IntegerAttr":$mode,
-      "mlir::IntegerAttr":$batchDims
+      "mlir::IntegerAttr":$batchDims,
+      "mlir::IntegerAttr":$OutOfBoundsMode
     )>
   ];
 }

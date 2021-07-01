@@ -4,7 +4,6 @@
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
-#include "mlir/Dialect/StandardOps/EDSC/Intrinsics.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/Pass/Pass.h"
@@ -128,37 +127,36 @@ struct TanLowering : public LibMCallLowering<stdx::TanOp> {
 
 class BaseViewConversionHelper {
 public:
-  explicit BaseViewConversionHelper(Type type)
-      : desc(MemRefDescriptor::undef(rewriter(), loc(), type)) {}
+  BaseViewConversionHelper(OpBuilder &rewriter, Location loc, Type type)
+      : rewriter(rewriter), loc(loc),
+        desc(MemRefDescriptor::undef(rewriter, loc, type)) {}
 
-  explicit BaseViewConversionHelper(Value v) : desc(v) {}
+  explicit BaseViewConversionHelper(OpBuilder &rewriter, Location loc, Value v)
+      : rewriter(rewriter), loc(loc), desc(v) {}
 
   /// Wrappers around MemRefDescriptor that use EDSC builder and location.
-  Value allocatedPtr() { return desc.allocatedPtr(rewriter(), loc()); }
-  void setAllocatedPtr(Value v) { desc.setAllocatedPtr(rewriter(), loc(), v); }
-  Value alignedPtr() { return desc.alignedPtr(rewriter(), loc()); }
-  void setAlignedPtr(Value v) { desc.setAlignedPtr(rewriter(), loc(), v); }
-  Value offset() { return desc.offset(rewriter(), loc()); }
-  void setOffset(Value v) { desc.setOffset(rewriter(), loc(), v); }
-  Value size(unsigned i) { return desc.size(rewriter(), loc(), i); }
-  void setSize(unsigned i, Value v) { desc.setSize(rewriter(), loc(), i, v); }
+  Value allocatedPtr() { return desc.allocatedPtr(rewriter, loc); }
+  void setAllocatedPtr(Value v) { desc.setAllocatedPtr(rewriter, loc, v); }
+  Value alignedPtr() { return desc.alignedPtr(rewriter, loc); }
+  void setAlignedPtr(Value v) { desc.setAlignedPtr(rewriter, loc, v); }
+  Value offset() { return desc.offset(rewriter, loc); }
+  void setOffset(Value v) { desc.setOffset(rewriter, loc, v); }
+  Value size(unsigned i) { return desc.size(rewriter, loc, i); }
+  void setSize(unsigned i, Value v) { desc.setSize(rewriter, loc, i, v); }
   void setConstantSize(unsigned i, int64_t v) {
-    desc.setConstantSize(rewriter(), loc(), i, v);
+    desc.setConstantSize(rewriter, loc, i, v);
   }
-  Value stride(unsigned i) { return desc.stride(rewriter(), loc(), i); }
-  void setStride(unsigned i, Value v) {
-    desc.setStride(rewriter(), loc(), i, v);
-  }
+  Value stride(unsigned i) { return desc.stride(rewriter, loc, i); }
+  void setStride(unsigned i, Value v) { desc.setStride(rewriter, loc, i, v); }
   void setConstantStride(unsigned i, int64_t v) {
-    desc.setConstantStride(rewriter(), loc(), i, v);
+    desc.setConstantStride(rewriter, loc, i, v);
   }
 
   operator Value() { return desc; }
 
 private:
-  OpBuilder &rewriter() { return edsc::ScopedContext::getBuilderRef(); }
-  Location loc() { return edsc::ScopedContext::getLocation(); }
-
+  OpBuilder &rewriter;
+  Location loc;
   MemRefDescriptor desc;
 };
 
@@ -181,10 +179,10 @@ struct ReshapeLowering : public ConvertOpToLLVMPattern<stdx::ReshapeOp> {
         }))
       return failure();
 
-    edsc::ScopedContext context(rewriter, op->getLoc());
     stdx::ReshapeOpAdaptor adaptor(operands);
-    BaseViewConversionHelper baseDesc(adaptor.tensor());
-    BaseViewConversionHelper desc(typeConverter->convertType(dstType));
+    BaseViewConversionHelper baseDesc(rewriter, op->getLoc(), adaptor.tensor());
+    BaseViewConversionHelper desc(rewriter, op->getLoc(),
+                                  typeConverter->convertType(dstType));
     desc.setAllocatedPtr(baseDesc.allocatedPtr());
     desc.setAlignedPtr(baseDesc.alignedPtr());
     desc.setOffset(baseDesc.offset());

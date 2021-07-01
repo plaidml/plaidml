@@ -36,12 +36,11 @@ Tensor GatherTree(Tensor step_ids, Tensor parent_idx, Tensor max_seq_len, Tensor
   }
 
   Tensor zero = edsl::cast(edsl::index({edsl::TensorDim(1)}, 0), step_ids.dtype());
-  Tensor zero_int = edsl::cast(zero, DType::INT32);
   // Add padding to update the whole PARENT_IDX value.
   Tensor index_time =
       edsl::index({edsl::TensorDim(MaxTime), edsl::TensorDim(BatchSize), edsl::TensorDim(BeamWidth)}, 0);
-  Tensor max_time = edsl::cast(Tensor(MaxTime), max_seq_len.dtype());
-  Tensor max_seq_len_in_beam = op::minimum(max_seq_len, max_time);
+  Tensor max_time = edsl::cast(Tensor(MaxTime), DType::INT32);
+  Tensor max_seq_len_in_beam = op::minimum(edsl::cast(max_seq_len, DType::INT32), max_time);
   Tensor parent_idx_filter = index_time - edsl::reshape(max_seq_len_in_beam, {1, BatchSize, 1});
   // Set padding value to unused index.
   Tensor index_beam = edsl::index({edsl::TensorDim(BatchSize), edsl::TensorDim(BeamWidth)}, 1);
@@ -54,15 +53,15 @@ Tensor GatherTree(Tensor step_ids, Tensor parent_idx, Tensor max_seq_len, Tensor
   // TODO: replace "for" with scanOp.
   for (int i = MaxTime - 1; i > 0; i--) {
     Parents.push_back(op::unsqueeze(parent, {0}));
-    Tensor parent_idx_s = op::squeeze(edsl::gather(parent_idx_new, zero_int + i).axis(0), {0});
-    Tensor new_parent = edsl::gather(parent_idx_s, op::unsqueeze(parent, {-1})).mode(edsl::GatherMode::ND).batchDims(1);
+    Tensor parent_idx_s = op::squeeze(edsl::gather(parent_idx_new, i).axis(0), {0});
+    Tensor new_parent = op::gatherND(parent_idx_s, op::unsqueeze(parent, {-1})).batchDims(1);
     parent = new_parent;
   }
   Parents.push_back(op::unsqueeze(parent, {0}));
   std::reverse(Parents.begin(), Parents.end());
   Tensor parents_idx_u = op::concatenate(Parents, 0);
   // Get output value.
-  Tensor update = edsl::gather(step_ids, op::unsqueeze(parents_idx_u, {-1})).mode(edsl::GatherMode::ND).batchDims(2);
+  Tensor update = op::gatherND(step_ids, op::unsqueeze(parents_idx_u, {-1})).batchDims(2);
   // Change padding to end_token.
   Tensor output = edsl::select(parent_idx_filter < 0, update, end_token);
   // Check the first decoded end_token on time axis, values are then filled with end_token.

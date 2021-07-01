@@ -31,11 +31,13 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
 
   AffineValueMap computeInnerValueMap(AffineMap orig, ValueRange operands,
                                       Block *block) {
-    auto strides = computeStrideInfo(orig, operands);
-    assert(strides && "Could not compute stride info");
+    SmallVector<StrideInfo> strides;
+    LogicalResult ok = computeMultiDimStrideInfo(orig, operands, strides);
+    (void)ok; // Silence warning in release builds
+    assert(succeeded(ok) && "Could not compute stride info");
     SmallVector<StrideInfo, 4> inner;
-    for (size_t i = 0; i < strides->size(); i++) {
-      auto innerStride = (*strides)[i].inner(block);
+    for (size_t i = 0; i < strides.size(); i++) {
+      auto innerStride = strides[i].inner(block);
       inner.push_back(innerStride);
     }
     return convertToValueMap(orig.getContext(), inner);
@@ -65,10 +67,13 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
     auto vectorSize = 0;
     for (auto &use : getIndirectAccessUses(op)) {
       IVLOG(2, "Found use: " << debugString(*use.getOwner()));
-      Optional<SmallVector<StrideInfo, 4>> maybeStrides;
+      SmallVector<StrideInfo> strides;
       if (auto lop = dyn_cast<PxaReadOpInterface>(use.getOwner())) {
-        maybeStrides =
-            computeStrideInfo(lop.getAffineMap(), lop.getMapOperands());
+        if (failed(computeMultiDimStrideInfo(lop.getAffineMap(),
+                                             lop.getMapOperands(), strides))) {
+          lop.emitRemark("Unable to compute strides for access");
+          return;
+        }
         // Get vector size value. For scalar ops vec size is set to 1.
         // For now this value can be optimized only when all sizes match.
         // TODO: investigate if different values can be used here and how to
@@ -90,8 +95,11 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
           return;
         }
       } else if (auto rop = dyn_cast<PxaReduceOpInterface>(use.getOwner())) {
-        maybeStrides =
-            computeStrideInfo(rop.getAffineMap(), rop.getMapOperands());
+        if (failed(computeMultiDimStrideInfo(rop.getAffineMap(),
+                                             rop.getMapOperands(), strides))) {
+          rop.emitRemark("Unable to compute strides for access");
+          return;
+        }
         // Get vector size value. For scalar ops vec size is set to 1.
         // For now this value can be optimized only when all sizes match.
         // TODO: investigate if different values can be used here and how to
@@ -113,15 +121,11 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
           return;
         }
       }
-      if (!maybeStrides) {
-        use.getOwner()->emitRemark("Unable to compute strides for access");
-        return;
-      }
 
       SmallVector<StrideInfo, 4> curOuter;
       SmallVector<StrideRange, 4> curInner;
-      for (size_t i = 0; i < maybeStrides->size(); i++) {
-        auto dimStride = (*maybeStrides)[i];
+      for (size_t i = 0; i < strides.size(); i++) {
+        auto dimStride = strides[i];
         auto dimStrideOuter = dimStride.outer(opBlock);
         auto dimStrideInner = dimStride.inner(opBlock);
         curOuter.push_back(dimStrideOuter);
@@ -232,7 +236,7 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
         } else if (auto ropOp =
                        dyn_cast<PxaVectorReduceOp>(rop.getOperation())) {
           auto nrop = replace.create<PxaVectorReduceOp>(
-              ropOp.getLoc(), ropOp.agg(), ropOp.vector(), ropOp.getMemRef(),
+              ropOp.getLoc(), ropOp.agg(), ropOp.val(), ropOp.getMemRef(),
               vm.getAffineMap(), vm.getOperands());
           ropOp.replaceAllUsesWith(nrop.result());
         }

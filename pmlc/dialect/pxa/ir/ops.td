@@ -24,25 +24,70 @@ class PXA_OpWithPP<string mnemonic, list<OpTrait> traits = []> :
   let parser = [{ return parse$cppClass(parser, result); }];
 }
 
-def AnyStdScalar : AnyTypeOf<[AnyFloat, AnySignlessInteger]> {}
-
 class PxaReduceOpBase<string mnemonic, list<OpTrait> traits = []> :
-    PXA_OpWithPP<mnemonic, !listconcat(traits,
-        [DeclareOpInterfaceMethods<PxaReduceOpInterface>,
+    PXA_OpWithPP<mnemonic, !listconcat(traits, [
+        PxaGenericOpInterface,
+        DeclareOpInterfaceMethods<PxaReduceOpInterface>,
         DeclareOpInterfaceMethods<AffineMapAccessInterface>,
         MemRefsNormalizable])> {
 
   code extraClassDeclarationBase = [{
+    mlir::ValueRange inputs() { return {}; }
+    mlir::ValueRange outputs() { return {memref()}; }
+
+    mlir::OpOperandVector getInputOperands() { return {}; }
+    mlir::OpOperandVector getOutputOperands() {
+      mlir::OpOperandVector result;
+      result.push_back(&getOperation()->getOpOperand(1));
+      return result;
+    }
+
+    bool isReadOperand(mlir::OpOperand *opOperand) {
+      assert(opOperand->getOwner() == this->getOperation());
+      assert(opOperand->getOperandNumber() == 1);
+      return false;
+    }
+
+    bool isWriteOperand(mlir::OpOperand *opOperand) {
+      assert(opOperand->getOwner() == this->getOperation());
+      assert(opOperand->getOperandNumber() == 1);
+      return true;
+    }
+
+    mlir::SmallVector<StrideRange> getTiedInternalRanges(
+        mlir::OpOperand *opOperand) {
+      assert(opOperand->getOwner() == this->getOperation());
+      assert(opOperand->getOperandNumber() == 1);
+      mlir::SmallVector<StrideRange> result(getMemRefType().getRank(),
+                                            StrideRange(0));
+      if (mlir::VectorType vecType = getVectorType()) {
+        mlir::ArrayRef<int64_t> shape = vecType.getShape();
+        for (size_t i = 0; i < shape.size(); i++)
+          result[i + shape.size() - result.size()] =
+            StrideRange(0, shape[i] - 1, 1);
+      }
+      return result;
+    }
+
+    mlir::AffineValueMap getTiedAffineValueMap(mlir::OpOperand *opOperand) {
+      assert(opOperand->getOwner() == this->getOperation());
+      assert(opOperand->getOperandNumber() == 1);
+      return mlir::AffineValueMap(map(), idxs());
+    }
+
     mlir::Value getMemRef() { return memref(); }
-    unsigned getMemRefOperandIndex() { return 1; }
-    void setMemRef(mlir::Value value) { setOperand(getMemRefOperandIndex(), value); }
-    mlir::MemRefType getMemRefType() { return memref().getType().cast<mlir::MemRefType>(); }
+    mlir::MemRefType getMemRefType() {
+      return memref().getType().cast<mlir::MemRefType>();
+    }
+
+    mlir::VectorType getVectorType() {
+      return val().getType().dyn_cast<mlir::VectorType>();
+    }
+
     mlir::AffineMap getAffineMap() { return map(); }
     operand_range getMapOperands() { return idxs(); }
     static mlir::StringRef getMapAttrName() { return "map"; }
-    mlir::AffineMapAttr getAffineMapAttr() {
-      return (*this)->getAttr(getMapAttrName()).cast<mlir::AffineMapAttr>();
-    }
+    mlir::AffineMapAttr getAffineMapAttr() { return mapAttr(); }
     mlir::AtomicRMWKind getAgg() { return agg(); }
   }];
 }
@@ -65,41 +110,16 @@ def PxaReduceOp : PxaReduceOpBase<"reduce"> {
     OpBuilder<(ins
       "mlir::AtomicRMWKind":$agg,
       "mlir::Value":$val,
-      "mlir::Value":$mem,
+      "mlir::Value":$memref,
       "mlir::AffineMap":$map,
       "mlir::ValueRange":$idxs
     ), [{
-      build($_builder, $_state, mem.getType(), agg, val, mem, map, idxs);
+      build($_builder, $_state, memref.getType(), agg, val, memref, map, idxs);
     }]>
   ];
 
-  let extraClassDeclaration =  extraClassDeclarationBase # [{
+  let extraClassDeclaration = extraClassDeclarationBase # [{
     mlir::Value getValueToStore() { return val(); }
-  }];
-}
-
-def PxaGemmOp : PXA_OpWithPP<"gemm"> {
-  let arguments = (ins
-    Arg<AnyMemRef, "the C memref to store to", [MemWrite]>:$c,
-    AffineMapAttr:$cAccessMap,
-    AffineMapAttr:$cTileMap,
-    Arg<AnyMemRef, "the A memref to load from", [MemRead]>:$a,
-    AffineMapAttr:$aAccessMap,
-    AffineMapAttr:$aTileMap,
-    Arg<AnyMemRef, "the B memref to load from", [MemRead]>:$b,
-    AffineMapAttr:$bAccessMap,
-    AffineMapAttr:$bTileMap,
-    I64ArrayAttr:$tile,
-    I64ArrayAttr:$numBatches,
-    Variadic<Index>:$mapOperands);
-  let results = (outs AnyMemRef:$out);
-
-  let hasCanonicalizer = 1;
-
-  let extraClassDeclaration = [{
-    operand_range getOperandsForA();
-    operand_range getOperandsForB();
-    operand_range getOperandsForC();
   }];
 }
 
@@ -107,7 +127,7 @@ def PxaVectorReduceOp : PxaReduceOpBase<"vector_reduce"> {
   let summary = "affine vector reduction operation";
   let arguments = (ins
     AtomicRMWKindAttr:$agg,
-    AnyVector:$vector,
+    AnyVector:$val,
     AnyMemRef:$memref,
     AffineMapAttr:$map,
     Variadic<Index>:$idxs
@@ -120,43 +140,87 @@ def PxaVectorReduceOp : PxaReduceOpBase<"vector_reduce"> {
   let builders = [
     OpBuilder<(ins
       "mlir::AtomicRMWKind":$agg,
-      "mlir::Value":$vector,
-      "mlir::Value":$mem,
+      "mlir::Value":$val,
+      "mlir::Value":$memref,
       "mlir::AffineMap":$map,
       "mlir::ValueRange":$idxs
     ), [{
-      build($_builder, $_state, mem.getType(), agg, vector, mem, map, idxs);
+      build($_builder, $_state, memref.getType(), agg, val, memref, map, idxs);
     }]>
   ];
 
   let extraClassDeclaration = extraClassDeclarationBase # [{
-    mlir::Value getValueToStore() { return vector(); }
-    mlir::VectorType getVectorType() {
-      return vector().getType().cast<mlir::VectorType>();
-    }
+    mlir::Value getValueToStore() { return val(); }
   }];
 }
 
 class PxaLoadOpBase<string mnemonic, list<OpTrait> traits = []> :
-    PXA_OpWithPP<mnemonic, !listconcat(traits,
-        [DeclareOpInterfaceMethods<PxaReadOpInterface>,
+    PXA_OpWithPP<mnemonic, !listconcat(traits, [
+        PxaGenericOpInterface,
+        DeclareOpInterfaceMethods<PxaReadOpInterface>,
         DeclareOpInterfaceMethods<AffineMapAccessInterface>,
         MemRefsNormalizable])> {
   let arguments = (ins
     AnyMemRef:$memref,
-    Variadic<Index>:$indices
+    AffineMapAttr:$map,
+    Variadic<Index>:$idxs
   );
 
   code extraClassDeclarationBase = [{
-    /// Returns the operand index of the memref.
-    unsigned getMemRefOperandIndex() { return 0; }
+    mlir::ValueRange inputs() { return {memref()}; }
+    mlir::ValueRange outputs() { return {}; }
 
-    void setMemRef(mlir::Value value) { setOperand(getMemRefOperandIndex(), value); }
+    mlir::OpOperandVector getInputOperands() {
+      mlir::OpOperandVector result;
+      result.push_back(&getOperation()->getOpOperand(0));
+      return result;
+    }
+    mlir::OpOperandVector getOutputOperands() { return {}; }
+
+    bool isReadOperand(mlir::OpOperand *opOperand) {
+      assert(opOperand->getOwner() == this->getOperation());
+      assert(opOperand->getOperandNumber() == 0);
+      return true;
+    }
+
+    bool isWriteOperand(mlir::OpOperand *opOperand) {
+      assert(opOperand->getOwner() == this->getOperation());
+      assert(opOperand->getOperandNumber() == 0);
+      return false;
+    }
+
+    mlir::SmallVector<StrideRange> getTiedInternalRanges(
+        mlir::OpOperand *opOperand) {
+      assert(opOperand->getOwner() == this->getOperation());
+      assert(opOperand->getOperandNumber() == 0);
+      mlir::SmallVector<StrideRange> result(getMemRefType().getRank(),
+                                            StrideRange(0));
+      if (mlir::VectorType vecType = getVectorType()) {
+        mlir::ArrayRef<int64_t> shape = vecType.getShape();
+        for (size_t i = 0; i < shape.size(); i++)
+          result[i + shape.size() - result.size()] =
+            StrideRange(0, shape[i] - 1, 1);
+      }
+      return result;
+    }
+
+    mlir::AffineValueMap getTiedAffineValueMap(mlir::OpOperand *opOperand) {
+      assert(opOperand->getOwner() == this->getOperation());
+      assert(opOperand->getOperandNumber() == 0);
+      return mlir::AffineValueMap(map(), idxs());
+    }
+
+    mlir::Value getMemRef() { return memref(); }
+    mlir::MemRefType getMemRefType() {
+      return memref().getType().cast<mlir::MemRefType>();
+    }
+
+    mlir::VectorType getVectorType() {
+      return result().getType().dyn_cast<mlir::VectorType>();
+    }
 
     /// Returns the affine map used to index the memref for this operation.
-    mlir::AffineMapAttr getAffineMapAttr() {
-      return (*this)->getAttr(getMapAttrName()).cast<mlir::AffineMapAttr>();
-    }
+    mlir::AffineMapAttr getAffineMapAttr() { return mapAttr(); }
 
     static mlir::StringRef getMapAttrName() { return "map"; }
   }];
@@ -263,11 +327,7 @@ def PxaVectorLoadOp : PxaLoadOpBase<"vector_load"> {
     )>
   ];
 
-  let extraClassDeclaration = extraClassDeclarationBase # [{
-    mlir::VectorType getVectorType() {
-      return result().getType().cast<mlir::VectorType>();
-    }
-  }];
+  let extraClassDeclaration = extraClassDeclarationBase;
 
   let hasCanonicalizer = 1;
   let hasFolder = 1;
@@ -304,41 +364,63 @@ def PxaStoreOp : PXA_OpWithPP<"store", [MemRefsNormalizable]> {
 }
 
 def PxaGenericOp : PXA_OpWithPP<"generic", [
-    AttrSizedOperandSegments,
-    IsolatedFromAbove]> {
+    PxaGenericOpInterface,
+    AttrSizedOperandSegments]> {
   let summary = "PXA generic operation";
   let arguments = (ins
     Variadic<AnyMemRef>:$inputs,
     Variadic<AnyMemRef>:$outputs,
-    Variadic<Index>:$indices,
-    AffineMapArrayAttr:$input_access_maps,
-    AffineMapArrayAttr:$input_tile_maps,
-    AffineMapArrayAttr:$output_access_maps,
-    AffineMapArrayAttr:$output_tile_maps,
+    Variadic<Index>:$inputIndices,
+    Variadic<Index>:$outputIndices,
+    AffineMapArrayAttr:$inputAccessMaps,
+    AffineMapArrayAttr:$inputTileMaps,
+    AffineMapArrayAttr:$outputAccessMaps,
+    AffineMapArrayAttr:$outputTileMaps,
     StrAttr:$kernel,
-    I64ArrayAttr:$tile
+    I64ArrayAttr:$tile,
+    I64ArrayAttr:$reductions
   );
   let results = (outs Variadic<AnyMemRef>:$results);
 
+  let hasCanonicalizer = 1;
+
   let extraClassDeclaration = [{
+    void getAffineValueMaps(
+      mlir::ArrayAttr accessMaps,
+      mlir::OperandRange mapOperands,
+      mlir::SmallVectorImpl<mlir::AffineValueMap> &result);
+
+    mlir::OpOperandVector getInputOperands();
+    mlir::OpOperandVector getOutputOperands();
+
+    bool isReadOperand(mlir::OpOperand *opOperand);
+    bool isWriteOperand(mlir::OpOperand *opOperand);
+
+    mlir::SmallVector<StrideRange> getTiedInternalRanges(
+      mlir::OpOperand *opOperand);
+
+    mlir::SmallVector<mlir::AffineValueMap> getAffineValueMaps();
+    mlir::AffineValueMap getTiedAffineValueMap(mlir::OpOperand *opOperand);
+
     static mlir::StringRef getInputAccessMapsAttrName() {
-      return "input_access_maps";
+      return "inputAccessMaps";
     }
     static mlir::StringRef getInputTileMapsAttrName() {
-      return "input_tile_maps";
+      return "inputTileMaps";
     }
     static mlir::StringRef getOutputAccessMapsAttrName() {
-      return "output_access_maps";
+      return "outputAccessMaps";
     }
     static mlir::StringRef getOutputTileMapsAttrName() {
-      return "output_tile_maps";
+      return "outputTileMaps";
     }
     static mlir::StringRef getKernelAttrName() { return "kernel"; }
     static mlir::StringRef getTileAttrName() { return "tile"; }
+    static mlir::StringRef getReductionsAttrName() { return "reductions"; }
   }];
 }
 
-// TODO: replace PrngOp with an AffineGreyboxOp
+// TODO: replace PrngOp with an PxaGenericOp
 def PrngOp : PXA_Op<"prng"> {
   let summary = "pseudorandom number generator operation";
   let arguments = (ins AnyMemRef:$state, AnyMemRef:$tensor, AnyMemRef:$new_state);

@@ -17,10 +17,10 @@ class PlaidMLExecutableNetwork : public InferenceEngine::ExecutableNetworkThread
  public:
   using Ptr = std::shared_ptr<PlaidMLExecutableNetwork>;
 
-  PlaidMLExecutableNetwork(const InferenceEngine::ICNNNetwork& network, const std::string& device);
+  PlaidMLExecutableNetwork(const InferenceEngine::CNNNetwork& network, const std::string& device);
   virtual ~PlaidMLExecutableNetwork() = default;
 
-  InferenceEngine::InferRequestInternal::Ptr CreateInferRequestImpl(
+  InferenceEngine::IInferRequestInternal::Ptr CreateInferRequestImpl(
       InferenceEngine::InputsDataMap networkInputs, InferenceEngine::OutputsDataMap networkOutputs) final;
 
   InferenceEngine::Parameter GetMetric(const std::string& name) const override;

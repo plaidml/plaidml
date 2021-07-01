@@ -1333,7 +1333,7 @@ def random_uniform_variable(shape, low, high, dtype=None, name=None, seed=None):
 
 
 @_log_call
-def relu(x, alpha=None, max_value=None, threshold=0.):
+def relu(x, alpha=None, max_value=None, threshold=0.0):
     return _KerasNode('relu',
                       tensor=plaidml_op.relu(x.tensor, alpha, max_value, threshold),
                       operands=[x])

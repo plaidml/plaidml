@@ -5,9 +5,130 @@
 
 include "mlir/IR/OpBase.td"
 
-class PxaOpInterface<string name> : OpInterface<name>;
+def PxaGenericOpInterface : OpInterface<"PxaGenericOpInterface"> {
+  let description = [{}];
 
-def PxaReadOpInterface : PxaOpInterface<"PxaReadOpInterface"> {
+  let cppNamespace = "pmlc::dialect::pxa";
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Return the input operands.
+      }],
+      /*retTy=*/"::mlir::ValueRange",
+      /*methodName=*/"inputs",
+      /*args=*/(ins)
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Return the output operands.
+      }],
+      /*retTy=*/"::mlir::ValueRange",
+      /*methodName=*/"outputs",
+      /*args=*/(ins)
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Return the number of inputs.
+      }],
+      /*retTy=*/"int64_t",
+      /*methodName=*/"getNumInputs",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return $_op.inputs().size();
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Return the number of outputs.
+      }],
+      /*retTy=*/"int64_t",
+      /*methodName=*/"getNumOutputs",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return $_op.outputs().size();
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Return the input operands.
+      }],
+      /*retTy=*/"::mlir::OpOperandVector",
+      /*methodName=*/"getInputOperands",
+      /*args=*/(ins)
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Return the output operands.
+      }],
+      /*retTy=*/"::mlir::OpOperandVector",
+      /*methodName=*/"getOutputOperands",
+      /*args=*/(ins)
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Return whether the operand is a read.
+      }],
+      /*retTy=*/"bool",
+      /*methodName=*/"isReadOperand",
+      /*args=*/(ins "::mlir::OpOperand *":$opOperand)
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Return whether the operand is a write.
+      }],
+      /*retTy=*/"bool",
+      /*methodName=*/"isWriteOperand",
+      /*args=*/(ins "::mlir::OpOperand *":$opOperand)
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Return the internal StrideRanges for `opOperand`.
+      }],
+      /*retTy=*/"::mlir::SmallVector<pmlc::dialect::pxa::StrideRange>",
+      /*methodName=*/"getTiedInternalRanges",
+      /*args=*/(ins "::mlir::OpOperand *":$opOperand)
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Return the AffineValueMap for `opOperand`.
+      }],
+      /*retTy=*/"::mlir::AffineValueMap",
+      /*methodName=*/"getTiedAffineValueMap",
+      /*args=*/(ins "::mlir::OpOperand *":$opOperand)
+    >,
+    InterfaceMethod<
+      /*desc=*/"Return the input PxaMemAccessOperands.",
+      /*retTy=*/"::mlir::SmallVector<pmlc::dialect::pxa::PxaMemAccessOperand>",
+      /*methodName=*/"getInputMemAccesses",
+      /*args=*/(ins),
+      /*methodBody=*/[{
+        ::mlir::SmallVector<pmlc::dialect::pxa::PxaMemAccessOperand> result;
+        result.reserve($_op.getNumInputs());
+        for (::mlir::OpOperand *operand : $_op.getInputOperands())
+          result.emplace_back(operand);
+        return result;
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/"Return the output PxaMemAccessOperands.",
+      /*retTy=*/"::mlir::SmallVector<pmlc::dialect::pxa::PxaMemAccessOperand>",
+      /*methodName=*/"getOutputMemAccesses",
+      /*args=*/(ins),
+      /*methodBody=*/[{
+        ::mlir::SmallVector<pmlc::dialect::pxa::PxaMemAccessOperand> result;
+        result.reserve($_op.getNumOutputs());
+        for (::mlir::OpOperand *operand : $_op.getOutputOperands())
+          result.emplace_back(operand);
+        return result;
+      }]
+    >,
+  ];
+}
+
+def PxaReadOpInterface : OpInterface<"PxaReadOpInterface"> {
   let description = [{
       Interface to query characteristics of read-like ops with affine
       restrictions.
@@ -21,10 +142,9 @@ def PxaReadOpInterface : PxaOpInterface<"PxaReadOpInterface"> {
       /*retTy=*/"::mlir::Value",
       /*methodName=*/"getMemRef",
       /*args=*/(ins),
-      /*methodBody*/[{}],
-      /*defaultImplementation=*/ [{
-        ConcreteOp op = ::mlir::cast<ConcreteOp>(this->getOperation());
-        return op.getOperand(op.getMemRefOperandIndex());
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        return $_op.getMemRef();
       }]
     >,
     InterfaceMethod<
@@ -34,8 +154,7 @@ def PxaReadOpInterface : PxaOpInterface<"PxaReadOpInterface"> {
       /*args=*/(ins),
       /*methodBody=*/[{}],
       /*defaultImplementation=*/[{
-        ConcreteOp op = ::mlir::cast<ConcreteOp>(this->getOperation());
-        return op.getMemRef().getType().template cast<::mlir::MemRefType>();
+        return $_op.getMemRef().getType().template cast<::mlir::MemRefType>();
       }]
     >,
     InterfaceMethod<
@@ -45,8 +164,7 @@ def PxaReadOpInterface : PxaOpInterface<"PxaReadOpInterface"> {
       /*args=*/(ins),
       /*methodBody=*/[{}],
       /*defaultImplementation=*/[{
-        ConcreteOp op = ::mlir::cast<ConcreteOp>(this->getOperation());
-        return llvm::drop_begin(op.getOperands(), 1);
+        return llvm::drop_begin($_op.getOperands(), 1);
       }]
     >,
     InterfaceMethod<
@@ -58,8 +176,7 @@ def PxaReadOpInterface : PxaOpInterface<"PxaReadOpInterface"> {
       /*args=*/(ins),
       /*methodBody=*/[{}],
       /*defaultImplementation=*/[{
-        ConcreteOp op = ::mlir::cast<ConcreteOp>(this->getOperation());
-        return op.getAffineMapAttr().getValue();
+        return $_op.getAffineMapAttr().getValue();
       }]
     >,
     InterfaceMethod<
@@ -69,13 +186,13 @@ def PxaReadOpInterface : PxaOpInterface<"PxaReadOpInterface"> {
       /*args=*/(ins),
       /*methodBody=*/[{}],
       /*defaultImplementation=*/[{
-        return ::mlir::cast<ConcreteOp>(this->getOperation());
+        return $_op.result();
       }]
     >,
   ];
 }
 
-def PxaReduceOpInterface : PxaOpInterface<"PxaReduceOpInterface"> {
+def PxaReduceOpInterface : OpInterface<"PxaReduceOpInterface"> {
   let description = [{
       Interface to query characteristics of write-like ops with affine
       restrictions.
@@ -89,8 +206,7 @@ def PxaReduceOpInterface : PxaOpInterface<"PxaReduceOpInterface"> {
       /*args=*/(ins),
       /*methodBody=*/[{}],
       /*defaultImplementation=*/[{
-        ConcreteOp op = ::mlir::cast<ConcreteOp>(this->getOperation());
-        return op.getOperand(op.getMemRefOperandIndex());
+        return $_op.getMemRef();
       }]
     >,
     InterfaceMethod<
@@ -100,8 +216,7 @@ def PxaReduceOpInterface : PxaOpInterface<"PxaReduceOpInterface"> {
       /*args=*/(ins),
       /*methodBody=*/[{}],
       /*defaultImplementation=*/[{
-        ConcreteOp op = ::mlir::cast<ConcreteOp>(this->getOperation());
-        return op.getMemRef().getType().template cast<::mlir::MemRefType>();
+        return $_op.getMemRef().getType().template cast<::mlir::MemRefType>();
       }]
     >,
     InterfaceMethod<
@@ -111,8 +226,7 @@ def PxaReduceOpInterface : PxaOpInterface<"PxaReduceOpInterface"> {
       /*args=*/(ins),
       /*methodBody=*/[{}],
       /*defaultImplementation=*/[{
-        ConcreteOp op = ::mlir::cast<ConcreteOp>(this->getOperation());
-        return llvm::drop_begin(op.getOperands(), 2);
+        return llvm::drop_begin($_op.getOperands(), 2);
       }]
     >,
     InterfaceMethod<
@@ -122,10 +236,9 @@ def PxaReduceOpInterface : PxaOpInterface<"PxaReduceOpInterface"> {
       /*retTy=*/"::mlir::AffineMap",
       /*methodName=*/"getAffineMap",
       /*args=*/(ins),
-      /*methodName=*/[{}],
+      /*methodBody=*/[{}],
       /*defaultImplementation=*/[{
-        ConcreteOp op = ::mlir::cast<ConcreteOp>(this->getOperation());
-        return op.getAffineMapAttr().getValue();
+        return $_op.getAffineMapAttr().getValue();
       }]
     >,
     InterfaceMethod<
@@ -135,8 +248,7 @@ def PxaReduceOpInterface : PxaOpInterface<"PxaReduceOpInterface"> {
       /*args=*/(ins),
       /*methodBody=*/[{}],
       /*defaultImplementation=*/[{
-        ConcreteOp op = ::mlir::cast<ConcreteOp>(this->getOperation());
-        return op.getOperand(op.getStoredValOperandIndex());
+        return $_op.getOperand($_op.getStoredValOperandIndex());
       }]
     >,
     InterfaceMethod<
@@ -146,8 +258,7 @@ def PxaReduceOpInterface : PxaOpInterface<"PxaReduceOpInterface"> {
       /*args=*/(ins),
       /*methodBody=*/[{}],
       /*defaultImplementation=*/[{
-        ConcreteOp op = ::mlir::cast<ConcreteOp>(this->getOperation());
-        return op.getAgg();
+        return $_op.getAgg();
       }]
     >,
     InterfaceMethod<
@@ -157,8 +268,7 @@ def PxaReduceOpInterface : PxaOpInterface<"PxaReduceOpInterface"> {
       /*args=*/(ins),
       /*methodBody=*/[{}],
       /*defaultImplementation=*/[{
-        ConcreteOp op = ::mlir::cast<ConcreteOp>(this->getOperation());
-        return op.idxs();
+        return $_op.idxs();
       }]
     >,
     InterfaceMethod<
@@ -168,8 +278,7 @@ def PxaReduceOpInterface : PxaOpInterface<"PxaReduceOpInterface"> {
       /*args=*/(ins),
       /*methodBody=*/[{}],
       /*defaultImplementation=*/[{
-        ConcreteOp op = ::mlir::cast<ConcreteOp>(this->getOperation());
-        return op.result();
+        return $_op.result();
       }]
     >,
   ];

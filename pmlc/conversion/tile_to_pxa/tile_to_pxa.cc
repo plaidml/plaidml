@@ -1282,6 +1282,7 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         EltwiseOpConversion<tile::LogicalNotOp, LogicalNotOp>,
         EltwiseOpConversion<tile::LogicalOrOp, LogicalOp<mlir::OrOp>>,
         EltwiseOpConversion<tile::LogicalXorOp, LogicalOp<mlir::XOrOp>>,
+        EltwiseOpConversion<tile::ReluOp, StdOp<stdx::ReluOp>>,
         EltwiseOpConversion<tile::SelectOp, SelectOp>,
         EltwiseOpConversion<tile::IdentOp, FirstOperand>>(&getContext());
 

@@ -241,7 +241,7 @@ void LayoutConverter::convertPxaLoadOp(PxaLoadOp loadOp) {
 
   mlir::AffineMap newMap = transformAffineMap(loadOp.getAffineMap());
   mlir::Value loadRes = builder.create<PxaLoadOp>(
-      loadOp.getLoc(), loadOp.getMemRef(), newMap, loadOp.indices());
+      loadOp.getLoc(), loadOp.getMemRef(), newMap, loadOp.idxs());
   loadOp.replaceAllUsesWith(loadRes);
   loadOp.erase();
 }
@@ -253,7 +253,7 @@ void LayoutConverter::convertPxaVectorLoadOp(PxaVectorLoadOp loadOp) {
   mlir::VectorType newVectorType = transformVectorType(loadOp.getVectorType());
   mlir::Value loadRes = builder.create<PxaVectorLoadOp>(
       loadOp.getLoc(), newVectorType, loadOp.getMemRef(), newMap,
-      loadOp.indices());
+      loadOp.idxs());
   loadOp.replaceAllUsesWith(loadRes);
   loadOp.erase();
 }
@@ -275,7 +275,7 @@ void LayoutConverter::convertPxaVectorReduceOp(PxaVectorReduceOp reduceOp) {
 
   mlir::AffineMap newMap = transformAffineMap(reduceOp.getAffineMap());
   mlir::Value reduceRes = builder.create<PxaVectorReduceOp>(
-      reduceOp.getLoc(), reduceOp.getAgg(), reduceOp.vector(),
+      reduceOp.getLoc(), reduceOp.getAgg(), reduceOp.val(),
       reduceOp.getMemRef(), newMap, reduceOp.getMapOperands());
   reduceOp.replaceAllUsesWith(reduceRes);
   workQueue.push_back({reduceRes});

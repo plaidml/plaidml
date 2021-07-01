@@ -18,6 +18,7 @@ set(LLVM_INCLUDE_TOOLS ON CACHE BOOL "" FORCE)
 set(LLVM_INCLUDE_BENCHMARKS OFF CACHE BOOL "" FORCE)
 set(LLVM_TARGETS_TO_BUILD "X86" CACHE STRING "" FORCE)
 set(LIBOMP_ENABLE_SHARED OFF CACHE BOOL "" FORCE)
+set(LIBOMP_OMPD_SUPPORT OFF CACHE BOOL "" FORCE)
 set(OPENMP_ENABLE_LIBOMPTARGET OFF CACHE BOOL "" FORCE)
 set(OPENMP_ENABLE_OMPT_TOOLS OFF CACHE BOOL "" FORCE)
 set(OPENMP_STANDALONE_BUILD ON CACHE BOOL "" FORCE)
@@ -32,8 +33,8 @@ else()
   message("Fetching LLVM")
   FetchContent_Declare(
     llvm-project
-    URL      https://github.com/plaidml/llvm-project/archive/480196768af18de71ceb576500b79933f52ecc85.tar.gz
-    URL_HASH SHA256=63399591e570816b706e4f8a9fd25af5b4561aad8e22813ad21dd33fec8c8f43
+    URL      https://github.com/plaidml/llvm-project/archive/f951c621cb80807205e1badc3c0643825bc8bcf0.tar.gz
+    URL_HASH SHA256=b97576639b0bc689f68993e9527747284bba2fbb26fd399857446a398082d4f4
   )
   FetchContent_GetProperties(llvm-project)
   if(NOT llvm-project_POPULATED)

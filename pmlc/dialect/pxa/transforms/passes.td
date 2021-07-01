@@ -9,7 +9,10 @@ def AffineNormalize : FunctionPass<"pxa-normalize"> {
   let options = [
     Option<"promote", "promote", "bool",
            /*default=*/"true",
-           "Promote the body of 1 trip loops">
+           "Promote the body of 1 trip loops">,
+    Option<"denest", "denest", "bool",
+           /*default=*/"false",
+           "Combine perfectly nested loops">
   ];
 }
 
@@ -70,7 +73,7 @@ def Fusion : FunctionPass<"pxa-fusion"> {
            "Whether fuse the loops with exactly matched indices">,
     Option<"tiledFusion", "tiled-fusion", "bool",
            /*default=*/"false",
-           "Perform tiled fusions, including additional loop transformations from subgroups pass">,
+           "Perform tiled fusions">,
     Option<"loopDepth", "loop-depth", "int64_t",
            /*default=*/"0",
            "How deep the fusion should perform">,

@@ -20,7 +20,6 @@ struct InlinerImpl : InlinerInterface {
 
   void handleTerminator(Operation *op,
                         ArrayRef<Value> valuesToReplace) const final {
-    IVLOG(1, "handleTerminator");
     auto returnOp = cast<ReturnOp>(op);
     // Replace the values directly with the return operands.
     assert(returnOp.getNumOperands() == valuesToReplace.size());
