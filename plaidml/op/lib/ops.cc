@@ -2487,7 +2487,7 @@ Value l2norm(const Value& value) {
       X = X + epsilon;
       break;
     case EpsMode::MAX:
-      X = op::maximum(X, edsl::Tensor{epsilon});
+      X = op::maximum(X, edsl::cast(edsl::Tensor{epsilon}, X.dtype()));
       break;
     default:
       throw std::runtime_error("Unrecognized eps_mode in l2norm op");

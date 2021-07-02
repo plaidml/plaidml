@@ -42,14 +42,29 @@ class PxaReduceOpBase<string mnemonic, list<OpTrait> traits = []> :
       return result;
     }
 
-    mlir::SmallVector<int64_t> getTiedVectorShape(mlir::OpOperand *opOperand) {
+    bool isReadOperand(mlir::OpOperand *opOperand) {
       assert(opOperand->getOwner() == this->getOperation());
       assert(opOperand->getOperandNumber() == 1);
-      mlir::SmallVector<int64_t> result(getMemRefType().getRank(), 1);
+      return false;
+    }
+
+    bool isWriteOperand(mlir::OpOperand *opOperand) {
+      assert(opOperand->getOwner() == this->getOperation());
+      assert(opOperand->getOperandNumber() == 1);
+      return true;
+    }
+
+    mlir::SmallVector<StrideRange> getTiedInternalRanges(
+        mlir::OpOperand *opOperand) {
+      assert(opOperand->getOwner() == this->getOperation());
+      assert(opOperand->getOperandNumber() == 1);
+      mlir::SmallVector<StrideRange> result(getMemRefType().getRank(),
+                                            StrideRange(0));
       if (mlir::VectorType vecType = getVectorType()) {
         mlir::ArrayRef<int64_t> shape = vecType.getShape();
         for (size_t i = 0; i < shape.size(); i++)
-          result[i + shape.size() - result.size()] = shape[i];
+          result[i + shape.size() - result.size()] =
+            StrideRange(0, shape[i] - 1, 1);
       }
       return result;
     }
@@ -108,31 +123,6 @@ def PxaReduceOp : PxaReduceOpBase<"reduce"> {
   }];
 }
 
-def PxaGemmOp : PXA_OpWithPP<"gemm"> {
-  let arguments = (ins
-    Arg<AnyMemRef, "the C memref to store to", [MemWrite]>:$c,
-    AffineMapAttr:$cAccessMap,
-    AffineMapAttr:$cTileMap,
-    Arg<AnyMemRef, "the A memref to load from", [MemRead]>:$a,
-    AffineMapAttr:$aAccessMap,
-    AffineMapAttr:$aTileMap,
-    Arg<AnyMemRef, "the B memref to load from", [MemRead]>:$b,
-    AffineMapAttr:$bAccessMap,
-    AffineMapAttr:$bTileMap,
-    I64ArrayAttr:$tile,
-    I64ArrayAttr:$numBatches,
-    Variadic<Index>:$mapOperands);
-  let results = (outs AnyMemRef:$out);
-
-  let hasCanonicalizer = 1;
-
-  let extraClassDeclaration = [{
-    operand_range getOperandsForA();
-    operand_range getOperandsForB();
-    operand_range getOperandsForC();
-  }];
-}
-
 def PxaVectorReduceOp : PxaReduceOpBase<"vector_reduce"> {
   let summary = "affine vector reduction operation";
   let arguments = (ins
@@ -187,14 +177,29 @@ class PxaLoadOpBase<string mnemonic, list<OpTrait> traits = []> :
     }
     mlir::OpOperandVector getOutputOperands() { return {}; }
 
-    mlir::SmallVector<int64_t> getTiedVectorShape(mlir::OpOperand *opOperand) {
+    bool isReadOperand(mlir::OpOperand *opOperand) {
       assert(opOperand->getOwner() == this->getOperation());
       assert(opOperand->getOperandNumber() == 0);
-      mlir::SmallVector<int64_t> result(getMemRefType().getRank(), 1);
+      return true;
+    }
+
+    bool isWriteOperand(mlir::OpOperand *opOperand) {
+      assert(opOperand->getOwner() == this->getOperation());
+      assert(opOperand->getOperandNumber() == 0);
+      return false;
+    }
+
+    mlir::SmallVector<StrideRange> getTiedInternalRanges(
+        mlir::OpOperand *opOperand) {
+      assert(opOperand->getOwner() == this->getOperation());
+      assert(opOperand->getOperandNumber() == 0);
+      mlir::SmallVector<StrideRange> result(getMemRefType().getRank(),
+                                            StrideRange(0));
       if (mlir::VectorType vecType = getVectorType()) {
         mlir::ArrayRef<int64_t> shape = vecType.getShape();
         for (size_t i = 0; i < shape.size(); i++)
-          result[i + shape.size() - result.size()] = shape[i];
+          result[i + shape.size() - result.size()] =
+            StrideRange(0, shape[i] - 1, 1);
       }
       return result;
     }
@@ -377,16 +382,22 @@ def PxaGenericOp : PXA_OpWithPP<"generic", [
   );
   let results = (outs Variadic<AnyMemRef>:$results);
 
+  let hasCanonicalizer = 1;
+
   let extraClassDeclaration = [{
     void getAffineValueMaps(
       mlir::ArrayAttr accessMaps,
       mlir::OperandRange mapOperands,
-      mlir::SmallVectorImpl<mlir::AffineValueMap>& result);
+      mlir::SmallVectorImpl<mlir::AffineValueMap> &result);
 
     mlir::OpOperandVector getInputOperands();
     mlir::OpOperandVector getOutputOperands();
 
-    mlir::SmallVector<int64_t> getTiedVectorShape(mlir::OpOperand *opOperand);
+    bool isReadOperand(mlir::OpOperand *opOperand);
+    bool isWriteOperand(mlir::OpOperand *opOperand);
+
+    mlir::SmallVector<StrideRange> getTiedInternalRanges(
+      mlir::OpOperand *opOperand);
 
     mlir::SmallVector<mlir::AffineValueMap> getAffineValueMaps();
     mlir::AffineValueMap getTiedAffineValueMap(mlir::OpOperand *opOperand);

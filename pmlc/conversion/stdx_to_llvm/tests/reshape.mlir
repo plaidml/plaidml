@@ -8,7 +8,7 @@ module {
 }
 
 // CHECK-LABEL: func @reshaper0
-// CHECK: undef : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<3 x i64>, array<3 x i64>)>
+// CHECK: undef : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<1 x i64>, array<1 x i64>)>
 // CHECK: %[[index0:.*]] = llvm.mlir.constant(60 : index)
 // CHECK: insertvalue %[[index0]], %{{.*}}[3, 0]
 // CHECK: %[[index1:.*]] = llvm.mlir.constant(1 : index)
@@ -25,7 +25,7 @@ module {
 }
 
 // CHECK-LABEL: func @reshaper1
-// CHECK: undef : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<3 x i64>, array<3 x i64>)>
+// CHECK: undef : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
 // CHECK: %[[index0:.*]] = llvm.mlir.constant(2 : index)
 // CHECK: insertvalue %[[index0]], %{{.*}}[3, 0]
 // CHECK: %[[index1:.*]] = llvm.mlir.constant(20 : index)
@@ -45,7 +45,7 @@ module {
 }
 
 // CHECK-LABEL: func @reshaper2
-// CHECK: undef : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<3 x i64>, array<3 x i64>)>
+// CHECK: undef : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
 // CHECK: %[[index0:.*]] = llvm.mlir.constant(5 : index)
 // CHECK: insertvalue %[[index0]], %{{.*}}[3, 0]
 // CHECK: %[[index1:.*]] = llvm.mlir.constant(6 : index)
@@ -66,7 +66,7 @@ module {
 }
 
 // CHECK-LABEL: func @squeeze
-// CHECK: undef : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<5 x i64>, array<5 x i64>)>
+// CHECK: undef : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<4 x i64>, array<4 x i64>)>
 // CHECK: %[[index0:.*]] = llvm.mlir.constant(4 : index)
 // CHECK: insertvalue %[[index0]], %{{.*}}[3, 0]
 // CHECK: %[[index1:.*]] = llvm.mlir.constant(2 : index)
@@ -82,4 +82,3 @@ module {
 // CHECK: %[[index5:.*]] = llvm.mlir.constant(1 : index)
 // CHECK: insertvalue %[[index5]], %{{.*}}[4, 3]
 // CHECK: return %{{.*}} : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<4 x i64>, array<4 x i64>)>
-

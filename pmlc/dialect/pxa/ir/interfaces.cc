@@ -15,3 +15,29 @@ OpOperandVector::operator SmallVector<Value>() {
 }
 
 } // namespace mlir
+
+using namespace mlir; // NOLINT
+
+namespace pmlc::dialect::pxa {
+
+bool PxaMemAccessOperand::isRead() const {
+  auto op = cast<PxaGenericOpInterface>(getOperation());
+  return op.isReadOperand(opOperand);
+}
+
+bool PxaMemAccessOperand::isWrite() const {
+  auto op = cast<PxaGenericOpInterface>(getOperation());
+  return op.isWriteOperand(opOperand);
+}
+
+SmallVector<StrideRange> PxaMemAccessOperand::getInternalRanges() const {
+  auto op = cast<PxaGenericOpInterface>(getOperation());
+  return op.getTiedInternalRanges(opOperand);
+}
+
+AffineValueMap PxaMemAccessOperand::getAffineValueMap() const {
+  auto op = cast<PxaGenericOpInterface>(getOperation());
+  return op.getTiedAffineValueMap(opOperand);
+}
+
+} // namespace pmlc::dialect::pxa

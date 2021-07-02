@@ -58,17 +58,16 @@ struct Program {
   explicit Program(llvm::StringRef name = "");
   explicit Program(mlir::ModuleOp module);
   explicit Program(std::unique_ptr<mlir::MLIRContext> context,
-                   std::unique_ptr<llvm::MemoryBuffer> buffer);
-
-  static std::unique_ptr<Program>
-  fromSource(std::unique_ptr<mlir::MLIRContext> context,
-             llvm::StringRef source);
+                   std::unique_ptr<llvm::MemoryBuffer> buffer,
+                   llvm::StringRef entry);
 
   void compile(mlir::StringRef targetName, bool collectPasses = false,
                mlir::StringRef dumpDir = "");
 
   util::BufferPtr
   save(const std::unordered_map<std::string, std::string> &config = {});
+
+  void parseIOTypes(std::unique_ptr<llvm::MemoryBuffer> buffer);
 };
 
 void registerTargets();
