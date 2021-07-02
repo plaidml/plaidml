@@ -34,6 +34,7 @@
 #include "pmlc/util/logging.h"
 #include "pmlc/util/matchers.h"
 #include "pmlc/util/tags.h"
+#include "pmlc/util/util.h"
 
 namespace pmlc::dialect::pxa {
 
@@ -434,13 +435,13 @@ void recognizeConvsAndInsertBlockedDataLayouts(
             reduceOp.getAffineMap().getNumResults() ==
                 expectedDimSizeOfTensors) {
           llvm::SmallVector<mlir::Value, 4> loadOp1Operands;
-          if (!getResultOperands(loadOp1.getAffineMap(), loadOp1.indices(),
+          if (!getResultOperands(loadOp1.getAffineMap(), loadOp1.idxs(),
                                  loadOp1Operands)) {
             return;
           }
 
           llvm::SmallVector<mlir::Value, 4> loadOp2Operands;
-          if (!getResultOperands(loadOp2.getAffineMap(), loadOp2.indices(),
+          if (!getResultOperands(loadOp2.getAffineMap(), loadOp2.idxs(),
                                  loadOp2Operands)) {
             return;
           }
@@ -816,8 +817,8 @@ void simplifyMemrefMapsInInnerLoops(
     IVLOG(4, "map: " << mlir::debugString(map));
 
     mlir::OpBuilder builder(loadOp);
-    MemRefSimplificationResults results = simplifyMemrefMapsInInnerLoops(
-        map, loadOp.indices(), parallelOp, varMap);
+    MemRefSimplificationResults results =
+        simplifyMemrefMapsInInnerLoops(map, loadOp.idxs(), parallelOp, varMap);
 
     if (results.newMapFormed) {
       mlir::Value loadRes = builder.create<PxaLoadOp>(
@@ -902,7 +903,7 @@ void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {
     IVLOG(4, "read load op: " << op);
     mlir::Value memRef = op.getMemRef();
     IVLOG(4, "op.getMemRef(): " << mlir::debugString(memRef));
-    IVLOG(4, "op.getMapOperands().size(): " << op.indices().size());
+    IVLOG(4, "op.getMapOperands().size(): " << op.idxs().size());
 
     mlir::AffineMap map = op.getAffineMap();
     IVLOG(4, "map: " << mlir::debugString(map));
@@ -925,7 +926,7 @@ void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {
           unsigned pos = dimExpr.getPosition();
 
           IVLOG(4, "lhsExpr-pos: " << pos);
-          mlir::Value operand = op.indices()[pos];
+          mlir::Value operand = op.idxs()[pos];
 
           IVLOG(4, "operand: " << mlir::debugString(operand));
 
@@ -1004,6 +1005,7 @@ void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {
           mlir::AffineParallelOp innerLoops =
               performTiling(parallelOp, tileSizes);
 
+          IVLOG(4, "tiled_loops: " << mlir::debugString(innerLoops));
           mlir::AffineMap outerLoopLowerMap =
               parallelOp.getLowerBoundsValueMap().getAffineMap();
           mlir::AffineMap outerLoopUpperMap =
@@ -1069,6 +1071,7 @@ void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {
           mlir::SmallVector<mlir::AffineExpr, 6> lowerExpandedExprs;
           mlir::SmallVector<mlir::AffineExpr, 6> upperExpandedExprs;
           unsigned currentNumDims = lowerMap.getNumResults();
+          IVLOG(4, "currentNumDims at the beginning: " << currentNumDims);
           for (size_t i = 0; i < currentNumDims; i++) {
             lowerExpandedExprs.push_back(lowerMap.getResult(i));
             upperExpandedExprs.push_back(upperMap.getResult(i));
@@ -1081,28 +1084,9 @@ void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {
               auto upperDimIdExpr = builder.getAffineConstantExpr(tileSizes[i]);
               lowerExpandedExprs.push_back(lowerDimIdExpr);
               upperExpandedExprs.push_back(upperDimIdExpr);
+              currentNumDims++;
             }
           }
-
-          mlir::AffineMap expandedLowerMap = mlir::AffineMap::get(
-              currentNumDims, 0, lowerExpandedExprs, lowerMap.getContext());
-
-          mlir::AffineMap expandedUpperMap = mlir::AffineMap::get(
-              currentNumDims, 0, upperExpandedExprs, upperMap.getContext());
-
-          IVLOG(4, "expandedLowerMap: " << mlir::debugString(expandedLowerMap));
-          IVLOG(4, "expandedUpperMap: " << mlir::debugString(expandedUpperMap));
-
-          innerLoops.setLowerBoundsMap(expandedLowerMap);
-          innerLoops.setUpperBoundsMap(expandedUpperMap);
-
-          llvm::SmallVector<int64_t, 8> steps = innerLoops.getSteps();
-          for (size_t i = 0; i < numTileSizes; i++) {
-            steps.push_back(1);
-          }
-
-          innerLoops.setSteps(steps);
-          IVLOG(4, "The steps have been set.");
 
           int64_t numArguments = innerLoops.getBody()->getNumArguments();
           mlir::DenseMap<mlir::Value, mlir::Value> varMap;
@@ -1125,9 +1109,140 @@ void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {
             }
           }
 
+          IVLOG(4, "currentNumDims at the end: " << currentNumDims);
+          mlir::AffineMap expandedLowerMap = mlir::AffineMap::get(
+              currentNumDims, 0, lowerExpandedExprs, lowerMap.getContext());
+
+          mlir::AffineMap expandedUpperMap = mlir::AffineMap::get(
+              currentNumDims, 0, upperExpandedExprs, upperMap.getContext());
+
+          IVLOG(4, "expandedLowerMap: " << mlir::debugString(expandedLowerMap));
+          IVLOG(4, "expandedUpperMap: " << mlir::debugString(expandedUpperMap));
+
+          //         auto lbOperands = innerLoops.getLowerBoundsOperands();
+          //         auto ubOperands = innerLoops.getUpperBoundsOperands();
+
+          // mlir::SmallVector<mlir::Value> newLowerBoundOperands(lbOperands);
+          // mlir::SmallVector<mlir::Value> newUpperBoundOperands(ubOperands);
+
+          // We will create dummy map operands and insert them to match the
+          // increased number of dimensions The operands can be dummy because
+          // the lower and upper bounds are constant and therefore the map
+          // operands will not be relevant.
+          /*
+          for (size_t i = 0; i < numTileSizes; i++) {
+            if (lbOperands.size() > 0 && ubOperands.size() > 0) {
+            newLowerBoundOperands.push_back(lbOperands[0]);
+            newUpperBoundOperands.push_back(ubOperands[0]);
+           } else {
+             IVLOG(4, "The number of operands to the AffineParallelOp is zero.
+          Quitting\n"); exit(1);
+           }
+          }
+         */
+
+          innerLoops.setLowerBounds(
+              mlir::ValueRange(innerLoops.getBody()->getArguments()),
+              expandedLowerMap);
+          innerLoops.setUpperBounds(
+              mlir::ValueRange(innerLoops.getBody()->getArguments()),
+              expandedUpperMap);
+          // innerLoops.setLowerBounds(mlir::ValueRange(newLowerBoundOperands),
+          // expandedLowerMap);
+          // innerLoops.setUpperBounds(mlir::ValueRange(newUpperBoundOperands),
+          // expandedUpperMap);
+          // innerLoops.lowerBoundsMapAttr(mlir::AffineMapAttr::get(expandedLowerMap));
+          // innerLoops.upperBoundsMapAttr(mlir::AffineMapAttr::get(expandedUpperMap));
+          // innerLoops.setLowerBoundsMap(expandedLowerMap);
+          // innerLoops.setUpperBoundsMap(expandedUpperMap);
+
+          llvm::SmallVector<int64_t, 8> steps = innerLoops.getSteps();
+          for (size_t i = 0; i < numTileSizes; i++) {
+            steps.push_back(1);
+          }
+
+          innerLoops.setSteps(steps);
+          IVLOG(4, "The steps have been set.");
+
+          mlir::SmallVector<int32_t> newLbGroups, newUbGroups;
+          auto lowerBoundsGroups = innerLoops.lowerBoundsGroups();
+          auto upperBoundsGroups = innerLoops.upperBoundsGroups();
+          IVLOG(4, "getNumElements(): " << lowerBoundsGroups.getNumElements());
+          for (unsigned i = 0; i < lowerBoundsGroups.getNumElements(); i++) {
+            IVLOG(4, "group: " << lowerBoundsGroups.getValue<int32_t>(i));
+            newLbGroups.push_back(lowerBoundsGroups.getValue<int32_t>(i));
+          }
+
+          for (unsigned i = 0; i < upperBoundsGroups.getNumElements(); i++) {
+            newUbGroups.push_back(upperBoundsGroups.getValue<int32_t>(i));
+          }
+
+          for (size_t i = 0; i < numTileSizes; i++) {
+            newLbGroups.push_back(1);
+            newUbGroups.push_back(1);
+          }
+
+          innerLoops.lowerBoundsGroupsAttr(
+              builder.getI32TensorAttr(newLbGroups));
+          innerLoops.upperBoundsGroupsAttr(
+              builder.getI32TensorAttr(newUbGroups));
+          // innerLoops.addAttribute(innerLoops.getLowerBoundsGroupsAttrName(),
+          //          builder.getI32TensorAttr(newLbGroups));
+
           // TODO: Establish the conditions under which simplifying the affine
           // expressions is OK
           simplifyMemrefMapsInInnerLoops(innerLoops, varMap);
+
+          /* New AffineParalleOp construction starts */
+          /*
+          auto test = innerLoops.lowerBoundsGroups();
+          mlir::SmallVector<mlir::AtomicRMWKind, 1> reductions;
+          for (mlir::Attribute attr : innerLoops.reductions()) {
+            auto intAttr = attr.cast<mlir::IntegerAttr>();
+            mlir::Optional<mlir::AtomicRMWKind> optReduction =
+                mlir::symbolizeAtomicRMWKind(intAttr.getInt());
+            reductions.push_back(optReduction.getValue());
+          }
+
+          mlir::SmallVector<mlir::AffineMap> lbMaps, ubMaps;
+          util::splitAffineMaps(expandedLowerMap, lbMaps);
+          util::splitAffineMaps(expandedUpperMap, ubMaps);
+
+          auto newParallel = builder.create<mlir::AffineParallelOp>(
+              innerLoops.getLoc(), innerLoops.getResultTypes(), reductions,
+          lbMaps, innerLoops.getBody()->getArguments(), ubMaps,
+              innerLoops.getBody()->getArguments(), innerLoops.getSteps());
+
+          IVLOG(4, "newParallel0: " << mlir::debugString(newParallel));
+
+
+          newParallel.region().takeBody(innerLoops.region());
+          if (hasTags(innerLoops)) {
+            copyTags(newParallel, innerLoops);
+          }
+          */
+          /*
+          auto args = innerLoops.getBody()->getArguments();
+          for (unsigned i = 0; i < args.size(); i++) {
+               mlir::Type type = args[0].getType();
+               newParallel.getBody()->insertArgument(i, type);
+          }
+          */
+
+          /*
+          innerLoops.replaceAllUsesWith(newParallel);
+          innerLoops.erase();
+           IVLOG(4, "newParallel: " << mlir::debugString(newParallel));
+          IVLOG(4, "Printing done\n");
+
+         // Splice instructions into the interior
+         auto &innerLoopOps = newParallel.getBody()->getOperations();
+         auto &outerLoopOps = parallelOp.getBody()->getOperations();
+         innerLoopOps.splice(std::prev(innerLoopOps.end()), outerLoopOps,
+                             std::next(outerLoopOps.begin(), 1),
+         outerLoopOps.end());
+           */
+          /* New AffineParallelOp construction ends */
         }
       }
     }
