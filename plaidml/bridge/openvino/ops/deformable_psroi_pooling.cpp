@@ -41,12 +41,11 @@ void registerDeformablePSROIPooling() {
     auto dim_one = edsl::TensorDim(1);
 
     rois = edsl::round(rois);
-    auto roi_idx = edsl::index({edsl::TensorDim(2)}, 0) + 1;
     // Left top ROI corner - (x1, y1)
-    edsl::Tensor roi_lt = edsl::cast(edsl::gather(rois, roi_idx).axis(1), DType::FLOAT32);
+    edsl::Tensor roi_lt = edsl::cast(op::slice(rois).add_dim(0, num_rois).add_dim(1, 3), DType::FLOAT32);
     roi_lt = roi_lt * spatial_scale - 0.5f;
     // Right bottom ROI corner - (x2, y2)
-    edsl::Tensor roi_rb = edsl::cast(edsl::gather(rois, roi_idx + 2).axis(1), DType::FLOAT32);
+    edsl::Tensor roi_rb = edsl::cast(op::slice(rois).add_dim(0, num_rois).add_dim(3, 5), DType::FLOAT32);
     roi_rb = (roi_rb + 1.0f) * spatial_scale - 0.5f;
 
     // Calculate coordinates of each bin of roi boxes
