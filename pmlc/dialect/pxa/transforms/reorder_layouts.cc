@@ -1119,34 +1119,33 @@ void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {
           IVLOG(4, "expandedLowerMap: " << mlir::debugString(expandedLowerMap));
           IVLOG(4, "expandedUpperMap: " << mlir::debugString(expandedUpperMap));
 
-          //         auto lbOperands = innerLoops.getLowerBoundsOperands();
-          //         auto ubOperands = innerLoops.getUpperBoundsOperands();
+          auto lbOperands = innerLoops.getLowerBoundsOperands();
+          auto ubOperands = innerLoops.getUpperBoundsOperands();
 
-          // mlir::SmallVector<mlir::Value> newLowerBoundOperands(lbOperands);
-          // mlir::SmallVector<mlir::Value> newUpperBoundOperands(ubOperands);
+          mlir::SmallVector<mlir::Value> newLowerBoundOperands(lbOperands);
+          mlir::SmallVector<mlir::Value> newUpperBoundOperands(ubOperands);
 
           // We will create dummy map operands and insert them to match the
           // increased number of dimensions The operands can be dummy because
           // the lower and upper bounds are constant and therefore the map
           // operands will not be relevant.
-          /*
+
           for (size_t i = 0; i < numTileSizes; i++) {
             if (lbOperands.size() > 0 && ubOperands.size() > 0) {
-            newLowerBoundOperands.push_back(lbOperands[0]);
-            newUpperBoundOperands.push_back(ubOperands[0]);
-           } else {
-             IVLOG(4, "The number of operands to the AffineParallelOp is zero.
-          Quitting\n"); exit(1);
-           }
+              newLowerBoundOperands.push_back(lbOperands[0]);
+              newUpperBoundOperands.push_back(ubOperands[0]);
+            } else {
+              IVLOG(4, "The number of operands to the AffineParallelOp is "
+                       "zero. Quitting\n");
+              exit(1);
+            }
           }
-         */
 
-          innerLoops.setLowerBounds(
-              mlir::ValueRange(innerLoops.getBody()->getArguments()),
-              expandedLowerMap);
-          innerLoops.setUpperBounds(
-              mlir::ValueRange(innerLoops.getBody()->getArguments()),
-              expandedUpperMap);
+          innerLoops.setLowerBounds(mlir::ValueRange(newLowerBoundOperands),
+                                    expandedLowerMap);
+          innerLoops.setUpperBounds(mlir::ValueRange(newUpperBoundOperands),
+                                    expandedUpperMap);
+
           // innerLoops.setLowerBounds(mlir::ValueRange(newLowerBoundOperands),
           // expandedLowerMap);
           // innerLoops.setUpperBounds(mlir::ValueRange(newUpperBoundOperands),
