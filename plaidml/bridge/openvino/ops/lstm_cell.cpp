@@ -27,6 +27,7 @@ void registerLstmCell() {
 
     auto* layer = ngraph::as_type<ngraph::opset4::LSTMCell>(ctx.layer);
     auto hidden_size = layer->get_hidden_size();
+    auto batch_size = xt.compute_shape().sizes()[0];
 
     auto activations = layer->get_activations();
     auto activation_f = activations.at(0);
@@ -41,11 +42,12 @@ void registerLstmCell() {
     auto should_clip = (clip > 0.f) && (clip != std::numeric_limits<float>::infinity());
 
     auto gates_output = op::dot(xt, op::transpose(W)) + op::dot(ht_1, op::transpose(R)) + op::unsqueeze(B, {0});
-    auto hidden_indices = edsl::index({edsl::TensorDim(hidden_size)}, 0);
-    edsl::Tensor ft = edsl::gather(gates_output, hidden_indices).axis(1);
-    edsl::Tensor it = edsl::gather(gates_output, hidden_indices + hidden_size).axis(1);
-    edsl::Tensor ct = edsl::gather(gates_output, hidden_indices + 2 * hidden_size).axis(1);
-    edsl::Tensor ot = edsl::gather(gates_output, hidden_indices + 3 * hidden_size).axis(1);
+
+    edsl::Tensor ft = op::slice(gates_output).add_dim(0, batch_size).add_dim(0, hidden_size);
+    edsl::Tensor it = op::slice(gates_output).add_dim(0, batch_size).add_dim(hidden_size, 2 * hidden_size);
+    edsl::Tensor ct = op::slice(gates_output).add_dim(0, batch_size).add_dim(2 * hidden_size, 3 * hidden_size);
+    edsl::Tensor ot = op::slice(gates_output).add_dim(0, batch_size).add_dim(3 * hidden_size, 4 * hidden_size);
+
     ft = clip_activation(activation_f, should_clip, clip, ft);
     it = clip_activation(activation_f, should_clip, clip, it);
     ct = clip_activation(activation_g, should_clip, clip, ct);

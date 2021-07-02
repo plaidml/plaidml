@@ -26,6 +26,8 @@ std::vector<size_t> input_size{
 };
 // When set `relu` as Gate gate activation and forbid clip, it
 // potentially will get a big error.
+// This precision error seems potentially related to
+// differences between fp16 PlaidML and fp32 reference implementations.
 std::vector<std::vector<std::string>> activations = {
     {"relu", "tanh"},
     {"tanh", "sigmoid"},
@@ -33,7 +35,7 @@ std::vector<std::vector<std::string>> activations = {
     {"tanh", "relu"},
 };
 std::vector<float> clips = {
-//    0.0f,
+    // 0.0f,
     0.7f,
 };
 std::vector<bool> linear_before_reset = {
