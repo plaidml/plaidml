@@ -7,6 +7,8 @@
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/OpDefinition.h"
 
+#include "pmlc/dialect/pxa/analysis/stride_range.h"
+
 namespace mlir {
 
 struct OpOperandVector : public SmallVector<OpOperand *> {
@@ -14,5 +16,31 @@ struct OpOperandVector : public SmallVector<OpOperand *> {
 };
 
 } // namespace mlir
+
+namespace pmlc::dialect::pxa {
+
+struct PxaMemAccessOperand {
+  mlir::OpOperand *opOperand;
+
+  explicit PxaMemAccessOperand(mlir::OpOperand *opOperand)
+      : opOperand(opOperand) {}
+
+  mlir::Operation *getOperation() const { return opOperand->getOwner(); }
+
+  mlir::Value getMemRef() const { return opOperand->get(); }
+
+  mlir::MemRefType getMemRefType() const {
+    return getMemRef().getType().cast<mlir::MemRefType>();
+  }
+
+  bool isRead() const;
+  bool isWrite() const;
+
+  mlir::SmallVector<StrideRange> getInternalRanges() const;
+
+  mlir::AffineValueMap getAffineValueMap() const;
+};
+
+} // namespace pmlc::dialect::pxa
 
 #include "pmlc/dialect/pxa/ir/interfaces.h.inc"

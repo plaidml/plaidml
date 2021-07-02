@@ -38,7 +38,8 @@ Value getPrevIndirectDef(OpResult def) {
       .Case<PxaReduceOp>([&](auto op) { return op.memref(); })
       .Case<PxaStoreOp>([&](auto op) { return op.memref(); })
       .Case<PxaVectorReduceOp>([&](auto op) { return op.memref(); })
-      .Case<PxaGemmOp>([&](auto op) { return op.c(); })
+      .Case<PxaGenericOp>(
+          [&](auto op) { return op.outputs()[def.getResultNumber()]; })
       .Case<stdx::ReshapeOp>([&](auto op) { return op.tensor(); })
       .Default([](auto op) { return nullptr; });
 }
@@ -54,10 +55,10 @@ Value getNextIndirectUse(mlir::OpOperand &use) {
       .Case<PxaReduceOp>([&](auto op) { return op.result(); })
       .Case<PxaStoreOp>([&](auto op) { return op.result(); })
       .Case<PxaVectorReduceOp>([&](auto op) { return op.result(); })
-      .Case<PxaGemmOp>([&](auto op) {
-        if (op.getOperand(use.getOperandNumber()) == op.c()) {
-          return op.out();
-        }
+      .Case<PxaGenericOp>([&](auto op) {
+        if (use.getOperandNumber() >= op.getNumInputs() &&
+            use.getOperandNumber() < op.getNumInputs() + op.getNumOutputs())
+          return op.getResult(use.getOperandNumber() - op.getNumInputs());
         return Value();
       })
       .Case<PrngOp>([&](auto op) {
@@ -168,8 +169,8 @@ IndirectAccessUsesIterator &IndirectAccessUsesIterator::operator++() {
 
 void IndirectAccessUsesIterator::skipNonAccess() {
   while (inner != IndirectUsesIterator()) {
-    if (isa<PxaLoadOp, PxaReduceOp, PxaStoreOp, PxaVectorLoadOp, PxaVectorReduceOp>(
-            inner->getOwner())) {
+    if (isa<PxaGenericOp, PxaLoadOp, PxaReduceOp, PxaStoreOp, PxaVectorLoadOp,
+            PxaVectorReduceOp>(inner->getOwner())) {
       break;
     }
     ++inner;

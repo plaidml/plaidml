@@ -25,24 +25,7 @@ namespace pmlc::dialect::pxa {
 
 namespace {
 
-struct MemAccessOperand {
-  OpOperand *opOperand;
-
-  Operation *getOperation() const { return opOperand->getOwner(); }
-  Value getMemRef() const { return opOperand->get(); }
-
-  SmallVector<int64_t> getVectorShape() const {
-    auto op = cast<PxaGenericOpInterface>(getOperation());
-    return op.getTiedVectorShape(opOperand);
-  }
-
-  AffineValueMap getAffineValueMap() const {
-    auto op = cast<PxaGenericOpInterface>(getOperation());
-    return op.getTiedAffineValueMap(opOperand);
-  }
-};
-
-using MemAccessPair = std::pair<MemAccessOperand, MemAccessOperand>;
+using MemAccessPair = std::pair<PxaMemAccessOperand, PxaMemAccessOperand>;
 
 struct FusionInfo {
   struct AffineParallelInfo {
@@ -85,14 +68,14 @@ struct FusionInfo {
         singleOutput(singleOutput) {}
 
   // Helper method to find the original source write of a state update.
-  static Optional<MemAccessOperand> findSourceWrite(Value value) {
+  static Optional<PxaMemAccessOperand> findSourceWrite(Value value) {
     auto opResult = value.cast<OpResult>();
     Operation *owner = opResult.getOwner();
     if (auto op = dyn_cast<PxaGenericOpInterface>(owner)) {
-      OpOperandVector outputs = op.getOutputOperands();
+      SmallVector<PxaMemAccessOperand> outputs = op.getOutputMemAccesses();
       if (outputs.size() != 1)
         return None;
-      return MemAccessOperand{outputs[0]};
+      return outputs[0];
     }
     if (auto op = dyn_cast<AffineParallelOp>(owner)) {
       auto yieldOp = cast<AffineYieldOp>(op.getBody()->getTerminator());
@@ -122,7 +105,7 @@ struct FusionInfo {
 
   // Helper to get a clean version of the strides for a specific op (or fail)
   static bool getStrides(SmallVectorImpl<StrideInfo> &out,
-                         MemAccessOperand access, AffineParallelOp ap) {
+                         PxaMemAccessOperand access, AffineParallelOp ap) {
     SmallVector<StrideInfo> strides;
     if (failed(
             computeMultiDimStrideInfo(access.getAffineValueMap(), strides))) {
@@ -136,7 +119,7 @@ struct FusionInfo {
     return true;
   }
 
-  bool considerPlan(MemAccessOperand opA, MemAccessOperand opB) {
+  bool considerPlan(PxaMemAccessOperand opA, PxaMemAccessOperand opB) {
     // Early exit is we already have a plan
     if (hasPlan)
       return true;
@@ -297,25 +280,18 @@ struct FusionInfo {
       }
     }
 
-    auto aRap = computeThisRelativeAccess(opA);
-    auto bRap = computeThisRelativeAccess(opB);
-    // Fail if getting Rap is unsuccessfull
-    if (!aRap || !bRap) {
-      undoTilings();
-      bInfo.op.emitRemark("RelativeAccessPattern computation failure");
-      return false;
-    }
-
-    for (const auto &raw : readAfterWrites) {
+    for (const MemAccessPair &raw : readAfterWrites) {
       IVLOG(3, "  RAW: " << debugString(*raw.second.getOperation()));
-      auto aRap = computeThisRelativeAccess(raw.first);
-      auto bRap = computeThisRelativeAccess(raw.second);
+      Optional<RelativeAccessPattern> aRap =
+          computeThisRelativeAccess(raw.first);
+      Optional<RelativeAccessPattern> bRap =
+          computeThisRelativeAccess(raw.second);
       if (!aRap || !bRap) {
         undoTilings();
         bInfo.op.emitRemark("RelativeAccessPattern computation failure");
         return false;
       }
-      auto ret = hasPerfectAliasing(*aRap, *bRap, bToA);
+      bool ret = hasPerfectAliasing(*aRap, *bRap, bToA);
       IVLOG(3, "  isAliased: " << ret);
       if (!ret) {
         undoTilings();
@@ -324,16 +300,18 @@ struct FusionInfo {
       }
     }
 
-    for (const auto &waw : writeAfterWrites) {
+    for (const MemAccessPair &waw : writeAfterWrites) {
       IVLOG(3, "  WAW: " << debugString(*waw.second.getOperation()));
-      auto aRap = computeThisRelativeAccess(waw.first);
-      auto bRap = computeThisRelativeAccess(waw.second);
+      Optional<RelativeAccessPattern> aRap =
+          computeThisRelativeAccess(waw.first);
+      Optional<RelativeAccessPattern> bRap =
+          computeThisRelativeAccess(waw.second);
       if (!aRap || !bRap) {
         undoTilings();
         bInfo.op.emitRemark("RelativeAccessPattern computation failure");
         return false;
       }
-      auto ret = hasPerfectAliasing(*aRap, *bRap, bToA);
+      bool ret = hasPerfectAliasing(*aRap, *bRap, bToA);
       IVLOG(3, "  isAliased: " << ret);
       if (!ret) {
         undoTilings();
@@ -365,8 +343,8 @@ struct FusionInfo {
   }
 
   Optional<RelativeAccessPattern>
-  computeThisRelativeAccess(MemAccessOperand access) {
-    return computeRelativeAccess(access.getMemRef(), access.getVectorShape(),
+  computeThisRelativeAccess(PxaMemAccessOperand access) {
+    return computeRelativeAccess(access.getMemRef(), access.getInternalRanges(),
                                  access.getAffineValueMap(),
                                  [&](BlockArgument arg) {
                                    return (aToB.count(arg) || bToA.count(arg))
@@ -403,14 +381,14 @@ struct FusionInfo {
     // Get initial information setup
     auto rangesA = aInfo.op.getConstantRanges();
     if (!rangesA) {
-      aInfo.op.emitRemark("Op does not have constant ranges");
+      IVLOG(3, "A: Op does not have constant ranges");
       return false;
     }
     std::swap(aInfo.sizes, *rangesA);
     aInfo.tileSizes = SmallVector<int64_t, 8>(aInfo.sizes.size(), 1);
     auto rangesB = bInfo.op.getConstantRanges();
     if (!rangesB) {
-      bInfo.op.emitRemark("Op does not have constant ranges");
+      IVLOG(3, "B: Op does not have constant ranges");
       return false;
     }
     std::swap(bInfo.sizes, *rangesB);
@@ -421,40 +399,43 @@ struct FusionInfo {
     // For each output from loop
     for (OpResult result : aInfo.op.results()) {
       // Find the source write
-      Optional<MemAccessOperand> write = findSourceWrite(result);
+      Optional<PxaMemAccessOperand> write = findSourceWrite(result);
       // If it's not a proper affine reduce, give up
       if (!write) {
-        aInfo.op.emitRemark("Not all results can be traced to writes");
+        IVLOG(3, "Not all results can be traced to writes");
         return false;
       }
-      // For each use of the write:
-      for (Operation *user : result.getUsers()) {
+
+      for (OpOperand &use : result.getUses()) {
         // Check if it is inside B, if not, we don't care, check next use.
-        if (!bInfo.op.getOperation()->isAncestor(user)) {
+        if (!bInfo.op.getOperation()->isAncestor(use.getOwner())) {
           if (singleOutput) {
             // If the use is not inside B, we have to keep the write as an
             // output and the other output in B after fusion. Then there would
             // be multiple outputs
-            aInfo.op.emitRemark("Multiple outputs");
+            IVLOG(3, "Multiple outputs");
             return false;
           }
           continue;
         }
+
         // Now we make sure it's a read or a write, if not, we can't do fusion,
         // bail.
-        if (auto op = dyn_cast<PxaGenericOpInterface>(user)) {
-          for (OpOperand *opOperand : op.getInputOperands()) {
-            readAfterWrites.emplace_back(*write, MemAccessOperand{opOperand});
-          }
-          for (OpOperand *opOperand : op.getOutputOperands()) {
-            writeAfterWrites.emplace_back(*write, MemAccessOperand{opOperand});
-          }
+        if (auto op = dyn_cast<PxaGenericOpInterface>(use.getOwner())) {
+          PxaMemAccessOperand access(&use);
+          if (access.isRead())
+            readAfterWrites.emplace_back(*write, access);
+          else if (access.isWrite())
+            writeAfterWrites.emplace_back(*write, access);
+          else
+            return false;
         } else {
-          user->emitRemark("Op does not implement PxaGenericOpInterface");
+          IVLOG(3, "Op does not implement PxaGenericOpInterface");
           return false;
         }
       }
     }
+
     // For each raw & waw, consider the plan
     for (auto &raw : readAfterWrites)
       considerPlan(raw.first, raw.second);
@@ -679,6 +660,7 @@ struct FusionPass : public FusionBase<FusionPass> {
           }
         }
       }
+
       // Check if the closest reader is also and affine parallel, in which case,
       // attempt to merge
       if (auto fuseB = dyn_cast_or_null<AffineParallelOp>(nearestReader)) {

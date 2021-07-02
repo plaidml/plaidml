@@ -29,15 +29,17 @@ AffineParallelOp tileAccumulations(AffineParallelOp op, bool skipTrivial) {
   // Find the originating write and its StrideInfo
   Optional<StrideInfo> maybeStrideInfo;
   if (op.getNumResults() == 1) {
-    auto srcDef = getPrevWriter(op.getResult(0));
-    if (auto gemmOp = dyn_cast_or_null<PxaGemmOp>(srcDef)) {
+    Operation *srcDef = getPrevWriter(op.getResult(0));
+    if (auto genericOpInterface =
+            dyn_cast_or_null<PxaGenericOpInterface>(srcDef)) {
+      PxaMemAccessOperand access = genericOpInterface.getOutputMemAccesses()[0];
+      AffineValueMap valueMap = access.getAffineValueMap();
       maybeStrideInfo =
-          computeStrideInfo(gemmOp.out().getType().cast<MemRefType>(),
-                            gemmOp.cAccessMap(), gemmOp.getOperandsForC());
-    } else if (auto reduceOp = dyn_cast_or_null<PxaReduceOp>(srcDef)) {
-      maybeStrideInfo = computeStrideInfo(reduceOp);
+          computeStrideInfo(access.getMemRefType(), valueMap.getAffineMap(),
+                            valueMap.getOperands());
     }
   }
+
   // If we can't fall back to adding a nesting level (to guarentee all
   // accumulations are in the 'inner' loop)
   if (!maybeStrideInfo) {
