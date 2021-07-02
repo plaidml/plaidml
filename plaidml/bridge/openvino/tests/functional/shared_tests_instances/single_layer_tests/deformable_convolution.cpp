@@ -14,8 +14,8 @@ namespace {
 const std::vector<InferenceEngine::Precision> netPrecisions = {
     InferenceEngine::Precision::FP32,
     // InferenceEngine::Precision::FP16,
-    // InferenceEngine::Precision::I32,
-    // InferenceEngine::Precision::I16,
+    InferenceEngine::Precision::I32,
+    InferenceEngine::Precision::I16,
 };
 
 /* ============= 2D DeformableConvolution ============= */

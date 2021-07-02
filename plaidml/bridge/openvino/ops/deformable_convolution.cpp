@@ -54,18 +54,19 @@ std::pair<TensorDim, TensorDim> compute_padding_and_output_size(  //
   THROW_IE_EXCEPTION << "Unexpected autopadding mode.";
 }
 
-edsl::Tensor compute_deformable_convolution(edsl::Tensor I,                  //
-                                            edsl::Tensor OFF,                //
-                                            edsl::Tensor F,                  //
-                                            std::vector<int64_t> I_shape,    //
-                                            std::vector<int64_t> OFF_shape,  //
-                                            std::vector<int64_t> F_shape,    //
-                                            int64_t G,                       //
-                                            int64_t DG,                      //
-                                            int64_t rank,                    //
-                                            std::vector<size_t> strides,     //
-                                            std::vector<size_t> dilations,   //
-                                            std::vector<TensorDim> pad_befores) {
+edsl::Tensor compute_deformable_convolution(edsl::Tensor I,                      //
+                                            edsl::Tensor OFF,                    //
+                                            edsl::Tensor F,                      //
+                                            std::vector<int64_t> I_shape,        //
+                                            std::vector<int64_t> OFF_shape,      //
+                                            std::vector<int64_t> F_shape,        //
+                                            int64_t G,                           //
+                                            int64_t DG,                          //
+                                            int64_t rank,                        //
+                                            std::vector<size_t> strides,         //
+                                            std::vector<size_t> dilations,       //
+                                            std::vector<TensorDim> pad_befores,  //
+                                            plaidml::DType plaidml_type) {
   auto N = I_shape[0];
   auto CI = I_shape[1];
   auto CO = F_shape[0];
@@ -116,8 +117,10 @@ edsl::Tensor compute_deformable_convolution(edsl::Tensor I,                  //
 
   std::vector<edsl::Tensor> index_vec(rank - 2);
   for (auto i = 0; i < rank - 2; ++i) {
-    edsl::Tensor index_vec_0 = edsl::index({TensorDim(OFF_shape[i + 2]), TensorDim(F_shape[i + 2])}, 0);
-    edsl::Tensor index_vec_1 = edsl::index({TensorDim(OFF_shape[i + 2]), TensorDim(F_shape[i + 2])}, 1);
+    edsl::Tensor index_vec_0 =
+        cast(edsl::index({TensorDim(OFF_shape[i + 2]), TensorDim(F_shape[i + 2])}, 0), plaidml_type);
+    edsl::Tensor index_vec_1 =
+        cast(edsl::index({TensorDim(OFF_shape[i + 2]), TensorDim(F_shape[i + 2])}, 1), plaidml_type);
     index_vec[i] = index_vec_0 * strides[i] + index_vec_1 * dilations[i] - pad_befores[i];
 
     std::vector<int64_t> index_reshape_dims(rank + 1, 1);
@@ -138,15 +141,15 @@ edsl::Tensor compute_deformable_convolution(edsl::Tensor I,                  //
   edsl::Tensor index = op::concatenate(index_vec, -1);  // The shape of index is {1, 1, NEW_DIM, rank-2}
   edsl::Tensor deformed_index = offset + index;
 
-  deformed_index = edsl::select(deformed_index < 0.0, cast(Tensor{-1.0}, DType::FLOAT32), deformed_index);
+  deformed_index = edsl::select(deformed_index < 0, cast(Tensor{-1.0}, plaidml_type), deformed_index);
   std::vector<edsl::Tensor> deformed_index_vec(rank - 2);
   for (auto i = 0; i < rank - 2; ++i) {
     deformed_index_vec[i] = edsl::gather(deformed_index, i).axis(-1);
     deformed_index_vec[i] = edsl::select(deformed_index_vec[i] > I_shape[i + 2],
-                                         cast(Tensor{I_shape[i + 2]}, DType::FLOAT32), deformed_index_vec[i]);
+                                         cast(Tensor{I_shape[i + 2]}, plaidml_type), deformed_index_vec[i]);
     deformed_index_vec[i] =
-        edsl::select((deformed_index_vec[i] > (I_shape[i + 2] - 1.0)) && (deformed_index_vec[i] < I_shape[i + 2]),
-                     cast(Tensor{I_shape[i + 2] - 1.0}, DType::FLOAT32), deformed_index_vec[i]);
+        edsl::select((deformed_index_vec[i] > (I_shape[i + 2] - 1)) && (deformed_index_vec[i] < I_shape[i + 2]),
+                     cast(Tensor{I_shape[i + 2] - 1}, plaidml_type), deformed_index_vec[i]);
   }
   deformed_index = op::concatenate(deformed_index_vec, -1);
   int64_t deformed_dims_size = 1;
@@ -194,6 +197,8 @@ void registerDeformableConvolution() {
     auto strides = layer->get_strides();
     auto dilations = layer->get_dilations();
     auto autopad_mode = to_plaidml(layer->get_auto_pad());
+    auto type = layer->get_input_element_type(0);
+    auto plaidml_type = to_plaidml(type);
     auto I_rank = I.rank();
     // Compute the spatial size of filter;
     auto F_spatial_size = 1;
@@ -231,7 +236,7 @@ void registerDeformableConvolution() {
     }
     // Compute DeformableConvolution.
     edsl::Tensor O = compute_deformable_convolution(I, OFF, F, I_shape, OFF_shape, F_shape, G, DG, I_rank, strides,
-                                                    dilations, pad_befores);
+                                                    dilations, pad_befores, plaidml_type);
     return edsl::make_tuple(O);
   });
 }
