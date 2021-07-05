@@ -472,22 +472,17 @@ void recognizeConvsAndInsertBlockedDataLayouts(
             filter = loadOp1;
           }
 
-          static int count = 0;
-          /* if (count < 1) */ {
-            if (createBlockedLayoutForFilterTensor(filter, memLayoutMaps,
-                                                   datatileSize)) {
-              createBlockedLayoutForInputTensor(input, memLayoutMaps,
-                                                datatileSize);
-            } else if (createBlockedLayoutForFilterTensor_KCHW(
-                           filter, memLayoutMaps, datatileSize)) {
-              createBlockedLayoutForInputTensor_NCHW(input, memLayoutMaps,
-                                                     datatileSize);
-            }
+          if (createBlockedLayoutForFilterTensor(filter, memLayoutMaps,
+                                                 datatileSize)) {
+            createBlockedLayoutForInputTensor(input, memLayoutMaps,
+                                              datatileSize);
+          } else if (createBlockedLayoutForFilterTensor_KCHW(
+                         filter, memLayoutMaps, datatileSize)) {
+            createBlockedLayoutForInputTensor_NCHW(input, memLayoutMaps,
+                                                   datatileSize);
           }
 
           parallelOps.insert(parallelOp);
-          count++;
-          IVLOG(4, "count = " << count);
         }
       }
     }
@@ -823,7 +818,7 @@ void simplifyMemrefMapsInInnerLoops(
     if (results.newMapFormed) {
       mlir::Value loadRes = builder.create<PxaLoadOp>(
           loadOp.getLoc(), loadOp.getMemRef(), results.simplifiedMap,
-          /* loadOp.indices() */ results.resultOperands);
+          results.resultOperands);
       loadOp.replaceAllUsesWith(loadRes);
       loadOp.erase();
     }
@@ -875,11 +870,9 @@ void simplifyMemrefMapsInInnerLoops(
 void tileLoopNestsToAlignWithDataMaps(mlir::FuncOp func) {
   func.walk([&](mlir::AffineParallelOp parallelOp) {
     size_t numLoopsInConv2d = 7;
-    static int count = 0;
 
     if (parallelOp.getSteps().size() == numLoopsInConv2d) {
       tileLoopNestsToAlignWithDataMaps(parallelOp);
-      count++;
     }
   });
 }
@@ -1093,7 +1086,6 @@ void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {
           numTileSizes = 0;
           for (size_t i = 0; i < tileSizes.size(); i++) {
             if (tileSizes[i] != 1) {
-              // FIXME: Create the type in a better fashion.
               if (numArguments > 0) {
                 mlir::Type type =
                     innerLoops.getBody()->getArgument(0).getType();
@@ -1146,15 +1138,6 @@ void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {
           innerLoops.setUpperBounds(mlir::ValueRange(newUpperBoundOperands),
                                     expandedUpperMap);
 
-          // innerLoops.setLowerBounds(mlir::ValueRange(newLowerBoundOperands),
-          // expandedLowerMap);
-          // innerLoops.setUpperBounds(mlir::ValueRange(newUpperBoundOperands),
-          // expandedUpperMap);
-          // innerLoops.lowerBoundsMapAttr(mlir::AffineMapAttr::get(expandedLowerMap));
-          // innerLoops.upperBoundsMapAttr(mlir::AffineMapAttr::get(expandedUpperMap));
-          // innerLoops.setLowerBoundsMap(expandedLowerMap);
-          // innerLoops.setUpperBoundsMap(expandedUpperMap);
-
           llvm::SmallVector<int64_t, 8> steps = innerLoops.getSteps();
           for (size_t i = 0; i < numTileSizes; i++) {
             steps.push_back(1);
@@ -1185,63 +1168,8 @@ void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {
               builder.getI32TensorAttr(newLbGroups));
           innerLoops.upperBoundsGroupsAttr(
               builder.getI32TensorAttr(newUbGroups));
-          // innerLoops.addAttribute(innerLoops.getLowerBoundsGroupsAttrName(),
-          //          builder.getI32TensorAttr(newLbGroups));
 
-          // TODO: Establish the conditions under which simplifying the affine
-          // expressions is OK
           simplifyMemrefMapsInInnerLoops(innerLoops, varMap);
-
-          /* New AffineParalleOp construction starts */
-          /*
-          auto test = innerLoops.lowerBoundsGroups();
-          mlir::SmallVector<mlir::AtomicRMWKind, 1> reductions;
-          for (mlir::Attribute attr : innerLoops.reductions()) {
-            auto intAttr = attr.cast<mlir::IntegerAttr>();
-            mlir::Optional<mlir::AtomicRMWKind> optReduction =
-                mlir::symbolizeAtomicRMWKind(intAttr.getInt());
-            reductions.push_back(optReduction.getValue());
-          }
-
-          mlir::SmallVector<mlir::AffineMap> lbMaps, ubMaps;
-          util::splitAffineMaps(expandedLowerMap, lbMaps);
-          util::splitAffineMaps(expandedUpperMap, ubMaps);
-
-          auto newParallel = builder.create<mlir::AffineParallelOp>(
-              innerLoops.getLoc(), innerLoops.getResultTypes(), reductions,
-          lbMaps, innerLoops.getBody()->getArguments(), ubMaps,
-              innerLoops.getBody()->getArguments(), innerLoops.getSteps());
-
-          IVLOG(4, "newParallel0: " << mlir::debugString(newParallel));
-
-
-          newParallel.region().takeBody(innerLoops.region());
-          if (hasTags(innerLoops)) {
-            copyTags(newParallel, innerLoops);
-          }
-          */
-          /*
-          auto args = innerLoops.getBody()->getArguments();
-          for (unsigned i = 0; i < args.size(); i++) {
-               mlir::Type type = args[0].getType();
-               newParallel.getBody()->insertArgument(i, type);
-          }
-          */
-
-          /*
-          innerLoops.replaceAllUsesWith(newParallel);
-          innerLoops.erase();
-           IVLOG(4, "newParallel: " << mlir::debugString(newParallel));
-          IVLOG(4, "Printing done\n");
-
-         // Splice instructions into the interior
-         auto &innerLoopOps = newParallel.getBody()->getOperations();
-         auto &outerLoopOps = parallelOp.getBody()->getOperations();
-         innerLoopOps.splice(std::prev(innerLoopOps.end()), outerLoopOps,
-                             std::next(outerLoopOps.begin(), 1),
-         outerLoopOps.end());
-           */
-          /* New AffineParallelOp construction ends */
         }
       }
     }
@@ -1463,7 +1391,6 @@ mlir::LogicalResult
 applyMapOnConstantArray(mlir::AffineMap map, mlir::ArrayRef<int64_t> &input,
                         mlir::SmallVector<int64_t, 6> &expandedShape) {
   mlir::SmallVector<mlir::AffineExpr, 6> expansionExprs;
-  // mlir::SmallVector<int64_t, 6> expandedShape;
   mlir::SmallVector<int64_t, 6> expandedVec;
   IVLOG(3, "applyMapOnConstantArray map: " << mlir::debugString(map));
 
@@ -1503,39 +1430,18 @@ mlir::Optional<ReorderDesc> chooseUserProvidedTargetLayout(
   mlir::Optional<ReorderDesc> selectedReorder = llvm::None;
 
   if (memoryDesc.reads.size() > 0) {
-    /*
-     IVLOG(4, "memoryDesc.reads.size(): " << memoryDesc.reads.size());
-     MemoryReadDesc &readDesc = memoryDesc.reads.front();
-
-     PxaReadOpInterface readOp = readDesc.readOp;
-     mlir::Value readMem = readOp.getMemRef();
-
-     mlir::MemRefType memrefType = readOp.getMemRefType();
-    */
     mlir::MemRefType memrefType =
         memoryDesc.reads.front().readOp.getMemRefType();
-    bool layoutSet = false;
     mlir::AffineMap layoutMap;
+    bool layoutSet = false;
 
-    /*
-    // First we check if a layout is set with the memref itself
-    if (memrefType.getAffineMaps().size() > 0) {
-      layoutMap = memrefType.getAffineMaps().front();
-      IVLOG(3, "layoutMap: " << mlir::debugString(layoutMap));
-      layoutSet = true;
-    }
-    */
-
-    // Then we check if a layout is set by any of the pattern recognizers
+    // We check if a layout is set by any of the pattern recognizers
     // such as convolution recognizers
-    if (!layoutSet) {
-      auto memLayoutMapsIt = memLayoutMaps.find(memoryDesc.value);
-      if (memLayoutMapsIt != memLayoutMaps.end()) {
-        layoutMap = memLayoutMapsIt->second;
-        layoutSet = true;
-        // IVLOG(3, "readMem: " << mlir::debugString(readMem));
-        IVLOG(4, "layoutMap for conv2d: " << mlir::debugString(layoutMap));
-      }
+    auto memLayoutMapsIt = memLayoutMaps.find(memoryDesc.value);
+    if (memLayoutMapsIt != memLayoutMaps.end()) {
+      layoutMap = memLayoutMapsIt->second;
+      layoutSet = true;
+      IVLOG(4, "layoutMap for conv2d: " << mlir::debugString(layoutMap));
     }
 
     if (layoutSet) {
@@ -1586,7 +1492,7 @@ mlir::Optional<ReorderDesc> optimizeLayoutForReads(
   mlir::Optional<ReorderDesc> selectedReorder = llvm::None;
 
   if (makeUserLayoutsExplicit) {
-    // FIXME: short circuiting other reordering logic
+    // Short circuiting other reordering logic
     selectedReorder = chooseUserProvidedTargetLayout(memoryDesc, memLayoutMaps);
     return selectedReorder;
   }
