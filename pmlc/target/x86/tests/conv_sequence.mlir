@@ -1,12 +1,12 @@
-// RUN: pmlc-opt  -convert-linalg-to-loops -pxa-reorder-layouts="allow-reorder=true make-user-layouts-explicit=true" -canonicalize  -x86-affine-stencil-xsmm %s | FileCheck %s
+// RUN: pmlc-opt  -convert-linalg-to-loops -pxa-reorder-layouts="allow-reorder=true make-user-layouts-explicit=true" -canonicalize  -x86-stencil-tpp-gemm %s | FileCheck %s
 
 
-// PLAIDML_VERBOSE=5 build-x86_64/Release/bin/pmlc-opt -convert-linalg-to-loops -pxa-reorder-layouts="allow-reorder=true make-user-layouts-explicit=true" -canonicalize -x86-affine-stencil-xsmm pmlc/target/x86/tests/conv_sequence.mlir > output
+// PLAIDML_VERBOSE=5 build-x86_64/Release/bin/pmlc-opt -convert-linalg-to-loops -pxa-reorder-layouts="allow-reorder=true make-user-layouts-explicit=true" -canonicalize -x86-stencil-tpp-gemm pmlc/target/x86/tests/conv_sequence.mlir > output
 
-// WithOUT data reordering: build-x86_64/Release/bin/pmlc-opt -convert-linalg-to-loops -canonicalize -x86-affine-stencil-xsmm -x86-convert-pxa-to-affine --normalize-memrefs --simplify-affine-structures  -lower-affine  -canonicalize -convert-scf-to-std -x86-convert-std-to-llvm pmlc/target/x86/tests/conv_sequence.mlir | build-x86_64/Release/bin/pmlc-jit -e conv
+// WithOUT data reordering: build-x86_64/Release/bin/pmlc-opt -convert-linalg-to-loops -canonicalize -x86-stencil-tpp-gemm -x86-convert-pxa-to-affine --normalize-memrefs --simplify-affine-structures  -lower-affine  -canonicalize -convert-scf-to-std -x86-convert-std-to-llvm pmlc/target/x86/tests/conv_sequence.mlir | build-x86_64/Release/bin/pmlc-jit -e conv
 
 
-// WITH data reordering: build-x86_64/Release/bin/pmlc-opt -convert-linalg-to-loops -pxa-reorder-layouts="allow-reorder=true make-user-layouts-explicit=true" -canonicalize -x86-affine-stencil-xsmm -x86-convert-pxa-to-affine --normalize-memrefs --simplify-affine-structures  -lower-affine  -canonicalize -convert-scf-to-std -x86-convert-std-to-llvm pmlc/target/x86/tests/conv_sequence.mlir | build-x86_64/Release/bin/pmlc-jit -e conv
+// WITH data reordering: build-x86_64/Release/bin/pmlc-opt -convert-linalg-to-loops -pxa-reorder-layouts="allow-reorder=true make-user-layouts-explicit=true" -canonicalize -x86-stencil-tpp-gemm -x86-convert-pxa-to-affine --normalize-memrefs --simplify-affine-structures  -lower-affine  -canonicalize -convert-scf-to-std -x86-convert-std-to-llvm pmlc/target/x86/tests/conv_sequence.mlir | build-x86_64/Release/bin/pmlc-jit -e conv
 
 // cat ref | grep -v sizes > ref.cleaned 
 // cat out | grep -v sizes > out.cleaned 
@@ -183,6 +183,6 @@ func @conv() {
 
    return
 }
-// CHECK: pxa.gemm
+// CHECK: pxa.generic
 
 func private @print_memref_f32(memref<*xf32>)
