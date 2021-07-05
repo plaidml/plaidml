@@ -5,6 +5,7 @@ pml_cc_library(
     expand_reshape.h
     passes.h
   SRCS
+    algebraic_opt.cc
     contraction.cc
     expand_reshape.cc
     materialize.cc

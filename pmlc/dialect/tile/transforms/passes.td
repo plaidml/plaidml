@@ -3,6 +3,11 @@
 
 include "mlir/Pass/PassBase.td"
 
+def AlgebraicOpt : FunctionPass<"tile-algebraic-opt"> {
+  let summary = "Algebraic optimizations";
+  let constructor = "pmlc::dialect::tile::createAlgebraicOptPass()";
+}
+
 def ComputeBounds : FunctionPass<"tile-compute-bounds"> {
   let summary = "Compute bounds for contractions";
   let constructor = "pmlc::dialect::tile::createComputeBoundsPass()";
