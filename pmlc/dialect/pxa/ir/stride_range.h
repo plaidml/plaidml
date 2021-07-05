@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include "mlir/IR/Value.h"
+
 namespace pmlc::dialect::pxa {
 
 struct StrideRange {
