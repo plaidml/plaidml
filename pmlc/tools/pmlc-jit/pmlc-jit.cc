@@ -41,19 +41,37 @@ namespace {
 /// This options struct prevents the need for global static initializers, and
 /// is only initialized if the JITRunner is invoked.
 struct Options {
-  llvm::cl::opt<std::string> inputFilename{llvm::cl::Positional,
-                                           llvm::cl::desc("<input file>"),
-                                           llvm::cl::init("-")};
+  llvm::cl::opt<std::string> inputFilename{
+      llvm::cl::Positional,
+      llvm::cl::desc("<input file>"),
+      llvm::cl::init("-"),
+  };
+
   llvm::cl::opt<std::string> mainFuncName{
-      "e", llvm::cl::desc("The function to be called"),
-      llvm::cl::value_desc("function name"), llvm::cl::init("main")};
+      "e",
+      llvm::cl::desc("The function to be called"),
+      llvm::cl::value_desc("function name"),
+      llvm::cl::init("main"),
+  };
 
   llvm::cl::opt<std::string> sourceFilename{
-      "source", llvm::cl::value_desc("source file")};
+      "source",
+      llvm::cl::value_desc("source file"),
+  };
 
-  llvm::cl::opt<std::string> optDeviceID{
-      "device", llvm::cl::desc("The device to use"),
-      llvm::cl::value_desc("device_id"), llvm::cl::init("llvm_cpu.0")};
+  llvm::cl::opt<std::string> deviceId{
+      "device",
+      llvm::cl::desc("The device to use"),
+      llvm::cl::value_desc("device_id"),
+      llvm::cl::init("llvm_cpu.0"),
+  };
+
+  llvm::cl::opt<unsigned> iterations{
+      "n",
+      llvm::cl::desc("The number of iterations to run"),
+      llvm::cl::value_desc("iterations"),
+      llvm::cl::init(1),
+  };
 };
 
 } // namespace
@@ -90,8 +108,9 @@ int JitRunnerMain(int argc, char **argv) {
   }
 
   auto executable =
-      Executable::fromProgram(program, options.optDeviceID.getValue());
-  executable->invoke();
+      Executable::fromProgram(program, options.deviceId.getValue());
+  for (unsigned i = 0; i < options.iterations.getValue(); i++)
+    executable->invoke();
 
   return EXIT_SUCCESS;
 }
