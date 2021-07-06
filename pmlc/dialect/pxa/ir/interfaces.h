@@ -7,7 +7,7 @@
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/OpDefinition.h"
 
-#include "pmlc/dialect/pxa/analysis/stride_range.h"
+#include "pmlc/dialect/pxa/ir/stride_range.h"
 
 namespace mlir {
 
