@@ -34,9 +34,7 @@ steps:
 
 {{#tests}}
   - label: '{{emoji}}{{engine}}{{suite}}/{{workload}}/{{platform}} BATCH_SIZE={{batch_size}}'
-    command: |
-      {{python}} -m pip install pyyaml --user
-      {{python}} ci/buildkite.py test {{platform}} {{suite}} {{workload}} {{batch_size}}
+    command: '{{python}} ci/buildkite.py test {{platform}} {{suite}} {{workload}} {{batch_size}}'
     depends_on: {{variant}}
 
   {{#soft_fail}}

@@ -242,8 +242,6 @@ def iterate_tests(plan, pipeline):
             if pipeline not in platform['pipelines']:
                 continue
             for wkey, workload in suite['workloads'].items():
-                if workload is None:
-                    workload = {}
                 popt = PlanOption(suite, workload, pkey)
                 skip = workload.get('skip_platforms', [])
                 if pkey in skip:

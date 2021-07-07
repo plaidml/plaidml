@@ -153,8 +153,8 @@ SUITES:
         platform_overrides:
           pml-llvm-cpu:
             prepend_args: [--examples=64]
-      mobilenet:
-      mobilenet_v2:
+      mobilenet: {}
+      mobilenet_v2: {}
       resnet50:
         platform_overrides:
           pml-llvm-cpu:
