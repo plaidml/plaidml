@@ -30,44 +30,46 @@ struct AddInitPattern final : public OpRewritePattern<AddOp> {
   using OpRewritePattern<AddOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(AddOp op, PatternRewriter &rewriter) const {
-    return failure(
-        failed(matchAndRewritePermutation(op, rewriter, op.lhs(), op.rhs())) ||
-        failed(matchAndRewritePermutation(op, rewriter, op.rhs(), op.lhs())));
+    return success(succeeded(matchAndRewritePermutation(op, rewriter, op.lhs(),
+                                                        op.rhs())) ||
+                   succeeded(matchAndRewritePermutation(op, rewriter, op.rhs(),
+                                                        op.lhs())));
   }
 
   LogicalResult matchAndRewritePermutation(AddOp op, PatternRewriter &rewriter,
                                            Value thisOperand,
                                            Value otherOperand) const {
-    if (ContractionOp contractOp =
-            dyn_cast_or_null<ContractionOp>(thisOperand.getDefiningOp())) {
-      if (!contractOp->hasOneUse())
-        return failure();
+    ContractionOp contractOp =
+        dyn_cast_or_null<ContractionOp>(thisOperand.getDefiningOp());
+    if (!contractOp)
+      return failure();
 
-      // Prevent possible cyclic uses; only allow BlockArguments or constants.
-      if (otherOperand.getDefiningOp() &&
-          !matchPattern(otherOperand, m_Constant()))
-        return failure();
+    if (!contractOp->hasOneUse())
+      return failure();
 
-      // Prevent issues with broadcasts.
-      if (op.result().getType() != contractOp.result().getType())
-        return failure();
+    // Prevent possible cyclic uses; only allow BlockArguments or constants.
+    if (otherOperand.getDefiningOp() &&
+        !matchPattern(otherOperand, m_Constant()))
+      return failure();
 
-      // Add is the only legal aggregation kind for this pattern.
-      if (contractOp.agg() != AggregationKind::add)
-        return failure();
+    // Prevent issues with broadcasts.
+    if (op.result().getType() != contractOp.result().getType())
+      return failure();
 
-      FloatAttr init;
-      if (!matchPattern(contractOp.init(), m_Constant(&init)))
-        return failure();
-      if (init.getValueAsDouble() != 0.0)
-        return failure();
+    // Add is the only legal aggregation kind for this pattern.
+    if (contractOp.agg() != AggregationKind::add)
+      return failure();
 
-      contractOp.setOperand(0, otherOperand);
-      rewriter.replaceOp(op, contractOp.result());
+    FloatAttr init;
+    if (!matchPattern(contractOp.init(), m_Constant(&init)))
+      return failure();
+    if (init.getValueAsDouble() != 0.0)
+      return failure();
 
-      return success();
-    }
-    return failure();
+    contractOp.setOperand(0, otherOperand);
+    rewriter.replaceOp(op, contractOp.result());
+
+    return success();
   }
 };
 
