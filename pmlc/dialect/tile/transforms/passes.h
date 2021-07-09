@@ -10,6 +10,8 @@ class Pass;
 
 namespace pmlc::dialect::tile {
 
+std::unique_ptr<mlir::Pass> createAlgebraicOptPass();
+
 std::unique_ptr<mlir::Pass> createComputeBoundsPass();
 
 std::unique_ptr<mlir::Pass> createExpandReshapePass();
