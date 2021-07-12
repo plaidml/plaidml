@@ -1043,7 +1043,6 @@ void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {
   mod 16). But, since (%arg3 floordiv 16) = %arg10 and (%arg3 mod 16) = %arg14,
   we can equivalently write: %arg10 * 16 + %arg14 and that is what is written in
   place of %arg3 in the pxa.reduce op.
-
    */
   mlir::DenseMap<mlir::Value, int64_t> tileSizeMap;
   bool tileSizesAreConsistent = true;
@@ -1058,6 +1057,7 @@ void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {
     IVLOG(4, "index i: " << i << ": " << mlir::debugString(val));
   }
 
+  // Step 1. We determine the tile sizes for loop tiling
   bool floorDivsPresent = false;
   parallelOp.walk([&](PxaLoadOp op) {
     IVLOG(4, "read load op: " << op);
@@ -1065,11 +1065,22 @@ void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {
     IVLOG(4, "op.getMemRef(): " << mlir::debugString(memRef));
     IVLOG(4, "op.getMapOperands().size(): " << op.idxs().size());
 
+    /*
+     * Example: map -
+     * (d0, d1, d2, d3) -> (d2 floordiv 16, d3 floordiv 16, d0, d1, d2 mod 16,
+     * d3 mod 16)
+     */
+
     mlir::AffineMap map = op.getAffineMap();
     IVLOG(4, "map: " << mlir::debugString(map));
+
+    // In the below 'for' loop we iterate through the mapResults.
+    // For the above example, it would be: (d2 floordiv 16, d3 floordiv 16, d0,
+    // d1, d2 mod 16, d3 mod 16)
     for (unsigned idx = 0; idx < map.getNumResults(); ++idx) {
       mlir::AffineExpr expr = map.getResult(idx);
 
+      // E.g., d2 floordiv 16
       if (expr.getKind() == mlir::AffineExprKind::FloorDiv) {
         floorDivsPresent = true;
         auto divExpr = expr.cast<mlir::AffineBinaryOpExpr>();
@@ -1082,14 +1093,27 @@ void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {
           int64_t res = constantExpr.getValue();
           IVLOG(4, "The floor div constantValue: " << res);
 
+          // For d2 floordiv, pos will be 2 (because we are referring to d2)
+          // The domain (pre-image) of a map will always start from d0. E.g.,
+          // (d0, d1, d2, d3)
           auto dimExpr = lhsExpr.cast<mlir::AffineDimExpr>();
           unsigned pos = dimExpr.getPosition();
 
           IVLOG(4, "lhsExpr-pos: " << pos);
+          // operand below is pxa.load op's 'pos' operand.
+          // E.g., the operand that will be substituted for d2.
           mlir::Value operand = op.idxs()[pos];
 
           IVLOG(4, "operand: " << mlir::debugString(operand));
 
+          // We now search trhough the parallel loop's operands for loop
+          // variables to see what the 'operand' matches for.
+          // E.g., pxa.load %6[%arg6 floordiv 16, %arg3 floordiv 16, %arg4,
+          // %arg5, %arg6 mod 16, %arg3 mod 16] Here we are dealing with %arg6
+          // floordiv 16 The loop is: affine.parallel (%arg0, %arg1, %arg2,
+          // %arg3, %arg4, %arg5, %arg6) = ... The below loop matches '%arg3' of
+          // the affine.parallel with pxa.load's %arg3 and assigns tile size of
+          // 16 to the loop variable %arg3.
           for (unsigned i = 0; i < outerIdxs.size(); ++i) {
             mlir::Value loopVar = outerIdxs[i];
 
@@ -1099,6 +1123,18 @@ void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {
                 IVLOG(4, "MATCH found. tile size = " << res);
                 tileSizeMap.insert({loopVar, res});
               } else {
+                // We want to ensure that tile sizes are consistent.
+                // There may be multiple pxa.loads in an affine.parallel
+                // E.g., pxa.load %4[%arg0, %arg6 floordiv 16, %arg1 + %arg4,
+                // %arg2 + %arg5, %arg6 mod 16] pxa.load %6[%arg6 floordiv 16,
+                // %arg3 floordiv 16, %arg4, %arg5, %arg6 mod 16, %arg3 mod 16]
+                // Here we check that the tile size associated with
+                // affine.parallel's %arg6 is always the same. A scenario where
+                // tile sizes will not be consistent is if in one pxa.load we
+                // have %arg6 floordiv 16 and in another %arg6 floordiv 32. In
+                // such a case, the candidate tile sizes -- 16 and 32 are not
+                // the same, and we deem that tile sizes are NOT consistent.
+
                 int64_t existingTileSize = tileSizeMapIt->second;
                 if (res != existingTileSize) {
                   IVLOG(4, "Tile Sizes are not consistent: res = "
@@ -1115,6 +1151,8 @@ void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {
     IVLOG(4, "PxaLoadOp description ends");
   });
 
+  // If there are no floordivs at all in the affine.parallel loop, then no loop
+  // tiling is necessary and we return from the function here.
   if (!floorDivsPresent) {
     return;
   }
@@ -1124,6 +1162,7 @@ void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {
     IVLOG(4, "index i: " << i << ": " << mlir::debugString(val));
   }
 
+  // Step 2. We perform loop tiling ONLY IF tile sizes are consistent.
   if (tileSizesAreConsistent) {
     IVLOG(4, "Tile sizes are consistent. Performing tiling");
     mlir::SmallVector<int64_t, 6> tileSizes;
@@ -1144,8 +1183,11 @@ void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {
       IVLOG(4, "tile size: " << tileSize);
     }
 
+    // If there is some tile size that is not 1, we proceed to perform tiling.
     if (nonUnitTileSizesPresent) {
       // We will check that the tile sizes divide the loop lengths exactly.
+      // The loop lengths returned below for the examplar affine.parallel loop
+      // will be: (1, 56, 56, 64, 3, 3, 64)
       auto loopLengths = parallelOp.getConstantRanges();
 
       if (loopLengths.hasValue() &&
@@ -1162,9 +1204,33 @@ void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {
         }
 
         if (tileSizesDivideLoopLengths) {
+          // If the tile sizes divide the loop lengths exactly, we perform
+          // tiling. In the examplar, affine.parallel (%arg0, %arg1, %arg2,
+          // %arg3, %arg4, %arg5, %arg6) the loop variables %arg3, %arg6 are to
+          // be tiled. The tile sizes will be, [1, 1, 1, 16, 1, 1, 16].
           mlir::AffineParallelOp innerLoops =
               performTiling(parallelOp, tileSizes);
 
+          /*
+           The tiled code at this point looks like the following:
+           %8 = affine.parallel (%arg0, %arg1, %arg2, %arg3, %arg4, %arg5,
+          %arg6) = (0, 0, 0, 0, 0, 0, 0) to (1, 56, 56, 64, 3, 3, 64) step (1,
+          1, 1, 16, 1, 1, 16) reduce ("assign") -> (memref<1x56x56x64xf32>) {
+            %10 = affine.parallel (%arg7, %arg8, %arg9, %arg10, %arg11, %arg12,
+          %arg13) = (%arg0, %arg1, %arg2, %arg3, %arg4, %arg5, %arg6) to (%arg0
+          + 1, %arg1 + 1, %arg2 + 1, %arg3 + 16, %arg4 + 1, %arg5 + 1, %arg6 +
+          16) reduce ("assign") -> (memref<1x56x56x64xf32>) { %11 = pxa.load
+          %4[%arg7, %arg13 floordiv 16, %arg8 + %arg11, %arg9 + %arg12, %arg13
+          mod 16] : memref<1x4x58x58x16xf32> %12 = pxa.load %6[%arg13 floordiv
+          16, %arg10 floordiv 16, %arg11, %arg12, %arg13 mod 16, %arg10 mod 16]
+          : memref<4x4x3x3x16x16xf32> %13 = mulf %11, %12 : f32 %14 = pxa.reduce
+          addf %13, %7[%arg7, %arg8, %arg9, %arg10] : memref<1x56x56x64xf32>
+              affine.yield %14 : memref<1x56x56x64xf32>
+            }
+            affine.yield %10 : memref<1x56x56x64xf32>
+          }
+           */
+          IVLOG(4, "outer_tiled_loops: " << mlir::debugString(parallelOp));
           IVLOG(4, "tiled_loops: " << mlir::debugString(innerLoops));
           mlir::AffineMap outerLoopLowerMap =
               parallelOp.getLowerBoundsValueMap().getAffineMap();
@@ -1190,30 +1256,6 @@ void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {
           // something like the following: Lower bounds: (d0, d1, d2 floordiv
           // 16, d3 floordiv 16, d4, d5) Upper bounds: (d0 + 1, d1 + 1, d2
           // floordiv 16 + 1, d3 floordiv 16 + 1, d4 + 1, d5 + 1)
-          // TODO: the load/reduce ops' variables need to be modified too if
-          // they depend upon the modified loop variables.
-          /*
-              %8 = affine.parallel (%arg0, %arg1, %arg2, %arg3, %arg4, %arg5,
-            %arg6) = (0, 0, 0, 0, 0, 0, 0) to (1, 56, 56, 64, 3, 3, 64) step (1,
-            1, 1, 16, 1, 1, 16) reduce ("assign") -> (memref<1x56x56x64xf32>) {
-                %10 = affine.parallel (%arg7, %arg8, %arg9, %arg10, %arg11,
-            %arg12, %arg13, %arg14, %arg15) = (%arg0, %arg1, %arg2, %arg3
-            floordiv 16, %arg4, %arg5, %arg6 floordiv 16, 0, 0) to (%arg0 + 1,
-            %arg1 + 1, %arg2 + 1, %arg3 floordiv 16 + 1, %arg4 + 1, %arg5 + 1,
-            %arg6 floordiv 16 + 1, 16, 16) reduce ("assign") ->
-            (memref<1x56x56x64xf32>) { %11 = pxa.load %4[%arg7, %arg13, %arg8 +
-            %arg11, %arg9 + %arg12, %arg15] : memref<1x4x58x58x16xf32> %12 =
-            pxa.load %6[%arg13, %arg10, %arg11, %arg12, %arg15, %arg14] :
-            memref<4x4x3x3x16x16xf32> %13 = mulf %11, %12 : f32 %14 = pxa.reduce
-            addf %13, %7[%arg7, %arg8, %arg9, %arg10] : memref<1x56x56x64xf32>
-                  affine.yield %14 : memref<1x56x56x64xf32>
-                }
-                affine.yield %10 : memref<1x56x56x64xf32>
-              }
-
-            pxa.reduce addf %13, %7[%arg7, %arg8, %arg9, %arg10] ->
-            pxa.reduce addf %13, %7[%arg7, %arg8, %arg9, %arg10 * 16 + %arg14]
-          */
           for (size_t i = 0; i < tileSizes.size(); i++) {
             if (tileSizes[i] != 1) {
               lowerBoundsMap.setResult(
