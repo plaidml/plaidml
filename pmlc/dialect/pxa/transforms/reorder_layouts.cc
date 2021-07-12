@@ -1252,10 +1252,17 @@ void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {
           IVLOG(4, "upperBoundsMap: " << mlir::debugString(upperMap));
 
           unsigned numTileSizes = 0;
-          // The following will set the lower bound and upper bound maps to
-          // something like the following: Lower bounds: (d0, d1, d2 floordiv
-          // 16, d3 floordiv 16, d4, d5) Upper bounds: (d0 + 1, d1 + 1, d2
-          // floordiv 16 + 1, d3 floordiv 16 + 1, d4 + 1, d5 + 1)
+
+          /*
+           Currently, the lower bounds and upper bounds of tiled loops are as
+          follows. %arg10's lower-bound is: %arg3 and upper-bound is: %arg3 + 16
+          We will change the lower-bound to: %arg3 floordiv 16 and upper-bound
+          to: %arg3 floordiv 16 + 1. The loop-range is 1. That is, the loop runs
+          for only one iteration. But, the original loop's range is 16: 16
+          iterations. To make up for setting the loop-range to 1, we introduce a
+          new loop variable that will have the loop range of 16. Note that 16 is
+          the tile size of the loop.
+           */
           for (size_t i = 0; i < tileSizes.size(); i++) {
             if (tileSizes[i] != 1) {
               lowerBoundsMap.setResult(
@@ -1279,6 +1286,10 @@ void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {
             upperExpandedExprs.push_back(upperMap.getResult(i));
           }
 
+          /*For each tiled loop variable, we will introduce an extra dimension.
+           * The lower-bound for the new loop variable will be 0, and the
+           * upper-bound the tile size. For the above example, it would be 16.
+           */
           mlir::OpBuilder builder(lowerMap.getContext());
           for (size_t i = 0; i < tileSizes.size(); i++) {
             if (tileSizes[i] != 1) {
@@ -1290,6 +1301,10 @@ void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {
             }
           }
 
+          // Because we expanded the number of dimensions in the domain of the
+          // inner loop's affine map, we need to introduce
+          // arguments/map-operands for the expanded inner loop's affine map as
+          // well. That is done below.
           int64_t numArguments = innerLoops.getBody()->getNumArguments();
           mlir::DenseMap<mlir::Value, mlir::Value> varMap;
           numTileSizes = 0;
@@ -1301,6 +1316,26 @@ void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {
                 mlir::BlockArgument arg = innerLoops.getBody()->insertArgument(
                     numArguments + numTileSizes, type);
                 numTileSizes++;
+                /*
+                 * varMap relates the original loop variables with the newly
+                 * formed variables. That is, it relates the floordiv's loop
+                 * variable with mod's. For example, affine.parallel (%arg7,
+                 * %arg8, %arg9, %arg10, %arg11, %arg12, %arg13, %arg14, %arg15)
+                 * varMap will contain: {%arg10, %arg14} and {%arg13, %arg15}
+                 * pairs.
+                 *
+                 * The pairs are tracked for the following purpose:
+                 * In the following pxa.load:
+                 * pxa.load %4[%arg7, %arg13 floordiv 16, %arg8 + %arg11, %arg9
+                 * + %arg12, %arg13 mod 16]
+                 * "%arg13 floordiv 16" will be replaced with %arg13 (floodiv 16
+                 * will simply be discarded) while
+                 * "%arg13 mod 16" will be replaced with %arg15.
+                 * The resulting pxa.load will look like the following:
+                 * pxa.load %4[%arg7, %arg13, %arg8 + %arg11, %arg9 + %arg12,
+                 * %arg15]
+                 */
+
                 varMap.insert({innerLoops.getBody()->getArgument(i), arg});
                 IVLOG(4, "The new arg: " << mlir::debugString(arg));
               } else {
@@ -1317,6 +1352,13 @@ void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {
           mlir::AffineMap expandedUpperMap = mlir::AffineMap::get(
               currentNumDims, 0, upperExpandedExprs, upperMap.getContext());
 
+          /*
+           * For the running example, expandedLowerMap will be:
+           * (d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d1, d2, d3 floordiv
+           * 16, d4, d5, d6 floordiv 16, 0, 0) and the expandedUpperMap will be:
+           * (d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0 + 1, d1 + 1, d2 + 1, d3
+           * floordiv 16 + 1, d4 + 1, d5 + 1, d6 floordiv 16 + 1, 16, 16)
+           */
           IVLOG(4, "expandedLowerMap: " << mlir::debugString(expandedLowerMap));
           IVLOG(4, "expandedUpperMap: " << mlir::debugString(expandedUpperMap));
 
@@ -1331,7 +1373,12 @@ void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {
           // the lower and upper bounds are constant and therefore the map
           // operands will not be relevant.
 
+          // For the running example, we have to introduce the operands for d7
+          // and d8. They could be anything because d7 and d8 dimensions are
+          // constant dimensions so the operand will not be used.
           for (size_t i = 0; i < numTileSizes; i++) {
+            // Here we set the operands for d7 and d8 to be the same as the
+            // operand for d0.
             if (lbOperands.size() > 0 && ubOperands.size() > 0) {
               newLowerBoundOperands.push_back(lbOperands[0]);
               newUpperBoundOperands.push_back(ubOperands[0]);
@@ -1347,6 +1394,7 @@ void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {
           innerLoops.setUpperBounds(mlir::ValueRange(newUpperBoundOperands),
                                     expandedUpperMap);
 
+          // The inner loops steps are all 1.
           llvm::SmallVector<int64_t, 8> steps = innerLoops.getSteps();
           for (size_t i = 0; i < numTileSizes; i++) {
             steps.push_back(1);
@@ -1373,11 +1421,21 @@ void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {
             newUbGroups.push_back(1);
           }
 
+          // Because the number of dimensions of the affine.parallel loop has
+          // increased, we have to provide group numbers for the new dimensions
+          // also. We set them to 1 which means there is only 1 bound. An
+          // example where it would be more than 1 would be for example,
+          // lower-bound is max(a, b, c). Here, because lower-bound is a max of
+          // 3 values, group size would be 3.
           innerLoops.lowerBoundsGroupsAttr(
               builder.getI32TensorAttr(newLbGroups));
           innerLoops.upperBoundsGroupsAttr(
               builder.getI32TensorAttr(newUbGroups));
 
+          // We simplify pxa.load and pxa.reduce to get rid of floordivs and
+          // mods. E.g., pxa.load %4[%arg7, %arg13 floordiv 16, %arg8 + %arg11,
+          // %arg9 + %arg12, %arg13 mod 16] would be simplified to: pxa.load
+          // %4[%arg7, %arg13, %arg8 + %arg11, %arg9 + %arg12, %arg15].
           simplifyMemrefMapsInInnerLoops(innerLoops, varMap);
         }
       }
