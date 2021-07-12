@@ -8,10 +8,8 @@
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Support/DebugStringHelper.h"
 
 #include "pmlc/dialect/pxa/ir/ops.h"
-#include "pmlc/util/logging.h"
 #include "pmlc/util/tags.h"
 #include "pmlc/util/util.h"
 
@@ -24,7 +22,6 @@ mlir::Value createReorder(mlir::Location loc, mlir::OpBuilder &builder,
   mlir::MemRefType newMemType =
       mlir::MemRefType::Builder(srcMemType).setShape(desc.reorderedShape);
   mlir::Value newMem = builder.create<mlir::memref::AllocOp>(loc, newMemType);
-
   // Create `affine.parallel` that will perform copy with reordering.
   auto parallel = builder.create<mlir::AffineParallelOp>(
       loc, mlir::ArrayRef<mlir::Type>{newMem.getType()},
@@ -321,7 +318,6 @@ void LayoutConverter::convertYieldOp(mlir::AffineYieldOp yieldOp,
 }
 
 mlir::AffineMap LayoutConverter::transformAffineMap(mlir::AffineMap map) {
-  IVLOG(3, "transformAffineMap, map: " << mlir::debugString(map));
   return reorderDesc.reorderMap.compose(map);
 }
 

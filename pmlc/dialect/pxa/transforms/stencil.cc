@@ -123,13 +123,11 @@ void StencilBase::bindIndexes(ArrayRef<Value> values) {
 void StencilBase::recursiveBindIndex(SmallVector<BlockArgument, 8> &boundIdxs,
                                      ArrayRef<Value> values) {
   auto currIdx = boundIdxs.size();
-
   if (currIdx == requirements.size()) {
     // This is a legal binding, go find a tiling for it
     SmallVector<int64_t, 8> currTileSize(requirements.size());
     recursiveTileIndex(StencilOption(values, boundIdxs), currTileSize, 0);
   } else {
-    IVLOG(4, "In the ELSE part");
     for (const auto blockArg : getBlockArgsAsSet()) {
       // Don't bind same index twice
       // Note: While it's awkward to be repeatedly searching a vector, I think
@@ -145,22 +143,13 @@ void StencilBase::recursiveBindIndex(SmallVector<BlockArgument, 8> &boundIdxs,
       assert(requirements[currIdx].predicates.size() == values.size() &&
              "Each predicate entry must have one function per I/O op");
       for (unsigned i = 0; i < values.size(); i++) {
-        IVLOG(4, "Calling getStrideInfo");
         auto strideInfo = getStrideInfo(values[i]);
-        if (!strideInfo) {
-          IVLOG(4, "StrideInfo is NULL ");
-          exit(1);
-        }
-
-        IVLOG(3, "StrideInfo: " << debugString(*strideInfo));
-        IVLOG(4, "Returned from getStrideInfo");
         auto stride = strideInfo->strides[blockArg];
         if (!requirements[currIdx].predicates[i](stride)) {
           reqsMet = false;
           break;
         }
       }
-      IVLOG(4, "reqsMet: " << reqsMet);
       if (!reqsMet) {
         continue;
       }
@@ -213,10 +202,8 @@ void StencilBase::performStenciling() {
     IVLOG(4, "Cannot Stencil: Operations fail to pattern-match.");
     return;
   }
-  
   capturedValues = *maybeCapturedValues;
 
-  IVLOG(4, "In DoStenciling(), ordered list of loads and stores attempted");
   // We wrap loads & stores with `Orderer` to make the order the permutations
   // are iterated through deterministic (the "sorted" order of the IO ops is the
   // order they were returned by `capture`) -- without this, the sorted order
@@ -226,18 +213,12 @@ void StencilBase::performStenciling() {
   for (auto &storeOp : capturedValues.stores) {
     ordered.push_back(Orderer<Value>(ord++, storeOp));
   }
-
-  IVLOG(4, "In DoStenciling(), store ops are added to the data structure");
   size_t firstLoadIdx = ordered.size();
   for (auto &loadOp : capturedValues.loads) {
     ordered.push_back(Orderer<Value>(ord++, loadOp));
   }
-
-  IVLOG(4, "In DoStenciling(), load ops are added to the data structure");
   auto itLastStoreFirstLoad = ordered.begin() + firstLoadIdx;
   std::sort(ordered.begin(), itLastStoreFirstLoad);
-
-  IVLOG(4, "In DoStenciling(), created an ordered load store sequence");
   do { // Each store tensor permutation
     std::sort(itLastStoreFirstLoad, ordered.end());
     do { // Each load tensor permutation
@@ -245,10 +226,8 @@ void StencilBase::performStenciling() {
       for (const auto &ioOp : ordered) {
         values.push_back(*ioOp);
       }
-
       bindIndexes(values);
     } while (std::next_permutation(itLastStoreFirstLoad, ordered.end()));
-    IVLOG(4, "In DoStenciling(), do while loop 2");
   } while (std::next_permutation(ordered.begin(), itLastStoreFirstLoad));
 
   if (bestCost < std::numeric_limits<double>::infinity()) {

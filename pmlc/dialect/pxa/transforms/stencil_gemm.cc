@@ -45,7 +45,6 @@ private:
   Optional<StencilCapture> capture() {
     using matchers::m_Any;
     // Looking for load..load..mul..reduce..terminator
-    IVLOG(3, "StencilGEMMPass - in capture() function ");
     Value load1, load2, reduce;
     Operation *yield = op.getBody()->getTerminator();
     if (matchPattern(
@@ -64,11 +63,8 @@ private:
                              m_Op<MulIOp>(m_Capture(&load1, m_Op<PxaLoadOp>()),
                                           m_Capture(&load2, m_Op<PxaLoadOp>())),
                              m_Any()))))) {
-
       return StencilCapture{{reduce}, {load1, load2}};
     }
-
-    IVLOG(3, "StencilGEMMPass - returning NO match in capture() function ");
     return llvm::None;
   }
 

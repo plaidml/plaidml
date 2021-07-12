@@ -1767,9 +1767,6 @@ def var(x, axis=None, keepdims=False):
     return _KerasNode('var', tensor=plaidml_op.variance(x.tensor, axis, keepdims), operands=[x])
 
 
-count = 0
-
-
 @_log_call
 def variable(value, dtype=None, name=None, constraint=None):
     dtype = dtype or floatx()
@@ -1785,15 +1782,7 @@ def variable(value, dtype=None, name=None, constraint=None):
             #     'Casting to requested dtype in variable, received {} and requested {}'.format(
             #         value.dtype, dtype))
             value = value.astype(dtype)
-        if (str(name) == 'kernel'):
-            global count
-            count += 1
-            if (count < 1):
-                return _KerasNode('constant', name=name, const=value)
-            else:
-                return _KerasNode('variable', name=name, var=value)
-        else:
-            return _KerasNode('variable', name=name, var=value)
+        return _KerasNode('variable', name=name, var=value)
     raise TypeError('Unknown type for variable: {}'.format(type(value)))
 
 
