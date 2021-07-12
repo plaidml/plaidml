@@ -91,6 +91,8 @@ public:
                          toRemove);
     }
 
+    // We perform loop tiling so that the subsequent pass namely, stenciling
+    // pass will be able to extract GEMMs
     tileLoopNestsToAlignWithDataMaps(func);
 
     // Cleanup
@@ -958,12 +960,91 @@ void tileLoopNestsToAlignWithDataMaps(mlir::FuncOp func) {
     size_t numLoopsInConv2d = 7;
 
     if (parallelOp.getSteps().size() == numLoopsInConv2d) {
+      // The Convolution pattern recognizer would have recognized Convolutions
+      // and specified the blocked data layouts for input and filter tensors.
+      // The subsequent functions would have performed data layout
+      // transformations. We perform loop tiling for Convolution parallel
+      // operations.
       tileLoopNestsToAlignWithDataMaps(parallelOp);
     }
   });
 }
 
 void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {
+  /*
+   * INPUT: At this time, the Convolution ops would like the following:
+
+  %8 = affine.parallel (%arg0, %arg1, %arg2, %arg3, %arg4, %arg5, %arg6) = (0,
+  0, 0, 0, 0, 0, 0) to (1, 56, 56, 64, 3, 3, 64) reduce ("assign") ->
+  (memref<1x56x56x64xf32>) { %10 = pxa.load %4[%arg0, %arg6 floordiv 16, %arg1 +
+  %arg4, %arg2 + %arg5, %arg6 mod 16] : memref<1x4x58x58x16xf32> %11 = pxa.load
+  %6[%arg6 floordiv 16, %arg3 floordiv 16, %arg4, %arg5, %arg6 mod 16, %arg3 mod
+  16] : memref<4x4x3x3x16x16xf32> %12 = mulf %10, %11 : f32 %13 = pxa.reduce
+  addf %12, %7[%arg0, %arg1, %arg2, %arg3] : memref<1x56x56x64xf32> affine.yield
+  %13 : memref<1x56x56x64xf32>
+
+
+  OUTPUT: The goal of this function is to transform it to the following code:
+      %8 = affine.parallel (%arg0, %arg1, %arg2, %arg3, %arg4, %arg5, %arg6) =
+  (0, 0, 0, 0, 0, 0, 0) to (1, 56, 56, 64, 3, 3, 64) step (1, 1, 1, 16, 1, 1,
+  16) reduce ("assign") -> (memref<1x56x56x64xf32>) { %10 = affine.parallel
+  (%arg7, %arg8, %arg9, %arg10, %arg11, %arg12, %arg13, %arg14, %arg15) =
+  (%arg0, %arg1, %arg2, %arg3 floordiv 16, %arg4, %arg5, %arg6 floordiv 16, 0,
+  0) to (%arg0 + 1, %arg1 + 1, %arg2 + 1, %arg3 floordiv 16 + 1, %arg4 + 1,
+  %arg5 + 1, %arg6 floordiv 16 + 1, 16, 16) reduce ("assign") ->
+  (memref<1x56x56x64xf32>) { %11 = pxa.load %4[%arg7, %arg13, %arg8 + %arg11,
+  %arg9 + %arg12, %arg15] : memref<1x4x58x58x16xf32> %12 = pxa.load %6[%arg13,
+  %arg10, %arg11, %arg12, %arg15, %arg14] : memref<4x4x3x3x16x16xf32> %13 = mulf
+  %11, %12 : f32 %14 = pxa.reduce addf %13, %7[%arg7, %arg8, %arg9, %arg10 * 16
+  + %arg14] : memref<1x56x56x64xf32> affine.yield %14 : memref<1x56x56x64xf32>
+        }
+        affine.yield %10 : memref<1x56x56x64xf32>
+      }
+
+  SALIENT CHANGES: There are several salient transformations:
+
+  1) Let us consider the following pxa.load:
+  pxa.load %4[%arg0, %arg6 floordiv 16, %arg1 + %arg4, %arg2 + %arg5, %arg6 mod
+  16] It is changed to: pxa.load %4[%arg7, %arg13, %arg8 + %arg11, %arg9 +
+  %arg12, %arg15]
+
+  We notice that floordiv's and mod's have disappeared from the pxa.load.
+  It is possible because we performed loop tiling and one of the loop variables
+  of the inner loop namely, %arg13 has the lower bound of "%arg6 floordiv 16"
+  and the upper bound of "%arg6 floordiv 16 + 1". Therefore, we are able to
+  substite "%arg6 floordiv 16" with "%arg13".
+
+  2) In the above pxa.load "%arg6 mod 16" is substituted with "%arg15".
+  This is possible because %arg15 is a loop variable of the inner loop and
+  its lower bound is 0 and upper bound is 16.
+  "%arg6 mod 16" would have ranged from 0 through 15. The same effect is
+  obtained through the introduction of a loop variable, %arg15 in the inner loop
+  that ranges from 0 through 15 also.
+
+  3) The outer tile loop has the same number of loop variables (namely 7) as the
+  loop inputted to the function. However, the inner tile loop has two additional
+  loop variables -- a total of 9. The reason is, there are two loop variables on
+  which the pxa.loads perform floordiv and mod operations:
+  {%arg6 floordiv 16, %arg6 mod 16}, {%arg3 floordiv 16, %arg3 mod 16}.
+  In the inner loop, we will introduce as many extra loop variables as there are
+  tiled dimensions. Here, %arg6 and %arg3 represent tiled dimensions.
+
+  4) Let us consider:
+  pxa.reduce addf %12, %7[%arg0, %arg1, %arg2, %arg3]
+  It is changed to:
+  pxa.reduce addf %13, %7[%arg7, %arg8, %arg9, %arg10 * 16 + %arg14].
+  Here, we have substituted the outer loop variables with inner loop variables.
+  E.g., %arg0 -> %arg7, %arg1 -> %arg8, %arg2 -> %arg9
+  %arg3 however is one of the tiled dimensions.
+  The outer loop variable - %arg3 however has given rise to two inner loop
+  variables: %arg10: lower-bound - %arg3 floordiv 16 and upper-bound - %arg3
+  floordiv 16 + 1. %arg14: lower-bound-  0 and upper-bound - 16. To reconstruct
+  %arg3, we have to perform the operations: (%arg3 floordiv 16) * 16 + (%arg3
+  mod 16). But, since (%arg3 floordiv 16) = %arg10 and (%arg3 mod 16) = %arg14,
+  we can equivalently write: %arg10 * 16 + %arg14 and that is what is written in
+  place of %arg3 in the pxa.reduce op.
+
+   */
   mlir::DenseMap<mlir::Value, int64_t> tileSizeMap;
   bool tileSizesAreConsistent = true;
   IVLOG(4, "In tileLoopNestsToAlignWithDataMaps()");
