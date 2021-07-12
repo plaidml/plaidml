@@ -402,6 +402,21 @@ void recognizeConvsAndInsertBlockedDataLayouts(
       using mlir::matchers::m_Any;
       mlir::Value load1, load2, reduce;
       mlir::Operation *yield = parallelOp.getBody()->getTerminator();
+
+      /* Recognizing Convolution operation such as the following:
+
+    %34 = affine.parallel (%arg111, %arg112, %arg113, %arg114, %arg115, %arg116,
+    %arg117) = (0, 0, 0, 0, 0, 0, 0) to (1, 56, 56, 64, 3, 3, 64) reduce
+    ("assign") -> (memref<1x56x56x64xf32>) { %637 = pxa.load %31[%arg111,
+    %arg112 + %arg115, %arg113 + %arg116, %arg117] : memref<1x58x58x64xf32> %638
+    = pxa.load %arg88[%arg115, %arg116, %arg117, %arg114] :
+    memref<3x3x64x64xf32> %639 = mulf %637, %638 : f32 %640 = pxa.reduce addf
+    %639, %33[%arg111, %arg112, %arg113, %arg114] : memref<1x56x56x64xf32>
+      affine.yield %640 : memref<1x56x56x64xf32>
+    }
+
+
+      */
       if (matchPattern(
               yield,
               mlir::m_Op<mlir::AffineYieldOp>(m_Capture(
@@ -427,6 +442,9 @@ void recognizeConvsAndInsertBlockedDataLayouts(
 
         unsigned expectedDimSizeOfTensors = 4;
 
+        // We are checking that all loads and reduce operations operate
+        // on tensors of 4 dimensions. For example, NHWC for input and RSKC for
+        // filter
         if (loadOp1 && loadOp2 && reduceOp &&
             loadOp1.getAffineMap().getNumResults() ==
                 expectedDimSizeOfTensors &&
@@ -435,6 +453,17 @@ void recognizeConvsAndInsertBlockedDataLayouts(
             reduceOp.getAffineMap().getNumResults() ==
                 expectedDimSizeOfTensors) {
           llvm::SmallVector<mlir::Value, 4> loadOp1Operands;
+
+          /*
+           *The getResultOperands() function is attemptint to recover the
+           *operands that appear in the pxa.load and pxa.reduce operations. For
+           *example, if the load operation is - pxa.load %arg88[%arg115,
+           *%arg116, %arg117, %arg114] then, the function getResultOperands()
+           *fills the 3rd argument - loadOp1Operands with %arg115, %arg116,
+           *%arg117, %arg114. The 1st argument loadOp1.getAffineMap() could be
+           *for example, (d0, d1, d2, d3, d4, d5) -> (d0, d1 + d2, d3 + d4, d5)
+           */
+
           if (!getResultOperands(loadOp1.getAffineMap(), loadOp1.idxs(),
                                  loadOp1Operands)) {
             return;
@@ -451,6 +480,32 @@ void recognizeConvsAndInsertBlockedDataLayouts(
                                  reduceOperands)) {
             return;
           }
+
+          /*
+   *In the above examplar convolution, we observe that
+  the activation (or input) tensor is:
+  pxa.load %31[%arg111, %arg112 + %arg115, %arg113 + %arg116, %arg117] :
+  memref<1x58x58x64xf32> and, the filter (or kernel or weight) tensor is:
+  pxa.load %arg88[%arg115, %arg116, %arg117, %arg114] : memref<3x3x64x64xf32>.
+
+  The output tensor is:
+  %33[%arg111, %arg112, %arg113, %arg114] : memref<1x56x56x64xf32>.
+
+  We can distinguish between the input and weight tensors by determining:
+  1) the degree of overlap between the input and the output tensors:
+     %31[%arg111, %arg112 + %arg115, %arg113 + %arg116, %arg117] and
+     %33[%arg111, %arg112, %arg113, %arg114].
+      The operands that are common between the two are: {%arg111, %arg112,
+  %arg113}. There are 3 operands that are common. 2) the degree of overlap
+  between the filter and the output tensors: %arg88[%arg115, %arg116, %arg117,
+  %arg114] and %33[%arg111, %arg112, %arg113, %arg114]. The operands that are
+  common between the two are: {%arg114}. There is only 1 operand that is common.
+
+  Thus, if the number of operands between a tensor and the ouptut tensor is 3,
+  then we know that it is the input tensor.
+  While if the number of operands between a tensor and the output tensor is 1,
+  then we know that it is the filter tensor.
+   */
 
           int loadOp1ReduceCommon =
               intersectTwoSets(loadOp1Operands, reduceOperands);
@@ -472,6 +527,8 @@ void recognizeConvsAndInsertBlockedDataLayouts(
             filter = loadOp1;
           }
 
+          // Now we assign the blocked data layouts to the input
+          // and filter tensors
           if (createBlockedLayoutForFilterTensor(filter, memLayoutMaps,
                                                  datatileSize)) {
             createBlockedLayoutForInputTensor(input, memLayoutMaps,
@@ -491,6 +548,7 @@ void recognizeConvsAndInsertBlockedDataLayouts(
 
 bool getResultOperands(mlir::AffineMap map, mlir::ValueRange mapOperands,
                        llvm::SmallVector<mlir::Value, 4> &resultOperands) {
+  IVLOG(4, "In getResultOperands. map: " << mlir::debugString(map));
   for (unsigned idx = 0; idx < map.getNumResults(); ++idx) {
     mlir::AffineExpr expr = map.getResult(idx);
 
@@ -768,7 +826,9 @@ MemRefSimplificationResults scaleAndRewriteMemrefMapsInInnerLoops(
 
         if (multiplier == -1) {
           IVLOG(4, "The multiplier value couldn't be determined. Exiting");
-          exit(1);
+          results.error = true;
+          results.newMapFormed = false;
+          return results;
         }
 
         IVLOG(4, "Multiplier: " << multiplier);
@@ -1095,8 +1155,8 @@ void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {
                 varMap.insert({innerLoops.getBody()->getArgument(i), arg});
                 IVLOG(4, "The new arg: " << mlir::debugString(arg));
               } else {
-                IVLOG(4, "Error. Exiting");
-                exit(1);
+                IVLOG(4, "Error. Returning");
+                return;
               }
             }
           }
@@ -1129,7 +1189,7 @@ void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {
             } else {
               IVLOG(4, "The number of operands to the AffineParallelOp is "
                        "zero. Quitting\n");
-              exit(1);
+              return;
             }
           }
 
