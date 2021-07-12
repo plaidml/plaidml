@@ -51,9 +51,10 @@ public:
   void runOnFunction() {
     mlir::FuncOp func = getFunction();
     mlir::DenseMap<mlir::Value, mlir::AffineMap> memLayoutMaps;
-    llvm::SmallSet<mlir::AffineParallelOp, 4> parallelOps;
 
-    recognizeConvsAndInsertBlockedDataLayouts(func, memLayoutMaps, parallelOps,
+    // The following function populates 'memLayoutMaps' with
+    // the blocked target layouts for input and filter tensors of Convolutions
+    recognizeConvsAndInsertBlockedDataLayouts(func, memLayoutMaps,
                                               datatileSize);
 
     IVLOG(4, "Size of memLayoutMaps after Convolutions are recognized: "
@@ -134,12 +135,18 @@ void createBlockedLayoutForInputTensor(
   mlir::MLIRContext *context = map.getContext();
 
   int64_t blockSize = datatileSize;
+  // We would like to convert NHWC layout to N, C floordiv blockSize, HW, C mod
+  // blockSize We check that the C dimension size is divisible by blockSize
   if (shape[3] % blockSize == 0) {
+    // We arrive at the target layout in two steps
+    // 1. Permute
+    // NHWC -> NCHW: newMap: (d0 d1 d2 d3) -> (d0 d3 d1 d2)
     //
-    // *NHWC -> NCHW: newMap: (d0 d1 d2 d3) -> (d0 d3 d1 d2)
+    // 2. Tile
     // NCHW -> NCHWc16: newBlockedMap: (d0 d3 d1 d2) -> (d0 d3 floordiv 16, d1,
     // d2,d3 mod 16)
-    //
+
+    // 1. Permute
     mlir::SmallVector<unsigned, 4> permutationMap;
     permutationMap.push_back(0);
     permutationMap.push_back(3);
@@ -149,6 +156,7 @@ void createBlockedLayoutForInputTensor(
         mlir::AffineMap::getPermutationMap(permutationMap, context);
     IVLOG(4, "newMap: " << mlir::debugString(newMap));
 
+    // 2. Tile
     mlir::SmallVector<mlir::AffineExpr, 5> expansionExprs;
     for (unsigned idx = 0; idx < newMap.getNumResults(); ++idx) {
       mlir::AffineExpr expr;
@@ -159,6 +167,7 @@ void createBlockedLayoutForInputTensor(
       }
 
       expansionExprs.push_back(expr);
+      // We add the last dimension: C mod blockSize
       if (idx == newMap.getNumResults() - 1) {
         expansionExprs.push_back(newMap.getResult(1) % blockSize);
       }
@@ -185,11 +194,12 @@ void createBlockedLayoutForInputTensor_NCHW(
   mlir::MLIRContext *context = map.getContext();
 
   int64_t blockSize = datatileSize;
+  // We would like to convert NCHW layout to N, C floordiv blockSize, HW, C mod
+  // blockSize We check that the C dimension size is divisible by blockSize
   if (shape[1] % blockSize == 0) {
-    //
-    // NCHW -> NCHWc16: newBlockedMap: (d0 d1 d2 d3) -> (d0 d1 floordiv 16, d2,
-    // d3, d1 mod 16)
-    //
+    // Below blockSize is assumed to be 16 for illustration purposes:
+    // NCHW -> NCHWc16:
+    // (d0 d1 d2 d3) -> (d0 d1 floordiv 16, d2, d3, d1 mod 16)
     mlir::SmallVector<unsigned, 4> permutationMap;
     permutationMap.push_back(0);
     permutationMap.push_back(1);
@@ -235,13 +245,23 @@ bool createBlockedLayoutForFilterTensor(
   mlir::MLIRContext *context = map.getContext();
 
   int64_t blockSize = datatileSize;
+  // The filter layout is: RSCK. E.g., <3x3x64x64xf32>
+  // We first check that the C and K dimensions are divisible by the block size
+  // because we intend to tile C and K dimensions.
+  // 0th dimension is R, 1st dimension is S, 2nd dimension is C, and the 3rd is
+  // K.
   if (shape[2] % blockSize == 0 && shape[3] % blockSize == 0) {
-    // RSCK -> C floordiv 16, K floordiv 16, R, S, C mod 16, K mod 16
-    // RSCK -> CKRS (d0 d1 d2 d3) -> (d2 d3 d0 d1)
-    // CKRS -> C floordiv 16, K floordiv 16, R, S, C mod 16, K mod 16
-    // (d2 d3 d0 d1) -> (d2 floordiv 16, d3 floordiv 16, d0, d1, d2 mod 16, d3
-    // mod 16)
+    // The target layout is:
+    // C floordiv blockSize, K floordiv blockSize, R, S, C mod blockSize, K mod
+    // blockSize
 
+    // We accomplish it in two steps. Below blockSize is assumed to be 16 for
+    // illustration: Step 1: permute RSCK -> CKRS, that is, (d0 d1 d2 d3) -> (d2
+    // d3 d0 d1) Step 2: tile CKRS -> C floordiv 16, K floordiv 16, R, S, C mod
+    // 16, K mod 16 (d2 d3 d0 d1) -> (d2 floordiv 16, d3 floordiv 16, d0, d1, d2
+    // mod 16, d3 mod 16)
+
+    // Step 1: permute
     mlir::SmallVector<unsigned, 4> permutationMap;
     permutationMap.push_back(2);
     permutationMap.push_back(3);
@@ -251,6 +271,7 @@ bool createBlockedLayoutForFilterTensor(
         mlir::AffineMap::getPermutationMap(permutationMap, context);
     IVLOG(4, "newMap: " << mlir::debugString(newMap));
 
+    // Step 2: tile
     mlir::SmallVector<mlir::AffineExpr, 6> expansionExprs;
     for (unsigned idx = 0; idx < newMap.getNumResults(); ++idx) {
       mlir::AffineExpr expr;
@@ -276,6 +297,9 @@ bool createBlockedLayoutForFilterTensor(
     return true;
   }
 
+  // If the C or K dimension size is not divisible by the blockSize
+  // then, we leave the original layouts as they are and return false
+  // to indicate that no new layout was specified.
   return false;
 }
 
@@ -391,7 +415,6 @@ bool createBlockedLayoutForFilterTensor_KCHW(
 void recognizeConvsAndInsertBlockedDataLayouts(
     mlir::FuncOp func,
     mlir::DenseMap<mlir::Value, mlir::AffineMap> &memLayoutMaps,
-    llvm::SmallSet<mlir::AffineParallelOp, 4> &parallelOps,
     int64_t datatileSize) {
   IVLOG(4, "Looking for Conv2ds");
   func.walk([&](mlir::AffineParallelOp parallelOp) {
@@ -531,6 +554,8 @@ void recognizeConvsAndInsertBlockedDataLayouts(
           // and filter tensors
           if (createBlockedLayoutForFilterTensor(filter, memLayoutMaps,
                                                  datatileSize)) {
+            // We proceed to tile the input tensor only if the filter
+            // tensor was tiled.
             createBlockedLayoutForInputTensor(input, memLayoutMaps,
                                               datatileSize);
           } else if (createBlockedLayoutForFilterTensor_KCHW(
@@ -538,8 +563,6 @@ void recognizeConvsAndInsertBlockedDataLayouts(
             createBlockedLayoutForInputTensor_NCHW(input, memLayoutMaps,
                                                    datatileSize);
           }
-
-          parallelOps.insert(parallelOp);
         }
       }
     }
@@ -548,6 +571,9 @@ void recognizeConvsAndInsertBlockedDataLayouts(
 
 bool getResultOperands(mlir::AffineMap map, mlir::ValueRange mapOperands,
                        llvm::SmallVector<mlir::Value, 4> &resultOperands) {
+  // This function will determine the operands in the result
+  // when 'map' is applied with 'mapOperands'.
+
   IVLOG(4, "In getResultOperands. map: " << mlir::debugString(map));
   for (unsigned idx = 0; idx < map.getNumResults(); ++idx) {
     mlir::AffineExpr expr = map.getResult(idx);
@@ -1436,6 +1462,7 @@ void fixResultsIfModulosInAffineMap(
       IVLOG(3, "Modulo Op, LHS: " << mlir::debugString(lhsExpr));
       IVLOG(3, "Modulo Op, RHS: " << mlir::debugString(rhsExpr));
 
+      // If an expression is: d2 mod 16, we set the size to be 16.
       if (rhsExpr.getKind() == mlir::AffineExprKind::Constant) {
         auto constantExpr = rhsExpr.cast<mlir::AffineConstantExpr>();
         res = constantExpr.getValue();
@@ -1450,6 +1477,13 @@ void fixResultsIfModulosInAffineMap(
 mlir::LogicalResult
 applyMapOnConstantArray(mlir::AffineMap map, mlir::ArrayRef<int64_t> &input,
                         mlir::SmallVector<int64_t, 6> &expandedShape) {
+  /*
+   * Example:
+   * map: (d0, d1, d2, d3) -> (d2 floordiv 16, d3 floordiv 16, d0, d1, d2 mod
+   * 16, d3 mod 16) input: [3, 3, 64, 64] The result expandedShape: [4, 4, 3, 3,
+   * 16, 16]
+   */
+
   mlir::SmallVector<mlir::AffineExpr, 6> expansionExprs;
   mlir::SmallVector<int64_t, 6> expandedVec;
   IVLOG(3, "applyMapOnConstantArray map: " << mlir::debugString(map));
@@ -1463,15 +1497,26 @@ applyMapOnConstantArray(mlir::AffineMap map, mlir::ArrayRef<int64_t> &input,
   }
 
   mlir::SmallVector<mlir::Attribute, 4> foldedResults;
+  // AffineMap.constantFold is an MLIR function which does the following:
+  // "Folds the results of the application of an affine map on the provided
+  // operands to a constant if possible."
   if (mlir::failed(map.constantFold(operandConstants, foldedResults))) {
     return mlir::failure();
   } else {
+    IVLOG(4, "The foldedResults are:\n");
     for (unsigned i = 0; i < foldedResults.size(); i++) {
       int64_t val =
           foldedResults[i].cast<mlir::IntegerAttr>().getValue().getSExtValue();
+      IVLOG(4, "val: " << val);
       expandedShape.push_back(val);
     }
 
+    // If there is a modulo expression in the affine map, then for that
+    // position, the value the constantFold computs is 0. For the above example,
+    // the expandedShape becomes: [4, 4, 3, 3, 0, 0]. But, we would like the
+    // last two sizes to be 16, and 16 respectively. That is, [4, 4, 3, 3, 16,
+    // 16]. The below function sets the correct sizes for the dimensions where
+    // we have modulos.
     fixResultsIfModulosInAffineMap(map, expandedShape);
     IVLOG(3, "RESULTS: ");
     for (unsigned i = 0; i < expandedShape.size(); i++) {
@@ -1549,14 +1594,33 @@ mlir::Optional<ReorderDesc> optimizeLayoutForReads(
     MemoryUsageDesc &memoryDesc,
     mlir::DenseMap<mlir::Value, mlir::AffineMap> &memLayoutMaps,
     bool makeUserLayoutsExplicit) {
+  /*
+   * There are two ways of determining the target layouts for a tensor
+   * 1. If a tensor appears in an Op such as Convolution, then we would like
+   * to set the target layouts to the known optimal blocked layouts
+   * E.g., if the input tensor is NCHW then we would like the target layout to
+   * be NCHWc16
+   *
+   * 2. If a tensor appears in a generic op not recognized by our pattern
+   * matchers such as Convolution pattern matchers, then we would like to derive
+   * optimal layouts from first principles.
+   */
+
+  /* If the flag - makeUserLayoutsExplicit is set, then we adopt strategy 1).
+   * If the said flag is not set, then we go for strategy 2)
+   */
+
   mlir::Optional<ReorderDesc> selectedReorder = llvm::None;
 
+  // Strategy 1 - Pattern matcher (such as Conv) driven optimal blocked layout
+  // assignment
   if (makeUserLayoutsExplicit) {
     // Short circuiting other reordering logic
     selectedReorder = chooseUserProvidedTargetLayout(memoryDesc, memLayoutMaps);
     return selectedReorder;
   }
 
+  // Strategy 2 - Derivation of optimal layouts through heuristics
   if (!selectedReorder.hasValue()) {
     mlir::ArrayRef<int64_t> commonVector;
     if (mlir::failed(selectCommonVectorization(memoryDesc, commonVector))) {

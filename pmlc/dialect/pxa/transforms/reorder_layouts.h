@@ -142,7 +142,6 @@ void eraseLayoutMapsFromMemRefs(mlir::FuncOp func);
 void recognizeConvsAndInsertBlockedDataLayouts(
     mlir::FuncOp func,
     mlir::DenseMap<mlir::Value, mlir::AffineMap> &memLayoutMaps,
-    llvm::SmallSet<mlir::AffineParallelOp, 4> &parallelOps,
     int64_t datatileSize);
 bool getResultOperands(mlir::AffineMap map, mlir::ValueRange mapOperands,
                        llvm::SmallVector<mlir::Value, 4> &);
