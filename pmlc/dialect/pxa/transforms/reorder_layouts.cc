@@ -724,6 +724,32 @@ MemRefSimplificationResults simplifyMemrefMapsInInnerLoops(
     mlir::AffineMap &map, mlir::ValueRange mapOperands,
     mlir::AffineParallelOp innerParallelOp,
     mlir::DenseMap<mlir::Value, mlir::Value> &varMap) {
+
+  // We simplify pxa.load and pxa.reduce to get rid of floordivs and
+  // mods. E.g., pxa.load %4[%arg7, %arg13 floordiv 16, %arg8 + %arg11,
+  // %arg9 + %arg12, %arg13 mod 16] would be simplified to: pxa.load
+  // %4[%arg7, %arg13, %arg8 + %arg11, %arg9 + %arg12, %arg15].
+
+  // An example of the parameter - map is:
+  // (d0, d1, d2, d3, d4, d5) -> (d0, d5 floordiv 16, d1 + d2, d3 + d4, d5 mod
+  // 16) The parameter - varMap relates the original loop variables with the
+  // newly formed variables. That is, it relates the floordiv's loop variable
+  // with mod's. For example, affine.parallel (%arg7, %arg8, %arg9, %arg10,
+  // %arg11, %arg12, %arg13, %arg14, %arg15) varMap will contain: {%arg10,
+  // %arg14} and {%arg13, %arg15} pairs.
+
+  // What this function does is, transform
+  // (d0, d1, d2, d3, d4, d5) -> (d0, d5 floordiv 16, d1 + d2, d3 + d4, d5 mod
+  // 16) to: (d0, d1, d2, d3, d4, d5, d6) -> (d0, d5, d1 + d2, d3 + d4, d6) It
+  // does so by 1) when there is a floordiv such as "d5 floordiv 16", it
+  // substitutes it with "d5" (retains only the LHS of the expression and
+  // discards the RHS. 2) when there is a mod such as "d5 mod 16", it introduces
+  // a new dimension, namely d6. 3) looks up the varMap to find the value of the
+  // key - "d5 floordiv 16"'s mapOperand and adds that as the operand to the new
+  // dimension. Specifically, "d5 floordiv 16"'s mapOperand is %arg13. In
+  // varMap, the value corresponding to the key - %arg13 is, %arg15. Therefore,
+  // %arg15 becomes the mapOperand for "d5 mod 16" or "d6".
+  //
   IVLOG(4, "Entered simplifyMemrefMapsInInnerLoops() CORE");
 
   MemRefSimplificationResults results;
@@ -744,6 +770,8 @@ MemRefSimplificationResults simplifyMemrefMapsInInnerLoops(
     bool expressionAdded = false;
 
     if (expr.getKind() == mlir::AffineExprKind::FloorDiv) {
+      // If an expression is "d5 floordiv 16", we replace that with only the LHS
+      // - "d5".
       auto divExpr = expr.cast<mlir::AffineBinaryOpExpr>();
       mlir::AffineExpr lhsExpr = divExpr.getLHS();
       mlir::AffineExpr rhsExpr = divExpr.getRHS();
@@ -765,12 +793,18 @@ MemRefSimplificationResults simplifyMemrefMapsInInnerLoops(
           rhsExpr.getKind() == mlir::AffineExprKind::Constant) {
         auto dimExpr = lhsExpr.cast<mlir::AffineDimExpr>();
         unsigned pos = dimExpr.getPosition();
-
+        // If an expression is "d5 mod 16" then pos will be 5 (5 in d5).
+        // We look up its map operand. For the running example, "%arg13 mod 16"
+        // mapOperands[5] will be %arg13. We look up its corresponding key in
+        // varMap. varMapIt->second will be %arg15. We set that as the map
+        // operand for the newly formed dimension - d6.
         auto varMapIt = varMap.find(mapOperands[pos]);
         if (varMapIt == varMap.end()) {
           results.error = true;
           IVLOG(4, "Error: The map operand " << idx << " NOT found in varMap");
         } else {
+          // If an expression is "d5 mod 16" then it is
+          // substituted with a new dimension - d6.
           auto newDimIdExpr = mlir::getAffineDimExpr(currentNumDims + newDims,
                                                      map.getContext());
           newDims++;
@@ -812,8 +846,31 @@ MemRefSimplificationResults scaleAndRewriteMemrefMapsInInnerLoops(
     mlir::AffineMap &map, mlir::ValueRange mapOperands,
     mlir::AffineParallelOp innerParallelOp,
     mlir::DenseMap<mlir::Value, mlir::Value> &varMap) {
+  // scaleAndRewriteMemrefMapsInInnerLoops() is uded to transform
+  // pxa.reduce addf %13, %7[%arg7, %arg8, %arg9, %arg10]
+  // to
+  // pxa.reduce addf %13, %7[%arg7, %arg8, %arg9, %arg10 * 16 + %arg14]
+
+  // An example of the argument 'map' is:
+  // (d0, d1, d2, d3) -> (d0, d1, d2, d3)
+
+  // The argument - varMap relates the original loop variables with the newly
+  // formed variables. That is, it relates the floordiv's loop
+  // variable with mod's. For example, affine.parallel (%arg7,
+  // %arg8, %arg9, %arg10, %arg11, %arg12, %arg13, %arg14, %arg15)
+  // varMap will contain: {%arg10, %arg14} and {%arg13, %arg15}
+  // pairs.
+
+  // An example of the innerParallelLoop is:
+  // affine.parallel (%arg7, %arg8, %arg9, %arg10, %arg11, %arg12, %arg13,
+  // %arg14, %arg15) = (%arg0, %arg1, %arg2, %arg3 floordiv 16, %arg4, %arg5,
+  // %arg6 floordiv 16, 0, 0) to (%arg0 + 1, %arg1 + 1, %arg2 + 1, %arg3
+  // floordiv 16 + 1, %arg4 + 1, %arg5 + 1, %arg6 floordiv 16 + 1, 16, 16)
+
   IVLOG(4, "Entered scaleAndRewriteMemrefMapsInInnerLoops()");
 
+  // For the shown example, the innerLoopLengths will be:
+  // [1, 1, 1, 1, 1, 1, 1, 16, 16].
   auto innerLoopLengths = innerParallelOp.getConstantRanges();
   mlir::Block *body = innerParallelOp.getBody();
   auto innerIdxs = body->getArguments();
@@ -838,11 +895,25 @@ MemRefSimplificationResults scaleAndRewriteMemrefMapsInInnerLoops(
       auto dimExpr = expr.cast<mlir::AffineDimExpr>();
       unsigned pos = dimExpr.getPosition();
 
+      // Let us notice pxa.reduce's map: (d0, d1, d2, d3) -> (d0, d1, d2, d3)
+      // and its corresponding real expression: %7[%arg7, %arg8, %arg9, %arg10]
+      // varMap contains {%arg10, %arg14}.
+      // For d3 in the image (or range) of the map, the corresponding dimension
+      // in the pre-image (or domain) of the map is also d3. pos =
+      // dimExpr.getPosition() above. d3's map operand is %arg10. It is found in
+      // varMap. varMapIt->second = loopVar is %arg14. We search through the
+      // inner loop's map operands for %arg14. affine.parallel (%arg7, %arg8,
+      // %arg9, %arg10, %arg11, %arg12, %arg13, %arg14, %arg15) It is found at
+      // position 7 (indexed from 0). innerLoopLengths.getValue()[7] is 16
+      // because loop lengths are: [1, 1, 1, 1, 1, 1, 1, 16, 16]. In the below
+      // code, multiplier is thus set to 16.
+
       auto varMapIt = varMap.find(mapOperands[pos]);
       if (varMapIt != varMap.end()) {
         auto newDimIdExpr =
             mlir::getAffineDimExpr(currentNumDims + newDims, map.getContext());
         newDims++;
+        // We introduce a new dimension: d4 and set its operand to be %arg14
         results.resultOperands.push_back(varMapIt->second);
         auto loopVar = varMapIt->second;
         int64_t multiplier = -1;
@@ -861,6 +932,8 @@ MemRefSimplificationResults scaleAndRewriteMemrefMapsInInnerLoops(
 
         IVLOG(4, "Multiplier: " << multiplier);
 
+        // We introduce the new expression as: d3 * 16 + d4.
+        // We note that d4 is a new dimension we introduced above: newDimIdExpr
         simplifiedExprs.push_back(expr * multiplier + newDimIdExpr);
         expressionAdded = true;
         results.newMapFormed = true;
@@ -878,6 +951,8 @@ MemRefSimplificationResults scaleAndRewriteMemrefMapsInInnerLoops(
   }
 
   if (results.newMapFormed) {
+    // The simplifiedMap for the example becomes:
+    // (d0, d1, d2, d3, d4) -> (d0, d1, d2, d3 * 16 + d4).
     results.simplifiedMap = mlir::AffineMap::get(
         map.getNumDims() + newDims, 0, simplifiedExprs, map.getContext());
     IVLOG(4, "resultOperands.size(): " << results.resultOperands.size());
@@ -936,6 +1011,10 @@ void simplifyMemrefMapsInInnerLoops(
     }
 
     {
+      // scaleAndRewriteMemrefMapsInInnerLoops() is uded to transform
+      // pxa.reduce addf %13, %7[%arg7, %arg8, %arg9, %arg10]
+      // to
+      // pxa.reduce addf %13, %7[%arg7, %arg8, %arg9, %arg10 * 16 + %arg14]
       MemRefSimplificationResults results =
           scaleAndRewriteMemrefMapsInInnerLoops(map, reduceOp.idxs(),
                                                 parallelOp, varMap);
@@ -1441,6 +1520,29 @@ void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp) {
       }
     }
   }
+
+  // The modified parallel loop is how we would like it to be:
+  /*
+      %8 = affine.parallel (%arg0, %arg1, %arg2, %arg3, %arg4, %arg5, %arg6) =
+     (0, 0, 0, 0, 0, 0, 0) to (1, 56, 56, 64, 3, 3, 64) step (1, 1, 1, 16, 1, 1,
+     16) reduce ("assign") -> (memref<1x56x56x64xf32>) { %10 = affine.parallel
+     (%arg7, %arg8, %arg9, %arg10, %arg11, %arg12, %arg13, %arg14, %arg15) =
+     (%arg0, %arg1, %arg2, %arg3 floordiv 16, %arg4, %arg5, %arg6 floordiv 16,
+     0, 0) to (%arg0 + 1, %arg1 + 1, %arg2 + 1, %arg3 floordiv 16 + 1, %arg4 +
+     1, %arg5 + 1, %arg6 floordiv 16 + 1, 16, 16) reduce ("assign") ->
+     (memref<1x56x56x64xf32>) { %11 = pxa.load %4[%arg7, %arg13, %arg8 + %arg11,
+     %arg9 + %arg12, %arg15] : memref<1x4x58x58x16xf32> %12 = pxa.load
+     %6[%arg13, %arg10, %arg11, %arg12, %arg15, %arg14] :
+     memref<4x4x3x3x16x16xf32> %13 = mulf %11, %12 : f32 %14 = pxa.reduce addf
+     %13, %7[%arg7, %arg8, %arg9, %arg10 * 16 + %arg14] : memref<1x56x56x64xf32>
+          affine.yield %14 : memref<1x56x56x64xf32>
+        }
+        affine.yield %10 : memref<1x56x56x64xf32>
+      }
+
+  */
+  // There are no floordiv's or mod's in pxa.load or pxa.reduce ops
+  // and thus they are simplified.
 
   IVLOG(4, "modified_parallelOp: " << mlir::debugString(parallelOp));
 }
