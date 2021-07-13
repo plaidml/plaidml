@@ -1,5 +1,4 @@
-// RUN: pmlc-opt  -convert-linalg-to-loops -pxa-reorder-layouts="allow-reorder=true make-user-layouts-explicit=true" -canonicalize  -x86-stencil-tpp-gemm %s | FileCheck %s
-
+// RUN: pmlc-opt  -convert-linalg-to-loops -pxa-reorder-layouts="allow-reorder=true make-user-layouts-explicit=true" -canonicalize  -x86-stencil-tpp-gemm -x86-convert-pxa-to-affine --normalize-memrefs --simplify-affine-structures  -lower-affine  -canonicalize -convert-scf-to-std -x86-convert-std-to-llvm %s | pmlc-jit -e conv | FileCheck %s
 
 // PLAIDML_VERBOSE=5 build-x86_64/Release/bin/pmlc-opt -convert-linalg-to-loops -pxa-reorder-layouts="allow-reorder=true make-user-layouts-explicit=true" -canonicalize -x86-stencil-tpp-gemm pmlc/target/x86/tests/conv_sequence.mlir > output
 
@@ -11,7 +10,6 @@
 // cat ref | grep -v sizes > ref.cleaned 
 // cat out | grep -v sizes > out.cleaned 
 
-// CHECK-LABEL: @conv
 func @conv() {
     %cst_0 = constant 0.000000e+00 : f32
     %cst_1 = constant 1.000000e+00 : f32
@@ -170,19 +168,29 @@ func @conv() {
     }
 
     // Printing the output
-    affine.parallel (%arg111, %arg112, %arg113, %arg114) = (0, 0, 0, 0) to (1, 56, 56, 256) {
+    affine.parallel (%arg111, %arg112, %arg113, %arg114) = (0, 0, 0, 0) to (1, 56, 56, 256) 
+      step (1, 55, 55, 255) 
+      {
       %637 = pxa.load %44[%arg111, %arg112, %arg113, %arg114] : memref<1x56x56x256xf32>
       %638 = memref.alloc() : memref<1xf32>
       affine.store %637, %638[0] : memref<1xf32>
       %O_ud = memref.cast %638 : memref<1xf32> to memref<*xf32>
       call @print_memref_f32(%O_ud) : (memref<*xf32>) -> ()
+      // CHECK: [3.1827e+09]
+      // CHECK: [2.56377e+10]
+      // CHECK: [7.89821e+09]
+      // CHECK: [6.29253e+10]
+      // CHECK: [3.1827e+09]
+      // CHECK: [2.56377e+10]
+      // CHECK: [7.89821e+09]
+      // CHECK: [6.29253e+10]
     }
+
 
 //  %O_ud = memref.cast %45 : memref<1x56x56x256xf32> to memref<*xf32>
 //  call @print_memref_f32(%O_ud) : (memref<*xf32>) -> ()
 
    return
 }
-// CHECK: pxa.generic
 
 func private @print_memref_f32(memref<*xf32>)

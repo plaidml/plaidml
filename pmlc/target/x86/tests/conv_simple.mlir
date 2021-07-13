@@ -63,6 +63,8 @@ func @conv() {
     }
 
     // CONV1
+// CHECK: floordiv 16
+// CHECK: pxa.generic
     %34 = affine.parallel (%arg111, %arg112, %arg113, %arg114, %arg115, %arg116, %arg117) = (0, 0, 0, 0, 0, 0, 0) to (1, 56, 56, 64, 3, 3, 64) reduce ("assign") -> (memref<1x56x56x64xf32>) {
       %637 = pxa.load %31[%arg111, %arg112 + %arg115, %arg113 + %arg116, %arg117] : memref<1x58x58x64xf32>
       %638 = pxa.load %arg88[%arg115, %arg116, %arg117, %arg114] : memref<3x3x64x64xf32>
@@ -77,6 +79,5 @@ func @conv() {
 
    return
 }
-// CHECK: pxa.generic
 
 func private @print_memref_f32(memref<*xf32>)
