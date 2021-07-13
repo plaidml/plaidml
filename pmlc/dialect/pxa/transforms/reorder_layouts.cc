@@ -846,7 +846,7 @@ MemRefSimplificationResults scaleAndRewriteMemrefMapsInInnerLoops(
     mlir::AffineMap &map, mlir::ValueRange mapOperands,
     mlir::AffineParallelOp innerParallelOp,
     mlir::DenseMap<mlir::Value, mlir::Value> &varMap) {
-  // scaleAndRewriteMemrefMapsInInnerLoops() is uded to transform
+  // scaleAndRewriteMemrefMapsInInnerLoops() is used to transform
   // pxa.reduce addf %13, %7[%arg7, %arg8, %arg9, %arg10]
   // to
   // pxa.reduce addf %13, %7[%arg7, %arg8, %arg9, %arg10 * 16 + %arg14]
@@ -1011,7 +1011,7 @@ void simplifyMemrefMapsInInnerLoops(
     }
 
     {
-      // scaleAndRewriteMemrefMapsInInnerLoops() is uded to transform
+      // scaleAndRewriteMemrefMapsInInnerLoops() is used to transform
       // pxa.reduce addf %13, %7[%arg7, %arg8, %arg9, %arg10]
       // to
       // pxa.reduce addf %13, %7[%arg7, %arg8, %arg9, %arg10 * 16 + %arg14]
