@@ -191,6 +191,7 @@ void pipelineBuilderStage1(OpPassManager &pm, const Options &options) {
   IVLOG(1, "Number of threads: " << maxThreads);
 
   pm.addNestedPass<FuncOp>(layer::createInlineLayersPass());
+  pm.addNestedPass<FuncOp>(tile::createAlgebraicOptPass());
   pm.addNestedPass<FuncOp>(tile::createComputeBoundsPass());
   pm.addPass(tile::createSplitMainPass());
   pm.addPass(transforms::createHoistingPass());

@@ -7,9 +7,11 @@ pml_cc_library(
     matchers.h
     ops.cc.inc
     ops.h.inc
+    stride_range.h
   SRCS
     interfaces.cc
     ops.cc
+    stride_range.cc
   DEPS
     pmlc::util
     ::interfaces-gen
