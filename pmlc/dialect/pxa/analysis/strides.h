@@ -57,13 +57,6 @@ struct StrideInfo {
     return ret;
   }
 
-  StrideInfo &operator/=(int64_t factor);
-  StrideInfo operator/(int64_t factor) const {
-    StrideInfo ret = *this;
-    ret /= factor;
-    return ret;
-  }
-
   StrideInfo &operator+=(const StrideInfo &rhs);
   StrideInfo operator+(const StrideInfo &rhs) const {
     StrideInfo r = *this;
