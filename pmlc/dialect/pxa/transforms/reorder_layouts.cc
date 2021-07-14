@@ -54,8 +54,10 @@ public:
 
     // The following function populates 'memLayoutMaps' with
     // the blocked target layouts for input and filter tensors of Convolutions
-    recognizeConvsAndInsertBlockedDataLayouts(func, memLayoutMaps,
-                                              datatileSize);
+    if (makeUserLayoutsExplicit) {
+      recognizeConvsAndInsertBlockedDataLayouts(func, memLayoutMaps,
+                                                datatileSize);
+    }
 
     IVLOG(4, "Size of memLayoutMaps after Convolutions are recognized: "
                  << memLayoutMaps.size());
@@ -480,7 +482,7 @@ void recognizeConvsAndInsertBlockedDataLayouts(
           llvm::SmallVector<mlir::Value, 4> loadOp1Operands;
 
           /*
-           *The getResultOperands() function is attemptint to recover the
+           *The getResultOperands() function is attempting to recover the
            *operands that appear in the pxa.load and pxa.reduce operations. For
            *example, if the load operation is - pxa.load %arg88[%arg115,
            *%arg116, %arg117, %arg114] then, the function getResultOperands()

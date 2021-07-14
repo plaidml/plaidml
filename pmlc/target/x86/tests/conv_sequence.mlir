@@ -1,4 +1,4 @@
-// RUN: pmlc-opt  -convert-linalg-to-loops -pxa-reorder-layouts="allow-reorder=true make-user-layouts-explicit=true" -canonicalize  -x86-stencil-tpp-gemm -x86-convert-pxa-to-affine --normalize-memrefs --simplify-affine-structures  -lower-affine  -canonicalize -convert-scf-to-std -x86-convert-std-to-llvm %s | pmlc-jit -e conv | FileCheck %s
+// RUN: pmlc-opt  -convert-linalg-to-loops -pxa-reorder-layouts="allow-reorder=true make-user-layouts-explicit=true" -canonicalize -pxa-normalize -canonicalize -pxa-normalize=denest=true -canonicalize -x86-stencil-tpp-gemm -x86-convert-pxa-to-affine --normalize-memrefs --simplify-affine-structures  -lower-affine  -canonicalize -convert-scf-to-std -x86-convert-std-to-llvm %s | pmlc-jit -e conv | FileCheck %s
 
 // PLAIDML_VERBOSE=5 build-x86_64/Release/bin/pmlc-opt -convert-linalg-to-loops -pxa-reorder-layouts="allow-reorder=true make-user-layouts-explicit=true" -canonicalize -x86-stencil-tpp-gemm pmlc/target/x86/tests/conv_sequence.mlir > output
 
