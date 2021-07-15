@@ -256,8 +256,8 @@ def ReorderLayouts : FunctionPass<"pxa-reorder-layouts"> {
   let options = [
     Option<"allowReorder", "allow-reorder", "bool", /*default=*/"false",
            "Allow for creating separate reorder">,
-    Option<"makeUserLayoutsExplicit", "make-user-layouts-explicit", "bool", /*default=*/"false",
-           "Reorder data layouts per user specifications attached to memrefs">,
+    Option<"userLayouts", "user-layouts", "bool", /*default=*/"false",
+           "Pattern match ops e.g., convs and introduce user provided layouts">,
     Option<"datatileSize", "datatile-size", "int64_t",
            /*default=*/"16",
            "Data tile size">

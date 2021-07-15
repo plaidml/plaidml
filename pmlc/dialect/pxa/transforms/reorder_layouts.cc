@@ -41,10 +41,10 @@ namespace pmlc::dialect::pxa {
 class ReorderLayoutsPass final : public ReorderLayoutsBase<ReorderLayoutsPass> {
 public:
   ReorderLayoutsPass() = default;
-  explicit ReorderLayoutsPass(bool allowReorder, bool makeUserLayoutsExplicit,
+  explicit ReorderLayoutsPass(bool allowReorder, bool userLayouts,
                               int64_t datatileSize) {
     this->allowReorder = allowReorder;
-    this->makeUserLayoutsExplicit = makeUserLayoutsExplicit;
+    this->userLayouts = userLayouts;
     this->datatileSize = datatileSize;
   }
 
@@ -52,9 +52,9 @@ public:
     mlir::FuncOp func = getFunction();
     mlir::DenseMap<mlir::Value, mlir::AffineMap> memLayoutMaps;
 
-    // The following function populates 'memLayoutMaps' with
-    // the blocked target layouts for input and filter tensors of Convolutions
-    if (makeUserLayoutsExplicit) {
+    if (userLayouts) {
+      // The following function populates 'memLayoutMaps' with
+      // the blocked target layouts for input and filter tensors of Convolutions
       recognizeConvsAndInsertBlockedDataLayouts(func, memLayoutMaps,
                                                 datatileSize);
     }
@@ -69,8 +69,8 @@ public:
     for (auto &valueDesc : globalMemory) {
       MemoryUsageDesc &memoryDesc = valueDesc.second;
       IVLOG(3, "Optimizing layout for " << mlir::debugString(memoryDesc.value));
-      mlir::Optional<ReorderDesc> optReorder = optimizeLayoutForReads(
-          memoryDesc, memLayoutMaps, makeUserLayoutsExplicit);
+      mlir::Optional<ReorderDesc> optReorder =
+          optimizeLayoutForReads(memoryDesc, memLayoutMaps, userLayouts);
       if (!optReorder.hasValue()) {
         IVLOG(3, "Could not select more optimal layout");
         continue;
@@ -93,9 +93,11 @@ public:
                          toRemove);
     }
 
-    // We perform loop tiling so that the subsequent pass namely, stenciling
-    // pass will be able to extract GEMMs
-    tileLoopNestsToAlignWithDataMaps(func);
+    if (userLayouts) {
+      // We perform loop tiling so that the subsequent pass namely, stenciling
+      // pass will be able to extract GEMMs
+      tileLoopNestsToAlignWithDataMaps(func);
+    }
 
     // Cleanup
     for (auto op : toRemove)
@@ -1867,18 +1869,16 @@ void printSmallVector(mlir::ArrayRef<int64_t> vec) {
   IVLOG(3, "\n");
 }
 
-mlir::Optional<ReorderDesc>
-optimizeLayoutForReads(MemoryUsageDesc &memoryDesc,
-                       bool makeUserLayoutsExplicit) {
+mlir::Optional<ReorderDesc> optimizeLayoutForReads(MemoryUsageDesc &memoryDesc,
+                                                   bool userLayouts) {
   mlir::DenseMap<mlir::Value, mlir::AffineMap> memLayoutMaps;
-  return optimizeLayoutForReads(memoryDesc, memLayoutMaps,
-                                makeUserLayoutsExplicit);
+  return optimizeLayoutForReads(memoryDesc, memLayoutMaps, userLayouts);
 }
 
 mlir::Optional<ReorderDesc> optimizeLayoutForReads(
     MemoryUsageDesc &memoryDesc,
     mlir::DenseMap<mlir::Value, mlir::AffineMap> &memLayoutMaps,
-    bool makeUserLayoutsExplicit) {
+    bool userLayouts) {
   /*
    * There are two ways of determining the target layouts for a tensor
    * 1. If a tensor appears in an Op such as Convolution, then we would like
@@ -1891,7 +1891,7 @@ mlir::Optional<ReorderDesc> optimizeLayoutForReads(
    * optimal layouts from first principles.
    */
 
-  /* If the flag - makeUserLayoutsExplicit is set, then we adopt strategy 1).
+  /* If the flag - userLayouts is set, then we adopt strategy 1).
    * If the said flag is not set, then we go for strategy 2)
    */
 
@@ -1899,7 +1899,7 @@ mlir::Optional<ReorderDesc> optimizeLayoutForReads(
 
   // Strategy 1 - Pattern matcher (such as Conv) driven optimal blocked layout
   // assignment
-  if (makeUserLayoutsExplicit) {
+  if (userLayouts) {
     // Short circuiting other reordering logic
     selectedReorder = chooseUserProvidedTargetLayout(memoryDesc, memLayoutMaps);
     return selectedReorder;
@@ -2258,11 +2258,11 @@ std::unique_ptr<mlir::Pass> createReorderLayoutsPass() {
   return std::make_unique<ReorderLayoutsPass>();
 }
 
-std::unique_ptr<mlir::Pass>
-createReorderLayoutsPass(bool allowReorder, bool makeUserLayoutsExplicit,
-                         int64_t datatileSize) {
-  return std::make_unique<ReorderLayoutsPass>(
-      allowReorder, makeUserLayoutsExplicit, datatileSize);
+std::unique_ptr<mlir::Pass> createReorderLayoutsPass(bool allowReorder,
+                                                     bool userLayouts,
+                                                     int64_t datatileSize) {
+  return std::make_unique<ReorderLayoutsPass>(allowReorder, userLayouts,
+                                              datatileSize);
 }
 
 } // namespace pmlc::dialect::pxa
