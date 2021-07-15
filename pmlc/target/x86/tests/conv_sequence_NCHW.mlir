@@ -1,4 +1,7 @@
-// RUN: pmlc-opt  -convert-linalg-to-loops -pxa-reorder-layouts="allow-reorder=true user-layouts=true" -canonicalize -pxa-normalize -canonicalize -pxa-normalize=denest=true -canonicalize -x86-stencil-tpp-gemm %s | FileCheck %s
+// RUN: pmlc-opt  -convert-linalg-to-loops -pxa-reorder-layouts="allow-reorder=true user-layouts=true" -canonicalize -pxa-normalize -canonicalize -pxa-normalize=denest=true -canonicalize -x86-stencil-tpp-gemm %s | FileCheck %s --check-prefix=COMPILE
+
+// RUN: pmlc-opt  -convert-linalg-to-loops -pxa-reorder-layouts="allow-reorder=true user-layouts=true" -canonicalize -pxa-normalize -canonicalize -pxa-normalize=denest=true -canonicalize -x86-stencil-tpp-gemm -x86-convert-pxa-to-affine --normalize-memrefs --simplify-affine-structures  -lower-affine  -canonicalize -convert-scf-to-std -x86-convert-std-to-llvm %s | pmlc-jit -e conv | FileCheck %s --check-prefix=RESULTS
+
 
 
 // PLAIDML_VERBOSE=5 build-x86_64/Release/bin/pmlc-opt -convert-linalg-to-loops -pxa-reorder-layouts="allow-reorder=true user-layouts=true" -canonicalize -pxa-normalize -canonicalize -pxa-normalize=denest=true -canonicalize -x86-stencil-tpp-gemm pmlc/target/x86/tests/conv_sequence_NCHW.mlir > output
@@ -41,9 +44,6 @@ func @conv() {
       affine.yield %637 : memref<1x64x58x58xf32>
     }
 
-//  %O_ud = memref.cast %31 : memref<1x64x58x58xf32> to memref<*xf32>
-//  call @print_memref_f32(%O_ud) : (memref<*xf32>) -> ()
-
 
      // Filter
     %origArg88_2 = affine.parallel (%arg111, %arg112, %arg113, %arg114) = (0, 0, 0, 0) to (64, 64, 3, 3) reduce ("assign") -> (memref<64x64x3x3xf32>) {
@@ -80,10 +80,6 @@ func @conv() {
     }
 
 
-//  %O_ud = memref.cast %arg12 : memref<256x64x1x1xf32> to memref<*xf32>
-//  call @print_memref_f32(%O_ud) : (memref<*xf32>) -> ()
-
-
 
     // Initializing output to 0
     %33 = affine.parallel (%arg111, %arg112, %arg113, %arg114) = (0, 0, 0, 0) to (1, 64, 56, 56) reduce ("assign") -> (memref<1x64x56x56xf32>) {
@@ -100,9 +96,6 @@ func @conv() {
       affine.yield %640 : memref<1x64x56x56xf32>
     }
 
-//  %O_ud = memref.cast %34 : memref<1x64x56x56xf32> to memref<*xf32>
-//  call @print_memref_f32(%O_ud) : (memref<*xf32>) -> ()
-
     %43 = memref.alloc() : memref<1x256x56x56xf32>
 
     // Initializing output2
@@ -111,8 +104,8 @@ func @conv() {
       affine.yield %637 : memref<1x256x56x56xf32>
     }
 
-    // CHECK: floordiv 16
-    // CHECK: pxa.generic
+    // COMPILE: floordiv 16
+    // COMPILE: pxa.generic
    // CONV2
     %45 = affine.parallel (%arg111, %arg112, %arg113, %arg114, %arg115, %arg116, %arg117) = (0, 0, 0, 0, 0, 0, 0) to (1, 56, 56, 256, 1, 1, 64) reduce ("assign") -> (memref<1x256x56x56xf32>) {
       %637 = pxa.load %34[%arg111, %arg117, %arg112 + %arg115, %arg113 + %arg116] : memref<1x64x56x56xf32>
@@ -123,16 +116,25 @@ func @conv() {
     }
 
     // Printing the output
-    affine.parallel (%arg111, %arg112, %arg113, %arg114) = (0, 0, 0, 0) to (1, 256, 56, 56) {
+    affine.parallel (%arg111, %arg112, %arg113, %arg114) = (0, 0, 0, 0) to (1, 256, 56, 56)
+      step (1, 255, 55, 55) {
       %637 = pxa.load %44[%arg111, %arg112, %arg113, %arg114] : memref<1x256x56x56xf32>
       %638 = memref.alloc() : memref<1xf32>
       affine.store %637, %638[0] : memref<1xf32>
       %O_ud = memref.cast %638 : memref<1xf32> to memref<*xf32>
       call @print_memref_f32(%O_ud) : (memref<*xf32>) -> ()
-    }
 
-//  %O_ud = memref.cast %45 : memref<1x256x56x56xf32> to memref<*xf32>
-//  call @print_memref_f32(%O_ud) : (memref<*xf32>) -> ()
+// RESULTS: [6.19315e+06]
+// RESULTS: [1.33927e+08]
+// RESULTS: [1.33927e+08]
+// RESULTS: [2.61661e+08]
+// RESULTS: [5.63282e+07]
+// RESULTS: [1.2181e+09]
+// RESULTS: [1.2181e+09]
+// RESULTS: [2.37987e+09]
+
+
+    }
 
    return
 }

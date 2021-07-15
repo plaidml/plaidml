@@ -204,7 +204,7 @@ void pipelineBuilderStage1(OpPassManager &pm, const Options &options) {
   pm.addPass(createCSEPass());
   pm.addNestedPass<FuncOp>(layer::createInlineLayersPass());
 
-  bool blockedDataLayouts = true;
+  bool blockedDataLayouts = false;
   if (blockedDataLayouts) {
     // If the userLayouts flag is set to true, Conv2D recognizer
     // will introduce blocked data layouts. If it is set to false, a heuristic
