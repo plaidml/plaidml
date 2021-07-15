@@ -19,6 +19,7 @@
 #include "pmlc/dialect/stdx/ir/ops.h"
 #include "pmlc/dialect/tile/ir/ops.h"
 #include "pmlc/dialect/xsmm/ir/ops.h"
+#include "pmlc/util/schedule.h"
 
 using namespace mlir; // NOLINT [build/namespaces]
 
@@ -38,5 +39,6 @@ void registerAllDialects(DialectRegistry &registry) {
                   pmlc::dialect::pxa::PXADialect,     //
                   pmlc::dialect::stdx::StdXDialect,   //
                   pmlc::dialect::tile::TileDialect,   //
-                  pmlc::dialect::xsmm::XSMMDialect>();
+                  pmlc::dialect::xsmm::XSMMDialect,   //
+                  pmlc::util::PMLDialect>();
 }

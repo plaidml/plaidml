@@ -84,8 +84,10 @@ private:
                  ArrayRef<int64_t> tileSizes) {
     OpBuilder builder(op);
 
-    auto outputOp = cast<pxa::PxaReduceOp>(stencil.values[0].getDefiningOp());
-    auto inputOp = cast<pxa::PxaLoadOp>(stencil.values[1].getDefiningOp());
+    auto outputOp =
+        cast<pxa::PxaReduceOp>(stencil.values[0].value.getDefiningOp());
+    auto inputOp =
+        cast<pxa::PxaLoadOp>(stencil.values[1].value.getDefiningOp());
 
     SmallVector<Value> inputIndices, outputIndices;
     Optional<TppOperand> output =
@@ -133,14 +135,16 @@ public:
             op,
             {
                 pxa::StencilIndexRequirement{
+                    /*idxName=*/"eltwise_i",
                     /*tilingGenerator=*/pxa::ExactRangeGenerator(),
-                    /*predicates=*/pxa::IndexStridePredicates{
+                    pxa::IndexStridePredicates{
                         [](int64_t stride) { return stride > 1; }, // output
                         [](int64_t stride) { return stride > 1; }, // input
                     }},
                 pxa::StencilIndexRequirement{
+                    /*idxName=*/"eltwise_j",
                     /*tilingGenerator=*/pxa::ExactRangeGenerator(),
-                    /*predicates=*/pxa::IndexStridePredicates{
+                    pxa::IndexStridePredicates{
                         [](int64_t stride) { return stride == 1; }, // output
                         [](int64_t stride) { return stride == 1; }, // input
                     }},
