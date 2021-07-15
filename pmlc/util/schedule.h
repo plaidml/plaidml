@@ -7,8 +7,6 @@
 #include "mlir/IR/Dialect.h"
 #include "mlir/Support/DebugStringHelper.h"
 
-#include "pmlc/util/schedule_struct.h.inc"
-
 namespace pmlc::util {
 struct AxisDim;
 } // namespace pmlc::util

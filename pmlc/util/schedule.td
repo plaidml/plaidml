@@ -14,7 +14,7 @@ def PML_AxisAttr : AttrDef<PML_Dialect, "Axis"> {
   let mnemonic = "axis";
 
   let parameters = (ins
-    "mlir::StringAttr":$type,
+    "mlir::StringAttr":$name,
     "int64_t":$range
   );
 }
@@ -28,17 +28,9 @@ def PML_ScheduleAttr : AttrDef<PML_Dialect, "Schedule"> {
   );
 
   let extraClassDeclaration = [{
-    mlir::Optional<AxisDim> getAxisInputDim(
-      mlir::StringRef type,
-      unsigned dim
-    );
-
-    mlir::Optional<AxisDim> getAxisResultDim(
-      mlir::StringRef type,
-      unsigned dim
-    );
-
-    ScheduleAttr removeAxes(mlir::StringRef type);
+    mlir::Optional<AxisDim> getAxisInputDim(mlir::StringRef name);
+    mlir::Optional<AxisDim> getAxisResultDim(mlir::StringRef name);
+    ScheduleAttr removeAxes(mlir::DenseSet<mlir::StringRef> names);
   }];
 }
 

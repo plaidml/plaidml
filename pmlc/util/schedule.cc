@@ -7,8 +7,6 @@
 #include "mlir/IR/OpDefinition.h"
 #include "llvm/ADT/TypeSwitch.h"
 
-#include "pmlc/util/schedule_struct.cc.inc"
-
 #define GET_ATTRDEF_CLASSES
 #include "pmlc/util/schedule_attrdef.cc.inc"
 
@@ -59,7 +57,7 @@ Attribute AxisAttr::parse(MLIRContext *context, DialectAsmParser &parser,
 }
 
 void AxisAttr::print(DialectAsmPrinter &printer) const {
-  printer << getType().getValue() << ':' << getRange();
+  printer << getName().getValue() << ':' << getRange();
 }
 
 Attribute ScheduleAttr::parse(MLIRContext *context, DialectAsmParser &parser,
@@ -95,22 +93,17 @@ void ScheduleAttr::print(DialectAsmPrinter &printer) const {
   printer << "]>";
 }
 
-Optional<AxisDim> ScheduleAttr::getAxisInputDim(StringRef type, unsigned dim) {
-  unsigned pos = 0;
+Optional<AxisDim> ScheduleAttr::getAxisInputDim(StringRef name) {
   for (auto it : llvm::enumerate(getAxes())) {
     AxisAttr axis = it.value();
-    if (axis.getType().getValue() == type) {
-      if (pos == dim)
-        return AxisDim{axis, it.index()};
-      ++pos;
-    }
+    if (axis.getName().getValue() == name)
+      return AxisDim{axis, it.index()};
   }
   return None;
 }
 
-Optional<AxisDim> ScheduleAttr::getAxisResultDim(StringRef type,
-                                                 unsigned inputDim) {
-  Optional<AxisDim> axisInputDim = getAxisInputDim(type, inputDim);
+Optional<AxisDim> ScheduleAttr::getAxisResultDim(StringRef name) {
+  Optional<AxisDim> axisInputDim = getAxisInputDim(name);
   if (!axisInputDim)
     return None;
 
@@ -135,12 +128,12 @@ Optional<AxisDim> ScheduleAttr::getAxisResultDim(StringRef type,
   return AxisDim{axisInputDim->axis, dims.front()};
 }
 
-ScheduleAttr ScheduleAttr::removeAxes(mlir::StringRef type) {
+ScheduleAttr ScheduleAttr::removeAxes(DenseSet<StringRef> names) {
   SmallVector<unsigned> toKeep;
   SmallVector<AxisAttr> axes;
   for (auto it : llvm::enumerate(getAxes())) {
     AxisAttr axis = it.value();
-    if (axis.getType().getValue() != type) {
+    if (!names.contains(axis.getName().getValue())) {
       toKeep.push_back(it.index());
       axes.push_back(axis);
     }

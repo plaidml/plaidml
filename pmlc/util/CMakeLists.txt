@@ -18,8 +18,6 @@ pml_cc_library(
     schedule.h
     schedule_attrdef.h.inc
     schedule_attrdef.cc.inc
-    schedule_struct.h.inc
-    schedule_struct.cc.inc
     strides.h
     tags.h
     util.h
@@ -60,7 +58,5 @@ pml_tblgen_library(
   OUTS
     -gen-attrdef-decls schedule_attrdef.h.inc
     -gen-attrdef-defs schedule_attrdef.cc.inc
-    -gen-struct-attr-decls schedule_struct.h.inc
-    -gen-struct-attr-defs schedule_struct.cc.inc
     -gen-dialect-decls dialect.h.inc
 )

@@ -24,7 +24,7 @@ static constexpr StringLiteral kStencilAxisType = "stencil";
 // we're going to be processing with std::next_permutation() --
 // e.g. if we used pointers as comparison values, our order of
 // iteration could vary run-to-run, creating non-determinism.
-using OrderedValue = std::pair<unsigned, Value>;
+using OrderedValue = std::pair<unsigned, ValueStrideInfo>;
 
 struct OrderedValueCmp {
   bool operator()(OrderedValue lhs, OrderedValue rhs) {
@@ -51,7 +51,8 @@ void StencilBase::reportBestStencil(unsigned logLevel) {
     ss << "Stencil Selection Report:\n";
     ss << "    Best Perf: " << bestCost << "\n";
     ss << "    Best Tensor Permutation:\n";
-    for (Value value : bestStencil.values) {
+    for (const ValueStrideInfo &vsi : bestStencil.values) {
+      Value value = vsi.value;
       ss << "        " << debugString(value) << "\n";
     }
     ss << "    Best Index Permutation: " << idxs << '\n';
@@ -89,45 +90,36 @@ StrideInfo StencilBase::getStrideInfo(Value value) {
   return *maybeInfo;
 }
 
-bool StencilIndexRequirement::check(ArrayRef<StrideInfo> infos,
-                                    BlockArgument blockArg) const {
-  assert(predicates.size() == infos.size() &&
+bool StencilIndexRequirement::check(ArrayRef<ValueStrideInfo> values,
+                                    BlockArgument idx) const {
+  assert(predicates.size() == values.size() &&
          "Each predicate entry must have one function per I/O op");
-  for (unsigned i = 0; i < infos.size(); i++) {
-    StrideInfo info = infos[i];
-    int64_t stride = info.strides[blockArg];
-    if (!predicates[i](stride)) {
+  for (unsigned i = 0; i < values.size(); i++) {
+    const StrideInfo &info = values[i].strideInfo;
+    int64_t stride = info.strides.lookup(idx);
+    if (!predicates[i](stride))
       return false;
-    }
   }
   return true;
 }
 
-void StencilBase::bindIndexes(ArrayRef<Value> values) {
+void StencilBase::bindIndexes(ArrayRef<ValueStrideInfo> values) {
   SetVector<BlockArgument> empty;
-  SmallVector<StrideInfo, 3> infos;
-  for (Value value : values) {
-    infos.push_back(getStrideInfo(value));
-  }
-  recursiveBindIndex(empty, values, infos);
+  recursiveBindIndex(empty, values);
 }
 
 void StencilBase::recursiveBindIndex(SetVector<BlockArgument> &boundIdxs,
-                                     ArrayRef<Value> values,
-                                     ArrayRef<StrideInfo> infos) {
+                                     ArrayRef<ValueStrideInfo> values) {
   size_t currIdx = boundIdxs.size();
   if (currIdx == requirements.size()) {
     // This is a legal binding, go find a tiling for it
     SmallVector<int64_t, 8> currTileSize(requirements.size());
-    recursiveTileIndex(StencilOption(values, boundIdxs.getArrayRef(), infos),
+    recursiveTileIndex(StencilOption(values, boundIdxs.getArrayRef()),
                        currTileSize, 0);
   } else {
     Optional<util::AxisDim> axisDim;
-    if (schedule) {
-      axisDim = schedule.getAxisResultDim(kStencilAxisType, currIdx);
-      if (axisDim)
-        IVLOG(4, "axisDim: " << axisDim->axis << ": " << axisDim->dim);
-    }
+    if (schedule)
+      axisDim = schedule.getAxisResultDim(requirements[currIdx].idxName);
 
     for (BlockArgument blockArg : getBlockArgsAsSet()) {
       // Don't bind same index twice
@@ -138,13 +130,13 @@ void StencilBase::recursiveBindIndex(SetVector<BlockArgument> &boundIdxs,
         continue;
 
       // Verify the requirements for this index with each tensor are all met
-      if (!requirements[currIdx].check(infos, blockArg))
+      if (!requirements[currIdx].check(values, blockArg))
         continue;
 
       // If we made it to here, this index has appropriate semantics; bind it
       // and recurse
       boundIdxs.insert(blockArg);
-      recursiveBindIndex(boundIdxs, values, infos);
+      recursiveBindIndex(boundIdxs, values);
       boundIdxs.pop_back();
     }
   }
@@ -169,7 +161,7 @@ void StencilBase::recursiveTileIndex(const StencilOption &stencil,
 
     if (schedule) {
       if (Optional<util::AxisDim> axisDim =
-              schedule.getAxisResultDim(kStencilAxisType, currIdx)) {
+              schedule.getAxisResultDim(requirements[currIdx].idxName)) {
         tileSizes[currIdx] = axisDim->axis.getRange();
         recursiveTileIndex(stencil, tileSizes, currIdx + 1);
         return;
@@ -208,19 +200,22 @@ void StencilBase::performStenciling() {
   SmallVector<OrderedValue, 3> ordered;
   OrderedValueCmp cmp;
   for (Value value : capturedValues.stores) {
-    ordered.push_back(std::make_pair(ordered.size(), value));
+    ordered.push_back(std::make_pair(
+        ordered.size(), ValueStrideInfo{value, getStrideInfo(value)}));
   }
   size_t firstLoadIdx = ordered.size();
   for (Value value : capturedValues.loads) {
-    ordered.push_back(std::make_pair(ordered.size(), value));
+    ordered.push_back(std::make_pair(
+        ordered.size(), ValueStrideInfo{value, getStrideInfo(value)}));
   }
   auto itLastStoreFirstLoad = ordered.begin() + firstLoadIdx;
   std::sort(ordered.begin(), itLastStoreFirstLoad, cmp);
   do { // Each store tensor permutation
     std::sort(itLastStoreFirstLoad, ordered.end(), cmp);
     do { // Each load tensor permutation
-      SmallVector<Value, 3> values = llvm::to_vector<3>(llvm::map_range(
-          ordered, [](OrderedValue value) { return value.second; }));
+      SmallVector<ValueStrideInfo, 3> values =
+          llvm::to_vector<3>(llvm::map_range(
+              ordered, [](OrderedValue value) { return value.second; }));
       bindIndexes(values);
     } while (std::next_permutation(itLastStoreFirstLoad, ordered.end(), cmp));
   } while (std::next_permutation(ordered.begin(), itLastStoreFirstLoad, cmp));
@@ -229,7 +224,12 @@ void StencilBase::performStenciling() {
     reportBestStencil(2);
     transform(bestStencil, bestTiling);
     if (schedule) {
-      util::ScheduleAttr newSchedule = schedule.removeAxes(kStencilAxisType);
+      DenseSet<StringRef> usedIdxs;
+      for (const StencilIndexRequirement &req : requirements) {
+        usedIdxs.insert(req.idxName);
+      }
+
+      util::ScheduleAttr newSchedule = schedule.removeAxes(usedIdxs);
       if (newSchedule)
         op->setAttr(util::kScheduleAttrName, newSchedule);
       else

@@ -1,10 +1,10 @@
-// RUN: pmlc-opt %s \
+// RUN: pmlc-opt -split-input-file %s \
 // RUN:   -x86-stencil-tpp-gemm='threads=4 batched=true' \
 // RUN:   -pxa-normalize \
 // RUN:   -canonicalize \
 // RUN:   | FileCheck %s
 //
-// RUN: pmlc-opt %s \
+// RUN: pmlc-opt -split-input-file %s \
 // RUN:   -x86-stencil-tpp-gemm='threads=4 batched=false' \
 // RUN:   -pxa-normalize \
 // RUN:   -canonicalize \
@@ -147,7 +147,7 @@ func @res2a_branch2a(%arg0: memref<1x56x56x64xf32>, %arg1: memref<1x1x64x64xf32>
 
 // -----
 
-#schedule = #pml.schedule<(m, n, k) -> (0, 0, m, n, 0, 0, k), [stencil:56, stencil:64, stencil:64]>
+#schedule = #pml.schedule<(m, n, k) -> (0, 0, m, n, 0, 0, k), [stencil_m:56, stencil_n:64, stencil_k:64]>
 
 // CHECK-LABEL: func @use_schedule
 //       CHECK:   affine.parallel (%[[I0:.*]]) = (0) to (56)
@@ -155,6 +155,26 @@ func @res2a_branch2a(%arg0: memref<1x56x56x64xf32>, %arg1: memref<1x1x64x64xf32>
 //  CHECK-SAME:       @tpp_gemm(%{{.*}}[0, %[[I0]], 0, 0]: #{{.*}}, %{{.*}}[0, 0, 0, 0]: #{{.*}}) tile: [56, 64, 64]
 //   CHECK-NOT:   {schedule = #{{.*}}}
 func @use_schedule(%arg0: memref<1x56x56x64xf32>, %arg1: memref<1x1x64x64xf32>, %arg2: memref<1x56x56x64xf32>) -> memref<1x56x56x64xf32> {
+  %2 = affine.parallel (%n, %h, %w, %k, %r, %s, %c) = (0, 0, 0, 0, 0, 0, 0) to (1, 56, 56, 64, 1, 1, 64) reduce ("assign") -> (memref<1x56x56x64xf32>) {
+    %6 = pxa.load %arg0[%n, %h + %r, %w + %s, %c] : memref<1x56x56x64xf32>
+    %7 = pxa.load %arg1[%r, %s, %c, %k] : memref<1x1x64x64xf32>
+    %8 = mulf %6, %7 : f32
+    %9 = pxa.reduce addf %8, %arg2[%n, %h, %w, %k] : memref<1x56x56x64xf32>
+    affine.yield %9 : memref<1x56x56x64xf32>
+  } {schedule = #schedule}
+  return %2 : memref<1x56x56x64xf32>
+}
+
+// -----
+
+#schedule = #pml.schedule<(m) -> (0, 0, m, 0, 0, 0, 0), [stencil_m:28]>
+
+// CHECK-LABEL: func @partial_schedule
+//       CHECK:   affine.parallel (%[[I0:.*]], %[[I1:.*]]) = (0, 0) to (56, 2)
+//       CHECK:     pxa.generic (%{{.*}}[0, %[[I0]], %[[I1]] * 28, 0]: #{{.*}}) <addf>
+//  CHECK-SAME:       @tpp_gemm(%{{.*}}[0, %[[I0]], %[[I1]] * 28, 0]: #{{.*}}, %{{.*}}[0, 0, 0, 0]: #{{.*}}) tile: [28, 64, 64]
+//   CHECK-NOT:   {schedule = #{{.*}}}
+func @partial_schedule(%arg0: memref<1x56x56x64xf32>, %arg1: memref<1x1x64x64xf32>, %arg2: memref<1x56x56x64xf32>) -> memref<1x56x56x64xf32> {
   %2 = affine.parallel (%n, %h, %w, %k, %r, %s, %c) = (0, 0, 0, 0, 0, 0, 0) to (1, 56, 56, 64, 1, 1, 64) reduce ("assign") -> (memref<1x56x56x64xf32>) {
     %6 = pxa.load %arg0[%n, %h + %r, %w + %s, %c] : memref<1x56x56x64xf32>
     %7 = pxa.load %arg1[%r, %s, %c, %k] : memref<1x1x64x64xf32>

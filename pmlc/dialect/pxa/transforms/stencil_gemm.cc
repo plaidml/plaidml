@@ -36,6 +36,17 @@ struct GemmOperand {
   }
 };
 
+// Requirements for additional reduction indices that do not appear in output
+// tensor
+static StencilIndexRequirement etcIdxReqs{
+    /*idxName=*/"etc",                         // this is unused
+    /*tilingGenerator=*/EvenTilingGenerator(), // this is unused
+    IndexStridePredicates{
+        [](int64_t stride) { return stride == 0; }, // output
+        [](int64_t stride) { return stride != 0; }, // input0
+        [](int64_t stride) { return stride != 0; }, // input1
+    }};
+
 class StencilGEMM : public StencilBase {
 private:
   unsigned numThreads;
@@ -68,31 +79,10 @@ private:
     return llvm::None;
   }
 
-  // Requirements for additional reduction indices
-  // that do not appear in output tensor
-  IndexStridePredicates additionalReductionIdxReqs = IndexStridePredicates{
-      [](int64_t stride) { return stride == 0; }, // output
-      [](int64_t stride) { return stride != 0; }, // input0
-      [](int64_t stride) { return stride != 0; }, // input1
-  };
-
-  bool isAdditionalReductionIndex(BlockArgument index,
-                                  ArrayRef<StrideInfo> infos) {
-    for (auto it : llvm::zip(infos, additionalReductionIdxReqs)) {
-      StrideInfo info;
-      IndexStridePredicate predicate;
-      std::tie(info, predicate) = it;
-      int64_t stride = info.strides[index];
-      if (!predicate(stride))
-        return false;
-    }
-    return true;
-  }
-
   double getCost(const StencilOption &stencil, ArrayRef<int64_t> tileSize) {
     SmallVector<Type, 3> types;
-    for (Value value : stencil.values) {
-      types.push_back(value.getType());
+    for (const ValueStrideInfo &vsi : stencil.values) {
+      types.push_back(vsi.value.getType());
     }
     auto cost = stencilCostFn(tileSize, types);
     if (cost.throughput == 0) {
@@ -102,7 +92,7 @@ private:
     // The middle idxs are the accumulation indexes, i.e. those used on loads
     // but not stores
     DenseMap<BlockArgument, unsigned> middleIdxs, outerIdxs;
-    for (const auto &kvp : stencil.strideInfos[1].strides) {
+    for (const auto &kvp : stencil.values[1].strideInfo.strides) {
       if (getBlockArgsAsSet().count(kvp.first)) {
         IVLOG(6, "Based on first tensor, inserting middle index "
                      << kvp.first.getArgNumber());
@@ -111,7 +101,7 @@ private:
     }
     IVLOG(5, "Current size of middleIdxs = " << middleIdxs.size());
 
-    for (const auto &kvp : stencil.strideInfos[2].strides) {
+    for (const auto &kvp : stencil.values[2].strideInfo.strides) {
       if (getBlockArgsAsSet().count(kvp.first)) {
         IVLOG(6, "Based on second tensor, inserting middle index "
                      << kvp.first.getArgNumber());
@@ -120,7 +110,7 @@ private:
     }
     IVLOG(5, "Current size of middleIdxs = " << middleIdxs.size());
 
-    for (const auto &kvp : stencil.strideInfos[0].strides) {
+    for (const auto &kvp : stencil.values[0].strideInfo.strides) {
       if (getBlockArgsAsSet().count(kvp.first)) {
         auto it = middleIdxs.find(kvp.first);
         if (it != middleIdxs.end()) {
@@ -192,9 +182,9 @@ private:
     SmallVector<int64_t> batches;
 
     // Generate the GEMM op; select inputs based on permutation order
-    auto opC = cast<PxaReduceOp>(stencil.values[0].getDefiningOp());
-    auto opA = cast<PxaLoadOp>(stencil.values[1].getDefiningOp());
-    auto opB = cast<PxaLoadOp>(stencil.values[2].getDefiningOp());
+    auto opC = cast<PxaReduceOp>(stencil.values[0].value.getDefiningOp());
+    auto opA = cast<PxaLoadOp>(stencil.values[1].value.getDefiningOp());
+    auto opB = cast<PxaLoadOp>(stencil.values[2].value.getDefiningOp());
 
     // First, modify step size of all tiled indexes
     SmallVector<int64_t, 8> steps = op.getSteps();
@@ -240,7 +230,7 @@ private:
 
       // Check for additional reduction indices with a range greater than 1
       if (doBatch && !foundBlockArg && steps[i] == 1 && idxRange > 1 &&
-          isAdditionalReductionIndex(idx, stencil.strideInfos)) {
+          etcIdxReqs.check(stencil.values, idx)) {
         tileEtcIdxs.push_back(idx);
         batches.emplace_back(idxRange);
         foundBlockArg = true;
@@ -301,26 +291,26 @@ public:
       : StencilBase(
             op,
             {
-                // Requirement for 'M'
                 StencilIndexRequirement{
+                    /*idxName=*/"stencil_m",
                     /*tilingGenerator=*/EvenTilingGenerator(),
-                    /*predicates=*/IndexStridePredicates{
+                    IndexStridePredicates{
                         [](int64_t stride) { return stride != 0; }, // output
                         [](int64_t stride) { return stride != 0; }, // input0
                         [](int64_t stride) { return stride == 0; }, // input1
                     }},
-                // Requirement for 'N'
                 StencilIndexRequirement{
+                    /*idxName=*/"stencil_n",
                     /*tilingGenerator=*/EvenTilingGenerator(),
-                    /*predicates=*/IndexStridePredicates{
+                    IndexStridePredicates{
                         [](int64_t stride) { return stride == 1; }, // output
                         [](int64_t stride) { return stride == 0; }, // input0
                         [](int64_t stride) { return stride == 1; }, // input1
                     }},
-                // Requirement for 'K'
                 StencilIndexRequirement{
+                    /*idxName=*/"stencil_k",
                     /*tilingGenerator=*/EvenTilingGenerator(),
-                    /*predicates=*/IndexStridePredicates{
+                    IndexStridePredicates{
                         [](int64_t stride) { return stride == 0; }, // output
                         [](int64_t stride) { return stride == 1; }, // input0
                         [](int64_t stride) { return stride != 0; }, // input1

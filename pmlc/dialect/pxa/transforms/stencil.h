@@ -40,6 +40,7 @@
 //    we chose above was C then A then B, so the first element of `requirements`
 //    for this example will be:
 //        StencilIndexRequirement{ // requirement for i
+//          /*idxName=*/"i",
 //          /*tilingGenerator=*/EvenTilingGenerator(),
 //          /*predicates=*/IndexStridePredicates{
 //            [](int64_t stride) { return stride != 0; }, // C
@@ -54,6 +55,7 @@
 #include <functional>
 #include <limits>
 #include <map>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -73,7 +75,14 @@ using IndexStridePredicates = mlir::SmallVector<IndexStridePredicate>;
 
 using TileSizeGenerator = std::function<std::vector<int64_t>(int64_t)>;
 
+struct ValueStrideInfo {
+  mlir::Value value;
+  StrideInfo strideInfo;
+};
+
 struct StencilIndexRequirement {
+  std::string idxName;
+
   // For each tiled index, a generator for tile sizes. Ordered to match the
   // index permutation.
   TileSizeGenerator tilingGenerator;
@@ -84,23 +93,21 @@ struct StencilIndexRequirement {
   //   return stride == 0;
   IndexStridePredicates predicates;
 
-  bool check(mlir::ArrayRef<StrideInfo> infos,
+  bool check(mlir::ArrayRef<ValueStrideInfo> values,
              mlir::BlockArgument blockArg) const;
 };
 
 // An order of the Tensors and indicies used in an operation
 struct StencilOption {
-  mlir::SmallVector<mlir::Value, 3> values;
+  mlir::SmallVector<ValueStrideInfo, 3> values;
   mlir::SmallVector<mlir::BlockArgument, 8> indexes;
-  mlir::ArrayRef<StrideInfo> strideInfos;
 
   StencilOption() = default;
 
-  StencilOption(mlir::ArrayRef<mlir::Value> values,
-                mlir::ArrayRef<mlir::BlockArgument> indexes,
-                mlir::ArrayRef<StrideInfo> strideInfos)
+  StencilOption(mlir::ArrayRef<ValueStrideInfo> values,
+                mlir::ArrayRef<mlir::BlockArgument> indexes)
       : values(values.begin(), values.end()),
-        indexes(indexes.begin(), indexes.end()), strideInfos(strideInfos) {}
+        indexes(indexes.begin(), indexes.end()) {}
 };
 
 // The load and store values captured within the body of an `affine.parallel`.
@@ -189,10 +196,9 @@ protected:
   mlir::AffineParallelOp op;
 
 private:
-  void bindIndexes(mlir::ArrayRef<mlir::Value> values);
+  void bindIndexes(mlir::ArrayRef<ValueStrideInfo> values);
   void recursiveBindIndex(mlir::SetVector<mlir::BlockArgument> &b_idxs,
-                          mlir::ArrayRef<mlir::Value> values,
-                          mlir::ArrayRef<StrideInfo> infos);
+                          mlir::ArrayRef<ValueStrideInfo> values);
   void recursiveTileIndex(const StencilOption &stencil,
                           mlir::MutableArrayRef<int64_t> tileSize,
                           int64_t currIdx);
