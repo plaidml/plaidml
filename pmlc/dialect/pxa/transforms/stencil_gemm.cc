@@ -76,20 +76,20 @@ private:
       [](int64_t stride) { return stride != 0; }, // input1
   };
 
-  bool isAdditionalReductionIndex(const BlockArgument &index,
-                                  ArrayRef<Value> operands) {
-    for (auto it : llvm::zip(operands, additionalReductionIdxReqs)) {
-      Optional<StrideInfo> strideInfo = getStrideInfo(std::get<0>(it));
-      int64_t stride = strideInfo->strides[index];
-      if (!std::get<1>(it)(stride))
+  bool isAdditionalReductionIndex(BlockArgument index,
+                                  ArrayRef<StrideInfo> infos) {
+    for (auto it : llvm::zip(infos, additionalReductionIdxReqs)) {
+      StrideInfo info;
+      IndexStridePredicate predicate;
+      std::tie(info, predicate) = it;
+      int64_t stride = info.strides[index];
+      if (!predicate(stride))
         return false;
     }
     return true;
   }
 
   double getCost(const StencilOption &stencil, ArrayRef<int64_t> tileSize) {
-    unsigned tot_inner_loop = tileSize[0] * tileSize[1] * tileSize[2];
-
     SmallVector<Type, 3> types;
     for (Value value : stencil.values) {
       types.push_back(value.getType());
@@ -98,127 +98,88 @@ private:
     if (cost.throughput == 0) {
       return std::numeric_limits<double>::infinity();
     }
-    double inner_time = tot_inner_loop / cost.throughput;
-    IVLOG(6, "Inner loop (product of tile size) = " << tot_inner_loop);
-    IVLOG(6, "Inner time (inner loop / throughput) = " << inner_time);
-    for (unsigned i = 0; i < getTiledIdxCount(); ++i) {
-      BlockArgument arg = stencil.indexes[i];
-      IVLOG(6, debugString(arg) << ": " << tileSize[i]);
-    }
 
     // The middle idxs are the accumulation indexes, i.e. those used on loads
     // but not stores
-    DenseMap<BlockArgument, unsigned> middle_idxs;
-    auto in0StrideInfo = getStrideInfo(stencil.values[1]);
-    for (const auto &kvp : in0StrideInfo->strides) {
+    DenseMap<BlockArgument, unsigned> middleIdxs, outerIdxs;
+    for (const auto &kvp : stencil.strideInfos[1].strides) {
       if (getBlockArgsAsSet().count(kvp.first)) {
         IVLOG(6, "Based on first tensor, inserting middle index "
                      << kvp.first.getArgNumber());
-        middle_idxs.insert(std::make_pair(kvp.first, getIdxRange(kvp.first)));
-      } else {
-        IVLOG(5, "Index found from outside current loop on left input: "
-                     << kvp.first.getArgNumber());
+        middleIdxs.insert(std::make_pair(kvp.first, getIdxRange(kvp.first)));
       }
     }
-    IVLOG(5, "Current size of middle_idxs = " << middle_idxs.size());
+    IVLOG(5, "Current size of middleIdxs = " << middleIdxs.size());
 
-    auto in1StrideInfo = getStrideInfo(stencil.values[2]);
-    for (const auto &kvp : in1StrideInfo->strides) {
+    for (const auto &kvp : stencil.strideInfos[2].strides) {
       if (getBlockArgsAsSet().count(kvp.first)) {
         IVLOG(6, "Based on second tensor, inserting middle index "
                      << kvp.first.getArgNumber());
-        middle_idxs.insert(std::make_pair(kvp.first, getIdxRange(kvp.first)));
-      } else {
-        IVLOG(5, "Index found from outside current loop on right input: "
-                     << kvp.first.getArgNumber());
+        middleIdxs.insert(std::make_pair(kvp.first, getIdxRange(kvp.first)));
       }
     }
-    IVLOG(5, "Current size of middle_idxs = " << middle_idxs.size());
-    auto outStrideInfo = getStrideInfo(stencil.values[0]);
-    for (const auto &kvp : outStrideInfo->strides) {
+    IVLOG(5, "Current size of middleIdxs = " << middleIdxs.size());
+
+    for (const auto &kvp : stencil.strideInfos[0].strides) {
       if (getBlockArgsAsSet().count(kvp.first)) {
-        auto it = middle_idxs.find(kvp.first);
-        if (it != middle_idxs.end()) {
+        auto it = middleIdxs.find(kvp.first);
+        if (it != middleIdxs.end()) {
           IVLOG(6, "Based on output tensor, erasing middle index "
                        << it->first.getArgNumber());
-          middle_idxs.erase(it);
+          middleIdxs.erase(it);
         }
-      } else {
-        IVLOG(5, "Index found from outside current loop on output: "
-                     << kvp.first.getArgNumber());
+        outerIdxs.try_emplace(kvp.first, getIdxRange(kvp.first));
       }
     }
 
     for (unsigned i = 0; i < getTiledIdxCount(); ++i) {
       assert(getBlockArgsAsSet().count(stencil.indexes[i]) &&
              "All tiled indexes must be introduced in current loop");
-      auto it = middle_idxs.find(stencil.indexes[i]);
-      if (it != middle_idxs.end()) {
-        it->second = llvm::divideCeil(it->second, tileSize[i]);
+
+      auto itMiddle = middleIdxs.find(stencil.indexes[i]);
+      if (itMiddle != middleIdxs.end()) {
+        itMiddle->second = llvm::divideCeil(itMiddle->second, tileSize[i]);
+      }
+
+      auto itOuter = outerIdxs.find(stencil.indexes[i]);
+      if (itOuter != outerIdxs.end()) {
+        itOuter->second = llvm::divideCeil(itOuter->second, tileSize[i]);
       }
     }
-    unsigned tot_middle_loop = 1;
-    for (auto &kvp : middle_idxs) {
-      tot_middle_loop *= kvp.second;
+
+    unsigned totOuterLoop = 1;
+    for (const auto &kvp : outerIdxs) {
+      totOuterLoop *= kvp.second;
     }
 
-    IVLOG(4, "Middle: loop = " << tot_middle_loop);
+    unsigned totMiddleLoop = 1;
+    for (const auto &kvp : middleIdxs) {
+      totMiddleLoop *= kvp.second;
+    }
 
+    unsigned totInnerLoop = tileSize[0] * tileSize[1] * tileSize[2];
+    double innerTime = totInnerLoop / cost.throughput;
+
+    IVLOG(4, "Outer: loop = " << totOuterLoop);
     if (VLOG_IS_ON(4)) {
-      for (auto &kvp : middle_idxs) {
+      for (auto &kvp : outerIdxs) {
         if (kvp.second > 1) {
           IVLOG(4, kvp.first.getArgNumber() << ": " << kvp.second);
         }
       }
     }
 
-    DenseMap<BlockArgument, unsigned> outer_idxs;
-    for (const auto &kvp : outStrideInfo->strides) {
-      if (getBlockArgsAsSet().count(kvp.first)) {
-        IVLOG(4, "First: " << kvp.first.getArgNumber());
-        IVLOG(5, "Second: " << kvp.second);
-        IVLOG(5, "IdxRange: " << getIdxRange(kvp.first));
-        outer_idxs.try_emplace(kvp.first, getIdxRange(kvp.first));
-        IVLOG(4, "And now emplaced");
-      }
-      // If the index is from outside `op` this has already been logged, no need
-      // for `else` branch here
-    }
-    for (unsigned i = 0; i < getTiledIdxCount(); i++) {
-      assert(getBlockArgsAsSet().count(stencil.indexes[i]) &&
-             "All tiled indexes must be introduced in current loop");
-      auto it = outer_idxs.find(stencil.indexes[i]);
-      if (it != outer_idxs.end()) {
-        it->second = llvm::divideCeil(it->second, tileSize[i]);
-      }
-    }
-    unsigned tot_outer_loop = 1;
-    for (auto &kvp : outer_idxs) {
-      tot_outer_loop *= kvp.second;
-    }
-
-    IVLOG(4, "Outer: loop = " << tot_outer_loop);
-
-    if (VLOG_IS_ON(4)) {
-      for (auto &kvp : outer_idxs) {
-        if (kvp.second > 1) {
-          IVLOG(4, kvp.first.getArgNumber() << ": " << kvp.second);
-        }
-      }
-    }
-
-    unsigned outer_batches = (tot_outer_loop - 1) / numThreads + 1;
-    double perf =
-        outer_batches * tot_middle_loop * (cost.startupCost + inner_time);
+    unsigned outerBatches = (totOuterLoop - 1) / numThreads + 1;
+    double perf = outerBatches * totMiddleLoop * (cost.startupCost + innerTime);
 
     IVLOG(3, "Tile Information:");
     IVLOG(3, " tile:         "
                  << "[" << tileSize[0] << " " << tileSize[1] << " "
                  << tileSize[2] << "]");
-    IVLOG(3, " outer count:  " << outer_batches);
-    IVLOG(3, " middle count: " << tot_middle_loop);
+    IVLOG(3, " outer count:  " << outerBatches);
+    IVLOG(3, " middle count: " << totMiddleLoop);
     IVLOG(3, " startup cost: " << cost.startupCost);
-    IVLOG(3, " inner time:   " << inner_time);
+    IVLOG(3, " inner time:   " << innerTime);
     return perf;
   }
 
@@ -279,7 +240,7 @@ private:
 
       // Check for additional reduction indices with a range greater than 1
       if (doBatch && !foundBlockArg && steps[i] == 1 && idxRange > 1 &&
-          isAdditionalReductionIndex(idx, ArrayRef<Value>{opC, opA, opB})) {
+          isAdditionalReductionIndex(idx, stencil.strideInfos)) {
         tileEtcIdxs.push_back(idx);
         batches.emplace_back(idxRange);
         foundBlockArg = true;
@@ -340,6 +301,7 @@ public:
       : StencilBase(
             op,
             {
+                // Requirement for 'M'
                 StencilIndexRequirement{
                     /*tilingGenerator=*/EvenTilingGenerator(),
                     /*predicates=*/IndexStridePredicates{
@@ -347,6 +309,7 @@ public:
                         [](int64_t stride) { return stride != 0; }, // input0
                         [](int64_t stride) { return stride == 0; }, // input1
                     }},
+                // Requirement for 'N'
                 StencilIndexRequirement{
                     /*tilingGenerator=*/EvenTilingGenerator(),
                     /*predicates=*/IndexStridePredicates{
@@ -354,6 +317,7 @@ public:
                         [](int64_t stride) { return stride == 0; }, // input0
                         [](int64_t stride) { return stride == 1; }, // input1
                     }},
+                // Requirement for 'K'
                 StencilIndexRequirement{
                     /*tilingGenerator=*/EvenTilingGenerator(),
                     /*predicates=*/IndexStridePredicates{
