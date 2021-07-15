@@ -29,6 +29,7 @@
 #include "pmlc/dialect/tile/ir/util.h"
 #include "pmlc/dialect/tile/transforms/passes.h"
 #include "pmlc/util/logging.h"
+#include "pmlc/util/schedule.h"
 
 using namespace mlir; // NOLINT
 
@@ -479,6 +480,7 @@ struct ProgramBuilder {
     context->getOrLoadDialect<dialect::layer::LayerDialect>();
     context->getOrLoadDialect<math::MathDialect>();
     context->getOrLoadDialect<StandardOpsDialect>();
+    context->getOrLoadDialect<util::PMLDialect>();
   }
 
   std::shared_ptr<Program> build(const ProgramArguments &args) {
