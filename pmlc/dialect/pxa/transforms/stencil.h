@@ -40,6 +40,7 @@
 //    we chose above was C then A then B, so the first element of `requirements`
 //    for this example will be:
 //        StencilIndexRequirement{ // requirement for i
+//          /*idxName=*/"i",
 //          /*tilingGenerator=*/EvenTilingGenerator(),
 //          /*predicates=*/IndexStridePredicates{
 //            [](int64_t stride) { return stride != 0; }, // C
@@ -54,23 +55,34 @@
 #include <functional>
 #include <limits>
 #include <map>
+#include <string>
 #include <utility>
 #include <vector>
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Pass/Pass.h"
+#include "llvm/ADT/SetVector.h"
 
 #include "pmlc/dialect/pxa/analysis/strides.h"
+#include "pmlc/util/schedule.h"
 
 namespace pmlc::dialect::pxa {
 
-using BlockArgumentSet = llvm::SmallPtrSet<mlir::BlockArgument, 8>;
+using BlockArgumentSet = mlir::SmallPtrSet<mlir::BlockArgument, 8>;
 
-using IndexStridePredicates = llvm::SmallVector<std::function<bool(int64_t)>>;
+using IndexStridePredicate = std::function<bool(int64_t)>;
+using IndexStridePredicates = mlir::SmallVector<IndexStridePredicate>;
 
 using TileSizeGenerator = std::function<std::vector<int64_t>(int64_t)>;
 
+struct ValueStrideInfo {
+  mlir::Value value;
+  StrideInfo strideInfo;
+};
+
 struct StencilIndexRequirement {
+  std::string idxName;
+
   // For each tiled index, a generator for tile sizes. Ordered to match the
   // index permutation.
   TileSizeGenerator tilingGenerator;
@@ -80,31 +92,34 @@ struct StencilIndexRequirement {
   // index, the function should be:
   //   return stride == 0;
   IndexStridePredicates predicates;
+
+  bool check(mlir::ArrayRef<ValueStrideInfo> values,
+             mlir::BlockArgument blockArg) const;
 };
 
+// An order of the Tensors and indicies used in an operation
 struct StencilOption {
-  // An order of the Tensors and indicies used in an operation
-  llvm::SmallVector<mlir::Value, 3> values;
-  llvm::SmallVector<mlir::BlockArgument, 8> indexes;
+  mlir::SmallVector<ValueStrideInfo, 3> values;
+  mlir::SmallVector<mlir::BlockArgument, 8> indexes;
 
   StencilOption() = default;
 
-  StencilOption(llvm::ArrayRef<mlir::Value> values,
-                llvm::ArrayRef<mlir::BlockArgument> indexes)
+  StencilOption(mlir::ArrayRef<ValueStrideInfo> values,
+                mlir::ArrayRef<mlir::BlockArgument> indexes)
       : values(values.begin(), values.end()),
         indexes(indexes.begin(), indexes.end()) {}
 };
 
 // The load and store values captured within the body of an `affine.parallel`.
 struct StencilCapture {
-  llvm::SmallVector<mlir::Value, 1> stores;
-  llvm::SmallVector<mlir::Value, 2> loads;
+  mlir::SmallVector<mlir::Value, 1> stores;
+  mlir::SmallVector<mlir::Value, 2> loads;
 };
 
 class StencilBase {
 public:
   explicit StencilBase(mlir::AffineParallelOp op,
-                       llvm::ArrayRef<StencilIndexRequirement> requirements);
+                       mlir::ArrayRef<StencilIndexRequirement> requirements);
 
   // `performStenciling` will first find appropriate IO ops (i.e., loads
   // (`PxaLoadOp`) and stores (pxa::PxaReduceOp`)) using the `capture`
@@ -131,12 +146,12 @@ public:
 
 protected:
   // Search the body of `op` for IO ops, and verify that `op` has a structure
-  // amenable to this stenciling. Returns a `llvm::Optional<StencilCapture>`,
+  // amenable to this stenciling. Returns a `mlir::Optional<StencilCapture>`,
   // which is to be `None` if `op` cannot be stenciled by this pass and
   // otherwise contains the IO ops, with store or reduce ops in `stores` and
   // load ops in `loads`. The order of `loads` and `stores` does not matter,
   // as `performStencil` will attempt all permutations.
-  virtual llvm::Optional<StencilCapture> capture() = 0;
+  virtual mlir::Optional<StencilCapture> capture() = 0;
 
   // Determine the cost of a proposed tiling. The tiling is provided as
   // parameters to `getCost` (same as for `transform`):
@@ -149,7 +164,7 @@ protected:
   // Returns the cost as a double. If the proposed tiling is illegal, the
   // cost `std::numeric_limits<double>::infinity()` should be returned.
   virtual double getCost(const StencilOption &stencil,
-                         llvm::ArrayRef<int64_t> tileSize) = 0;
+                         mlir::ArrayRef<int64_t> tileSizes) = 0;
 
   // Transform `op` based on the already-determined optimal tiling. The
   // tiling is provided as paramters to `transform` (same as for `getCost`):
@@ -162,14 +177,10 @@ protected:
   // The `transform` function will also need to access the member variable
   // `op`, as this is the operation it is transforming.
   virtual void transform(const StencilOption &stencil,
-                         llvm::ArrayRef<int64_t> tileSize) = 0;
+                         mlir::ArrayRef<int64_t> tileSize) = 0;
 
   // Get the range of the `idx`th BlockArg
   int64_t getIdxRange(mlir::BlockArgument idx);
-
-  // Call `computeStrideInfo` with caching and automatic conversion to whichever
-  // of PxaLoadOp, or PxaReduceOp is correct
-  mlir::Optional<StrideInfo> getStrideInfo(mlir::Value value);
 
   // Print a log of the best stencil (reporting on cost, permutation, and
   // tiling) provided verbosity is at least `logLevel`
@@ -185,30 +196,28 @@ protected:
   mlir::AffineParallelOp op;
 
 private:
-  void bindIndexes(llvm::ArrayRef<mlir::Value> values);
-  void recursiveBindIndex(llvm::SmallVector<mlir::BlockArgument, 8> &bound_idxs,
-                          llvm::ArrayRef<mlir::Value> values);
+  void bindIndexes(mlir::ArrayRef<ValueStrideInfo> values);
+  void recursiveBindIndex(mlir::SetVector<mlir::BlockArgument> &b_idxs,
+                          mlir::ArrayRef<ValueStrideInfo> values);
   void recursiveTileIndex(const StencilOption &stencil,
-                          llvm::MutableArrayRef<int64_t> tileSize,
+                          mlir::MutableArrayRef<int64_t> tileSize,
                           int64_t currIdx);
+  StrideInfo getStrideInfo(mlir::Value value);
 
   // Cached call of the `idx`th tilingGenerator on parameter `range`
   std::vector<int64_t> generateTilings(int64_t idx, int64_t range);
 
   BlockArgumentSet blockArgs;
 
-  llvm::SmallVector<StencilIndexRequirement> requirements;
+  mlir::SmallVector<StencilIndexRequirement> requirements;
 
   // Cache of results of tilingGenerators calls: First value of the key is which
   // generator was called, second value of the key is range it was called with
-  llvm::DenseMap<std::pair<int64_t, int64_t>, std::vector<int64_t>>
+  mlir::DenseMap<std::pair<int64_t, int64_t>, std::vector<int64_t>>
       tilingsCache;
 
   // The range of each index (cached result of op.getConstantRanges())
-  llvm::SmallVector<int64_t, 8> ranges;
-
-  // Cache of StrideInfo results
-  llvm::DenseMap<mlir::Value, mlir::Optional<StrideInfo>> strideInfoCache;
+  mlir::SmallVector<int64_t, 8> ranges;
 
   // The values captured by `capture.
   StencilCapture capturedValues;
@@ -217,7 +226,9 @@ private:
   // same permutation & tiling choices and should only be modified together
   double bestCost;
   StencilOption bestStencil;
-  llvm::SmallVector<int64_t, 8> bestTiling;
+  mlir::SmallVector<int64_t, 8> bestTiling;
+
+  util::ScheduleAttr schedule;
 };
 
 struct StencilCost {
@@ -226,7 +237,7 @@ struct StencilCost {
 };
 
 using StencilCostFunction = std::function<StencilCost(
-    llvm::ArrayRef<int64_t>, llvm::ArrayRef<mlir::Type>)>;
+    mlir::ArrayRef<int64_t>, mlir::ArrayRef<mlir::Type>)>;
 
 mlir::LogicalResult applyStencilGEMM(mlir::AffineParallelOp op,
                                      unsigned numThreads, bool isBatched,
