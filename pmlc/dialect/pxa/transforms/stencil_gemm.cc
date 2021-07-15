@@ -292,7 +292,7 @@ public:
             op,
             {
                 StencilIndexRequirement{
-                    /*idxName=*/"stencil_m",
+                    /*idxName=*/"gemm_m",
                     /*tilingGenerator=*/EvenTilingGenerator(),
                     IndexStridePredicates{
                         [](int64_t stride) { return stride != 0; }, // output
@@ -300,7 +300,7 @@ public:
                         [](int64_t stride) { return stride == 0; }, // input1
                     }},
                 StencilIndexRequirement{
-                    /*idxName=*/"stencil_n",
+                    /*idxName=*/"gemm_n",
                     /*tilingGenerator=*/EvenTilingGenerator(),
                     IndexStridePredicates{
                         [](int64_t stride) { return stride == 1; }, // output
@@ -308,7 +308,7 @@ public:
                         [](int64_t stride) { return stride == 1; }, // input1
                     }},
                 StencilIndexRequirement{
-                    /*idxName=*/"stencil_k",
+                    /*idxName=*/"gemm_k",
                     /*tilingGenerator=*/EvenTilingGenerator(),
                     IndexStridePredicates{
                         [](int64_t stride) { return stride == 0; }, // output

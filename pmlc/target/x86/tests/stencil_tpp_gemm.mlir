@@ -147,7 +147,7 @@ func @res2a_branch2a(%arg0: memref<1x56x56x64xf32>, %arg1: memref<1x1x64x64xf32>
 
 // -----
 
-#schedule = #pml.schedule<(m, n, k) -> (0, 0, m, n, 0, 0, k), [stencil_m:56, stencil_n:64, stencil_k:64]>
+#schedule = #pml.schedule<(m, n, k) -> (0, 0, m, n, 0, 0, k), [gemm_m:56, gemm_n:64, gemm_k:64]>
 
 // CHECK-LABEL: func @use_schedule
 //       CHECK:   affine.parallel (%[[I0:.*]]) = (0) to (56)
@@ -167,7 +167,7 @@ func @use_schedule(%arg0: memref<1x56x56x64xf32>, %arg1: memref<1x1x64x64xf32>, 
 
 // -----
 
-#schedule = #pml.schedule<(m) -> (0, 0, m, 0, 0, 0, 0), [stencil_m:28]>
+#schedule = #pml.schedule<(m) -> (0, 0, m, 0, 0, 0, 0), [gemm_m:28]>
 
 // CHECK-LABEL: func @partial_schedule
 //       CHECK:   affine.parallel (%[[I0:.*]], %[[I1:.*]]) = (0, 0) to (56, 2)
