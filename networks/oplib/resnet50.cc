@@ -18,8 +18,10 @@ namespace {
 using llvm::ArrayRef;
 using llvm::SmallVector;
 using llvm::StringRef;
+using plaidml::Buffer;
 using plaidml::DType;
 using plaidml::Program;
+using plaidml::TensorShape;
 
 edsl::Tensor block(             //
     const edsl::Tensor& I_raw,  //
@@ -57,164 +59,164 @@ edsl::Tensor block(             //
 std::vector<edsl::Tensor> weight_placeholders() {
   return {
       // conv1
-      edsl::Placeholder(DType::FLOAT32, {7, 7, 3, 64}),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {7, 7, 3, 64})), ""),
 
       // block2a
-      edsl::Placeholder(DType::FLOAT32, {1, 1, 64, 64}),
-      edsl::Placeholder(DType::FLOAT32, {3, 3, 64, 64}),
-      edsl::Placeholder(DType::FLOAT32, {1, 1, 64, 256}),
-      edsl::Placeholder(DType::FLOAT32, {1, 1, 64, 256}),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {1, 1, 64, 64})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {3, 3, 64, 64})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {1, 1, 64, 256})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {1, 1, 64, 256})), ""),
       // block2b
-      edsl::Placeholder(DType::FLOAT32, {1, 1, 256, 64}),
-      edsl::Placeholder(DType::FLOAT32, {3, 3, 64, 64}),
-      edsl::Placeholder(DType::FLOAT32, {1, 1, 64, 256}),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {1, 1, 256, 64})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {3, 3, 64, 64})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {1, 1, 64, 256})), ""),
       // block2c
-      edsl::Placeholder(DType::FLOAT32, {1, 1, 256, 64}),
-      edsl::Placeholder(DType::FLOAT32, {3, 3, 64, 64}),
-      edsl::Placeholder(DType::FLOAT32, {1, 1, 64, 256}),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {1, 1, 256, 64})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {3, 3, 64, 64})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {1, 1, 64, 256})), ""),
 
       // block3a
-      edsl::Placeholder(DType::FLOAT32, {1, 1, 256, 128}),
-      edsl::Placeholder(DType::FLOAT32, {3, 3, 128, 128}),
-      edsl::Placeholder(DType::FLOAT32, {1, 1, 128, 512}),
-      edsl::Placeholder(DType::FLOAT32, {1, 1, 256, 512}),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {1, 1, 256, 128})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {3, 3, 128, 128})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {1, 1, 128, 512})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {1, 1, 256, 512})), ""),
       // block3b
-      edsl::Placeholder(DType::FLOAT32, {1, 1, 512, 128}),
-      edsl::Placeholder(DType::FLOAT32, {3, 3, 128, 128}),
-      edsl::Placeholder(DType::FLOAT32, {1, 1, 128, 512}),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {1, 1, 512, 128})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {3, 3, 128, 128})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {1, 1, 128, 512})), ""),
       // block3c
-      edsl::Placeholder(DType::FLOAT32, {1, 1, 512, 128}),
-      edsl::Placeholder(DType::FLOAT32, {3, 3, 128, 128}),
-      edsl::Placeholder(DType::FLOAT32, {1, 1, 128, 512}),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {1, 1, 512, 128})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {3, 3, 128, 128})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {1, 1, 128, 512})), ""),
       // block3d
-      edsl::Placeholder(DType::FLOAT32, {1, 1, 512, 128}),
-      edsl::Placeholder(DType::FLOAT32, {3, 3, 128, 128}),
-      edsl::Placeholder(DType::FLOAT32, {1, 1, 128, 512}),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {1, 1, 512, 128})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {3, 3, 128, 128})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {1, 1, 128, 512})), ""),
 
       // block4a
-      edsl::Placeholder(DType::FLOAT32, {1, 1, 512, 256}),
-      edsl::Placeholder(DType::FLOAT32, {3, 3, 256, 256}),
-      edsl::Placeholder(DType::FLOAT32, {1, 1, 256, 1024}),
-      edsl::Placeholder(DType::FLOAT32, {1, 1, 512, 1024}),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {1, 1, 512, 256})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {3, 3, 256, 256})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {1, 1, 256, 1024})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {1, 1, 512, 1024})), ""),
       // block4b
-      edsl::Placeholder(DType::FLOAT32, {1, 1, 1024, 256}),
-      edsl::Placeholder(DType::FLOAT32, {3, 3, 256, 256}),
-      edsl::Placeholder(DType::FLOAT32, {1, 1, 256, 1024}),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {1, 1, 1024, 256})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {3, 3, 256, 256})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {1, 1, 256, 1024})), ""),
       // block4c
-      edsl::Placeholder(DType::FLOAT32, {1, 1, 1024, 256}),
-      edsl::Placeholder(DType::FLOAT32, {3, 3, 256, 256}),
-      edsl::Placeholder(DType::FLOAT32, {1, 1, 256, 1024}),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {1, 1, 1024, 256})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {3, 3, 256, 256})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {1, 1, 256, 1024})), ""),
       // block4d
-      edsl::Placeholder(DType::FLOAT32, {1, 1, 1024, 256}),
-      edsl::Placeholder(DType::FLOAT32, {3, 3, 256, 256}),
-      edsl::Placeholder(DType::FLOAT32, {1, 1, 256, 1024}),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {1, 1, 1024, 256})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {3, 3, 256, 256})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {1, 1, 256, 1024})), ""),
       // block4e
-      edsl::Placeholder(DType::FLOAT32, {1, 1, 1024, 256}),
-      edsl::Placeholder(DType::FLOAT32, {3, 3, 256, 256}),
-      edsl::Placeholder(DType::FLOAT32, {1, 1, 256, 1024}),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {1, 1, 1024, 256})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {3, 3, 256, 256})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {1, 1, 256, 1024})), ""),
       // block4f
-      edsl::Placeholder(DType::FLOAT32, {1, 1, 1024, 256}),
-      edsl::Placeholder(DType::FLOAT32, {3, 3, 256, 256}),
-      edsl::Placeholder(DType::FLOAT32, {1, 1, 256, 1024}),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {1, 1, 1024, 256})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {3, 3, 256, 256})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {1, 1, 256, 1024})), ""),
 
       // block5a
-      edsl::Placeholder(DType::FLOAT32, {1, 1, 1024, 512}),
-      edsl::Placeholder(DType::FLOAT32, {3, 3, 512, 512}),
-      edsl::Placeholder(DType::FLOAT32, {1, 1, 512, 2048}),
-      edsl::Placeholder(DType::FLOAT32, {1, 1, 1024, 2048}),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {1, 1, 1024, 512})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {3, 3, 512, 512})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {1, 1, 512, 2048})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {1, 1, 1024, 2048})), ""),
       // block5b
-      edsl::Placeholder(DType::FLOAT32, {1, 1, 2048, 512}),
-      edsl::Placeholder(DType::FLOAT32, {3, 3, 512, 512}),
-      edsl::Placeholder(DType::FLOAT32, {1, 1, 512, 2048}),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {1, 1, 2048, 512})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {3, 3, 512, 512})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {1, 1, 512, 2048})), ""),
       // block5c
-      edsl::Placeholder(DType::FLOAT32, {1, 1, 2048, 512}),
-      edsl::Placeholder(DType::FLOAT32, {3, 3, 512, 512}),
-      edsl::Placeholder(DType::FLOAT32, {1, 1, 512, 2048}),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {1, 1, 2048, 512})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {3, 3, 512, 512})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {1, 1, 512, 2048})), ""),
 
       // dense
-      edsl::Placeholder(DType::FLOAT32, {2048, 1000}),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {2048, 1000})), ""),
   };
 }
 
 std::vector<edsl::Tensor> bias_placeholders() {
   return {
       // conv1
-      edsl::Placeholder(DType::FLOAT32, {64}),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {64})), ""),
 
       // block2a
-      edsl::Placeholder(DType::FLOAT32, {64}),
-      edsl::Placeholder(DType::FLOAT32, {64}),
-      edsl::Placeholder(DType::FLOAT32, {256}),
-      edsl::Placeholder(DType::FLOAT32, {256}),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {64})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {64})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {256})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {256})), ""),
       // block2b
-      edsl::Placeholder(DType::FLOAT32, {64}),
-      edsl::Placeholder(DType::FLOAT32, {64}),
-      edsl::Placeholder(DType::FLOAT32, {256}),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {64})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {64})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {256})), ""),
       // block2c
-      edsl::Placeholder(DType::FLOAT32, {64}),
-      edsl::Placeholder(DType::FLOAT32, {64}),
-      edsl::Placeholder(DType::FLOAT32, {256}),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {64})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {64})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {256})), ""),
 
       // block3a
-      edsl::Placeholder(DType::FLOAT32, {128}),
-      edsl::Placeholder(DType::FLOAT32, {128}),
-      edsl::Placeholder(DType::FLOAT32, {512}),
-      edsl::Placeholder(DType::FLOAT32, {512}),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {128})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {128})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {512})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {512})), ""),
       // block3b
-      edsl::Placeholder(DType::FLOAT32, {128}),
-      edsl::Placeholder(DType::FLOAT32, {128}),
-      edsl::Placeholder(DType::FLOAT32, {512}),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {128})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {128})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {512})), ""),
       // block3c
-      edsl::Placeholder(DType::FLOAT32, {128}),
-      edsl::Placeholder(DType::FLOAT32, {128}),
-      edsl::Placeholder(DType::FLOAT32, {512}),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {128})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {128})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {512})), ""),
       // block3d
-      edsl::Placeholder(DType::FLOAT32, {128}),
-      edsl::Placeholder(DType::FLOAT32, {128}),
-      edsl::Placeholder(DType::FLOAT32, {512}),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {128})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {128})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {512})), ""),
 
       // block4a
-      edsl::Placeholder(DType::FLOAT32, {256}),
-      edsl::Placeholder(DType::FLOAT32, {256}),
-      edsl::Placeholder(DType::FLOAT32, {1024}),
-      edsl::Placeholder(DType::FLOAT32, {1024}),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {256})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {256})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {1024})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {1024})), ""),
       // block4b
-      edsl::Placeholder(DType::FLOAT32, {256}),
-      edsl::Placeholder(DType::FLOAT32, {256}),
-      edsl::Placeholder(DType::FLOAT32, {1024}),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {256})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {256})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {1024})), ""),
       // block4c
-      edsl::Placeholder(DType::FLOAT32, {256}),
-      edsl::Placeholder(DType::FLOAT32, {256}),
-      edsl::Placeholder(DType::FLOAT32, {1024}),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {256})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {256})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {1024})), ""),
       // block4d
-      edsl::Placeholder(DType::FLOAT32, {256}),
-      edsl::Placeholder(DType::FLOAT32, {256}),
-      edsl::Placeholder(DType::FLOAT32, {1024}),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {256})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {256})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {1024})), ""),
       // block4e
-      edsl::Placeholder(DType::FLOAT32, {256}),
-      edsl::Placeholder(DType::FLOAT32, {256}),
-      edsl::Placeholder(DType::FLOAT32, {1024}),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {256})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {256})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {1024})), ""),
       // block4f
-      edsl::Placeholder(DType::FLOAT32, {256}),
-      edsl::Placeholder(DType::FLOAT32, {256}),
-      edsl::Placeholder(DType::FLOAT32, {1024}),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {256})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {256})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {1024})), ""),
 
       // block5a
-      edsl::Placeholder(DType::FLOAT32, {512}),
-      edsl::Placeholder(DType::FLOAT32, {512}),
-      edsl::Placeholder(DType::FLOAT32, {2048}),
-      edsl::Placeholder(DType::FLOAT32, {2048}),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {512})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {512})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {2048})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {2048})), ""),
       // block5b
-      edsl::Placeholder(DType::FLOAT32, {512}),
-      edsl::Placeholder(DType::FLOAT32, {512}),
-      edsl::Placeholder(DType::FLOAT32, {2048}),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {512})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {512})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {2048})), ""),
       // block5c
-      edsl::Placeholder(DType::FLOAT32, {512}),
-      edsl::Placeholder(DType::FLOAT32, {512}),
-      edsl::Placeholder(DType::FLOAT32, {2048}),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {512})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {512})), ""),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {2048})), ""),
 
       // dense
-      edsl::Placeholder(DType::FLOAT32, {1000}),
+      edsl::Constant(Buffer(TensorShape(DType::FLOAT32, {1000})), ""),
   };
 }
 
