@@ -34,6 +34,7 @@
     MLIRIR
     pmlc::dialect::pxa::analysis
     pmlc::dialect::pxa::ir
+    pmlc::util
     ::passes-gen
 )
 

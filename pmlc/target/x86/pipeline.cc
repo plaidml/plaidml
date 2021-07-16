@@ -182,6 +182,7 @@ void pipelineBuilderStage1(OpPassManager &pm, const Options &options) {
   IVLOG(1, "Number of threads: " << maxThreads);
 
   pm.addNestedPass<FuncOp>(layer::createInlineLayersPass());
+  pm.addNestedPass<FuncOp>(tile::createAlgebraicOptPass());
   pm.addNestedPass<FuncOp>(tile::createComputeBoundsPass());
   pm.addPass(tile::createSplitMainPass());
   pm.addPass(transforms::createHoistingPass());
@@ -193,6 +194,22 @@ void pipelineBuilderStage1(OpPassManager &pm, const Options &options) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
   pm.addNestedPass<FuncOp>(layer::createInlineLayersPass());
+
+  bool blockedDataLayouts = false;
+  if (blockedDataLayouts) {
+    // If the userLayouts flag is set to true, Conv2D recognizer
+    // will introduce blocked data layouts. If it is set to false, a heuristic
+    // will determine the best data layouts
+    pm.addNestedPass<FuncOp>(
+        pxa::createReorderLayoutsPass(/*allowReorder*/ true,
+                                      /*userLayouts*/ true,
+                                      /*datatileSize*/ 64));
+    pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
+    pm.addPass(createCanonicalizerPass());
+    pm.addNestedPass<FuncOp>(
+        pxa::createAffineNormalizePass(/*promote*/ true, /*denest*/ true));
+    pm.addPass(createCanonicalizerPass());
+  }
 
   pm.addNestedPass<FuncOp>(createStencilTppGemmPass(/*numThreads=*/maxThreads,
                                                     /*isBatched=*/true));

@@ -10,6 +10,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/SmallSet.h"
 
 #include "pmlc/dialect/pxa/ir/interfaces.h"
 #include "pmlc/dialect/pxa/transforms/layout_utils.h"
@@ -33,6 +34,10 @@ struct MemoryReadDesc {
 
 /// Structure holding information about single write operation.
 struct MemoryWriteDesc {
+  // Operation this structure describes.
+  PxaReduceOpInterface reduceOp;
+  // Surrounding parallelOp
+  mlir::AffineParallelOp surroundingParallelOp;
   // Vectorization of write operation.
   mlir::SmallVector<int64_t, 4> writeVector;
 };
@@ -43,6 +48,8 @@ struct MemoryUsageDesc {
   mlir::Value value;
   // Shape of memory.
   mlir::SmallVector<int64_t, 4> shape;
+  // The AffineParallelOp surrouding the read/write.
+  mlir::Optional<mlir::AffineParallelOp> parallelOp;
   // Number of elements in memory.
   int64_t count;
   // List of descriptions of reads accessing memory.
@@ -103,7 +110,13 @@ naiveScheduleModel(mlir::ArrayRef<mlir::AffineParallelOp> loopNest);
 ///    are separated as non-empty dimensions not depending on any loop variable.
 /// 2. Permuting/sorting separated dimensions in order of loops whose variables
 ///    are used in each dimension.
-mlir::Optional<ReorderDesc> optimizeLayoutForReads(MemoryUsageDesc &desc);
+mlir::Optional<ReorderDesc> optimizeLayoutForReads(MemoryUsageDesc &desc,
+                                                   bool userLayouts = false);
+
+mlir::Optional<ReorderDesc> optimizeLayoutForReads(
+    MemoryUsageDesc &desc,
+    mlir::DenseMap<mlir::Value, mlir::AffineMap> &memLayoutMaps,
+    bool userLayouts = false);
 
 /// Type of function that is expected to create reordering operation
 /// from "srcMemory" to layout described by "reorderDesc".
@@ -120,6 +133,17 @@ using ReorderCreator = std::function<mlir::Value(
 void reorderMemoryReads(const ReorderCreator &creator, ReorderDesc &reorderDesc,
                         MemoryUsageDesc &memoryDesc, mlir::ModuleOp &moduleOp,
                         llvm::SetVector<mlir::Operation *> &toRemove);
+
+void tileLoopNestsToAlignWithDataMaps(mlir::FuncOp func);
+void tileLoopNestsToAlignWithDataMaps(mlir::AffineParallelOp &parallelOp);
+void simplifyMemrefMaps(mlir::AffineParallelOp &parallelOp);
+void eraseLayoutMapsFromMemRefs(mlir::FuncOp func);
+void recognizeConvsAndInsertBlockedDataLayouts(
+    mlir::FuncOp func,
+    mlir::DenseMap<mlir::Value, mlir::AffineMap> &memLayoutMaps,
+    int64_t datatileSize);
+bool getResultOperands(mlir::AffineMap map, mlir::ValueRange mapOperands,
+                       llvm::SmallVector<mlir::Value, 4> &);
 
 // ============================================================================
 // Helper affine map transformations
@@ -143,7 +167,8 @@ void reorderMemoryReads(const ReorderCreator &creator, ReorderDesc &reorderDesc,
 /// Note: to obtain affine map from input space to expanded space composition
 ///       A o B can be used (with simplification).
 /// A o B = (d0, d1) -> (d0 + d1, d0, d1, 0)
-ReorderDesc expandAffineMap(mlir::AffineMap map, mlir::ArrayRef<int64_t> vector,
+ReorderDesc expandAffineMap(mlir::AffineMap map, mlir::ArrayRef<int64_t> shape,
+                            mlir::ArrayRef<int64_t> vector,
                             mlir::FlatAffineConstraints &constraints);
 
 /// Create affine permutation map that sorts resulting space dimensions in order
