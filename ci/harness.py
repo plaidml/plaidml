@@ -4,8 +4,6 @@ import os
 import pathlib
 import shutil
 import sys
-import tarfile
-from distutils.dir_util import copy_tree
 
 import analysis
 import util

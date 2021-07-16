@@ -3,12 +3,7 @@
 import argparse
 import glob
 import os
-import platform
-import re
-import shutil
 import subprocess
-import sys
-import tarfile
 from pathlib import Path
 
 import harness
