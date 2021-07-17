@@ -18,51 +18,29 @@ namespace pmlc::dialect::pxa {
 
 namespace {
 
+static constexpr StringLiteral kStencilAxisType = "stencil";
+
 // A simple wrapper to provide an ordering to object vectors that
 // we're going to be processing with std::next_permutation() --
 // e.g. if we used pointers as comparison values, our order of
 // iteration could vary run-to-run, creating non-determinism.
-template <typename V>
-class Orderer {
-public:
-  Orderer(unsigned ord, V value) : ord_{ord}, value_{std::forward<V>(value)} {}
+using OrderedValue = std::pair<unsigned, ValueStrideInfo>;
 
-  void setOrd(unsigned ord) { ord_ = ord; }
-  unsigned ord() const { return ord_; }
-
-  V &operator*() { return value_; }
-  const V &operator*() const { return value_; }
-
-  V &operator->() { return value_; }
-  const V &operator->() const { return value_; }
-
-  bool operator<(const Orderer<V> &other) const { return ord() < other.ord(); }
-
-private:
-  unsigned ord_;
-  V value_;
+struct OrderedValueCmp {
+  bool operator()(OrderedValue lhs, OrderedValue rhs) {
+    return lhs.first < rhs.first;
+  }
 };
 
-template <typename V>
-std::ostream &operator<<(std::ostream &os, const Orderer<V> &v) {
-  os << *v << ":" << v.ord();
-  return os;
-}
-
-template <typename V>
-void swap(Orderer<V> &v1, Orderer<V> &v2) {
-  unsigned v1o = v1.ord();
-  v1.setOrd(v2.ord());
-  v2.setOrd(v1o);
-  std::swap(*v1, *v2);
-}
-
 } // namespace
+
 StencilBase::StencilBase(AffineParallelOp op,
                          ArrayRef<StencilIndexRequirement> requirements)
-    : op(op), requirements(requirements.begin(), requirements.end()),
+    : op(op), blockArgs(op.getIVs().begin(), op.getIVs().end()),
+      requirements(requirements.begin(), requirements.end()),
       bestCost(std::numeric_limits<double>::infinity()),
-      blockArgs(op.getIVs().begin(), op.getIVs().end()) {}
+      schedule(op->getAttrOfType<util::ScheduleAttr>(util::kScheduleAttrName)) {
+}
 
 void StencilBase::reportBestStencil(unsigned logLevel) {
   if (VLOG_IS_ON(logLevel)) {
@@ -73,7 +51,8 @@ void StencilBase::reportBestStencil(unsigned logLevel) {
     ss << "Stencil Selection Report:\n";
     ss << "    Best Perf: " << bestCost << "\n";
     ss << "    Best Tensor Permutation:\n";
-    for (Value value : bestStencil.values) {
+    for (const ValueStrideInfo &vsi : bestStencil.values) {
+      Value value = vsi.value;
       ss << "        " << debugString(value) << "\n";
     }
     ss << "    Best Index Permutation: " << idxs << '\n';
@@ -88,7 +67,7 @@ std::vector<int64_t> StencilBase::generateTilings(int64_t idx, int64_t range) {
   if (cached != tilingsCache.end()) {
     return cached->second;
   }
-  auto result = requirements[idx].tilingGenerator(range);
+  std::vector<int64_t> result = requirements[idx].tilingGenerator(range);
   tilingsCache.insert(std::make_pair(idxRangePair, result));
   return result;
 }
@@ -100,63 +79,63 @@ int64_t StencilBase::getIdxRange(BlockArgument idx) {
   return ranges[idx.getArgNumber()];
 }
 
-Optional<StrideInfo> StencilBase::getStrideInfo(Value value) {
-  auto cached = strideInfoCache.find(value);
-  if (cached != strideInfoCache.end()) {
-    return cached->second;
-  }
-  auto maybeInfo =
+StrideInfo StencilBase::getStrideInfo(Value value) {
+  Optional<StrideInfo> maybeInfo =
       TypeSwitch<Operation *, Optional<StrideInfo>>(value.getDefiningOp())
           .Case<PxaLoadOp>([&](PxaLoadOp op) { return computeStrideInfo(op); })
           .Case<PxaReduceOp>(
               [&](PxaReduceOp op) { return computeStrideInfo(op); })
           .Default([](Operation *) { return None; });
-  strideInfoCache[value] = maybeInfo;
-  return maybeInfo;
+  assert(maybeInfo.hasValue() && "StrideInfo must be computable");
+  return *maybeInfo;
 }
 
-void StencilBase::bindIndexes(ArrayRef<Value> values) {
-  SmallVector<BlockArgument, 8> emptyBoundIdxsVector;
-  recursiveBindIndex(emptyBoundIdxsVector, values);
+bool StencilIndexRequirement::check(ArrayRef<ValueStrideInfo> values,
+                                    BlockArgument idx) const {
+  assert(predicates.size() == values.size() &&
+         "Each predicate entry must have one function per I/O op");
+  for (unsigned i = 0; i < values.size(); i++) {
+    const StrideInfo &info = values[i].strideInfo;
+    int64_t stride = info.strides.lookup(idx);
+    if (!predicates[i](stride))
+      return false;
+  }
+  return true;
 }
 
-void StencilBase::recursiveBindIndex(SmallVector<BlockArgument, 8> &boundIdxs,
-                                     ArrayRef<Value> values) {
-  auto currIdx = boundIdxs.size();
+void StencilBase::bindIndexes(ArrayRef<ValueStrideInfo> values) {
+  SetVector<BlockArgument> empty;
+  recursiveBindIndex(empty, values);
+}
+
+void StencilBase::recursiveBindIndex(SetVector<BlockArgument> &boundIdxs,
+                                     ArrayRef<ValueStrideInfo> values) {
+  size_t currIdx = boundIdxs.size();
   if (currIdx == requirements.size()) {
     // This is a legal binding, go find a tiling for it
     SmallVector<int64_t, 8> currTileSize(requirements.size());
-    recursiveTileIndex(StencilOption(values, boundIdxs), currTileSize, 0);
+    recursiveTileIndex(StencilOption(values, boundIdxs.getArrayRef()),
+                       currTileSize, 0);
   } else {
-    for (const auto blockArg : getBlockArgsAsSet()) {
+    Optional<util::AxisDim> axisDim;
+    if (schedule)
+      axisDim = schedule.getAxisResultDim(requirements[currIdx].idxName);
+
+    for (BlockArgument blockArg : getBlockArgsAsSet()) {
       // Don't bind same index twice
-      // Note: While it's awkward to be repeatedly searching a vector, I think
-      // boundIdxs is small enough that it would not be efficient to maintain a
-      // parallel map
-      if (std::find(boundIdxs.begin(), boundIdxs.end(), blockArg) !=
-          boundIdxs.end()) {
+      if (boundIdxs.contains(blockArg))
         continue;
-      }
+
+      if (axisDim && blockArg.getArgNumber() != axisDim->dim)
+        continue;
 
       // Verify the requirements for this index with each tensor are all met
-      bool reqsMet = true;
-      assert(requirements[currIdx].predicates.size() == values.size() &&
-             "Each predicate entry must have one function per I/O op");
-      for (unsigned i = 0; i < values.size(); i++) {
-        auto strideInfo = getStrideInfo(values[i]);
-        auto stride = strideInfo->strides[blockArg];
-        if (!requirements[currIdx].predicates[i](stride)) {
-          reqsMet = false;
-          break;
-        }
-      }
-      if (!reqsMet) {
+      if (!requirements[currIdx].check(values, blockArg))
         continue;
-      }
 
       // If we made it to here, this index has appropriate semantics; bind it
       // and recurse
-      boundIdxs.push_back(blockArg);
+      boundIdxs.insert(blockArg);
       recursiveBindIndex(boundIdxs, values);
       boundIdxs.pop_back();
     }
@@ -164,25 +143,35 @@ void StencilBase::recursiveBindIndex(SmallVector<BlockArgument, 8> &boundIdxs,
 }
 
 void StencilBase::recursiveTileIndex(const StencilOption &stencil,
-                                     MutableArrayRef<int64_t> tileSize,
+                                     MutableArrayRef<int64_t> tileSizes,
                                      int64_t currIdx) {
-  assert(tileSize.size() == requirements.size());
+  assert(tileSizes.size() == requirements.size());
   if (currIdx == requirements.size()) {
-    IVLOG(3, "Considering Tile " << tileSize);
-    auto cost = getCost(stencil, tileSize);
+    IVLOG(3, "Considering Tile " << tileSizes);
+    auto cost = getCost(stencil, tileSizes);
     IVLOG(3, "Tile cost = " << cost);
     if (cost < bestCost) {
       bestCost = cost;
       bestStencil = stencil;
-      bestTiling.assign(tileSize.begin(), tileSize.end());
+      bestTiling.assign(tileSizes.begin(), tileSizes.end());
     }
   } else {
     assert(getBlockArgsAsSet().count(stencil.indexes[currIdx]) &&
            "BlockArg for current index must be valid");
+
+    if (schedule) {
+      if (Optional<util::AxisDim> axisDim =
+              schedule.getAxisResultDim(requirements[currIdx].idxName)) {
+        tileSizes[currIdx] = axisDim->axis.getRange();
+        recursiveTileIndex(stencil, tileSizes, currIdx + 1);
+        return;
+      }
+    }
+
     for (int64_t currIdxTileSize : generateTilings(
              currIdx, ranges[stencil.indexes[currIdx].getArgNumber()])) {
-      tileSize[currIdx] = currIdxTileSize;
-      recursiveTileIndex(stencil, tileSize, currIdx + 1);
+      tileSizes[currIdx] = currIdxTileSize;
+      recursiveTileIndex(stencil, tileSizes, currIdx + 1);
     }
   }
 }
@@ -204,35 +193,48 @@ void StencilBase::performStenciling() {
   }
   capturedValues = *maybeCapturedValues;
 
-  // We wrap loads & stores with `Orderer` to make the order the permutations
-  // are iterated through deterministic (the "sorted" order of the IO ops is the
-  // order they were returned by `capture`) -- without this, the sorted order
-  // would be however the pointers were ordered in memory.
-  SmallVector<Orderer<Value>, 3> ordered;
-  unsigned ord = 0;
-  for (auto &storeOp : capturedValues.stores) {
-    ordered.push_back(Orderer<Value>(ord++, storeOp));
+  // We wrap loads & stores with `OrderedValue` to make the order the
+  // permutations are iterated through deterministic (the "sorted" order of the
+  // IO ops is the order they were returned by `capture`) -- without this, the
+  // sorted order would be however the pointers were ordered in memory.
+  SmallVector<OrderedValue, 3> ordered;
+  OrderedValueCmp cmp;
+  for (Value value : capturedValues.stores) {
+    ordered.push_back(std::make_pair(
+        ordered.size(), ValueStrideInfo{value, getStrideInfo(value)}));
   }
   size_t firstLoadIdx = ordered.size();
-  for (auto &loadOp : capturedValues.loads) {
-    ordered.push_back(Orderer<Value>(ord++, loadOp));
+  for (Value value : capturedValues.loads) {
+    ordered.push_back(std::make_pair(
+        ordered.size(), ValueStrideInfo{value, getStrideInfo(value)}));
   }
   auto itLastStoreFirstLoad = ordered.begin() + firstLoadIdx;
-  std::sort(ordered.begin(), itLastStoreFirstLoad);
+  std::sort(ordered.begin(), itLastStoreFirstLoad, cmp);
   do { // Each store tensor permutation
-    std::sort(itLastStoreFirstLoad, ordered.end());
+    std::sort(itLastStoreFirstLoad, ordered.end(), cmp);
     do { // Each load tensor permutation
-      SmallVector<Value, 3> values;
-      for (const auto &ioOp : ordered) {
-        values.push_back(*ioOp);
-      }
+      SmallVector<ValueStrideInfo, 3> values =
+          llvm::to_vector<3>(llvm::map_range(
+              ordered, [](OrderedValue value) { return value.second; }));
       bindIndexes(values);
-    } while (std::next_permutation(itLastStoreFirstLoad, ordered.end()));
-  } while (std::next_permutation(ordered.begin(), itLastStoreFirstLoad));
+    } while (std::next_permutation(itLastStoreFirstLoad, ordered.end(), cmp));
+  } while (std::next_permutation(ordered.begin(), itLastStoreFirstLoad, cmp));
 
   if (bestCost < std::numeric_limits<double>::infinity()) {
     reportBestStencil(2);
     transform(bestStencil, bestTiling);
+    if (schedule) {
+      DenseSet<StringRef> usedIdxs;
+      for (const StencilIndexRequirement &req : requirements) {
+        usedIdxs.insert(req.idxName);
+      }
+
+      util::ScheduleAttr newSchedule = schedule.removeAxes(usedIdxs);
+      if (newSchedule)
+        op->setAttr(util::kScheduleAttrName, newSchedule);
+      else
+        op->removeAttr(util::kScheduleAttrName);
+    }
   } else {
     IVLOG(3, "No legal tiling found to stencil");
   }

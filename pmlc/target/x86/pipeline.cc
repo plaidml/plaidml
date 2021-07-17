@@ -173,16 +173,7 @@ struct Options : public PassPipelineOptions<Options> {
                               llvm::cl::desc("Number of threads")};
 
   unsigned getNumThreads() const {
-    if (numThreads)
-      return numThreads.getValue();
-
-    unsigned numProcs = omp_get_num_procs();
-    unsigned physCores = getPhysicalCoreNumber();
-    IVLOG(3, "numProcs: " << numProcs);
-    IVLOG(3, "physCores: " << physCores);
-    if (physCores)
-      numProcs = std::min(physCores, numProcs);
-    return numProcs;
+    return numThreads ? numThreads.getValue() : omp_get_max_threads();
   }
 };
 
@@ -203,6 +194,22 @@ void pipelineBuilderStage1(OpPassManager &pm, const Options &options) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
   pm.addNestedPass<FuncOp>(layer::createInlineLayersPass());
+
+  bool blockedDataLayouts = false;
+  if (blockedDataLayouts) {
+    // If the userLayouts flag is set to true, Conv2D recognizer
+    // will introduce blocked data layouts. If it is set to false, a heuristic
+    // will determine the best data layouts
+    pm.addNestedPass<FuncOp>(
+        pxa::createReorderLayoutsPass(/*allowReorder*/ true,
+                                      /*userLayouts*/ true,
+                                      /*datatileSize*/ 64));
+    pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
+    pm.addPass(createCanonicalizerPass());
+    pm.addNestedPass<FuncOp>(
+        pxa::createAffineNormalizePass(/*promote*/ true, /*denest*/ true));
+    pm.addPass(createCanonicalizerPass());
+  }
 
   pm.addNestedPass<FuncOp>(createStencilTppGemmPass(/*numThreads=*/maxThreads,
                                                     /*isBatched=*/true));
