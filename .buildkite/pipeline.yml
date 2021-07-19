@@ -1,0 +1,11 @@
+env:
+  PIPELINE: "plaidml"
+
+steps:
+  - block: "Verify public contribution. Accept this PR?"
+    branches: "*:*"
+
+  - command: "python ci/buildkite.py pipeline | buildkite-agent pipeline upload"
+    label: ":pipeline:"
+    agents:
+      PLATFORM: linux_x86_64
