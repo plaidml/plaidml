@@ -16,6 +16,7 @@
 #include "pmlc/conversion/tile_to_pxa/passes.h"
 #include "pmlc/dialect/affinex/transforms/passes.h"
 #include "pmlc/dialect/layer/transforms/passes.h"
+#include "pmlc/dialect/pml/transforms/passes.h"
 #include "pmlc/dialect/pxa/transforms/passes.h"
 #include "pmlc/dialect/stdx/transforms/passes.h"
 #include "pmlc/dialect/tile/transforms/passes.h"
@@ -61,6 +62,7 @@ inline void registerAllPasses() {
   // Dialect passes
   pmlc::dialect::affinex::registerPasses();
   pmlc::dialect::layer::registerPasses();
+  pmlc::dialect::pml::registerPasses();
   pmlc::dialect::pxa::registerPasses();
   pmlc::dialect::stdx::registerPasses();
   pmlc::dialect::tile::registerPasses();

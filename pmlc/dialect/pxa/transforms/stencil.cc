@@ -16,6 +16,8 @@ using namespace mlir; // NOLINT
 
 namespace pmlc::dialect::pxa {
 
+namespace pml = dialect::pml;
+
 namespace {
 
 static constexpr StringLiteral kStencilAxisType = "stencil";
@@ -39,8 +41,7 @@ StencilBase::StencilBase(AffineParallelOp op,
     : op(op), blockArgs(op.getIVs().begin(), op.getIVs().end()),
       requirements(requirements.begin(), requirements.end()),
       bestCost(std::numeric_limits<double>::infinity()),
-      schedule(op->getAttrOfType<util::ScheduleAttr>(util::kScheduleAttrName)) {
-}
+      schedule(op->getAttrOfType<pml::ScheduleAttr>(pml::kScheduleAttrName)) {}
 
 void StencilBase::reportBestStencil(unsigned logLevel) {
   if (VLOG_IS_ON(logLevel)) {
@@ -117,7 +118,7 @@ void StencilBase::recursiveBindIndex(SetVector<BlockArgument> &boundIdxs,
     recursiveTileIndex(StencilOption(values, boundIdxs.getArrayRef()),
                        currTileSize, 0);
   } else {
-    Optional<util::AxisDim> axisDim;
+    Optional<pml::AxisDim> axisDim;
     if (schedule)
       axisDim = schedule.getAxisResultDim(requirements[currIdx].idxName);
 
@@ -160,7 +161,7 @@ void StencilBase::recursiveTileIndex(const StencilOption &stencil,
            "BlockArg for current index must be valid");
 
     if (schedule) {
-      if (Optional<util::AxisDim> axisDim =
+      if (Optional<pml::AxisDim> axisDim =
               schedule.getAxisResultDim(requirements[currIdx].idxName)) {
         tileSizes[currIdx] = axisDim->axis.getRange();
         recursiveTileIndex(stencil, tileSizes, currIdx + 1);
@@ -229,11 +230,11 @@ void StencilBase::performStenciling() {
         usedIdxs.insert(req.idxName);
       }
 
-      util::ScheduleAttr newSchedule = schedule.removeAxes(usedIdxs);
+      pml::ScheduleAttr newSchedule = schedule.removeAxes(usedIdxs);
       if (newSchedule)
-        op->setAttr(util::kScheduleAttrName, newSchedule);
+        op->setAttr(pml::kScheduleAttrName, newSchedule);
       else
-        op->removeAttr(util::kScheduleAttrName);
+        op->removeAttr(pml::kScheduleAttrName);
     }
   } else {
     IVLOG(3, "No legal tiling found to stencil");

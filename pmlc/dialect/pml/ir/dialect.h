@@ -7,16 +7,16 @@
 #include "mlir/IR/Dialect.h"
 #include "mlir/Support/DebugStringHelper.h"
 
-namespace pmlc::util {
+namespace pmlc::dialect::pml {
 struct AxisDim;
-} // namespace pmlc::util
+} // namespace pmlc::dialect::pml
 
 #define GET_ATTRDEF_CLASSES
-#include "pmlc/util/schedule_attrdef.h.inc"
+#include "pmlc/dialect/pml/ir/attrdef.h.inc"
 
-#include "pmlc/util/dialect.h.inc"
+#include "pmlc/dialect/pml/ir/dialect.h.inc"
 
-namespace pmlc::util {
+namespace pmlc::dialect::pml {
 
 struct AxisDim {
   AxisAttr axis;
@@ -37,4 +37,4 @@ inline std::ostream &operator<<(std::ostream &os, ScheduleAttr attr) {
 
 static constexpr mlir::StringLiteral kScheduleAttrName = "schedule";
 
-} // namespace pmlc::util
+} // namespace pmlc::dialect::pml
