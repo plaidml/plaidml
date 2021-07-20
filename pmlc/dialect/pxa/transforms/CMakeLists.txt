@@ -32,6 +32,7 @@
     LLVMSupport
     MLIRAffineTransforms
     MLIRIR
+    pmlc::dialect::pml::ir
     pmlc::dialect::pxa::analysis
     pmlc::dialect::pxa::ir
     pmlc::util

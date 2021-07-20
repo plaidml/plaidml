@@ -7,7 +7,7 @@ include "mlir/IR/OpBase.td"
 
 def PML_Dialect : Dialect {
   let name = "pml";
-  let cppNamespace = "pmlc::util";
+  let cppNamespace = "pmlc::dialect::pml";
 }
 
 def PML_AxisAttr : AttrDef<PML_Dialect, "Axis"> {
@@ -32,6 +32,24 @@ def PML_ScheduleAttr : AttrDef<PML_Dialect, "Schedule"> {
     mlir::Optional<AxisDim> getAxisResultDim(mlir::StringRef name);
     ScheduleAttr removeAxes(mlir::DenseSet<mlir::StringRef> names);
   }];
+}
+
+def PML_PatternAttr : AttrDef<PML_Dialect, "Pattern"> {
+  let mnemonic = "pattern";
+
+  let parameters = (ins
+    "mlir::StringAttr":$op,
+    "mlir::DictionaryAttr":$dict
+  );
+}
+
+def PML_ApplyAttr : AttrDef<PML_Dialect, "Apply"> {
+  let mnemonic = "apply";
+
+  let parameters = (ins
+    "PatternAttr":$pattern,
+    "mlir::DictionaryAttr":$dict
+  );
 }
 
 #endif // __PML_SCHEDULE__

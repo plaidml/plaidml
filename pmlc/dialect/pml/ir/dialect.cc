@@ -1,6 +1,6 @@
 // Copyright 2021, Intel Corporation
 
-#include "pmlc/util/schedule.h"
+#include "pmlc/dialect/pml/ir/dialect.h"
 
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/Identifier.h"
@@ -8,16 +8,18 @@
 #include "llvm/ADT/TypeSwitch.h"
 
 #define GET_ATTRDEF_CLASSES
-#include "pmlc/util/schedule_attrdef.cc.inc"
+#include "pmlc/dialect/pml/ir/attrdef.cc.inc"
+
+#include "pmlc/util/logging.h"
 
 using namespace mlir; // NOLINT
 
-namespace pmlc::util {
+namespace pmlc::dialect::pml {
 
 void PMLDialect::initialize() {
   addAttributes<
 #define GET_ATTRDEF_LIST
-#include "pmlc/util/schedule_attrdef.cc.inc" // NOLINT
+#include "pmlc/dialect/pml/ir/attrdef.cc.inc" // NOLINT
       >();
 }
 
@@ -41,46 +43,62 @@ void PMLDialect::printAttribute(Attribute attr,
     return;
 }
 
-Attribute AxisAttr::parse(MLIRContext *context, DialectAsmParser &parser,
-                          Type type) {
+static ParseResult parseAxisAttr(MLIRContext *context, DialectAsmParser &parser,
+                                 AxisAttr &attr) {
   StringRef typeStr;
   IntegerAttr range;
   if (parser.parseKeyword(&typeStr) || //
       parser.parseColon() ||           //
       parser.parseAttribute(range)) {
-    parser.emitError(parser.getNameLoc(), "expected 'type:range'");
-    return {};
+    parser.emitError(parser.getNameLoc(), "expected '$type:$range'");
+    return failure();
   }
 
   auto typeAttr = StringAttr::get(context, typeStr);
-  return parser.getChecked<AxisAttr>(context, typeAttr, range.getInt());
+  attr = parser.getChecked<AxisAttr>(context, typeAttr, range.getInt());
+
+  return success();
+}
+
+static void printAxisAttr(DialectAsmPrinter &printer, AxisAttr axis) {
+  printer << axis.getName().getValue() << ':' << axis.getRange();
+}
+
+Attribute AxisAttr::parse(MLIRContext *context, DialectAsmParser &parser,
+                          Type type) {
+  AxisAttr attr;
+  if (parser.parseLess() ||                   //
+      parseAxisAttr(context, parser, attr) || //
+      parser.parseGreater())
+    return {};
+  return attr;
 }
 
 void AxisAttr::print(DialectAsmPrinter &printer) const {
-  printer << getName().getValue() << ':' << getRange();
+  printer << "axis<" << getName().getValue() << ':' << getRange() << '>';
 }
 
 Attribute ScheduleAttr::parse(MLIRContext *context, DialectAsmParser &parser,
                               Type type) {
-  if (failed(parser.parseLess()))
-    return {};
-
   AffineMap map;
-  if (failed(parser.parseAffineMap(map))) {
-    parser.emitError(parser.getNameLoc(), "expected an affine map");
+  if (parser.parseLess() ||         //
+      parser.parseAffineMap(map) || //
+      parser.parseComma() ||        //
+      parser.parseLSquare()) {
+    parser.emitError(parser.getNameLoc(), "expected '$map, $axes'");
     return {};
   }
 
-  if (parser.parseComma() || parser.parseLSquare())
-    return {};
-
   SmallVector<AxisAttr> axes;
   do {
-    Attribute attr = AxisAttr::parse(context, parser, type);
-    axes.push_back(attr.cast<AxisAttr>());
+    AxisAttr axis;
+    if (parseAxisAttr(context, parser, axis))
+      return {};
+    axes.push_back(axis);
   } while (succeeded(parser.parseOptionalComma()));
 
-  if (parser.parseRSquare() || parser.parseGreater())
+  if (parser.parseRSquare() || //
+      parser.parseGreater())
     return {};
 
   return parser.getChecked<ScheduleAttr>(context, map, axes);
@@ -89,7 +107,7 @@ Attribute ScheduleAttr::parse(MLIRContext *context, DialectAsmParser &parser,
 void ScheduleAttr::print(DialectAsmPrinter &printer) const {
   printer << "schedule<" << getMap() << ", [";
   llvm::interleaveComma(getAxes(), printer,
-                        [&](AxisAttr axis) { axis.print(printer); });
+                        [&](AxisAttr axis) { printAxisAttr(printer, axis); });
   printer << "]>";
 }
 
@@ -146,4 +164,42 @@ ScheduleAttr ScheduleAttr::removeAxes(DenseSet<StringRef> names) {
   return ScheduleAttr::get(getContext(), map, axes);
 }
 
-} // namespace pmlc::util
+Attribute PatternAttr::parse(MLIRContext *context, DialectAsmParser &parser,
+                             Type type) {
+  StringAttr op;
+  DictionaryAttr dict;
+  if (parser.parseLess() ||          //
+      parser.parseAttribute(op) ||   //
+      parser.parseComma() ||         //
+      parser.parseAttribute(dict) || //
+      parser.parseGreater()) {
+    parser.emitError(parser.getNameLoc(), "expected '$op, $dict'");
+    return {};
+  }
+  return parser.getChecked<PatternAttr>(context, op, dict);
+}
+
+void PatternAttr::print(DialectAsmPrinter &printer) const {
+  printer << "pattern<" << getOp() << ", " << getDict() << '>';
+}
+
+Attribute ApplyAttr::parse(MLIRContext *context, DialectAsmParser &parser,
+                           Type type) {
+  PatternAttr pattern;
+  DictionaryAttr dict;
+  if (parser.parseLess() ||             //
+      parser.parseAttribute(pattern) || //
+      parser.parseComma() ||            //
+      parser.parseAttribute(dict) ||    //
+      parser.parseGreater()) {
+    parser.emitError(parser.getNameLoc(), "expected '$pattern, $dict'");
+    return {};
+  }
+  return parser.getChecked<ApplyAttr>(context, pattern, dict);
+}
+
+void ApplyAttr::print(DialectAsmPrinter &printer) const {
+  printer << "apply<" << getPattern() << ", " << getDict() << '>';
+}
+
+} // namespace pmlc::dialect::pml

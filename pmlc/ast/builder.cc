@@ -28,8 +28,8 @@
 #include "pmlc/dialect/tile/ir/ops.h"
 #include "pmlc/dialect/tile/ir/util.h"
 #include "pmlc/dialect/tile/transforms/passes.h"
+#include "pmlc/util/dialect.h"
 #include "pmlc/util/logging.h"
-#include "pmlc/util/schedule.h"
 
 using namespace mlir; // NOLINT
 

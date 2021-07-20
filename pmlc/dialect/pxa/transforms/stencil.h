@@ -63,8 +63,8 @@
 #include "mlir/Pass/Pass.h"
 #include "llvm/ADT/SetVector.h"
 
+#include "pmlc/dialect/pml/ir/dialect.h"
 #include "pmlc/dialect/pxa/analysis/strides.h"
-#include "pmlc/util/schedule.h"
 
 namespace pmlc::dialect::pxa {
 
@@ -228,7 +228,7 @@ private:
   StencilOption bestStencil;
   mlir::SmallVector<int64_t, 8> bestTiling;
 
-  util::ScheduleAttr schedule;
+  dialect::pml::ScheduleAttr schedule;
 };
 
 struct StencilCost {

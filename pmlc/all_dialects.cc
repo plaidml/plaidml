@@ -15,11 +15,11 @@
 #include "mlir/IR/Dialect.h"
 
 #include "pmlc/dialect/layer/ir/ops.h"
+#include "pmlc/dialect/pml/ir/dialect.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/dialect/stdx/ir/ops.h"
 #include "pmlc/dialect/tile/ir/ops.h"
 #include "pmlc/dialect/xsmm/ir/ops.h"
-#include "pmlc/util/schedule.h"
 
 using namespace mlir; // NOLINT [build/namespaces]
 
@@ -36,9 +36,9 @@ void registerAllDialects(DialectRegistry &registry) {
                   tensor::TensorDialect,              //
                   vector::VectorDialect,              //
                   pmlc::dialect::layer::LayerDialect, //
+                  pmlc::dialect::pml::PMLDialect,     //
                   pmlc::dialect::pxa::PXADialect,     //
                   pmlc::dialect::stdx::StdXDialect,   //
                   pmlc::dialect::tile::TileDialect,   //
-                  pmlc::dialect::xsmm::XSMMDialect,   //
-                  pmlc::util::PMLDialect>();
+                  pmlc::dialect::xsmm::XSMMDialect>();
 }
