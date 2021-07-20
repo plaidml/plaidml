@@ -3,8 +3,8 @@ pml_cc_library(
   HDRS
     attrdef.h.inc
     attrdef.cc.inc
-    dialect.h.inc
     dialect.h
+    dialect.h.inc
   SRCS
     dialect.cc
   DEPS

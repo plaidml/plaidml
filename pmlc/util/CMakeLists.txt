@@ -5,7 +5,6 @@ pml_cc_library(
   NAME util
   HDRS
     buffer.h
-    dialect.h.inc
     enums.h
     enums.h.inc
     enums.cc.inc
