@@ -30,6 +30,8 @@ pml_cc_library(
     pmlc::dialect::affinex::transforms
     pmlc::dialect::layer::ir
     pmlc::dialect::layer::transforms
+    pmlc::dialect::pml::ir
+    pmlc::dialect::pml::transforms
     pmlc::dialect::pxa::ir
     pmlc::dialect::pxa::transforms
     pmlc::dialect::stdx::ir

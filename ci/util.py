@@ -204,7 +204,7 @@ class Platform(object):
 
 class TestInfo(object):
 
-    def __init__(self, suite, workload, platform, batch_size, variant, popt, shards=1, shard_id=0):
+    def __init__(self, suite, workload, platform, batch_size, variant, popt):
         self.suite_name, self.suite = suite
         self.workload_name, self.workload = workload
         self.platform_name, self.platform = platform
@@ -214,12 +214,7 @@ class TestInfo(object):
         self.retry = popt.get('retry')
         self.soft_fail = popt.get('soft_fail')
         self.perf_threshold = popt.get('perf_threshold', DEFAULT_RATIO_THRESHOLD)
-        self.shards = shards
-        self.shard_id = shard_id
-        if self.shards > 1:
-            self.instance_name = '{}-{}'.format(self.workload_name, self.shard_id)
-        else:
-            self.instance_name = self.workload_name
+        self.instance_name = self.workload_name
 
     def __repr__(self):
         return '{}/{}/{}/bs{}'.format(self.suite_name, self.workload_name, self.platform_name,
@@ -251,16 +246,12 @@ def iterate_tests(plan, pipeline):
                 skip = workload.get('skip_platforms', [])
                 if pkey in skip:
                     continue
-                shards = popt.get('shards', 1)
-                for shard_id in range(shards):
-                    for batch_size in suite['params'][pipeline]['batch_sizes']:
-                        yield TestInfo(
-                            suite=(skey, suite),
-                            workload=(wkey, workload),
-                            platform=(pkey, Platform(pkey, gpu_flops)),
-                            batch_size=batch_size,
-                            variant=variant,
-                            popt=popt,
-                            shard_id=shard_id,
-                            shards=shards,
-                        )
+                for batch_size in suite['params'][pipeline]['batch_sizes']:
+                    yield TestInfo(
+                        suite=(skey, suite),
+                        workload=(wkey, workload),
+                        platform=(pkey, Platform(pkey, gpu_flops)),
+                        batch_size=batch_size,
+                        variant=variant,
+                        popt=popt,
+                    )

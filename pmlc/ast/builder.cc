@@ -25,6 +25,7 @@
 #include "pmlc/ast/ast_ops.h"
 #include "pmlc/ast/eval.h"
 #include "pmlc/dialect/layer/ir/ops.h"
+#include "pmlc/dialect/pml/ir/dialect.h"
 #include "pmlc/dialect/tile/ir/ops.h"
 #include "pmlc/dialect/tile/ir/util.h"
 #include "pmlc/dialect/tile/transforms/passes.h"
@@ -475,6 +476,7 @@ struct ProgramBuilder {
       : program(std::make_shared<compiler::Program>(name)),
         context(program->context.get()), loc(UnknownLoc::get(context)),
         module(*program->module), builder(module) {
+    context->getOrLoadDialect<dialect::pml::PMLDialect>();
     context->getOrLoadDialect<dialect::tile::TileDialect>();
     context->getOrLoadDialect<dialect::layer::LayerDialect>();
     context->getOrLoadDialect<math::MathDialect>();
