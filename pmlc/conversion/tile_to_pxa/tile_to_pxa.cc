@@ -564,6 +564,11 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
         /*resultTypes=*/ArrayRef<Type>{alloc.memRefType},
         /*reductions=*/ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign},
         /*ranges=*/alloc.rankedTensorType.getShape());
+    if (Attribute attr = op->getAttr("name"))
+      forOp->setAttr("name", attr);
+    if (Attribute attr = op->getAttr("schedule"))
+      forOp->setAttr("schedule", attr);
+
     auto body = forOp.getBody();
     rewriter.setInsertionPointToStart(body);
 
@@ -681,6 +686,10 @@ struct ContractionOpConversion
         /*ubMaps=*/ubMaps,
         /*ubArgs=*/ArrayRef<Value>{},
         /*steps=*/steps);
+    if (Attribute attr = op->getAttr("name"))
+      forOp->setAttr("name", attr);
+    if (Attribute attr = op->getAttr("schedule"))
+      forOp->setAttr("schedule", attr);
 
     auto body = forOp.getBody();
     rewriter.setInsertionPointToStart(body);
