@@ -2,22 +2,21 @@
 
 #include "pmlc/dialect/pml/transforms/pass_detail.h"
 
-#include "mlir/Support/DebugStringHelper.h"
-
 #include "pmlc/dialect/pml/ir/dialect.h"
-#include "pmlc/util/logging.h"
 
 using namespace mlir; // NOLINT
 
 namespace pmlc::dialect::pml {
 
 struct ApplyRulesPass : public ApplyRulesBase<ApplyRulesPass> {
-  void runOnFunction() final {
-    FuncOp func = getFunction();
-    auto parent = func->getParentOfType<ModuleOp>();
-    ModuleOp source = parent.lookupSymbol<ModuleOp>(module);
+  ApplyRulesPass() = default;
+
+  explicit ApplyRulesPass(StringRef module) { this->module = module.str(); }
+
+  void runOnOperation() final {
+    auto source = getOperation().lookupSymbol<ModuleOp>(module);
     if (!source) {
-      func.emitError("Source module not found");
+      getOperation().emitError("Source module not found");
       signalPassFailure();
       return;
     }
@@ -46,7 +45,7 @@ struct ApplyRulesPass : public ApplyRulesBase<ApplyRulesPass> {
   void processRule(ApplyAttr apply) {
     PatternAttr pattern = apply.getPattern();
     StringRef opName = pattern.getOp().getValue();
-    getFunction().walk([&](Operation *op) {
+    getOperation().walk([&](Operation *op) {
       if (op->getName().getStringRef() != opName)
         return;
 
@@ -65,6 +64,10 @@ struct ApplyRulesPass : public ApplyRulesBase<ApplyRulesPass> {
 
 std::unique_ptr<mlir::Pass> createApplyRulesPass() {
   return std::make_unique<ApplyRulesPass>();
+}
+
+std::unique_ptr<mlir::Pass> createApplyRulesPass(StringRef module) {
+  return std::make_unique<ApplyRulesPass>(module);
 }
 
 } // namespace pmlc::dialect::pml

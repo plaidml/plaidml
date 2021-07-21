@@ -38,11 +38,13 @@ def run(cmd, **kwargs):
 class Configure:
 
     def __init__(self):
-        conda = shutil.which('conda')
+        conda = shutil.which('mamba')
         if not conda:
-            print('Please install conda.')
-            print('See: https://docs.conda.io/projects/conda/en/latest/user-guide/install')
-            sys.exit(1)
+            conda = shutil.which('conda')
+            if not conda:
+                print('Please install conda.')
+                print('See: https://docs.conda.io/projects/conda/en/latest/user-guide/install')
+                sys.exit(1)
         self.conda = pathlib.Path(conda)
         self.this_dir = pathlib.Path(__file__).absolute().parent
         self.cenv_dir = self.this_dir / '.cenv'
@@ -51,11 +53,11 @@ class Configure:
     def is_activated(self):
         return os.getenv('CONDA_PREFIX') == str(self.cenv_dir)
 
-    def activate_conda(self):
+    def activate_conda(self, args):
         printf('Activating conda environment')
         env = os.environ.copy()
         env['SKIP_BOOTSTRAP'] = '1'
-        run([
+        cmd = [
             self.conda,
             'run',
             '--no-capture-output',
@@ -63,9 +65,10 @@ class Configure:
             self.cenv_dir,
             'python',
             __file__,
-        ],
-            check=True,
-            env=env)
+        ]
+        if args.skip_precommit:
+            cmd += ['--skip_precommit']
+        run(cmd, check=True, env=env)
 
     def configure_conda(self, skip_cenv=None):
         if is_windows():
@@ -203,7 +206,7 @@ def main():
         if not cfg.is_activated():
             if not args.skip_conda_env:
                 cfg.configure_conda()
-            cfg.activate_conda()
+            cfg.activate_conda(args)
         else:
             if not args.skip_precommit:
                 cfg.configure_precommit()

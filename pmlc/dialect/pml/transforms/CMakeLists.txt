@@ -4,6 +4,7 @@ pml_cc_library(
     passes.h
   SRCS
     apply_rules.cc
+    load_module.cc
   DEPS
     LLVMSupport
     MLIRIR
