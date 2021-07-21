@@ -23,6 +23,7 @@ pml_cc_library(
     ${MLIR_DIALECT_LIBS}
     ${MLIR_CONVERSION_LIBS}
     MLIRTransforms
+    pmlc::conversion::linalg_to_pxa
     pmlc::conversion::pxa_to_affine
     pmlc::conversion::scf_to_omp
     pmlc::conversion::stdx_to_llvm
