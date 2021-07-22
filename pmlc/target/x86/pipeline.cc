@@ -221,24 +221,47 @@ void pipelineBuilderStage2(OpPassManager &pm, const Options &options) {
     pm.addPass(createCanonicalizerPass());
   }
 
-  pm.addNestedPass<FuncOp>(createStencilTppGemmPass(/*numThreads=*/maxThreads,
-                                                    /*isBatched=*/true));
-  pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
-  pm.addPass(createCanonicalizerPass());
+  if (util::getEnvVar("PLAIDML_NEW_PIPELINE") == "1") {
+    pm.addNestedPass<FuncOp>(createStencilTppGemmPass(/*numThreads=*/maxThreads,
+                                                      /*isBatched=*/true));
+    pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
+    pm.addPass(createCanonicalizerPass());
 
-  pm.addNestedPass<FuncOp>(pxa::createTileAccumulatePass());
-  pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass(/*promote=*/false));
-  pm.addPass(createCanonicalizerPass());
+    pm.addNestedPass<FuncOp>(
+        pxa::createFusionPass(/*memoryActivityThreshold=*/0,
+                              /*exactlyMatch=*/false,
+                              /*tiledFusion=*/true));
+    pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
+    pm.addPass(createCanonicalizerPass());
 
-  pm.addNestedPass<FuncOp>(pxa::createCPUThreadPass(maxThreads));
-  pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
-  pm.addPass(createCanonicalizerPass());
+    pm.addNestedPass<FuncOp>(pxa::createTileAccumulatePass());
+    pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass(/*promote=*/false));
+    pm.addPass(createCanonicalizerPass());
 
-  pm.addNestedPass<FuncOp>(pxa::createFusionPass(/*memoryActivityThreshold=*/0,
-                                                 /*exactlyMatch=*/false,
-                                                 /*tiledFusion=*/true));
-  pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
-  pm.addPass(createCanonicalizerPass());
+    pm.addNestedPass<FuncOp>(pxa::createCPUThreadPass(maxThreads));
+    pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
+    pm.addPass(createCanonicalizerPass());
+  } else {
+    pm.addNestedPass<FuncOp>(createStencilTppGemmPass(/*numThreads=*/maxThreads,
+                                                      /*isBatched=*/true));
+    pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
+    pm.addPass(createCanonicalizerPass());
+
+    pm.addNestedPass<FuncOp>(pxa::createTileAccumulatePass());
+    pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass(/*promote=*/false));
+    pm.addPass(createCanonicalizerPass());
+
+    pm.addNestedPass<FuncOp>(pxa::createCPUThreadPass(maxThreads));
+    pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
+    pm.addPass(createCanonicalizerPass());
+
+    pm.addNestedPass<FuncOp>(
+        pxa::createFusionPass(/*memoryActivityThreshold=*/0,
+                              /*exactlyMatch=*/false,
+                              /*tiledFusion=*/true));
+    pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
+    pm.addPass(createCanonicalizerPass());
+  }
 
   pm.addNestedPass<FuncOp>(pxa::createMemRefDataFlowOptPass());
   pm.addPass(createCanonicalizerPass());
