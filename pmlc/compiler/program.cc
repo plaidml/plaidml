@@ -187,9 +187,10 @@ void Program::compile(StringRef targetNameAndOptions, bool collectPasses,
     }
     for (auto pass : llvm::enumerate(passes)) {
       const auto &info = pass.value();
-      SmallString<128> path(dumpDir);
-      llvm::sys::path::append(
-          path, llvm::formatv("{0,0+2}_{1}.mlir", pass.index(), info.name));
+      SmallString<512> path(dumpDir);
+      std::string filename =
+          llvm::formatv("{0,0+2}_{1}.mlir", pass.index(), info.name);
+      llvm::sys::path::append(path, filename);
       auto file = openOutputFile(path, &err);
       if (!err.empty()) {
         throw std::runtime_error("Failed to dump pass: " + err);

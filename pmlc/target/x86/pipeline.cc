@@ -1,8 +1,10 @@
-// Copyright 2020 Intel Corporation
+// Copyright 2021 Intel Corporation
+
 #include "pmlc/target/x86/pipeline.h"
 
 #include <algorithm>
 #include <memory>
+#include <string>
 #include <utility>
 
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
@@ -26,6 +28,7 @@
 #include "pmlc/conversion/stdx_to_llvm/passes.h"
 #include "pmlc/conversion/tile_to_pxa/passes.h"
 #include "pmlc/dialect/layer/transforms/passes.h"
+#include "pmlc/dialect/pml/transforms/passes.h"
 #include "pmlc/dialect/pxa/transforms/passes.h"
 #include "pmlc/dialect/pxa/transforms/stencil.h"
 #include "pmlc/dialect/stdx/transforms/passes.h"
@@ -40,13 +43,12 @@
 
 #include "omp.h" // NOLINT
 
-#include "pmlc/target/x86/utils.h"
-
 using namespace mlir; // NOLINT[build/namespaces]
 
 namespace pmlc::target::x86 {
 
 namespace layer = dialect::layer;
+namespace pml = dialect::pml;
 namespace pxa = dialect::pxa;
 namespace stdx = dialect::stdx;
 namespace tile = dialect::tile;
@@ -177,10 +179,7 @@ struct Options : public PassPipelineOptions<Options> {
   }
 };
 
-void pipelineBuilderStage1(OpPassManager &pm, const Options &options) {
-  unsigned maxThreads = options.getNumThreads();
-  IVLOG(1, "Number of threads: " << maxThreads);
-
+void pipelineBuilderStage1(OpPassManager &pm) {
   pm.addNestedPass<FuncOp>(layer::createInlineLayersPass());
   pm.addNestedPass<FuncOp>(tile::createAlgebraicOptPass());
   pm.addNestedPass<FuncOp>(tile::createComputeBoundsPass());
@@ -190,24 +189,35 @@ void pipelineBuilderStage1(OpPassManager &pm, const Options &options) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
+  std::string schedulePath = util::getEnvVar("PLAIDML_SCHEDULE_PATH");
+  if (!schedulePath.empty()) {
+    pm.addPass(pml::createLoadModulePass(/*path=*/schedulePath));
+    pm.addPass(createCanonicalizerPass());
+    pm.addPass(pml::createApplyRulesPass(/*module=*/"schedule"));
+  }
+}
+
+void pipelineBuilderStage2(OpPassManager &pm, const Options &options) {
+  unsigned maxThreads = options.getNumThreads();
+  IVLOG(1, "Number of threads: " << maxThreads);
+
   pm.addPass(pmlc::conversion::tile_to_pxa::createLowerTileToPXAPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
   pm.addNestedPass<FuncOp>(layer::createInlineLayersPass());
 
-  bool blockedDataLayouts = false;
-  if (blockedDataLayouts) {
+  if (util::getEnvVar("PLAIDML_BLOCKED_LAYOUTS") == "1") {
     // If the userLayouts flag is set to true, Conv2D recognizer
     // will introduce blocked data layouts. If it is set to false, a heuristic
     // will determine the best data layouts
     pm.addNestedPass<FuncOp>(
-        pxa::createReorderLayoutsPass(/*allowReorder*/ true,
-                                      /*userLayouts*/ true,
-                                      /*datatileSize*/ 64));
+        pxa::createReorderLayoutsPass(/*allowReorder=*/true,
+                                      /*userLayouts=*/true,
+                                      /*datatileSize=*/64));
     pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
     pm.addPass(createCanonicalizerPass());
-    pm.addNestedPass<FuncOp>(
-        pxa::createAffineNormalizePass(/*promote*/ true, /*denest*/ true));
+    pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass(/*promote=*/true,
+                                                            /*denest=*/true));
     pm.addPass(createCanonicalizerPass());
   }
 
@@ -248,7 +258,7 @@ void pipelineBuilderStage1(OpPassManager &pm, const Options &options) {
   pm.addPass(createPRNGLinkingPass());
 }
 
-void pipelineBuilderStage2(OpPassManager &pm) {
+void pipelineBuilderStage3(OpPassManager &pm) {
   pm.addPass(createLowerPXAToAffinePass());
   pm.addPass(createLoopInvariantCodeMotionPass());
   pm.addPass(createCanonicalizerPass());
@@ -263,7 +273,7 @@ void pipelineBuilderStage2(OpPassManager &pm) {
   pm.addPass(createCSEPass());
 }
 
-void pipelineBuilderStage3(OpPassManager &pm) {
+void pipelineBuilderStage4(OpPassManager &pm) {
   pm.addPass(createLowerToCFGPass());
   if (pmlc::util::getEnvVar("PLAIDML_BOUNDS_CHECK") == "1")
     pm.addNestedPass<FuncOp>(stdx::createBoundsCheckPass());
@@ -274,21 +284,26 @@ void pipelineBuilderStage3(OpPassManager &pm) {
 
 void pipelineBuilder(OpPassManager &pm) {
   Options options;
-  pipelineBuilderStage1(pm, options);
-  pipelineBuilderStage2(pm);
+  pipelineBuilderStage1(pm);
+  pipelineBuilderStage2(pm, options);
   pipelineBuilderStage3(pm);
+  pipelineBuilderStage4(pm);
 }
 
-static PassPipelineRegistration<Options>
-    registerStage1Pipeline("x86-stage1", "x86 Stage1 Pipeline",
-                           pipelineBuilderStage1);
+static PassPipelineRegistration<> registerStage1Pipeline("x86-stage1",
+                                                         "x86 Stage1 Pipeline",
+                                                         pipelineBuilderStage1);
 
-static PassPipelineRegistration<> registerStage2Pipeline("x86-stage2",
-                                                         "x86 Stage2 Pipeline",
-                                                         pipelineBuilderStage2);
+static PassPipelineRegistration<Options>
+    registerStage2Pipeline("x86-stage2", "x86 Stage2 Pipeline",
+                           pipelineBuilderStage2);
 
 static PassPipelineRegistration<> registerStage3Pipeline("x86-stage3",
                                                          "x86 Stage3 Pipeline",
                                                          pipelineBuilderStage3);
+
+static PassPipelineRegistration<> registerStage4Pipeline("x86-stage4",
+                                                         "x86 Stage4 Pipeline",
+                                                         pipelineBuilderStage4);
 
 } // namespace pmlc::target::x86

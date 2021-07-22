@@ -78,6 +78,7 @@ def ContractionOp : TileOp<"contract", [
   let printer = [{ print$cppClass(&p, *this); }];
   let parser = [{ return parse$cppClass(&parser, result); }];
   let verifier = [{ return verify$cppClass(*this); }];
+  let hasCanonicalizer = 1;
 }
 
 class SpecialOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :

@@ -38,11 +38,13 @@ def run(cmd, **kwargs):
 class Configure:
 
     def __init__(self):
-        conda = shutil.which('conda')
+        conda = shutil.which('mamba')
         if not conda:
-            print('Please install conda.')
-            print('See: https://docs.conda.io/projects/conda/en/latest/user-guide/install')
-            sys.exit(1)
+            conda = shutil.which('conda')
+            if not conda:
+                print('Please install conda.')
+                print('See: https://docs.conda.io/projects/conda/en/latest/user-guide/install')
+                sys.exit(1)
         self.conda = pathlib.Path(conda)
         self.this_dir = pathlib.Path(__file__).absolute().parent
         self.cenv_dir = self.this_dir / '.cenv'
@@ -51,21 +53,19 @@ class Configure:
     def is_activated(self):
         return os.getenv('CONDA_PREFIX') == str(self.cenv_dir)
 
-    def activate_conda(self):
+    def activate_conda(self, args):
         printf('Activating conda environment')
         env = os.environ.copy()
         env['SKIP_BOOTSTRAP'] = '1'
-        run([
+        cmd = [
             self.conda,
             'run',
             '--no-capture-output',
             '-p',
             self.cenv_dir,
             'python',
-            __file__,
-        ],
-            check=True,
-            env=env)
+        ] + sys.argv
+        run(cmd, check=True, env=env)
 
     def configure_conda(self, skip_cenv=None):
         if is_windows():
@@ -116,38 +116,40 @@ class Configure:
 
     def configure_cmake(self, args):
         build_dir = pathlib.Path(f'build-{args.target}').resolve() / args.type
-        openvino_dir = build_dir / '_deps/openvino-build'
-        if args.temp:
-            temp_dir = args.temp / args.target
-            fc_dir = temp_dir / 'fc'
 
-        cmd = [
-            'cmake',
-            '-Svendor/openvino',
-            f'-B{openvino_dir}',
-            '-GNinja',
-            f'-DCMAKE_BUILD_TYPE={args.type}',
-            '-DCMAKE_C_COMPILER_LAUNCHER=ccache',
-            '-DCMAKE_CXX_COMPILER_LAUNCHER=ccache',
-            '-DCMAKE_CXX_FLAGS=-w',
-            '-DENABLE_CLDNN=OFF',
-            '-DENABLE_DATA=OFF',
-            '-DENABLE_FUNCTIONAL_TESTS=ON',
-            '-DENABLE_GNA=OFF',
-            '-DENABLE_MKL_DNN=OFF',
-            '-DENABLE_MYRIAD=OFF',
-            '-DENABLE_PYTHON=ON',
-            '-DENABLE_SPEECH_DEMO=OFF',
-            '-DENABLE_TESTS=ON',
-            '-DENABLE_VPU=OFF',
-            '-DFETCHCONTENT_QUIET=OFF',
-            f'-DOUTPUT_ROOT={build_dir}',
-        ]
-        if args.temp:
-            cmd.append(f'-DFETCHCONTENT_BASE_DIR={fc_dir}')
-        run(cmd, check=True)
+        if not args.no_openvino:
+            openvino_dir = build_dir / '_deps/openvino-build'
+            if args.temp:
+                temp_dir = args.temp / args.target
+                fc_dir = temp_dir / 'fc'
 
-        run(['ninja', '-C', openvino_dir], check=True)
+            cmd = [
+                'cmake',
+                '-Svendor/openvino',
+                f'-B{openvino_dir}',
+                '-GNinja',
+                f'-DCMAKE_BUILD_TYPE={args.type}',
+                '-DCMAKE_C_COMPILER_LAUNCHER=ccache',
+                '-DCMAKE_CXX_COMPILER_LAUNCHER=ccache',
+                '-DCMAKE_CXX_FLAGS=-w',
+                '-DENABLE_CLDNN=OFF',
+                '-DENABLE_DATA=OFF',
+                '-DENABLE_FUNCTIONAL_TESTS=ON',
+                '-DENABLE_GNA=OFF',
+                '-DENABLE_MKL_DNN=OFF',
+                '-DENABLE_MYRIAD=OFF',
+                '-DENABLE_PYTHON=ON',
+                '-DENABLE_SPEECH_DEMO=OFF',
+                '-DENABLE_TESTS=ON',
+                '-DENABLE_VPU=OFF',
+                '-DFETCHCONTENT_QUIET=OFF',
+                f'-DOUTPUT_ROOT={build_dir}',
+            ]
+            if args.temp:
+                cmd.append(f'-DFETCHCONTENT_BASE_DIR={fc_dir}')
+            run(cmd, check=True)
+
+            run(['ninja', '-C', openvino_dir], check=True)
 
         cmd = [
             'cmake',
@@ -158,8 +160,14 @@ class Configure:
             '-DCMAKE_C_COMPILER_LAUNCHER=ccache',
             '-DCMAKE_CXX_COMPILER_LAUNCHER=ccache',
             '-DFETCHCONTENT_QUIET=OFF',
-            f'-DInferenceEngineDeveloperPackage_DIR={openvino_dir}',
         ]
+        if args.no_openvino:
+            cmd += ['-DPML_OPENVINO_BRIDGE=OFF']
+        else:
+            cmd += [
+                '-DPML_OPENVINO_BRIDGE=ON',
+                f'-DInferenceEngineDeveloperPackage_DIR={openvino_dir}',
+            ]
         if args.temp:
             cmd.append(f'-DFETCHCONTENT_BASE_DIR={fc_dir}')
         if args.local_llvm:
@@ -190,10 +198,11 @@ def main():
     parser.add_argument('--temp',
                         type=pathlib.Path,
                         help='Configures the temporary directory for cached assets.')
+    parser.add_argument('--no_openvino', action='store_true')
     args = parser.parse_args()
 
     print("Configuring PlaidML build environment")
-    print()
+    print(args)
 
     cfg = Configure()
 
@@ -203,7 +212,7 @@ def main():
         if not cfg.is_activated():
             if not args.skip_conda_env:
                 cfg.configure_conda()
-            cfg.activate_conda()
+            cfg.activate_conda(args)
         else:
             if not args.skip_precommit:
                 cfg.configure_precommit()
@@ -213,7 +222,7 @@ def main():
         print("Your build is configured.")
         print("Use the following to run all unit tests:")
         print()
-        print("ninja -C build-x86_64/Release check-smoke")
+        print("ninja -C build-x86_64/Release setup check-smoke")
         print()
 
 

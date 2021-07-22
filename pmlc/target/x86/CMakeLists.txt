@@ -11,7 +11,6 @@ pml_cc_library(
     stencil_tpp_unary.cc
     trace_linking.cc
     xsmm_lowering.cc
-    utils.cc
   DEPS
     ::passes-gen
     ::prng_lowering
@@ -21,6 +20,7 @@ pml_cc_library(
     pmlc::conversion::stdx_to_llvm
     pmlc::conversion::tile_to_pxa
     pmlc::dialect::layer::transforms
+    pmlc::dialect::pml::transforms
     pmlc::dialect::pxa::analysis
     pmlc::dialect::pxa::transforms
     pmlc::dialect::stdx::transforms
