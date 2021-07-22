@@ -192,6 +192,7 @@ void pipelineBuilderStage1(OpPassManager &pm) {
   std::string schedulePath = util::getEnvVar("PLAIDML_SCHEDULE_PATH");
   if (!schedulePath.empty()) {
     pm.addPass(pml::createLoadModulePass(/*path=*/schedulePath));
+    pm.addPass(createCanonicalizerPass());
     pm.addPass(pml::createApplyRulesPass(/*module=*/"schedule"));
   }
 }

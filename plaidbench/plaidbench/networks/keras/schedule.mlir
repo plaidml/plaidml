@@ -1,7 +1,7 @@
 #output = affine_map<(n, h, w, c, r, s, k) -> (n, h, w, c)>
-#input_1x1s1 = affine_map<(n, h, w, c, r, s, k) -> (n, r + h, s + w, k)>
-#input_1x1s2 = affine_map<(n, h, w, c, r, s, k) -> (n, r + h * 2, s + w * 2, k)>
-#input_3x3s1 = affine_map<(n, h, w, c, r, s, k) -> (n, r + h - 1, s + w - 1, k)>
+#input_1x1s1 = affine_map<(n, h, w, c, r, s, k) -> (n, h + r, w + s, k)>
+#input_1x1s2 = affine_map<(n, h, w, c, r, s, k) -> (n, h * 2 + r, w * 2 + s, k)>
+#input_3x3s1 = affine_map<(n, h, w, c, r, s, k) -> (n, h + r - 1, w + s - 1, k)>
 #filter = affine_map<(n, h, w, c, r, s, k) -> (r, s, k, c)>
 
 // NOTE: these schedules have not been tuned yet!
