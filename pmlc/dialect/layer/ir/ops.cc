@@ -88,5 +88,7 @@ void LayerDialect::initialize() {
 
 } // namespace pmlc::dialect::layer
 
+#include "pmlc/dialect/layer/ir/dialect.cc.inc" // NOLINT
+
 #define GET_OP_CLASSES
 #include "pmlc/dialect/layer/ir/ops.cc.inc" // NOLINT

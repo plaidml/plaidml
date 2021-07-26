@@ -897,5 +897,7 @@ static ParseResult parsePxaGenericOp(OpAsmParser &parser,
 
 } // namespace pmlc::dialect::pxa
 
+#include "pmlc/dialect/pxa/ir/dialect.cc.inc" // NOLINT
+
 #define GET_OP_CLASSES
 #include "pmlc/dialect/pxa/ir/ops.cc.inc" // NOLINT

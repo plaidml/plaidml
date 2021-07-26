@@ -78,5 +78,7 @@ void StdXDialect::initialize() {
 
 } // namespace pmlc::dialect::stdx
 
+#include "pmlc/dialect/stdx/ir/dialect.cc.inc" // NOLINT
+
 #define GET_OP_CLASSES
 #include "pmlc/dialect/stdx/ir/ops.cc.inc" // NOLINT
