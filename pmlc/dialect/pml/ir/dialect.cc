@@ -203,3 +203,5 @@ void ApplyAttr::print(DialectAsmPrinter &printer) const {
 }
 
 } // namespace pmlc::dialect::pml
+
+#include "pmlc/dialect/pml/ir/dialect.cc.inc" // NOLINT

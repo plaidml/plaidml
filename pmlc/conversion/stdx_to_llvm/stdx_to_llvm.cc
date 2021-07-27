@@ -1,5 +1,9 @@
 // Copyright 2020, Intel Corporation
 
+#include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
+#include "mlir/Conversion/LLVMCommon/Pattern.h"
+#include "mlir/Conversion/MathToLLVM/MathToLLVM.h"
+#include "mlir/Conversion/MemRefToLLVM/MemRefToLLVM.h"
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
@@ -302,10 +306,13 @@ struct LowerToLLVMPass : public LowerToLLVMBase<LowerToLLVMPass> {
     RewritePatternSet patterns(context);
     populateLoopToStdConversionPatterns(patterns);
     populateStdToLLVMConversionPatterns(typeConverter, patterns);
+    populateMemRefToLLVMConversionPatterns(typeConverter, patterns);
+    populateMathToLLVMConversionPatterns(typeConverter, patterns);
     populateStdXToLLVMConversionPatterns(typeConverter, patterns);
 
     LLVMConversionTarget target(*context);
     target.addIllegalDialect<stdx::StdXDialect>();
+    target.addIllegalOp<UnrealizedConversionCastOp>();
     if (failed(applyPartialConversion(module, target, std::move(patterns)))) {
       signalPassFailure();
     }

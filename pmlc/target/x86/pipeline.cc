@@ -8,6 +8,10 @@
 #include <utility>
 
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
+#include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
+#include "mlir/Conversion/LLVMCommon/TypeConverter.h"
+#include "mlir/Conversion/MathToLLVM/MathToLLVM.h"
+#include "mlir/Conversion/MemRefToLLVM/MemRefToLLVM.h"
 #include "mlir/Conversion/OpenMPToLLVM/ConvertOpenMPToLLVM.h"
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
@@ -90,11 +94,14 @@ struct ConvertStandardToLLVMPass
     populateExpandTanhPattern(patterns);
     populateXSMMToLLVMConversionPatterns(typeConverter, patterns);
     populateStdToLLVMConversionPatterns(typeConverter, patterns);
+    populateMemRefToLLVMConversionPatterns(typeConverter, patterns);
+    populateMathToLLVMConversionPatterns(typeConverter, patterns);
     conversion::stdx_to_llvm::populateStdXToLLVMConversionPatterns(
         typeConverter, patterns);
     populateOpenMPToLLVMConversionPatterns(typeConverter, patterns);
 
     LLVMConversionTarget target(*context);
+    target.addIllegalOp<UnrealizedConversionCastOp>();
     target.addDynamicallyLegalOp<omp::ParallelOp>([&](omp::ParallelOp op) {
       return typeConverter.isLegal(&op.getRegion());
     });

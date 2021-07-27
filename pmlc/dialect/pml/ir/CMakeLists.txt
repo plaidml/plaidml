@@ -23,4 +23,5 @@ pml_tblgen_library(
     -gen-attrdef-decls attrdef.h.inc
     -gen-attrdef-defs attrdef.cc.inc
     -gen-dialect-decls dialect.h.inc
+    -gen-dialect-defs dialect.cc.inc
 )
