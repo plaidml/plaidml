@@ -5,7 +5,7 @@ steps:
   - block: "Verify public contribution. Accept this PR?"
     branches: "*:*"
 
-  - command: "python ci/buildkite.py pipeline | buildkite-agent pipeline upload"
+  - command: "PYTHONPATH=$$PWD python ci/buildkite.py | buildkite-agent pipeline upload"
     label: ":pipeline:"
     agents:
       PLATFORM: linux_x86_64
