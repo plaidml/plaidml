@@ -3,66 +3,45 @@ env:
   LANG: en_US.UTF-8
 
 steps:
-# build phase
 
-{{#variants}}
-  - label: ':hammer_and_wrench: {{emoji}}'
-    command: '{{python}} ci/buildkite.py build {{name}}'
-    key: '{{name}}'
-    agents:
-      PLATFORM: '{{name}}'
-    artifact_paths:
-      - "logs/*.log"
-{{/variants}}
-
-  - label: 'IRv10 models'
-    trigger: irv10
-    async: false
-    depends_on: linux_x86_64
-    build:
-      message: "${BUILDKITE_MESSAGE}"
-      commit: d5733fa7ebe31c2cb959e0dd22737d7c37ecbe8c
-      env:
-        PLAIDML_COMMIT: "${BUILDKITE_COMMIT}"
-        BUILDKITE_PULL_REQUEST: "${BUILDKITE_PULL_REQUEST}"
-        BUILDKITE_PULL_REQUEST_BASE_BRANCH: "${BUILDKITE_PULL_REQUEST_BASE_BRANCH}"
-        BUILDKITE_PULL_REQUEST_REPO: "${BUILDKITE_PULL_REQUEST_REPO}"
-
-
-# test phase
-
-
-{{#tests}}
-  - label: '{{emoji}}{{engine}}{{suite}}/{{workload}}/{{platform}} BATCH_SIZE={{batch_size}}'
+{{#actions}}
+  - label: '{{vars.emoji}}{{name}}'
+    key: '{{vars.key}}'
+  {{#vars.depends_on}}
+    depends_on: '{{.}}'
+  {{/vars.depends_on}}
     command: |
-      {{python}} -m pip install pyyaml --user
-      {{python}} ci/buildkite.py test {{platform}} {{suite}} {{workload}} {{batch_size}}
-    depends_on: {{variant}}
-
-  {{#soft_fail}}
+    {{#cmds}}
+      {{.}}
+    {{/cmds}}
+  {{#vars.soft_fail}}
     soft_fail: true
-  {{/soft_fail}}
-    timeout_in_minutes: {{timeout}}
-  {{#retry}}
-    retry:
-      automatic:
-        limit: {{.}}
-  {{/retry}}
+  {{/vars.soft_fail}}
+  {{#vars.timeout}}
+    timeout_in_minutes: {{.}}
+  {{/vars.timeout}}
     agents:
-      PLATFORM: '{{platform}}'
+      PLATFORM: '{{vars.platform}}'
     artifact_paths:
-      - "tmp/test/**/report.json"
-{{/tests}}
+  {{#vars.artifacts}}
+      - '{{.}}'
+  {{/vars.artifacts}}
+
+{{/actions}}
 
   - wait: ~
     continue_on_failure: true
 
-# report phase
-
   - label: ':bar_chart:'
-    command: python3 ci/buildkite.py report
+    command: |
+      echo --- :buildkite: Downloading artifacts
+      buildkite-agent artifact download ci/test/**/* .
+      PYTHONPATH=$$PWD python ci/report.py ci
+      cat ci/report/annotate.html | buildkite-agent annotate --style=$$(cat ci/report/status.txt)
     agents:
       PLATFORM: linux_x86_64
     retry:
       manual:
         permit_on_passed: true
+    artifact_paths:
+      - ci/report/**/*

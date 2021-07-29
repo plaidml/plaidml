@@ -1,4 +1,4 @@
-// Copyright 2020 Intel Corporation
+// Copyright 2020, Intel Corporation
 
 #include "pmlc/dialect/pxa/analysis/strides.h"
 
@@ -73,60 +73,6 @@ static Optional<StrideInfo> flatten(MemRefType memRefType,
   }
 
   return flat;
-}
-
-StrideRange::StrideRange(BlockArgument arg)
-    : valid(false), minVal(0), maxVal(0), stride(0) {
-  if (auto ap = dyn_cast<AffineParallelOp>(arg.getOwner()->getParentOp())) {
-    auto rangeExpr = util::getRangesValueMap(ap).getResult(arg.getArgNumber());
-    auto rangeConstantExpr = rangeExpr.dyn_cast<AffineConstantExpr>();
-    if (!rangeConstantExpr) {
-      return;
-    }
-    int64_t range = rangeConstantExpr.getValue();
-    if (range < 1) {
-      return;
-    }
-    auto steps = ap.getSteps();
-    int64_t step = steps[arg.getArgNumber()];
-    if (step <= 0) {
-      return;
-    }
-    stride = 1;
-    minVal = 0;
-    // This is a correction to deal with the fact that strides are measured
-    // relative to loop iterations not indexes.
-    maxVal = (range - 1) / step;
-    valid = true;
-    if (minVal == maxVal) {
-      stride = 0;
-    }
-  }
-}
-
-StrideRange &StrideRange::operator*=(int64_t factor) {
-  minVal *= factor;
-  maxVal *= factor;
-  stride *= factor;
-  if (factor < 0) {
-    std::swap(minVal, maxVal);
-  }
-  return *this;
-}
-
-StrideRange &StrideRange::operator+=(const StrideRange &rhs) {
-  valid = valid && rhs.valid;
-  minVal += rhs.minVal;
-  maxVal += rhs.maxVal;
-  stride = std::gcd(stride, rhs.stride);
-  return *this;
-}
-
-void StrideRange::unionEquals(const StrideRange &rhs) {
-  valid = valid && rhs.valid;
-  minVal = std::min(minVal, rhs.minVal);
-  maxVal = std::max(maxVal, rhs.maxVal);
-  stride = std::gcd(stride, rhs.stride);
 }
 
 // Multiply the offset and all strides by a constant.
@@ -475,16 +421,16 @@ Optional<StrideInfo> computeStrideInfo(PxaVectorReduceOp op) {
 }
 
 Optional<RelativeAccessPattern>
-computeRelativeAccess(Value memref, ArrayRef<int64_t> vectorShape,
+computeRelativeAccess(Value memref, ArrayRef<StrideRange> internalRanges,
                       const AffineValueMap &valueMap, Block *block) {
   return computeRelativeAccess(
-      memref, vectorShape, valueMap, [block](BlockArgument arg) {
+      memref, internalRanges, valueMap, [block](BlockArgument arg) {
         return getBoundaryRegion(arg.getOwner(), block);
       });
 }
 
 Optional<RelativeAccessPattern>
-computeRelativeAccess(Value memref, ArrayRef<int64_t> vectorShape,
+computeRelativeAccess(Value memref, ArrayRef<StrideRange> internalRanges,
                       const AffineValueMap &valueMap,
                       BlockArgumentBoundaryFn fn) {
   SmallVector<StrideInfo> strides;
@@ -492,19 +438,15 @@ computeRelativeAccess(Value memref, ArrayRef<int64_t> vectorShape,
     return None;
 
   RelativeAccessPattern ret(memref);
-  for (auto it : llvm::zip(strides, vectorShape)) {
+  for (auto it : llvm::zip(strides, internalRanges)) {
     StrideInfo &si = std::get<0>(it);
-    int64_t vectorSize = std::get<1>(it);
+    const StrideRange &internalRange = std::get<1>(it);
 
     ret.outer.push_back(si.outer(fn));
     StrideInfo inner = si.inner(fn);
     ret.inner.push_back(inner);
 
-    StrideRange range = inner.range();
-    if (vectorSize > 1) {
-      range += StrideRange{0, vectorSize - 1, 1};
-    }
-
+    StrideRange range = inner.range() + internalRange;
     if (!range.valid || range.minVal != 0)
       return None;
 
@@ -647,6 +589,7 @@ RelativeAccessPattern::unionMerge(const RelativeAccessPattern &rhs) {
 bool RelativeAccessPattern::outerAlias(DenseSet<BlockArgument> allOuter) const {
   using Poly = util::math::Polynomial<util::math::Rational>;
   using RangeCons = util::math::RangeConstraint;
+
   util::bilp::ILPSolver solver;
   // We track each index as we add it, and make a string version since the
   // Polynomial logic uses string names for variables.
@@ -673,8 +616,8 @@ bool RelativeAccessPattern::outerAlias(DenseSet<BlockArgument> allOuter) const {
     return Poly(str + "_a") - Poly(str + "_b");
   };
   // Add entries for all the outer indexes.
-  for (auto &arg : allOuter) {
-    auto diff = toDiff(arg);
+  for (BlockArgument arg : allOuter) {
+    Poly diff = toDiff(arg);
     toMin.emplace_back(diff);
   }
   // Go over each dimension of the access.
@@ -683,11 +626,11 @@ bool RelativeAccessPattern::outerAlias(DenseSet<BlockArgument> allOuter) const {
     // dimension of the access.
     Poly totDiff;
     for (const auto &kvp : outer[i].strides) {
-      auto diff = toDiff(kvp.first);
+      Poly diff = toDiff(kvp.first);
       totDiff += diff * kvp.second;
     }
     for (const auto &kvp : inner[i].strides) {
-      auto diff = toDiff(kvp.first);
+      Poly diff = toDiff(kvp.first);
       totDiff += diff * kvp.second;
     }
     // Constrain this diff to be the range [0, 1) in integers, i.e. constrain it
@@ -715,14 +658,18 @@ bool RelativeAccessPattern::outerAlias(DenseSet<BlockArgument> allOuter) const {
 bool hasPerfectAliasing(const RelativeAccessPattern &aRap,
                         RelativeAccessPattern bRap,
                         const DenseMap<BlockArgument, BlockArgument> &bToA) {
+  IVLOG(3, "hasPerfectAliasing");
+
   DenseSet<BlockArgument> allOuter;
   for (const auto &kvp : bToA) {
     allOuter.insert(kvp.second);
   }
+
   if (aRap.outerAlias(allOuter)) {
     IVLOG(3, "outerAlias");
     return false;
   }
+
   for (auto &si : bRap.outer) {
     StrideInfo translated(si.offset);
     for (const auto &kvp : si.strides) {
@@ -730,25 +677,34 @@ bool hasPerfectAliasing(const RelativeAccessPattern &aRap,
     }
     si = translated;
   }
+
   if (aRap.outer.size() != bRap.outer.size()) {
     IVLOG(3, "size mismatch: " << aRap.outer.size()
                                << " != " << bRap.outer.size());
     return false;
   }
+
+  IVLOG(3, "aRap.innerCount: " << aRap.innerCount);
+  IVLOG(3, "bRap.innerCount: " << bRap.innerCount);
+
   for (size_t i = 0; i < aRap.outer.size(); i++) {
     const StrideInfo &aOuter = aRap.outer[i];
     const StrideInfo &bOuter = bRap.outer[i];
     const int64_t aInnerCount = aRap.innerCount[i];
     const int64_t bInnerCount = bRap.innerCount[i];
+
     if (aOuter != bOuter) {
       IVLOG(3, "aOuter != bOuter");
       return false;
     }
+
     if (aInnerCount != bInnerCount) {
-      IVLOG(3, "aInnerCount != bInnerCount");
+      IVLOG(3, "aInnerCount: " << aInnerCount
+                               << " != bInnerCount: " << bInnerCount);
       return false;
     }
   }
+
   return true;
 }
 

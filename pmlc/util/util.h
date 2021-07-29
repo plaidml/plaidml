@@ -19,18 +19,7 @@
 
 namespace pmlc::util {
 
-static constexpr const char *kTagAttribute = "tags";
-
 uint64_t getByteSize(mlir::MemRefType type);
-
-// Check if all tags exist in op and they are all true
-bool hasAllTags(mlir::Operation *op, llvm::ArrayRef<llvm::StringRef> tags);
-
-// Check if tag exists in op
-bool hasTag(mlir::Operation *op, llvm::StringRef tag);
-
-// Set tags in op
-void setTags(mlir::Operation *op, llvm::ArrayRef<llvm::StringRef> tags);
 
 // Pack function arguments to an i8** pointer
 void wrapFunctionAndPackArguments(llvm::Module *module,
@@ -76,6 +65,11 @@ namespace llvm {
 
 template <class T>
 inline std::ostream &operator<<(std::ostream &os, const SmallVectorImpl<T> &x) {
+  return stringify_collection(os, x.begin(), x.end());
+}
+
+template <class T>
+inline std::ostream &operator<<(std::ostream &os, ArrayRef<T> x) {
   return stringify_collection(os, x.begin(), x.end());
 }
 

@@ -39,6 +39,26 @@ LogicalResult ContractionOp::materializeOperands(OpBuilder &builder) {
   return tile::materializeOperands(builder, getOperation());
 }
 
+struct SimplifyContractionOp : public OpRewritePattern<ContractionOp> {
+  using OpRewritePattern<ContractionOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(ContractionOp op,
+                                PatternRewriter &rewriter) const override {
+    op.setSink(simplifyAffineMap(op.sink()));
+    SmallVector<AffineMap> srcs;
+    for (AffineMap src : op.srcs().getAsValueRange<AffineMapAttr>()) {
+      srcs.push_back(simplifyAffineMap(src));
+    }
+    op.setSources(srcs);
+    return success();
+  }
+};
+
+void ContractionOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
+                                                MLIRContext *context) {
+  patterns.insert<SimplifyContractionOp>(patterns.getContext());
+}
+
 LogicalResult GatherOp::materializeOperands(OpBuilder &builder) {
   Operation *op = getOperation();
   return tile::materializeOperands(builder, op,

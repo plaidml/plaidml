@@ -9,57 +9,13 @@
 
 #include "pmlc/dialect/pxa/analysis/affine_expr.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
+#include "pmlc/dialect/pxa/ir/stride_range.h"
 
 namespace pmlc::dialect::pxa {
 
 // Get the step for a block argument as an IV of an affine.for or
 // affine.parallel
 int64_t getIVStep(mlir::BlockArgument arg);
-
-struct StrideRange {
-  bool valid;
-  int64_t minVal;
-  int64_t maxVal;
-  int64_t stride;
-
-  explicit StrideRange(int64_t val)
-      : valid(true), minVal(val), maxVal(val), stride(0) {}
-
-  explicit StrideRange(int64_t min, int64_t max, int64_t stride)
-      : valid(true), minVal(min), maxVal(max), stride(stride) {
-    if (min == max) {
-      stride = 0;
-    }
-  }
-
-  explicit StrideRange(mlir::BlockArgument arg);
-
-  StrideRange &operator*=(int64_t factor);
-  StrideRange operator*(int64_t factor) const {
-    StrideRange ret = *this;
-    ret *= factor;
-    return ret;
-  }
-
-  StrideRange &operator+=(const StrideRange &rhs);
-  StrideRange operator+(const StrideRange &rhs) const {
-    StrideRange ret = *this;
-    ret += rhs;
-    return ret;
-  }
-
-  int64_t count() const {
-    if (!valid) {
-      return 0;
-    }
-    if (stride == 0) {
-      return 1;
-    }
-    return (maxVal - minVal) / stride + 1;
-  }
-
-  void unionEquals(const StrideRange &rhs);
-};
 
 enum class BoundaryRegion {
   Interior,
@@ -231,13 +187,13 @@ computeRelativeAccess(mlir::Operation *op, BlockArgumentBoundaryFn fn);
 mlir::Optional<RelativeAccessPattern> computeRelativeAccess(mlir::Operation *op,
                                                             mlir::Block *block);
 
-mlir::Optional<RelativeAccessPattern>
-computeRelativeAccess(mlir::Value memref, mlir::ArrayRef<int64_t> vectorShape,
-                      const mlir::AffineValueMap &valueMap,
-                      BlockArgumentBoundaryFn fn);
+mlir::Optional<RelativeAccessPattern> computeRelativeAccess(
+    mlir::Value memref, mlir::ArrayRef<StrideRange> internalRanges,
+    const mlir::AffineValueMap &valueMap, BlockArgumentBoundaryFn fn);
 
 mlir::Optional<RelativeAccessPattern>
-computeRelativeAccess(mlir::Value memref, mlir::ArrayRef<int64_t> vectorShape,
+computeRelativeAccess(mlir::Value memref,
+                      mlir::ArrayRef<StrideRange> internalRanges,
                       const mlir::AffineValueMap &valueMap, mlir::Block *block);
 
 bool hasPerfectAliasing(

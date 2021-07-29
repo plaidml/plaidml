@@ -1,16 +1,21 @@
+#!/usr/bin/env python
+import argparse
 import json
-import pathlib
+import os
+import sys
+from pathlib import Path
 
 import numpy as np
-import util
 
-GOLDEN_ROOT = pathlib.Path('ci/golden')
+GOLDEN_ROOT = Path('ci/golden')
+DEFAULT_BUILD_URL = 'https://buildkite.com/plaidml'
+DEFAULT_PERF_THRESHOLD = 0.7
 
 
-class RawResult(object):
+class RawResult:
 
-    def __init__(self, root, test_info):
-        self.path = test_info.path(root)
+    def __init__(self, path):
+        self.path = path
 
         data = {}
         result_path = self.path / 'result.json'
@@ -31,7 +36,7 @@ class RawResult(object):
             try:
                 self.np_data = np.load(np_result_path)
             except Exception as ex:
-                util.printf('  Exception:', ex)
+                print('  Exception:', ex)
                 if self.exception is None:
                     self.exception = str(ex)
 
@@ -39,7 +44,7 @@ class RawResult(object):
         return self.path.exists()
 
 
-class TestResult(object):
+class TestResult:
 
     def __init__(self, skip, compare):
         self.errors = []
@@ -50,19 +55,19 @@ class TestResult(object):
         self.compare = compare
 
     def add_error(self, msg):
-        util.printf('  ERROR:', msg)
+        print('  ERROR:', msg)
         self.errors.append(msg)
 
     def add_failure(self, msg):
-        util.printf('  FAIL:', msg)
+        print('  FAIL:', msg)
         self.failures.append(msg)
 
     def add_skip(self, msg):
-        util.printf('  SKIP:', msg)
+        print('  SKIP:', msg)
         self.skips.append(msg)
 
     def set_expected(self, msg):
-        util.printf('  SKIP:', msg)
+        print('  SKIP:', msg)
         self.expected = msg
 
     def status(self):
@@ -96,59 +101,30 @@ class TestResult(object):
         return self.status() == 'SKIP' or self.status() == 'PASS'
 
 
-class Result(object):
+class Result:
 
-    def __init__(self, root, test_info, golden_info):
-        self.test_info = test_info
+    def __init__(self, root, path):
+        self.path = path
         # The current results
-        self.cur = RawResult(root, test_info)
+        self.cur = RawResult(root / path)
         # The last results matching the platform of the current results
-        self.ref = RawResult(GOLDEN_ROOT, test_info)
-        # The golden results for the baseline platform (usually a TF/CUDA variant)
-        self.golden = RawResult(GOLDEN_ROOT, golden_info)
+        self.ref = RawResult(GOLDEN_ROOT / path)
 
         self.ratio = None
         if self.cur.execution_duration and self.ref.execution_duration:
             self.ratio = self.ref.execution_duration / self.cur.execution_duration
 
-        cur_efficiency = None
-        base_efficiency = None
-        if self.cur.execution_duration and self.test_info.platform.gpu_flops:
-            cur_efficiency = self.cur.execution_duration * self.test_info.platform.gpu_flops
-        if self.golden.execution_duration:
-            base_efficiency = self.golden.execution_duration * golden_info.platform.gpu_flops
-
-        self.efficiency = None
-        if cur_efficiency and base_efficiency:
-            self.efficiency = base_efficiency / cur_efficiency
-
-        label_parts = [self.test_info.platform.gpu, self.test_info.workload_name]
-        if self.test_info.batch_size:
-            label_parts += [str(self.test_info.batch_size)]
-        self.label = '-'.join(label_parts)
-
-        self.test_result = self._check_result()
-
     def __repr__(self):
-        return '<Result({})>'.format(self.test_info)
+        return '<Result({})>'.format(self.path)
 
-    def _check_result(self):
-        util.printf(self.test_info, self.cur.compile_duration, self.ref.execution_duration,
-                    self.cur.execution_duration, self.ratio, self.efficiency)
-
-        skip = self.test_info.workload.get('skip', False)
-        expected = self.test_info.workload.get('expected')
-        precision = self.test_info.workload.get('precision')
-        perf_threshold = self.test_info.perf_threshold
-        correct = self.test_info.workload.get('correct', True)
-        popt = util.PlanOption(self.test_info.suite, self.test_info.workload,
-                               self.test_info.platform)
-        compare = popt.get('compare', True)
+    def check_result(self, skip, compare, precision, perf_threshold, expected, correct):
+        print(self.path, self.cur.compile_duration, self.ref.execution_duration,
+              self.cur.execution_duration, self.ratio)
 
         if not self.cur.exists():
-            util.printf('  missing cur')
+            print('  missing cur')
         if not compare and not self.ref.exists():
-            util.printf('  missing ref')
+            print('  missing ref')
 
         test_result = TestResult(skip, compare)
 
@@ -164,14 +140,14 @@ class Result(object):
                     test_result.add_failure(first_line)
             elif compare:
                 if not self.ref.execution_duration:
-                    test_result.add_error('Missing reference duration')
+                    test_result.add_error('Missing golden duration')
                 elif not self.cur.execution_duration:
                     test_result.add_error('Missing result duration')
                 else:
                     if self.ratio < perf_threshold:
                         test_result.add_failure('Performance regression')
 
-                base_output = self.golden.np_data
+                base_output = self.ref.np_data
                 if precision != 'untested':
                     # If base_output is None and precision == 'untested' then
                     # this is interpreted to mean no correctness test is desired;
@@ -226,3 +202,49 @@ class Result(object):
             else:
                 msg = 'Correctness failure (expected): {}, max_abs_error: {}, fail rate: {}'
                 test_result.add_skip(msg.format(max_error, max_abs_error, fail_ratio))
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('root', type=Path)
+    parser.add_argument('path', type=Path)
+    parser.add_argument('--skip', type=bool, default=False)
+    parser.add_argument('--compare', type=bool, default=True)
+    parser.add_argument('--precision', choices=['untested', 'high', 'low'], default='untested')
+    parser.add_argument('--threshold', type=float, default=DEFAULT_PERF_THRESHOLD)
+    parser.add_argument('--expected', type=str)
+    parser.add_argument('--correct', type=bool, default=True)
+    args = parser.parse_args()
+
+    build_url = os.getenv('BUILDKITE_BUILD_URL')
+    if build_url:
+        job_id = os.getenv('BUILDKITE_JOB_ID')
+        build_url = f'{build_url}#{job_id}'
+    else:
+        build_url = DEFAULT_BUILD_URL
+
+    result = Result(args.root, args.path)
+    test_result = result.check_result(args.skip, args.compare, args.precision, args.threshold,
+                                      args.expected, args.correct)
+    report = {
+        'build_url': build_url,
+        'compare': test_result.compare,
+        'errors': test_result.errors,
+        'failures': test_result.failures,
+        'ratio': result.ratio,
+        'reason': test_result.reason(),
+        'status': test_result.status(),
+        'compile_duration': result.cur.compile_duration,
+        'cur.execution_duration': result.cur.execution_duration,
+        'ref.execution_duration': result.ref.execution_duration,
+    }
+
+    with (args.root / args.path / 'report.json').open('w') as fp:
+        json.dump(report, fp)
+
+    if not test_result.is_ok():
+        sys.exit(1)
+
+
+if __name__ == '__main__':
+    main()

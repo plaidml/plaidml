@@ -1,44 +1,91 @@
+#!/usr/bin/env python
+
+import argparse
 import base64
 import csv
 import json
 import mimetypes
-import pathlib
-import subprocess
-import sys
+import os
+from pathlib import Path
 
 import pystache
-import util
-import yaml
 from asq.initiators import query
 from asq.record import new
 
+import ci.plan
+
+DEFAULT_PIPELINE = 'plaidml'
+PIPELINE = os.getenv('PIPELINE', os.getenv('BUILDKITE_PIPELINE_NAME', DEFAULT_PIPELINE))
 DEFAULT_BUILD_URL = 'https://buildkite.com/plaidml'
-PLAN_PATH = pathlib.Path('ci/plan.yml')
+GPU_FLOPS = {
+    # nvidia
+    'gt650m': 605.77,
+    'gtx780': 3819.42,
+    'gtx1050': 1733.15,
+    'gtx1070': 7282.69,
+    'gtx1080': 9380.39,
+    'gtx1080ti': 12571.25,
+    'gp100gl': 10736.02,
+    'gv100gl': 14757.70,
+    # amd
+    'r560': 1815.01,
+    'rx480': 5950.39,
+    'r9nano': 8077.04,
+    'vega': 12697.10,
+    'gfx900': 11300.84,
+    'gfx803': 3573.79,
+    'gfx906': 13379.70,
+    'vega56': 4342.63,
+    # mali
+    't628': 34.05,
+    # intel
+    'hd4000': 247.14,
+    'hd505': 213.80,
+    'hd630': 417.22,
+    'uhd630': 454.72,
+    'iris655': 757.84,
+    'neo': 1084.50,
+}
 
 
-def printf(*args, **kwargs):
-    print(*args, **kwargs)
-    sys.stdout.flush()
+class Platform:
+
+    def __init__(self, full):
+        self.full = full
+        self.compiler, self.runtime, self.gpu = full.split('-')
+        self.engine = '{}_{}'.format(self.compiler, self.runtime)
+        self.gpu_flops = GPU_FLOPS.get(self.gpu)
+
+    def __repr__(self):
+        return f'<Platform({self.full})>'
 
 
-def check_call(cmd, **kwargs):
-    printf(cmd)
-    subprocess.check_call(cmd, **kwargs)
+class TestInfo:
+
+    def __init__(self, src):
+        self.vars = src
+        self.platform = Platform(self.vars['platform'])
+        self.suite = self.vars['suite']
+        self.model = self.vars['model']
+        self.batch_size = self.vars['batch_size']
+
+    def label(self):
+        label_parts = [self.platform.gpu, self.model]
+        if self.batch_size:
+            label_parts += [f'bs{self.batch_size}']
+        return '-'.join(label_parts)
 
 
 def collect_results(root, pipeline):
-    with open(PLAN_PATH) as file_:
-        plan = yaml.safe_load(file_)
-    gpu_flops = plan['CONST']['gpu_flops']
-    baseline_name = plan['CONST']['efficiency_baseline']
-    for info in util.iterate_tests(plan, pipeline):
-        if info.platform_name == baseline_name:
+    plan = ci.plan.load('ci/plan.yml')
+    selector = dict(pipeline=pipeline)
+    for action in plan.get_actions(selector):
+        if not action.vars.get('expect_result', False):
             continue
-        path = info.path(root) / 'report.json'
-        print(path)
+        path = root / action.vars['path'] / 'report.json'
         if path.exists():
-            with path.open() as fp:
-                data = json.load(fp)
+            print(f'Loading: {path}')
+            data = json.loads(path.read_text())
         else:
             data = {
                 'compare': False,
@@ -52,7 +99,7 @@ def collect_results(root, pipeline):
                 'reason': 'Result not found',
                 'build_url': DEFAULT_BUILD_URL,
             }
-        data['info'] = info
+        data['info'] = TestInfo(action.vars)
         yield data
 
 
@@ -65,7 +112,7 @@ CSS_MAP = {
 
 
 def load_template(name):
-    this_dir = pathlib.Path(__file__).parent
+    this_dir = Path(__file__).parent
     template_path = this_dir / 'templates' / name
     with open(template_path, 'r') as file_:
         return file_.read()
@@ -117,22 +164,6 @@ def generate_ratio_chart(results, report_dir):
     return None
 
 
-def generate_efficiency_chart(results, report_dir):
-    data = query(results) \
-        .where(lambda x: x['compare']) \
-        .where(lambda x: x['efficiency']) \
-        .order_by(lambda x: x['info'].label()) \
-        .select(lambda x: new(label=x['info'].label(), value=x['efficiency'])) \
-        .to_list()
-    labels = query(data).select(lambda x: x.label).to_list()
-    values = query(data).select(lambda x: x.value).to_list()
-    if len(values):
-        filename = report_dir / 'efficiency.png'
-        ratio_plot(filename, labels, values, 'Efficiency relative to TF/GP100')
-        return Image(filename)
-    return None
-
-
 def render_float(value):
     if value:
         return '{0:.3f}'.format(value)
@@ -149,7 +180,7 @@ def make_html_results(results):
             status=x['status'],
             gpu=info.platform.gpu,
             engine=info.platform.engine,
-            workload=info.instance_name,
+            workload=info.model,
             batch_size=info.batch_size,
             cur_com=render_float(x['compile_duration']),
             cur_run=render_float(x['cur.execution_duration']),
@@ -168,7 +199,7 @@ def make_html_results(results):
 def make_html_suites(results):
     return query(results) \
         .group_by(
-            lambda x: x['info'].suite_name,
+            lambda x: x['info'].suite,
             result_selector=lambda k, g: new(name=k, results=make_html_results(g))) \
         .order_by(lambda x: x.name) \
         .to_list()
@@ -246,7 +277,7 @@ def make_junit_context(results):
     testcases = query(results) \
         .select(lambda x: new(
             classname=x['info'].platform.full,
-            name='{}-{}'.format(x['info'].workload_name, x['info'].batch_size),
+            name='{}-{}'.format(x['info'].model, x['info'].batch_size),
             time=x['cur.execution_duration'],
             skipped=is_skipped(x),
             failure=make_junit_failure(x),
@@ -265,7 +296,7 @@ def make_csv_results(results):
             status=x['status'],
             gpu=info.platform.gpu,
             engine=info.platform.engine,
-            workload=info.instance_name,
+            workload=info.model,
             batch_size=info.batch_size,
             cur_com=x['compile_duration'],
             cur_run=x['cur.execution_duration'],
@@ -286,7 +317,7 @@ class Image(object):
         self.path = path
 
     def artifact_url(self):
-        return 'artifact://report/{}'.format(self.path.name)
+        return 'artifact://ci/report/{}'.format(self.path.name)
 
     def data_url(self):
         mime, _ = mimetypes.guess_type(str(self.path))
@@ -297,22 +328,18 @@ class Image(object):
 
 
 def write_file(filename, content):
-    printf('Writing:', filename)
+    print(f'Writing: {filename}')
     with open(filename, 'w') as file_:
         file_.write(content)
 
 
-def buildkite_annotate(root, style, html):
-    printf('--- :buildkite: Uploading artifacts and adding annotations')
-    check_call(['buildkite-agent', 'artifact', 'upload', 'report/**/*'], cwd=root)
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('root', type=Path)
+    parser.add_argument('--pipeline', default=PIPELINE)
+    args = parser.parse_args()
 
-    cmd = ['buildkite-agent', 'annotate', '--style', style]
-    proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
-    proc.communicate(html.encode())
-
-
-def run(args, remainder):
-    printf('--- :bar_chart: Analyzing test results')
+    print('--- :bar_chart: Analyzing test results')
 
     test_dir = args.root / 'test'
     report_dir = args.root / 'report'
@@ -324,7 +351,7 @@ def run(args, remainder):
     csv_results = make_csv_results(results)
     field_names = list(csv_results[0].keys())
     with csv_path.open('w') as csv_file:
-        printf('Writing:', csv_path)
+        print(f'Writing: {csv_path}')
         writer = csv.DictWriter(csv_file, field_names)
         writer.writeheader()
         writer.writerows(csv_results)
@@ -342,10 +369,6 @@ def run(args, remainder):
     if ratio_png:
         context['ratio_png'] = ratio_png.data_url()
 
-    efficiency_png = generate_efficiency_chart(results, report_dir)
-    if efficiency_png:
-        context['efficiency_png'] = efficiency_png.data_url()
-
     html = pystache.render(load_template('report.html'), context)
     write_file(report_dir / 'report.html', html)
 
@@ -359,11 +382,11 @@ def run(args, remainder):
         'summary': summary,
         'errors': make_html_failures(results, 'ERROR'),
         'failures': make_html_failures(results, 'FAIL'),
-        'report_url': 'artifact://report/report.html',
-        'wheel_url': 'artifact://all_wheels.tar.gz'
+        'report_url': 'artifact://ci/report/report.html',
     }
     html = pystache.render(load_template('annotate.html'), context)
     write_file(report_dir / 'annotate.html', html)
 
-    if not args.local:
-        buildkite_annotate(args.root, style, html)
+
+if __name__ == '__main__':
+    main()

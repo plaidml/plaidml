@@ -182,5 +182,7 @@ ParseResult parseUnaryInvokeOp(OpAsmParser &parser, OperationState &result) {
 
 } // namespace pmlc::dialect::xsmm
 
+#include "pmlc/dialect/xsmm/ir/dialect.cc.inc" // NOLINT
+
 #define GET_OP_CLASSES
 #include "pmlc/dialect/xsmm/ir/ops.cc.inc" // NOLINT

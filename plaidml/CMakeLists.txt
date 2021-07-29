@@ -107,3 +107,45 @@ pml_py_wheel(
     plaidml::exec::py
     plaidml::op::py
 )
+
+function(plaidml_setup)
+  cmake_parse_arguments(
+    _RULE
+    ""
+    ""
+    "DEPS;PY_DEPS"
+    ${ARGN}
+  )
+
+  pml_package_ns(_PACKAGE_NS)
+  # Replace dependencies passed by ::name with ::pml::package::name
+  list(TRANSFORM _RULE_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
+  list(TRANSFORM _RULE_PY_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
+  list(TRANSFORM _RULE_PY_DEPS REPLACE "::" "_")
+
+  foreach(_PY_DEP ${_RULE_PY_DEPS})
+    get_target_property(_PY_SRCS ${_PY_DEP} PY_SRCS)
+    list(APPEND _PY_DEP_SRCS ${_PY_SRCS})
+  endforeach()
+
+  add_custom_target(
+    setup
+    COMMAND
+      PYTHONPATH=${CMAKE_BINARY_DIR} ${PYTHON_EXECUTABLE} plaidml_setup.py
+    DEPENDS
+      ${_RULE_DEPS}
+      ${_PY_DEP_SRCS}
+    USES_TERMINAL
+  )
+endfunction()
+
+plaidml_setup(
+  DEPS ::plaidml
+  PY_DEPS
+    ::py
+    plaidml::core::py
+    plaidml::edsl::py
+    plaidml::exec::py
+    plaidml::op::py
+)
+
