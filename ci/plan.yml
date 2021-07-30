@@ -85,7 +85,7 @@ RULES:
     params:
       pipeline: [plaidml, nightly]
       platform: linux_x86_64
-      cfg: [release]
+      cfg: [release, debug]
     actions: [build]
     expand:
       key: "{platform}:{cfg}"
