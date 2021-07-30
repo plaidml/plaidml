@@ -58,6 +58,23 @@ static llvm::APFloat convertFloatUsingType(llvm::APFloat value,
   return value;
 }
 
+static FlatSymbolRefAttr createStubTraceFunc(ModuleOp module, StringAttr msg) {
+  static unsigned idCounter = 0;
+  auto uniqueId = idCounter++;
+  auto symbol = llvm::formatv("__trace_{0}", uniqueId).str();
+  auto context = module.getContext();
+  OpBuilder builder(context);
+  builder.setInsertionPointToStart(module.getBody());
+  auto funcType = FunctionType::get(context, {}, {});
+  auto funcOp = builder.create<FuncOp>(module.getLoc(), symbol, funcType,
+                                       ArrayRef<NamedAttribute>{});
+  funcOp->setAttr("msg", msg);
+  funcOp->setAttr("trace", builder.getUnitAttr());
+  funcOp->setAttr("id", builder.getI64IntegerAttr(uniqueId));
+  funcOp.setPrivate();
+  return SymbolRefAttr::get(context, symbol);
+}
+
 struct ConstantOpConversion : public OpConversionPattern<tile::ConstantOp> {
   using OpConversionPattern<tile::ConstantOp>::OpConversionPattern;
 
@@ -637,8 +654,14 @@ struct ContractionOpConversion
     // Create an adaptor
     tile::ContractionOpAdaptor cionAdaptor(operands);
     auto cionOperands = cionAdaptor.operands();
-
     auto loc = op.getLoc();
+
+    if (auto attr = op->getAttrOfType<StringAttr>("trace")) {
+      auto module = op->getParentOfType<ModuleOp>();
+      auto symbol = createStubTraceFunc(module, attr);
+      rewriter.create<CallOp>(loc, symbol, ArrayRef<Type>{});
+    }
+
     BufferAllocator alloc(rewriter, op.getOperation(), op.result().getType());
 
     // Do initialization
@@ -656,7 +679,7 @@ struct ContractionOpConversion
                                   alloc.resultMemRef, tile::getPaddingInfo(op));
     if (maybePadding)
       updateAffineMap(store.getDefiningOp(), *maybePadding);
-    parallelBuilder.create<AffineYieldOp>(loc, ValueRange{store});
+    parallelBuilder.create<AffineYieldOp>(loc, store);
     auto filled = parallel.getResult(0);
 
     // Determine lower and upper bounds.
@@ -987,27 +1010,10 @@ struct TraceOpConversion : public OpConversionPattern<tile::PragmaOp> {
     if (!msg) {
       return failure();
     }
-    auto symbol = createStubFunc(module, msg->second.cast<StringAttr>());
+    auto symbol = createStubTraceFunc(module, msg->second.cast<StringAttr>());
     rewriter.create<CallOp>(op.getLoc(), symbol, ArrayRef<Type>{});
     rewriter.replaceOp(op, adaptor.tensor());
     return success();
-  }
-
-  FlatSymbolRefAttr createStubFunc(ModuleOp module, StringAttr msg) const {
-    static unsigned idCounter = 0;
-    auto uniqueId = idCounter++;
-    auto symbol = llvm::formatv("__trace_{0}", uniqueId).str();
-    auto context = module.getContext();
-    OpBuilder builder(context);
-    builder.setInsertionPointToStart(module.getBody());
-    auto funcType = FunctionType::get(context, {}, {});
-    auto funcOp = builder.create<FuncOp>(module.getLoc(), symbol, funcType,
-                                         ArrayRef<NamedAttribute>{});
-    funcOp->setAttr("msg", msg);
-    funcOp->setAttr("trace", builder.getUnitAttr());
-    funcOp->setAttr("id", builder.getI64IntegerAttr(uniqueId));
-    funcOp.setPrivate();
-    return SymbolRefAttr::get(context, symbol);
   }
 };
 
