@@ -11,3 +11,18 @@ pml_cc_binary(
     pmlc::rt::all_runtimes
     pmlc::target::all
 )
+
+pml_cc_binary(
+  NAME layer
+  SRCS
+    layer.cc
+  DEPS
+    plaidml::core
+    plaidml::edsl
+    plaidml::exec
+    plaidml::op
+    pmlc::rt::all_runtimes
+    pmlc::target::all
+)
+
+
