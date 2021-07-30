@@ -46,13 +46,13 @@ func @conv1(%I: tensor<1x230x230x3xf32>, %K: tensor<7x7x3x64xf32>, %B: tensor<64
 
 // -----
 
-#map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
-#map4 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d3)>
-#map8 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4, d2 + d5, d6)>
+#output = affine_map<(n, h, w, c, r, s, k) -> (n, h, w, c)>
+#filter = affine_map<(n, h, w, c, r, s, k) -> (r, s, k, c)>
+#input = affine_map<(n, h, w, c, r, s, k) -> (n, h + r, w + s, k)>
 
 func @res2a_branch2a(%I: tensor<1x56x56x64xf32>, %K: tensor<1x1x64x64xf32>, %B: tensor<64xf32>, %O: tensor<1x56x56x64xf32>) -> tensor<1x56x56x64xf32> {
   %zero = tile.constant(0.0 : f64) : tensor<f32>
-  %0 = tile.contract add, mul, %zero, %I, %K {sink = #map2, srcs = [#map8, #map4]} : tensor<f32>, tensor<1x56x56x64xf32>, tensor<1x1x64x64xf32> -> tensor<1x56x56x64xf32>
+  %0 = tile.contract add, mul, %zero, %I, %K {sink = #output, srcs = [#input, #filter]} : tensor<f32>, tensor<1x56x56x64xf32>, tensor<1x1x64x64xf32> -> tensor<1x56x56x64xf32>
   %1 = tile.add %0, %B : (tensor<1x56x56x64xf32>, tensor<64xf32>) -> tensor<1x56x56x64xf32>
   %2 = tile.relu %1 : (tensor<1x56x56x64xf32>) -> tensor<1x56x56x64xf32>
   return %2 : tensor<1x56x56x64xf32>
