@@ -52,6 +52,7 @@ struct GeneralizeTensorCollapseShapeOp
         /*outputs=*/ValueRange{},
         /*numIdxs=*/numIdxs,
         /*maps=*/ArrayRef<AffineMap>{inputMap, outputMap},
+        /*iterTypes=*/SmallVector<StringRef, 4>(numIdxs, "parallel"),
         /*bodyBuilder=*/buildSimpleYieldBody);
     op.getResult().replaceAllUsesWith(genericOp.getResult(0));
     rewriter.eraseOp(op);
@@ -104,6 +105,7 @@ struct GeneralizeTensorExpandShapeOp
         /*outputs=*/ValueRange{},
         /*numIdxs=*/numIdxs,
         /*maps=*/ArrayRef<AffineMap>{inputMap, outputMap},
+        /*iterTypes=*/SmallVector<StringRef, 4>(numIdxs, "parallel"),
         /*bodyBuilder=*/buildSimpleYieldBody);
     op.getResult().replaceAllUsesWith(genericOp.getResult(0));
     rewriter.eraseOp(op);

@@ -30,6 +30,7 @@ createGenericOp(mlir::OpBuilder &builder, mlir::Operation *locationOp,
                 mlir::TypeRange outputTypes, mlir::ValueRange inputs,
                 mlir::ValueRange outputs, unsigned numIdxs,
                 mlir::ArrayRef<mlir::AffineMap> maps,
+                mlir::ArrayRef<mlir::StringRef> iterTypes,
                 GenericOpBodyBuilder bodyBuilder);
 
 void populateLinalgTensorCollapseOpGeneralizationPatterns(

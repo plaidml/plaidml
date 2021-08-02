@@ -110,6 +110,8 @@ struct GeneralizePoolingOp : public OpRewritePattern<PoolingOpType> {
       op.emitError("Invalid pooling op.");
     }
 
+    SmallVector<StringRef, 4> iterTypes(
+        op.iterator_types().template getAsValueRange<StringAttr>());
     auto genericOp = createGenericOp(
         /*builder=*/rewriter,
         /*locationOp=*/op,
@@ -118,6 +120,7 @@ struct GeneralizePoolingOp : public OpRewritePattern<PoolingOpType> {
         /*outputs=*/ValueRange{op.output()},
         /*numIdxs=*/numIdxs,
         /*maps=*/ArrayRef<AffineMap>{inputMap, windowMap, outputMap},
+        /*iterTypes*/ iterTypes,
         /*bodyBuilder=*/bodyBuilder);
 
     // Do not replace the use of the output in the new generic op

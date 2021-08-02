@@ -31,6 +31,7 @@ GenericOp createGenericOp(OpBuilder &builder, Operation *locationOp,
                           TypeRange outputTypes, ValueRange inputs,
                           ValueRange outputs, unsigned numIdxs,
                           ArrayRef<AffineMap> maps,
+                          ArrayRef<StringRef> iterTypes,
                           GenericOpBodyBuilder bodyBuilder) {
   builder.setInsertionPoint(locationOp);
   SmallVector<Value, 1> inits;
@@ -52,8 +53,6 @@ GenericOp createGenericOp(OpBuilder &builder, Operation *locationOp,
     // operands as generic op's output operands.
     inits.insert(inits.end(), outputs.begin(), outputs.end());
   }
-
-  SmallVector<StringRef, 4> iterTypes(numIdxs, "parallel"); // FIX ME
 
   auto genericOp = builder.create<GenericOp>(builder.getUnknownLoc(),
                                              /*resultTensorTypes=*/outputTypes,
