@@ -1656,15 +1656,15 @@ Value explicit_padding(const Value& value) {
         O.bind_dims(O_dims);
 
         std::vector<TensorIndex> lo_idxs = Lo_idxs;
+        lo_idxs[i] = TensorIndex(0);
         Lo_dims = O_dims;
         Lo_dims[i] = TensorDim(lo_pads[i]);
-        lo_idxs[i] = TensorIndex(0);
         Tensor Lo = Contraction(Lo_dims, Lo_idxs).assign(O(lo_idxs));
 
         std::vector<TensorIndex> hi_idxs = Hi_idxs;
+        hi_idxs[i] = O_dims[i] - TensorIndex(1);
         Hi_dims = O_dims;
         Hi_dims[i] = TensorDim(hi_pads[i]);
-        hi_idxs[i] = O_dims[i] - TensorIndex(1);
         Tensor Hi = Contraction(Hi_dims, Hi_idxs).assign(O(hi_idxs));
 
         O = op::concatenate({Lo, O, Hi}, i);
