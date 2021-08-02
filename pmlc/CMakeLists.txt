@@ -24,7 +24,6 @@ pml_cc_library(
     ${MLIR_CONVERSION_LIBS}
     MLIRTransforms
     pmlc::conversion::pxa_to_affine
-    pmlc::conversion::scf_to_omp
     pmlc::conversion::stdx_to_llvm
     pmlc::conversion::tile_to_pxa
     pmlc::dialect::affinex::transforms
