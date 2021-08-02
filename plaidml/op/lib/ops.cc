@@ -1646,8 +1646,8 @@ Value explicit_padding(const Value& value) {
       IVLOG(2, "Edge padding requested");
       O = I;
 
-      std::vector<TensorIndex> Lo_idxs(I.rank());
-      std::vector<TensorIndex> Hi_idxs(I.rank());
+      std::vector<TensorIndex> dst_lo_idxs(I.rank());
+      std::vector<TensorIndex> dst_hi_idxs(I.rank());
       std::vector<TensorDim> Lo_dims(I.rank());
       std::vector<TensorDim> Hi_dims(I.rank());
 
@@ -1655,17 +1655,17 @@ Value explicit_padding(const Value& value) {
         std::vector<TensorDim> O_dims(I.rank());
         O.bind_dims(O_dims);
 
-        std::vector<TensorIndex> lo_idxs = Lo_idxs;
-        lo_idxs[i] = TensorIndex(0);
+        std::vector<TensorIndex> src_lo_idxs = dst_lo_idxs;
+        src_lo_idxs[i] = TensorIndex(0);
         Lo_dims = O_dims;
         Lo_dims[i] = TensorDim(lo_pads[i]);
-        Tensor Lo = Contraction(Lo_dims, Lo_idxs).assign(O(lo_idxs));
+        Tensor Lo = Contraction(Lo_dims, Lo_idxs).assign(O(src_lo_idxs));
 
-        std::vector<TensorIndex> hi_idxs = Hi_idxs;
-        hi_idxs[i] = O_dims[i] - TensorIndex(1);
+        std::vector<TensorIndex> src_hi_idxs = dst_hi_idxs;
+        src_hi_idxs[i] = O_dims[i] - TensorIndex(1);
         Hi_dims = O_dims;
         Hi_dims[i] = TensorDim(hi_pads[i]);
-        Tensor Hi = Contraction(Hi_dims, Hi_idxs).assign(O(hi_idxs));
+        Tensor Hi = Contraction(Hi_dims, Hi_idxs).assign(O(src_hi_idxs));
 
         O = op::concatenate({Lo, O, Hi}, i);
       }
