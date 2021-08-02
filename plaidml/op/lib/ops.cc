@@ -1648,8 +1648,8 @@ Value explicit_padding(const Value& value) {
 
       std::vector<TensorIndex> dst_lo_idxs(I.rank());
       std::vector<TensorIndex> dst_hi_idxs(I.rank());
-      std::vector<TensorDim> Lo_dims(I.rank());
-      std::vector<TensorDim> Hi_dims(I.rank());
+      std::vector<TensorDim> dst_lo_dims(I.rank());
+      std::vector<TensorDim> dst_hi_dims(I.rank());
 
       for (size_t i = 0; i < I.rank(); ++i) {
         std::vector<TensorDim> O_dims(I.rank());
@@ -1657,15 +1657,15 @@ Value explicit_padding(const Value& value) {
 
         std::vector<TensorIndex> src_lo_idxs = dst_lo_idxs;
         src_lo_idxs[i] = TensorIndex(0);
-        Lo_dims = O_dims;
-        Lo_dims[i] = TensorDim(lo_pads[i]);
-        Tensor Lo = Contraction(Lo_dims, Lo_idxs).assign(O(src_lo_idxs));
+        dst_lo_dims = O_dims;
+        dst_lo_dims[i] = TensorDim(lo_pads[i]);
+        Tensor Lo = Contraction(dst_lo_dims, dst_lo_idxs).assign(O(src_lo_idxs));
 
         std::vector<TensorIndex> src_hi_idxs = dst_hi_idxs;
         src_hi_idxs[i] = O_dims[i] - TensorIndex(1);
-        Hi_dims = O_dims;
-        Hi_dims[i] = TensorDim(hi_pads[i]);
-        Tensor Hi = Contraction(Hi_dims, Hi_idxs).assign(O(src_hi_idxs));
+        dst_hi_dims = O_dims;
+        dst_hi_dims[i] = TensorDim(hi_pads[i]);
+        Tensor Hi = Contraction(dst_hi_dims, dst_hi_idxs).assign(O(src_hi_idxs));
 
         O = op::concatenate({Lo, O, Hi}, i);
       }
