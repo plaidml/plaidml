@@ -383,14 +383,28 @@ TEST_F(OpTest, ExplicitPaddingNoOp) {
 }
 
 TEST_F(OpTest, ExplicitPaddingEdge) {
-  auto I = Placeholder(DType::FLOAT32, {2, 3}, "A");
-  auto O = op::explicit_padding(I, {2, 1}, {2, 1}).mode(op::PadMode::EDGE);
+  auto I = Placeholder(DType::FLOAT32, {1, 2, 3}, "A");
+  auto O = op::explicit_padding(I, {1, 2, 1}, {1, 2, 1}).mode(op::PadMode::EDGE);
   auto program = makeProgram("explicit_padding", {I}, {O});
 
   std::vector<float> I_input = {1, 2, 3,  //
                                 4, 5, 6};
 
   std::vector<float> O_output = {1, 1, 2, 3, 3,  //
+                                 1, 1, 2, 3, 3,  //
+                                 1, 1, 2, 3, 3,  //
+                                 4, 4, 5, 6, 6,  //
+                                 4, 4, 5, 6, 6,  //
+                                 4, 4, 5, 6, 6,  //
+                                 //
+                                 1, 1, 2, 3, 3,  //
+                                 1, 1, 2, 3, 3,  //
+                                 1, 1, 2, 3, 3,  //
+                                 4, 4, 5, 6, 6,  //
+                                 4, 4, 5, 6, 6,  //
+                                 4, 4, 5, 6, 6,  //
+                                 //
+                                 1, 1, 2, 3, 3,  //
                                  1, 1, 2, 3, 3,  //
                                  1, 1, 2, 3, 3,  //
                                  4, 4, 5, 6, 6,  //
