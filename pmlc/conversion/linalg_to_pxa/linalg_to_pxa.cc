@@ -245,45 +245,17 @@ struct GenericOpConversion : public OpConversionPattern<GenericOp> {
       outputTypes.emplace_back(output.getType());
     }
 
-    // Make a parallel for loop to fill the result
-    SmallVector<AtomicRMWKind, 4> reduction(outputs.size(),
-                                            AtomicRMWKind::assign); // FIX ME
-    auto ranges = op.getStaticLoopRanges();
-    if (!ranges) {
-      op.emitError("LiangOp does not have static ranges.");
-    }
-    auto forOp = rewriter.create<AffineParallelOp>(op.getLoc(),
-                                                   /*resultTypes=*/outputTypes,
-                                                   /*reductions=*/reduction,
-                                                   /*ranges=*/*ranges);
-
-    // Create the a load op for each block argument.
-    auto forBody = forOp.getBody();
-    auto idxs = forBody->getArguments();
-    auto opArgs = op.getBody()->getArguments();
-    auto numInputs = inputs.size();
-    rewriter.setInsertionPointToStart(forBody);
-    for (unsigned i = 0; i < numInputs; ++i) {
-      if (inputs[i].getType().isa<ShapedType>()) {
-        // input is a tensor
-        auto loadOp = rewriter.create<pxa::PxaLoadOp>(
-            rewriter.getUnknownLoc(), inputs[i], idxMaps[i], idxs);
-        opArgs[i].replaceAllUsesWith(loadOp.getResult());
-      } else {
-        // input is a scalar
-        opArgs[i].replaceAllUsesWith(inputs[i]);
-      }
-    }
-
     // Prepare for creating the reduce ops. The operations with output arguments
     // should be converted to reduce op. We need to extract the aggregation
     // kind, the scalar value and the related operations from these operations.
     llvm::SmallSet<Operation *, 4> toRemove;
+    auto numInputs = inputs.size();
     auto numOutputs = outputs.size();
-    SmallVector<AtomicRMWKind, 4> aggs(numOutputs, AtomicRMWKind::assign);
+    // Make a parallel for loop to fill the result
+    SmallVector<AtomicRMWKind, 4> aggs(outputs.size(), AtomicRMWKind::assign);
+    auto outputArgs = op.getBody()->getArguments();
     for (unsigned i = 0; i < outputs.size(); ++i) {
-      auto output = opArgs[numInputs + i];
-      for (auto &use : output.getUses()) {
+      for (auto &use : outputArgs[numInputs + i].getUses()) {
         auto useOp = use.getOwner();
         if (toRemove.count(useOp) || useOp->getNumResults() != 1) {
           continue;
@@ -305,6 +277,32 @@ struct GenericOpConversion : public OpConversionPattern<GenericOp> {
         if (auto relatedOp = ri.getRelatedOp()) {
           toRemove.insert(relatedOp);
         }
+      }
+    }
+
+    auto ranges = op.getStaticLoopRanges();
+    if (!ranges) {
+      op.emitError("LiangOp does not have static ranges.");
+    }
+    auto forOp = rewriter.create<AffineParallelOp>(op.getLoc(),
+                                                   /*resultTypes=*/outputTypes,
+                                                   /*reductions=*/aggs,
+                                                   /*ranges=*/*ranges);
+
+    // Create the a load op for each block argument.
+    auto forBody = forOp.getBody();
+    auto idxs = forBody->getArguments();
+    auto opArgs = op.getBody()->getArguments();
+    rewriter.setInsertionPointToStart(forBody);
+    for (unsigned i = 0; i < numInputs; ++i) {
+      if (inputs[i].getType().isa<ShapedType>()) {
+        // input is a tensor
+        auto loadOp = rewriter.create<pxa::PxaLoadOp>(
+            rewriter.getUnknownLoc(), inputs[i], idxMaps[i], idxs);
+        opArgs[i].replaceAllUsesWith(loadOp.getResult());
+      } else {
+        // input is a scalar
+        opArgs[i].replaceAllUsesWith(inputs[i]);
       }
     }
 
