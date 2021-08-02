@@ -1,21 +1,6 @@
 // Copyright 2021, Intel Corporation
 
-#include "llvm/ADT/TypeSwitch.h"
-
-#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
-#include "mlir/IR/Matchers.h"
-#include "mlir/Pass/Pass.h"
-#include "mlir/Pass/PassManager.h"
-#include "mlir/Support/DebugStringHelper.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-
 #include "pmlc/conversion/linalg_to_pxa/pass_detail.h"
-#include "pmlc/dialect/pxa/analysis/strides.h"
-#include "pmlc/dialect/pxa/analysis/uses.h"
-#include "pmlc/util/logging.h"
-#include "pmlc/util/util.h"
-
-#include "pmlc/util/ident.h"
 
 namespace pmlc::conversion::linalg_to_pxa {
 

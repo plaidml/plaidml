@@ -13,7 +13,6 @@ def LowerLinalgToPXA : Pass<"convert-linalg-to-pxa", "mlir::ModuleOp"> {
     "mlir::memref::MemRefDialect",
     "mlir::scf::SCFDialect",
     "pmlc::dialect::pxa::PXADialect",
-    "pmlc::dialect::layer::LayerDialect",
     "pmlc::dialect::stdx::StdXDialect",
   ];
 }

@@ -1,38 +1,18 @@
 // Copyright 2021, Intel Corporation
 
-#include <limits>
-#include <utility>
-
-#include "llvm/ADT/SmallSet.h"
-#include "llvm/ADT/TypeSwitch.h"
-
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
-#include "mlir/IR/Matchers.h"
-#include "mlir/Pass/Pass.h"
-#include "mlir/Pass/PassManager.h"
-#include "mlir/Support/DebugStringHelper.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "pmlc/conversion/linalg_to_pxa/pass_detail.h"
-#include "pmlc/dialect/pxa/analysis/strides.h"
-#include "pmlc/dialect/pxa/analysis/uses.h"
-#include "pmlc/util/logging.h"
 #include "pmlc/util/matchers.h"
-#include "pmlc/util/util.h"
-
-#include "pmlc/util/ident.h"
 
 namespace pmlc::conversion::linalg_to_pxa {
 
-namespace layer = dialect::layer;
 namespace pxa = dialect::pxa;
 namespace stdx = dialect::stdx;
 
 using namespace mlir;         // NOLINT
 using namespace mlir::linalg; // NOLINT
-
-using util::AggregationKind;
-using util::CombinationKind;
 
 namespace {
 
@@ -472,7 +452,6 @@ struct LowerLinalgToPXAPass
                            mlir::math::MathDialect,     //
                            mlir::memref::MemRefDialect, //
                            mlir::scf::SCFDialect,       //
-                           layer::LayerDialect,         //
                            pxa::PXADialect,             //
                            stdx::StdXDialect>();
     target.addLegalOp<scf::ForOp,   //
@@ -499,8 +478,6 @@ struct LowerLinalgToPXAPass
                     PoolingOpConversion<PoolingMaxOp>, //
                     PoolingOpConversion<PoolingMinOp>, //
                     PoolingOpConversion<PoolingSumOp>>(&getContext());
-
-    populateLinalgToPXASpecialPatterns(patterns);
 
     auto module = getOperation();
     performLinalgTransforms(module);

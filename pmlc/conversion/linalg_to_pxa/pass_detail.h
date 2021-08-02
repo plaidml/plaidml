@@ -10,7 +10,6 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-#include "pmlc/dialect/layer/ir/ops.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/dialect/stdx/ir/ops.h"
 
@@ -30,8 +29,6 @@ mlir::linalg::GenericOp createGenericOp(
     mlir::OpBuilder &builder, mlir::Operation *op, mlir::TypeRange outputTypes,
     mlir::ValueRange inputs, mlir::ValueRange outputs, unsigned numIdxs,
     mlir::ArrayRef<mlir::AffineMap> maps, GenericOpBodyBuilder bodyBuilder);
-
-void populateLinalgToPXASpecialPatterns(mlir::RewritePatternSet &patterns);
 
 void populateLinalgTensorCollapseOpGeneralizationPatterns(
     mlir::RewritePatternSet &patterns);
