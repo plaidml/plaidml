@@ -25,10 +25,12 @@ struct LinalgToPXATypeConverter : public mlir::TypeConverter {
 using GenericOpBodyBuilder =
     llvm::function_ref<void(mlir::OpBuilder &, unsigned, mlir::ValueRange)>;
 
-mlir::linalg::GenericOp createGenericOp(
-    mlir::OpBuilder &builder, mlir::Operation *op, mlir::TypeRange outputTypes,
-    mlir::ValueRange inputs, mlir::ValueRange outputs, unsigned numIdxs,
-    mlir::ArrayRef<mlir::AffineMap> maps, GenericOpBodyBuilder bodyBuilder);
+mlir::linalg::GenericOp
+createGenericOp(mlir::OpBuilder &builder, mlir::Operation *locationOp,
+                mlir::TypeRange outputTypes, mlir::ValueRange inputs,
+                mlir::ValueRange outputs, unsigned numIdxs,
+                mlir::ArrayRef<mlir::AffineMap> maps,
+                GenericOpBodyBuilder bodyBuilder);
 
 void populateLinalgTensorCollapseOpGeneralizationPatterns(
     mlir::RewritePatternSet &patterns);

@@ -44,9 +44,10 @@ struct BufferAllocator {
   }
 };
 
-// Extract the agg kind and the scalar for op. bufElem is the element
-// in the target buffer. So the scalar should be the other operand of the
-// reduceOp
+// To create a new reduce op, we need to extract the aggregation kind, the
+// scalar for op, and the related operation if there are multiple operations for
+// the reduction. bufElem is the element value in the target buffer. So the
+// scalar should be the other operand of the reduceOp
 struct ReductionInfo {
   ReductionInfo(Operation *op, Value bufElem) : relatedOp(nullptr) {
     Value lhs, rhs;
@@ -204,6 +205,7 @@ struct FuncOpConversion : public OpConversionPattern<FuncOp> {
   }
 };
 
+// Most of Linalg ops are converted to GenericOp first.
 struct GenericOpConversion : public OpConversionPattern<GenericOp> {
   using OpConversionPattern<GenericOp>::OpConversionPattern;
 
@@ -255,7 +257,7 @@ struct GenericOpConversion : public OpConversionPattern<GenericOp> {
                                                    /*reductions=*/reduction,
                                                    /*ranges=*/*ranges);
 
-    // Create the load ops
+    // Create the a load op for each block argument.
     auto forBody = forOp.getBody();
     auto idxs = forBody->getArguments();
     auto opArgs = op.getBody()->getArguments();
@@ -273,7 +275,9 @@ struct GenericOpConversion : public OpConversionPattern<GenericOp> {
       }
     }
 
-    // Create the reduce ops
+    // Prepare for creating the reduce ops. The operations with output arguments
+    // should be converted to reduce op. We need to extract the aggregation
+    // kind, the scalar value and the related operations from these operations.
     llvm::SmallSet<Operation *, 4> toRemove;
     auto numOutputs = outputs.size();
     SmallVector<AtomicRMWKind, 4> aggs(numOutputs, AtomicRMWKind::assign);
@@ -284,8 +288,7 @@ struct GenericOpConversion : public OpConversionPattern<GenericOp> {
         if (toRemove.count(useOp) || useOp->getNumResults() != 1) {
           continue;
         }
-        // Extract the aggregation kind, the scalar, and the related op from the
-        // yield operand
+        // Extract the aggregation kind, the scalar value, and the related op.
         ReductionInfo ri(useOp, use.get());
         useOp->getResult(0).replaceUsesWithIf(
             ri.getScalar(), [&](mlir::OpOperand &operand) {
@@ -296,6 +299,8 @@ struct GenericOpConversion : public OpConversionPattern<GenericOp> {
               aggs[operand.getOperandNumber()] = ri.getAgg();
               return true;
             });
+        // The reduction-like op and the related op will not be copied to the
+        // parallel loop.
         toRemove.insert(useOp);
         if (auto relatedOp = ri.getRelatedOp()) {
           toRemove.insert(relatedOp);
@@ -303,7 +308,7 @@ struct GenericOpConversion : public OpConversionPattern<GenericOp> {
       }
     }
 
-    // Move the selected original ops
+    // Move the original ops except for toRemove into the parallel loop
     SmallVector<Operation *, 4> toMove;
     for (auto &origOp : *op.getBody()) {
       if (toRemove.count(&origOp) == 0) {
@@ -314,7 +319,7 @@ struct GenericOpConversion : public OpConversionPattern<GenericOp> {
       newOp->moveBefore(forBody, forBody->getOperations().end());
     }
 
-    // Must insert reduce ops here. Later, the reduce op's memref information
+    // Must insert reduce ops here. Later on, the reduce op's memref information
     // may be lost while the generic op is erased.
     if (auto yieldOp = dyn_cast<linalg::YieldOp>(forBody->back())) {
       SmallVector<AffineMap, 4> maps(idxMaps.begin() + numInputs,
@@ -433,6 +438,8 @@ struct LowerLinalgToPXAPass
     : public LowerLinalgToPXABase<LowerLinalgToPXAPass> {
 
   void performLinalgTransforms(ModuleOp op) {
+    // We perform some Linalg transformations first in order to convert as many
+    // as operations to GenericOp.
     RewritePatternSet patterns(op.getContext());
     populateLinalgConvGeneralizationPatterns(patterns);
     populateLinalgNamedOpsGeneralizationPatterns(patterns);

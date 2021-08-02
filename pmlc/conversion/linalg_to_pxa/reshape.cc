@@ -43,10 +43,16 @@ struct GeneralizeTensorCollapseShapeOp
 
     AffineMap inputMap = AffineMap::getMultiDimIdentityMap(numIdxs, context);
     AffineMap outputMap = AffineMap::get(numIdxs, 0, exprs, context);
+
     auto genericOp = createGenericOp(
-        rewriter, op, TypeRange{op.getResult().getType().cast<ShapedType>()},
-        ValueRange{op.src()}, ValueRange{}, numIdxs,
-        ArrayRef<AffineMap>{inputMap, outputMap}, buildSimpleYieldBody);
+        /*builder=*/rewriter,
+        /*locationOp=*/op,
+        /*outputTypes=*/TypeRange{op.getResult().getType().cast<ShapedType>()},
+        /*inputs=*/ValueRange{op.src()},
+        /*outputs=*/ValueRange{},
+        /*numIdxs=*/numIdxs,
+        /*maps=*/ArrayRef<AffineMap>{inputMap, outputMap},
+        /*bodyBuilder=*/buildSimpleYieldBody);
     op.getResult().replaceAllUsesWith(genericOp.getResult(0));
     rewriter.eraseOp(op);
 
@@ -89,10 +95,16 @@ struct GeneralizeTensorExpandShapeOp
 
     AffineMap inputMap = AffineMap::get(numIdxs, 0, exprs, context);
     AffineMap outputMap = AffineMap::getMultiDimIdentityMap(numIdxs, context);
+
     auto genericOp = createGenericOp(
-        rewriter, op, TypeRange{op.getResult().getType().cast<ShapedType>()},
-        ValueRange{op.src()}, ValueRange{}, numIdxs,
-        ArrayRef<AffineMap>{inputMap, outputMap}, buildSimpleYieldBody);
+        /*builder=*/rewriter,
+        /*locationOp=*/op,
+        /*outputTypes=*/TypeRange{op.getResult().getType().cast<ShapedType>()},
+        /*inputs=*/ValueRange{op.src()},
+        /*outputs=*/ValueRange{},
+        /*numIdxs=*/numIdxs,
+        /*maps=*/ArrayRef<AffineMap>{inputMap, outputMap},
+        /*bodyBuilder=*/buildSimpleYieldBody);
     op.getResult().replaceAllUsesWith(genericOp.getResult(0));
     rewriter.eraseOp(op);
 

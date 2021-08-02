@@ -98,6 +98,7 @@ struct GeneralizePoolingOp : public OpRewritePattern<PoolingOpType> {
         exprs.begin() + (numInputDims + numWindowDims), exprs.end());
     AffineMap outputMap = AffineMap::get(numIdxs, 0, outputExprs, context);
 
+    // Use different body builder for different pooling ops
     GenericOpBodyBuilder bodyBuilder;
     if (isa<PoolingMaxOp>(op)) {
       bodyBuilder = buildPoolingMaxOpBody;
@@ -110,10 +111,16 @@ struct GeneralizePoolingOp : public OpRewritePattern<PoolingOpType> {
     }
 
     auto genericOp = createGenericOp(
-        rewriter, op, TypeRange{outputType},
-        ValueRange{op.input(), op.windowDims()}, ValueRange{op.output()},
-        numIdxs, ArrayRef<AffineMap>{inputMap, windowMap, outputMap},
-        bodyBuilder);
+        /*builder=*/rewriter,
+        /*locationOp=*/op,
+        /*outputTypes=*/TypeRange{outputType},
+        /*inputs=*/ValueRange{op.input(), op.windowDims()},
+        /*outputs=*/ValueRange{op.output()},
+        /*numIdxs=*/numIdxs,
+        /*maps=*/ArrayRef<AffineMap>{inputMap, windowMap, outputMap},
+        /*bodyBuilder=*/bodyBuilder);
+
+    // Do not replace the use of the output in the new generic op
     op.output().replaceUsesWithIf(genericOp.getResult(0), [&](OpOperand &use) {
       return genericOp.getOperation() != use.getOwner();
     });

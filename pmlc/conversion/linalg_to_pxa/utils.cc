@@ -25,15 +25,20 @@ LinalgToPXATypeConverter::LinalgToPXATypeConverter() {
   });
 }
 
-GenericOp createGenericOp(OpBuilder &builder, Operation *op,
+// Generate a linalg.generic. This function uses bodyBuilder to create the
+// different generic op bodies.
+GenericOp createGenericOp(OpBuilder &builder, Operation *locationOp,
                           TypeRange outputTypes, ValueRange inputs,
                           ValueRange outputs, unsigned numIdxs,
                           ArrayRef<AffineMap> maps,
                           GenericOpBodyBuilder bodyBuilder) {
-  builder.setInsertionPoint(op);
+  builder.setInsertionPoint(locationOp);
   SmallVector<Value, 1> inits;
 
+  // Some original ops use outputs as operands, and some ops return outputs
   if (outputs.empty()) {
+    // For the ops only return outputs, we have to initialize a tensor for its
+    // output.
     for (auto outputType : outputTypes) {
       auto shapedType = outputType.cast<ShapedType>();
       auto outputShape = shapedType.getShape();
@@ -43,10 +48,12 @@ GenericOp createGenericOp(OpBuilder &builder, Operation *op,
       inits.emplace_back(initOp.getResult());
     }
   } else {
+    // For the ops take output as operands, we can simply reuse these output
+    // operands as generic op's output operands.
     inits.insert(inits.end(), outputs.begin(), outputs.end());
   }
 
-  SmallVector<StringRef, 4> iterTypes(numIdxs, "parallel");
+  SmallVector<StringRef, 4> iterTypes(numIdxs, "parallel"); // FIX ME
 
   auto genericOp = builder.create<GenericOp>(builder.getUnknownLoc(),
                                              /*resultTensorTypes=*/outputTypes,
@@ -67,6 +74,7 @@ GenericOp createGenericOp(OpBuilder &builder, Operation *op,
   Block &block = genericOp.region().emplaceBlock();
   block.addArguments(argTypes);
   builder.setInsertionPointToStart(&block);
+  // Call bodyBuilder to create the customized generic op body.
   bodyBuilder(builder, inputs.size(), block.getArguments());
   return genericOp;
 }
