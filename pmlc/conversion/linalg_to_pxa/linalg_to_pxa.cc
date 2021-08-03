@@ -133,39 +133,6 @@ private:
   Operation *relatedOp;
 };
 
-struct ConvOpConversion : public OpConversionPattern<ConvOp> {
-  using OpConversionPattern<ConvOp>::OpConversionPattern;
-
-  LogicalResult
-  matchAndRewrite(ConvOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const final {
-    op.emitError("The program should not contain linalg.conv");
-    return success();
-  }
-};
-
-struct CopyOpConversion : public OpConversionPattern<CopyOp> {
-  using OpConversionPattern<CopyOp>::OpConversionPattern;
-
-  LogicalResult
-  matchAndRewrite(CopyOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const final {
-    op.emitError("The program should not contain linalg.copy");
-    return success();
-  }
-};
-
-struct FillOpConversion : public OpConversionPattern<FillOp> {
-  using OpConversionPattern<FillOp>::OpConversionPattern;
-
-  LogicalResult
-  matchAndRewrite(FillOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const final {
-    op.emitError("The program should not contain linalg.fill");
-    return success();
-  }
-};
-
 struct FuncOpConversion : public OpConversionPattern<FuncOp> {
   using OpConversionPattern<FuncOp>::OpConversionPattern;
 
@@ -376,17 +343,6 @@ struct InitTensorOpConversion : public OpConversionPattern<InitTensorOp> {
   }
 };
 
-struct PadTensorOpConversion : public OpConversionPattern<PadTensorOp> {
-  using OpConversionPattern<PadTensorOp>::OpConversionPattern;
-
-  LogicalResult
-  matchAndRewrite(PadTensorOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const final {
-    op.emitError("The program should not contain linalg.pad_tensor");
-    return success();
-  }
-};
-
 struct RangeOpConversion : public OpConversionPattern<RangeOp> {
   using OpConversionPattern<RangeOp>::OpConversionPattern;
 
@@ -420,18 +376,6 @@ struct YieldOpConversion : public OpConversionPattern<linalg::YieldOp> {
   }
 };
 
-template <typename FromOpType>
-struct PoolingOpConversion : public OpConversionPattern<FromOpType> {
-  using OpConversionPattern<FromOpType>::OpConversionPattern;
-
-  LogicalResult
-  matchAndRewrite(FromOpType op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const final {
-    op.emitError("The program should not contain linalg pooling ops.");
-    return success();
-  }
-};
-
 struct LowerLinalgToPXAPass
     : public LowerLinalgToPXABase<LowerLinalgToPXAPass> {
 
@@ -449,6 +393,11 @@ struct LowerLinalgToPXAPass
   }
 
   void runOnOperation() final {
+    // Perform Linalg transformations to convert some operations to
+    // linalg.generic
+    auto module = getOperation();
+    performLinalgTransforms(module);
+
     // Set up target (i.e. what is legal)
     ConversionTarget target(getContext());
     LinalgToPXATypeConverter converter;
@@ -467,25 +416,24 @@ struct LowerLinalgToPXAPass
     target.addDynamicallyLegalOp<FuncOp>(
         [&](FuncOp op) { return converter.isSignatureLegal(op.getType()); });
 
+    // These ops should be converted by the Linalg transformations before
+    target.addIllegalOp<ConvOp,       //
+                        CopyOp,       //
+                        FillOp,       //
+                        PadTensorOp,  //
+                        PoolingMaxOp, //
+                        PoolingMinOp, //
+                        PoolingSumOp>();
+
     // Setup rewrite patterns
     RewritePatternSet patterns(&getContext());
-    patterns.insert<ConvOpConversion,                  //
-                    CopyOpConversion,                  //
-                    FillOpConversion,                  //
-                    FuncOpConversion,                  //
-                    GenericOpConversion,               //
-                    IndexOpConversion,                 //
-                    InitTensorOpConversion,            //
-                    PadTensorOpConversion,             //
-                    RangeOpConversion,                 //
-                    TiledLoopOpConversion,             //
-                    YieldOpConversion,                 //
-                    PoolingOpConversion<PoolingMaxOp>, //
-                    PoolingOpConversion<PoolingMinOp>, //
-                    PoolingOpConversion<PoolingSumOp>>(&getContext());
-
-    auto module = getOperation();
-    performLinalgTransforms(module);
+    patterns.insert<FuncOpConversion,       //
+                    GenericOpConversion,    //
+                    IndexOpConversion,      //
+                    InitTensorOpConversion, //
+                    RangeOpConversion,      //
+                    TiledLoopOpConversion,  //
+                    YieldOpConversion>(&getContext());
 
     // Run the conversion
     if (failed(applyFullConversion(module, target, std::move(patterns)))) {

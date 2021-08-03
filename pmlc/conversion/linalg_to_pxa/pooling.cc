@@ -22,7 +22,7 @@ void buildPoolingMaxOpBody(OpBuilder &builder, unsigned numInputs,
                     .getResult();
   } else {
     builder.getBlock()->getParentOp()->emitError(
-        "The input value is not integer or float for pooling sum.");
+        "The input value is not integer or float for pooling max.");
   }
   auto result = builder.create<SelectOp>(builder.getUnknownLoc(), cmpResult,
                                          args[2], args[0]);
@@ -44,7 +44,7 @@ void buildPoolingMinOpBody(OpBuilder &builder, unsigned numInputs,
                     .getResult();
   } else {
     builder.getBlock()->getParentOp()->emitError(
-        "The input value is not integer or float for pooling sum.");
+        "The input value is not integer or float for pooling min.");
   }
   auto result = builder.create<SelectOp>(builder.getUnknownLoc(), cmpResult,
                                          args[2], args[0]);
@@ -86,7 +86,7 @@ struct GeneralizePoolingOp : public OpRewritePattern<PoolingOpType> {
     SmallVector<AffineExpr, 4> inputExprs(exprs.begin(),
                                           exprs.begin() + numInputDims);
     AffineMap inputMap = AffineMap::get(numIdxs, 0, inputExprs, context);
-    // Input's affine map
+    // Window's affine map
     Type windowType = op.windowDims().getType();
     unsigned numWindowDims = windowType.cast<ShapedType>().getRank();
     SmallVector<AffineExpr, 4> windowExprs(exprs.begin() + numInputDims,

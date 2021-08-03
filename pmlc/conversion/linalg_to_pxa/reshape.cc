@@ -33,7 +33,8 @@ struct GeneralizeTensorCollapseShapeOp
       AffineExpr expr = getAffineConstantExpr(0, context);
       int64_t stride = 1;
       for (int i = numIdxs + dims.size() - 1; i >= numIdxs; --i) {
-        assert(dims[i] == i && "Reassociation is not in order.");
+        assert(dims[i].cast<IntegerAttr>().getInt() == i &&
+               "Reassociation is not in order.");
         expr = getAffineConstantExpr(stride, context) *
                    getAffineDimExpr(i, context) +
                expr;
@@ -88,7 +89,8 @@ struct GeneralizeTensorExpandShapeOp
       AffineExpr expr = getAffineConstantExpr(0, context);
       int64_t stride = 1;
       for (int i = numIdxs + dims.size() - 1; i >= numIdxs; --i) {
-        assert(dims[i] == i && "Reassociation is not in order.");
+        assert(dims[i].cast<IntegerAttr>().getInt() == i &&
+               "Reassociation is not in order.");
         expr = getAffineConstantExpr(stride, context) *
                    getAffineDimExpr(i, context) +
                expr;
