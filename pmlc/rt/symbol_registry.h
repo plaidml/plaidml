@@ -25,3 +25,6 @@ inline void *resolveSymbol(mlir::StringRef symbol) {
 }
 
 } // namespace pmlc::rt
+
+#define REGISTER_SYMBOL(symbol)                                                \
+  ::pmlc::rt::registerSymbol(#symbol, reinterpret_cast<void *>(symbol));

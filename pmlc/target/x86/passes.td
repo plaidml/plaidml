@@ -3,6 +3,11 @@
 
 include "mlir/Pass/PassBase.td"
 
+def CollapseParallelLoops : FunctionPass<"x86-collapse-scf-parallel"> {
+  let summary = "Collapse parallel loops to use a single induction variable";
+  let constructor = "pmlc::target::x86::createCollapseParallelLoopsPass()";
+}
+
 def ConvertPXAToAffine : Pass<"x86-convert-pxa-to-affine", "mlir::ModuleOp"> {
   let summary = "Convert PXA dialect to Affine dialect";
   let constructor = "pmlc::target::x86::createLowerPXAToAffinePass()";
