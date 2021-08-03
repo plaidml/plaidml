@@ -13,6 +13,8 @@ void buildSimpleYieldBody(OpBuilder &builder, unsigned numInputs,
   builder.create<linalg::YieldOp>(builder.getUnknownLoc(), args[0]);
 }
 
+// TensorCollapseShapeOp does not have proper iterator_types() and
+// getLoopsToShapesMap()
 struct GeneralizeTensorCollapseShapeOp
     : public OpRewritePattern<TensorCollapseShapeOp> {
   using OpRewritePattern<TensorCollapseShapeOp>::OpRewritePattern;
@@ -66,6 +68,8 @@ void populateLinalgTensorCollapseOpGeneralizationPatterns(
   patterns.add<GeneralizeTensorCollapseShapeOp>(patterns.getContext());
 }
 
+// TensorExpandShapeOp does not have proper iterator_types() and
+// getLoopsToShapesMap()
 struct GeneralizeTensorExpandShapeOp
     : public OpRewritePattern<TensorExpandShapeOp> {
   using OpRewritePattern<TensorExpandShapeOp>::OpRewritePattern;

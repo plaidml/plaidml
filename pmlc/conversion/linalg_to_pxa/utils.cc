@@ -4,9 +4,6 @@
 
 namespace pmlc::conversion::linalg_to_pxa {
 
-namespace pxa = dialect::pxa;
-namespace stdx = dialect::stdx;
-
 using namespace mlir;         // NOLINT
 using namespace mlir::linalg; // NOLINT
 
@@ -16,7 +13,6 @@ LinalgToPXATypeConverter::LinalgToPXATypeConverter() {
   addConversion([](IntegerType type) { return type; });
   addConversion([](IndexType type) { return type; });
   addConversion([](MemRefType type) { return type; });
-  addConversion([](stdx::ArgpackType type) { return type; });
   addConversion([this](RankedTensorType type) {
     Type elementType = type.getElementType();
     Type newType = convertType(elementType);
