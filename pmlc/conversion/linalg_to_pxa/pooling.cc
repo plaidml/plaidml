@@ -23,7 +23,7 @@ void buildPoolingMaxOpBody(OpBuilder &builder, Location loc, unsigned numInputs,
         "The input value is not integer or float for pooling max.");
   }
   auto result = builder.create<SelectOp>(loc, cmpResult, args[2], args[0]);
-  builder.create<linalg::YieldOp>(builder.loc, result.getResult());
+  builder.create<linalg::YieldOp>(loc, result.getResult());
 }
 
 void buildPoolingMinOpBody(OpBuilder &builder, Location loc, unsigned numInputs,
