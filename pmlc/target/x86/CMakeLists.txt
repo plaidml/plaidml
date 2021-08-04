@@ -16,7 +16,6 @@ pml_cc_library(
     ::prng_lowering
     pmlc::compiler
     pmlc::conversion::pxa_to_affine
-    pmlc::conversion::scf_to_omp
     pmlc::conversion::stdx_to_llvm
     pmlc::conversion::tile_to_pxa
     pmlc::dialect::layer::transforms
@@ -35,6 +34,7 @@ pml_cc_library(
     MLIRMathTransforms
     MLIRMemRef
     MLIROpenMPToLLVM
+    MLIRSCFToOpenMP
     MLIRSCFToStandard
     MLIRStandardOpsTransforms
     MLIRStandardToLLVM

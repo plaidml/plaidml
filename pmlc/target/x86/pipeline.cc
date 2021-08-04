@@ -6,6 +6,7 @@
 #include <memory>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
@@ -13,22 +14,24 @@
 #include "mlir/Conversion/MathToLLVM/MathToLLVM.h"
 #include "mlir/Conversion/MemRefToLLVM/MemRefToLLVM.h"
 #include "mlir/Conversion/OpenMPToLLVM/ConvertOpenMPToLLVM.h"
+#include "mlir/Conversion/SCFToOpenMP/SCFToOpenMP.h"
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
 #include "mlir/Dialect/Affine/Passes.h"
 #include "mlir/Dialect/Math/Transforms/Passes.h"
 #include "mlir/Dialect/OpenMP/OpenMPDialect.h"
+#include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/StandardOps/Transforms/Passes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Transforms/LoopUtils.h"
 #include "mlir/Transforms/Passes.h"
 #include "mlir/Transforms/RegionUtils.h"
 
 #include "pmlc/compiler/registry.h"
 #include "pmlc/conversion/pxa_to_affine/passes.h"
-#include "pmlc/conversion/scf_to_omp/passes.h"
 #include "pmlc/conversion/stdx_to_llvm/passes.h"
 #include "pmlc/conversion/tile_to_pxa/passes.h"
 #include "pmlc/dialect/layer/transforms/passes.h"
@@ -88,31 +91,41 @@ struct ConvertStandardToLLVMPass
 
     LowerToLLVMOptions options(context);
     options.emitCWrappers = true;
-    LLVMTypeConverter typeConverter(context, options);
+    LLVMTypeConverter converter(context, options);
 
     RewritePatternSet patterns(context);
     populateExpandTanhPattern(patterns);
-    populateXSMMToLLVMConversionPatterns(typeConverter, patterns);
-    populateStdToLLVMConversionPatterns(typeConverter, patterns);
-    populateMemRefToLLVMConversionPatterns(typeConverter, patterns);
-    populateMathToLLVMConversionPatterns(typeConverter, patterns);
-    conversion::stdx_to_llvm::populateStdXToLLVMConversionPatterns(
-        typeConverter, patterns);
-    populateOpenMPToLLVMConversionPatterns(typeConverter, patterns);
+    populateXSMMToLLVMConversionPatterns(converter, patterns);
+    populateStdToLLVMConversionPatterns(converter, patterns);
+    populateMemRefToLLVMConversionPatterns(converter, patterns);
+    populateMathToLLVMConversionPatterns(converter, patterns);
+    conversion::stdx_to_llvm::populateStdXToLLVMConversionPatterns(converter,
+                                                                   patterns);
+    populateOpenMPToLLVMConversionPatterns(converter, patterns);
 
     LLVMConversionTarget target(*context);
     target.addIllegalOp<UnrealizedConversionCastOp>();
-    target.addDynamicallyLegalOp<omp::ParallelOp>([&](omp::ParallelOp op) {
-      return typeConverter.isLegal(&op.getRegion());
-    });
-    target.addLegalOp<omp::TerminatorOp, //
-                      omp::TaskyieldOp,  //
-                      omp::FlushOp,      //
-                      omp::BarrierOp,    //
-                      omp::TaskwaitOp>();
+    target.addDynamicallyLegalOp<omp::ParallelOp, omp::WsLoopOp>(
+        [&](Operation *op) { return converter.isLegal(&op->getRegion(0)); });
+    target.addLegalOp<omp::BarrierOp, omp::FlushOp, omp::TaskyieldOp,
+                      omp::TaskwaitOp, omp::TerminatorOp>();
     if (failed(applyPartialConversion(module, target, std::move(patterns)))) {
       signalPassFailure();
     }
+  }
+};
+
+struct CollapseParallelLoopsPass
+    : public CollapseParallelLoopsBase<CollapseParallelLoopsPass> {
+  void runOnFunction() override {
+    getFunction().walk([&](scf::ParallelOp op) {
+      SmallVector<std::vector<unsigned>, 3> combinedLoops;
+      std::vector<unsigned> dims;
+      for (unsigned i = 0; i < op.getNumLoops(); i++)
+        dims.push_back(i);
+      combinedLoops.push_back(dims);
+      collapseParallelLoops(op, combinedLoops);
+    });
   }
 };
 
@@ -159,6 +172,10 @@ struct StencilTppGemmPass : public StencilTppGemmBase<StencilTppGemmPass> {
     });
   }
 };
+
+std::unique_ptr<Pass> createCollapseParallelLoopsPass() {
+  return std::make_unique<CollapseParallelLoopsPass>();
+}
 
 std::unique_ptr<Pass> createStencilTppGemmPass(unsigned numThreads,
                                                bool isBatched) {
@@ -299,7 +316,8 @@ void pipelineBuilderStage3(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
-  pm.addPass(pmlc::conversion::scf_to_omp::createLowerSCFToOpenMPPass());
+  pm.addNestedPass<FuncOp>(createCollapseParallelLoopsPass());
+  pm.addNestedPass<FuncOp>(createConvertSCFToOpenMPPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 }
