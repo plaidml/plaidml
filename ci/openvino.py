@@ -64,6 +64,7 @@ def accuracy_check(args):
     cmd += ['-s', DATASET_DIR]
     cmd += ['-td', 'PLAIDML']
     cmd += ['-ss', '10']
+    print(f'--- Running accuracy_check')
     print(cmd)
     subprocess.check_call(cmd, env=env)
 
@@ -73,7 +74,7 @@ def unmount_sshfs():
 
 
 def prepare_virtual_env(venv_path=Path('.venv')):
-    print(f'Creating virtualenv: {venv_path}')
+    print(f'--- :snake: Creating virtualenv: {venv_path}')
     venv_bin = venv_path / 'bin'
     venv.create(venv_path, with_pip=True)
 
