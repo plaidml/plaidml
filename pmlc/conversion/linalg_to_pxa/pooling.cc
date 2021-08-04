@@ -7,64 +7,56 @@ namespace pmlc::conversion::linalg_to_pxa {
 using namespace mlir;         // NOLINT
 using namespace mlir::linalg; // NOLINT
 
-void buildPoolingMaxOpBody(OpBuilder &builder, unsigned numInputs,
+void buildPoolingMaxOpBody(OpBuilder &builder, Location loc, unsigned numInputs,
                            ValueRange args) {
   Value cmpResult;
   if (args[2].getType().isa<IntegerType>()) {
-    cmpResult = builder
-                    .create<CmpIOp>(builder.getUnknownLoc(), CmpIPredicate::sgt,
-                                    args[2], args[0])
-                    .getResult();
+    cmpResult =
+        builder.create<CmpIOp>(loc, CmpIPredicate::sgt, args[2], args[0])
+            .getResult();
   } else if (args[2].getType().isa<FloatType>()) {
-    cmpResult = builder
-                    .create<CmpFOp>(builder.getUnknownLoc(), CmpFPredicate::OGT,
-                                    args[2], args[0])
-                    .getResult();
+    cmpResult =
+        builder.create<CmpFOp>(loc, CmpFPredicate::OGT, args[2], args[0])
+            .getResult();
   } else {
     builder.getBlock()->getParentOp()->emitError(
         "The input value is not integer or float for pooling max.");
   }
-  auto result = builder.create<SelectOp>(builder.getUnknownLoc(), cmpResult,
-                                         args[2], args[0]);
-  builder.create<linalg::YieldOp>(builder.getUnknownLoc(), result.getResult());
+  auto result = builder.create<SelectOp>(loc, cmpResult, args[2], args[0]);
+  builder.create<linalg::YieldOp>(builder.loc, result.getResult());
 }
 
-void buildPoolingMinOpBody(OpBuilder &builder, unsigned numInputs,
+void buildPoolingMinOpBody(OpBuilder &builder, Location loc, unsigned numInputs,
                            ValueRange args) {
   Value cmpResult;
   if (args[2].getType().isa<IntegerType>()) {
-    cmpResult = builder
-                    .create<CmpIOp>(builder.getUnknownLoc(), CmpIPredicate::slt,
-                                    args[2], args[0])
-                    .getResult();
+    cmpResult =
+        builder.create<CmpIOp>(loc, CmpIPredicate::slt, args[2], args[0])
+            .getResult();
   } else if (args[2].getType().isa<FloatType>()) {
-    cmpResult = builder
-                    .create<CmpFOp>(builder.getUnknownLoc(), CmpFPredicate::OLT,
-                                    args[2], args[0])
-                    .getResult();
+    cmpResult =
+        builder.create<CmpFOp>(loc, CmpFPredicate::OLT, args[2], args[0])
+            .getResult();
   } else {
     builder.getBlock()->getParentOp()->emitError(
         "The input value is not integer or float for pooling min.");
   }
-  auto result = builder.create<SelectOp>(builder.getUnknownLoc(), cmpResult,
-                                         args[2], args[0]);
-  builder.create<linalg::YieldOp>(builder.getUnknownLoc(), result.getResult());
+  auto result = builder.create<SelectOp>(loc, cmpResult, args[2], args[0]);
+  builder.create<linalg::YieldOp>(loc, result.getResult());
 }
 
-void buildPoolingSumOpBody(OpBuilder &builder, unsigned numInputs,
+void buildPoolingSumOpBody(OpBuilder &builder, Location loc, unsigned numInputs,
                            ValueRange args) {
   Value result;
   if (args[2].getType().isa<IntegerType>()) {
-    result = builder.create<AddIOp>(builder.getUnknownLoc(), args[2], args[0])
-                 .getResult();
+    result = builder.create<AddIOp>(loc, args[2], args[0]).getResult();
   } else if (args[2].getType().isa<FloatType>()) {
-    result = builder.create<AddFOp>(builder.getUnknownLoc(), args[2], args[0])
-                 .getResult();
+    result = builder.create<AddFOp>(loc, args[2], args[0]).getResult();
   } else {
     builder.getBlock()->getParentOp()->emitError(
         "The input value is not integer or float for pooling sum.");
   }
-  builder.create<linalg::YieldOp>(builder.getUnknownLoc(), result);
+  builder.create<linalg::YieldOp>(loc, result);
 }
 
 template <typename PoolingOpType>

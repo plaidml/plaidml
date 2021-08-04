@@ -264,8 +264,8 @@ struct GenericOpConversion : public OpConversionPattern<GenericOp> {
     for (unsigned i = 0; i < numInputs; ++i) {
       if (inputs[i].getType().isa<ShapedType>()) {
         // input is a tensor
-        auto loadOp = rewriter.create<pxa::PxaLoadOp>(
-            rewriter.getUnknownLoc(), inputs[i], idxMaps[i], idxs);
+        auto loadOp = rewriter.create<pxa::PxaLoadOp>(forOp.getLoc(), inputs[i],
+                                                      idxMaps[i], idxs);
         opArgs[i].replaceAllUsesWith(loadOp.getResult());
       } else {
         // input is a scalar
@@ -295,8 +295,7 @@ struct GenericOpConversion : public OpConversionPattern<GenericOp> {
       for (unsigned i = 0; i < numOutputs; ++i) {
         if (outputs[i].getType().isa<ShapedType>()) {
           auto reduceOp = rewriter.create<pxa::PxaReduceOp>(
-              rewriter.getUnknownLoc(), aggs[i], results[i], outputs[i],
-              maps[i], idxs);
+              yieldOp.getLoc(), aggs[i], results[i], outputs[i], maps[i], idxs);
           results[i].replaceUsesWithIf(
               reduceOp.getResult(), [&](mlir::OpOperand &operand) {
                 mlir::Operation *owner = operand.getOwner();

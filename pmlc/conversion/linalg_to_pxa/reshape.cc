@@ -7,10 +7,10 @@ namespace pmlc::conversion::linalg_to_pxa {
 using namespace mlir;         // NOLINT
 using namespace mlir::linalg; // NOLINT
 
-void buildSimpleYieldBody(OpBuilder &builder, unsigned numInputs,
+void buildSimpleYieldBody(OpBuilder &builder, Location loc, unsigned numInputs,
                           ValueRange args) {
   assert(args.size() == 2);
-  builder.create<linalg::YieldOp>(builder.getUnknownLoc(), args[0]);
+  builder.create<linalg::YieldOp>(loc, args[0]);
 }
 
 // TensorCollapseShapeOp does not have proper iterator_types() and

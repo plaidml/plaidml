@@ -22,8 +22,8 @@ struct LinalgToPXATypeConverter : public mlir::TypeConverter {
   LinalgToPXATypeConverter();
 };
 
-using GenericOpBodyBuilder =
-    llvm::function_ref<void(mlir::OpBuilder &, unsigned, mlir::ValueRange)>;
+using GenericOpBodyBuilder = llvm::function_ref<void(
+    mlir::OpBuilder &, mlir::Location, unsigned, mlir::ValueRange)>;
 
 mlir::linalg::GenericOp
 createGenericOp(mlir::OpBuilder &builder, mlir::Operation *locationOp,

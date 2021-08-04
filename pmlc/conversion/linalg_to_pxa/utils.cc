@@ -40,7 +40,7 @@ GenericOp createGenericOp(OpBuilder &builder, Operation *locationOp,
       auto shapedType = outputType.cast<ShapedType>();
       auto outputShape = shapedType.getShape();
       auto elemType = shapedType.getElementType();
-      auto initOp = builder.create<InitTensorOp>(builder.getUnknownLoc(),
+      auto initOp = builder.create<InitTensorOp>(locationOp->getLoc(),
                                                  outputShape, elemType);
       inits.emplace_back(initOp.getResult());
     }
@@ -50,7 +50,7 @@ GenericOp createGenericOp(OpBuilder &builder, Operation *locationOp,
     inits.insert(inits.end(), outputs.begin(), outputs.end());
   }
 
-  auto genericOp = builder.create<GenericOp>(builder.getUnknownLoc(),
+  auto genericOp = builder.create<GenericOp>(locationOp->getLoc(),
                                              /*resultTensorTypes=*/outputTypes,
                                              /*inputs=*/inputs,
                                              /*outputs=*/inits,
@@ -70,7 +70,7 @@ GenericOp createGenericOp(OpBuilder &builder, Operation *locationOp,
   block.addArguments(argTypes);
   builder.setInsertionPointToStart(&block);
   // Call bodyBuilder to create the customized generic op body.
-  bodyBuilder(builder, inputs.size(), block.getArguments());
+  bodyBuilder(builder, genericOp.getLoc(), inputs.size(), block.getArguments());
   return genericOp;
 }
 
