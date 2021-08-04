@@ -49,15 +49,12 @@ void registerBuiltins() {
   registerSymbol("___truncsfhf2", reinterpret_cast<void *>(f2h));
 
   // cstdlib functions
-  registerSymbol("free", reinterpret_cast<void *>(free));
-  registerSymbol("malloc", reinterpret_cast<void *>(malloc));
+  REGISTER_SYMBOL(free);
+  REGISTER_SYMBOL(malloc);
 
   // RunnerUtils functions
-  registerSymbol("_mlir_ciface_print_memref_f32",
-                 reinterpret_cast<void *>(_mlir_ciface_print_memref_f32));
-
-  registerSymbol("plaidml_rt_trace",
-                 reinterpret_cast<void *>(plaidml_rt_trace));
+  REGISTER_SYMBOL(_mlir_ciface_print_memref_f32);
+  REGISTER_SYMBOL(plaidml_rt_trace);
 }
 
 } // namespace pmlc::rt
