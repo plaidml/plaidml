@@ -41,6 +41,7 @@ def accuracy_check(args):
         str(AC_DIR.resolve()),
     ])
     env['LD_LIBRARY_PATH'] = os.pathsep.join([
+        str(CONDA_PREFIX / 'lib'),
         str(args.pkgdir.resolve()),
     ])
     print('PYTHONPATH:', env['PYTHONPATH'])
