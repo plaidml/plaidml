@@ -40,10 +40,8 @@ _mlir_ciface_plaidml_rt_prng(UnrankedMemRefType<uint32_t> *state,
 
 namespace pmlc::rt {
 
-void registerPrng() {
-  using pmlc::rt::registerSymbol;
-  registerSymbol("_mlir_ciface_plaidml_rt_prng",
-                 reinterpret_cast<void *>(_mlir_ciface_plaidml_rt_prng));
+void registerPrng() { //
+  REGISTER_SYMBOL(_mlir_ciface_plaidml_rt_prng);
 }
 
 } // namespace pmlc::rt

@@ -125,33 +125,14 @@ namespace pmlc::rt {
 void registerXsmm() {
   libxsmm_init();
 
-  using pmlc::rt::registerSymbol;
-
-  registerSymbol("plaidml_rt_xsmm_gemm_invoke_f32",
-                 reinterpret_cast<void *>(plaidml_rt_xsmm_gemm_invoke_f32));
-
-  registerSymbol("plaidml_rt_xsmm_gemm_dispatch_f32",
-                 reinterpret_cast<void *>(plaidml_rt_xsmm_gemm_dispatch_f32));
-
-  registerSymbol("plaidml_rt_xsmm_brgemm_invoke_f32",
-                 reinterpret_cast<void *>(plaidml_rt_xsmm_brgemm_invoke_f32));
-
-  registerSymbol("plaidml_rt_xsmm_brgemm_dispatch_f32",
-                 reinterpret_cast<void *>(plaidml_rt_xsmm_brgemm_dispatch_f32));
-
-  registerSymbol(
-      "plaidml_rt_xsmm_brgemm_offs_invoke_f32",
-      reinterpret_cast<void *>(plaidml_rt_xsmm_brgemm_offs_invoke_f32));
-
-  registerSymbol(
-      "plaidml_rt_xsmm_brgemm_offs_dispatch_f32",
-      reinterpret_cast<void *>(plaidml_rt_xsmm_brgemm_offs_dispatch_f32));
-
-  registerSymbol("plaidml_rt_xsmm_unary_dispatch",
-                 reinterpret_cast<void *>(plaidml_rt_xsmm_unary_dispatch));
-
-  registerSymbol("plaidml_rt_xsmm_unary_invoke",
-                 reinterpret_cast<void *>(plaidml_rt_xsmm_unary_invoke));
+  REGISTER_SYMBOL(plaidml_rt_xsmm_gemm_invoke_f32);
+  REGISTER_SYMBOL(plaidml_rt_xsmm_gemm_dispatch_f32);
+  REGISTER_SYMBOL(plaidml_rt_xsmm_brgemm_invoke_f32);
+  REGISTER_SYMBOL(plaidml_rt_xsmm_brgemm_dispatch_f32);
+  REGISTER_SYMBOL(plaidml_rt_xsmm_brgemm_offs_invoke_f32);
+  REGISTER_SYMBOL(plaidml_rt_xsmm_brgemm_offs_dispatch_f32);
+  REGISTER_SYMBOL(plaidml_rt_xsmm_unary_dispatch);
+  REGISTER_SYMBOL(plaidml_rt_xsmm_unary_invoke);
 }
 
 } // namespace pmlc::rt
