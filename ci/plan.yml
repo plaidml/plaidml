@@ -84,7 +84,7 @@ ACTIONS:
     - "echo --- Running {test}: {model}"
     - export PLAIDML_DEVICE=$$BUILDKITE_AGENT_META_DATA_PLAIDML_DEVICE
     - export PLAIDML_TARGET=$$BUILDKITE_AGENT_META_DATA_PLAIDML_TARGET
-    - python ci/openvino.py {test} {model} --pkgdir=testkit --outdir=ci/test/{path}
+    - python ci/openvino.py {test} {model_path} --pkgdir=testkit --outdir=ci/test/{path}
 
 RULES:
   - name: "{platform}/{cfg}"
