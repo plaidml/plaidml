@@ -3,6 +3,9 @@ exclude: >
     ci/pipeline.yml|
     plaidbench/plaidbench/networks/keras/imdb_lstm.h5|
     pmlc/target/x86/heatmap_skx_xeonplat_8180_1-7GHz_mblocked.csv.gz|
+    networks/openvino/mobilenet-v2/FP16/mobilenet-v2.bin|
+    networks/openvino/resnet-50-pytorch/FP16/resnet-50-pytorch.bin|
+    networks/openvino/yolo-v2-tiny-ava-0001/FP16/yolo-v2-tiny-ava-0001.bin|
     vendor/half/half.hpp
   )$
 repos:
