@@ -173,14 +173,14 @@ def PackOp : Op<StdX_Dialect, "pack"> {
   let summary = "Pack multiple values into a tuple";
   let arguments = (ins Variadic<AnyType>:$in);
   let results = (outs Argpack:$out);
-  let assemblyFormat = [{ $in `:` type($in) attr-dict }];
+  let assemblyFormat = [{ `(` $in `)` attr-dict `:` functional-type(operands, results) }];
 }
 
 def UnpackOp : Op<StdX_Dialect, "unpack"> {
-  let summary = "Pack multiple values into a tuple";
+  let summary = "Unpack multiple values from a tuple";
   let arguments = (ins Argpack:$in);
   let results = (outs Variadic<AnyType>:$out);
-  let assemblyFormat = [{ $in `:` type($out) attr-dict }];
+  let assemblyFormat = [{ `(` $in `)` attr-dict `:` functional-type(operands, results) }];
 }
 
 #endif // __PML_STDX_OPS__

@@ -1642,7 +1642,34 @@ Value explicit_padding(const Value& value) {
       auto padval = args[4].as_tensor();
       O = Contraction(O_dims, O_idxs).assign(I(I_idxs)).init(padval);
     } break;
-    case PadMode::EDGE:
+    case PadMode::EDGE: {
+      IVLOG(2, "Edge padding requested");
+      O = I;
+
+      std::vector<TensorIndex> dst_lo_idxs(I.rank());
+      std::vector<TensorIndex> dst_hi_idxs(I.rank());
+      std::vector<TensorDim> dst_lo_dims(I.rank());
+      std::vector<TensorDim> dst_hi_dims(I.rank());
+
+      for (size_t i = 0; i < I.rank(); ++i) {
+        std::vector<TensorDim> O_dims(I.rank());
+        O.bind_dims(O_dims);
+
+        std::vector<TensorIndex> src_lo_idxs = dst_lo_idxs;
+        src_lo_idxs[i] = TensorIndex(0);
+        dst_lo_dims = O_dims;
+        dst_lo_dims[i] = TensorDim(lo_pads[i]);
+        Tensor Lo = Contraction(dst_lo_dims, dst_lo_idxs).assign(O(src_lo_idxs));
+
+        std::vector<TensorIndex> src_hi_idxs = dst_hi_idxs;
+        src_hi_idxs[i] = O_dims[i] - TensorIndex(1);
+        dst_hi_dims = O_dims;
+        dst_hi_dims[i] = TensorDim(hi_pads[i]);
+        Tensor Hi = Contraction(dst_hi_dims, dst_hi_idxs).assign(O(src_hi_idxs));
+
+        O = op::concatenate({Lo, O, Hi}, i);
+      }
+    } break;
     case PadMode::SYMMETRIC:
     case PadMode::REFLECT: {
       throw std::runtime_error(llvm::formatv("Unimplemented padding mode: {0}", to_string(mode)));

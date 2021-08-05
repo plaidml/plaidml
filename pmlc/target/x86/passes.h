@@ -14,6 +14,8 @@ class RewritePatternSet;
 
 namespace pmlc::target::x86 {
 
+std::unique_ptr<mlir::Pass> createCollapseParallelLoopsPass();
+
 std::unique_ptr<mlir::Pass> createLowerPXAToAffinePass();
 
 std::unique_ptr<mlir::Pass> createLowerToLLVMPass();
