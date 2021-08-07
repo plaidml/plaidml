@@ -25,10 +25,10 @@ def plaidml_workspace():
 
     http_archive(
         name = "boost",
-        sha256 = "607cfd0e49587d4f95c9cb31954ffa7f5ef10929395a6264c106a7f78a3bd59e",
+        sha256 = "bd0df411efd9a585e5a2212275f8762079fed8842264954675a4fddc46cfcf60",
         urls = [
-            "https://mirror.bazel.build/github.com/plaidml/depot/raw/master/boost_1_66_0.tar.gz",
-            "https://github.com/plaidml/depot/raw/master/boost_1_66_0.tar.gz",
+            "https://mirror.bazel.build/boostorg.jfrog.io/artifactory/main/release/1.66.0/source/boost_1_66_0.tar.gz",
+            "https://boostorg.jfrog.io/artifactory/main/release/1.66.0/source/boost_1_66_0.tar.gz",
         ],
         strip_prefix = "boost_1_66_0",
         build_file = clean_dep("//bzl:boost.BUILD"),
