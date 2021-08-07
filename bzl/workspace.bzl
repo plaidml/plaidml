@@ -124,7 +124,7 @@ def plaidml_workspace():
             "https://mirror.bazel.build/github.com/nmoinvaz/minizip/archive/36089398a362a117105ebfcb3751a269c70ab3b7.zip",
             "https://github.com/nmoinvaz/minizip/archive/36089398a362a117105ebfcb3751a269c70ab3b7.zip",
         ],
-        strip_prefix = "minizip-36089398a362a117105ebfcb3751a269c70ab3b7",
+        strip_prefix = "minizip-ng-36089398a362a117105ebfcb3751a269c70ab3b7",
         build_file = clean_dep("//bzl:minizip.BUILD"),
     )
 
