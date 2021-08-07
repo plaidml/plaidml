@@ -5,7 +5,7 @@ def _xsmm_repo_impl(repository_ctx):
              "If you are on Windows, did you run 'conda activate .cenv\\'?")
 
     repository_ctx.download_and_extract(
-        url = repository_ctx.attr.url,
+        url = repository_ctx.attr.urls,
         sha256 = repository_ctx.attr.sha256,
         stripPrefix = repository_ctx.attr.strip_prefix,
     )
@@ -21,7 +21,7 @@ def _xsmm_repo_impl(repository_ctx):
 
 xsmm_repo = repository_rule(
     attrs = {
-        "url": attr.string(mandatory = True),
+        "urls": attr.string_list(mandatory = True),
         "sha256": attr.string(),
         "strip_prefix": attr.string(),
         "build_file": attr.label(
