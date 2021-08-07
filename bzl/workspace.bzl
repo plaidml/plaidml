@@ -77,10 +77,10 @@ def plaidml_workspace():
 
     http_archive(
         name = "half",
-        sha256 = "46d38e2616a7652809ea861928ac5464fdc98901ac7044a1cc0b6cbf1754d27e",
+        sha256 = "9e5ddb4b43abeafe190e780b5b606b081acb511e6edd4ef6fbe5de863a4affaf",
         urls = [
-            "https://mirror.bazel.build/github.com/plaidml/depot/raw/master/half-1.11.0.zip",
-            "https://github.com/plaidml/depot/raw/master/half-1.11.0.zip",
+            "https://mirror.bazel.build/sourceforge.net/projects/half/files/half/1.11.0/half-1.11.0.zip/download",
+            "https://sourceforge.net/projects/half/files/half/1.11.0/half-1.11.0.zip/download",
         ],
         strip_prefix = "half-1.11.0",
         build_file = clean_dep("//bzl:half.BUILD"),
