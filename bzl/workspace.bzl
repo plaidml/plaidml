@@ -79,8 +79,8 @@ def plaidml_workspace():
         name = "half",
         sha256 = "9e5ddb4b43abeafe190e780b5b606b081acb511e6edd4ef6fbe5de863a4affaf",
         urls = [
-            "https://mirror.bazel.build/sourceforge.net/projects/half/files/half/1.11.0/half-1.11.0.zip/download",
-            "https://sourceforge.net/projects/half/files/half/1.11.0/half-1.11.0.zip/download",
+            "https://mirror.bazel.build/versaweb.dl.sourceforge.net/project/half/half/1.11.0/half-1.11.0.zip",
+            "https://versaweb.dl.sourceforge.net/project/half/half/1.11.0/half-1.11.0.zip",
         ],
         strip_prefix = "half-1.11.0",
         build_file = clean_dep("//bzl:half.BUILD"),
