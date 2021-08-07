@@ -26,7 +26,7 @@ def _http_archive_impl(ctx):
             ctx.delete(ctx.path(tgt))
     else:
         ctx.download_and_extract(
-            ctx.attr.url,
+            ctx.attr.urls,
             "",
             ctx.attr.sha256,
             ctx.attr.type,
@@ -52,7 +52,7 @@ http_archive = repository_rule(
     implementation = _http_archive_impl,
     attrs = {
         "sha256": attr.string(mandatory = True),
-        "url": attr.string(mandatory = True),
+        "urls": attr.string_list(mandatory = True),
         "strip_prefix": attr.string(),
         "type": attr.string(),
         "delete": attr.string_list(),
