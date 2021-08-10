@@ -1,3 +1,4 @@
+add_subdirectory(linalg_to_pxa)
 add_subdirectory(pxa_to_affine)
 add_subdirectory(stdx_to_llvm)
 add_subdirectory(tile_to_pxa)
