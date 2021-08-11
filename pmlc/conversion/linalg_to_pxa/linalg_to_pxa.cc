@@ -145,7 +145,7 @@ struct ConstantOpConversion : public OpConversionPattern<ConstantOp> {
     if (auto origType = origValue.getType().dyn_cast<ShapedType>()) {
       LinalgToPXATypeConverter typeConverter;
       auto newType = typeConverter.convertType(origType);
-      auto name = llvm::formatv("cst_{0}", constCount++).str();
+      auto name = llvm::formatv("cst_memref_{0}", constCount++).str();
       auto funcOp = op->getParentOfType<FuncOp>();
       rewriter.setInsertionPoint(funcOp);
       auto globalOp = rewriter.create<memref::GlobalOp>(
