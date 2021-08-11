@@ -17,8 +17,6 @@ using namespace mlir::linalg; // NOLINT
 
 namespace {
 
-static int constCount = 0;
-
 static RankedTensorType getRankedTensorType(Type type) {
   if (auto rankedTensorType = type.dyn_cast<RankedTensorType>()) {
     return rankedTensorType;
@@ -142,6 +140,7 @@ struct ConstantOpConversion : public OpConversionPattern<ConstantOp> {
   LogicalResult
   matchAndRewrite(ConstantOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
+    static int constCount = 0;
     auto origValue = op.getValue();
     if (auto origType = origValue.getType().dyn_cast<ShapedType>()) {
       LinalgToPXATypeConverter typeConverter;
