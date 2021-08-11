@@ -211,7 +211,7 @@ struct GenericOpConversion : public OpConversionPattern<GenericOp> {
   LogicalResult
   matchAndRewrite(GenericOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
-    GenericOpAdaptor adaptor(operands, op.getOperation()->getAttrDictionary());
+    GenericOpAdaptor adaptor(operands, op->getAttrDictionary());
     auto inputs = adaptor.inputs();
     auto outputs = adaptor.outputs();
     auto idxMapAttrs = adaptor.indexing_maps().getValue();
@@ -353,7 +353,7 @@ struct IndexOpConversion : public OpConversionPattern<IndexOp> {
   LogicalResult
   matchAndRewrite(IndexOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
-    auto idxs = op.getOperation()->getBlock()->getArguments();
+    auto idxs = op->getBlock()->getArguments();
     op.replaceAllUsesWith(idxs[op.dim()]);
     rewriter.eraseOp(op);
     return success();
@@ -366,8 +366,7 @@ struct InitTensorOpConversion : public OpConversionPattern<InitTensorOp> {
   LogicalResult
   matchAndRewrite(InitTensorOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
-    BufferAllocator allocResult(rewriter, op.getOperation(),
-                                op.result().getType());
+    BufferAllocator allocResult(rewriter, op, op.result().getType());
     op.replaceAllUsesWith(allocResult.resultMemRef);
     rewriter.eraseOp(op);
     return success();
