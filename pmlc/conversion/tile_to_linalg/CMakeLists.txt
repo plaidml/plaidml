@@ -1,0 +1,22 @@
+pml_cc_library(
+  NAME tile_to_linalg
+  HDRS
+    passes.h
+  SRCS
+    specials.cc
+    tile_to_linalg.cc
+    utils.cc
+  DEPS
+    ::passes-gen
+    pmlc::dialect::layer::ir
+    pmlc::dialect::stdx::ir
+    pmlc::dialect::tile::ir
+    pmlc::util
+)
+
+pml_tblgen_library(
+  NAME passes-gen
+  TD_FILE passes.td
+  OUTS
+    -gen-pass-decls passes.h.inc
+)
