@@ -5,6 +5,7 @@
 
 #include "pmlc/conversion/linalg_to_pxa/pass_detail.h"
 #include "pmlc/util/matchers.h"
+#include "pmlc/util/util.h"
 
 namespace pmlc::conversion::linalg_to_pxa {
 
@@ -15,6 +16,8 @@ using namespace mlir;         // NOLINT
 using namespace mlir::linalg; // NOLINT
 
 namespace {
+
+static int constCount = 0;
 
 static RankedTensorType getRankedTensorType(Type type) {
   if (auto rankedTensorType = type.dyn_cast<RankedTensorType>()) {
@@ -131,6 +134,35 @@ private:
   AtomicRMWKind agg;
   Value scalar;
   Operation *relatedOp;
+};
+
+struct ConstantOpConversion : public OpConversionPattern<ConstantOp> {
+  using OpConversionPattern<ConstantOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(ConstantOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const final {
+    auto origValue = op.getValue();
+    if (auto origType = origValue.getType().dyn_cast<ShapedType>()) {
+      LinalgToPXATypeConverter typeConverter;
+      auto newType = typeConverter.convertType(origType);
+      auto name = llvm::formatv("cst_{0}", constCount++).str();
+      auto funcOp = op->getParentOfType<FuncOp>();
+      rewriter.setInsertionPoint(funcOp);
+      auto globalOp = rewriter.create<memref::GlobalOp>(
+          funcOp.getLoc(),
+          /*sym_name=*/name,
+          /*sym_visibility=*/rewriter.getStringAttr("private"),
+          /*type=*/newType,
+          /*initial_value=*/origValue,
+          /*constant=*/true);
+      rewriter.setInsertionPoint(op);
+      rewriter.replaceOpWithNewOp<memref::GetGlobalOp>(op, newType,
+                                                       globalOp.sym_name());
+      return success();
+    }
+    return failure();
+  }
 };
 
 struct FuncOpConversion : public OpConversionPattern<FuncOp> {
@@ -414,6 +446,8 @@ struct LowerLinalgToPXAPass
                       ReturnOp>();
     target.addDynamicallyLegalOp<FuncOp>(
         [&](FuncOp op) { return converter.isSignatureLegal(op.getType()); });
+    target.addDynamicallyLegalOp<ConstantOp>(
+        [&](ConstantOp op) { return !op.getType().isa<TensorType>(); });
 
     // These ops should be converted by the Linalg transformations before
     target.addIllegalOp<ConvOp,       //
@@ -426,7 +460,8 @@ struct LowerLinalgToPXAPass
 
     // Setup rewrite patterns
     RewritePatternSet patterns(&getContext());
-    patterns.insert<FuncOpConversion,       //
+    patterns.insert<ConstantOpConversion,   //
+                    FuncOpConversion,       //
                     GenericOpConversion,    //
                     IndexOpConversion,      //
                     InitTensorOpConversion, //
