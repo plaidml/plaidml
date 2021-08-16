@@ -8,7 +8,6 @@ def LowerLinalgToPXA : Pass<"convert-linalg-to-pxa", "mlir::ModuleOp"> {
   let constructor = "pmlc::conversion::linalg_to_pxa::createLowerLinalgToPXAPass()";
   let dependentDialects = [
     "mlir::AffineDialect",
-    "mlir::linalg::LinalgDialect",
     "mlir::math::MathDialect",
     "mlir::memref::MemRefDialect",
     "mlir::scf::SCFDialect",

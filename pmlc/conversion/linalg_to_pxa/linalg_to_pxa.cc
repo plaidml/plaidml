@@ -5,6 +5,7 @@
 
 #include "pmlc/conversion/linalg_to_pxa/pass_detail.h"
 #include "pmlc/util/matchers.h"
+#include "pmlc/util/util.h"
 
 namespace pmlc::conversion::linalg_to_pxa {
 
@@ -133,6 +134,36 @@ private:
   Operation *relatedOp;
 };
 
+struct ConstantOpConversion : public OpConversionPattern<ConstantOp> {
+  using OpConversionPattern<ConstantOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(ConstantOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const final {
+    static int constCount = 0;
+    auto origValue = op.getValue();
+    if (auto origType = origValue.getType().dyn_cast<ShapedType>()) {
+      LinalgToPXATypeConverter typeConverter;
+      auto newType = typeConverter.convertType(origType);
+      auto name = llvm::formatv("cst_memref_{0}", constCount++).str();
+      auto funcOp = op->getParentOfType<FuncOp>();
+      rewriter.setInsertionPoint(funcOp);
+      auto globalOp = rewriter.create<memref::GlobalOp>(
+          funcOp.getLoc(),
+          /*sym_name=*/name,
+          /*sym_visibility=*/rewriter.getStringAttr("private"),
+          /*type=*/newType,
+          /*initial_value=*/origValue,
+          /*constant=*/true);
+      rewriter.setInsertionPoint(op);
+      rewriter.replaceOpWithNewOp<memref::GetGlobalOp>(op, newType,
+                                                       globalOp.sym_name());
+      return success();
+    }
+    return failure();
+  }
+};
+
 struct FuncOpConversion : public OpConversionPattern<FuncOp> {
   using OpConversionPattern<FuncOp>::OpConversionPattern;
 
@@ -179,7 +210,7 @@ struct GenericOpConversion : public OpConversionPattern<GenericOp> {
   LogicalResult
   matchAndRewrite(GenericOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
-    GenericOpAdaptor adaptor(operands, op.getOperation()->getAttrDictionary());
+    GenericOpAdaptor adaptor(operands, op->getAttrDictionary());
     auto inputs = adaptor.inputs();
     auto outputs = adaptor.outputs();
     auto idxMapAttrs = adaptor.indexing_maps().getValue();
@@ -321,7 +352,7 @@ struct IndexOpConversion : public OpConversionPattern<IndexOp> {
   LogicalResult
   matchAndRewrite(IndexOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
-    auto idxs = op.getOperation()->getBlock()->getArguments();
+    auto idxs = op->getBlock()->getArguments();
     op.replaceAllUsesWith(idxs[op.dim()]);
     rewriter.eraseOp(op);
     return success();
@@ -334,8 +365,7 @@ struct InitTensorOpConversion : public OpConversionPattern<InitTensorOp> {
   LogicalResult
   matchAndRewrite(InitTensorOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
-    BufferAllocator allocResult(rewriter, op.getOperation(),
-                                op.result().getType());
+    BufferAllocator allocResult(rewriter, op, op.result().getType());
     op.replaceAllUsesWith(allocResult.resultMemRef);
     rewriter.eraseOp(op);
     return success();
@@ -414,6 +444,8 @@ struct LowerLinalgToPXAPass
                       ReturnOp>();
     target.addDynamicallyLegalOp<FuncOp>(
         [&](FuncOp op) { return converter.isSignatureLegal(op.getType()); });
+    target.addDynamicallyLegalOp<ConstantOp>(
+        [&](ConstantOp op) { return !op.getType().isa<TensorType>(); });
 
     // These ops should be converted by the Linalg transformations before
     target.addIllegalOp<ConvOp,       //
@@ -426,7 +458,8 @@ struct LowerLinalgToPXAPass
 
     // Setup rewrite patterns
     RewritePatternSet patterns(&getContext());
-    patterns.insert<FuncOpConversion,       //
+    patterns.insert<ConstantOpConversion,   //
+                    FuncOpConversion,       //
                     GenericOpConversion,    //
                     IndexOpConversion,      //
                     InitTensorOpConversion, //
