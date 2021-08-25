@@ -16,10 +16,14 @@ function(pml_py_library)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME"
+    "NAME;SRCS_DIR"
     "SRCS;DEPS;GEN_SRCS"
     ${ARGN}
   )
+
+  if(NOT _RULE_SRCS_DIR)
+    set(_RULE_SRCS_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+  endif()
 
   pml_package_ns(_PACKAGE_NS)
   # Replace dependencies passed by ::name with ::pml::package::name
@@ -38,9 +42,9 @@ function(pml_py_library)
     add_custom_command(
       OUTPUT ${SRC_FILE}
       COMMAND ${CMAKE_COMMAND} -E copy
-        ${CMAKE_CURRENT_SOURCE_DIR}/${SRC_FILE}
+        ${_RULE_SRCS_DIR}/${SRC_FILE}
         ${CMAKE_CURRENT_BINARY_DIR}/${SRC_FILE}
-      DEPENDS ${SRC_FILE}
+      DEPENDS ${_RULE_SRCS_DIR}/${SRC_FILE}
     )
     set_property(TARGET ${_NAME} APPEND PROPERTY PY_SRCS ${CMAKE_CURRENT_BINARY_DIR}/${SRC_FILE})
   endforeach()
@@ -175,13 +179,19 @@ function(pml_py_wheel)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;PKG_NAME;PLATFORM;VERSION"
+    "NAME;PKG_NAME;PLATFORM;VERSION;ABI;PY_VER"
     "DEPS;PY_DEPS"
     ${ARGN}
   )
 
   if(NOT _RULE_PLATFORM)
     set(_RULE_PLATFORM "any")
+  endif()
+  if(NOT _RULE_ABI)
+    set(_RULE_ABI "none")
+  endif()
+  if(NOT _RULE_PY_VER)
+    set(_RULE_PY_VER "py3")
   endif()
 
   pml_package_ns(_PACKAGE_NS)
@@ -195,9 +205,7 @@ function(pml_py_wheel)
 
   configure_file(setup.in.py setup.py)
 
-  set(_ABI "none")
-  set(_PY_VER "py3")
-  set(_WHEEL_FILE ${_RULE_PKG_NAME}-${_RULE_VERSION}-${_PY_VER}-${_ABI}-${_RULE_PLATFORM}.whl)
+  set(_WHEEL_FILE ${_RULE_PKG_NAME}-${_RULE_VERSION}-${_RULE_PY_VER}-${_RULE_ABI}-${_RULE_PLATFORM}.whl)
 
   add_custom_target(${_NAME} ALL
     DEPENDS ${_WHEEL_FILE}
