@@ -26,6 +26,7 @@ dependencies:
       - keras-applications==1.0.8
       - livereload==2.6.3
       - nbstripout==0.3.9
+      - opencv-python-headless==4.5.3.56
       - pcpp==1.20.1
       - sphinx-rtd-theme==0.5.1
       - sphinxcontrib-katex==0.7.1

@@ -63,6 +63,8 @@ if(NOT InferenceEngineDeveloperPackage_FOUND)
   include(gflags)
 endif()
 include(googletest)
+include(pybind11)
+include(mlperf)
 include(xsmm)
 
 add_subdirectory(vendor)
@@ -110,6 +112,7 @@ add_subdirectory(plaidml)
 add_subdirectory(pmlc)
 add_subdirectory(docs)
 add_subdirectory(networks)
+add_subdirectory(mlperf)
 
 # Note: this must be called after all libraries have been declared.
 pml_complete_binary_link_options()
