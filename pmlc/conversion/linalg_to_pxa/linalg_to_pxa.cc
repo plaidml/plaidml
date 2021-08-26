@@ -339,7 +339,13 @@ struct GenericOpConversion : public OpConversionPattern<GenericOp> {
       op->emitError("No linalg.yield in generic op.");
     }
 
-    rewriter.replaceOp(op, forOp.getResults());
+    if (op.getNumResults() == forOp.getNumResults()) {
+      rewriter.replaceOp(op, forOp.getResults());
+    } else {
+      // For some original ops such as conv and copy, they don't return
+      // anything. So we erase the original op directly.
+      rewriter.eraseOp(op);
+    }
     return success();
   }
 };

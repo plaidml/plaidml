@@ -1,4 +1,4 @@
-// RUN: pmlc-opt --convert-linalg-to-pxa %s | FileCheck %s
+// RUN: pmlc-opt -convert-linalg-to-pxa -cse %s | FileCheck %s
 
 #map0 = affine_map<(d0, d1, d2, d3) -> ()>
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>  
