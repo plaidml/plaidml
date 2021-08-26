@@ -4,6 +4,7 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "pmlc/conversion/linalg_to_pxa/pass_detail.h"
+#include "pmlc/dialect/pxa/analysis/uses.h"
 #include "pmlc/util/matchers.h"
 #include "pmlc/util/util.h"
 
@@ -338,10 +339,7 @@ struct GenericOpConversion : public OpConversionPattern<GenericOp> {
       op->emitError("No linalg.yield in generic op.");
     }
 
-    for (unsigned i = 0; i < op.getNumResults(); ++i) {
-      op.getResult(i).replaceAllUsesWith(forOp.getResult(i));
-    }
-    rewriter.eraseOp(op);
+    rewriter.replaceOp(op, forOp.getResults());
     return success();
   }
 };
@@ -379,6 +377,25 @@ struct RangeOpConversion : public OpConversionPattern<RangeOp> {
   matchAndRewrite(RangeOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
     op.emitError("Conversion of linalg.range is not implemented.");
+    return success();
+  }
+};
+
+struct ReturnOpConversion : public OpConversionPattern<ReturnOp> {
+  using OpConversionPattern<ReturnOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(ReturnOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const final {
+    auto &block = op->getParentRegion()->front();
+    auto funcOp = op->getParentOfType<FuncOp>();
+    auto blockArg = funcOp.getType().getNumInputs() - op.getNumOperands();
+    for (Value operand : operands) {
+      // Find very initial allocation of memref
+      auto def = pxa::getIndirectDef(operand);
+      def.replaceAllUsesWith(block.getArgument(blockArg++));
+    }
+    rewriter.replaceOpWithNewOp<ReturnOp>(op, operands);
     return success();
   }
 };
@@ -446,6 +463,8 @@ struct LowerLinalgToPXAPass
         [&](FuncOp op) { return converter.isSignatureLegal(op.getType()); });
     target.addDynamicallyLegalOp<ConstantOp>(
         [&](ConstantOp op) { return !op.getType().isa<TensorType>(); });
+    target.addDynamicallyLegalOp<ReturnOp>(
+        [&](ReturnOp op) { return converter.isLegal(op); });
 
     // These ops should be converted by the Linalg transformations before
     target.addIllegalOp<ConvOp,       //
@@ -464,6 +483,7 @@ struct LowerLinalgToPXAPass
                     IndexOpConversion,      //
                     InitTensorOpConversion, //
                     RangeOpConversion,      //
+                    ReturnOpConversion,     //
                     TiledLoopOpConversion,  //
                     YieldOpConversion>(&getContext());
 
