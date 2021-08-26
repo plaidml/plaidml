@@ -423,7 +423,12 @@ struct YieldOpConversion : public OpConversionPattern<linalg::YieldOp> {
   LogicalResult
   matchAndRewrite(linalg::YieldOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
-    rewriter.replaceOpWithNewOp<AffineYieldOp>(op, operands);
+    // We should put AffineYieldOp after the replaced linalg::YieldOp.
+    // Otherwise, the use of Block::getTerminator() may return the to-be-removed
+    // linalg::YieldOp. So we do not use replaceOp or replaceOpWithNewOp here.
+    rewriter.setInsertionPointAfter(op);
+    auto affineYieldOp = rewriter.create<AffineYieldOp>(op.getLoc(), operands);
+    rewriter.eraseOp(op);
     return success();
   }
 };
