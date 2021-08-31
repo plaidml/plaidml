@@ -3,6 +3,7 @@
 import json
 import os
 import sys
+import site
 import uuid
 
 import plaidml.exceptions
@@ -13,6 +14,8 @@ def _find_config(name):
         sys.prefix,
         os.path.join(sys.prefix, 'local'),
     ]
+    if(site.USER_SITE == os.path.commonprefix([__file__, site.USER_SITE])):
+        prefixes = [site.USER_BASE]
     for prefix in prefixes:
         cfg_path = os.path.join(prefix, 'share', 'plaidml', name)
         if os.path.exists(cfg_path):

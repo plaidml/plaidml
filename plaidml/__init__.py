@@ -50,6 +50,7 @@ import plaidml.library
 import plaidml.settings
 import platform
 import sys
+import site
 import threading
 import traceback
 import uuid
@@ -178,6 +179,8 @@ class _Library(plaidml.library.Library):
             lib = load_library('libplaidml.dylib', ['lib'])
         else:
             prefixes = [sys.exec_prefix, os.path.join(sys.exec_prefix, 'local')]
+            if(site.USER_SITE == os.path.commonprefix([__file__, site.USER_SITE])):
+                prefixes = [site.USER_BASE]
             lib = load_library('libplaidml.so', ['lib'], prefixes)
 
         super(_Library, self).__init__(lib, logger=logger)
