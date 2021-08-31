@@ -700,7 +700,7 @@ struct ContractionMapsAndShapes {
   bool shapeHasAllLoopDims() {
     llvm::SmallSet<unsigned, 4> dims;
     for (auto map : newMaps) {
-      assert(numDims == maps[i].getNumDims() &&
+      assert(numDims == map.getNumDims() &&
              "The input maps have different numbers of dimensions.");
       for (auto expr : map.getResults()) {
         if (auto dimExpr = expr.dyn_cast<AffineDimExpr>()) {
