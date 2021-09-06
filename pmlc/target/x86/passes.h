@@ -16,6 +16,8 @@ namespace pmlc::target::x86 {
 
 std::unique_ptr<mlir::Pass> createCollapseParallelLoopsPass();
 
+std::unique_ptr<mlir::Pass> createLowerClosureToCoroPass();
+
 std::unique_ptr<mlir::Pass> createLowerPXAToAffinePass();
 
 std::unique_ptr<mlir::Pass> createLowerToLLVMPass();
@@ -31,6 +33,9 @@ std::unique_ptr<mlir::Pass> createTraceLinkingPass();
 std::unique_ptr<mlir::Pass> createXSMMLoweringPass();
 
 void populatePXAGemmToXSMMConversionPatterns(mlir::RewritePatternSet &patterns);
+
+void populateCoroToLLVMConversionPatterns(mlir::LLVMTypeConverter &converter,
+                                          mlir::RewritePatternSet &patterns);
 
 void populateXSMMToLLVMConversionPatterns(mlir::LLVMTypeConverter &converter,
                                           mlir::RewritePatternSet &patterns);

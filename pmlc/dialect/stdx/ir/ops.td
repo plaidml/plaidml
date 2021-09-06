@@ -3,13 +3,10 @@
 #ifndef __PML_STDX_OPS__
 #define __PML_STDX_OPS__
 
-#ifndef OP_BASE
 include "mlir/IR/OpBase.td"
-#endif
-
+include "mlir/Interfaces/LoopLikeInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/ViewLikeInterface.td"
-
 include "mlir/Dialect/StandardOps/IR/StandardOpsBase.td"
 
 def StdX_Dialect : Dialect {
@@ -181,6 +178,33 @@ def UnpackOp : Op<StdX_Dialect, "unpack"> {
   let arguments = (ins Argpack:$in);
   let results = (outs Variadic<AnyType>:$out);
   let assemblyFormat = [{ `(` $in `)` attr-dict `:` functional-type(operands, results) }];
+}
+
+def ClosureOp : StdX_Op<"closure", [
+  DeclareOpInterfaceMethods<LoopLikeOpInterface>
+]> {
+  let arguments = (ins TypeAttr:$type);
+  let regions = (region SizedRegion<1>:$body);
+
+  let printer = [{ return print$cppClass(p, *this); }];
+  let parser = [{ return parse$cppClass(parser, result); }];
+
+  let extraClassDeclaration = [{
+      mlir::FunctionType getType() { return type().cast<mlir::FunctionType>(); }
+      void setType(mlir::FunctionType type) {
+        typeAttr(mlir::TypeAttr::get(type));
+      }
+      mlir::Region &getBody() { return body(); }
+  }];
+}
+
+def YieldOp : StdX_Op<"yield", [
+  HasParent<"ClosureOp">,
+  NoSideEffect,
+  Terminator
+]> {
+  let arguments = (ins Variadic<AnyType>:$operands);
+  let assemblyFormat = "attr-dict ($operands^ `:` type($operands))?";
 }
 
 #endif // __PML_STDX_OPS__

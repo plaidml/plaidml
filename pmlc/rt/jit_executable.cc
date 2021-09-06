@@ -30,6 +30,7 @@
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/ExecutionEngine/OptUtils.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
@@ -50,6 +51,11 @@ using namespace mlir; // NOLINT[build/namespaces]
 using pmlc::compiler::Program;
 
 namespace pmlc::rt {
+
+namespace {
+
+constexpr const char *kResume = "__resume";
+constexpr const char *kDestroy = "__destroy";
 
 // Setup LLVM target triple from the current machine.
 static void setupTargetTriple(llvm::Module *llvmModule) {
@@ -94,10 +100,25 @@ static std::string packFunctionArguments(llvm::Module *module,
   return newName;
 }
 
-namespace {
+static void generateControlWrapper(llvm::Module *module, const char *name,
+                                   llvm::Intrinsic::ID intrID) {
+  llvm::LLVMContext &ctx = module->getContext();
+  llvm::IRBuilder<> builder(ctx);
 
-constexpr const char *kInitName = "init";
-constexpr const char *kFiniName = "fini";
+  auto funcType =
+      llvm::FunctionType::get(builder.getVoidTy(), builder.getInt8PtrTy(),
+                              /*isVarArg=*/false);
+  llvm::FunctionCallee funcCallee = module->getOrInsertFunction(name, funcType);
+  llvm::Function *func = cast<llvm::Function>(funcCallee.getCallee());
+
+  auto bb = llvm::BasicBlock::Create(ctx);
+  bb->insertInto(func);
+  builder.SetInsertPoint(bb);
+
+  auto intr = llvm::Intrinsic::getDeclaration(module, intrID);
+  builder.CreateCall(intr, {func->getArg(0)});
+  builder.CreateRetVoid();
+}
 
 class MemRefDescriptor {
 private:
@@ -139,13 +160,14 @@ private:
   std::vector<char> memory;
 };
 
-using Function = uint8_t *(*)(void **);
+using EntryFunction = uint8_t *(*)(void **);
+using ControlFunction = void (*)(uint8_t *);
 
 struct EngineImpl {
   virtual ~EngineImpl() = default;
   virtual void compile(std::unique_ptr<llvm::Module> module,
                        std::unique_ptr<llvm::LLVMContext> ctx) = 0;
-  virtual Function getFunction(StringRef symbol) = 0;
+  virtual uint64_t getFunction(StringRef symbol) = 0;
 };
 
 static void *tryResolveSymbol(StringRef symbol) {
@@ -206,13 +228,13 @@ struct MCJITEngineImpl : EngineImpl {
     engine->finalizeObject();
   }
 
-  Function getFunction(StringRef symbol) final {
+  uint64_t getFunction(StringRef symbol) final {
     uint64_t addr = engine->getFunctionAddress(symbol.str());
     if (!addr) {
       throw std::runtime_error(
           llvm::formatv("Entry point not found: {0}", symbol.str()));
     }
-    return reinterpret_cast<Function>(addr);
+    return addr;
   }
 
   std::unique_ptr<llvm::ExecutionEngine> engine;
@@ -232,6 +254,22 @@ struct OrcJITEngineImpl : EngineImpl {
 
     auto dataLayout = module->getDataLayout();
 
+    auto tmBuilderOrError = JITTargetMachineBuilder::detectHost();
+    if (!tmBuilderOrError) {
+      throw std::runtime_error(
+          "Failed to create a JITTargetMachineBuilder for the host");
+    }
+
+    auto tmOrError = tmBuilderOrError->createTargetMachine();
+    if (!tmOrError) {
+      throw std::runtime_error("Failed to create a TargetMachine for the host");
+    }
+
+    auto transformer = makeOptimizingTransformer(
+        /*optLevel=*/3,
+        /*sizeLevel=*/0,
+        /*targetMachine=*/tmOrError->get());
+
     // Callback to inspect the cache and recompile on demand. This follows
     // Lang's LLJITWithObjectCache example.
     auto compileFunctionCreator = [&](JITTargetMachineBuilder JTMB)
@@ -249,6 +287,14 @@ struct OrcJITEngineImpl : EngineImpl {
 
     // Add a ThreadSafeModule to the engine and return.
     ThreadSafeModule tsm(std::move(module), std::move(ctx));
+    cantFail(tsm.withModuleDo(
+        [&](llvm::Module &module) { return transformer(&module); }));
+
+    if (VLOG_IS_ON(6)) {
+      tsm.withModuleDo(
+          [&](llvm::Module &module) { module.print(llvm::errs(), nullptr); });
+    }
+
     llvm::cantFail(jit->addIRModule(std::move(tsm)));
 
     SymbolMap symbols;
@@ -274,7 +320,7 @@ struct OrcJITEngineImpl : EngineImpl {
             dataLayout.getGlobalPrefix())));
   }
 
-  Function getFunction(StringRef symbol) {
+  uint64_t getFunction(StringRef symbol) {
     // JIT lookup may return an Error referring to strings stored internally by
     // the JIT. If the Error outlives the ExecutionEngine, it would want have a
     // dangling reference, which is currently caught by an assertion inside JIT
@@ -289,9 +335,7 @@ struct OrcJITEngineImpl : EngineImpl {
                             [&os](llvm::ErrorInfoBase &ei) { ei.log(os); });
       throw std::runtime_error(os.str());
     }
-
-    auto addr = expectedSymbol->getAddress();
-    return reinterpret_cast<Function>(addr);
+    return expectedSymbol->getAddress();
   }
 
   std::unique_ptr<llvm::orc::LLJIT> jit;
@@ -319,12 +363,20 @@ struct StopWatch {
   std::chrono::steady_clock::time_point stopTime;
 };
 
+static bool detectCoroutine(Program *program) {
+  MLIRContext *context = program->context.get();
+  auto funcOp = program->module->lookupSymbol<LLVM::LLVMFuncOp>(program->entry);
+  Type ptrType = LLVM::LLVMPointerType::get(IntegerType::get(context, 8));
+  Type returnType = funcOp.getType().getReturnType();
+  return returnType == ptrType;
+}
+
 class JitExecutable final : public Executable {
 public:
   JitExecutable(const std::shared_ptr<Program> &program,
                 std::shared_ptr<Device> device, ArrayRef<void *> preParams)
       : program(program), device(std::move(device)), preParams(preParams),
-        jitInit(nullptr), jitFini(nullptr), initPack(nullptr) {
+        useCoroutine(detectCoroutine(program.get())) {
     static std::once_flag is_initialized;
     std::call_once(is_initialized, []() {
       llvm::InitializeNativeTarget();
@@ -362,12 +414,11 @@ public:
 
     setupTargetTriple(llvmModule.get());
     auto entryPoint = packFunctionArguments(llvmModule.get(), program->entry);
-    std::string initPacked;
-    std::string finiPacked;
-    if (llvmModule->getFunction(kInitName) &&
-        llvmModule->getFunction(kFiniName)) {
-      initPacked = packFunctionArguments(llvmModule.get(), kInitName);
-      finiPacked = packFunctionArguments(llvmModule.get(), kFiniName);
+    if (useCoroutine) {
+      generateControlWrapper(llvmModule.get(), kResume,
+                             llvm::Intrinsic::coro_resume);
+      generateControlWrapper(llvmModule.get(), kDestroy,
+                             llvm::Intrinsic::coro_destroy);
     }
 
     if (VLOG_IS_ON(6)) {
@@ -375,68 +426,59 @@ public:
     }
 
     impl->compile(std::move(llvmModule), std::move(ctx));
-    jitMain = impl->getFunction(entryPoint);
-    if (initPacked != "" && finiPacked != "") {
-      jitInit = impl->getFunction(initPacked);
-      jitFini = impl->getFunction(finiPacked);
+    jitEntry = reinterpret_cast<EntryFunction>(impl->getFunction(entryPoint));
+    if (useCoroutine) {
+      jitResume = reinterpret_cast<ControlFunction>(impl->getFunction(kResume));
+      jitDestroy =
+          reinterpret_cast<ControlFunction>(impl->getFunction(kDestroy));
     }
 
-    if (!jitMain) {
-      throw std::runtime_error("jitEntry function is null");
+    for (const compiler::ConstantArgument &arg : program->constants) {
+      descriptors.emplace_back(arg.buffer->data(),
+                               arg.type.cast<RankedTensorType>());
+      ptrs.push_back(descriptors.back().ptr());
+    }
+    for (Type type : program->inputs) {
+      auto shape = util::TensorShape::fromType(type);
+      auto buffer = std::make_shared<util::SimpleBuffer>(shape);
+      descriptors.emplace_back(buffer->data(), type.cast<RankedTensorType>());
+      ptrs.push_back(descriptors.back().ptr());
+      inputBuffers.emplace_back(buffer);
+    }
+    for (Type type : program->outputs) {
+      auto shape = util::TensorShape::fromType(type);
+      auto buffer = std::make_shared<util::SimpleBuffer>(shape);
+      descriptors.emplace_back(buffer->data(), type.cast<RankedTensorType>());
+      ptrs.push_back(descriptors.back().ptr());
+      outputBuffers.emplace_back(buffer);
     }
 
-    if (jitInit) {
-      IVLOG(3, "Doing jit init");
-      std::vector<void *> initPtrs;
-      std::vector<MemRefDescriptor> initDescriptors;
-      std::copy(preParams.begin(), preParams.end(),
-                std::back_inserter(initPtrs));
-      for (const compiler::ConstantArgument &arg : program->constants) {
-        initDescriptors.emplace_back(arg.buffer->data(),
-                                     arg.type.cast<RankedTensorType>());
-        initPtrs.push_back(initDescriptors.back().ptr());
-      }
-      initPack = jitInit(initPtrs.data());
-      IVLOG(3, "Jit init complete");
+    if (useCoroutine) {
+      coroHandle = jitEntry(ptrs.data());
     }
   }
 
   ~JitExecutable() {
-    if (jitFini) {
-      IVLOG(3, "Doing jit fini");
-      std::vector<void *> finiPtrs;
-      finiPtrs.push_back(initPack);
-      IVLOG(3, "Jit fini complete");
-      free(initPack);
+    if (useCoroutine) {
+      jitDestroy(coroHandle);
     }
   }
 
-  double invoke() final {
-    std::vector<util::BufferPtr> inputBuffers, outputBuffers;
+  double invoke() final { return invoke(inputBuffers, outputBuffers); }
 
-    for (Type type : program->inputs) {
-      auto shape = util::TensorShape::fromType(type);
-      auto buffer = std::make_shared<util::SimpleBuffer>(shape);
-      inputBuffers.emplace_back(buffer);
-    }
-
-    for (Type type : program->outputs) {
-      auto shape = util::TensorShape::fromType(type);
-      auto buffer = std::make_shared<util::SimpleBuffer>(shape);
-      outputBuffers.emplace_back(buffer);
-    }
-
-    return invoke(inputBuffers, outputBuffers);
-  }
-
-  double invoke(mlir::ArrayRef<util::BufferPtr> inputBuffers,
-                mlir::ArrayRef<util::BufferPtr> outputBuffers) final {
+  double invoke(ArrayRef<util::BufferPtr> inputs,
+                ArrayRef<util::BufferPtr> outputs) final {
     StopWatch stopWatch;
     if (VLOG_IS_ON(1)) {
       stopWatch.start();
     }
-    bindArguments(inputBuffers, outputBuffers);
-    jitMain(ptrs.data());
+    copyBuffers(inputs, inputBuffers);
+    if (useCoroutine) {
+      jitResume(coroHandle);
+    } else {
+      jitEntry(ptrs.data());
+    }
+    copyBuffers(outputBuffers, outputs);
     if (VLOG_IS_ON(1)) {
       stopWatch.stop();
       IVLOG(1, "Execution time: " << stopWatch.delta_ms() << "ms");
@@ -444,40 +486,15 @@ public:
     return device->execTimeInMS;
   }
 
-  void bindArguments(ArrayRef<util::BufferPtr> inputBuffers,
-                     ArrayRef<util::BufferPtr> outputBuffers) {
-    if (inputBuffers.size() != program->inputs.size()) {
-      throw std::runtime_error("Program input arguments and buffers mismatch");
+  void copyBuffers(ArrayRef<util::BufferPtr> fromBuffers,
+                   ArrayRef<util::BufferPtr> intoBuffers) {
+    if (fromBuffers.size() != intoBuffers.size()) {
+      throw std::runtime_error("from/into buffers mismatch");
     }
-
-    if (outputBuffers.size() != program->outputs.size()) {
-      throw std::runtime_error(
-          "Program outputs arguments and buffers mismatch");
-    }
-
-    descriptors.clear();
-    ptrs.clear();
-
-    if (jitInit) {
-      ptrs.push_back(initPack);
-    } else {
-      std::copy(preParams.begin(), preParams.end(), std::back_inserter(ptrs));
-    }
-
-    for (auto [type, buffer] : llvm::zip(program->inputs, inputBuffers)) {
-      descriptors.emplace_back(buffer->data(), type.cast<RankedTensorType>());
-      ptrs.push_back(descriptors.back().ptr());
-    }
-    if (!jitInit) {
-      for (const compiler::ConstantArgument &arg : program->constants) {
-        descriptors.emplace_back(arg.buffer->data(),
-                                 arg.type.cast<RankedTensorType>());
-        ptrs.push_back(descriptors.back().ptr());
-      }
-    }
-    for (auto [type, buffer] : llvm::zip(program->outputs, outputBuffers)) {
-      descriptors.emplace_back(buffer->data(), type.cast<RankedTensorType>());
-      ptrs.push_back(descriptors.back().ptr());
+    for (auto it : llvm::zip(fromBuffers, intoBuffers)) {
+      util::BufferPtr from, into;
+      std::tie(from, into) = it;
+      std::memcpy(into->data(), from->data(), from->size());
     }
   }
 
@@ -488,10 +505,13 @@ private:
   std::unique_ptr<EngineImpl> impl;
   std::vector<MemRefDescriptor> descriptors;
   std::vector<void *> ptrs;
-  Function jitInit;
-  Function jitMain;
-  Function jitFini;
-  uint8_t *initPack;
+  EntryFunction jitEntry = nullptr;
+  ControlFunction jitResume = nullptr;
+  ControlFunction jitDestroy = nullptr;
+  uint8_t *coroHandle = nullptr;
+  bool useCoroutine;
+  SmallVector<util::BufferPtr> inputBuffers;
+  SmallVector<util::BufferPtr> outputBuffers;
 };
 
 } // namespace

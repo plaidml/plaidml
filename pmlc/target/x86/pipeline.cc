@@ -101,6 +101,7 @@ struct ConvertStandardToLLVMPass
     populateMathToLLVMConversionPatterns(converter, patterns);
     conversion::stdx_to_llvm::populateStdXToLLVMConversionPatterns(converter,
                                                                    patterns);
+    populateCoroToLLVMConversionPatterns(converter, patterns);
     populateOpenMPToLLVMConversionPatterns(converter, patterns);
 
     LLVMConversionTarget target(*context);
@@ -207,8 +208,7 @@ void pipelineBuilderStage1(OpPassManager &pm) {
   pm.addNestedPass<FuncOp>(layer::createInlineLayersPass());
   pm.addNestedPass<FuncOp>(tile::createAlgebraicOptPass());
   pm.addNestedPass<FuncOp>(tile::createComputeBoundsPass());
-  pm.addPass(tile::createSplitMainPass());
-  pm.addPass(transforms::createHoistingPass());
+  pm.addPass(stdx::createSplitMainPass());
   pm.addNestedPass<FuncOp>(tile::createPadConstraintsPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
@@ -315,11 +315,14 @@ void pipelineBuilderStage3(OpPassManager &pm) {
   pm.addPass(createLowerAffinePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
+  pm.addPass(createLoopInvariantCodeMotionPass());
 
   pm.addNestedPass<FuncOp>(createCollapseParallelLoopsPass());
   pm.addNestedPass<FuncOp>(createConvertSCFToOpenMPPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
+
+  pm.addNestedPass<FuncOp>(createLowerClosureToCoroPass());
 }
 
 void pipelineBuilderStage4(OpPassManager &pm) {

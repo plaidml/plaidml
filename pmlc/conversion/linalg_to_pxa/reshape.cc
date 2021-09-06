@@ -4,8 +4,7 @@
 
 namespace pmlc::conversion::linalg_to_pxa {
 
-using namespace mlir;         // NOLINT
-using namespace mlir::linalg; // NOLINT
+using namespace mlir; // NOLINT
 
 void buildSimpleYieldBody(OpBuilder &builder, Location loc, unsigned numInputs,
                           ValueRange args) {
@@ -16,10 +15,10 @@ void buildSimpleYieldBody(OpBuilder &builder, Location loc, unsigned numInputs,
 // TensorCollapseShapeOp does not have proper iterator_types() and
 // getLoopsToShapesMap()
 struct GeneralizeTensorCollapseShapeOp
-    : public OpRewritePattern<TensorCollapseShapeOp> {
-  using OpRewritePattern<TensorCollapseShapeOp>::OpRewritePattern;
+    : public OpRewritePattern<linalg::TensorCollapseShapeOp> {
+  using OpRewritePattern<linalg::TensorCollapseShapeOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(TensorCollapseShapeOp op,
+  LogicalResult matchAndRewrite(linalg::TensorCollapseShapeOp op,
                                 PatternRewriter &rewriter) const override {
     auto srcType = op.src().getType().cast<ShapedType>();
     auto srcShape = srcType.getShape();
@@ -65,17 +64,17 @@ struct GeneralizeTensorCollapseShapeOp
 };
 
 void populateLinalgTensorCollapseOpGeneralizationPatterns(
-    mlir::RewritePatternSet &patterns) {
+    RewritePatternSet &patterns) {
   patterns.add<GeneralizeTensorCollapseShapeOp>(patterns.getContext());
 }
 
 // TensorExpandShapeOp does not have proper iterator_types() and
 // getLoopsToShapesMap()
 struct GeneralizeTensorExpandShapeOp
-    : public OpRewritePattern<TensorExpandShapeOp> {
-  using OpRewritePattern<TensorExpandShapeOp>::OpRewritePattern;
+    : public OpRewritePattern<linalg::TensorExpandShapeOp> {
+  using OpRewritePattern<linalg::TensorExpandShapeOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(TensorExpandShapeOp op,
+  LogicalResult matchAndRewrite(linalg::TensorExpandShapeOp op,
                                 PatternRewriter &rewriter) const override {
     auto dstType = op.result().getType().cast<ShapedType>();
     auto dstShape = dstType.getShape();
@@ -121,7 +120,7 @@ struct GeneralizeTensorExpandShapeOp
 };
 
 void populateLinalgTensorExpandOpGeneralizationPatterns(
-    mlir::RewritePatternSet &patterns) {
+    RewritePatternSet &patterns) {
   patterns.add<GeneralizeTensorExpandShapeOp>(patterns.getContext());
 }
 

@@ -8,6 +8,12 @@ def CollapseParallelLoops : FunctionPass<"x86-collapse-scf-parallel"> {
   let constructor = "pmlc::target::x86::createCollapseParallelLoopsPass()";
 }
 
+def ConvertClosureToCoro : FunctionPass<"convert-closure-to-coro"> {
+  let summary = "Convert closures to coroutines";
+  let constructor = "pmlc::target::x86::createLowerClosureToCoroPass()";
+  let dependentDialects = ["mlir::async::AsyncDialect"];
+}
+
 def ConvertPXAToAffine : Pass<"x86-convert-pxa-to-affine", "mlir::ModuleOp"> {
   let summary = "Convert PXA dialect to Affine dialect";
   let constructor = "pmlc::target::x86::createLowerPXAToAffinePass()";

@@ -1,7 +1,8 @@
 // RUN: pmlc-opt --convert-linalg-to-pxa %s | FileCheck %s
 
 #map0 = affine_map<(d0, d1, d2, d3) -> ()>
-#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>  
+#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+
 func @main(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x224x224x3xf32> {
   %cst = constant dense<"0x00000000"> : tensor<f32>
   %0 = linalg.init_tensor [1, 224, 224, 3] : tensor<1x224x224x3xf32>

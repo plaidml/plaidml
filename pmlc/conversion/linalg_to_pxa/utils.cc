@@ -4,8 +4,7 @@
 
 namespace pmlc::conversion::linalg_to_pxa {
 
-using namespace mlir;         // NOLINT
-using namespace mlir::linalg; // NOLINT
+using namespace mlir; // NOLINT
 
 LinalgToPXATypeConverter::LinalgToPXATypeConverter() {
   addConversion([](FunctionType type) { return type; });
@@ -23,12 +22,12 @@ LinalgToPXATypeConverter::LinalgToPXATypeConverter() {
 
 // Generate a linalg.generic. This function uses bodyBuilder to create the
 // different generic op bodies.
-GenericOp createGenericOp(OpBuilder &builder, Operation *locationOp,
-                          TypeRange outputTypes, ValueRange inputs,
-                          ValueRange outputs, unsigned numIdxs,
-                          ArrayRef<AffineMap> maps,
-                          ArrayRef<StringRef> iterTypes,
-                          GenericOpBodyBuilder bodyBuilder) {
+linalg::GenericOp createGenericOp(OpBuilder &builder, Operation *locationOp,
+                                  TypeRange outputTypes, ValueRange inputs,
+                                  ValueRange outputs, unsigned numIdxs,
+                                  ArrayRef<AffineMap> maps,
+                                  ArrayRef<StringRef> iterTypes,
+                                  GenericOpBodyBuilder bodyBuilder) {
   builder.setInsertionPoint(locationOp);
   SmallVector<Value, 1> inits;
 
@@ -40,8 +39,8 @@ GenericOp createGenericOp(OpBuilder &builder, Operation *locationOp,
       auto shapedType = outputType.cast<ShapedType>();
       auto outputShape = shapedType.getShape();
       auto elemType = shapedType.getElementType();
-      auto initOp = builder.create<InitTensorOp>(locationOp->getLoc(),
-                                                 outputShape, elemType);
+      auto initOp = builder.create<linalg::InitTensorOp>(locationOp->getLoc(),
+                                                         outputShape, elemType);
       inits.emplace_back(initOp.getResult());
     }
   } else {
@@ -50,12 +49,13 @@ GenericOp createGenericOp(OpBuilder &builder, Operation *locationOp,
     inits.insert(inits.end(), outputs.begin(), outputs.end());
   }
 
-  auto genericOp = builder.create<GenericOp>(locationOp->getLoc(),
-                                             /*resultTensorTypes=*/outputTypes,
-                                             /*inputs=*/inputs,
-                                             /*outputs=*/inits,
-                                             /*indexingMaps=*/maps,
-                                             /*iteratorTypes=*/iterTypes);
+  auto genericOp =
+      builder.create<linalg::GenericOp>(locationOp->getLoc(),
+                                        /*resultTensorTypes=*/outputTypes,
+                                        /*inputs=*/inputs,
+                                        /*outputs=*/inits,
+                                        /*indexingMaps=*/maps,
+                                        /*iteratorTypes=*/iterTypes);
 
   // Arguments for the loop body
   SmallVector<Type, 4> argTypes;

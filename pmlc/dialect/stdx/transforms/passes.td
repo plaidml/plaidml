@@ -8,4 +8,10 @@ def BoundsCheck : FunctionPass<"stdx-check-bounds"> {
   let constructor = "pmlc::dialect::stdx::createBoundsCheckPass()";
 }
 
+def SplitMain : Pass<"stdx-split-main", "mlir::ModuleOp"> {
+  let summary = "Split main into init/main/fini blocks";
+  let constructor = "pmlc::dialect::stdx::createSplitMainPass()";
+  let dependentDialects = ["pmlc::dialect::stdx::StdXDialect"];
+}
+
 #endif // __PMLC_DIALECT_STDX_PASSES__

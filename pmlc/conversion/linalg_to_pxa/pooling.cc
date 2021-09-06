@@ -4,8 +4,7 @@
 
 namespace pmlc::conversion::linalg_to_pxa {
 
-using namespace mlir;         // NOLINT
-using namespace mlir::linalg; // NOLINT
+using namespace mlir; // NOLINT
 
 void buildPoolingMaxOpBody(OpBuilder &builder, Location loc, unsigned numInputs,
                            ValueRange args) {
@@ -92,11 +91,11 @@ struct GeneralizePoolingOp : public OpRewritePattern<PoolingOpType> {
 
     // Use different body builder for different pooling ops
     GenericOpBodyBuilder bodyBuilder;
-    if (isa<PoolingMaxOp>(op)) {
+    if (isa<linalg::PoolingMaxOp>(op)) {
       bodyBuilder = buildPoolingMaxOpBody;
-    } else if (isa<PoolingMinOp>(op)) {
+    } else if (isa<linalg::PoolingMinOp>(op)) {
       bodyBuilder = buildPoolingMinOpBody;
-    } else if (isa<PoolingSumOp>(op)) {
+    } else if (isa<linalg::PoolingSumOp>(op)) {
       bodyBuilder = buildPoolingSumOpBody;
     } else {
       op.emitError("Invalid pooling op.");
@@ -125,10 +124,11 @@ struct GeneralizePoolingOp : public OpRewritePattern<PoolingOpType> {
 };
 
 void populateLinalgPoolingOpGeneralizationPatterns(
-    mlir::RewritePatternSet &patterns) {
-  patterns.add<GeneralizePoolingOp<PoolingMaxOp>, //
-               GeneralizePoolingOp<PoolingMinOp>, //
-               GeneralizePoolingOp<PoolingSumOp>>(patterns.getContext());
+    RewritePatternSet &patterns) {
+  patterns.add<GeneralizePoolingOp<linalg::PoolingMaxOp>, //
+               GeneralizePoolingOp<linalg::PoolingMinOp>, //
+               GeneralizePoolingOp<linalg::PoolingSumOp>>(
+      patterns.getContext());
 }
 
 } // namespace pmlc::conversion::linalg_to_pxa

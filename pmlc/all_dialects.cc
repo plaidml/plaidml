@@ -3,6 +3,7 @@
 #include "pmlc/all_dialects.h"
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Async/IR/Async.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Math/IR/Math.h"
@@ -27,6 +28,7 @@ using namespace mlir; // NOLINT [build/namespaces]
 void registerAllDialects(DialectRegistry &registry) {
   registry.insert<AffineDialect,                      //
                   LLVM::LLVMDialect,                  //
+                  async::AsyncDialect,                //
                   linalg::LinalgDialect,              //
                   math::MathDialect,                  //
                   memref::MemRefDialect,              //

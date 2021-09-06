@@ -4,6 +4,8 @@ pml_cc_library(
     passes.h
     pipeline.h
   SRCS
+    closure_to_coro.cc
+    coro_to_llvm.cc
     heatmap.cc
     heatmap_impl.cc
     pipeline.cc
@@ -28,6 +30,7 @@ pml_cc_library(
     pmlc::transforms
     MLIRAffineToStandard
     MLIRAffineTransforms
+    MLIRAsync
     MLIRLLVMCommonConversion
     MLIRLLVMIRTransforms
     MLIRMathToLLVM
