@@ -387,25 +387,6 @@ struct RangeOpConversion : public OpConversionPattern<RangeOp> {
   }
 };
 
-struct ReturnOpConversion : public OpConversionPattern<ReturnOp> {
-  using OpConversionPattern<ReturnOp>::OpConversionPattern;
-
-  LogicalResult
-  matchAndRewrite(ReturnOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const final {
-    auto &block = op->getParentRegion()->front();
-    auto funcOp = op->getParentOfType<FuncOp>();
-    auto blockArg = funcOp.getType().getNumInputs() - op.getNumOperands();
-    for (Value operand : operands) {
-      // Find very initial allocation of memref
-      auto def = pxa::getIndirectDef(operand);
-      def.replaceAllUsesWith(block.getArgument(blockArg++));
-    }
-    rewriter.replaceOpWithNewOp<ReturnOp>(op, operands);
-    return success();
-  }
-};
-
 struct TiledLoopOpConversion : public OpConversionPattern<TiledLoopOp> {
   using OpConversionPattern<TiledLoopOp>::OpConversionPattern;
 
@@ -423,12 +404,7 @@ struct YieldOpConversion : public OpConversionPattern<linalg::YieldOp> {
   LogicalResult
   matchAndRewrite(linalg::YieldOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
-    // We should put AffineYieldOp after the replaced linalg::YieldOp.
-    // Otherwise, the use of Block::getTerminator() may return the to-be-removed
-    // linalg::YieldOp. So we do not use replaceOp or replaceOpWithNewOp here.
-    rewriter.setInsertionPointAfter(op);
-    auto affineYieldOp = rewriter.create<AffineYieldOp>(op.getLoc(), operands);
-    rewriter.eraseOp(op);
+    rewriter.replaceOpWithNewOp<AffineYieldOp>(op, operands);
     return success();
   }
 };
@@ -474,8 +450,6 @@ struct LowerLinalgToPXAPass
         [&](FuncOp op) { return converter.isSignatureLegal(op.getType()); });
     target.addDynamicallyLegalOp<ConstantOp>(
         [&](ConstantOp op) { return !op.getType().isa<TensorType>(); });
-    target.addDynamicallyLegalOp<ReturnOp>(
-        [&](ReturnOp op) { return converter.isLegal(op); });
 
     // These ops should be converted by the Linalg transformations before
     target.addIllegalOp<ConvOp,       //
@@ -494,7 +468,6 @@ struct LowerLinalgToPXAPass
                     IndexOpConversion,      //
                     InitTensorOpConversion, //
                     RangeOpConversion,      //
-                    ReturnOpConversion,     //
                     TiledLoopOpConversion,  //
                     YieldOpConversion>(&getContext());
 
@@ -503,6 +476,22 @@ struct LowerLinalgToPXAPass
       signalPassFailure();
       return;
     }
+
+    // Replace allocated memrefs with output arguments
+    module.walk([&](ReturnOp ret) {
+      auto &block = ret->getParentRegion()->front();
+      auto funcOp = ret->getParentOfType<FuncOp>();
+      auto blockArg = funcOp.getType().getNumInputs() - ret.getNumOperands();
+      for (Value operand : ret.getOperands()) {
+        // Find very initial allocation of memref
+        auto init = pxa::getIndirectDef(operand);
+        if (auto defOp = init.getDefiningOp()) {
+          if (isa<memref::AllocOp>(defOp)) {
+            init.replaceAllUsesWith(block.getArgument(blockArg++));
+          }
+        }
+      }
+    });
   }
 };
 } // namespace
