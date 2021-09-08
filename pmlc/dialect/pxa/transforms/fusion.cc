@@ -15,7 +15,6 @@
 #include "pmlc/dialect/pxa/transforms/tile.h"
 #include "pmlc/dialect/pxa/transforms/tile_accumulate.h"
 #include "pmlc/dialect/pxa/transforms/vectorize.h"
-#include "pmlc/dialect/stdx/ir/ops.h"
 #include "pmlc/util/logging.h"
 #include "pmlc/util/tags.h"
 #include "pmlc/util/util.h"
@@ -684,13 +683,19 @@ struct FusionPass : public FusionBase<FusionPass> {
 
   void runOnFunction() final {
     FuncOp func = getFunction();
-    stdx::ClosureOp closureOp = *func.getBody().op_begin<stdx::ClosureOp>();
-    Block &block =
-        closureOp ? closureOp.getBody().front() : func.getBody().front();
+
+    Block *block = nullptr;
+    func.walk<WalkOrder::PreOrder>([&](AffineParallelOp op) {
+      block = op->getBlock();
+      return WalkResult::interrupt();
+    });
+
+    if (!block)
+      return;
 
     // Always run on outer blocks, inner will be also
     // fused based on the loopDepth parameter
-    performFusion(block);
+    performFusion(*block);
 
     int64_t loopDepthVal = loopDepth.getValue();
     for (auto it = 0; it < loopDepthVal; it++) {
