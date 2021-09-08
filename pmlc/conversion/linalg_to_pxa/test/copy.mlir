@@ -1,10 +1,8 @@
 // RUN: pmlc-opt -convert-linalg-to-pxa -cse %s | FileCheck %s
 
-module  {
-  func @test_copy(%arg0: memref<16x16xf32>, %arg1: memref<16x16xf32>) {
-    linalg.copy(%arg0, %arg1) : memref<16x16xf32>, memref<16x16xf32>
-    return
-  }
+func @test_copy(%arg0: memref<16x16xf32>, %arg1: memref<16x16xf32>) {
+  linalg.copy(%arg0, %arg1) : memref<16x16xf32>, memref<16x16xf32>
+  return
 }
 
 // CHECK-LABEL: func @test_copy
@@ -14,4 +12,3 @@ module  {
 // CHECK:   %[[t1:.*]] = pxa.reduce assign %[[t0]], %[[arg1]][%[[arg2]], %[[arg3]]] : memref<16x16xf32>
 // CHECK:   affine.yield %[[t1]] : memref<16x16xf32>
 // CHECK: return
-

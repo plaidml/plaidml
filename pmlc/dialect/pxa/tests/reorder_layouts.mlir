@@ -143,13 +143,13 @@ func @different_vector() -> memref<4xf32> {
 //    RDR-NEXT:     affine.yield
 //    RDR-NEXT:   }
 //    RDR-NEXT:   stdx.pack
-func @init(%arg0: memref<16x16xf32>) -> !stdx.argpack {
-  %0 = stdx.pack(%arg0) : (memref<16x16xf32>) -> !stdx.argpack
-  return %0 : !stdx.argpack
+func @init(%arg0: memref<16x16xf32>) -> tuple<memref<16x16xf32>> {
+  %0 = stdx.pack(%arg0) : (memref<16x16xf32>) -> tuple<memref<16x16xf32>>
+  return %0 : tuple<memref<16x16xf32>>
 }
 
-func @main(%arg0: !stdx.argpack) -> memref<1xf32> {
-  %0:1 = stdx.unpack(%arg0) : (!stdx.argpack) -> memref<16x16xf32>
+func @main(%arg0: tuple<memref<16x16xf32>>) -> memref<1xf32> {
+  %0:1 = stdx.unpack(%arg0) : (tuple<memref<16x16xf32>>) -> memref<16x16xf32>
   %2 = memref.alloc() : memref<1xf32>
   %3 = affine.parallel (%i, %j) = (0, 0) to (4, 4) reduce("assign") -> memref<1xf32> {
     %4 = affine.parallel (%k, %l) = (0, 0) to (4, 4) reduce("addf") -> memref<1xf32> {
@@ -162,7 +162,7 @@ func @main(%arg0: !stdx.argpack) -> memref<1xf32> {
   return %3 : memref<1xf32>
 }
 
-func @fini(%arg0: !stdx.argpack) {
-  %0:1 = stdx.unpack(%arg0) : (!stdx.argpack) -> memref<16x16xf32>
+func @fini(%arg0: tuple<memref<16x16xf32>>) {
+  %0:1 = stdx.unpack(%arg0) : (tuple<memref<16x16xf32>>) -> memref<16x16xf32>
   return
 }

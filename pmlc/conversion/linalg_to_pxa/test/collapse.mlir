@@ -1,10 +1,8 @@
 // RUN: pmlc-opt -convert-linalg-to-pxa -cse %s | FileCheck %s
 
-module  {
-  func @test_collapse_reshape(%arg0: tensor<3x4x5xf32>) -> tensor<12x5xf32> {
-    %0 = linalg.tensor_collapse_shape %arg0 [[0, 1], [2]] : tensor<3x4x5xf32> into tensor<12x5xf32>
-    return %0 : tensor<12x5xf32>
-  }
+func @test_collapse_reshape(%arg0: tensor<3x4x5xf32>) -> tensor<12x5xf32> {
+  %0 = linalg.tensor_collapse_shape %arg0 [[0, 1], [2]] : tensor<3x4x5xf32> into tensor<12x5xf32>
+  return %0 : tensor<12x5xf32>
 }
 
 // CHECK-LABEL: func @test_collapse_reshape

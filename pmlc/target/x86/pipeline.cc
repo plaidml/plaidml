@@ -44,7 +44,6 @@
 #include "pmlc/target/x86/heatmap.h"
 #include "pmlc/target/x86/pass_detail.h"
 #include "pmlc/target/x86/passes.h"
-#include "pmlc/transforms/passes.h"
 #include "pmlc/util/env.h"
 #include "pmlc/util/logging.h"
 
@@ -207,8 +206,6 @@ void pipelineBuilderStage1(OpPassManager &pm) {
   pm.addNestedPass<FuncOp>(layer::createInlineLayersPass());
   pm.addNestedPass<FuncOp>(tile::createAlgebraicOptPass());
   pm.addNestedPass<FuncOp>(tile::createComputeBoundsPass());
-  pm.addPass(tile::createSplitMainPass());
-  pm.addPass(transforms::createHoistingPass());
   pm.addNestedPass<FuncOp>(tile::createPadConstraintsPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
@@ -219,6 +216,8 @@ void pipelineBuilderStage1(OpPassManager &pm) {
     pm.addPass(createCanonicalizerPass());
     pm.addPass(pml::createApplyRulesPass(/*module=*/"schedule"));
   }
+
+  pm.addPass(stdx::createMainClosurePass());
 }
 
 void pipelineBuilderStage2(OpPassManager &pm, const Options &options) {
@@ -315,11 +314,14 @@ void pipelineBuilderStage3(OpPassManager &pm) {
   pm.addPass(createLowerAffinePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
+  pm.addPass(createLoopInvariantCodeMotionPass());
 
   pm.addNestedPass<FuncOp>(createCollapseParallelLoopsPass());
   pm.addNestedPass<FuncOp>(createConvertSCFToOpenMPPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
+
+  pm.addPass(stdx::createSplitClosurePass());
 }
 
 void pipelineBuilderStage4(OpPassManager &pm) {

@@ -1,6 +1,6 @@
 pml_py_library(
   NAME py
-  SRC
+  SRCS
     hypersphere.py
     op.py
     torus.py
@@ -14,9 +14,9 @@ pml_py_test(
   DEPS
     ::py
   CHECKS
-      core
-      smoke
-      test
+    core
+    smoke
+    test
 )
 
 # the rules below are used to generate graphs for torus and hypersphere experiments. 

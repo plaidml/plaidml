@@ -13,8 +13,7 @@ namespace pmlc::conversion::linalg_to_pxa {
 namespace pxa = dialect::pxa;
 namespace stdx = dialect::stdx;
 
-using namespace mlir;         // NOLINT
-using namespace mlir::linalg; // NOLINT
+using namespace mlir; // NOLINT
 
 namespace {
 
@@ -34,7 +33,7 @@ struct BufferAllocator {
   BufferAllocator(OpBuilder &builder, Operation *op, Type resultType) {
     // Gather some basic info
     LinalgToPXATypeConverter typeConverter;
-    auto loc = op->getLoc();
+    Location loc = op->getLoc();
     rankedTensorType = getRankedTensorType(resultType);
     elementType = typeConverter.convertType(rankedTensorType.getElementType());
     ArrayRef<int64_t> originalShape = rankedTensorType.getShape();
@@ -142,11 +141,11 @@ struct ConstantOpConversion : public OpConversionPattern<ConstantOp> {
   matchAndRewrite(ConstantOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
     static int constCount = 0;
-    auto origValue = op.getValue();
+    Attribute origValue = op.getValue();
     if (auto origType = origValue.getType().dyn_cast<ShapedType>()) {
       LinalgToPXATypeConverter typeConverter;
-      auto newType = typeConverter.convertType(origType);
-      auto name = llvm::formatv("cst_memref_{0}", constCount++).str();
+      Type newType = typeConverter.convertType(origType);
+      std::string name = llvm::formatv("cst_memref_{0}", constCount++).str();
       auto funcOp = op->getParentOfType<FuncOp>();
       rewriter.setInsertionPoint(funcOp);
       auto globalOp = rewriter.create<memref::GlobalOp>(
@@ -165,32 +164,32 @@ struct ConstantOpConversion : public OpConversionPattern<ConstantOp> {
   }
 };
 
-struct FuncOpConversion : public OpConversionPattern<FuncOp> {
-  using OpConversionPattern<FuncOp>::OpConversionPattern;
+template <typename FuncLikeOp>
+struct FuncOpConversion : public OpConversionPattern<FuncLikeOp> {
+  using OpConversionPattern<FuncLikeOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(FuncOp op, ArrayRef<Value> operands,
+  matchAndRewrite(FuncLikeOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
     FunctionType type = op.getType();
 
     // Convert the function signature
     LinalgToPXATypeConverter typeConverter;
-    mlir::TypeConverter::SignatureConversion result(type.getNumInputs());
+    TypeConverter::SignatureConversion result(type.getNumInputs());
     for (unsigned i = 0; i < type.getNumInputs(); ++i) {
       result.addInputs(i, {typeConverter.convertType(type.getInput(i))});
     }
     SmallVector<Type, 8> resultTypes;
     for (Type resultType : type.getResults()) {
       Type newResultType = typeConverter.convertType(resultType);
-      if (!newResultType.isa<stdx::ArgpackType>()) {
-        result.addInputs({newResultType});
-      }
+      result.addInputs({newResultType});
       resultTypes.push_back(newResultType);
     }
 
     // Create a new function with an updated signature.
-    auto newOp = rewriter.cloneWithoutRegions(op);
-    rewriter.inlineRegionBefore(op.getBody(), newOp.getBody(), newOp.end());
+    FuncLikeOp newOp = rewriter.cloneWithoutRegions(op);
+    rewriter.inlineRegionBefore(op.getBody(), newOp.getBody(),
+                                newOp.getBody().end());
     newOp.setType(FunctionType::get(op.getContext(), result.getConvertedTypes(),
                                     resultTypes));
 
@@ -205,44 +204,17 @@ struct FuncOpConversion : public OpConversionPattern<FuncOp> {
 };
 
 // Most of Linalg ops are converted to GenericOp first.
-struct GenericOpConversion : public OpConversionPattern<GenericOp> {
-  using OpConversionPattern<GenericOp>::OpConversionPattern;
+struct GenericOpConversion : public OpConversionPattern<linalg::GenericOp> {
+  using OpConversionPattern<linalg::GenericOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(GenericOp op, ArrayRef<Value> operands,
+  matchAndRewrite(linalg::GenericOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
-    GenericOpAdaptor adaptor(operands, op->getAttrDictionary());
-    auto inputs = adaptor.inputs();
-    auto outputs = adaptor.outputs();
-    auto idxMapAttrs = adaptor.indexing_maps().getValue();
-    SmallVector<AffineMap, 4> idxMaps;
-    for (auto attr : idxMapAttrs) {
-      idxMaps.emplace_back(attr.cast<AffineMapAttr>().getValue());
-    }
-
-    // Get all inputs' and outputs' shapes. Note that inputs and outputs may be
-    // scalar.
-    SmallVector<ArrayRef<int64_t>, 4> shapes;
-    for (auto input : inputs) {
-      if (auto shapedType = input.getType().dyn_cast<ShapedType>()) {
-        shapes.emplace_back(shapedType.getShape());
-      } else {
-        shapes.emplace_back(ArrayRef<int64_t>{1});
-      }
-    }
-    for (auto output : outputs) {
-      if (auto shapedType = output.getType().dyn_cast<ShapedType>()) {
-        shapes.emplace_back(shapedType.getShape());
-      } else {
-        shapes.emplace_back(ArrayRef<int64_t>{1});
-      }
-    }
-
-    // Get output types
-    SmallVector<Type, 4> outputTypes;
-    for (auto output : outputs) {
-      outputTypes.emplace_back(output.getType());
-    }
+    linalg::GenericOpAdaptor adaptor(operands, op->getAttrDictionary());
+    ValueRange inputs = adaptor.inputs();
+    ValueRange outputs = adaptor.outputs();
+    SmallVector<AffineMap, 4> idxMaps = llvm::to_vector<4>(
+        adaptor.indexing_maps().getAsValueRange<AffineMapAttr>());
 
     // Prepare for creating the reduce ops. The operations with output arguments
     // should be converted to reduce op. We need to extract the aggregation
@@ -262,8 +234,8 @@ struct GenericOpConversion : public OpConversionPattern<GenericOp> {
         // Extract the aggregation kind, the scalar value, and the related op.
         ReductionInfo ri(useOp, use.get());
         useOp->getResult(0).replaceUsesWithIf(
-            ri.getScalar(), [&](mlir::OpOperand &operand) {
-              mlir::Operation *owner = operand.getOwner();
+            ri.getScalar(), [&](OpOperand &operand) {
+              Operation *owner = operand.getOwner();
               if (!isa<linalg::YieldOp>(owner)) {
                 op.emitError("Reduce op is not used by linalg.yield");
               }
@@ -283,25 +255,25 @@ struct GenericOpConversion : public OpConversionPattern<GenericOp> {
     if (!ranges) {
       op.emitError("LiangOp does not have static ranges.");
     }
-    auto forOp = rewriter.create<AffineParallelOp>(op.getLoc(),
-                                                   /*resultTypes=*/outputTypes,
-                                                   /*reductions=*/aggs,
-                                                   /*ranges=*/*ranges);
+    auto forOp =
+        rewriter.create<AffineParallelOp>(op.getLoc(),
+                                          /*resultTypes=*/outputs.getTypes(),
+                                          /*reductions=*/aggs,
+                                          /*ranges=*/*ranges);
 
     // Create the a load op for each block argument.
-    auto forBody = forOp.getBody();
+    Block *forBody = forOp.getBody();
     auto idxs = forBody->getArguments();
-    auto opArgs = op.getBody()->getArguments();
     rewriter.setInsertionPointToStart(forBody);
     for (unsigned i = 0; i < numInputs; ++i) {
       if (inputs[i].getType().isa<ShapedType>()) {
         // input is a tensor
         auto loadOp = rewriter.create<pxa::PxaLoadOp>(forOp.getLoc(), inputs[i],
                                                       idxMaps[i], idxs);
-        opArgs[i].replaceAllUsesWith(loadOp.getResult());
+        outputArgs[i].replaceAllUsesWith(loadOp.getResult());
       } else {
         // input is a scalar
-        opArgs[i].replaceAllUsesWith(inputs[i]);
+        outputArgs[i].replaceAllUsesWith(inputs[i]);
       }
     }
 
@@ -328,11 +300,11 @@ struct GenericOpConversion : public OpConversionPattern<GenericOp> {
         if (outputs[i].getType().isa<ShapedType>()) {
           auto reduceOp = rewriter.create<pxa::PxaReduceOp>(
               yieldOp.getLoc(), aggs[i], results[i], outputs[i], maps[i], idxs);
-          results[i].replaceUsesWithIf(
-              reduceOp.getResult(), [&](mlir::OpOperand &operand) {
-                mlir::Operation *owner = operand.getOwner();
-                return isa<linalg::YieldOp>(owner);
-              });
+          results[i].replaceUsesWithIf(reduceOp.getResult(),
+                                       [&](OpOperand &operand) {
+                                         Operation *owner = operand.getOwner();
+                                         return isa<linalg::YieldOp>(owner);
+                                       });
         }
       }
     } else {
@@ -350,11 +322,11 @@ struct GenericOpConversion : public OpConversionPattern<GenericOp> {
   }
 };
 
-struct IndexOpConversion : public OpConversionPattern<IndexOp> {
-  using OpConversionPattern<IndexOp>::OpConversionPattern;
+struct IndexOpConversion : public OpConversionPattern<linalg::IndexOp> {
+  using OpConversionPattern<linalg::IndexOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(IndexOp op, ArrayRef<Value> operands,
+  matchAndRewrite(linalg::IndexOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
     auto idxs = op->getBlock()->getArguments();
     op.replaceAllUsesWith(idxs[op.dim()]);
@@ -363,37 +335,16 @@ struct IndexOpConversion : public OpConversionPattern<IndexOp> {
   }
 };
 
-struct InitTensorOpConversion : public OpConversionPattern<InitTensorOp> {
-  using OpConversionPattern<InitTensorOp>::OpConversionPattern;
+struct InitTensorOpConversion
+    : public OpConversionPattern<linalg::InitTensorOp> {
+  using OpConversionPattern<linalg::InitTensorOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(InitTensorOp op, ArrayRef<Value> operands,
+  matchAndRewrite(linalg::InitTensorOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
     BufferAllocator allocResult(rewriter, op, op.result().getType());
     op.replaceAllUsesWith(allocResult.resultMemRef);
     rewriter.eraseOp(op);
-    return success();
-  }
-};
-
-struct RangeOpConversion : public OpConversionPattern<RangeOp> {
-  using OpConversionPattern<RangeOp>::OpConversionPattern;
-
-  LogicalResult
-  matchAndRewrite(RangeOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const final {
-    op.emitError("Conversion of linalg.range is not implemented.");
-    return success();
-  }
-};
-
-struct TiledLoopOpConversion : public OpConversionPattern<TiledLoopOp> {
-  using OpConversionPattern<TiledLoopOp>::OpConversionPattern;
-
-  LogicalResult
-  matchAndRewrite(TiledLoopOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const final {
-    op.emitError("Conversion of linalg.tiled_loop is not implemented.");
     return success();
   }
 };
@@ -413,87 +364,81 @@ struct LowerLinalgToPXAPass
     : public LowerLinalgToPXABase<LowerLinalgToPXAPass> {
 
   void performLinalgTransforms(ModuleOp op) {
-    // We perform some Linalg transformations first in order to convert as many
-    // as operations to GenericOp.
     RewritePatternSet patterns(op.getContext());
-    populateLinalgConvGeneralizationPatterns(patterns);
-    populateLinalgNamedOpsGeneralizationPatterns(patterns);
+    linalg::populateLinalgConvGeneralizationPatterns(patterns);
+    linalg::populateLinalgNamedOpsGeneralizationPatterns(patterns);
     populateLinalgTensorCollapseOpGeneralizationPatterns(patterns);
     populateLinalgTensorExpandOpGeneralizationPatterns(patterns);
     populateLinalgPoolingOpGeneralizationPatterns(patterns);
-    patterns.add<PadTensorOpTransformationPattern>(op.getContext());
+    patterns.add<linalg::PadTensorOpTransformationPattern>(op.getContext());
     (void)applyPatternsAndFoldGreedily(op, std::move(patterns));
   }
 
   void runOnOperation() final {
-    // Perform Linalg transformations to convert some operations to
-    // linalg.generic
-    auto module = getOperation();
+    ModuleOp module = getOperation();
+
+    // Convert named/structured ops to GenericOps.
     performLinalgTransforms(module);
 
-    // Set up target (i.e. what is legal)
     ConversionTarget target(getContext());
     LinalgToPXATypeConverter converter;
-    target.addLegalDialect<mlir::AffineDialect,         //
-                           mlir::StandardOpsDialect,    //
-                           mlir::math::MathDialect,     //
-                           mlir::memref::MemRefDialect, //
-                           mlir::scf::SCFDialect,       //
-                           pxa::PXADialect,             //
+    target.addLegalDialect<AffineDialect,         //
+                           StandardOpsDialect,    //
+                           math::MathDialect,     //
+                           memref::MemRefDialect, //
+                           scf::SCFDialect,       //
+                           pxa::PXADialect,       //
                            stdx::StdXDialect>();
-    target.addLegalOp<scf::ForOp,   //
-                      scf::YieldOp, //
-                      scf::IfOp>();
-    target.addLegalOp<mlir::ModuleOp, //
-                      ReturnOp>();
+    target.addLegalOp<ModuleOp>();
     target.addDynamicallyLegalOp<FuncOp>(
         [&](FuncOp op) { return converter.isSignatureLegal(op.getType()); });
+    target.addDynamicallyLegalOp<stdx::ClosureOp>([&](stdx::ClosureOp op) {
+      return converter.isSignatureLegal(op.getType());
+    });
     target.addDynamicallyLegalOp<ConstantOp>(
         [&](ConstantOp op) { return !op.getType().isa<TensorType>(); });
 
-    // These ops should be converted by the Linalg transformations before
-    target.addIllegalOp<ConvOp,       //
-                        CopyOp,       //
-                        FillOp,       //
-                        PadTensorOp,  //
-                        PoolingMaxOp, //
-                        PoolingMinOp, //
-                        PoolingSumOp>();
-
-    // Setup rewrite patterns
     RewritePatternSet patterns(&getContext());
-    patterns.insert<ConstantOpConversion,   //
-                    FuncOpConversion,       //
-                    GenericOpConversion,    //
-                    IndexOpConversion,      //
-                    InitTensorOpConversion, //
-                    RangeOpConversion,      //
-                    TiledLoopOpConversion,  //
+    patterns.insert<ConstantOpConversion,              //
+                    FuncOpConversion<FuncOp>,          //
+                    FuncOpConversion<stdx::ClosureOp>, //
+                    GenericOpConversion,               //
+                    IndexOpConversion,                 //
+                    InitTensorOpConversion,            //
                     YieldOpConversion>(&getContext());
 
-    // Run the conversion
     if (failed(applyFullConversion(module, target, std::move(patterns)))) {
       signalPassFailure();
       return;
     }
 
-    // Replace allocated memrefs with output arguments
-    module.walk([&](ReturnOp ret) {
-      auto &block = ret->getParentRegion()->front();
-      auto funcOp = ret->getParentOfType<FuncOp>();
-      auto blockArg = funcOp.getType().getNumInputs() - ret.getNumOperands();
-      for (Value operand : ret.getOperands()) {
-        // Find very initial allocation of memref
-        auto init = pxa::getIndirectDef(operand);
-        if (auto defOp = init.getDefiningOp()) {
-          if (isa<memref::AllocOp>(defOp)) {
-            init.replaceAllUsesWith(block.getArgument(blockArg++));
+    for (FuncOp funcOp : module.getOps<FuncOp>()) {
+      for (ReturnOp returnOp : funcOp.getOps<ReturnOp>()) {
+        connectResults(funcOp, returnOp);
+        for (stdx::ClosureOp closureOp : funcOp.getOps<stdx::ClosureOp>()) {
+          for (stdx::YieldOp yieldOp : closureOp.getOps<stdx::YieldOp>()) {
+            connectResults(closureOp, yieldOp);
           }
         }
       }
-    });
+    }
+  }
+
+  template <typename FuncLikeOp, typename ReturnLikeOp>
+  void connectResults(FuncLikeOp funcOp, ReturnLikeOp returnOp) {
+    unsigned argNumber =
+        funcOp.getType().getNumInputs() - returnOp.getNumOperands();
+    for (Value operand : returnOp.operands()) {
+      // Find very initial allocation of memref
+      Value def = pxa::getIndirectDef(operand);
+      BlockArgument blockArg = funcOp.getBody().getArgument(argNumber++);
+      if (def != blockArg) {
+        def.replaceAllUsesWith(blockArg);
+      }
+    }
   }
 };
+
 } // namespace
 
 std::unique_ptr<Pass> createLowerLinalgToPXAPass() {

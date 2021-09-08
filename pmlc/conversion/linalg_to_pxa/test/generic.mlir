@@ -3,17 +3,16 @@
 #map0 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 * 2 + d4, d2 * 2 + d5, d6)>
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d3)>
 #map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
-module  {
-  func @test_conv_2d_input_nhwc_filter_hwcf(%arg0: tensor<1x255x255x3xf32>, %arg1: tensor<3x3x3x32xf32>) -> tensor<1x112x112x32xf32> {
-    %0 = linalg.init_tensor [1, 112, 112, 32] : tensor<1x112x112x32xf32>
-    %1 = linalg.generic {indexing_maps = [#map0, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "parallel"]} ins(%arg0, %arg1 : tensor<1x255x255x3xf32>, tensor<3x3x3x32xf32>) outs(%0 : tensor<1x112x112x32xf32>) {
-    ^bb0(%arg2: f32, %arg3: f32, %arg4: f32):  // no predecessors
-      %2 = mulf %arg2, %arg3 : f32
-      %3 = addf %arg4, %2 : f32
-      linalg.yield %3 : f32
-    } -> tensor<1x112x112x32xf32>
-    return %1 : tensor<1x112x112x32xf32>
-  }
+
+func @test_conv_2d_input_nhwc_filter_hwcf(%arg0: tensor<1x255x255x3xf32>, %arg1: tensor<3x3x3x32xf32>) -> tensor<1x112x112x32xf32> {
+  %0 = linalg.init_tensor [1, 112, 112, 32] : tensor<1x112x112x32xf32>
+  %1 = linalg.generic {indexing_maps = [#map0, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "parallel"]} ins(%arg0, %arg1 : tensor<1x255x255x3xf32>, tensor<3x3x3x32xf32>) outs(%0 : tensor<1x112x112x32xf32>) {
+  ^bb0(%arg2: f32, %arg3: f32, %arg4: f32):  // no predecessors
+    %2 = mulf %arg2, %arg3 : f32
+    %3 = addf %arg4, %2 : f32
+    linalg.yield %3 : f32
+  } -> tensor<1x112x112x32xf32>
+  return %1 : tensor<1x112x112x32xf32>
 }
 
 // CHECK-LABEL: func @test_conv_2d_input_nhwc_filter_hwcf

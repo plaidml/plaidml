@@ -51,6 +51,8 @@ using pmlc::compiler::Program;
 
 namespace pmlc::rt {
 
+namespace {
+
 // Setup LLVM target triple from the current machine.
 static void setupTargetTriple(llvm::Module *llvmModule) {
   // Setup the machine properties from the current architecture.
@@ -93,8 +95,6 @@ static std::string packFunctionArguments(llvm::Module *module,
   util::wrapFunctionAndPackArguments(module, funcName, newName);
   return newName;
 }
-
-namespace {
 
 constexpr const char *kInitName = "init";
 constexpr const char *kFiniName = "fini";
@@ -232,6 +232,22 @@ struct OrcJITEngineImpl : EngineImpl {
 
     auto dataLayout = module->getDataLayout();
 
+    auto tmBuilderOrError = JITTargetMachineBuilder::detectHost();
+    if (!tmBuilderOrError) {
+      throw std::runtime_error(
+          "Failed to create a JITTargetMachineBuilder for the host");
+    }
+
+    auto tmOrError = tmBuilderOrError->createTargetMachine();
+    if (!tmOrError) {
+      throw std::runtime_error("Failed to create a TargetMachine for the host");
+    }
+
+    auto transformer = makeOptimizingTransformer(
+        /*optLevel=*/3,
+        /*sizeLevel=*/0,
+        /*targetMachine=*/tmOrError->get());
+
     // Callback to inspect the cache and recompile on demand. This follows
     // Lang's LLJITWithObjectCache example.
     auto compileFunctionCreator = [&](JITTargetMachineBuilder JTMB)
@@ -249,6 +265,14 @@ struct OrcJITEngineImpl : EngineImpl {
 
     // Add a ThreadSafeModule to the engine and return.
     ThreadSafeModule tsm(std::move(module), std::move(ctx));
+    cantFail(tsm.withModuleDo(
+        [&](llvm::Module &module) { return transformer(&module); }));
+
+    if (VLOG_IS_ON(6)) {
+      tsm.withModuleDo(
+          [&](llvm::Module &module) { module.print(llvm::errs(), nullptr); });
+    }
+
     llvm::cantFail(jit->addIRModule(std::move(tsm)));
 
     SymbolMap symbols;
@@ -323,8 +347,7 @@ class JitExecutable final : public Executable {
 public:
   JitExecutable(const std::shared_ptr<Program> &program,
                 std::shared_ptr<Device> device, ArrayRef<void *> preParams)
-      : program(program), device(std::move(device)), preParams(preParams),
-        jitInit(nullptr), jitFini(nullptr), initPack(nullptr) {
+      : program(program), device(std::move(device)), preParams(preParams) {
     static std::once_flag is_initialized;
     std::call_once(is_initialized, []() {
       llvm::InitializeNativeTarget();
@@ -429,8 +452,8 @@ public:
     return invoke(inputBuffers, outputBuffers);
   }
 
-  double invoke(mlir::ArrayRef<util::BufferPtr> inputBuffers,
-                mlir::ArrayRef<util::BufferPtr> outputBuffers) final {
+  double invoke(ArrayRef<util::BufferPtr> inputBuffers,
+                ArrayRef<util::BufferPtr> outputBuffers) final {
     StopWatch stopWatch;
     if (VLOG_IS_ON(1)) {
       stopWatch.start();
@@ -488,10 +511,10 @@ private:
   std::unique_ptr<EngineImpl> impl;
   std::vector<MemRefDescriptor> descriptors;
   std::vector<void *> ptrs;
-  Function jitInit;
-  Function jitMain;
-  Function jitFini;
-  uint8_t *initPack;
+  Function jitInit = nullptr;
+  Function jitMain = nullptr;
+  Function jitFini = nullptr;
+  uint8_t *initPack = nullptr;
 };
 
 } // namespace

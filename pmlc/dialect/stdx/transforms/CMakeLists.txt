@@ -5,6 +5,8 @@ pml_cc_library(
     passes.h
   SRCS
     boundscheck.cc
+    main_closure.cc
+    split_closure.cc
   DEPS
     LLVMSupport
     MLIRIR

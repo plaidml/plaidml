@@ -89,13 +89,14 @@ struct TileAccumulatePass : public TileAccumulateBase<TileAccumulatePass> {
   void runOnFunction() final {
     auto func = getFunction();
     // Tile only the outermost loops
-    for (auto op : func.getBody().getOps<AffineParallelOp>()) {
+    func.walk<WalkOrder::PreOrder>([&](AffineParallelOp op) {
       if (!op.getConstantRanges()) {
         signalPassFailure();
-        break;
+        return WalkResult::interrupt();
       }
       tileAccumulations(op, false);
-    }
+      return WalkResult::skip();
+    });
   }
 };
 

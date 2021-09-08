@@ -1,16 +1,10 @@
 import unittest
+
 import numpy.testing as npt
-import os
-import math
-from torus import toroidal_shell_integral_moment_of_innertia_exact
-from torus import torus_surface_area_exact
-from torus import torus_volume_exact
-from torus import torus
-from torus import integrand_inertia
-from hypersphere import hypersphere
-from hypersphere import hypersphere_area_exact
-from hypersphere import hypersphere_volume_exact
+from hypersphere import (hypersphere, hypersphere_area_exact, hypersphere_volume_exact)
 from op import *
+from torus import (integrand_inertia, toroidal_shell_integral_moment_of_innertia_exact, torus,
+                   torus_surface_area_exact, torus_volume_exact)
 
 DEFAULT_TOL = 1e-2
 DEFAULT_ATOL = 1e-8
