@@ -4,6 +4,7 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "pmlc/conversion/linalg_to_pxa/pass_detail.h"
+#include "pmlc/dialect/pxa/analysis/uses.h"
 #include "pmlc/util/matchers.h"
 #include "pmlc/util/util.h"
 
@@ -338,10 +339,13 @@ struct GenericOpConversion : public OpConversionPattern<GenericOp> {
       op->emitError("No linalg.yield in generic op.");
     }
 
-    for (unsigned i = 0; i < op.getNumResults(); ++i) {
-      op.getResult(i).replaceAllUsesWith(forOp.getResult(i));
+    if (op.getNumResults() == forOp.getNumResults()) {
+      rewriter.replaceOp(op, forOp.getResults());
+    } else {
+      // For some original ops such as conv and copy, they don't return
+      // anything. So we erase the original op directly.
+      rewriter.eraseOp(op);
     }
-    rewriter.eraseOp(op);
     return success();
   }
 };
@@ -472,6 +476,22 @@ struct LowerLinalgToPXAPass
       signalPassFailure();
       return;
     }
+
+    // Replace allocated memrefs with output arguments
+    module.walk([&](ReturnOp ret) {
+      auto &block = ret->getParentRegion()->front();
+      auto funcOp = ret->getParentOfType<FuncOp>();
+      auto blockArg = funcOp.getType().getNumInputs() - ret.getNumOperands();
+      for (Value operand : ret.getOperands()) {
+        // Find very initial allocation of memref
+        auto init = pxa::getIndirectDef(operand);
+        if (auto defOp = init.getDefiningOp()) {
+          if (isa<memref::AllocOp>(defOp)) {
+            init.replaceAllUsesWith(block.getArgument(blockArg++));
+          }
+        }
+      }
+    });
   }
 };
 } // namespace

@@ -1,4 +1,4 @@
-// RUN: pmlc-opt -convert-linalg-to-pxa %s | FileCheck %s
+// RUN: pmlc-opt -convert-linalg-to-pxa -cse %s | FileCheck %s
 
 module  {
   func @test_conv(%arg0: memref<128x128x3xf32>, %arg1: memref<3x3x3xf32>, %arg2: memref<126x126x3xf32>) {

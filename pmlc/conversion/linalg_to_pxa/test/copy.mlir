@@ -1,4 +1,4 @@
-// RUN: pmlc-opt -convert-linalg-to-pxa %s | FileCheck %s
+// RUN: pmlc-opt -convert-linalg-to-pxa -cse %s | FileCheck %s
 
 module  {
   func @test_copy(%arg0: memref<16x16xf32>, %arg1: memref<16x16xf32>) {
