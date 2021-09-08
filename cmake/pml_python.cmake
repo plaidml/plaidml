@@ -104,7 +104,9 @@ function(pml_py_test)
   )
 
   add_custom_target(${_NAME} ALL
-    DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${_RULE_SRC}
+    DEPENDS
+      ${_RULE_DEPS}
+      ${CMAKE_CURRENT_BINARY_DIR}/${_RULE_SRC}
   )
 
   add_custom_command(
@@ -112,6 +114,7 @@ function(pml_py_test)
     COMMAND ${CMAKE_COMMAND} -E copy
       ${CMAKE_CURRENT_SOURCE_DIR}/${_RULE_SRC}
       ${CMAKE_CURRENT_BINARY_DIR}/${_RULE_SRC}
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${SRC_FILE}
   )
 
   pml_add_checks(

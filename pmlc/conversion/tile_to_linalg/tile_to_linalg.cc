@@ -1088,9 +1088,7 @@ struct FuncOpConversion : public OpConversionPattern<FuncOp> {
     SmallVector<Type, 8> resultTypes;
     for (Type resultType : type.getResults()) {
       Type newResultType = typeConverter.convertType(resultType);
-      if (!newResultType.isa<stdx::ArgpackType>()) {
-        result.addInputs({newResultType});
-      }
+      result.addInputs({newResultType});
       resultTypes.push_back(newResultType);
     }
 
@@ -1191,11 +1189,10 @@ struct LowerTileToLinalgPass
       OpBuilder builder(op);
       for (OpOperand &operand : op->getOpOperands()) {
         Value value = operand.get();
-        bool needsIdent =                                  //
-            value.isa<BlockArgument>() ||                  // Block arguemnt
-            matchPattern(value, m_Constant()) ||           // Constant op
-            matchPattern(value, m_Op<stdx::UnpackOp>()) || // Direct from unpack
-            matchPattern(value, m_Op<tile::ReshapeOp>());  // Reshape op
+        bool needsIdent =                                 //
+            value.isa<BlockArgument>() ||                 // Block arguemnt
+            matchPattern(value, m_Constant()) ||          // Constant op
+            matchPattern(value, m_Op<tile::ReshapeOp>()); // Reshape op
         if (needsIdent) {
           Value copy = builder.create<tile::IdentOp>(op.getLoc(),
                                                      value.getType(), value);
@@ -1224,9 +1221,6 @@ struct LowerTileToLinalgPass
         [&](FuncOp op) { return converter.isSignatureLegal(op.getType()); });
     target.addDynamicallyLegalOp<ReturnOp>(
         [&](ReturnOp op) { return converter.isLegal(op); });
-    target.addDynamicallyLegalOp<stdx::UnpackOp>([&](stdx::UnpackOp op) {
-      return converter.isLegal(op.getResultTypes());
-    });
     target.addDynamicallyLegalOp<scf::ForOp>(
         [&](scf::ForOp op) { return converter.isLegal(op.getResultTypes()); });
 

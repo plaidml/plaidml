@@ -1,11 +1,10 @@
 import timeit
-from collections import OrderedDict
 
 import numpy as np
-import math
-import plaidml as plaidml
+
+import plaidml
 import plaidml.edsl as edsl
-import plaidml.exec as plaidml_exec
+import plaidml.exec
 
 
 def sq(X):

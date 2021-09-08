@@ -1,14 +1,12 @@
 // RUN: pmlc-opt -convert-linalg-to-pxa -cse %s | FileCheck %s
 
-module  {
-  func @test_pad(%arg0: tensor<4x8x8x16xf32>) -> tensor<8x10x14x20xf32> {
-    %pad_value = constant 0.000000e+00 : f32
-    %0 = linalg.pad_tensor %arg0 low[2, 2, 4, 4] high[2, 0, 2, 0] {
-      ^bb0(%arg1 : index, %arg2 : index, %arg3 : index, %arg4 : index):
-        linalg.yield %pad_value : f32
-    } : tensor<4x8x8x16xf32> to tensor<8x10x14x20xf32>
-    return %0 : tensor<8x10x14x20xf32>
-  }
+func @test_pad(%arg0: tensor<4x8x8x16xf32>) -> tensor<8x10x14x20xf32> {
+  %pad_value = constant 0.000000e+00 : f32
+  %0 = linalg.pad_tensor %arg0 low[2, 2, 4, 4] high[2, 0, 2, 0] {
+    ^bb0(%arg1 : index, %arg2 : index, %arg3 : index, %arg4 : index):
+      linalg.yield %pad_value : f32
+  } : tensor<4x8x8x16xf32> to tensor<8x10x14x20xf32>
+  return %0 : tensor<8x10x14x20xf32>
 }
 
 // CHECK-LABEL: func @test_pad
@@ -22,4 +20,3 @@ module  {
 // CHECK:          %[[t2:.*]] = pxa.reduce assign %[[t1]], %[[out1]][%[[arg2]] + 2, %[[arg3]] + 2, %[[arg4]] + 4, %[[arg5]] + 4] : memref<8x10x14x20xf32>
 // CHECK:          affine.yield %[[t2]] : memref<8x10x14x20xf32>
 // CHECK:        return %[[out2]] : memref<8x10x14x20xf32>
-

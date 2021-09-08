@@ -16,7 +16,6 @@ TileToPXATypeConverter::TileToPXATypeConverter() {
   addConversion([](IntegerType type) { return tile::toSignlessType(type); });
   addConversion([](IndexType type) { return type; });
   addConversion([](MemRefType type) { return type; });
-  addConversion([](stdx::ArgpackType type) { return type; });
   addConversion([this](RankedTensorType type) {
     Type elementType = type.getElementType();
     Type newType = convertType(elementType);

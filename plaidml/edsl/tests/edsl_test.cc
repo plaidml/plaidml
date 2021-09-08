@@ -2194,7 +2194,7 @@ TEST_F(CppEdsl, LayerEmbeddedConst) {
   // clang-format off
   // CHECK-LABEL: CppEdsl.LayerEmbeddedConst
   // CHECK: module @LayerEmbeddedConst
-  // CHECK: func @main(%[[ARG0:.*]]: tensor<10x20xf32>, %[[ARG1:.*]]: tensor<10x20xf32> {tile.const = 0 : index}) -> tensor<10x20xf32>
+  // CHECK: func @main(%[[ARG0:.*]]: tensor<10x20xf32>, %[[ARG1:.*]]: tensor<10x20xf32> {stdx.const = 0 : index}) -> tensor<10x20xf32>
   // CHECK:   %[[X0:.*]] = layer.box "sum" (%[[ARG2:.*]], %[[ARG3:.*]]) = (%[[ARG0]], %[[ARG1]]) : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
   // CHECK:     %[[X1:.*]] = tile.add %[[ARG2]], %[[ARG3]] : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
   // CHECK:     layer.return %[[X1]] : tensor<10x20xf32>
@@ -2215,7 +2215,7 @@ TEST_F(CppEdsl, LayerUnusedOperand) {
   // clang-format off
   // CHECK-LABEL: CppEdsl.LayerUnusedOperand
   // CHECK: module @LayerUnusedOperand
-  // CHECK: func @main(%[[ARG0:.*]]: tensor<10x20xf32>, %[[ARG1:.*]]: tensor<10x20xf32> {tile.const = 0 : index}, %[[ARG2:.*]]: tensor<10x20xf32> {tile.const = 1 : index}) -> tensor<10x20xf32>
+  // CHECK: func @main(%[[ARG0:.*]]: tensor<10x20xf32>, %[[ARG1:.*]]: tensor<10x20xf32> {stdx.const = 0 : index}, %[[ARG2:.*]]: tensor<10x20xf32> {stdx.const = 1 : index}) -> tensor<10x20xf32>
   // CHECK:   %[[X0:.*]] = layer.box "sum" (%[[ARG3:.*]], %[[ARG4:.*]], %[[ARG5:.*]]) = (%[[ARG0]], %[[ARG1]], %[[ARG2]]) : (tensor<10x20xf32>, tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
   // CHECK:     %[[X1:.*]] = tile.add %[[ARG3]], %[[ARG5]] : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
   // CHECK:     layer.return %[[X1]] : tensor<10x20xf32>
@@ -2255,7 +2255,7 @@ TEST_F(CppEdsl, LayerMulti) {
   // clang-format off
   // CHECK-LABEL: CppEdsl.LayerMulti
   // CHECK: module @LayerMulti
-  // CHECK: func @main(%[[ARG0:.*]]: tensor<10x20xf32>, %[[ARG1:.*]]: tensor<10x20xf32> {tile.const = 0 : index}, %[[ARG2:.*]]: tensor<10x20xf32> {tile.const = 1 : index}) -> tensor<10x20xf32> {
+  // CHECK: func @main(%[[ARG0:.*]]: tensor<10x20xf32>, %[[ARG1:.*]]: tensor<10x20xf32> {stdx.const = 0 : index}, %[[ARG2:.*]]: tensor<10x20xf32> {stdx.const = 1 : index}) -> tensor<10x20xf32> {
   // CHECK:   %[[X0:.*]] = layer.box "sum" (%[[ARG3:.*]], %[[ARG4:.*]]) = (%[[ARG0]], %[[ARG1]]) : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32> {
   // CHECK:     %[[X2:.*]] = tile.add %[[ARG3]], %[[ARG4]] : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
   // CHECK:     layer.return %[[X2]] : tensor<10x20xf32>
@@ -2284,7 +2284,7 @@ TEST_F(CppEdsl, LayerException) {
   // clang-format off
   // CHECK-LABEL: CppEdsl.LayerException
   // CHECK: module @LayerException
-  // CHECK: func @main(%[[ARG0:.*]]: tensor<10x20xf32>, %[[ARG1:.*]]: tensor<10x20xf32> {tile.const = 0 : index}) -> tensor<10x20xf32>
+  // CHECK: func @main(%[[ARG0:.*]]: tensor<10x20xf32>, %[[ARG1:.*]]: tensor<10x20xf32> {stdx.const = 0 : index}) -> tensor<10x20xf32>
   // CHECK:   %[[X0:.*]] = layer.box "sum" (%[[ARG2:.*]], %[[ARG3:.*]]) = (%[[ARG0]], %[[ARG1]]) : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
   // CHECK:     %[[X1:.*]] = tile.add %[[ARG2]], %[[ARG3]] : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
   // CHECK:     layer.return %[[X1]] : tensor<10x20xf32>
@@ -2654,6 +2654,18 @@ TEST_F(CppEdsl, ArgSort3dAxisNeg2Asc) {
   // CHECK:   %[[X0:.*]] = tile.argsort asc %[[ARG0]][-2] : (tensor<2x2x2xf32>) -> tensor<2x2x2xsi32>
   // CHECK:   return %[[X0]] : tensor<2x2x2xsi32>
   // clang-format on
+}
+
+TEST_F(CppEdsl, FunkySum) {
+  Tensor I = Placeholder(DType::FLOAT32, {3});
+  Tensor K = Placeholder(DType::FLOAT32, {3});
+  TensorIndex i, j;
+  Tensor O = Contraction().outShape(5).outAccess(i).sum(I((i - j + 1) / 2) * K(j));
+  Program program = makeProgram("funky_sum", {I, K}, {O});
+  std::vector<float> input1 = {1, 2, 3};
+  std::vector<float> input2 = {1, 2, 3};
+  std::vector<float> output = {2, 5, 4, 9, 6};
+  checkExact(program, {input1, input2}, {output});
 }
 
 }  // namespace

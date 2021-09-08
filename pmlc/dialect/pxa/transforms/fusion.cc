@@ -682,11 +682,20 @@ struct FusionPass : public FusionBase<FusionPass> {
   }
 
   void runOnFunction() final {
-    auto func = getFunction();
-    auto &block = func.getBody().front();
+    FuncOp func = getFunction();
+
+    Block *block = nullptr;
+    func.walk<WalkOrder::PreOrder>([&](AffineParallelOp op) {
+      block = op->getBlock();
+      return WalkResult::interrupt();
+    });
+
+    if (!block)
+      return;
+
     // Always run on outer blocks, inner will be also
     // fused based on the loopDepth parameter
-    performFusion(block);
+    performFusion(*block);
 
     int64_t loopDepthVal = loopDepth.getValue();
     for (auto it = 0; it < loopDepthVal; it++) {

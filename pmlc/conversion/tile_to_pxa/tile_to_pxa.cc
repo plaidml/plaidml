@@ -269,7 +269,7 @@ struct StdOp {
   }
 };
 
-struct SelectOp {
+struct SelectOpBuilder {
   Value create(ConversionPatternRewriter &rewriter, Location loc,
                Type resultType, ArrayRef<Value> operands,
                ArrayRef<Type> types) {
@@ -922,11 +922,12 @@ struct CastOpConversion : public OpConversionPattern<tile::CastOp> {
   }
 };
 
-struct FuncOpConversion : public OpConversionPattern<FuncOp> {
-  using OpConversionPattern<FuncOp>::OpConversionPattern;
+template <typename FuncLikeOp>
+struct FuncOpConversion : public OpConversionPattern<FuncLikeOp> {
+  using OpConversionPattern<FuncLikeOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(FuncOp op, ArrayRef<Value> operands,
+  matchAndRewrite(FuncLikeOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
     FunctionType type = op.getType();
 
@@ -939,15 +940,14 @@ struct FuncOpConversion : public OpConversionPattern<FuncOp> {
     SmallVector<Type, 8> resultTypes;
     for (Type resultType : type.getResults()) {
       Type newResultType = typeConverter.convertType(resultType);
-      if (!newResultType.isa<stdx::ArgpackType>()) {
-        result.addInputs({newResultType});
-      }
+      result.addInputs({newResultType});
       resultTypes.push_back(newResultType);
     }
 
     // Create a new function with an updated signature.
     auto newOp = rewriter.cloneWithoutRegions(op);
-    rewriter.inlineRegionBefore(op.getBody(), newOp.getBody(), newOp.end());
+    rewriter.inlineRegionBefore(op.getBody(), newOp.getBody(),
+                                newOp.getBody().end());
     newOp.setType(FunctionType::get(op.getContext(), result.getConvertedTypes(),
                                     resultTypes));
 
@@ -957,25 +957,6 @@ struct FuncOpConversion : public OpConversionPattern<FuncOp> {
     // Finally cause the old func op to be erased
     rewriter.eraseOp(op);
 
-    return success();
-  }
-};
-
-struct ReturnOpConversion : public OpConversionPattern<ReturnOp> {
-  using OpConversionPattern<ReturnOp>::OpConversionPattern;
-
-  LogicalResult
-  matchAndRewrite(ReturnOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const final {
-    auto &block = op->getParentRegion()->front();
-    auto funcOp = op->getParentOfType<FuncOp>();
-    auto blockArg = funcOp.getType().getNumInputs() - op.getNumOperands();
-    for (Value operand : operands) {
-      // Find very initial allocation of memref
-      auto def = pxa::getIndirectDef(operand);
-      def.replaceAllUsesWith(block.getArgument(blockArg++));
-    }
-    rewriter.replaceOpWithNewOp<ReturnOp>(op, operands);
     return success();
   }
 };
@@ -1017,61 +998,6 @@ struct TraceOpConversion : public OpConversionPattern<tile::PragmaOp> {
   }
 };
 
-struct PackOpConversion : public OpConversionPattern<stdx::PackOp> {
-  using OpConversionPattern<stdx::PackOp>::OpConversionPattern;
-
-  LogicalResult
-  matchAndRewrite(stdx::PackOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const final {
-    auto argpackType = stdx::ArgpackType::get(op.getContext());
-    // Some 0-dim tensors convert to 0-dim memrefs, and some convert to actual
-    // scalars. To make the type mapping exact, we always convert 0-dim memrefs
-    // to scalars via doing a load before packing.
-    SmallVector<Value, 8> scalarizedOperands;
-    for (auto val : operands) {
-      // Handle cases that require a load.
-      if (auto memrefType = val.getType().dyn_cast<MemRefType>()) {
-        if (memrefType.getRank() == 0) {
-          auto loadOp =
-              rewriter.create<pxa::PxaLoadOp>(op.getLoc(), val, ValueRange{});
-          scalarizedOperands.push_back(loadOp.getResult());
-          continue;
-        }
-      }
-      // Default case is a no-op
-      scalarizedOperands.push_back(val);
-    }
-    rewriter.replaceOpWithNewOp<stdx::PackOp>(op, TypeRange(argpackType),
-                                              scalarizedOperands);
-    return success();
-  }
-};
-
-struct UnpackOpConversion : public OpConversionPattern<stdx::UnpackOp> {
-  using OpConversionPattern<stdx::UnpackOp>::OpConversionPattern;
-
-  LogicalResult
-  matchAndRewrite(stdx::UnpackOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const final {
-    SmallVector<Type, 8> newResultTypes;
-    TileToPXATypeConverter typeConverter;
-    for (auto type : op.getResultTypes()) {
-      if (auto tensorType = type.dyn_cast<TensorType>()) {
-        if (tensorType.getRank() == 0) {
-          auto newType = typeConverter.convertType(tensorType.getElementType());
-          newResultTypes.push_back(newType);
-          continue;
-        }
-      }
-      auto newType = typeConverter.convertType(type);
-      newResultTypes.push_back(newType);
-    }
-    rewriter.replaceOpWithNewOp<stdx::UnpackOp>(op, newResultTypes,
-                                                operands[0]);
-    return success();
-  }
-};
-
 struct ScfForOpConversion : public OpConversionPattern<scf::ForOp> {
   using OpConversionPattern<scf::ForOp>::OpConversionPattern;
 
@@ -1098,24 +1024,26 @@ struct ScfForOpConversion : public OpConversionPattern<scf::ForOp> {
 
 struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
   void runOnOperation() final {
+    ModuleOp module = getOperation();
     // Inject tile.ident ops for each return operand that needs it.
     // argument, a constant value, or a reshape op.
-    getOperation().walk([&](ReturnOp op) {
+    auto injectIdent = [](Operation *op) {
       OpBuilder builder(op);
       for (OpOperand &operand : op->getOpOperands()) {
         Value value = operand.get();
-        bool needsIdent =                                  //
-            value.isa<BlockArgument>() ||                  // Block arguemnt
-            matchPattern(value, m_Constant()) ||           // Constant op
-            matchPattern(value, m_Op<stdx::UnpackOp>()) || // Direct from unpack
-            matchPattern(value, m_Op<tile::ReshapeOp>());  // Reshape op
+        bool needsIdent =                                 //
+            value.isa<BlockArgument>() ||                 // Block arguemnt
+            matchPattern(value, m_Constant()) ||          // Constant op
+            matchPattern(value, m_Op<tile::ReshapeOp>()); // Reshape op
         if (needsIdent) {
-          Value copy = builder.create<tile::IdentOp>(op.getLoc(),
+          Value copy = builder.create<tile::IdentOp>(op->getLoc(),
                                                      value.getType(), value);
           operand.set(copy);
         }
       }
-    });
+    };
+    module.walk([&](ReturnOp op) { injectIdent(op); });
+    module.walk([&](stdx::YieldOp op) { injectIdent(op); });
 
     // Set up target (i.e. what is legal)
     ConversionTarget target(getContext());
@@ -1135,13 +1063,8 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
                       ReturnOp>();
     target.addDynamicallyLegalOp<FuncOp>(
         [&](FuncOp op) { return converter.isSignatureLegal(op.getType()); });
-    target.addDynamicallyLegalOp<ReturnOp>(
-        [&](ReturnOp op) { return converter.isLegal(op); });
-    target.addDynamicallyLegalOp<stdx::PackOp>([&](stdx::PackOp op) {
-      return converter.isLegal(op.getOperandTypes());
-    });
-    target.addDynamicallyLegalOp<stdx::UnpackOp>([&](stdx::UnpackOp op) {
-      return converter.isLegal(op.getResultTypes());
+    target.addDynamicallyLegalOp<stdx::ClosureOp>([&](stdx::ClosureOp op) {
+      return converter.isSignatureLegal(op.getType());
     });
     target.addDynamicallyLegalOp<scf::ForOp>(
         [&](scf::ForOp op) { return converter.isLegal(op.getResultTypes()); });
@@ -1157,19 +1080,17 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         CmpIntInequalityOp<CmpIPredicate::sge, CmpIPredicate::uge>;
     RewritePatternSet patterns(&getContext());
     patterns.insert<
-        CastOpConversion,     //
-        ConstantOpConversion, //
-        FuncOpConversion,     //
-        IndexOpConversion,    //
-        PragmaOpConversion,   //
-        PrngOpConversion,     //
-        ReshapeOpConversion,  //
-        ReturnOpConversion,   //
-        ShapeOpConversion,    //
-        TraceOpConversion,    //
-        PackOpConversion,     //
-        UnpackOpConversion,   //
-        ScfForOpConversion,   //
+        CastOpConversion,                  //
+        ConstantOpConversion,              //
+        FuncOpConversion<FuncOp>,          //
+        FuncOpConversion<stdx::ClosureOp>, //
+        IndexOpConversion,                 //
+        PragmaOpConversion,                //
+        PrngOpConversion,                  //
+        ReshapeOpConversion,               //
+        ShapeOpConversion,                 //
+        TraceOpConversion,                 //
+        ScfForOpConversion,                //
         ContractionOpConversion<CombinationKind::none, FirstOperand>,
         ContractionOpConversion<CombinationKind::add, StdOp<mlir::AddFOp>,
                                 ResultIs<EltwiseFloat>>,
@@ -1298,7 +1219,7 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         EltwiseOpConversion<tile::LogicalOrOp, LogicalOp<mlir::OrOp>>,
         EltwiseOpConversion<tile::LogicalXorOp, LogicalOp<mlir::XOrOp>>,
         EltwiseOpConversion<tile::ReluOp, StdOp<stdx::ReluOp>>,
-        EltwiseOpConversion<tile::SelectOp, SelectOp>,
+        EltwiseOpConversion<tile::SelectOp, SelectOpBuilder>,
         EltwiseOpConversion<tile::IdentOp, FirstOperand>>(&getContext());
 
     populateTileToPXASpecialPatterns(patterns);
@@ -1308,6 +1229,31 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
             applyFullConversion(getOperation(), target, std::move(patterns)))) {
       signalPassFailure();
       return;
+    }
+
+    for (FuncOp funcOp : module.getOps<FuncOp>()) {
+      for (ReturnOp returnOp : funcOp.getOps<ReturnOp>()) {
+        connectResults(funcOp, returnOp);
+        for (stdx::ClosureOp closureOp : funcOp.getOps<stdx::ClosureOp>()) {
+          for (stdx::YieldOp yieldOp : closureOp.getOps<stdx::YieldOp>()) {
+            connectResults(closureOp, yieldOp);
+          }
+        }
+      }
+    }
+  }
+
+  template <typename FuncLikeOp, typename ReturnLikeOp>
+  void connectResults(FuncLikeOp funcOp, ReturnLikeOp returnOp) {
+    unsigned argNumber =
+        funcOp.getType().getNumInputs() - returnOp.getNumOperands();
+    for (Value operand : returnOp.operands()) {
+      // Find very initial allocation of memref
+      Value def = pxa::getIndirectDef(operand);
+      BlockArgument blockArg = funcOp.getBody().getArgument(argNumber++);
+      if (def != blockArg) {
+        def.replaceAllUsesWith(blockArg);
+      }
     }
   }
 };

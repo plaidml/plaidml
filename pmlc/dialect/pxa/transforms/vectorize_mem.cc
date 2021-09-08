@@ -419,9 +419,6 @@ void getGlobalMemory(FuncOp f, std::list<Operation *> &globalAllocList) {
   for (auto parallelOp : f.getOps<AffineParallelOp>()) {
     globalAllocList.push_back(parallelOp.getOperation());
   }
-  for (auto unpackOp : f.getOps<stdx::UnpackOp>()) {
-    globalAllocList.push_back(unpackOp.getOperation());
-  }
 }
 
 struct VectorizeMemPass : public VectorizeMemBase<VectorizeMemPass> {

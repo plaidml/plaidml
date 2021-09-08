@@ -229,10 +229,8 @@ struct PackLowering : public ConvertOpToLLVMPattern<stdx::PackOp> {
   matchAndRewrite(stdx::PackOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
     Location loc = op.getLoc();
-    auto i8PtrType =
-        LLVM::LLVMPointerType::get(IntegerType::get(rewriter.getContext(), 8));
     if (op.getNumOperands() == 0) {
-      auto nullPtr = rewriter.create<LLVM::NullOp>(loc, i8PtrType);
+      auto nullPtr = rewriter.create<LLVM::NullOp>(loc, getVoidPtrType());
       rewriter.replaceOp(op, {nullPtr});
       return success();
     }
@@ -240,10 +238,11 @@ struct PackLowering : public ConvertOpToLLVMPattern<stdx::PackOp> {
     auto structType = getStructType(*typeConverter, op.getOperandTypes());
     // Get the size of the struct type and malloc
     auto sizeofStruct = getSizeInBytes(loc, structType, rewriter);
-    auto mallocFunc = importFunc(
-        rewriter, "malloc",
-        LLVM::LLVMFunctionType::get(i8PtrType, ArrayRef<Type>{getIndexType()},
-                                    /*isVarArg=*/false));
+    auto mallocFunc =
+        importFunc(rewriter, "malloc",
+                   LLVM::LLVMFunctionType::get(getVoidPtrType(),
+                                               ArrayRef<Type>{getIndexType()},
+                                               /*isVarArg=*/false));
     auto rawPtr =
         rewriter.create<LLVM::CallOp>(loc, mallocFunc, ValueRange{sizeofStruct})
             .getResult(0);
@@ -340,9 +339,7 @@ void populateStdXToLLVMConversionPatterns(LLVMTypeConverter &converter,
                   TanLowering,     //
                   UnpackLowering   //
                   >(converter);
-  converter.addConversion([](stdx::ArgpackType type) -> Optional<Type> {
-    // Argpack types look like i8 pointers.  I'd like this to be void*, but MLIR
-    // disallows void* in it's validation for some bizare reason
+  converter.addConversion([](TupleType type) -> Optional<Type> {
     return LLVM::LLVMPointerType::get(IntegerType::get(type.getContext(), 8));
   });
 }
