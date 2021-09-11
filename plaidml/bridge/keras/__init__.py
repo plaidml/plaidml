@@ -114,22 +114,19 @@ def _get_operand_and_tensor(x):
 
 class _Runner(object):
 
-    def __init__(self, name, shapes, inputs, outputs, updates, vars):
+    def __init__(self, name, shapes, inputs, outputs, updates):
         input_tensors = [x.tensor for x in inputs]
         input_shapes = [
             edsl.TensorShape(tensor.dtype, shape) for tensor, shape in zip(input_tensors, shapes)
         ]
         self.input_buffers = [plaidml.Buffer(shape) for shape in input_shapes]
-        var_tensors = [x.tensor for x in vars]
-        var_shapes = [x.compute_shape() for x in var_tensors]
-        self.var_buffers = [x.buffer for x in vars]
         output_tensors = [x.tensor for x in outputs]
         update_tensors = [x[1].tensor for x in updates]
         program = plaidml.Program(
             name,
-            input_tensors + var_tensors,
+            input_tensors,
             output_tensors + update_tensors,
-            shapes=input_shapes + var_shapes,
+            shapes=input_shapes,
         )
         program.compile()
         self.output_buffers = [plaidml.Buffer(x) for x in program.outputs[:len(output_tensors)]]
@@ -140,7 +137,7 @@ class _Runner(object):
         for input, buffer in zip(inputs, self.input_buffers):
             buffer.copy_from_ndarray(input)
         global lastExecTimeInMS
-        lastExecTimeInMS = self.executable.run(self.input_buffers + self.var_buffers,
+        lastExecTimeInMS = self.executable.run(self.input_buffers,
                                                self.output_buffers + self.update_buffers)
         return [buffer.as_ndarray() for buffer in self.output_buffers]
 
@@ -155,23 +152,6 @@ class _Function(object):
         self._outputs = outputs
         self._updates = updates
         self._cache = {}
-        self._vars = set()
-        self._trace_vars(outputs + [x[1] for x in updates], seen=set())
-        logger.debug('vars:')
-        for var in self._vars:
-            logger.debug('  {}: {}'.format(var, var.tensor.compute_shape()))
-
-    def _trace_vars(self, nodes, seen):
-        for node in nodes:
-            if node in seen:
-                continue
-            seen.add(node)
-            if is_placeholder(node) and node not in self._inputs:
-                raise PlaidMLKerasException('_Function depends on an unspecified input')
-            if is_tensor(node):
-                if node.opname == 'variable':
-                    self._vars.add(node)
-                self._trace_vars(node.operands, seen)
 
     def __call__(self, inputs=[]):
         inputs = [np.array(x) if isinstance(x, (six.integer_types, float)) else x for x in inputs]
@@ -185,7 +165,7 @@ class _Function(object):
         return runner.run(inputs)
 
     def _compile(self, shapes):
-        return _Runner(self._name, shapes, self._inputs, self._outputs, self._updates, self._vars)
+        return _Runner(self._name, shapes, self._inputs, self._outputs, self._updates)
 
 
 def _create_buffer(value):
@@ -214,7 +194,7 @@ class _KerasNode(object):
             tensor = edsl.Placeholder(input, name=self.name)
         elif var is not None:
             shape, self.buffer = _create_buffer(var)
-            tensor = edsl.Placeholder(shape, name=self.name)
+            tensor = edsl.Constant(self.buffer, name=self.name)
         elif const is not None:
             shape, self.buffer = _create_buffer(const)
             tensor = edsl.Constant(self.buffer, name=self.name)
@@ -1558,10 +1538,7 @@ def set_learning_phase(value):
 
 @_log_call
 def set_value(x, value):
-    dtype = plaidml.DType.from_numpy(value.dtype)
-    shape = plaidml.TensorShape(dtype, value.shape)
-    buffer = plaidml.Buffer(shape, data=value)
-    x.buffer = buffer
+    x.buffer.copy_from_ndarray(value)
 
 
 @_log_call

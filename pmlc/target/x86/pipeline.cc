@@ -24,6 +24,7 @@
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/StandardOps/Transforms/Passes.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/LoopUtils.h"
@@ -84,7 +85,7 @@ struct LowerPXAToAffinePass
 
 struct ConvertStandardToLLVMPass
     : public ConvertStandardToLLVMBase<ConvertStandardToLLVMPass> {
-  void runOnOperation() override {
+  void runOnOperation() final {
     ModuleOp module = getOperation();
     MLIRContext *context = module.getContext();
 
@@ -116,7 +117,7 @@ struct ConvertStandardToLLVMPass
 
 struct CollapseParallelLoopsPass
     : public CollapseParallelLoopsBase<CollapseParallelLoopsPass> {
-  void runOnFunction() override {
+  void runOnFunction() final {
     getFunction().walk([&](scf::ParallelOp op) {
       SmallVector<std::vector<unsigned>, 3> combinedLoops;
       std::vector<unsigned> dims;
@@ -124,6 +125,43 @@ struct CollapseParallelLoopsPass
         dims.push_back(i);
       combinedLoops.push_back(dims);
       collapseParallelLoops(op, combinedLoops);
+    });
+  }
+};
+
+static APFloat convertFloatUsingType(double value, FloatType type) {
+  bool losesInfo = false;
+  APFloat apValue(value);
+  apValue.convert(type.getFloatSemantics(), APFloat::rmNearestTiesToEven,
+                  &losesInfo);
+  return apValue;
+}
+
+struct FoldConstantCastPass
+    : public FoldConstantCastBase<FoldConstantCastPass> {
+  void runOnFunction() final {
+    getFunction().walk([&](CastOpInterface op) {
+      Attribute attr;
+      if (matchPattern(op->getOperand(0), m_Constant(&attr))) {
+        OpBuilder builder(op);
+        Value result = op->getResult(0);
+        Type type = result.getType();
+        if (auto floatType = type.dyn_cast<FloatType>()) {
+          if (auto intAttr = attr.dyn_cast<IntegerAttr>()) {
+            APFloat value = convertFloatUsingType(intAttr.getInt(), floatType);
+            auto constOp =
+                builder.create<ConstantFloatOp>(op->getLoc(), value, floatType);
+            result.replaceAllUsesWith(constOp);
+          }
+        } else if (auto intType = type.dyn_cast<IntegerType>()) {
+          if (auto floatAttr = attr.dyn_cast<FloatAttr>()) {
+            int64_t value = static_cast<int64_t>(floatAttr.getValueAsDouble());
+            auto constOp =
+                builder.create<ConstantIntOp>(op->getLoc(), value, intType);
+            result.replaceAllUsesWith(constOp);
+          }
+        }
+      }
     });
   }
 };
@@ -193,6 +231,10 @@ std::unique_ptr<Pass> createLowerToLLVMPass() {
   return std::make_unique<ConvertStandardToLLVMPass>();
 }
 
+std::unique_ptr<Pass> createFoldConstantCastPass() {
+  return std::make_unique<FoldConstantCastPass>();
+}
+
 struct Options : public PassPipelineOptions<Options> {
   Option<unsigned> numThreads{*this, "threads",
                               llvm::cl::desc("Number of threads")};
@@ -218,6 +260,9 @@ void pipelineBuilderStage1(OpPassManager &pm) {
   }
 
   pm.addPass(stdx::createMainClosurePass());
+  pm.addPass(createLoopInvariantCodeMotionPass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
 }
 
 void pipelineBuilderStage2(OpPassManager &pm, const Options &options) {
@@ -312,16 +357,21 @@ void pipelineBuilderStage3(OpPassManager &pm) {
   pm.addPass(createCSEPass());
 
   pm.addPass(createLowerAffinePass());
+  pm.addPass(createLoopInvariantCodeMotionPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
-  pm.addPass(createLoopInvariantCodeMotionPass());
 
   pm.addNestedPass<FuncOp>(createCollapseParallelLoopsPass());
   pm.addNestedPass<FuncOp>(createConvertSCFToOpenMPPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
+  pm.addNestedPass<FuncOp>(createFoldConstantCastPass());
+
   pm.addPass(stdx::createSplitClosurePass());
+  pm.addPass(createLoopInvariantCodeMotionPass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
 }
 
 void pipelineBuilderStage4(OpPassManager &pm) {

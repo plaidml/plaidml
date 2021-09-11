@@ -1,6 +1,6 @@
 // RUN: pmlc-opt -split-input-file -stdx-split-closure %s | FileCheck %s
 
-func @main(%arg0: memref<16x16xf32> {stdx.const = 0 : index}, %arg1: memref<16x16xf32> {stdx.const = 1 : index}) {
+func @main(%arg0: memref<16x16xf32> {stdx.const}, %arg1: memref<16x16xf32> {stdx.const}) {
   %0 = memref.alloc() : memref<16x16xf32>
   affine.for %arg2 = 0 to 16 {
     affine.for %arg3 = 0 to 16 {
@@ -58,7 +58,7 @@ func @main(%arg0: memref<16x16xf32> {stdx.const = 0 : index}, %arg1: memref<16x1
 
 // -----
 
-func @main(%arg0: memref<16x16xf32> {stdx.const = 0 : index}, %arg1: memref<16x16xf32> {stdx.const = 1 : index}) {
+func @main(%arg0: memref<16x16xf32> {stdx.conststdx.const}, %arg1: memref<16x16xf32> {stdx.const}) {
   stdx.closure(%arg2: memref<16x16xf32>) {
     affine.for %arg4 = 0 to 16 {
       affine.for %arg5 = 0 to 16 {
@@ -90,3 +90,65 @@ func @main(%arg0: memref<16x16xf32> {stdx.const = 0 : index}, %arg1: memref<16x1
 // CHECK: func @fini(%[[fini_arg0:.*]]: tuple<memref<16x16xf32>, memref<16x16xf32>>) {
 // CHECK:   %[[fini_tuple:.*]]:2 = stdx.unpack(%[[fini_arg0]]) : (tuple<memref<16x16xf32>, memref<16x16xf32>>) -> (memref<16x16xf32>, memref<16x16xf32>)
 // CHECK:   return
+
+// -----
+
+func private @plaidml_rt_prng(memref<*xi32>, memref<*xf32>, memref<*xi32>)
+
+func @main(%arg0: memref<1x3xi32> {stdx.const}) {
+  %0 = memref.cast %arg0 : memref<1x3xi32> to memref<*xi32>
+  stdx.closure(%arg1: memref<2x3xf32>, %arg2: memref<1x3xi32>) {
+    %1 = memref.cast %arg1 : memref<2x3xf32> to memref<*xf32>
+    %2 = memref.cast %arg2 : memref<1x3xi32> to memref<*xi32>
+    call @plaidml_rt_prng(%0, %1, %2) : (memref<*xi32>, memref<*xf32>, memref<*xi32>) -> ()
+    stdx.yield
+  }
+  return
+}
+
+// CHECK: func @init(%[[init_arg0:.*]]: memref<1x3xi32>) -> tuple<memref<1x3xi32>>
+// CHECK:   %[[init_X0:.*]] = memref.cast %[[init_arg0]] : memref<1x3xi32> to memref<*xi32>
+// CHECK:   %[[init_X1:.*]] = stdx.pack(%[[init_arg0]]) : (memref<1x3xi32>) -> tuple<memref<1x3xi32>>
+// CHECK:   return %[[init_X1]] : tuple<memref<1x3xi32>>
+
+// CHECK: func @main(%[[main_arg0:.*]]: tuple<memref<1x3xi32>>, %[[main_arg1:.*]]: memref<2x3xf32>, %[[main_arg2:.*]]: memref<1x3xi32>)
+// CHECK:   %[[main_X0:.*]] = stdx.unpack(%[[main_arg0]]) : (tuple<memref<1x3xi32>>) -> memref<1x3xi32>
+// CHECK:   %[[main_X1:.*]] = memref.cast %[[main_X0]] : memref<1x3xi32> to memref<*xi32>
+// CHECK:   %[[main_X2:.*]] = memref.cast %[[main_arg1]] : memref<2x3xf32> to memref<*xf32>
+// CHECK:   %[[main_X3:.*]] = memref.cast %[[main_arg2]] : memref<1x3xi32> to memref<*xi32>
+// CHECK:   call @plaidml_rt_prng(%[[main_X1]], %[[main_X2]], %[[main_X3]]) : (memref<*xi32>, memref<*xf32>, memref<*xi32>) -> ()
+// CHECK:   return
+
+// CHECK: func @fini(%[[fini_arg0:.*]]: tuple<memref<1x3xi32>>)
+// CHECK:   %[[fini_X0:.*]] = stdx.unpack(%[[fini_arg0]]) : (tuple<memref<1x3xi32>>) -> memref<1x3xi32>
+// CHECK:   %[[fini_X1:.*]] = memref.cast %[[fini_X0]] : memref<1x3xi32> to memref<*xi32>
+// CHECK:   return
+
+// -----
+
+func private @print(index)
+
+func @main() {
+  %c3 = constant 3 : index
+  stdx.closure() {
+    call @print(%c3) : (index) -> ()
+    stdx.yield
+  }
+  return
+}
+
+// CHECK: func @init() -> tuple<> {
+// CHECK:   %c3 = constant 3 : index
+// CHECK:   %0 = stdx.pack() : () -> tuple<>
+// CHECK:   return %0 : tuple<>
+
+// CHECK: func @main(%[[main_arg0:.*]]: tuple<>) {
+// CHECK:   stdx.unpack(%[[main_arg0]]) : (tuple<>) -> ()
+// CHECK:   %c3 = constant 3 : index
+// CHECK:   call @print(%c3) : (index) -> ()
+// CHECK:   return
+
+// CHECK: func @fini(%[[fini_arg0:.*]]: tuple<>) {
+// CHECK:   stdx.unpack(%[[fini_arg0]]) : (tuple<>) -> ()
+// CHECK:   return
+// CHECK: }
