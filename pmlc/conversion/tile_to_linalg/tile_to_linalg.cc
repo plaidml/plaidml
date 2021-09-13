@@ -415,8 +415,7 @@ struct CondOp {
     CmpOpBuilder cmpOpBuilder;
     auto cmp = cmpOpBuilder.create(rewriter, loc, resultType,
                                    operands.take_front(2), types.take_front(2));
-    auto zero = createInit(rewriter, loc, resultType, AggregationKind::add);
-    return rewriter.create<mlir::SelectOp>(loc, cmp, operands[2], zero)
+    return rewriter.create<mlir::SelectOp>(loc, cmp, operands[0], operands[1])
         .getResult();
   }
 };
