@@ -6,6 +6,7 @@ add_subdirectory(rt)
 add_subdirectory(target)
 add_subdirectory(testing)
 add_subdirectory(tools)
+add_subdirectory(transforms)
 add_subdirectory(util)
 
 get_property(MLIR_DIALECT_LIBS GLOBAL PROPERTY MLIR_DIALECT_LIBS)
@@ -41,6 +42,7 @@ pml_cc_library(
     pmlc::dialect::xsmm::ir
     pmlc::rt::all_runtimes
     pmlc::target::all
+    pmlc::transforms
 )
 
 pml_lit_test(
