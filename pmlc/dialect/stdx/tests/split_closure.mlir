@@ -58,7 +58,7 @@ func @main(%arg0: memref<16x16xf32> {stdx.const}, %arg1: memref<16x16xf32> {stdx
 
 // -----
 
-func @main(%arg0: memref<16x16xf32> {stdx.conststdx.const}, %arg1: memref<16x16xf32> {stdx.const}) {
+func @main(%arg0: memref<16x16xf32> {stdx.const}, %arg1: memref<16x16xf32> {stdx.const}) {
   stdx.closure(%arg2: memref<16x16xf32>) {
     affine.for %arg4 = 0 to 16 {
       affine.for %arg5 = 0 to 16 {
