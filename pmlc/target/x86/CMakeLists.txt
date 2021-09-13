@@ -15,8 +15,10 @@ pml_cc_library(
     ::passes-gen
     ::prng_lowering
     pmlc::compiler
+    pmlc::conversion::linalg_to_pxa
     pmlc::conversion::pxa_to_affine
     pmlc::conversion::stdx_to_llvm
+    pmlc::conversion::tile_to_linalg
     pmlc::conversion::tile_to_pxa
     pmlc::dialect::layer::transforms
     pmlc::dialect::pml::transforms
@@ -27,6 +29,7 @@ pml_cc_library(
     pmlc::dialect::xsmm::ir
     MLIRAffineToStandard
     MLIRAffineTransforms
+    MLIRLinalgTransforms
     MLIRLLVMCommonConversion
     MLIRLLVMIRTransforms
     MLIRMathToLLVM
