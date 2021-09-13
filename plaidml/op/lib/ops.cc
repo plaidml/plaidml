@@ -437,7 +437,7 @@ std::vector<int64_t>* extend_manual_padding(std::vector<int64_t>* pads, size_t r
 }  // namespace
 
 Value abs(const Value& value) {
-  IVLOG(1, "abs");
+  IVLOG(2, "abs");
   auto args = value.as_tuple();
   if (args.size() != 1) {
     throw std::runtime_error("abs expects 1 argument");
@@ -448,7 +448,7 @@ Value abs(const Value& value) {
 }
 
 Value all(const Value& value) {
-  IVLOG(1, "all");
+  IVLOG(2, "all");
   auto args = value.as_tuple();
   if (args.size() != 3) {
     throw std::runtime_error("all expects 3 arguments");
@@ -475,7 +475,7 @@ Value all(const Value& value) {
 }
 
 Value any(const Value& value) {
-  IVLOG(1, "any");
+  IVLOG(2, "any");
   auto args = value.as_tuple();
   if (args.size() != 3) {
     throw std::runtime_error("any expects 3 arguments");
@@ -503,7 +503,7 @@ Value any(const Value& value) {
 }
 
 Value argmax(const Value& value) {
-  IVLOG(1, "argmax");
+  IVLOG(2, "argmax");
   auto args = value.as_tuple();
   if (args.size() != 2) {
     throw std::runtime_error("argmax expects 2 arguments");
@@ -520,7 +520,7 @@ Value argmax(const Value& value) {
 }
 
 Value binary_crossentropy(const Value& value) {
-  IVLOG(1, "binary_crossentropy")
+  IVLOG(2, "binary_crossentropy")
   auto args = value.as_tuple();
 
   // Read arguments
@@ -543,7 +543,7 @@ Value binary_crossentropy(const Value& value) {
 }
 
 Value broadcast(const Value& value) {
-  IVLOG(1, "broadcast");
+  IVLOG(2, "broadcast");
   auto args = value.as_tuple();
   if (args.size() != 3) {
     throw std::runtime_error(llvm::formatv("PlaidML broadcast op expects 3 arguments (received {0})", args.size()));
@@ -581,7 +581,7 @@ Value broadcast(const Value& value) {
 }
 
 Value clip(const Value& value) {
-  IVLOG(1, "clip");
+  IVLOG(2, "clip");
   auto args = value.as_tuple();
 
   // Read arguments
@@ -606,7 +606,7 @@ Value clip(const Value& value) {
 
 Value concatenate(const Value& value) {
   // TODO: Make errors nicer (e.g. when bind_dims fails)
-  IVLOG(1, "concatenate")
+  IVLOG(2, "concatenate")
 
   // Read Arguments
   auto args = value.as_tuple();
@@ -876,7 +876,7 @@ void normalize_grouping_strategy(int64_t* groups, AutoGroupMode* autogroup_mode,
 }  // namespace
 
 Value convolution(const Value& value) {
-  IVLOG(1, "convolution");
+  IVLOG(2, "convolution");
   // Parameters:
   //  0. Input Tensor
   //  1. Filter Tensor
@@ -1466,7 +1466,7 @@ Value convolution(const Value& value) {
 }
 
 Value cumprod(const Value& value) {
-  IVLOG(1, "cumprod");
+  IVLOG(2, "cumprod");
   auto args = value.as_tuple();
   if (args.size() != 2) {
     throw std::runtime_error("cumprod expects 2 arguments");
@@ -1487,7 +1487,7 @@ Value cumprod(const Value& value) {
 }
 
 Value cumsum(const Value& value) {
-  IVLOG(1, "cumsum");
+  IVLOG(2, "cumsum");
   auto args = value.as_tuple();
   if (args.size() != 3) {
     throw std::runtime_error("cumsum expects 2 arguments");
@@ -1509,7 +1509,7 @@ Value cumsum(const Value& value) {
 }
 
 Value dot(const Value& value) {
-  IVLOG(1, "dot");
+  IVLOG(2, "dot");
   auto args = value.as_tuple();
   if (args.size() != 2) {
     throw std::runtime_error("dot expects 2 arguments");
@@ -1558,7 +1558,7 @@ Value dot(const Value& value) {
 }
 
 Value elu(const Value& value) {
-  IVLOG(1, "elu");
+  IVLOG(2, "elu");
 
   // Read arguments
   auto args = value.as_tuple();
@@ -1581,7 +1581,7 @@ Value elu(const Value& value) {
 }
 
 Value explicit_padding(const Value& value) {
-  IVLOG(1, "explicit_padding");
+  IVLOG(2, "explicit_padding");
   auto args = value.as_tuple();
   if (args.size() < 5) {
     throw std::runtime_error("explicit_padding expects 5 arguments");
@@ -1682,7 +1682,7 @@ Value explicit_padding(const Value& value) {
 }
 
 Value flip(const Value& value) {
-  IVLOG(1, "flip");
+  IVLOG(2, "flip");
   // This is numpy-style `flip`; Keras calls it `repeat`
 
   // Read arguments
@@ -1723,7 +1723,7 @@ Value flip(const Value& value) {
 }
 
 Value gatherND(const Value& value) {
-  IVLOG(1, "gatherND");
+  IVLOG(2, "gatherND");
   auto args = value.as_tuple();
 
   // Read arguments
@@ -1798,7 +1798,7 @@ Value gatherND(const Value& value) {
 }
 
 Value hard_sigmoid(const Value& value) {
-  IVLOG(1, "hard_sigmoid");
+  IVLOG(2, "hard_sigmoid");
   auto args = value.as_tuple();
   if (args.size() != 2) {
     throw std::runtime_error("hard_sigmoid expects 2 arguments");
@@ -1818,7 +1818,7 @@ Value hard_sigmoid(const Value& value) {
 
 Value image_resize(const Value& value) {
   // Resize a 2D image's spatial dimensions, each by a positive integer factor
-  IVLOG(1, "image_resize");
+  IVLOG(2, "image_resize");
   auto args = value.as_tuple();
   if (args.size() != 4) {
     throw std::runtime_error("image_resize expects 4 arguments");
@@ -1913,7 +1913,7 @@ Value image_resize(const Value& value) {
 }
 
 Value lrn(const Value& value) {
-  IVLOG(1, "lrn");
+  IVLOG(2, "lrn");
   auto args = value.as_tuple();
   if (args.size() != 6) {
     throw std::runtime_error("lrn expects 6 arguments");
@@ -1935,7 +1935,7 @@ Value lrn(const Value& value) {
 }
 
 Value max(const Value& value) {
-  IVLOG(1, "max");
+  IVLOG(2, "max");
   auto args = value.as_tuple();
   if (args.size() != 3) {
     throw std::runtime_error("max expects 3 arguments");
@@ -1950,7 +1950,7 @@ Value max(const Value& value) {
 }
 
 Value maximum(const Value& value) {
-  IVLOG(1, "maximum");
+  IVLOG(2, "maximum");
   auto args = value.as_tuple();
   if (args.size() != 2) {
     throw std::runtime_error("maximum expects 2 arguments");
@@ -1962,7 +1962,7 @@ Value maximum(const Value& value) {
 }
 
 Value mean(const Value& value) {
-  IVLOG(1, "mean");
+  IVLOG(2, "mean");
   auto args = value.as_tuple();
   if (args.size() != 3) {
     throw std::runtime_error("mean expects 3 arguments");
@@ -1997,7 +1997,7 @@ Value mean(const Value& value) {
 }
 
 Value min(const Value& value) {
-  IVLOG(1, "min");
+  IVLOG(2, "min");
   auto args = value.as_tuple();
   if (args.size() != 3) {
     throw std::runtime_error("min expects 3 arguments");
@@ -2012,7 +2012,7 @@ Value min(const Value& value) {
 }
 
 Value minimum(const Value& value) {
-  IVLOG(1, "minimum");
+  IVLOG(2, "minimum");
   auto args = value.as_tuple();
   if (args.size() != 2) {
     throw std::runtime_error("minimum expects 2 arguments");
@@ -2150,7 +2150,7 @@ Tensor compute_iou(std::vector<Tensor> boxes_coordinates, TensorDim num_batches,
 
 // Non-maximum suppression
 Value nms(const Value& value) {
-  IVLOG(1, "nms");
+  IVLOG(2, "nms");
   auto args = value.as_tuple();
   if (args.size() != 21) {
     throw std::runtime_error("nms expects 21 arguments");
@@ -2412,7 +2412,7 @@ Value nms(const Value& value) {
 }
 
 Value topk(const Value& value) {
-  IVLOG(1, "topk");
+  IVLOG(2, "topk");
   auto args = value.as_tuple();
   if (args.size() != 6) {
     throw std::runtime_error("topk expects 6 arguments");
@@ -2461,7 +2461,7 @@ Value topk(const Value& value) {
 }
 
 Value mvn(const Value& value) {
-  IVLOG(1, "mvn");
+  IVLOG(2, "mvn");
   auto args = value.as_tuple();
   if (args.size() != 6) {
     throw std::runtime_error("mvn expects 6 arguments");
@@ -2497,7 +2497,7 @@ Value mvn(const Value& value) {
 }
 
 Value l2norm(const Value& value) {
-  IVLOG(1, "l2norm");
+  IVLOG(2, "l2norm");
   auto args = value.as_tuple();
   if (args.size() != 4) {
     throw std::runtime_error("norm expects 4 arguments");
@@ -2524,7 +2524,7 @@ Value l2norm(const Value& value) {
 }
 
 Value prod(const Value& value) {
-  IVLOG(1, "prod");
+  IVLOG(2, "prod");
   auto args = value.as_tuple();
   if (args.size() != 3) {
     throw std::runtime_error("prod expects 3 arguments");
@@ -2694,7 +2694,7 @@ Value pool(const Value& value) {
 }
 
 Value relu(const Value& value) {
-  IVLOG(1, "relu");
+  IVLOG(2, "relu");
   auto args = value.as_tuple();
   if (args.size() != 4) {
     throw std::runtime_error("relu expects 4 arguments");
@@ -2717,7 +2717,7 @@ Value relu(const Value& value) {
 }
 
 Value reorg_yolo(const Value& value) {
-  IVLOG(1, "reorg_yolo");
+  IVLOG(2, "reorg_yolo");
 
   auto args = value.as_tuple();
   if (args.size() != 4) {
@@ -2769,7 +2769,7 @@ Value reorg_yolo(const Value& value) {
 }
 
 Value repeat(const Value& value) {
-  IVLOG(1, "repeat");
+  IVLOG(2, "repeat");
   // This is numpy-style `repeat`; Keras calls it `repeat_elements`
   // This is more limited than in numpy (both repeats & axis required, both must
   // be ints)
@@ -2808,7 +2808,7 @@ Value repeat(const Value& value) {
 }
 
 Value reshape(const Value& value) {
-  IVLOG(1, "reshape");
+  IVLOG(2, "reshape");
   auto args = value.as_tuple();
   if (args.size() != 2) {
     throw std::runtime_error(llvm::formatv("PlaidML reshape op expects 2 arguments (received {0})", args.size()));
@@ -2875,7 +2875,7 @@ Value reshape(const Value& value) {
 }
 
 Value scale_gradient(const Value& value) {
-  IVLOG(1, "scale_gradient");
+  IVLOG(2, "scale_gradient");
   auto args = value.as_tuple();
   if (args.size() != 2) {
     throw std::runtime_error("scale_gradient expects 2 arguments");
@@ -2893,7 +2893,7 @@ Value scale_gradient(const Value& value) {
 }
 
 Value sigmoid(const Value& value) {
-  IVLOG(1, "sigmoid");
+  IVLOG(2, "sigmoid");
   auto args = value.as_tuple();
   if (args.size() != 1) {
     throw std::runtime_error("sigmoid expects 1 argument");
@@ -2906,7 +2906,7 @@ Value sigmoid(const Value& value) {
 Value slice(const Value& value) {
   // This code avoids using max/min ops to keep start/stop values in the [-dim - 1, dim] range
   // This means requesting a slice with a start/stop index outside the valid range will give bizarre behavior
-  IVLOG(1, "slice");
+  IVLOG(2, "slice");
   auto args = value.as_tuple();
   if (args.size() != 2) {
     throw std::runtime_error("slice expects 2 arguments");
@@ -3036,7 +3036,7 @@ Value slice(const Value& value) {
 }
 
 Value softmax(const Value& value) {
-  IVLOG(1, "softmax");
+  IVLOG(2, "softmax");
   auto args = value.as_tuple();
   if (args.size() != 2) {
     throw std::runtime_error("softmax expects 2 arguments");
@@ -3085,7 +3085,7 @@ Value softmax(const Value& value) {
 }
 
 Value sort(const Value& value) {
-  IVLOG(1, "sort");
+  IVLOG(2, "sort");
   auto args = value.as_tuple();
   if (args.size() != 3) {
     throw std::runtime_error("sort expects 3 arguments");
@@ -3114,7 +3114,7 @@ Value sort(const Value& value) {
 }
 
 Value spatial_padding(const Value& value) {
-  IVLOG(1, "spatial_padding");
+  IVLOG(2, "spatial_padding");
   auto args = value.as_tuple();
   if (args.size() != 4) {
     throw std::runtime_error("spatial_padding expects 4 arguments");
@@ -3365,13 +3365,13 @@ Value spatial_padding(const Value& value) {
 }
 
 Value square(const Value& value) {
-  IVLOG(1, "square");
+  IVLOG(2, "square");
   auto x = value.as_tensor();
   return Value(x * x);
 }
 
 Value squeeze(const Value& value) {
-  IVLOG(1, "squeeze");
+  IVLOG(2, "squeeze");
   auto args = value.as_tuple();
   if (args.size() != 2) {
     throw std::runtime_error("Squeeze expects 2 arguments");
@@ -3409,7 +3409,7 @@ Value squeeze(const Value& value) {
 }
 
 Value sum(const Value& value) {
-  IVLOG(1, "sum");
+  IVLOG(2, "sum");
   auto args = value.as_tuple();
   if (args.size() != 3) {
     throw std::runtime_error("sum expects 3 arguments");
@@ -3439,7 +3439,7 @@ Value sum(const Value& value) {
 }
 
 Value tile(const Value& value) {
-  IVLOG(1, "tile");
+  IVLOG(2, "tile");
   auto args = value.as_tuple();
   if (args.size() != 2) {
     throw std::runtime_error("Tile expects 2 arguments");
@@ -3477,7 +3477,7 @@ Value tile(const Value& value) {
 
 Value transpose(const Value& value) {
   // Reorders dimensions so dim i of the output is dim pattern[i] of the input
-  IVLOG(1, "transpose");
+  IVLOG(2, "transpose");
   auto args = value.as_tuple();
   if (args.size() != 2) {
     throw std::runtime_error("Transpose expects 2 arguments");
@@ -3573,7 +3573,7 @@ Value unsqueeze(const Value& value) {
 Value variance(const Value& value) {
   // This computes the *uncorrected* sample variance (i.e. denominator = n
   // rather than = n-1) to match tensorflow
-  IVLOG(1, "variance");
+  IVLOG(2, "variance");
   auto args = value.as_tuple();
   if (args.size() != 3) {
     throw std::runtime_error("Variance expects 3 arguments");

@@ -7,7 +7,7 @@ func @init() -> tuple<> {
   return %0 : tuple<>
 }
 
-func @closure(%arg0: tensor<16x16xf32> {stdx.const = 0 : index}) {
+func @closure(%arg0: tensor<16x16xf32> {stdx.const}) {
   stdx.closure(%arg1: tensor<16x16xf32>) -> tensor<16x16xf32> {
     %0 = addf %arg0, %arg1 : tensor<16x16xf32>
     stdx.yield %0 : tensor<16x16xf32>
@@ -15,7 +15,7 @@ func @closure(%arg0: tensor<16x16xf32> {stdx.const = 0 : index}) {
   return
 }
 // CHECK-LABEL: func @closure
-//  CHECK-SAME: (%[[arg0:.*]]: tensor<16x16xf32> {stdx.const = 0 : index})
+//  CHECK-SAME: (%[[arg0:.*]]: tensor<16x16xf32> {stdx.const})
 //       CHECK:   stdx.closure(%[[arg1:.*]]: tensor<16x16xf32>) -> tensor<16x16xf32>
 //       CHECK:     %[[ret:.*]] = addf %[[arg0]], %[[arg1]] : tensor<16x16xf32>
 //       CHECK:     stdx.yield %[[ret]] : tensor<16x16xf32>

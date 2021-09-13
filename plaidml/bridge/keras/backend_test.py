@@ -1299,18 +1299,6 @@ class TestBackendOps(unittest.TestCase):
         z = pkb.exp(x)
         self.assertFalse(pkb.is_placeholder(z))
 
-    # Note: we skip tensorflow since init_global must be called in the middle of this function
-    # for correct semantics, and Theano is sufficient.
-    @compareForwardExact(skip_tensorflow=True, skip_theano=False)
-    def testUpdate(self, b):
-        a = b.variable(m(10, 10))
-        a2 = a * a
-        up = b.update(a, a2)
-        f = b.function([], [], updates=[up])
-        f([])
-        f([])
-        return a
-
     @unittest.expectedFailure
     @compareForwardExact()
     def testRandomChanges(self, b):
