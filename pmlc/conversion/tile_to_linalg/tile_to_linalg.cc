@@ -773,11 +773,34 @@ struct ContractionOpConversion
         AffineMap::getMultiDimIdentityMap(numInitDims, context);
 
     // Do initialization
-    auto fillOp =
-        rewriter.create<linalg::FillOp>(loc,
-                                        /*value=*/cionAdaptor.init(),
-                                        /*output=*/bufInit.resultTensor);
-    auto filled = fillOp.getResult(0);
+    auto initValue = cionAdaptor.init();
+    Value filled;
+    if (initValue.getType().isa<RankedTensorType>()) {
+      // Init value is a tensor
+      SmallVector<StringRef, 4> iterTypes(numInitDims, "parallel");
+      auto initLoopOp = rewriter.create<linalg::GenericOp>(
+          loc,
+          /*resultTensorTypes=*/TypeRange{initType},                //
+          /*inputs=*/ValueRange{initValue},                         //
+          /*outputs=*/ValueRange{bufInit.resultTensor},             //
+          /*indexingMaps=*/ArrayRef<AffineMap>{identMap, identMap}, //
+          /*iteratorTypes=*/iterTypes);
+      Block *body = rewriter.createBlock(
+          &initLoopOp.region(), initLoopOp.region().begin(),
+          TypeRange{bufInit.elementType, bufInit.elementType});
+      rewriter.setInsertionPointToStart(body);
+      rewriter.create<linalg::YieldOp>(loc,
+                                       ArrayRef<Value>{body->getArgument(0)});
+      rewriter.setInsertionPointAfter(initLoopOp);
+      filled = initLoopOp.getResult(0);
+    } else {
+      // Initial value is a scalar
+      auto fillOp =
+          rewriter.create<linalg::FillOp>(loc,
+                                          /*value=*/initValue,
+                                          /*output=*/bufInit.resultTensor);
+      filled = fillOp.getResult(0);
+    }
 
     // Prepare for indexing maps and iterator types
     SmallVector<AffineMap, 4> idxMaps;

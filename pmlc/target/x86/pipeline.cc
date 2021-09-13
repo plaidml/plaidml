@@ -228,8 +228,6 @@ void pipelineBuilderStage2(OpPassManager &pm, const Options &options) {
 
   if (util::getEnvVar("PLAIDML_USE_LINALG") == "1") {
     pm.addPass(pmlc::conversion::tile_to_linalg::createLowerTileToLinalgPass());
-    pm.addPass(createCanonicalizerPass());
-    pm.addPass(createCSEPass());
     pm.addPass(pmlc::conversion::linalg_to_pxa::createLowerLinalgToPXAPass());
   } else {
     pm.addPass(pmlc::conversion::tile_to_pxa::createLowerTileToPXAPass());
