@@ -1,15 +1,70 @@
-// RUN: pmlc-opt  -convert-linalg-to-loops -pxa-reorder-layouts="allow-reorder=true user-layouts=true" -canonicalize -canonicalize -pxa-normalize -canonicalize -pxa-normalize=denest=true -canonicalize -x86-stencil-tpp-gemm  %s | FileCheck %s
+// RUN: pmlc-opt %s \
+// RUN:   -pxa-reorder-layouts="allow-reorder=true user-layouts=true" \
+// RUN:   -canonicalize \
+// RUN:   -pxa-normalize \
+// RUN:   -canonicalize \
+// RUN:   -pxa-normalize=denest=true \
+// RUN:   -canonicalize \
+// RUN:   -x86-stencil-tpp-gemm \
+// RUN:   | FileCheck %s
 
-// PLAIDML_VERBOSE=5 build-x86_64/Release/bin/pmlc-opt -convert-linalg-to-loops -pxa-reorder-layouts="allow-reorder=true user-layouts=true" -canonicalize -pxa-normalize -canonicalize -pxa-normalize=denest=true -canonicalize -x86-stencil-tpp-gemm pmlc/target/x86/tests/conv_simple.mlir
+// build-x86_64/Release/bin/pmlc-opt \
+//   -pxa-reorder-layouts="allow-reorder=true user-layouts=true" \
+//   -canonicalize \
+//   -pxa-normalize \
+//   -canonicalize \
+//   -pxa-normalize=denest=true \
+//   -canonicalize \
+//   -x86-stencil-tpp-gemm pmlc/target/x86/tests/conv_simple.mlir
 
-// WithOUT data reordering: build-x86_64/Release/bin/pmlc-opt -convert-linalg-to-loops -canonicalize -x86-stencil-tpp-gemm -x86-convert-pxa-to-affine --normalize-memrefs --simplify-affine-structures  -lower-affine  -canonicalize -convert-scf-to-std -x86-convert-std-to-llvm pmlc/target/x86/tests/conv_simple.mlir | build-x86_64/Release/bin/pmlc-jit -e conv
+// WithOUT data reordering:
+// build-x86_64/Release/bin/pmlc-opt \
+//   -canonicalize \
+//   -x86-stencil-tpp-gemm \
+//   -x86-convert-pxa-to-affine \
+//   -normalize-memrefs \
+//   -simplify-affine-structures \
+//   -lower-affine \
+//   -canonicalize \
+//   -convert-scf-to-std \
+//   -x86-convert-std-to-llvm pmlc/target/x86/tests/conv_simple.mlir | build-x86_64/Release/bin/pmlc-jit -e conv
 
-// WITH data reordering: build-x86_64/Release/bin/pmlc-opt -convert-linalg-to-loops -pxa-reorder-layouts="allow-reorder=true user-layouts=true" -canonicalize -pxa-normalize -canonicalize -pxa-normalize=denest=true -canonicalize -x86-stencil-tpp-gemm -x86-convert-pxa-to-affine --normalize-memrefs --simplify-affine-structures  -lower-affine  -canonicalize -convert-scf-to-std -x86-convert-std-to-llvm pmlc/target/x86/tests/conv_simple.mlir | build-x86_64/Release/bin/pmlc-jit -e conv
+// WITH data reordering:
+// build-x86_64/Release/bin/pmlc-opt \
+//   -pxa-reorder-layouts="allow-reorder=true user-layouts=true" \
+//   -canonicalize \
+//   -pxa-normalize \
+//   -canonicalize \
+//   -pxa-normalize=denest=true \
+//   -canonicalize \
+//   -x86-stencil-tpp-gemm \
+//   -x86-convert-pxa-to-affine \
+//   -normalize-memrefs \
+//   -simplify-affine-structures \
+//   -lower-affine \
+//   -canonicalize \
+//   -convert-scf-to-std \
+//   -x86-convert-std-to-llvm pmlc/target/x86/tests/conv_simple.mlir | build-x86_64/Release/bin/pmlc-jit -e conv
 
+// Specifying the data tile size:
+// build-x86_64/Release/bin/pmlc-opt \
+//   -pxa-reorder-layouts="allow-reorder=true user-layouts=true datatile-size=64" \
+//   -canonicalize \
+//   -pxa-normalize \
+//   -canonicalize \
+//   -pxa-normalize=denest=true \
+//   -canonicalize \
+//   -x86-stencil-tpp-gemm pmlc/target/x86/tests/conv_simple.mlir
 
-// Specifying the data tile size: build-x86_64/Release/bin/pmlc-opt -convert-linalg-to-loops -pxa-reorder-layouts="allow-reorder=true user-layouts=true datatile-size=64" -canonicalize -pxa-normalize -canonicalize -pxa-normalize=denest=true -canonicalize -x86-stencil-tpp-gemm pmlc/target/x86/tests/conv_simple.mlir
-
-// With stenciling pass: PLAIDML_VERBOSE=5 ./build-x86_64/Release/bin/pmlc-opt -convert-linalg-to-loops -pxa-reorder-layouts="allow-reorder=true user-layouts=true" -canonicalize -pxa-normalize -canonicalize -pxa-normalize=denest=true -canonicalize -x86-stencil-tpp-gemm pmlc/target/x86/tests/conv_simple.mlir
+// With stenciling pass:
+// build-x86_64/Release/bin/pmlc-opt \
+//   -pxa-reorder-layouts="allow-reorder=true user-layouts=true" \
+//   -canonicalize \
+//   -pxa-normalize \
+//   -canonicalize \
+//   -pxa-normalize=denest=true \
+//   -canonicalize \
+//   -x86-stencil-tpp-gemm pmlc/target/x86/tests/conv_simple.mlir
 
 // CHECK-LABEL: @conv
 func @conv() {
