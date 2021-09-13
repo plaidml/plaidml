@@ -1071,6 +1071,41 @@ struct CastOpConversion : public OpConversionPattern<tile::CastOp> {
   }
 };
 
+struct ClosureOpConversion : public OpConversionPattern<stdx::ClosureOp> {
+  using OpConversionPattern<stdx::ClosureOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(stdx::ClosureOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const final {
+    FunctionType type = op.getType();
+
+    // Convert the closure/function signature
+    TileToLinalgTypeConverter typeConverter;
+    mlir::TypeConverter::SignatureConversion result(type.getNumInputs());
+    for (unsigned i = 0; i < type.getNumInputs(); ++i) {
+      result.addInputs(i, {typeConverter.convertType(type.getInput(i))});
+    }
+    SmallVector<Type, 8> resultTypes;
+    for (Type resultType : type.getResults()) {
+      Type newResultType = typeConverter.convertType(resultType);
+      resultTypes.push_back(newResultType);
+    }
+
+    // Create a new function type with an updated signature.
+    auto newOp = rewriter.cloneWithoutRegions(op);
+    rewriter.inlineRegionBefore(op.getBody(), newOp.getBody(),
+                                newOp.getBody().end());
+    newOp.setType(FunctionType::get(op.getContext(), result.getConvertedTypes(),
+                                    resultTypes));
+
+    // Tell the rewriter to convert the region signature.
+    rewriter.applySignatureConversion(&newOp.getBody(), result);
+    rewriter.eraseOp(op);
+
+    return success();
+  }
+};
+
 struct FuncOpConversion : public OpConversionPattern<FuncOp> {
   using OpConversionPattern<FuncOp>::OpConversionPattern;
 
@@ -1088,7 +1123,6 @@ struct FuncOpConversion : public OpConversionPattern<FuncOp> {
     SmallVector<Type, 8> resultTypes;
     for (Type resultType : type.getResults()) {
       Type newResultType = typeConverter.convertType(resultType);
-      result.addInputs({newResultType});
       resultTypes.push_back(newResultType);
     }
 
@@ -1219,6 +1253,9 @@ struct LowerTileToLinalgPass
                       ReturnOp>();
     target.addDynamicallyLegalOp<FuncOp>(
         [&](FuncOp op) { return converter.isSignatureLegal(op.getType()); });
+    target.addDynamicallyLegalOp<stdx::ClosureOp>([&](stdx::ClosureOp op) {
+      return converter.isSignatureLegal(op.getType());
+    });
     target.addDynamicallyLegalOp<ReturnOp>(
         [&](ReturnOp op) { return converter.isLegal(op); });
     target.addDynamicallyLegalOp<scf::ForOp>(
@@ -1236,6 +1273,7 @@ struct LowerTileToLinalgPass
     RewritePatternSet patterns(&getContext());
     patterns.insert<
         CastOpConversion,     //
+        ClosureOpConversion,  //
         ConstantOpConversion, //
         FuncOpConversion,     //
         IndexOpConversion,    //
