@@ -49,4 +49,9 @@ def TraceLinking : Pass<"x86-trace-linking", "mlir::ModuleOp"> {
   let constructor = "pmlc::target::x86::createTraceLinkingPass()";
 }
 
+def FoldConstantCast : FunctionPass<"fold-constant-cast"> {
+  let summary = "Materialize casts of constants to target type";
+  let constructor = "pmlc::target::x86::createFoldConstantCastPass()";
+}
+
 #endif // __PMLC_TARGET_X86_PASSES__

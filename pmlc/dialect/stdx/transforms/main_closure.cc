@@ -31,7 +31,7 @@ void MainClosurePass::runOnOperation() {
   SmallVector<unsigned> argIndices;
   SmallVector<Type> argTypes;
   for (BlockArgument arg : main.getArguments()) {
-    if (!main.getArgAttrOfType<IntegerAttr>(arg.getArgNumber(), "stdx.const")) {
+    if (!main.getArgAttr(arg.getArgNumber(), "stdx.const")) {
       args.push_back(arg);
       argIndices.push_back(arg.getArgNumber());
       argTypes.push_back(arg.getType());

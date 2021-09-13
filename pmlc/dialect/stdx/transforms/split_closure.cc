@@ -1,7 +1,9 @@
 // Copyright 2021 Intel Corporation
 
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/Transforms/RegionUtils.h"
 
 #include "pmlc/dialect/stdx/transforms/pass_detail.h"
@@ -12,6 +14,11 @@ using namespace mlir; // NOLINT[build/namespaces]
 namespace pmlc::dialect::stdx {
 
 namespace {
+
+struct ValuesWithCast {
+  Value value;
+  memref::CastOp castOp;
+};
 
 struct SplitClosurePass : public SplitClosureBase<SplitClosurePass> {
   void runOnOperation() final {
@@ -36,14 +43,26 @@ struct SplitClosurePass : public SplitClosureBase<SplitClosurePass> {
     auto itNextOp = std::next(itOp);
 
     SetVector<Value> values;
-    getUsedValuesDefinedAbove(op.body(), op.body(), values);
+    visitUsedValuesDefinedAbove(op.body(), op.body(), [&](OpOperand *operand) {
+      addUsedValue(*operand, values);
+    });
 
     Block *cleanup = func.body().front().splitBlock(itNextOp);
     getUsedValuesDefinedOutside(cleanup, values);
 
     SmallVector<Type> packedTypes;
+    SmallVector<Value> packedValues;
+    SmallVector<ValuesWithCast> valuesWithCast;
     for (Value value : values) {
-      packedTypes.push_back(value.getType());
+      if (auto op = dyn_cast_or_null<memref::CastOp>(value.getDefiningOp())) {
+        packedValues.push_back(op.source());
+        packedTypes.push_back(op.source().getType());
+        valuesWithCast.emplace_back(ValuesWithCast{value, op});
+      } else {
+        packedValues.push_back(value);
+        packedTypes.push_back(value.getType());
+        valuesWithCast.emplace_back(ValuesWithCast{value, nullptr});
+      }
     }
 
     auto tupleType = TupleType::get(context, packedTypes);
@@ -60,7 +79,7 @@ struct SplitClosurePass : public SplitClosureBase<SplitClosurePass> {
 
     // Construct the `init` function.
     builder.setInsertionPointToStart(init.addEntryBlock());
-    auto packOp = builder.create<PackOp>(tupleType, values.getArrayRef());
+    auto packOp = builder.create<PackOp>(tupleType, packedValues);
     builder.create<ReturnOp>(packOp.getResult());
     auto &initOps = init.body().front().getOperations();
     initOps.splice(initOps.begin(), funcOps, funcOps.begin(), itOp);
@@ -76,15 +95,17 @@ struct SplitClosurePass : public SplitClosureBase<SplitClosurePass> {
     builder.setInsertionPointToStart(&main.body().front());
     auto mainUnpackOp =
         builder.create<UnpackOp>(packedTypes, main.getArgument(0));
-    replaceWithUnpacked(values.getArrayRef(), mainUnpackOp, main);
+    replaceWithUnpacked(valuesWithCast, mainUnpackOp, main, builder);
 
     // Construct the `fini` function.
     builder.setInsertionPointToStart(fini.addEntryBlock());
     auto finiUnpackOp =
         builder.create<UnpackOp>(packedTypes, fini.getArgument(0));
     auto &finiOps = fini.body().front().getOperations();
-    finiOps.splice(finiOps.end(), funcOps, cleanup->begin(), cleanup->end());
-    replaceWithUnpacked(values.getArrayRef(), finiUnpackOp, fini);
+    finiOps.splice(finiOps.end(), funcOps, cleanup->begin(),
+                   std::prev(cleanup->end()));
+    replaceWithUnpacked(valuesWithCast, finiUnpackOp, fini, builder);
+    builder.create<ReturnOp>();
 
     // NOTE: we need to replace these at the end so that the `values` used in
     // `replaceWithUnpacked` remain valid.
@@ -95,16 +116,19 @@ struct SplitClosurePass : public SplitClosureBase<SplitClosurePass> {
     func.erase();
   }
 
-  void replaceWithUnpacked(ArrayRef<Value> values, UnpackOp unpackOp,
-                           FuncOp func) {
+  void replaceWithUnpacked(ArrayRef<ValuesWithCast> values, UnpackOp unpackOp,
+                           FuncOp func, OpBuilder &builder) {
     for (auto it : llvm::enumerate(values)) {
-      Value value = it.value();
-      value.replaceUsesWithIf(
-          unpackOp.getResult(it.index()), [&](OpOperand &operand) {
-            if (!operand.getOwner())
-              return false;
-            return operand.getOwner()->getParentOfType<FuncOp>() == func;
-          });
+      Value value = it.value().value;
+      memref::CastOp castOp = it.value().castOp;
+      Value newValue = unpackOp.getResult(it.index());
+      if (castOp) {
+        newValue = builder.create<memref::CastOp>(
+            castOp.getLoc(), castOp.dest().getType(), newValue);
+      }
+      value.replaceUsesWithIf(newValue, [&](OpOperand &operand) {
+        return operand.getOwner()->getParentOfType<FuncOp>() == func;
+      });
     }
   }
 
@@ -112,9 +136,19 @@ struct SplitClosurePass : public SplitClosureBase<SplitClosurePass> {
     block->walk([&](Operation *op) {
       for (OpOperand &operand : op->getOpOperands()) {
         if (operand.get().getParentBlock() != block)
-          values.insert(operand.get());
+          addUsedValue(operand, values);
       }
     });
+  }
+
+  void addUsedValue(OpOperand &operand, SetVector<Value> &values) {
+    if (matchPattern(operand.get(), m_Constant())) {
+      OpBuilder builder(operand.getOwner());
+      Operation *op = builder.clone(*operand.get().getDefiningOp());
+      operand.set(op->getResult(0));
+    } else {
+      values.insert(operand.get());
+    }
   }
 };
 

@@ -43,6 +43,6 @@ func @jitEntry() -> () {
   %outUnranked = memref.cast %out : memref<3xf32> to memref<*xf32>
   call @print_memref_f32(%outUnranked) : (memref<*xf32>) -> ()
   // JIT: [1, 2, 3]
+  memref.dealloc %in : memref<3xf32>
   return
 }
-
