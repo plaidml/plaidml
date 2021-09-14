@@ -9,6 +9,7 @@
 #include "mlir/Support/DebugStringHelper.h"
 
 #include "pmlc/conversion/tile_to_linalg/pass_detail.h"
+#include "pmlc/dialect/pxa/analysis/uses.h"
 #include "pmlc/util/logging.h"
 #include "pmlc/util/util.h"
 
@@ -1234,23 +1235,28 @@ struct ScfForOpConversion : public OpConversionPattern<scf::ForOp> {
 struct LowerTileToLinalgPass
     : public LowerTileToLinalgBase<LowerTileToLinalgPass> {
   void runOnOperation() final {
+    auto module = getOperation();
     // Inject tile.ident ops for each return operand that needs it.
     // argument, a constant value, or a reshape op.
-    getOperation().walk([&](ReturnOp op) {
+    auto injectIdent = [](Operation *op) {
       OpBuilder builder(op);
       for (OpOperand &operand : op->getOpOperands()) {
         Value value = operand.get();
-        bool needsIdent =                                 //
-            value.isa<BlockArgument>() ||                 // Block arguemnt
-            matchPattern(value, m_Constant()) ||          // Constant op
-            matchPattern(value, m_Op<tile::ReshapeOp>()); // Reshape op
+        Value def = dialect::pxa::getIndirectDef(value);
+        bool needsIdent =                                   //
+            value.isa<BlockArgument>() ||                   // Block arguemnt
+            matchPattern(value, m_Constant()) ||            // Constant op
+            matchPattern(value, m_Op<tile::ReshapeOp>()) || // Reshape op
+            def.getParentRegion() != op->getParentRegion();
         if (needsIdent) {
-          Value copy = builder.create<tile::IdentOp>(op.getLoc(),
+          Value copy = builder.create<tile::IdentOp>(op->getLoc(),
                                                      value.getType(), value);
           operand.set(copy);
         }
       }
-    });
+    };
+    module.walk([&](ReturnOp op) { injectIdent(op); });
+    module.walk([&](stdx::YieldOp op) { injectIdent(op); });
 
     // Set up target (i.e. what is legal)
     ConversionTarget target(getContext());
@@ -1434,8 +1440,7 @@ struct LowerTileToLinalgPass
     populateTileToLinalgSpecialPatterns(patterns);
 
     // Run the conversion
-    if (failed(
-            applyFullConversion(getOperation(), target, std::move(patterns)))) {
+    if (failed(applyFullConversion(module, target, std::move(patterns)))) {
       signalPassFailure();
       return;
     }
