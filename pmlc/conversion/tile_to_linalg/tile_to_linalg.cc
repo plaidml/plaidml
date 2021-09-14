@@ -555,17 +555,6 @@ struct BufferInitializer {
   }
 };
 
-struct PrngOpConversion : public OpConversionPattern<tile::PrngOp> {
-  using OpConversionPattern<tile::PrngOp>::OpConversionPattern;
-
-  LogicalResult
-  matchAndRewrite(tile::PrngOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const final {
-    op.emitError("Unsupported operation: tile::PrngOp.");
-    return success();
-  }
-};
-
 template <typename FromOpType, typename IntoOpBuilder,
           typename Matcher = AlwaysTrue>
 struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
@@ -1306,7 +1295,6 @@ struct LowerTileToLinalgPass
         FuncOpConversion,     //
         IndexOpConversion,    //
         PragmaOpConversion,   //
-        PrngOpConversion,     //
         ReshapeOpConversion,  //
         ReturnOpConversion,   //
         ShapeOpConversion,    //
