@@ -262,10 +262,9 @@ bool createBlockedLayoutForFilterTensor(
     // blockSize
 
     // We accomplish it in two steps. Below blockSize is assumed to be 16 for
-    // illustration: Step 1: permute RSCK -> CKRS, that is, (d0 d1 d2 d3) -> (d2
-    // d3 d0 d1) Step 2: tile CKRS -> C floordiv 16, K floordiv 16, R, S, C mod
-    // 16, K mod 16 (d2 d3 d0 d1) -> (d2 floordiv 16, d3 floordiv 16, d0, d1, d2
-    // mod 16, d3 mod 16)
+    // illustration:
+    // Step 1: permute: (r, s, c, k) -> (c, k, r, s)
+    // Step 2: tile: (c, k, r, s) -> (c // 16, k // 16, r, s, c % 16, k % 16)
 
     // Step 1: permute
     mlir::SmallVector<unsigned, 4> permutationMap;

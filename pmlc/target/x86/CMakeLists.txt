@@ -8,6 +8,7 @@ pml_cc_library(
     heatmap_impl.cc
     pipeline.cc
     register.cc
+    reorder_layouts.cc
     stencil_tpp_unary.cc
     trace_linking.cc
     xsmm_lowering.cc
