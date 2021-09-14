@@ -4,6 +4,7 @@ import tensorflow as tf
 from tensorflow.keras.layers import Input
 from tensorflow.python.framework.convert_to_constants import convert_variables_to_constants_v2
 from tensorflow.python.tools.optimize_for_inference_lib import optimize_for_inference
+from tensorflow.python.pywrap_mlir import import_graphdef
 
 parser = argparse.ArgumentParser(
     description='Read a TF model and produce serialized MLIR for that model')
@@ -87,7 +88,40 @@ elif args.model_type == 'tfhub-bert':
         )['default']  # Use 'sequence_output' to get what seems to be a training version (e.g. has dropout)
 elif args.model_type == 'mlperf-bert-experimental':
     # Load BERT trying to use import_graphdef
-    pass  # TODO
+    # Experimental paths for loading from *.pb
+    src_dir = args.src or "/home/tim/mlcommons/inference/language/bert/build/data/bert_tf_v1_1_large_fp32_384_v2/model.pb"  # TODO: Change the path
+    dst_path = args.dst or "/home/tim/tmp/bert_tf_todo.mlir"  # TODO: Change the path
+    graph_def = tf.compat.v1.GraphDef()
+    with tf.io.gfile.GFile(src_dir, 'rb') as f:
+        graph_def.ParseFromString(f.read())
+    inputs = args.in_layer_names or [
+        'input_ids:0',
+        'input_mask:0',
+        'segment_ids:0',
+    ]
+    outputs = args.out_layer_names or ['input_ids:0']
+    if args.verbose:
+        print("Layer names:")
+        print([n.name for n in graph_def.node])
+    # with open(dst_path, 'w') as f:
+    #     # graph_def = tf.compat.v1.import_graph_def(graph_def, name="")
+    #     f.write(tf.mlir.experimental.convert_graph_def(graph_def, pass_pipeline=args.pipeline))
+    # if args.verbose:
+    #     print("Done with convert_graph_def")
+    #     raise RuntimeError("Forced Abort")
+
+    mlir_tf = import_graphdef(
+        graph_def,
+        args.pipeline,
+        False,
+        input_names=[],  #[item.split(':')[0] for item in inputs],
+        input_data_types=[],  #["DT_INT", "DT_INT", "DT_INT"],
+        input_data_shapes=[],  #["1,256", "1,256", "1,256"],
+        output_names=["logits:0"])  #[item.split(':')[0] for item in outputs])
+    with open(dst_path, 'w') as f:
+        f.write(mlir_tf)
+    if args.verbose:
+        print("Done with experimental section...")
 elif args.model_type == 'mlperf-bert':
     # Experimental paths for loading from *.pb
     src_dir = args.src or "/home/tim/mlcommons/inference/language/bert/build/data/bert_tf_v1_1_large_fp32_384_v2/model.pb"  # TODO: Change the path
