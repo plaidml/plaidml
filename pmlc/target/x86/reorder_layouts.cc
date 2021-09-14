@@ -22,7 +22,7 @@ struct ConvOperand {
   RankedTensorType type;
   AffineMap idxMap;
 
-  ConvOperand(ArrayRef<Value> values, ArrayRef<AffineMap> idxMaps, int64_t i)
+  ConvOperand(ValueRange values, ArrayRef<AffineMap> idxMaps, int64_t i)
       : value(values[i]), type(value.getType().cast<RankedTensorType>()),
         idxMap(idxMaps[i]) {}
 };
@@ -32,7 +32,7 @@ struct ConvCapture {
   ConvOperand filter;
   ConvOperand output;
 
-  ConvCapture(ArrayRef<Value> values, ArrayRef<AffineMap> idxMaps,
+  ConvCapture(ValueRange values, ArrayRef<AffineMap> idxMaps,
               ArrayRef<int64_t> order)
       : input(values, idxMaps, order[0]), filter(values, idxMaps, order[1]),
         output(values, idxMaps, order[2]) {}
@@ -70,17 +70,19 @@ struct ConvCapture {
 };
 
 static Optional<ConvCapture> detectConv(linalg::GenericOp op) {
-  if (op.getNumInputs() != 2 && op.getNumOutputs() != 1)
+  if (op.getNumInputs() != 2 || op.getNumOutputs() != 1)
     return None;
 
-  SmallVector<Value, 3> values = llvm::to_vector<3>(op.getOperands());
+  ValueRange values = op.getOperands();
   SmallVector<AffineMap, 3> idxMaps =
       llvm::to_vector<3>(op.indexing_maps().getAsValueRange<AffineMapAttr>());
 
   Block *block = op.getBody();
   Block::BlockArgListType args = block->getArguments();
-  Operation *yieldOp = block->getTerminator();
+  if (args.size() != 3)
+    return None;
 
+  Operation *yieldOp = block->getTerminator();
   if (matchPattern(
           yieldOp,
           m_Op<linalg::YieldOp>(m_Op<AddFOp>(
