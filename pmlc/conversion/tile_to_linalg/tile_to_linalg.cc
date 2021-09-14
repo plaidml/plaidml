@@ -956,6 +956,12 @@ struct IndexOpConversion : public OpConversionPattern<tile::IndexOp> {
 Optional<SmallVector<ReassociationIndices, 4>>
 matchShape(ArrayRef<int64_t> srcShape, ArrayRef<int64_t> dstShape) {
   SmallVector<ReassociationIndices, 4> result;
+  if (dstShape.empty()) {
+    if (srcShape.empty()) {
+      return result;
+    }
+    return llvm::None;
+  }
   int dstDim = dstShape.size() - 1;
   for (int srcDim = srcShape.size() - 1; srcDim >= 0; --srcDim) {
     int64_t size = dstShape[dstDim];
