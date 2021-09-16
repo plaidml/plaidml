@@ -16,12 +16,6 @@ struct HoistingPass final : public HoistingPassBase<HoistingPass> {
   LogicalResult moveLoopInvariantCode(LoopLikeOpInterface looplike);
 };
 
-static bool canLinalgGenericBeHoisted(linalg::GenericOp op) {
-  return llvm::all_of(op->getOperandTypes(),
-                      [](Type type) { return type.isa<TensorType>(); }) &&
-         !op.result_tensors().empty();
-}
-
 // Checks whether the given op can be hoisted by checking that
 // - the op and any of its contained operations do not depend on SSA values
 //   defined inside of the loop (by means of calling definedOutside).
@@ -37,8 +31,8 @@ static bool canBeHoisted(Operation *op,
   // can be no side-effects because the surrounding op has claimed so, we can
   // (and have to) skip this step.
   if (auto memInterface = dyn_cast<MemoryEffectOpInterface>(op)) {
-    if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
-      if (!canLinalgGenericBeHoisted(genericOp))
+    if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
+      if (!linalgOp.hasTensorSemantics() && !memInterface.hasNoEffect())
         return false;
     } else if (!memInterface.hasNoEffect()) {
       return false;
