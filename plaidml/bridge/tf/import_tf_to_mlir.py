@@ -19,12 +19,7 @@ parser.add_argument('--model-type',
                     help='model type and source')
 parser.add_argument('--src', help='path to source file(s)')
 parser.add_argument('--dst', help='path to write output to')
-parser.add_argument('--out-layer-names', help='override the default output layers')
-parser.add_argument('--in-layer-names', nargs='*', help='override the default input layers')
 parser.add_argument('--verbose', action='store_true', help='enable verbose logging')
-parser.add_argument('--optimize-for-inference',
-                    action='store_true',
-                    help='enable inference optimizations for GraphDef models')
 parser.add_argument('--pipeline',
                     help='MLIR pass pipeline',
                     default=','.join([
@@ -39,12 +34,6 @@ if args.model_type == 'keras-resnet':
     # Load ResNet50 from Keras
     if args.src:
         print("Warning: --src specified but unused by Keras ResNet50")
-    if args.out_layer_names:
-        print("Warning: --out-layer-names specified but unused by Keras ResNet50")
-    if args.in_layer_names:
-        print("Warning: --in-layer-names specified but unused by Keras ResNet50")
-    if args.optimize_for_inference:
-        print("Warning: --optimize-for-inference specified but unused by Keras ResNet50")
     dst_path = args.dst or "/home/tim/tmp/rn50_tf.mlir"  # TODO: Change the path
     model = tf.keras.applications.resnet50.ResNet50()
     input_shape = [1, 224, 224, 3]  # NHWC for RN
@@ -55,12 +44,6 @@ if args.model_type == 'keras-resnet':
         return model.predict_step(inp)
 elif args.model_type == 'tfhub-bert':
     # For use with the model at https://tfhub.dev/tensorflow/bert_en_uncased_L-12_H-768_A-12/4
-    if args.out_layer_names:
-        print("Warning: --out-layer-names specified but unused by TFHub BERT")
-    if args.in_layer_names:
-        print("Warning: --in-layer-names specified but unused by TFHub BERT")
-    if args.optimize_for_inference:
-        print("Warning: --optimize-for-inference specified but unused by TFHub BERT")
     src_dir = args.src or "/home/tim/tmp/tf_hub_models/bert/resaved"  # TODO: Change the path
     dst_path = args.dst or "/home/tim/tmp/bert_tf_todo.mlir"  # TODO: Change the path
     model = tf.saved_model.load(src_dir)
@@ -86,12 +69,6 @@ elif args.model_type == 'tfhub-bert':
         )['default']  # Use 'sequence_output' to get what seems to be a training version (e.g. has dropout)
 elif args.model_type == 'tfhub-i3d-kin':
     # For use with the model at https://tfhub.dev/deepmind/i3d-kinetics-400/1
-    if args.out_layer_names:
-        print("Warning: --out-layer-names specified but unused by TFHub i3d-kinetics")
-    if args.in_layer_names:
-        print("Warning: --in-layer-names specified but unused by TFHub i3d-kinetics")
-    if args.optimize_for_inference:
-        print("Warning: --optimize-for-inference specified but unused by TFHub i3d-kinetics")
     src_dir = args.src or "/home/tim/tmp/tf_hub_models/i3d-kinetics"  # TODO: Change the path
     dst_path = args.dst or "/home/tim/tmp/i3d_tf_todo.mlir"  # TODO: Change the path
     model = tf.saved_model.load(src_dir, tags=[])
@@ -109,12 +86,6 @@ elif args.model_type == 'tfhub-i3d-kin':
         return model.signatures['default'](inp)
 elif args.model_type == 'tfhub-retinanet50':
     # For use with the model at https://tfhub.dev/tensorflow/retinanet/resnet50_v1_fpn_1024x1024/1
-    if args.out_layer_names:
-        print("Warning: --out-layer-names specified but unused by TFHub retinanet50")
-    if args.in_layer_names:
-        print("Warning: --in-layer-names specified but unused by TFHub retinanet50")
-    if args.optimize_for_inference:
-        print("Warning: --optimize-for-inference specified but unused by TFHub retinanet50")
     src_dir = args.src or "/home/tim/tmp/tf_hub_models/retinanet50_1024"  # TODO: Change the path
     dst_path = args.dst or "/home/tim/tmp/retinanet50_tf_todo.mlir"  # TODO: Change the path
     model = tf.saved_model.load(src_dir)
@@ -132,13 +103,6 @@ elif args.model_type == 'tfhub-retinanet50':
         return model.signatures['serving_default'](inp)
 elif args.model_type == 'tfhub-inception-resnet-v2':
     # For use with the model at https://tfhub.dev/google/faster_rcnn/openimages_v4/inception_resnet_v2/1
-    if args.out_layer_names:
-        print("Warning: --out-layer-names specified but unused by TFHub inception-resnet-v2")
-    if args.in_layer_names:
-        print("Warning: --in-layer-names specified but unused by TFHub inception-resnet-v2")
-    if args.optimize_for_inference:
-        print(
-            "Warning: --optimize-for-inference specified but unused by TFHub inception-resnet-v2")
     src_dir = args.src or "/home/tim/tmp/tf_hub_models/inception_resnet_v2"  # TODO: Change the path
     dst_path = args.dst or "/home/tim/tmp/inception_resnet_v2_tf_todo.mlir"  # TODO: Change the path
     model = tf.saved_model.load(src_dir)
