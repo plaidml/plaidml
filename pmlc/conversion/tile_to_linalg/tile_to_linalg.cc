@@ -1091,46 +1091,12 @@ struct CastOpConversion : public OpConversionPattern<tile::CastOp> {
   }
 };
 
-struct ClosureOpConversion : public OpConversionPattern<stdx::ClosureOp> {
-  using OpConversionPattern<stdx::ClosureOp>::OpConversionPattern;
+template <typename FuncLikeOp>
+struct FuncOpConversion : public OpConversionPattern<FuncLikeOp> {
+  using OpConversionPattern<FuncLikeOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(stdx::ClosureOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const final {
-    FunctionType type = op.getType();
-
-    // Convert the closure/function signature
-    TileToLinalgTypeConverter typeConverter;
-    mlir::TypeConverter::SignatureConversion result(type.getNumInputs());
-    for (unsigned i = 0; i < type.getNumInputs(); ++i) {
-      result.addInputs(i, {typeConverter.convertType(type.getInput(i))});
-    }
-    SmallVector<Type, 8> resultTypes;
-    for (Type resultType : type.getResults()) {
-      Type newResultType = typeConverter.convertType(resultType);
-      resultTypes.push_back(newResultType);
-    }
-
-    // Create a new function type with an updated signature.
-    auto newOp = rewriter.cloneWithoutRegions(op);
-    rewriter.inlineRegionBefore(op.getBody(), newOp.getBody(),
-                                newOp.getBody().end());
-    newOp.setType(FunctionType::get(op.getContext(), result.getConvertedTypes(),
-                                    resultTypes));
-
-    // Tell the rewriter to convert the region signature.
-    rewriter.applySignatureConversion(&newOp.getBody(), result);
-    rewriter.eraseOp(op);
-
-    return success();
-  }
-};
-
-struct FuncOpConversion : public OpConversionPattern<FuncOp> {
-  using OpConversionPattern<FuncOp>::OpConversionPattern;
-
-  LogicalResult
-  matchAndRewrite(FuncOp op, ArrayRef<Value> operands,
+  matchAndRewrite(FuncLikeOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
     FunctionType type = op.getType();
 
@@ -1148,7 +1114,8 @@ struct FuncOpConversion : public OpConversionPattern<FuncOp> {
 
     // Create a new function with an updated signature.
     auto newOp = rewriter.cloneWithoutRegions(op);
-    rewriter.inlineRegionBefore(op.getBody(), newOp.getBody(), newOp.end());
+    rewriter.inlineRegionBefore(op.getBody(), newOp.getBody(),
+                                newOp.getBody().end());
     newOp.setType(FunctionType::get(op.getContext(), result.getConvertedTypes(),
                                     resultTypes));
 
@@ -1297,17 +1264,17 @@ struct LowerTileToLinalgPass
         CmpIntInequalityOp<CmpIPredicate::sge, CmpIPredicate::uge>;
     RewritePatternSet patterns(&getContext());
     patterns.insert<
-        CastOpConversion,     //
-        ClosureOpConversion,  //
-        ConstantOpConversion, //
-        FuncOpConversion,     //
-        IndexOpConversion,    //
-        PragmaOpConversion,   //
-        ReshapeOpConversion,  //
-        ReturnOpConversion,   //
-        ShapeOpConversion,    //
-        TraceOpConversion,    //
-        ScfForOpConversion,   //
+        CastOpConversion,                  //
+        ConstantOpConversion,              //
+        FuncOpConversion<FuncOp>,          //
+        FuncOpConversion<stdx::ClosureOp>, //
+        IndexOpConversion,                 //
+        PragmaOpConversion,                //
+        ReshapeOpConversion,               //
+        ReturnOpConversion,                //
+        ShapeOpConversion,                 //
+        TraceOpConversion,                 //
+        ScfForOpConversion,                //
         ContractionOpConversion<CombinationKind::none, FirstOperand>,
         ContractionOpConversion<CombinationKind::add, StdOp<mlir::AddFOp>,
                                 ResultIs<EltwiseFloat>>,
