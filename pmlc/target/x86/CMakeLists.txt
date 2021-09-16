@@ -8,6 +8,7 @@ pml_cc_library(
     heatmap_impl.cc
     pipeline.cc
     register.cc
+    reorder_layouts.cc
     stencil_tpp_unary.cc
     trace_linking.cc
     xsmm_lowering.cc
@@ -25,6 +26,7 @@ pml_cc_library(
     pmlc::dialect::stdx::transforms
     pmlc::dialect::tile::transforms
     pmlc::dialect::xsmm::ir
+    pmlc::transforms
     MLIRAffineToStandard
     MLIRAffineTransforms
     MLIRLLVMCommonConversion

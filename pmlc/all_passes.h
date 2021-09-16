@@ -23,6 +23,7 @@
 #include "pmlc/dialect/tile/transforms/passes.h"
 #include "pmlc/rt/runtime_registry.h"
 #include "pmlc/target/x86/passes.h"
+#include "pmlc/transforms/passes.h"
 
 // This function may be called to register the MLIR passes with the
 // global registry.
@@ -70,6 +71,9 @@ inline void registerAllPasses() {
 
   // Target passes
   pmlc::target::x86::registerPasses();
+
+  // Generic transforms
+  pmlc::transforms::registerPasses();
 
   pmlc::rt::registerRuntimes();
 }

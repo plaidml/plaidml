@@ -24,6 +24,8 @@ std::unique_ptr<mlir::Pass> createLowerToLLVMPass();
 
 std::unique_ptr<mlir::Pass> createPRNGLinkingPass();
 
+std::unique_ptr<mlir::Pass> createReorderLayoutsPass();
+
 std::unique_ptr<mlir::Pass> createStencilTppGemmPass();
 
 std::unique_ptr<mlir::Pass> createStencilTppUnaryPass();
