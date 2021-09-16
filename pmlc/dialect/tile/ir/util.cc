@@ -57,25 +57,25 @@ unsigned typeScore(Type type) {
   if (type.isInteger(1)) {
     return 4;
   }
-  if (type.isSignedInteger(8)) {
+  if (type.isSignedInteger(8) || type.isSignlessInteger(8)) {
     return 5;
   }
   if (type.isUnsignedInteger(8)) {
     return 6;
   }
-  if (type.isSignedInteger(16)) {
+  if (type.isSignedInteger(16) || type.isSignlessInteger(16)) {
     return 7;
   }
   if (type.isUnsignedInteger(16)) {
     return 8;
   }
-  if (type.isSignedInteger(32)) {
+  if (type.isSignedInteger(32) || type.isSignlessInteger(32)) {
     return 9;
   }
   if (type.isUnsignedInteger(32)) {
     return 10;
   }
-  if (type.isSignedInteger(64)) {
+  if (type.isSignedInteger(64) || type.isSignlessInteger(64)) {
     return 11;
   }
   if (type.isUnsignedInteger(64)) {
