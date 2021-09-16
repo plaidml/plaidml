@@ -767,12 +767,14 @@ struct ContractionOpConversion
     if (initValue.getType().isa<RankedTensorType>()) {
       // Init value is a tensor
       SmallVector<StringRef, 4> iterTypes(numInitDims, "parallel");
+      auto inputMap =
+          buildBroadcastMap(rewriter, loc, initValue, initShape.size());
       auto initLoopOp = rewriter.create<linalg::GenericOp>(
           loc,
           /*resultTensorTypes=*/TypeRange{initType},                //
           /*inputs=*/ValueRange{initValue},                         //
           /*outputs=*/ValueRange{bufInit.resultTensor},             //
-          /*indexingMaps=*/ArrayRef<AffineMap>{identMap, identMap}, //
+          /*indexingMaps=*/ArrayRef<AffineMap>{inputMap, identMap}, //
           /*iteratorTypes=*/iterTypes);
       Block *body = rewriter.createBlock(
           &initLoopOp.region(), initLoopOp.region().begin(),

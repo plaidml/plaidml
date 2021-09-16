@@ -31,3 +31,19 @@ func @broadcast_matrix_scalar(%arg0: tensor<ui64>, %arg1: tensor<3x4xui64>) -> t
   // CHECK:    cmpi uge
   // CHECK:    linalg.yield
 }
+
+func @main(%arg0: tensor<1x784xf32>, %arg1: tensor<784x512xf32>, %arg2: tensor<512xf32>) -> tensor<1x512xf32> {
+  %0 = tile.contract add, mul, %arg2, %arg0, %arg1 {lowerBounds = affine_map<() -> (0, 0, 0)>, sink = affine_map<(d0, d1, d2) -> (d0, d1)>, srcs = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>], upperBounds = affine_map<() -> (0, 511, 783)>} : tensor<512xf32>, tensor<1x784xf32>, tensor<784x512xf32> -> tensor<1x512xf32>
+  return %0 : tensor<1x512xf32>
+}
+
+// CHECK-LABEL: func @main
+// CHECK: linalg.init_tensor
+// CHECK: linalg.generic
+// CHECK-SAME: ins({{.*}} : tensor<512xf32>) outs({{.*}} : tensor<1x512xf32>)
+// CHECK:   linalg.yield
+// CHECK: linalg.generic
+// CHECK:   mulf
+// CHECK:   addf
+// CHECK:   linalg.yield
+// CHECK: return
