@@ -13,6 +13,8 @@ parser.add_argument('--model-type',
                         'keras-resnet',
                         'tfhub-bert',
                         'tfhub-i3d-kin',
+                        'tfhub-inception-resnet-v2',
+                        'tfhub-retinanet50',
                     ],
                     help='model type and source')
 parser.add_argument('--src', help='path to source file(s)')
@@ -52,7 +54,7 @@ if args.model_type == 'keras-resnet':
     def predict(inp):
         return model.predict_step(inp)
 elif args.model_type == 'tfhub-bert':
-    # Load from file for BERT
+    # For use with the model at https://tfhub.dev/tensorflow/bert_en_uncased_L-12_H-768_A-12/4
     if args.out_layer_names:
         print("Warning: --out-layer-names specified but unused by TFHub BERT")
     if args.in_layer_names:
@@ -83,7 +85,7 @@ elif args.model_type == 'tfhub-bert':
             None
         )['default']  # Use 'sequence_output' to get what seems to be a training version (e.g. has dropout)
 elif args.model_type == 'tfhub-i3d-kin':
-    # Load from file for BERT
+    # For use with the model at https://tfhub.dev/deepmind/i3d-kinetics-400/1
     if args.out_layer_names:
         print("Warning: --out-layer-names specified but unused by TFHub i3d-kinetics")
     if args.in_layer_names:
@@ -102,6 +104,53 @@ elif args.model_type == 'tfhub-i3d-kin':
         tf.TensorSpec(input_shape, tf.float32),
     ]
 
+    @tf.function(input_signature=input_signature)
+    def predict(inp):
+        return model.signatures['default'](inp)
+elif args.model_type == 'tfhub-retinanet50':
+    # For use with the model at https://tfhub.dev/tensorflow/retinanet/resnet50_v1_fpn_1024x1024/1
+    if args.out_layer_names:
+        print("Warning: --out-layer-names specified but unused by TFHub retinanet50")
+    if args.in_layer_names:
+        print("Warning: --in-layer-names specified but unused by TFHub retinanet50")
+    if args.optimize_for_inference:
+        print("Warning: --optimize-for-inference specified but unused by TFHub retinanet50")
+    src_dir = args.src or "/home/tim/tmp/tf_hub_models/retinanet50_1024"  # TODO: Change the path
+    dst_path = args.dst or "/home/tim/tmp/retinanet50_tf_todo.mlir"  # TODO: Change the path
+    model = tf.saved_model.load(src_dir)
+    if args.verbose:
+        print("Model: ", model)
+        print("Signatures?: ", model.signatures)
+    input_shape = [1, 1024, 1024, 3]
+    input_signature = [
+        tf.TensorSpec(input_shape, tf.uint8),
+    ]
+
+    # TODO: Might be multiple outputs? May need to specify?
+    @tf.function(input_signature=input_signature)
+    def predict(inp):
+        return model.signatures['serving_default'](inp)
+elif args.model_type == 'tfhub-inception-resnet-v2':
+    # For use with the model at https://tfhub.dev/google/faster_rcnn/openimages_v4/inception_resnet_v2/1
+    if args.out_layer_names:
+        print("Warning: --out-layer-names specified but unused by TFHub inception-resnet-v2")
+    if args.in_layer_names:
+        print("Warning: --in-layer-names specified but unused by TFHub inception-resnet-v2")
+    if args.optimize_for_inference:
+        print(
+            "Warning: --optimize-for-inference specified but unused by TFHub inception-resnet-v2")
+    src_dir = args.src or "/home/tim/tmp/tf_hub_models/inception_resnet_v2"  # TODO: Change the path
+    dst_path = args.dst or "/home/tim/tmp/inception_resnet_v2_tf_todo.mlir"  # TODO: Change the path
+    model = tf.saved_model.load(src_dir)
+    if args.verbose:
+        print("Model: ", model)
+        print("Signatures?: ", model.signatures)
+    input_shape = [1, 1024, 1024, 3]
+    input_signature = [
+        tf.TensorSpec(input_shape, tf.float32),
+    ]
+
+    # TODO: Might be multiple outputs? May need to specify?
     @tf.function(input_signature=input_signature)
     def predict(inp):
         return model.signatures['default'](inp)
