@@ -12,6 +12,7 @@ parser.add_argument('--model-type',
                     choices=[
                         'keras-resnet',
                         'tfhub-bert',
+                        'tfhub-i3d-kin',
                         'mlperf-bert',
                         'mlperf-bert-experimental',
                     ],
@@ -34,7 +35,7 @@ parser.add_argument('--pipeline',
                     ]))
 args = parser.parse_args()
 
-if args.model_type == 'keras-resnet' or args.model_type == 'tfhub-bert':
+if args.model_type == 'keras-resnet' or args.model_type == 'tfhub-bert' or args.model_type == 'tfhub-i3d-kin':
     from_saved_model = True
 else:
     from_saved_model = False
@@ -68,6 +69,8 @@ elif args.model_type == 'tfhub-bert':
     src_dir = args.src or "/home/tim/tmp/tf_hub_models/bert/resaved"  # TODO: Change the path
     dst_path = args.dst or "/home/tim/tmp/bert_tf_todo.mlir"  # TODO: Change the path
     model = tf.saved_model.load(src_dir)
+    if args.verbose:
+        print("Model: ", model)
     input_shape = [1, 256]  # [batch_size, seq_length] for BERT
     input_signature = [
         tf.TensorSpec(input_shape, tf.int32),
@@ -86,6 +89,29 @@ elif args.model_type == 'tfhub-bert':
             True,  # Or False?
             None
         )['default']  # Use 'sequence_output' to get what seems to be a training version (e.g. has dropout)
+elif args.model_type == 'tfhub-i3d-kin':
+    # Load from file for BERT
+    if args.out_layer_names:
+        print("Warning: --out-layer-names specified but unused by TFHub i3d-kinetics")
+    if args.in_layer_names:
+        print("Warning: --in-layer-names specified but unused by TFHub i3d-kinetics")
+    if args.optimize_for_inference:
+        print("Warning: --optimize-for-inference specified but unused by TFHub i3d-kinetics")
+    src_dir = args.src or "/home/tim/tmp/tf_hub_models/i3d-kinetics"  # TODO: Change the path
+    dst_path = args.dst or "/home/tim/tmp/i3d_tf_todo.mlir"  # TODO: Change the path
+    model = tf.saved_model.load(src_dir, tags=[])
+    if args.verbose:
+        print("Model: ", model)
+        print("Signatures?: ", model.signatures)
+    # Shape: [batch_size, frame_count, height=224, width=224, 3] for i3d-kin
+    input_shape = [1, 16, 224, 224, 3]
+    input_signature = [
+        tf.TensorSpec(input_shape, tf.float32),
+    ]
+
+    @tf.function(input_signature=input_signature)
+    def predict(inp):
+        return model.signatures['default'](inp)
 elif args.model_type == 'mlperf-bert-experimental':
     # Load BERT trying to use import_graphdef
     # Experimental paths for loading from *.pb
