@@ -15,6 +15,8 @@ parser.add_argument('--model-type',
                         'tfhub-i3d-kin',
                         'tfhub-inception-resnet-v2',
                         'tfhub-retinanet50',
+                        'tfhub-silero-stt',
+                        'tfhub-s3d-video',
                     ],
                     help='model type and source')
 parser.add_argument('--src', help='path to source file(s)')
@@ -118,6 +120,40 @@ elif args.model_type == 'tfhub-inception-resnet-v2':
     @tf.function(input_signature=input_signature)
     def predict(inp):
         return model.signatures['default'](inp)
+elif args.model_type == 'tfhub-silero-stt':
+    # For use with the model at https://tfhub.dev/silero/silero-stt/en/1
+    src_dir = args.src or "/home/tim/tmp/tf_hub_models/silero_stt"  # TODO: Change the path
+    dst_path = args.dst or "/home/tim/tmp/inception_resnet_v2_tf_todo.mlir"  # TODO: Change the path
+    model = tf.saved_model.load(src_dir)
+    if args.verbose:
+        print("Model: ", model)
+        print("Signatures?: ", model.signatures)
+    input_shape = [1024]  # Just guessing at a reasonable size
+    input_signature = [
+        tf.TensorSpec(input_shape, tf.float32),
+    ]
+
+    # TODO: Might be multiple outputs? May need to specify?
+    @tf.function(input_signature=input_signature)
+    def predict(inp):
+        return model.signatures['serving_default'](inp)
+elif args.model_type == 'tfhub-s3d-video':
+    # For use with the model at https://tfhub.dev/deepmind/mmv/s3d/1
+    src_dir = args.src or "/home/tim/tmp/tf_hub_models/s3d"  # TODO: Change the path
+    dst_path = args.dst or "/home/tim/tmp/s3d_tf_todo.mlir"  # TODO: Change the path
+    model = tf.saved_model.load(src_dir, tags=[])
+    if args.verbose:
+        print("Model: ", model)
+        print("Signatures?: ", model.signatures)
+    input_shape = [1, 32, 200, 200, 3]  # shape Batch x T x H x W x 3
+    input_signature = [
+        tf.TensorSpec(input_shape, tf.float32),
+    ]
+
+    # TODO: Might be multiple outputs? May need to specify?
+    @tf.function(input_signature=input_signature)
+    def predict(inp):
+        return model.signatures['video'](inp)
 else:
     raise ValueError("Invalid --model-type specified")
 
