@@ -32,8 +32,10 @@
 #include "mlir/Transforms/RegionUtils.h"
 
 #include "pmlc/compiler/registry.h"
+#include "pmlc/conversion/linalg_to_pxa/passes.h"
 #include "pmlc/conversion/pxa_to_affine/passes.h"
 #include "pmlc/conversion/stdx_to_llvm/passes.h"
+#include "pmlc/conversion/tile_to_linalg/passes.h"
 #include "pmlc/conversion/tile_to_pxa/passes.h"
 #include "pmlc/dialect/layer/transforms/passes.h"
 #include "pmlc/dialect/pml/transforms/passes.h"
@@ -269,7 +271,12 @@ void pipelineBuilderStage2(OpPassManager &pm, const Options &options) {
   unsigned maxThreads = options.getNumThreads();
   IVLOG(1, "Number of threads: " << maxThreads);
 
-  pm.addPass(pmlc::conversion::tile_to_pxa::createLowerTileToPXAPass());
+  if (util::getEnvVar("PLAIDML_USE_LINALG") == "1") {
+    pm.addPass(pmlc::conversion::tile_to_linalg::createLowerTileToLinalgPass());
+    pm.addPass(pmlc::conversion::linalg_to_pxa::createLowerLinalgToPXAPass());
+  } else {
+    pm.addPass(pmlc::conversion::tile_to_pxa::createLowerTileToPXAPass());
+  }
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
   pm.addNestedPass<FuncOp>(layer::createInlineLayersPass());

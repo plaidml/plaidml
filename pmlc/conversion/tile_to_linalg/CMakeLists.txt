@@ -9,6 +9,7 @@ pml_cc_library(
   DEPS
     ::passes-gen
     pmlc::dialect::layer::ir
+    pmlc::dialect::pxa::analysis
     pmlc::dialect::stdx::ir
     pmlc::dialect::tile::ir
     pmlc::util

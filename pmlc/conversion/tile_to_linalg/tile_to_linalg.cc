@@ -9,6 +9,7 @@
 #include "mlir/Support/DebugStringHelper.h"
 
 #include "pmlc/conversion/tile_to_linalg/pass_detail.h"
+#include "pmlc/dialect/pxa/analysis/uses.h"
 #include "pmlc/util/logging.h"
 #include "pmlc/util/util.h"
 
@@ -415,8 +416,7 @@ struct CondOp {
     CmpOpBuilder cmpOpBuilder;
     auto cmp = cmpOpBuilder.create(rewriter, loc, resultType,
                                    operands.take_front(2), types.take_front(2));
-    auto zero = createInit(rewriter, loc, resultType, AggregationKind::add);
-    return rewriter.create<mlir::SelectOp>(loc, cmp, operands[2], zero)
+    return rewriter.create<mlir::SelectOp>(loc, cmp, operands[0], operands[1])
         .getResult();
   }
 };
@@ -524,7 +524,8 @@ struct BufferInitializer {
   RankedTensorType newTensorType;
   Type elementType;
 
-  BufferInitializer(OpBuilder &builder, Operation *op, Type resultType) {
+  BufferInitializer(OpBuilder &builder, Operation *op, Type resultType,
+                    bool padding = true) {
     // Gather some basic info
     TileToLinalgTypeConverter typeConverter;
     auto loc = op->getLoc();
@@ -535,7 +536,7 @@ struct BufferInitializer {
 
     // If padding is detected, expand the shape to accomodate.
     auto maybePadding = tile::getPaddingInfo(op);
-    if (maybePadding) {
+    if (padding && maybePadding) {
       for (unsigned i = 0, e = shape.size(); i < e; ++i) {
         shape[i] += maybePadding->lower[i] + maybePadding->upper[i];
       }
@@ -546,24 +547,13 @@ struct BufferInitializer {
         builder.create<linalg::InitTensorOp>(loc, shape, elementType);
     newTensorType = resultTensor.getType().cast<RankedTensorType>();
 
-    if (maybePadding) {
+    if (padding && maybePadding) {
       auto initValue = createInit(builder, loc, elementType, maybePadding->agg);
       auto fillOp = builder.create<linalg::FillOp>(loc,
                                                    /*value=*/initValue,
                                                    /*output=*/resultTensor);
       resultTensor = fillOp.getResult(0);
     }
-  }
-};
-
-struct PrngOpConversion : public OpConversionPattern<tile::PrngOp> {
-  using OpConversionPattern<tile::PrngOp>::OpConversionPattern;
-
-  LogicalResult
-  matchAndRewrite(tile::PrngOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const final {
-    op.emitError("Unsupported operation: tile::PrngOp.");
-    return success();
   }
 };
 
@@ -581,7 +571,8 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
                ConversionPatternRewriter &rewriter) const final {
     auto loc = op.getLoc();
     auto context = op.getContext();
-    BufferInitializer init(rewriter, op.getOperation(), op.result().getType());
+    BufferInitializer init(rewriter, op.getOperation(), op.result().getType(),
+                           false);
 
     auto initType = init.newTensorType;
     auto shape = initType.getShape();
@@ -608,10 +599,6 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
 
     // For output indexing map and type
     AffineMap outputMap = AffineMap::getMultiDimIdentityMap(numDims, context);
-    auto maybePadding = tile::getPaddingInfo(op);
-    if (maybePadding) {
-      outputMap = updatePaddingMap(outputMap, *maybePadding, context);
-    }
     idxMaps.emplace_back(outputMap);
     argTypes.emplace_back(init.elementType);
 
@@ -653,8 +640,31 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
     // Create the yield
     rewriter.create<linalg::YieldOp>(loc, ArrayRef<Value>{result});
 
+    auto outTensor = genericOp.getResult(0);
+
+    // If we need to pad the result
+    auto maybePadding = tile::getPaddingInfo(op);
+    if (maybePadding) {
+      rewriter.setInsertionPointAfter(genericOp);
+      auto initValue = createInit(rewriter, loc, initType.getElementType(),
+                                  maybePadding->agg);
+      auto pad = rewriter.create<linalg::PadTensorOp>(
+          loc,
+          /*source=*/outTensor,
+          /*staticLow=*/maybePadding->lower,
+          /*staticHigh=*/maybePadding->upper,
+          /*low=*/ValueRange{},
+          /*high=*/ValueRange{});
+      SmallVector<Type, 4> padArgs(numDims, rewriter.getIndexType());
+      Block *padBody =
+          rewriter.createBlock(&pad.region(), pad.region().begin(), padArgs);
+      rewriter.setInsertionPointToStart(padBody);
+      rewriter.create<linalg::YieldOp>(loc, ArrayRef<Value>{initValue});
+      outTensor = pad.getResult();
+    }
+
     // Replace output with the newly allocated buffer
-    rewriter.replaceOp(op, genericOp.getResult(0));
+    rewriter.replaceOp(op, outTensor);
   }
 };
 
@@ -773,11 +783,36 @@ struct ContractionOpConversion
         AffineMap::getMultiDimIdentityMap(numInitDims, context);
 
     // Do initialization
-    auto fillOp =
-        rewriter.create<linalg::FillOp>(loc,
-                                        /*value=*/cionAdaptor.init(),
-                                        /*output=*/bufInit.resultTensor);
-    auto filled = fillOp.getResult(0);
+    auto initValue = cionAdaptor.init();
+    Value filled;
+    if (initValue.getType().isa<RankedTensorType>()) {
+      // Init value is a tensor
+      SmallVector<StringRef, 4> iterTypes(numInitDims, "parallel");
+      auto inputMap =
+          buildBroadcastMap(rewriter, loc, initValue, initShape.size());
+      auto initLoopOp = rewriter.create<linalg::GenericOp>(
+          loc,
+          /*resultTensorTypes=*/TypeRange{initType},                //
+          /*inputs=*/ValueRange{initValue},                         //
+          /*outputs=*/ValueRange{bufInit.resultTensor},             //
+          /*indexingMaps=*/ArrayRef<AffineMap>{inputMap, identMap}, //
+          /*iteratorTypes=*/iterTypes);
+      Block *body = rewriter.createBlock(
+          &initLoopOp.region(), initLoopOp.region().begin(),
+          TypeRange{bufInit.elementType, bufInit.elementType});
+      rewriter.setInsertionPointToStart(body);
+      rewriter.create<linalg::YieldOp>(loc,
+                                       ArrayRef<Value>{body->getArgument(0)});
+      rewriter.setInsertionPointAfter(initLoopOp);
+      filled = initLoopOp.getResult(0);
+    } else {
+      // Initial value is a scalar
+      auto fillOp =
+          rewriter.create<linalg::FillOp>(loc,
+                                          /*value=*/initValue,
+                                          /*output=*/bufInit.resultTensor);
+      filled = fillOp.getResult(0);
+    }
 
     // Prepare for indexing maps and iterator types
     SmallVector<AffineMap, 4> idxMaps;
@@ -934,6 +969,12 @@ struct IndexOpConversion : public OpConversionPattern<tile::IndexOp> {
 Optional<SmallVector<ReassociationIndices, 4>>
 matchShape(ArrayRef<int64_t> srcShape, ArrayRef<int64_t> dstShape) {
   SmallVector<ReassociationIndices, 4> result;
+  if (dstShape.empty()) {
+    if (srcShape.empty()) {
+      return result;
+    }
+    return llvm::None;
+  }
   int dstDim = dstShape.size() - 1;
   for (int srcDim = srcShape.size() - 1; srcDim >= 0; --srcDim) {
     int64_t size = dstShape[dstDim];
@@ -1071,11 +1112,12 @@ struct CastOpConversion : public OpConversionPattern<tile::CastOp> {
   }
 };
 
-struct FuncOpConversion : public OpConversionPattern<FuncOp> {
-  using OpConversionPattern<FuncOp>::OpConversionPattern;
+template <typename FuncLikeOp>
+struct FuncOpConversion : public OpConversionPattern<FuncLikeOp> {
+  using OpConversionPattern<FuncLikeOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(FuncOp op, ArrayRef<Value> operands,
+  matchAndRewrite(FuncLikeOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
     FunctionType type = op.getType();
 
@@ -1088,13 +1130,13 @@ struct FuncOpConversion : public OpConversionPattern<FuncOp> {
     SmallVector<Type, 8> resultTypes;
     for (Type resultType : type.getResults()) {
       Type newResultType = typeConverter.convertType(resultType);
-      result.addInputs({newResultType});
       resultTypes.push_back(newResultType);
     }
 
     // Create a new function with an updated signature.
     auto newOp = rewriter.cloneWithoutRegions(op);
-    rewriter.inlineRegionBefore(op.getBody(), newOp.getBody(), newOp.end());
+    rewriter.inlineRegionBefore(op.getBody(), newOp.getBody(),
+                                newOp.getBody().end());
     newOp.setType(FunctionType::get(op.getContext(), result.getConvertedTypes(),
                                     resultTypes));
 
@@ -1183,23 +1225,28 @@ struct ScfForOpConversion : public OpConversionPattern<scf::ForOp> {
 struct LowerTileToLinalgPass
     : public LowerTileToLinalgBase<LowerTileToLinalgPass> {
   void runOnOperation() final {
+    auto module = getOperation();
     // Inject tile.ident ops for each return operand that needs it.
     // argument, a constant value, or a reshape op.
-    getOperation().walk([&](ReturnOp op) {
+    auto injectIdent = [](Operation *op) {
       OpBuilder builder(op);
       for (OpOperand &operand : op->getOpOperands()) {
         Value value = operand.get();
-        bool needsIdent =                                 //
-            value.isa<BlockArgument>() ||                 // Block arguemnt
-            matchPattern(value, m_Constant()) ||          // Constant op
-            matchPattern(value, m_Op<tile::ReshapeOp>()); // Reshape op
+        Value def = dialect::pxa::getIndirectDef(value);
+        bool needsIdent =                                   //
+            value.isa<BlockArgument>() ||                   // Block arguemnt
+            matchPattern(value, m_Constant()) ||            // Constant op
+            matchPattern(value, m_Op<tile::ReshapeOp>()) || // Reshape op
+            def.getParentRegion() != op->getParentRegion();
         if (needsIdent) {
-          Value copy = builder.create<tile::IdentOp>(op.getLoc(),
+          Value copy = builder.create<tile::IdentOp>(op->getLoc(),
                                                      value.getType(), value);
           operand.set(copy);
         }
       }
-    });
+    };
+    module.walk([&](ReturnOp op) { injectIdent(op); });
+    module.walk([&](stdx::YieldOp op) { injectIdent(op); });
 
     // Set up target (i.e. what is legal)
     ConversionTarget target(getContext());
@@ -1219,6 +1266,9 @@ struct LowerTileToLinalgPass
                       ReturnOp>();
     target.addDynamicallyLegalOp<FuncOp>(
         [&](FuncOp op) { return converter.isSignatureLegal(op.getType()); });
+    target.addDynamicallyLegalOp<stdx::ClosureOp>([&](stdx::ClosureOp op) {
+      return converter.isSignatureLegal(op.getType());
+    });
     target.addDynamicallyLegalOp<ReturnOp>(
         [&](ReturnOp op) { return converter.isLegal(op); });
     target.addDynamicallyLegalOp<scf::ForOp>(
@@ -1235,17 +1285,17 @@ struct LowerTileToLinalgPass
         CmpIntInequalityOp<CmpIPredicate::sge, CmpIPredicate::uge>;
     RewritePatternSet patterns(&getContext());
     patterns.insert<
-        CastOpConversion,     //
-        ConstantOpConversion, //
-        FuncOpConversion,     //
-        IndexOpConversion,    //
-        PragmaOpConversion,   //
-        PrngOpConversion,     //
-        ReshapeOpConversion,  //
-        ReturnOpConversion,   //
-        ShapeOpConversion,    //
-        TraceOpConversion,    //
-        ScfForOpConversion,   //
+        CastOpConversion,                  //
+        ConstantOpConversion,              //
+        FuncOpConversion<FuncOp>,          //
+        FuncOpConversion<stdx::ClosureOp>, //
+        IndexOpConversion,                 //
+        PragmaOpConversion,                //
+        ReshapeOpConversion,               //
+        ReturnOpConversion,                //
+        ShapeOpConversion,                 //
+        TraceOpConversion,                 //
+        ScfForOpConversion,                //
         ContractionOpConversion<CombinationKind::none, FirstOperand>,
         ContractionOpConversion<CombinationKind::add, StdOp<mlir::AddFOp>,
                                 ResultIs<EltwiseFloat>>,
@@ -1380,8 +1430,7 @@ struct LowerTileToLinalgPass
     populateTileToLinalgSpecialPatterns(patterns);
 
     // Run the conversion
-    if (failed(
-            applyFullConversion(getOperation(), target, std::move(patterns)))) {
+    if (failed(applyFullConversion(module, target, std::move(patterns)))) {
       signalPassFailure();
       return;
     }

@@ -23,28 +23,34 @@ struct GeneralizeTensorCollapseShapeOp
     auto srcType = op.src().getType().cast<ShapedType>();
     auto srcShape = srcType.getShape();
     MLIRContext *context = op.getContext();
-    SmallVector<AffineExpr, 4> exprs;
-    int numIdxs = 0;
-
-    // Prepare for the src and dst maps
-    for (auto dimAttr : op.reassociation()) {
-      auto dims = dimAttr.cast<ArrayAttr>().getValue();
-      AffineExpr expr = getAffineConstantExpr(0, context);
-      int64_t stride = 1;
-      for (int i = numIdxs + dims.size() - 1; i >= numIdxs; --i) {
-        assert(dims[i - numIdxs].cast<IntegerAttr>().getInt() == i &&
-               "Reassociation is not in order.");
-        expr = getAffineConstantExpr(stride, context) *
-                   getAffineDimExpr(i, context) +
-               expr;
-        stride *= srcShape[i];
-      }
-      numIdxs += dims.size();
-      exprs.emplace_back(expr);
-    }
-
+    int numIdxs = srcShape.size();
     AffineMap inputMap = AffineMap::getMultiDimIdentityMap(numIdxs, context);
-    AffineMap outputMap = AffineMap::get(numIdxs, 0, exprs, context);
+    AffineMap outputMap;
+
+    if (op.reassociation().empty()) {
+      outputMap = AffineMap::get(numIdxs, 0, {}, context);
+    } else {
+      SmallVector<AffineExpr, 4> exprs;
+      int curIdxs = 0;
+      // Prepare for the src and dst maps
+      for (auto dimAttr : op.reassociation()) {
+        auto dims = dimAttr.cast<ArrayAttr>().getValue();
+        AffineExpr expr = getAffineConstantExpr(0, context);
+        int64_t stride = 1;
+        for (int i = curIdxs + dims.size() - 1; i >= curIdxs; --i) {
+          assert(dims[i - curIdxs].cast<IntegerAttr>().getInt() == i &&
+                 "Reassociation is not in order.");
+          expr = getAffineConstantExpr(stride, context) *
+                     getAffineDimExpr(i, context) +
+                 expr;
+          stride *= srcShape[i];
+        }
+        curIdxs += dims.size();
+        exprs.emplace_back(expr);
+      }
+      assert(numIdxs == curIdxs);
+      outputMap = AffineMap::get(numIdxs, 0, exprs, context);
+    }
 
     auto genericOp = createGenericOp(
         /*builder=*/rewriter,
@@ -79,28 +85,34 @@ struct GeneralizeTensorExpandShapeOp
     auto dstType = op.result().getType().cast<ShapedType>();
     auto dstShape = dstType.getShape();
     MLIRContext *context = op.getContext();
-    SmallVector<AffineExpr, 4> exprs;
-    int numIdxs = 0;
-
-    // Prepare for the src and dst maps
-    for (auto dimAttr : op.reassociation()) {
-      auto dims = dimAttr.cast<ArrayAttr>().getValue();
-      AffineExpr expr = getAffineConstantExpr(0, context);
-      int64_t stride = 1;
-      for (int i = numIdxs + dims.size() - 1; i >= numIdxs; --i) {
-        assert(dims[i - numIdxs].cast<IntegerAttr>().getInt() == i &&
-               "Reassociation is not in order.");
-        expr = getAffineConstantExpr(stride, context) *
-                   getAffineDimExpr(i, context) +
-               expr;
-        stride *= dstShape[i];
-      }
-      numIdxs += dims.size();
-      exprs.emplace_back(expr);
-    }
-
-    AffineMap inputMap = AffineMap::get(numIdxs, 0, exprs, context);
+    int numIdxs = dstShape.size();
+    AffineMap inputMap;
     AffineMap outputMap = AffineMap::getMultiDimIdentityMap(numIdxs, context);
+
+    if (op.reassociation().empty()) {
+      inputMap = AffineMap::get(numIdxs, 0, {}, context);
+    } else {
+      SmallVector<AffineExpr, 4> exprs;
+      int curIdxs = 0;
+      // Prepare for the src and dst maps
+      for (auto dimAttr : op.reassociation()) {
+        auto dims = dimAttr.cast<ArrayAttr>().getValue();
+        AffineExpr expr = getAffineConstantExpr(0, context);
+        int64_t stride = 1;
+        for (int i = curIdxs + dims.size() - 1; i >= curIdxs; --i) {
+          assert(dims[i - curIdxs].cast<IntegerAttr>().getInt() == i &&
+                 "Reassociation is not in order.");
+          expr = getAffineConstantExpr(stride, context) *
+                     getAffineDimExpr(i, context) +
+                 expr;
+          stride *= dstShape[i];
+        }
+        curIdxs += dims.size();
+        exprs.emplace_back(expr);
+      }
+      assert(numIdxs == curIdxs);
+      inputMap = AffineMap::get(numIdxs, 0, exprs, context);
+    }
 
     auto genericOp = createGenericOp(
         /*builder=*/rewriter,

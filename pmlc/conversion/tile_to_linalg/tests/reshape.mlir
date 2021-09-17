@@ -44,3 +44,12 @@ func @squeeze(%arg0: tensor<4x2x1x3x2xf32>) -> tensor<4x2x3x2xf32> {
 // CHECK-LABEL: func @squeeze
 // CHECK: linalg.tensor_collapse_shape
 // CHECK: tensor<4x2x3x2xf32>
+
+func @zero_dim(%arg0: tensor<si32>) -> tensor<1x1x1xsi32> {
+  %0 = tile.reshape %arg0 : (tensor<si32>) -> tensor<1x1x1xsi32>
+  return %0 : tensor<1x1x1xsi32>
+}
+
+// CHECK: func @zero_dim
+// CHECK-SAME: (%[[arg0:.*]]: tensor<i32>) -> tensor<1x1x1xi32>
+// CHECK:   linalg.tensor_expand_shape %[[arg0]] [] : tensor<i32> into tensor<1x1x1xi32>

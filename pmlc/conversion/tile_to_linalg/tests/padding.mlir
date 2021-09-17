@@ -11,21 +11,17 @@ func @pad_input(%arg0: tensor<10xf32>) -> tensor<10xf32> {
   return %0 : tensor<10xf32>
 }
 
-// CHECK: #[[map0:.*]] = affine_map<(d0) -> (d0)>
-// CHECK: #[[map1:.*]] = affine_map<(d0) -> (d0 + 1)>
-// CHECK: #[[map2:.*]] = affine_map<(d0, d1) -> (d0, d1)>
-// CHECK: #[[map3:.*]] = affine_map<(d0, d1) -> (d0 + d1)>
-// CHECK: #[[map4:.*]] = affine_map<(d0, d1) -> (d0)>
+// CHECK: #[[map0:.*]] = affine_map<(d0, d1) -> (d0, d1)>
+// CHECK: #[[map1:.*]] = affine_map<(d0, d1) -> (d0 + d1)>
+// CHECK: #[[map2:.*]] = affine_map<(d0, d1) -> (d0)>
 // CHECK: func @pad_input
-// CHECK: linalg.generic
-// CHECK-SAME:   indexing_maps = [#[[map0]], #[[map1]]]
-// CHECK-SAME:   iterator_types = ["parallel"]
-// CHECK-SAME:   ins({{.*}}: tensor<10xf32>) outs({{.*}} : tensor<12xf32>)
+// CHECK: linalg.pad_tensor {{.*}} low[1] high[1]
 // CHECK:    linalg.yield
+// CHECK: tensor<10xf32> to tensor<12xf32> 
 // CHECK: linalg.generic
-// CHECK-SAME:   indexing_maps = [#[[map2]], #[[map3]], #[[map4]]]
+// CHECK-SAME:   indexing_maps = [#[[map0]], #[[map1]], #[[map2]]]
 // CHECK-SAME:   iterator_types = ["parallel", "reduction"]
-// CHECK-SAME:   ins({{.*}}, {{.*}} : tensor<10x3xf32>, tensor<12xf32>) outs(%4 : tensor<10xf32>)
+// CHECK-SAME:   ins({{.*}}, {{.*}} : tensor<10x3xf32>, tensor<12xf32>) outs({{.*}} : tensor<10xf32>)
 // CHECK:   addf
 // CHECK:   linalg.yield
 // -----
