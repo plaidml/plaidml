@@ -4,14 +4,18 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "pmlc/conversion/linalg_to_pxa/pass_detail.h"
+#include "pmlc/conversion/tile_to_pxa/pass_detail.h"
 #include "pmlc/dialect/pxa/analysis/uses.h"
+#include "pmlc/dialect/tile/ir/ops.h"
 #include "pmlc/util/matchers.h"
 #include "pmlc/util/util.h"
 
 namespace pmlc::conversion::linalg_to_pxa {
 
+namespace layer = dialect::layer;
 namespace pxa = dialect::pxa;
 namespace stdx = dialect::stdx;
+namespace tile = dialect::tile;
 
 using namespace mlir; // NOLINT
 
@@ -387,6 +391,7 @@ struct LowerLinalgToPXAPass
                            math::MathDialect,     //
                            memref::MemRefDialect, //
                            scf::SCFDialect,       //
+                           layer::LayerDialect,   //
                            pxa::PXADialect,       //
                            stdx::StdXDialect>();
     target.addLegalOp<ModuleOp>();
@@ -406,6 +411,8 @@ struct LowerLinalgToPXAPass
                     IndexOpConversion,                 //
                     InitTensorOpConversion,            //
                     YieldOpConversion>(&getContext());
+
+    tile_to_pxa::populateTileToPXASpecialPatterns(patterns);
 
     if (failed(applyFullConversion(module, target, std::move(patterns)))) {
       signalPassFailure();

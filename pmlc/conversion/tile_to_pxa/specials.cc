@@ -903,11 +903,30 @@ struct ScatterOpConversion : public OpConversionPattern<tile::ScatterOp> {
   }
 };
 
+struct PrngOpConversion : public OpConversionPattern<tile::PrngOp> {
+  using OpConversionPattern<tile::PrngOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(tile::PrngOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const final {
+    tile::PrngOpAdaptor transformed(operands);
+    BufferAllocator allocResult(rewriter, op.getOperation(),
+                                op.result().getType());
+    BufferAllocator stateResult(rewriter, op.getOperation(),
+                                op.state().getType());
+    rewriter.replaceOpWithNewOp<pxa::PrngOp>(
+        op, allocResult.memRefType, stateResult.memRefType, transformed.state(),
+        allocResult.resultMemRef, stateResult.resultMemRef);
+    return success();
+  }
+};
+
 } // namespace
 
 void populateTileToPXASpecialPatterns(mlir::RewritePatternSet &patterns) {
   patterns.insert<ArgSortOpConversion, //
                   GatherOpConversion,  //
+                  PrngOpConversion,    //
                   ScatterOpConversion>(patterns.getContext());
 }
 

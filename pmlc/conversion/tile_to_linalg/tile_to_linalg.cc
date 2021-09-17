@@ -1176,6 +1176,22 @@ struct PragmaOpConversion : public OpConversionPattern<tile::PragmaOp> {
   }
 };
 
+template <typename SpecialOp>
+struct SpecialOpConversion : public OpConversionPattern<SpecialOp> {
+  using OpConversionPattern<SpecialOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(SpecialOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const final {
+    TileToLinalgTypeConverter typeConverter;
+    SmallVector<Type> resultTypes;
+    (void)typeConverter.convertTypes(op->getResultTypes(), resultTypes);
+    rewriter.replaceOpWithNewOp<SpecialOp>(op, resultTypes, operands,
+                                           op->getAttrs());
+    return success();
+  }
+};
+
 struct TraceOpConversion : public OpConversionPattern<tile::PragmaOp> {
   using OpConversionPattern<tile::PragmaOp>::OpConversionPattern;
 
@@ -1274,6 +1290,15 @@ struct LowerTileToLinalgPass
     target.addDynamicallyLegalOp<scf::ForOp>(
         [&](scf::ForOp op) { return converter.isLegal(op.getResultTypes()); });
 
+    target.addDynamicallyLegalOp<tile::ArgSortOp>(
+        [&](tile::ArgSortOp op) { return converter.isLegal(op); });
+    target.addDynamicallyLegalOp<tile::GatherOp>(
+        [&](tile::GatherOp op) { return converter.isLegal(op); });
+    target.addDynamicallyLegalOp<tile::PrngOp>(
+        [&](tile::PrngOp op) { return converter.isLegal(op); });
+    target.addDynamicallyLegalOp<tile::ScatterOp>(
+        [&](tile::ScatterOp op) { return converter.isLegal(op); });
+
     // Setup rewrite patterns
     using CmpIntLtOp =
         CmpIntInequalityOp<CmpIPredicate::slt, CmpIPredicate::ult>;
@@ -1285,17 +1310,21 @@ struct LowerTileToLinalgPass
         CmpIntInequalityOp<CmpIPredicate::sge, CmpIPredicate::uge>;
     RewritePatternSet patterns(&getContext());
     patterns.insert<
-        CastOpConversion,                  //
-        ConstantOpConversion,              //
-        FuncOpConversion<FuncOp>,          //
-        FuncOpConversion<stdx::ClosureOp>, //
-        IndexOpConversion,                 //
-        PragmaOpConversion,                //
-        ReshapeOpConversion,               //
-        ReturnOpConversion,                //
-        ShapeOpConversion,                 //
-        TraceOpConversion,                 //
-        ScfForOpConversion,                //
+        CastOpConversion,                     //
+        ConstantOpConversion,                 //
+        FuncOpConversion<FuncOp>,             //
+        FuncOpConversion<stdx::ClosureOp>,    //
+        IndexOpConversion,                    //
+        PragmaOpConversion,                   //
+        ReshapeOpConversion,                  //
+        ReturnOpConversion,                   //
+        SpecialOpConversion<tile::ArgSortOp>, //
+        SpecialOpConversion<tile::GatherOp>,  //
+        SpecialOpConversion<tile::PrngOp>,    //
+        SpecialOpConversion<tile::ScatterOp>, //
+        ShapeOpConversion,                    //
+        TraceOpConversion,                    //
+        ScfForOpConversion,                   //
         ContractionOpConversion<CombinationKind::none, FirstOperand>,
         ContractionOpConversion<CombinationKind::add, StdOp<mlir::AddFOp>,
                                 ResultIs<EltwiseFloat>>,
