@@ -17,6 +17,8 @@ parser.add_argument('--model-type',
                         'tfhub-retinanet50',
                         'tfhub-silero-stt',
                         'tfhub-s3d-video',
+                        'tfhub-s3d-audio',
+                        'tfhub-efficientnet-b7',
                     ],
                     help='model type and source')
 parser.add_argument('--src', help='path to source file(s)')
@@ -32,6 +34,127 @@ parser.add_argument('--pipeline',
                     ]))
 args = parser.parse_args()
 
+
+class ModelMetadata(object):
+    '''Handles metadata for non-Keras SavedModels
+
+    Includes information about save format, inputs, and default file location.'''
+
+    def __init__(self, verbose):
+        self._metadata = {}
+        self._verbose = verbose
+
+    def add_model_type(self,
+                       name,
+                       input_shape,
+                       input_dtype,
+                       sig_name,
+                       default_src=None,
+                       default_dst=None,
+                       tags=None):
+        self._metadata[name] = {
+            'default_src': default_src,
+            'default_dst': default_dst,
+            'input_shape': input_shape,
+            'input_dtype': input_dtype,
+            'sig_name': sig_name,
+            'tags': tags,
+        }
+
+    def import_concrete_function(self, model_type):
+        src_dir = args.src or self._metadata[model_type]['default_src']
+        input_signature = [
+            tf.TensorSpec(
+                self._metadata[model_type]['input_shape'],
+                self._metadata[model_type]['input_dtype'],
+            )
+        ]
+        # TODO: I think TF needs me to hold on to this TensorSpec, so I'm sticking it on this object. Not great architecture, rethink later.
+        self._input_sig = input_signature
+        model = tf.saved_model.load(src_dir, tags=self._metadata[model_type]['tags'])
+        if self._verbose:
+            print("Model: ", model)
+            print("Signatures: ", model.signatures)
+
+        def run(inp):
+            return model.signatures[self._metadata[model_type]['sig_name']](inp)
+
+        # TODO: I think TF needs me to hold on to this function, so I'm sticking it on this object. Not great architecture, revisit later
+        self._func = tf.function(run, input_signature=input_signature)
+        return self._func.get_concrete_function(*input_signature)
+
+    def default_dst_path(self, model_type):
+        return self._metadata[model_type]['default_dst']
+
+
+model_meta = ModelMetadata(args.verbose)
+model_meta.add_model_type(
+    # For use with the model at https://tfhub.dev/deepmind/i3d-kinetics-400/1
+    'tfhub-i3d-kin',
+    [1, 16, 224, 224, 3],  # Input Shape -- [batch_size, frame_count, height=224, width=224, 3]
+    tf.float32,  # Input DType
+    'default',  # Signature name
+    default_src="/home/tim/tmp/tf_hub_models/i3d-kinetics",
+    default_dst="/home/tim/tmp/i3d_tf_todo.mlir",
+    tags=[],
+)
+model_meta.add_model_type(
+    # For use with the model at https://tfhub.dev/tensorflow/retinanet/resnet50_v1_fpn_1024x1024/1
+    'tfhub-retinanet50',
+    [1, 1024, 1024, 3],  # Input Shape
+    tf.uint8,  # Input DType
+    'serving_default',  # Signature name
+    default_src="/home/tim/tmp/tf_hub_models/retinanet50_1024",
+    default_dst="/home/tim/tmp/retinanet50_tf_todo.mlir",
+)
+model_meta.add_model_type(
+    # For use with the model at https://tfhub.dev/google/faster_rcnn/openimages_v4/inception_resnet_v2/1
+    'tfhub-inception-resnet-v2',
+    [1, 1024, 1024, 3],  # Input Shape
+    tf.float32,  # Input DType
+    'default',  # Signature name
+    default_src="/home/tim/tmp/tf_hub_models/inception_resnet_v2",
+    default_dst="/home/tim/tmp/inception_resnet_v2_tf_todo.mlir",
+)
+model_meta.add_model_type(
+    # For use with the model at https://tfhub.dev/silero/silero-stt/en/1
+    'tfhub-silero-stt',
+    [1024],  # Input Shape -- this is just a guess at a reasonable size
+    tf.float32,  # Input DType
+    'serving_default',  # Signature name
+    default_src="/home/tim/tmp/tf_hub_models/silero_stt",
+    default_dst="/home/tim/tmp/silero_stt_tf_todo.mlir",
+)
+model_meta.add_model_type(
+    # For use with the model at https://tfhub.dev/deepmind/mmv/s3d/1
+    'tfhub-s3d-video',
+    [1, 32, 200, 200, 3],  # Input Shape -- Batch x T x H x W x 3
+    tf.float32,  # Input DType
+    'video',  # Signature name
+    default_src="/home/tim/tmp/tf_hub_models/s3d",
+    default_dst="/home/tim/tmp/s3d_video_tf_todo.mlir",
+    tags=[],
+)
+model_meta.add_model_type(
+    # For use with the model at https://tfhub.dev/deepmind/mmv/s3d/1
+    'tfhub-s3d-audio',
+    [1, 153600],  # Input Shape -- Batch x T
+    tf.float32,  # Input DType
+    'audio',  # Signature name
+    default_src="/home/tim/tmp/tf_hub_models/s3d",
+    default_dst="/home/tim/tmp/s3d_audio_tf_todo.mlir",
+    tags=[],
+)
+model_meta.add_model_type(
+    # For use with the model at https://tfhub.dev/tensorflow/efficientnet/b7/classification/1
+    'tfhub-efficientnet-b7',
+    [1, 600, 600, 3],  # Input Shape
+    tf.float32,  # Input DType
+    'serving_default',  # Signature name
+    default_src="/home/tim/tmp/tf_hub_models/efficientnet-b7",
+    default_dst="/home/tim/tmp/efficientnet_b7_tf_todo.mlir",
+)
+
 if args.model_type == 'keras-resnet':
     # Load ResNet50 from Keras
     if args.src:
@@ -44,6 +167,8 @@ if args.model_type == 'keras-resnet':
     @tf.function(input_signature=input_signature)
     def predict(inp):
         return model.predict_step(inp)
+
+    concrete_fcn = predict.get_concrete_function(*input_signature)
 elif args.model_type == 'tfhub-bert':
     # For use with the model at https://tfhub.dev/tensorflow/bert_en_uncased_L-12_H-768_A-12/4
     src_dir = args.src or "/home/tim/tmp/tf_hub_models/bert/resaved"  # TODO: Change the path
@@ -69,95 +194,13 @@ elif args.model_type == 'tfhub-bert':
             True,  # Or False?
             None
         )['default']  # Use 'sequence_output' to get what seems to be a training version (e.g. has dropout)
-elif args.model_type == 'tfhub-i3d-kin':
-    # For use with the model at https://tfhub.dev/deepmind/i3d-kinetics-400/1
-    src_dir = args.src or "/home/tim/tmp/tf_hub_models/i3d-kinetics"  # TODO: Change the path
-    dst_path = args.dst or "/home/tim/tmp/i3d_tf_todo.mlir"  # TODO: Change the path
-    model = tf.saved_model.load(src_dir, tags=[])
-    if args.verbose:
-        print("Model: ", model)
-        print("Signatures?: ", model.signatures)
-    # Shape: [batch_size, frame_count, height=224, width=224, 3] for i3d-kin
-    input_shape = [1, 16, 224, 224, 3]
-    input_signature = [
-        tf.TensorSpec(input_shape, tf.float32),
-    ]
 
-    @tf.function(input_signature=input_signature)
-    def predict(inp):
-        return model.signatures['default'](inp)
-elif args.model_type == 'tfhub-retinanet50':
-    # For use with the model at https://tfhub.dev/tensorflow/retinanet/resnet50_v1_fpn_1024x1024/1
-    src_dir = args.src or "/home/tim/tmp/tf_hub_models/retinanet50_1024"  # TODO: Change the path
-    dst_path = args.dst or "/home/tim/tmp/retinanet50_tf_todo.mlir"  # TODO: Change the path
-    model = tf.saved_model.load(src_dir)
-    if args.verbose:
-        print("Model: ", model)
-        print("Signatures?: ", model.signatures)
-    input_shape = [1, 1024, 1024, 3]
-    input_signature = [
-        tf.TensorSpec(input_shape, tf.uint8),
-    ]
-
-    # TODO: Might be multiple outputs? May need to specify?
-    @tf.function(input_signature=input_signature)
-    def predict(inp):
-        return model.signatures['serving_default'](inp)
-elif args.model_type == 'tfhub-inception-resnet-v2':
-    # For use with the model at https://tfhub.dev/google/faster_rcnn/openimages_v4/inception_resnet_v2/1
-    src_dir = args.src or "/home/tim/tmp/tf_hub_models/inception_resnet_v2"  # TODO: Change the path
-    dst_path = args.dst or "/home/tim/tmp/inception_resnet_v2_tf_todo.mlir"  # TODO: Change the path
-    model = tf.saved_model.load(src_dir)
-    if args.verbose:
-        print("Model: ", model)
-        print("Signatures?: ", model.signatures)
-    input_shape = [1, 1024, 1024, 3]
-    input_signature = [
-        tf.TensorSpec(input_shape, tf.float32),
-    ]
-
-    # TODO: Might be multiple outputs? May need to specify?
-    @tf.function(input_signature=input_signature)
-    def predict(inp):
-        return model.signatures['default'](inp)
-elif args.model_type == 'tfhub-silero-stt':
-    # For use with the model at https://tfhub.dev/silero/silero-stt/en/1
-    src_dir = args.src or "/home/tim/tmp/tf_hub_models/silero_stt"  # TODO: Change the path
-    dst_path = args.dst or "/home/tim/tmp/inception_resnet_v2_tf_todo.mlir"  # TODO: Change the path
-    model = tf.saved_model.load(src_dir)
-    if args.verbose:
-        print("Model: ", model)
-        print("Signatures?: ", model.signatures)
-    input_shape = [1024]  # Just guessing at a reasonable size
-    input_signature = [
-        tf.TensorSpec(input_shape, tf.float32),
-    ]
-
-    # TODO: Might be multiple outputs? May need to specify?
-    @tf.function(input_signature=input_signature)
-    def predict(inp):
-        return model.signatures['serving_default'](inp)
-elif args.model_type == 'tfhub-s3d-video':
-    # For use with the model at https://tfhub.dev/deepmind/mmv/s3d/1
-    src_dir = args.src or "/home/tim/tmp/tf_hub_models/s3d"  # TODO: Change the path
-    dst_path = args.dst or "/home/tim/tmp/s3d_tf_todo.mlir"  # TODO: Change the path
-    model = tf.saved_model.load(src_dir, tags=[])
-    if args.verbose:
-        print("Model: ", model)
-        print("Signatures?: ", model.signatures)
-    input_shape = [1, 32, 200, 200, 3]  # shape Batch x T x H x W x 3
-    input_signature = [
-        tf.TensorSpec(input_shape, tf.float32),
-    ]
-
-    # TODO: Might be multiple outputs? May need to specify?
-    @tf.function(input_signature=input_signature)
-    def predict(inp):
-        return model.signatures['video'](inp)
+    concrete_fcn = predict.get_concrete_function(*input_signature)
 else:
-    raise ValueError("Invalid --model-type specified")
+    # Default non-Keras single-input case
+    dst_path = model_meta.default_dst_path(args.model_type)
+    concrete_fcn = model_meta.import_concrete_function(args.model_type)
 
-concrete_fcn = predict.get_concrete_function(*input_signature)
 if args.verbose:
     print("Here's the initial concrete function from a saved_model: ", concrete_fcn)  # TODO
 concrete_fcn = convert_variables_to_constants_v2(concrete_fcn)  # freeze vars, fixing shapes
