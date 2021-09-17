@@ -524,7 +524,8 @@ struct BufferInitializer {
   RankedTensorType newTensorType;
   Type elementType;
 
-  BufferInitializer(OpBuilder &builder, Operation *op, Type resultType) {
+  BufferInitializer(OpBuilder &builder, Operation *op, Type resultType,
+                    bool padding = true) {
     // Gather some basic info
     TileToLinalgTypeConverter typeConverter;
     auto loc = op->getLoc();
@@ -535,7 +536,7 @@ struct BufferInitializer {
 
     // If padding is detected, expand the shape to accomodate.
     auto maybePadding = tile::getPaddingInfo(op);
-    if (maybePadding) {
+    if (padding && maybePadding) {
       for (unsigned i = 0, e = shape.size(); i < e; ++i) {
         shape[i] += maybePadding->lower[i] + maybePadding->upper[i];
       }
@@ -546,7 +547,7 @@ struct BufferInitializer {
         builder.create<linalg::InitTensorOp>(loc, shape, elementType);
     newTensorType = resultTensor.getType().cast<RankedTensorType>();
 
-    if (maybePadding) {
+    if (padding && maybePadding) {
       auto initValue = createInit(builder, loc, elementType, maybePadding->agg);
       auto fillOp = builder.create<linalg::FillOp>(loc,
                                                    /*value=*/initValue,
@@ -570,7 +571,8 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
                ConversionPatternRewriter &rewriter) const final {
     auto loc = op.getLoc();
     auto context = op.getContext();
-    BufferInitializer init(rewriter, op.getOperation(), op.result().getType());
+    BufferInitializer init(rewriter, op.getOperation(), op.result().getType(),
+                           false);
 
     auto initType = init.newTensorType;
     auto shape = initType.getShape();
@@ -597,10 +599,6 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
 
     // For output indexing map and type
     AffineMap outputMap = AffineMap::getMultiDimIdentityMap(numDims, context);
-    auto maybePadding = tile::getPaddingInfo(op);
-    if (maybePadding) {
-      outputMap = updatePaddingMap(outputMap, *maybePadding, context);
-    }
     idxMaps.emplace_back(outputMap);
     argTypes.emplace_back(init.elementType);
 
@@ -642,8 +640,31 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
     // Create the yield
     rewriter.create<linalg::YieldOp>(loc, ArrayRef<Value>{result});
 
+    auto outTensor = genericOp.getResult(0);
+
+    // If we need to pad the result
+    auto maybePadding = tile::getPaddingInfo(op);
+    if (maybePadding) {
+      rewriter.setInsertionPointAfter(genericOp);
+      auto initValue = createInit(rewriter, loc, initType.getElementType(),
+                                  maybePadding->agg);
+      auto pad = rewriter.create<linalg::PadTensorOp>(
+          loc,
+          /*source=*/outTensor,
+          /*staticLow=*/maybePadding->lower,
+          /*staticHigh=*/maybePadding->upper,
+          /*low=*/ValueRange{},
+          /*high=*/ValueRange{});
+      SmallVector<Type, 4> padArgs(numDims, rewriter.getIndexType());
+      Block *padBody =
+          rewriter.createBlock(&pad.region(), pad.region().begin(), padArgs);
+      rewriter.setInsertionPointToStart(padBody);
+      rewriter.create<linalg::YieldOp>(loc, ArrayRef<Value>{initValue});
+      outTensor = pad.getResult();
+    }
+
     // Replace output with the newly allocated buffer
-    rewriter.replaceOp(op, genericOp.getResult(0));
+    rewriter.replaceOp(op, outTensor);
   }
 };
 
