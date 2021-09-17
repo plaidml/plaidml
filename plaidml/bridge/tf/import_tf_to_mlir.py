@@ -24,6 +24,7 @@ class ModelMetadata(object):
                        default_dst=None,
                        tags=None):
         self._metadata[name] = {
+            # TODO: Do we even want default paths?
             'default_src': default_src,
             'default_dst': default_dst,
             'input_shape': input_shape,
@@ -40,8 +41,6 @@ class ModelMetadata(object):
                 self._metadata[model_type]['input_dtype'],
             )
         ]
-        # TODO: I think TF needs me to hold on to this TensorSpec, so I'm sticking it on this object. Not great architecture, rethink later.
-        self._input_sig = input_signature
         model = tf.saved_model.load(src_dir, tags=self._metadata[model_type]['tags'])
         if verbose:
             print("Model: ", model)
@@ -50,9 +49,10 @@ class ModelMetadata(object):
         def run(inp):
             return model.signatures[self._metadata[model_type]['sig_name']](inp)
 
-        # TODO: I think TF needs me to hold on to this function, so I'm sticking it on this object. Not great architecture, revisit later
-        self._func = tf.function(run, input_signature=input_signature)
-        return self._func.get_concrete_function(*input_signature)
+        # TF needs us to hold on to the original function, so return both
+        fcn = tf.function(run, input_signature=input_signature)
+        return fcn, fcn.get_concrete_function(*input_signature)
+        # return tf.function(run, input_signature=input_signature).get_concrete_function(*input_signature)
 
     def default_dst_path(self, model_type):
         return self._metadata[model_type]['default_dst']
@@ -203,12 +203,12 @@ if __name__ == '__main__':
     else:
         # Default non-Keras single-input case
         dst_path = args.dst or model_meta.default_dst_path(args.model_type)
-        concrete_fcn = model_meta.import_concrete_function(args.model_type,
-                                                           src=args.src,
-                                                           verbose=args.verbose)
+        fcn, concrete_fcn = model_meta.import_concrete_function(args.model_type,
+                                                                src=args.src,
+                                                                verbose=args.verbose)
 
     if args.verbose:
-        print("Here's the initial concrete function from a saved_model: ", concrete_fcn)  # TODO
+        print("Here's the initial concrete function from a saved_model: ", concrete_fcn)
     concrete_fcn = convert_variables_to_constants_v2(concrete_fcn)  # freeze vars, fixing shapes
 
     with open(dst_path, 'w') as f:
