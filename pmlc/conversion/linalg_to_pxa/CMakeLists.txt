@@ -9,9 +9,11 @@ pml_cc_library(
     utils.cc
   DEPS
     ::passes-gen
+    pmlc::conversion::tile_to_pxa
     pmlc::dialect::pxa::analysis
     pmlc::dialect::pxa::ir
     pmlc::dialect::stdx::ir
+    pmlc::dialect::tile::ir
     pmlc::util
 )
 

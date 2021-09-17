@@ -261,7 +261,11 @@ void pipelineBuilderStage1(OpPassManager &pm) {
     pm.addPass(pml::createApplyRulesPass(/*module=*/"schedule"));
   }
 
-  pm.addPass(stdx::createMainClosurePass());
+  if (util::getEnvVar("PLAIDML_USE_LINALG") == "1") {
+    pm.addPass(pmlc::conversion::tile_to_linalg::createLowerTileToLinalgPass());
+  }
+
+  // pm.addPass(stdx::createMainClosurePass());
   pm.addPass(createLoopInvariantCodeMotionPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
@@ -272,7 +276,6 @@ void pipelineBuilderStage2(OpPassManager &pm, const Options &options) {
   IVLOG(1, "Number of threads: " << maxThreads);
 
   if (util::getEnvVar("PLAIDML_USE_LINALG") == "1") {
-    pm.addPass(pmlc::conversion::tile_to_linalg::createLowerTileToLinalgPass());
     pm.addPass(pmlc::conversion::linalg_to_pxa::createLowerLinalgToPXAPass());
   } else {
     pm.addPass(pmlc::conversion::tile_to_pxa::createLowerTileToPXAPass());
