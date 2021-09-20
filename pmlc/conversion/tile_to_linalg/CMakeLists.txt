@@ -3,7 +3,6 @@ pml_cc_library(
   HDRS
     passes.h
   SRCS
-    specials.cc
     tile_to_linalg.cc
     utils.cc
   DEPS

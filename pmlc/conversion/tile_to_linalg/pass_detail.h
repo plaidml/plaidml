@@ -42,6 +42,4 @@ updatePaddingMap(mlir::AffineMap origMap,
 
 llvm::SmallSet<int64_t, 4> getUsedDims(mlir::AffineExpr expr);
 
-void populateTileToLinalgSpecialPatterns(mlir::RewritePatternSet &patterns);
-
 } // namespace pmlc::conversion::tile_to_linalg

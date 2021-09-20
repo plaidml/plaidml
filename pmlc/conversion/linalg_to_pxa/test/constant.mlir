@@ -6,7 +6,10 @@
 func @main(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x224x224x3xf32> {
   %cst = constant dense<"0x00000000"> : tensor<f32>
   %0 = linalg.init_tensor [1, 224, 224, 3] : tensor<1x224x224x3xf32>
-  %1 = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%cst : tensor<f32>) outs(%0 : tensor<1x224x224x3xf32>) {
+  %1 = linalg.generic {
+    indexing_maps = [#map0, #map1],
+    iterator_types = ["parallel", "parallel", "parallel", "parallel"]
+  } ins(%cst : tensor<f32>) outs(%0 : tensor<1x224x224x3xf32>) {
   ^bb0(%arg1: f32, %arg2: f32):  // no predecessors
     linalg.yield %arg1 : f32
   } -> tensor<1x224x224x3xf32>
