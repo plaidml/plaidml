@@ -438,8 +438,8 @@ struct LowerLinalgToPXAPass
     for (Value operand : returnOp.operands()) {
       // Find very initial allocation of memref
       Value def = pxa::getIndirectDef(operand);
-      BlockArgument blockArg = funcOp.getBody().getArgument(argNumber++);
-      if (def != blockArg) {
+      if (!def.isa<BlockArgument>()) {
+        BlockArgument blockArg = funcOp.getBody().getArgument(argNumber++);
         def.replaceAllUsesWith(blockArg);
       }
     }
