@@ -931,8 +931,24 @@ struct ReshapeOpConversion : public OpConversionPattern<tile::ReshapeOp> {
       rewriter.replaceOpWithNewOp<linalg::TensorExpandShapeOp>(op, resultType,
                                                                tensor, *dims);
     } else {
-      // TODO: general reshape
-      op.emitError("Reshape is not collapse or extend.");
+      // General reshape. Collapse the tensor into 1-D and then expand it to the
+      // result shape.
+      int64_t size = 1;
+      ReassociationIndices collapseDims;
+      for (unsigned i = 0; i < srcShape.size(); ++i) {
+        size *= srcShape[i];
+        collapseDims.emplace_back(i);
+      }
+      auto tmpType = RankedTensorType::get(
+          ArrayRef{size}, resultType.cast<RankedTensorType>().getElementType());
+      auto collapse = rewriter.create<linalg::TensorCollapseShapeOp>(
+          op.getLoc(), tmpType, tensor, collapseDims);
+      ReassociationIndices expandDims;
+      for (unsigned i = 0; i < dstShape.size(); ++i) {
+        expandDims.emplace_back(i);
+      }
+      rewriter.replaceOpWithNewOp<linalg::TensorExpandShapeOp>(
+          op, resultType, collapse.getResult(), expandDims);
     }
     return success();
   }
