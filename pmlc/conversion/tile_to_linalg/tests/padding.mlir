@@ -72,18 +72,3 @@ func @pad_contraction(%A: tensor<10xf32>, %B: tensor<1xf32>, %C: tensor<3xf32>) 
 //      CHECK:     mulf
 //      CHECK:     addf
 //      CHECK:     linalg.yield
-
-// -----
-
-// #map0 = affine_map<() -> (0, 0, 0, 0, 0, 0, 0)>
-// #map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
-// #map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4 - 1, d2 + d5 - 1, d6)>
-// #map3 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d3)>
-// #map4 = affine_map<() -> (0, 55, 55, 63, 2, 2, 63)>
-
-// func @pad_conv3x3(%arg0: tensor<1x56x56x64xf32>, %arg1: tensor<3x3x64x64xf32>) -> tensor<1x56x56x64xf32> {
-//   %cst = tile.constant(0.000000e+00 : f64) : tensor<f32>
-//   %0 = tile.ident %arg0 {padLower = [0, 1, 1, 0], padType = 1 : i64, padUpper = [0, 1, 1, 0]} : (tensor<1x56x56x64xf32>) -> tensor<1x56x56x64xf32>
-//   %1 = tile.contract add, mul, %cst, %0, %arg1 {lowerBounds = #map0, sink = #map1, srcs = [#map2, #map3], upperBounds = #map4} : tensor<f32>, tensor<1x56x56x64xf32>, tensor<3x3x64x64xf32> -> tensor<1x56x56x64xf32>
-//   return %1 : tensor<1x56x56x64xf32>
-// }
