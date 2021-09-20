@@ -22,6 +22,11 @@ set(LIBOMP_OMPD_SUPPORT OFF CACHE BOOL "" FORCE)
 set(OPENMP_ENABLE_LIBOMPTARGET OFF CACHE BOOL "" FORCE)
 set(OPENMP_ENABLE_OMPT_TOOLS OFF CACHE BOOL "" FORCE)
 set(OPENMP_STANDALONE_BUILD ON CACHE BOOL "" FORCE)
+list(APPEND LLVM_EXTERNAL_PROJECTS
+  mlir_hlo
+)
+set(LLVM_EXTERNAL_MLIR_HLO_SOURCE_DIR ${CMAKE_SOURCE_DIR}/vendor/mlir-hlo)
+set(MHLO_ENABLE_BINDINGS_PYTHON ON)
 
 if(LOCAL_LLVM_DIR)
   message("LOCAL_LLVM_DIR: ${LOCAL_LLVM_DIR}")
@@ -33,8 +38,8 @@ else()
   message("Fetching LLVM")
   FetchContent_Declare(
     llvm-project
-    URL      https://github.com/plaidml/llvm-project/archive/abcec22e991869ab038e4d585f79f7297b73832b.tar.gz
-    URL_HASH SHA256=c21ee6774e01001e29a762d59779936d86b10b165504a5eb599af0d49ab1c2a7
+    URL      https://github.com/plaidml/llvm-project/archive/4c1023b4b7900db3ddeec16e16018c1413ecc3db.tar.gz
+    URL_HASH SHA256=c0a42a040fa6c5da3e15ced41289820c7fdbb87cfd4372c67a971350e1b163d6
   )
   FetchContent_GetProperties(llvm-project)
   if(NOT llvm-project_POPULATED)

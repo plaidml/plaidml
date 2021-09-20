@@ -2,3 +2,6 @@
 	path = vendor/openvino
 	url = https://github.com/plaidml/openvino.git
 	branch = plaidml
+[submodule "vendor/mlir-hlo"]
+	path = vendor/mlir-hlo
+	url = https://github.com/plaidml/mlir-hlo
