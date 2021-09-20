@@ -407,7 +407,7 @@ struct XSMMGemmDispatchF32Lowering
     }
 
     rewriter.replaceOpWithNewOp<LLVM::CallOp>(
-        op, int64Type, rewriter.getSymbolRefAttr(func), callOperands);
+        op, int64Type, SymbolRefAttr::get(func), callOperands);
     return success();
   }
 
@@ -465,7 +465,7 @@ struct XSMMGemmInvokeF32Lowering
 
     auto func = getOrInsertFunc(op, rewriter);
     rewriter.create<LLVM::CallOp>(
-        op->getLoc(), ArrayRef<Type>(), rewriter.getSymbolRefAttr(func),
+        op->getLoc(), ArrayRef<Type>(), SymbolRefAttr::get(func),
         ArrayRef<Value>{transformed.ptr(), aPtr, bPtr, cPtr});
     rewriter.eraseOp(op);
 
@@ -523,7 +523,7 @@ struct XSMMBRGemmDispatchF32Lowering
     }
 
     rewriter.replaceOpWithNewOp<LLVM::CallOp>(
-        op, int64Type, rewriter.getSymbolRefAttr(func), callOperands);
+        op, int64Type, SymbolRefAttr::get(func), callOperands);
     return success();
   }
 
@@ -586,7 +586,7 @@ struct XSMMBRGemmInvokeF32Lowering
 
     auto func = getOrInsertFunc(op, rewriter);
     rewriter.create<LLVM::CallOp>(
-        op->getLoc(), ArrayRef<Type>(), rewriter.getSymbolRefAttr(func),
+        op->getLoc(), ArrayRef<Type>(), SymbolRefAttr::get(func),
         ArrayRef<Value>{transformed.ptr(), aPtr, bPtr, cPtr, numBatchesValue});
     rewriter.eraseOp(op);
 
@@ -645,7 +645,7 @@ struct XSMMBRGemmOffsDispatchF32Lowering
     }
 
     rewriter.replaceOpWithNewOp<LLVM::CallOp>(
-        op, int64Type, rewriter.getSymbolRefAttr(func), callOperands);
+        op, int64Type, SymbolRefAttr::get(func), callOperands);
     return success();
   }
 
@@ -759,7 +759,7 @@ struct XSMMBRGemmOffsInvokeF32Lowering
 
     auto func = getOrInsertFunc(op, rewriter);
     rewriter.create<LLVM::CallOp>(
-        op->getLoc(), ArrayRef<Type>(), rewriter.getSymbolRefAttr(func),
+        op->getLoc(), ArrayRef<Type>(), SymbolRefAttr::get(func),
         ArrayRef<Value>{transformed.ptr(), aPtr, bPtr, cPtr, numBatchesValue,
                         aOffsetsPtr, bOffsetsPtr});
     rewriter.eraseOp(op);
@@ -872,7 +872,7 @@ struct XSMMUnaryDispatchLowering
             static_cast<int32_t>(op.kindAttr().getValue()))));
 
     rewriter.replaceOpWithNewOp<LLVM::CallOp>(
-        op, int64Type, rewriter.getSymbolRefAttr(func), callOperands);
+        op, int64Type, SymbolRefAttr::get(func), callOperands);
 
     return success();
   }
@@ -935,7 +935,7 @@ struct XSMMUnaryInvokeLowering
 
     LLVM::LLVMFuncOp func = getOrInsertFunc(op, rewriter);
     rewriter.create<LLVM::CallOp>(loc, ArrayRef<Type>(),
-                                  rewriter.getSymbolRefAttr(func),
+                                  SymbolRefAttr::get(func),
                                   ArrayRef<Value>{
                                       transformed.ptr(),
                                       inputVoidPtr,
