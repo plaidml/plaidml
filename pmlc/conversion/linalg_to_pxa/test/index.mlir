@@ -5,7 +5,10 @@
 func @test_index() -> (tensor<16x16xindex>, tensor<16x16xi64>) {
   %out0 = linalg.init_tensor [16, 16] : tensor<16x16xindex>
   %out1 = linalg.init_tensor [16, 16] : tensor<16x16xi64>
-  %t0, %t1 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]} outs(%out0, %out1 : tensor<16x16xindex>, tensor<16x16xi64>) {
+  %t0, %t1 = linalg.generic {
+    indexing_maps = [#map, #map],
+    iterator_types = ["parallel", "parallel"]
+  } outs(%out0, %out1 : tensor<16x16xindex>, tensor<16x16xi64>) {
     ^bb0(%arg0 : index, %arg1 : i64):
     %i = linalg.index 0 : index
     %j0 = linalg.index 1 : index

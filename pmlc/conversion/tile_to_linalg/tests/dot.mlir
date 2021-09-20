@@ -15,11 +15,11 @@ func @dot(%arg0: tensor<1x784xf32>, %arg1: tensor<784x512xf32>) -> tensor<1x512x
 // CHECK-SAME: (%[[arg0:.*]]: tensor<1x784xf32>, %[[arg1:.*]]: tensor<784x512xf32>) -> tensor<1x512xf32>
 // CHECK: %[[cst:.*]] = constant 0.000000e+00 : f32
 // CHECK: %[[init:.*]] = linalg.init_tensor [1, 512] : tensor<1x512xf32>
-// CHECK: %[[filled:.*]] = linalg.fill(%[[cst]], %0) : f32, tensor<1x512xf32> -> tensor<1x512xf32> 
+// CHECK: %[[broadcast:.*]] = linalg.fill(%[[cst]], %[[init]]) : f32, tensor<1x512xf32> -> tensor<1x512xf32>
 // CHECK: %[[result:.*]] = linalg.generic
 // CHECK-SAME:               iterator_types = ["reduction", "parallel", "parallel"]}
 // CHECK-SAME:               ins(%[[arg0]], %[[arg1]] : tensor<1x784xf32>, tensor<784x512xf32>)
-// CHECK-SAME:               outs(%[[filled]] : tensor<1x512xf32>)
+// CHECK-SAME:               outs(%[[broadcast]] : tensor<1x512xf32>)
 // CHECK:   ^bb0(%[[arg2:.*]]: f32, %[[arg3:.*]]: f32, %[[arg4:.*]]: f32)
 // CHECK:      %[[t0:.*]] = mulf %[[arg2]], %[[arg3]] : f32
 // CHECK:      %[[t1:.*]] = addf %[[arg4]], %[[t0]] : f32

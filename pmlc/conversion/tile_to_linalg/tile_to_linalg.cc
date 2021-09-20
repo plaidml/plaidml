@@ -70,19 +70,22 @@ struct ConstantOpConversion : public OpConversionPattern<tile::ConstantOp> {
   LogicalResult
   matchAndRewrite(tile::ConstantOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
-    auto stdType = tile::toSignlessType(getElementType(op));
-    auto value = op.getValue();
-    if (auto floatType = stdType.dyn_cast<FloatType>()) {
+    TileToLinalgTypeConverter typeConverter;
+    Type newType = typeConverter.convertType(op.getType());
+    Type elementType = getElementType(newType);
+    Attribute value = op.getValue();
+    if (auto floatType = elementType.dyn_cast<FloatType>()) {
       auto floatAttr = value.cast<FloatAttr>();
-      auto floatValue = convertFloatUsingType(floatAttr.getValue(), floatType);
+      llvm::APFloat floatValue =
+          convertFloatUsingType(floatAttr.getValue(), floatType);
       value = FloatAttr::get(floatType, floatValue);
-    } else if (auto intType = stdType.dyn_cast<IntegerType>()) {
+    } else if (auto intType = elementType.dyn_cast<IntegerType>()) {
       auto intAttr = value.cast<IntegerAttr>();
       value = IntegerAttr::get(intType, intAttr.getInt());
     } else {
       llvm_unreachable("Invalid scalar constant op");
     }
-    rewriter.replaceOpWithNewOp<mlir::ConstantOp>(op, stdType, value);
+    rewriter.replaceOpWithNewOp<ConstantOp>(op, elementType, value);
     return success();
   }
 };
@@ -194,16 +197,14 @@ struct EltwiseUnsigned {
 };
 
 struct FirstOperand {
-  Value create(ConversionPatternRewriter &rewriter, Location loc,
-               Type resultType, ArrayRef<Value> operands,
-               ArrayRef<Type> types) {
+  Value create(OpBuilder &builder, Location loc, Type resultType,
+               ValueRange operands, TypeRange types) {
     return operands.front();
   }
 };
 
-static Type promoteTypes(ConversionPatternRewriter &rewriter, Location loc,
-                         ArrayRef<Value> operands, ArrayRef<Type> types,
-                         SmallVectorImpl<Value> *into) {
+static Type promoteTypes(OpBuilder &builder, Location loc, ValueRange operands,
+                         TypeRange types, SmallVectorImpl<Value> *into) {
   // First, determine the 'final' type that wins the promotion
   Type bestType;
   for (auto type : types) {
@@ -215,70 +216,64 @@ static Type promoteTypes(ConversionPatternRewriter &rewriter, Location loc,
   for (unsigned i = 0; i < operands.size(); i++) {
     auto dtype = types[i];
     auto operand = operands[i];
-    auto castedValue =
-        createCastOp(rewriter, loc, operand, dtype.isSignedInteger(),
-                     targetType, intoSigned);
+    auto castedValue = createCastOp(
+        builder, loc, operand, dtype.isSignedInteger(), targetType, intoSigned);
     into->push_back(castedValue);
   }
   return bestType;
 }
 
 struct NegIOp {
-  Value create(ConversionPatternRewriter &rewriter, Location loc,
-               Type resultType, ArrayRef<Value> operands,
-               ArrayRef<Type> types) {
-    auto zero = rewriter.create<mlir::ConstantIntOp>(loc, 0, resultType);
-    auto neg = rewriter.create<mlir::SubIOp>(loc, zero, operands[0]);
+  Value create(OpBuilder &builder, Location loc, Type resultType,
+               ValueRange operands, TypeRange types) {
+    auto zero = builder.create<mlir::ConstantIntOp>(loc, 0, resultType);
+    auto neg = builder.create<mlir::SubIOp>(loc, zero, operands[0]);
     return neg.getResult();
   }
 };
 
 struct NotOp {
-  Value create(ConversionPatternRewriter &rewriter, Location loc,
-               Type resultType, ArrayRef<Value> operands,
-               ArrayRef<Type> types) {
+  Value create(OpBuilder &builder, Location loc, Type resultType,
+               ValueRange operands, TypeRange types) {
     // -(x + 1) = -1 - x
-    auto negOne = rewriter.create<mlir::ConstantIntOp>(loc, -1, resultType);
-    auto sub = rewriter.create<mlir::SubIOp>(loc, negOne, operands[0]);
+    auto negOne = builder.create<mlir::ConstantIntOp>(loc, -1, resultType);
+    auto sub = builder.create<mlir::SubIOp>(loc, negOne, operands[0]);
     return sub.getResult();
   }
 };
 
 template <typename OpType>
 struct StdOp {
-  Value create(ConversionPatternRewriter &rewriter, Location loc,
-               Type resultType, ArrayRef<Value> operands,
-               ArrayRef<Type> types) {
+  Value create(OpBuilder &builder, Location loc, Type resultType,
+               ValueRange operands, TypeRange types) {
     SmallVector<Value, 2> promoted;
-    promoteTypes(rewriter, loc, operands, types, &promoted);
-    auto attrs = ArrayRef<NamedAttribute>{};
-    auto resultTypes = llvm::makeArrayRef(resultType);
-    auto op = rewriter.create<OpType>(loc, resultTypes, promoted, attrs);
+    promoteTypes(builder, loc, operands, types, &promoted);
+    ArrayRef<NamedAttribute> attrs;
+    auto op =
+        builder.create<OpType>(loc, TypeRange{resultType}, promoted, attrs);
     return op->getResult(0);
   }
 };
 
 struct SelectOp {
-  Value create(ConversionPatternRewriter &rewriter, Location loc,
-               Type resultType, ArrayRef<Value> operands,
-               ArrayRef<Type> types) {
+  Value create(OpBuilder &builder, Location loc, Type resultType,
+               ValueRange operands, TypeRange types) {
     SmallVector<Value, 2> promoted;
-    promoteTypes(rewriter, loc, operands.drop_front(), types.drop_front(),
+    promoteTypes(builder, loc, operands.drop_front(), types.drop_front(),
                  &promoted);
-    auto op = rewriter.create<mlir::SelectOp>(loc, operands[0], promoted[0],
-                                              promoted[1]);
+    auto op = builder.create<mlir::SelectOp>(loc, operands[0], promoted[0],
+                                             promoted[1]);
     return op.getResult();
   }
 };
 
 template <CmpFPredicate predicate>
 struct CmpFloatOp {
-  Value create(ConversionPatternRewriter &rewriter, Location loc,
-               Type resultType, ArrayRef<Value> operands,
-               ArrayRef<Type> types) {
+  Value create(OpBuilder &builder, Location loc, Type resultType,
+               ValueRange operands, TypeRange types) {
     SmallVector<Value, 2> promoted;
-    promoteTypes(rewriter, loc, operands, types, &promoted);
-    return rewriter
+    promoteTypes(builder, loc, operands, types, &promoted);
+    return builder
         .create<mlir::CmpFOp>(loc, predicate, promoted[0], promoted[1])
         .getResult();
   }
@@ -286,12 +281,11 @@ struct CmpFloatOp {
 
 template <CmpIPredicate predicate>
 struct CmpIntOp {
-  Value create(ConversionPatternRewriter &rewriter, Location loc,
-               Type resultType, ArrayRef<Value> operands,
-               ArrayRef<Type> types) {
+  Value create(OpBuilder &builder, Location loc, Type resultType,
+               ValueRange operands, TypeRange types) {
     SmallVector<Value, 2> promoted;
-    promoteTypes(rewriter, loc, operands, types, &promoted);
-    return rewriter
+    promoteTypes(builder, loc, operands, types, &promoted);
+    return builder
         .create<mlir::CmpIOp>(loc, predicate, promoted[0], promoted[1])
         .getResult();
   }
@@ -299,13 +293,12 @@ struct CmpIntOp {
 
 template <CmpIPredicate signedPred, CmpIPredicate unsignedPred>
 struct CmpIntInequalityOp {
-  Value create(ConversionPatternRewriter &rewriter, Location loc,
-               Type resultType, ArrayRef<Value> operands,
-               ArrayRef<Type> types) {
+  Value create(OpBuilder &builder, Location loc, Type resultType,
+               ValueRange operands, TypeRange types) {
     SmallVector<Value, 2> promoted;
-    auto bestType = promoteTypes(rewriter, loc, operands, types, &promoted);
+    auto bestType = promoteTypes(builder, loc, operands, types, &promoted);
     auto predicate = bestType.isSignedInteger() ? signedPred : unsignedPred;
-    return rewriter
+    return builder
         .create<mlir::CmpIOp>(loc, predicate, promoted[0], promoted[1])
         .getResult();
   }
@@ -313,52 +306,49 @@ struct CmpIntInequalityOp {
 
 template <typename OpType>
 struct LogicalOp {
-  Value create(ConversionPatternRewriter &rewriter, Location loc,
-               Type resultType, ArrayRef<Value> operands,
-               ArrayRef<Type> types) {
+  Value create(OpBuilder &builder, Location loc, Type resultType,
+               ValueRange operands, TypeRange types) {
     SmallVector<Value, 2> promoted;
-    for (unsigned i = 0; i < operands.size(); ++i) {
-      auto &operand = operands[i];
-      auto fromType = operand.getType();
+    for (Value operand : operands) {
+      Type fromType = operand.getType();
       if (auto floatType = fromType.dyn_cast<FloatType>()) {
-        auto value = convertFloatUsingType(llvm::APFloat(0.0), floatType);
+        llvm::APFloat value =
+            convertFloatUsingType(llvm::APFloat(0.0), floatType);
         auto zero =
-            rewriter.create<mlir::ConstantFloatOp>(loc, value, floatType);
+            builder.create<mlir::ConstantFloatOp>(loc, value, floatType);
         promoted.push_back(
-            rewriter
-                .create<mlir::CmpFOp>(loc, CmpFPredicate::ONE, operand, zero)
+            builder.create<mlir::CmpFOp>(loc, CmpFPredicate::ONE, operand, zero)
                 .getResult());
       } else if (auto intType = fromType.dyn_cast<IntegerType>()) {
-        auto zero = rewriter.create<mlir::ConstantIntOp>(loc, 0, intType);
+        auto zero = builder.create<mlir::ConstantIntOp>(loc, 0, intType);
         promoted.push_back(
-            rewriter.create<mlir::CmpIOp>(loc, CmpIPredicate::ne, operand, zero)
+            builder.create<mlir::CmpIOp>(loc, CmpIPredicate::ne, operand, zero)
                 .getResult());
       } else {
         llvm_unreachable("Unknown type for LogicalOp");
       }
     }
-    auto attrs = ArrayRef<NamedAttribute>{};
-    Type boolType = rewriter.getI1Type();
+    ArrayRef<NamedAttribute> attrs;
+    Type boolType = builder.getI1Type();
     auto resultTypes = llvm::makeArrayRef(boolType);
-    auto op = rewriter.create<OpType>(loc, resultTypes, promoted, attrs);
+    auto op = builder.create<OpType>(loc, resultTypes, promoted, attrs);
     return op->getResult(0);
   }
 };
 
 struct LogicalNotOp {
-  Value create(ConversionPatternRewriter &rewriter, Location loc,
-               Type resultType, ArrayRef<Value> operands,
-               ArrayRef<Type> types) {
+  Value create(OpBuilder &builder, Location loc, Type resultType,
+               ValueRange operands, TypeRange types) {
     auto input = operands[0];
     auto fromType = input.getType();
     if (auto floatType = fromType.dyn_cast<FloatType>()) {
       auto value = convertFloatUsingType(llvm::APFloat(0.0), floatType);
-      auto zero = rewriter.create<mlir::ConstantFloatOp>(loc, value, floatType);
-      return rewriter.create<mlir::CmpFOp>(loc, CmpFPredicate::OEQ, input, zero)
+      auto zero = builder.create<mlir::ConstantFloatOp>(loc, value, floatType);
+      return builder.create<mlir::CmpFOp>(loc, CmpFPredicate::OEQ, input, zero)
           .getResult();
     } else if (auto intType = fromType.dyn_cast<IntegerType>()) {
-      auto zero = rewriter.create<mlir::ConstantIntOp>(loc, 0, intType);
-      return rewriter.create<mlir::CmpIOp>(loc, CmpIPredicate::eq, input, zero)
+      auto zero = builder.create<mlir::ConstantIntOp>(loc, 0, intType);
+      return builder.create<mlir::CmpIOp>(loc, CmpIPredicate::eq, input, zero)
           .getResult();
     } else {
       llvm_unreachable("Unknown type for LogicalNotOp");
@@ -410,13 +400,12 @@ static Value createInit(OpBuilder &builder, Location loc, Type type,
 
 template <typename CmpOpBuilder>
 struct CondOp {
-  Value create(ConversionPatternRewriter &rewriter, Location loc,
-               Type resultType, ArrayRef<Value> operands,
-               ArrayRef<Type> types) {
+  Value create(OpBuilder &builder, Location loc, Type resultType,
+               ValueRange operands, TypeRange types) {
     CmpOpBuilder cmpOpBuilder;
-    auto cmp = cmpOpBuilder.create(rewriter, loc, resultType,
+    auto cmp = cmpOpBuilder.create(builder, loc, resultType,
                                    operands.take_front(2), types.take_front(2));
-    return rewriter.create<mlir::SelectOp>(loc, cmp, operands[0], operands[1])
+    return builder.create<mlir::SelectOp>(loc, cmp, operands[0], operands[1])
         .getResult();
   }
 };
@@ -451,18 +440,18 @@ buildBroadcastMap(OpBuilder &builder, Location loc, Value operand,
 }
 
 template <typename AggBuilder>
-Value createAggOp(ConversionPatternRewriter &rewriter, Location loc,
-                  Value aggValue, Value storedValue) {
+Value createAggOp(OpBuilder &builder, Location loc, Value aggValue,
+                  Value storedValue) {
   AggBuilder aggBuilder;
   return aggBuilder.create(
-      rewriter, loc,
+      builder, loc,
       /*resultType=*/aggValue.getType(),
-      /*operands=*/ArrayRef<Value>{aggValue, storedValue},
-      /*types=*/ArrayRef<Type>{aggValue.getType(), storedValue.getType()});
+      /*operands=*/ValueRange{aggValue, storedValue},
+      /*types=*/TypeRange{aggValue.getType(), storedValue.getType()});
 }
 
-Value getAggResult(ConversionPatternRewriter &rewriter, Location loc,
-                   AggregationKind agg, Value aggValue, Value storedValue) {
+Value getAggResult(OpBuilder &builder, Location loc, AggregationKind agg,
+                   Value aggValue, Value storedValue) {
   // Do the reduction op
   Type aggType = aggValue.getType();
   switch (agg) {
@@ -470,17 +459,17 @@ Value getAggResult(ConversionPatternRewriter &rewriter, Location loc,
     return storedValue;
   case AggregationKind::add:
     if (aggType.isa<IntegerType>()) {
-      return createAggOp<StdOp<AddIOp>>(rewriter, loc, aggValue, storedValue);
+      return createAggOp<StdOp<AddIOp>>(builder, loc, aggValue, storedValue);
     } else if (aggType.isa<FloatType>()) {
-      return createAggOp<StdOp<AddFOp>>(rewriter, loc, aggValue, storedValue);
+      return createAggOp<StdOp<AddFOp>>(builder, loc, aggValue, storedValue);
     } else {
       llvm_unreachable("Invalid aggregation value type.");
     }
   case AggregationKind::mul:
     if (aggType.isa<IntegerType>()) {
-      return createAggOp<StdOp<MulIOp>>(rewriter, loc, aggValue, storedValue);
+      return createAggOp<StdOp<MulIOp>>(builder, loc, aggValue, storedValue);
     } else if (aggType.isa<FloatType>()) {
-      return createAggOp<StdOp<MulFOp>>(rewriter, loc, aggValue, storedValue);
+      return createAggOp<StdOp<MulFOp>>(builder, loc, aggValue, storedValue);
     } else {
       llvm_unreachable("Invalid aggregation value type.");
     }
@@ -488,14 +477,14 @@ Value getAggResult(ConversionPatternRewriter &rewriter, Location loc,
     if (auto intType = aggType.dyn_cast<IntegerType>()) {
       if (intType.isSignedInteger()) {
         return createAggOp<CondOp<CmpIntOp<CmpIPredicate::slt>>>(
-            rewriter, loc, aggValue, storedValue);
+            builder, loc, aggValue, storedValue);
       } else {
         return createAggOp<CondOp<CmpIntOp<CmpIPredicate::ult>>>(
-            rewriter, loc, aggValue, storedValue);
+            builder, loc, aggValue, storedValue);
       }
     } else if (aggType.isa<FloatType>()) {
       return createAggOp<CondOp<CmpFloatOp<CmpFPredicate::OLT>>>(
-          rewriter, loc, aggValue, storedValue);
+          builder, loc, aggValue, storedValue);
     } else {
       llvm_unreachable("Invalid aggregation value type.");
     }
@@ -503,14 +492,14 @@ Value getAggResult(ConversionPatternRewriter &rewriter, Location loc,
     if (auto intType = aggType.dyn_cast<IntegerType>()) {
       if (intType.isSignedInteger()) {
         return createAggOp<CondOp<CmpIntOp<CmpIPredicate::sgt>>>(
-            rewriter, loc, aggValue, storedValue);
+            builder, loc, aggValue, storedValue);
       } else {
         return createAggOp<CondOp<CmpIntOp<CmpIPredicate::ugt>>>(
-            rewriter, loc, aggValue, storedValue);
+            builder, loc, aggValue, storedValue);
       }
     } else if (aggType.isa<FloatType>()) {
       return createAggOp<CondOp<CmpFloatOp<CmpFPredicate::OGT>>>(
-          rewriter, loc, aggValue, storedValue);
+          builder, loc, aggValue, storedValue);
     } else {
       llvm_unreachable("Invalid aggregation value type.");
     }
@@ -518,24 +507,21 @@ Value getAggResult(ConversionPatternRewriter &rewriter, Location loc,
   llvm_unreachable("Invalid aggregation kind.");
 }
 
-struct BufferInitializer {
+struct TensorInitializer {
   Value resultTensor;
-  RankedTensorType origTensorType;
-  RankedTensorType newTensorType;
-  Type elementType;
 
-  BufferInitializer(OpBuilder &builder, Operation *op, Type resultType,
+  TensorInitializer(OpBuilder &builder, Operation *op, Type resultType,
                     bool padding = true) {
     // Gather some basic info
     TileToLinalgTypeConverter typeConverter;
-    auto loc = op->getLoc();
-    origTensorType = resultType.cast<RankedTensorType>();
-    elementType = typeConverter.convertType(origTensorType.getElementType());
-    ArrayRef<int64_t> originalShape = origTensorType.getShape();
-    auto shape = llvm::to_vector<8>(originalShape);
+    RankedTensorType oldTensorType = resultType.cast<RankedTensorType>();
+    Type elementType =
+        typeConverter.convertType(oldTensorType.getElementType());
+    SmallVector<int64_t, 8> shape =
+        llvm::to_vector<8>(oldTensorType.getShape());
 
     // If padding is detected, expand the shape to accomodate.
-    auto maybePadding = tile::getPaddingInfo(op);
+    Optional<tile::PaddingInfo> maybePadding = tile::getPaddingInfo(op);
     if (padding && maybePadding) {
       for (unsigned i = 0, e = shape.size(); i < e; ++i) {
         shape[i] += maybePadding->lower[i] + maybePadding->upper[i];
@@ -543,17 +529,22 @@ struct BufferInitializer {
     }
 
     // Make an allocation for the output
+    Location loc = op->getLoc();
     resultTensor =
         builder.create<linalg::InitTensorOp>(loc, shape, elementType);
-    newTensorType = resultTensor.getType().cast<RankedTensorType>();
 
     if (padding && maybePadding) {
-      auto initValue = createInit(builder, loc, elementType, maybePadding->agg);
+      Value initValue =
+          createInit(builder, loc, elementType, maybePadding->agg);
       auto fillOp = builder.create<linalg::FillOp>(loc,
                                                    /*value=*/initValue,
                                                    /*output=*/resultTensor);
       resultTensor = fillOp.getResult(0);
     }
+  }
+
+  RankedTensorType getType() {
+    return resultTensor.getType().cast<RankedTensorType>();
   }
 };
 
@@ -569,85 +560,61 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
 
   void rewrite(FromOpType op, ArrayRef<Value> operands,
                ConversionPatternRewriter &rewriter) const final {
-    auto loc = op.getLoc();
-    auto context = op.getContext();
-    BufferInitializer init(rewriter, op.getOperation(), op.result().getType(),
-                           false);
+    Location loc = op.getLoc();
+    MLIRContext *context = op.getContext();
+    TensorInitializer init(rewriter, op, op.result().getType(),
+                           /*padding=*/false);
 
-    auto initType = init.newTensorType;
-    auto shape = initType.getShape();
-    auto numDims = shape.size();
+    RankedTensorType initType = init.getType();
+    unsigned numDims = initType.getRank();
 
     // Build indexing maps
     SmallVector<AffineMap, 4> idxMaps;
-    SmallVector<Type, 4> argTypes;
     for (size_t i = 0; i < operands.size(); i++) {
-      auto input = operands[i];
-      auto maybePadding =
+      Optional<tile::PaddingInfo> maybePadding =
           tile::getPaddingInfo(op->getOperand(i).getDefiningOp());
-      Type inputType = input.getType();
-      auto idxMap = buildBroadcastMap(rewriter, loc, input, shape.size());
-      if (maybePadding) {
-        idxMap = updatePaddingMap(idxMap, *maybePadding, context);
-      }
-      auto shapedType = inputType.dyn_cast<ShapedType>();
-      Type elementType = tile::toSignlessType(
-          shapedType ? shapedType.getElementType() : inputType);
+      AffineMap idxMap =
+          buildBroadcastMap(rewriter, loc, operands[i], numDims, maybePadding);
       idxMaps.emplace_back(idxMap);
-      argTypes.emplace_back(elementType);
     }
 
     // For output indexing map and type
     AffineMap outputMap = AffineMap::getMultiDimIdentityMap(numDims, context);
     idxMaps.emplace_back(outputMap);
-    argTypes.emplace_back(init.elementType);
 
     // Make a generic op
     auto genericOp = rewriter.create<linalg::GenericOp>(
         loc,
-        /*resultTensorTypes=*/TypeRange{initType}, //
-        /*inputs=*/operands,                       //
-        /*outputs=*/ValueRange{init.resultTensor}, //
-        /*indexingMaps=*/idxMaps,                  //
-        /*iteratorTypes=*/SmallVector<StringRef, 4>(numDims, "parallel"));
+        /*resultTensorTypes=*/TypeRange{initType},
+        /*inputs=*/operands,
+        /*outputs=*/ValueRange{init.resultTensor},
+        /*indexingMaps=*/idxMaps,
+        /*iteratorTypes=*/SmallVector<StringRef, 4>(numDims, "parallel"),
+        /*doc=*/"",
+        /*libraryCall=*/"",
+        [&](OpBuilder &builder, Location loc, ValueRange args) {
+          IntoOpBuilder intoOpBuilder;
+          ValueRange inputs = args.drop_back();
+          // Use the original operand types to retain signedness.
+          SmallVector<Type, 4> inputTypes = llvm::to_vector<4>(
+              llvm::map_range(op->getOperandTypes(),
+                              [](Type type) { return getElementType(type); }));
+          Value result = intoOpBuilder.create(
+              builder, loc, initType.getElementType(), inputs, inputTypes);
+          builder.create<linalg::YieldOp>(loc, ValueRange{result});
+        });
 
-    if (Attribute attr = op->getAttr("name")) {
+    if (Attribute attr = op->getAttr("name"))
       genericOp->setAttr("name", attr);
-    }
-    if (Attribute attr = op->getAttr("schedule")) {
+    if (Attribute attr = op->getAttr("schedule"))
       genericOp->setAttr("schedule", attr);
-    }
 
-    Block *body = rewriter.createBlock(&genericOp.region(),
-                                       genericOp.region().begin(), argTypes);
-    rewriter.setInsertionPointToStart(body);
-
-    // Pop the output type
-    argTypes.pop_back();
-    // Create the standard op
-    IntoOpBuilder intoOpBuilder;
-    auto bodyArgs = body->getArguments();
-    SmallVector<Value, 4> args(bodyArgs.begin(), bodyArgs.end() - 1);
-    // Use the original operands' types to keep the (un)signed info
-    SmallVector<Type, 4> operandTypes;
-    for (auto type : op->getOperandTypes()) {
-      operandTypes.push_back(getElementType(type));
-    }
-
-    Value result = intoOpBuilder.create(rewriter, loc, init.elementType, args,
-                                        operandTypes);
-
-    // Create the yield
-    rewriter.create<linalg::YieldOp>(loc, ArrayRef<Value>{result});
-
-    auto outTensor = genericOp.getResult(0);
+    Value outTensor = genericOp.getResult(0);
 
     // If we need to pad the result
-    auto maybePadding = tile::getPaddingInfo(op);
-    if (maybePadding) {
-      rewriter.setInsertionPointAfter(genericOp);
-      auto initValue = createInit(rewriter, loc, initType.getElementType(),
-                                  maybePadding->agg);
+    if (Optional<tile::PaddingInfo> maybePadding = tile::getPaddingInfo(op)) {
+      Value initValue = createInit(rewriter, loc, initType.getElementType(),
+                                   maybePadding->agg);
       auto pad = rewriter.create<linalg::PadTensorOp>(
           loc,
           /*source=*/outTensor,
@@ -656,10 +623,10 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
           /*low=*/ValueRange{},
           /*high=*/ValueRange{});
       SmallVector<Type, 4> padArgs(numDims, rewriter.getIndexType());
+      OpBuilder::InsertionGuard guard(rewriter);
       Block *padBody =
           rewriter.createBlock(&pad.region(), pad.region().begin(), padArgs);
-      rewriter.setInsertionPointToStart(padBody);
-      rewriter.create<linalg::YieldOp>(loc, ArrayRef<Value>{initValue});
+      rewriter.create<linalg::YieldOp>(loc, ValueRange{initValue});
       outTensor = pad.getResult();
     }
 
@@ -670,36 +637,24 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
 
 struct ContractionMapsAndShapes {
   // The contraction op contains the lower and upper bounds of the loop. Each
-  // AffineMap in maps maps the loop dims to shape dims. The function makes
+  // AffineMap in `maps` maps the loop dims to shape dims. The function makes
   // lower bounds be zero.
   ContractionMapsAndShapes(tile::ContractionOp op, ArrayRef<AffineMap> maps)
-      : op(op), oldMaps(maps) {
-    numDims = oldMaps[0].getNumDims();
-    auto context = op.getContext();
-    auto lowerBounds = op.lowerBounds().getValue();
-    auto upperBounds = op.upperBounds().getValue();
+      : numDims(maps[0].getNumDims()) {
+    MLIRContext *context = op.getContext();
+    SmallVector<int64_t> lowerBounds =
+        op.lowerBounds().getValue().getConstantResults();
+    SmallVector<int64_t> upperBounds =
+        op.upperBounds().getValue().getConstantResults();
     SmallVector<AffineExpr, 4> dimReplacements;
-    for (unsigned i = 0; i < lowerBounds.getNumResults(); i++) {
-      int64_t lowerBound, upperBound;
-      if (auto lower =
-              lowerBounds.getResult(i).dyn_cast<AffineConstantExpr>()) {
-        lowerBound = lower.getValue();
-      } else {
-        op.emitError("Lower bound is not a constant.");
-      }
-      if (auto upper =
-              upperBounds.getResult(i).dyn_cast<AffineConstantExpr>()) {
-        upperBound = upper.getValue();
-      } else {
-        op.emitError("Upper bound is not a constant.");
-      }
-      shape.emplace_back(upperBound - lowerBound + 1);
-      auto repl = getAffineDimExpr(i, context) +
-                  getAffineConstantExpr(lowerBound, context);
+    for (unsigned i = 0; i < lowerBounds.size(); i++) {
+      shape.emplace_back(upperBounds[i] - lowerBounds[i] + 1);
+      AffineExpr repl = getAffineDimExpr(i, context) +
+                        getAffineConstantExpr(lowerBounds[i], context);
       dimReplacements.emplace_back(simplifyAffineExpr(repl, numDims, 0));
     }
-    for (auto oldMap : oldMaps) {
-      auto newMap =
+    for (AffineMap oldMap : maps) {
+      AffineMap newMap =
           oldMap.replaceDimsAndSymbols(dimReplacements, {}, numDims, 0);
       newMaps.emplace_back(simplifyAffineMap(newMap));
     }
@@ -709,10 +664,10 @@ struct ContractionMapsAndShapes {
   // shape dims.
   bool shapeHasAllLoopDims() {
     llvm::SmallSet<unsigned, 4> dims;
-    for (auto map : newMaps) {
+    for (AffineMap map : newMaps) {
       assert(numDims == map.getNumDims() &&
              "The input maps have different numbers of dimensions.");
-      for (auto expr : map.getResults()) {
+      for (AffineExpr expr : map.getResults()) {
         if (auto dimExpr = expr.dyn_cast<AffineDimExpr>()) {
           dims.insert(dimExpr.getPosition());
         }
@@ -721,8 +676,6 @@ struct ContractionMapsAndShapes {
     return dims.size() == numDims;
   }
 
-  tile::ContractionOp op;
-  ArrayRef<AffineMap> oldMaps;
   SmallVector<AffineMap, 4> newMaps;
   SmallVector<int64_t, 4> shape;
   unsigned numDims;
@@ -752,96 +705,71 @@ struct ContractionOpConversion
 
   void rewrite(tile::ContractionOp op, ArrayRef<Value> operands,
                ConversionPatternRewriter &rewriter) const final {
-    try {
-      tryRewrite(op, operands, rewriter);
-    } catch (const std::exception &ex) {
-      op.emitError(ex.what());
-    }
-  }
+    MLIRContext *context = op.getContext();
+    Location loc = op.getLoc();
+    tile::ContractionOpAdaptor adaptor(operands);
+    ValueRange cionOperands = adaptor.operands();
 
-  void tryRewrite(tile::ContractionOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const {
-    // Create an adaptor
-    tile::ContractionOpAdaptor cionAdaptor(operands);
-    auto cionOperands = cionAdaptor.operands();
-    auto loc = op.getLoc();
-    auto context = op.getContext();
-
-    if (auto attr = op->getAttrOfType<StringAttr>("trace")) {
-      auto module = op->getParentOfType<ModuleOp>();
-      auto symbol = createStubTraceFunc(module, attr);
-      rewriter.create<CallOp>(loc, symbol, ArrayRef<Type>{});
-    }
-
-    BufferInitializer bufInit(rewriter, op.getOperation(),
-                              op.result().getType());
-    auto initType = bufInit.newTensorType;
-    auto initShape = initType.getShape();
-    auto numInitDims = initShape.size();
-
-    AffineMap identMap =
-        AffineMap::getMultiDimIdentityMap(numInitDims, context);
+    TensorInitializer init(rewriter, op, op.result().getType());
+    RankedTensorType resultType = init.getType();
+    unsigned numDims = resultType.getRank();
 
     // Do initialization
-    auto initValue = cionAdaptor.init();
-    Value filled;
-    if (initValue.getType().isa<RankedTensorType>()) {
-      // Init value is a tensor
-      SmallVector<StringRef, 4> iterTypes(numInitDims, "parallel");
-      auto inputMap =
-          buildBroadcastMap(rewriter, loc, initValue, initShape.size());
-      auto initLoopOp = rewriter.create<linalg::GenericOp>(
-          loc,
-          /*resultTensorTypes=*/TypeRange{initType},                //
-          /*inputs=*/ValueRange{initValue},                         //
-          /*outputs=*/ValueRange{bufInit.resultTensor},             //
-          /*indexingMaps=*/ArrayRef<AffineMap>{inputMap, identMap}, //
-          /*iteratorTypes=*/iterTypes);
-      Block *body = rewriter.createBlock(
-          &initLoopOp.region(), initLoopOp.region().begin(),
-          TypeRange{bufInit.elementType, bufInit.elementType});
-      rewriter.setInsertionPointToStart(body);
-      rewriter.create<linalg::YieldOp>(loc,
-                                       ArrayRef<Value>{body->getArgument(0)});
-      rewriter.setInsertionPointAfter(initLoopOp);
-      filled = initLoopOp.getResult(0);
+    Value initValue = adaptor.init();
+
+    // Broadcast the initializer as necessary.
+    if (auto tensorType = initValue.getType().dyn_cast<RankedTensorType>()) {
+      if (tensorType != resultType) {
+        AffineMap inputMap =
+            buildBroadcastMap(rewriter, loc, initValue, numDims);
+        AffineMap outputMap =
+            AffineMap::getMultiDimIdentityMap(numDims, context);
+        auto broadcastOp = rewriter.create<linalg::GenericOp>(
+            loc,
+            /*resultTensorTypes=*/TypeRange{resultType},
+            /*inputs=*/ValueRange{initValue},
+            /*outputs=*/ValueRange{init.resultTensor},
+            /*indexingMaps=*/ArrayRef<AffineMap>{inputMap, outputMap},
+            /*iteratorTypes=*/SmallVector<StringRef, 4>(numDims, "parallel"),
+            /*doc=*/"",
+            /*libraryCall=*/"",
+            [&](OpBuilder &builder, Location loc, ValueRange args) {
+              builder.create<linalg::YieldOp>(loc, args.take_front());
+            });
+        initValue = broadcastOp.getResult(0);
+      }
     } else {
-      // Initial value is a scalar
+      // Deal with scalar initializer values.
       auto fillOp =
           rewriter.create<linalg::FillOp>(loc,
                                           /*value=*/initValue,
-                                          /*output=*/bufInit.resultTensor);
-      filled = fillOp.getResult(0);
+                                          /*output=*/init.resultTensor);
+      initValue = fillOp.result();
     }
 
     // Prepare for indexing maps and iterator types
     SmallVector<AffineMap, 4> idxMaps;
-    auto srcs = op.srcs().getValue();
+    ArrayRef<Attribute> srcs = op.srcs().getValue();
     for (size_t i = 0; i < srcs.size(); i++) {
-      auto src = srcs[i];
-      auto map = src.cast<AffineMapAttr>().getValue();
-      auto maybePadding =
-          tile::getPaddingInfo(op.operands()[i].getDefiningOp());
-      if (maybePadding) {
+      AffineMap map = srcs[i].cast<AffineMapAttr>().getValue();
+      if (Optional<tile::PaddingInfo> maybePadding =
+              tile::getPaddingInfo(op.operands()[i].getDefiningOp())) {
         map = updatePaddingMap(map, *maybePadding, context);
       }
       idxMaps.emplace_back(map);
     }
-    auto sink = op.sink();
-    auto maybePadding = tile::getPaddingInfo(op);
-    if (maybePadding) {
+    AffineMap sink = op.sink();
+    if (Optional<tile::PaddingInfo> maybePadding = tile::getPaddingInfo(op)) {
       sink = updatePaddingMap(sink, *maybePadding, context);
     }
     idxMaps.emplace_back(sink);
 
-    auto numDims = sink.getNumDims();
-    SmallVector<StringRef, 4> iterTypes(numDims, "reduction");
-    for (auto expr : sink.getResults()) {
+    SmallVector<StringRef, 4> iterTypes(sink.getNumDims(), "reduction");
+    for (AffineExpr expr : sink.getResults()) {
       if (auto dimExpr = expr.dyn_cast<AffineDimExpr>()) {
         iterTypes[dimExpr.getPosition()] = "parallel";
       } else {
-        auto dims = getUsedDims(expr);
-        for (auto dim : dims) {
+        for (int64_t dim : getUsedDims(expr)) {
           iterTypes[dim] = "window";
         }
       }
@@ -854,15 +782,15 @@ struct ContractionOpConversion
     // fail to verify GenericOp sometimes. In this case, we add a redundant
     // tensor and its AffineMap to specify the loop bound explicitly. Then it
     // can pass the GenericOp verification. Later, the redundant tensor could be
-    // optimized becuase it is useless.
+    // optimized away because it is useless.
     ContractionMapsAndShapes info(op, idxMaps);
     bool needExtraMap = !info.shapeHasAllLoopDims();
     idxMaps = info.newMaps;
     SmallVector<Value, 4> inputs(cionOperands.begin(), cionOperands.end());
     if (needExtraMap) {
-      // Create a redundant tensor with the dimensions of loop bounds
+      // Create a synthetic tensor with the dimensions of loop bounds.
       auto extraTensor = rewriter.create<linalg::InitTensorOp>(
-          loc, info.shape, bufInit.elementType);
+          loc, info.shape, resultType.getElementType());
       inputs.insert(inputs.begin(), extraTensor);
       AffineMap loopMap =
           AffineMap::getMultiDimIdentityMap(info.numDims, context);
@@ -872,47 +800,29 @@ struct ContractionOpConversion
     // Create the main loop
     auto genericOp = rewriter.create<linalg::GenericOp>(
         loc,
-        /*resultTensorTypes=*/TypeRange{initType}, //
-        /*inputs=*/inputs,                         //
-        /*outputs=*/ValueRange{filled},            //
-        /*indexingMaps=*/idxMaps,                  //
-        /*iteratorTypes=*/iterTypes);
+        /*resultTensorTypes=*/TypeRange{resultType},
+        /*inputs=*/inputs,
+        /*outputs=*/ValueRange{initValue},
+        /*indexingMaps=*/idxMaps,
+        /*iteratorTypes=*/iterTypes,
+        /*doc=*/"",
+        /*libraryCall=*/"",
+        [&](OpBuilder &builder, Location loc, ValueRange args) {
+          int offset = needExtraMap ? 1 : 0;
+          ComboBuilder comboBuilder;
+          ValueRange comboArgs = args.slice(offset, args.size() - offset - 1);
+          Value combined =
+              comboBuilder.create(builder, loc, args.back().getType(),
+                                  comboArgs, comboArgs.getTypes());
+          Value aggregate =
+              getAggResult(builder, loc, op.agg(), args.back(), combined);
+          builder.create<linalg::YieldOp>(loc, ValueRange{aggregate});
+        });
 
     if (Attribute attr = op->getAttr("name"))
       genericOp->setAttr("name", attr);
     if (Attribute attr = op->getAttr("schedule"))
       genericOp->setAttr("schedule", attr);
-
-    // Prepare for the body of GenericOp
-    SmallVector<Type, 4> argTypes;
-    if (needExtraMap) {
-      argTypes.emplace_back(bufInit.elementType);
-    }
-    for (auto operand : cionOperands) {
-      auto tensorType = operand.getType().cast<RankedTensorType>();
-      argTypes.emplace_back(tensorType.getElementType());
-    }
-    argTypes.emplace_back(bufInit.elementType);
-    Block *body = rewriter.createBlock(&genericOp.region(),
-                                       genericOp.region().begin(), argTypes);
-    rewriter.setInsertionPointToStart(body);
-
-    // Do the combination op
-    ComboBuilder comboBuilder;
-    argTypes.pop_back();
-    auto bodyArgs = body->getArguments();
-    int offset = needExtraMap ? 1 : 0;
-    SmallVector<Value, 2> inputArgs(bodyArgs.begin() + offset,
-                                    bodyArgs.end() - 1);
-    auto combined = comboBuilder.create(rewriter, loc, bufInit.elementType,
-                                        inputArgs, argTypes);
-
-    // Do the reduction op
-    Value aggResult =
-        getAggResult(rewriter, loc, op.agg(), bodyArgs.back(), combined);
-
-    // Create the yield
-    rewriter.create<linalg::YieldOp>(loc, ArrayRef<Value>{aggResult});
 
     // Replace output with the newly allocated buffer
     rewriter.replaceOp(op, genericOp.getResult(0));
@@ -926,42 +836,37 @@ struct IndexOpConversion : public OpConversionPattern<tile::IndexOp> {
   matchAndRewrite(tile::IndexOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
     // Gather some basic info
-    auto loc = op.getLoc();
-    auto context = op.getContext();
+    Location loc = op.getLoc();
+    MLIRContext *context = op.getContext();
     TileToLinalgTypeConverter typeConverter;
     auto resultType = typeConverter.convertType(op.result().getType())
                           .cast<RankedTensorType>();
-    auto elementType = resultType.getElementType().cast<IntegerType>();
     auto init = rewriter.create<linalg::InitTensorOp>(
-        loc, resultType.getShape(), elementType);
-    auto numDims = resultType.getRank();
+        loc, resultType.getShape(), resultType.getElementType());
+    unsigned numDims = resultType.getRank();
     AffineMap identMap = AffineMap::getMultiDimIdentityMap(numDims, context);
-    SmallVector<StringRef, 4> iterTypes(numDims, "parallel");
 
     // Create a generic op to fill the result tensor
     auto genericOp = rewriter.create<linalg::GenericOp>(
         loc,
-        /*resultTensorTypes=*/TypeRange{resultType},    //
-        /*inputs=*/ValueRange{},                        //
-        /*outputs=*/ValueRange{init.getResult()},       //
-        /*indexingMaps=*/ArrayRef<AffineMap>{identMap}, //
-        /*iteratorTypes=*/iterTypes);
-
-    Block *body =
-        rewriter.createBlock(&genericOp.region(), genericOp.region().begin(),
-                             TypeRange{elementType});
-    rewriter.setInsertionPointToStart(body);
-
-    // Create index, index_cast and yield
-    auto index =
-        rewriter.create<linalg::IndexOp>(loc, op.axis().getZExtValue());
-    auto cast = rewriter.create<mlir::IndexCastOp>(
-        loc, index.getResult(),
-        rewriter.getIntegerType(elementType.getWidth()));
-    rewriter.create<linalg::YieldOp>(loc, ArrayRef<Value>{cast.getResult()});
+        /*resultTensorTypes=*/TypeRange{resultType},
+        /*inputs=*/ValueRange{},
+        /*outputs=*/ValueRange{init.getResult()},
+        /*indexingMaps=*/ArrayRef<AffineMap>{identMap},
+        /*iteratorTypes=*/SmallVector<StringRef, 4>(numDims, "parallel"),
+        /*doc=*/"",
+        /*libraryCall=*/"",
+        [&](OpBuilder &builder, Location loc, ValueRange args) {
+          auto index =
+              builder.create<linalg::IndexOp>(loc, op.axis().getZExtValue());
+          auto cast = builder.create<IndexCastOp>(loc, index.getResult(),
+                                                  resultType.getElementType());
+          builder.create<linalg::YieldOp>(loc, ValueRange{cast.getResult()});
+        });
 
     // Replace the op
     rewriter.replaceOp(op, genericOp.getResult(0));
+
     return success();
   }
 };
@@ -1072,42 +977,39 @@ struct CastOpConversion : public OpConversionPattern<tile::CastOp> {
   LogicalResult
   matchAndRewrite(tile::CastOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
-    auto loc = op.getLoc();
-    auto context = op.getContext();
+    Location loc = op.getLoc();
+    MLIRContext *context = op.getContext();
 
-    BufferInitializer init(rewriter, op.getOperation(), op.result().getType());
-    auto initType = init.newTensorType;
-    auto numDims = initType.getShape().size();
-    auto inputMap =
+    TensorInitializer init(rewriter, op, op.result().getType());
+    RankedTensorType initType = init.getType();
+    unsigned numDims = initType.getRank();
+    AffineMap inputMap =
         buildBroadcastMap(rewriter, loc, operands[0], initType.getRank());
-    auto outputMap = AffineMap::getMultiDimIdentityMap(numDims, context);
+    AffineMap outputMap = AffineMap::getMultiDimIdentityMap(numDims, context);
 
     auto genericOp = rewriter.create<linalg::GenericOp>(
         loc,
-        /*resultTensorTypes=*/TypeRange{initType},                 //
-        /*inputs=*/operands,                                       //
-        /*outputs=*/ValueRange{init.resultTensor},                 //
-        /*indexingMaps=*/ArrayRef<AffineMap>{inputMap, outputMap}, //
-        /*iteratorTypes=*/SmallVector<StringRef, 4>(numDims, "parallel"));
-
-    auto originalSrcType = getElementType(op.tensor());
-    auto convertedSrcType = getElementType(operands[0]);
-    Block *body =
-        rewriter.createBlock(&genericOp.region(), genericOp.region().begin(),
-                             {convertedSrcType, init.elementType});
-    rewriter.setInsertionPointToStart(body);
-
-    // Create the standard cast op
-    bool resultIsSigned =
-        getElementType(op.result().getType()).isSignedInteger();
-    auto result = createCastOp(rewriter, loc, body->getArgument(0),
-                               originalSrcType.isSignedInteger(),
-                               init.elementType, resultIsSigned);
-
-    // Create the yield
-    rewriter.create<linalg::YieldOp>(loc, ArrayRef<Value>{result});
+        /*resultTensorTypes=*/TypeRange{initType},
+        /*inputs=*/operands,
+        /*outputs=*/ValueRange{init.resultTensor},
+        /*indexingMaps=*/ArrayRef<AffineMap>{inputMap, outputMap},
+        /*iteratorTypes=*/SmallVector<StringRef, 4>(numDims, "parallel"),
+        /*doc=*/"",
+        /*libraryCall=*/"",
+        [&](OpBuilder &builder, Location loc, ValueRange args) {
+          Type originalSrcType = getElementType(op.tensor());
+          Type convertedSrcType = getElementType(operands[0]);
+          // Create the standard cast op
+          bool resultIsSigned =
+              getElementType(op.result().getType()).isSignedInteger();
+          auto result = createCastOp(rewriter, loc, args[0],
+                                     originalSrcType.isSignedInteger(),
+                                     initType.getElementType(), resultIsSigned);
+          rewriter.create<linalg::YieldOp>(loc, ValueRange{result});
+        });
 
     rewriter.replaceOp(op, genericOp.getResult(0));
+
     return success();
   }
 };
@@ -1208,7 +1110,7 @@ struct TraceOpConversion : public OpConversionPattern<tile::PragmaOp> {
       return failure();
     }
     auto symbol = createStubTraceFunc(module, msg->second.cast<StringAttr>());
-    rewriter.create<CallOp>(op.getLoc(), symbol, ArrayRef<Type>{});
+    rewriter.create<CallOp>(op.getLoc(), symbol, TypeRange{});
     rewriter.replaceOp(op, adaptor.tensor());
     return success();
   }
@@ -1455,8 +1357,6 @@ struct LowerTileToLinalgPass
         EltwiseOpConversion<tile::ReluOp, StdOp<stdx::ReluOp>>,
         EltwiseOpConversion<tile::SelectOp, SelectOp>,
         EltwiseOpConversion<tile::IdentOp, FirstOperand>>(&getContext());
-
-    populateTileToLinalgSpecialPatterns(patterns);
 
     // Run the conversion
     if (failed(applyFullConversion(module, target, std::move(patterns)))) {
