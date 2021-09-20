@@ -749,11 +749,16 @@ struct ContractionOpConversion
 
     // Prepare for indexing maps and iterator types
     SmallVector<AffineMap, 4> idxMaps;
-    ArrayRef<Attribute> srcs = op.srcs().getValue();
+    SmallVector<Value, 4> inputs(cionOperands.begin(), cionOperands.end());
+    auto srcs = op.srcs().getValue();
     for (size_t i = 0; i < srcs.size(); i++) {
-      AffineMap map = srcs[i].cast<AffineMapAttr>().getValue();
-      if (Optional<tile::PaddingInfo> maybePadding =
-              tile::getPaddingInfo(op.operands()[i].getDefiningOp())) {
+      auto src = srcs[i];
+      auto map = src.cast<AffineMapAttr>().getValue();
+      auto maybePadding =
+          tile::getPaddingInfo(op.operands()[i].getDefiningOp());
+      if (maybePadding) {
+        auto slice = sliceTensor(rewriter, loc, inputs[i], *maybePadding);
+        inputs[i] = slice.getResult();
         map = updatePaddingMap(map, *maybePadding, context);
       }
       idxMaps.emplace_back(map);
@@ -786,7 +791,6 @@ struct ContractionOpConversion
     ContractionMapsAndShapes info(op, idxMaps);
     bool needExtraMap = !info.shapeHasAllLoopDims();
     idxMaps = info.newMaps;
-    SmallVector<Value, 4> inputs(cionOperands.begin(), cionOperands.end());
     if (needExtraMap) {
       // Create a synthetic tensor with the dimensions of loop bounds.
       auto extraTensor = rewriter.create<linalg::InitTensorOp>(
@@ -1176,7 +1180,8 @@ struct LowerTileToLinalgPass
                            mlir::memref::MemRefDialect, //
                            mlir::scf::SCFDialect,       //
                            layer::LayerDialect,         //
-                           stdx::StdXDialect>();
+                           stdx::StdXDialect,           //
+                           tensor::TensorDialect>();
     target.addLegalOp<scf::ForOp,   //
                       scf::YieldOp, //
                       scf::IfOp>();

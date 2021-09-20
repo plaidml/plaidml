@@ -93,6 +93,26 @@ AffineMap updatePaddingMap(AffineMap origMap, const tile::PaddingInfo &padding,
   return AffineMap::get(origMap.getNumDims(), 0, newExprs, context);
 }
 
+tensor::ExtractSliceOp sliceTensor(OpBuilder &builder, Location loc,
+                                   Value source,
+                                   const tile::PaddingInfo &padding) {
+  unsigned numDims = padding.lower.size();
+  auto shape = source.getType().cast<RankedTensorType>().getShape();
+  SmallVector<OpFoldResult, 4> offsets;
+  SmallVector<OpFoldResult, 4> sizes;
+  SmallVector<OpFoldResult, 4> strides(numDims, builder.getIndexAttr(1));
+  for (unsigned i = 0; i < numDims; ++i) {
+    sizes.emplace_back(
+        builder.getIndexAttr(shape[i] - padding.lower[i] - padding.upper[i]));
+    offsets.emplace_back(builder.getIndexAttr(padding.lower[i]));
+  }
+  return builder.create<tensor::ExtractSliceOp>(loc,
+                                                /*source=*/source,
+                                                /*offsets=*/offsets,
+                                                /*sizes=*/sizes,
+                                                /*strides=*/strides);
+}
+
 class UsedDimsVisitor : public AffineExprVisitor<UsedDimsVisitor> {
 public:
   void visitMulExpr(AffineBinaryOpExpr expr) {

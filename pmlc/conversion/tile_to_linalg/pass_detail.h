@@ -30,15 +30,14 @@ mlir::Value createCastOp(mlir::OpBuilder &builder, mlir::Location loc,
                          mlir::Value from, bool fromSigned, mlir::Type intoType,
                          bool intoSigned);
 
-mlir::Value
-buildSimpleStore(mlir::OpBuilder &builder, mlir::Location loc,
-                 mlir::Value scalar, mlir::Value memRef,
-                 mlir::Optional<pmlc::dialect::tile::PaddingInfo> maybePadding);
-
 mlir::AffineMap
 updatePaddingMap(mlir::AffineMap origMap,
                  const pmlc::dialect::tile::PaddingInfo &padding,
                  mlir::MLIRContext *context);
+
+mlir::tensor::ExtractSliceOp
+sliceTensor(mlir::OpBuilder &builder, mlir::Location loc, mlir::Value source,
+            const pmlc::dialect::tile::PaddingInfo &padding);
 
 llvm::SmallSet<int64_t, 4> getUsedDims(mlir::AffineExpr expr);
 
