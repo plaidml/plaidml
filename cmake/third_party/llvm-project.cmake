@@ -60,6 +60,8 @@ list(APPEND LLVM_INCLUDE_DIRS
 list(APPEND MLIR_INCLUDE_DIRS
   ${MLIR_SOURCE_DIR}/include
   ${LLVM_BINARY_DIR}/tools/mlir/include
+  ${LLVM_EXTERNAL_MLIR_HLO_SOURCE_DIR}/include
+  ${LLVM_BINARY_DIR}/tools/mlir_hlo/include
 )
 
 set(LLVM_INCLUDE_DIRS ${LLVM_INCLUDE_DIRS})

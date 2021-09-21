@@ -23,6 +23,14 @@ pml_cc_library(
     ${MLIR_DIALECT_LIBS}
     ${MLIR_CONVERSION_LIBS}
     MLIRTransforms
+
+    # TODO: Unclear where theese should go
+    MhloRegisterDialects
+    AllMhloPasses
+    MLIRBufferTransforms
+    MLIRHLOAnalysis
+    MLIRHLOTestAnalysis
+
     pmlc::conversion::linalg_to_pxa
     pmlc::conversion::pxa_to_affine
     pmlc::conversion::stdx_to_llvm
