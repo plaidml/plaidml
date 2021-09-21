@@ -431,11 +431,29 @@ struct LowerLinalgToPXAPass
     }
   }
 
+  // Copy the input buffer to the output buffer.
+  AffineParallelOp copyBuffer(OpBuilder &builder, Location loc, Value input,
+                              Value output, MLIRContext *context) {
+    ShapedType type = output.getType().cast<ShapedType>();
+    auto forOp = builder.create<AffineParallelOp>(
+        loc,
+        /*resultTypes=*/TypeRange{type},
+        /*reductions=*/ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign},
+        /*ranges=*/type.getShape());
+    Block::BlockArgListType idxs = forOp.getBody()->getArguments();
+    OpBuilder bodyBuilder = forOp.getBodyBuilder();
+    AffineMap identityMap =
+        AffineMap::getMultiDimIdentityMap(type.getRank(), context);
+    auto loadOp =
+        bodyBuilder.create<pxa::PxaLoadOp>(loc, input, identityMap, idxs);
+    auto reduceOp = bodyBuilder.create<pxa::PxaReduceOp>(
+        loc, AtomicRMWKind::assign, loadOp, output, identityMap, idxs);
+    bodyBuilder.create<AffineYieldOp>(loc, reduceOp.result());
+    return forOp;
+  }
+
   template <typename FuncLikeOp, typename ReturnLikeOp>
   void connectResults(FuncLikeOp funcOp, ReturnLikeOp returnOp) {
-    MLIRContext *context = &getContext();
-    Location loc = returnOp->getLoc();
-    ImplicitLocOpBuilder builder(loc, returnOp);
     unsigned argNumber =
         funcOp.getType().getNumInputs() - returnOp.getNumOperands();
     for (OpOperand &operand : returnOp->getOpOperands()) {
@@ -443,23 +461,15 @@ struct LowerLinalgToPXAPass
       Value def = pxa::getIndirectDef(operand.get());
       BlockArgument outputArg = funcOp.getBody().getArgument(argNumber++);
       if (def != outputArg) {
+        MLIRContext *context = &getContext();
+        Location loc = returnOp->getLoc();
+        ImplicitLocOpBuilder builder(loc, returnOp);
         if (def.isa<BlockArgument>()) {
-          // Copy the input buffer to the output buffer.
-          ShapedType type = outputArg.getType().cast<ShapedType>();
-          auto forOp = builder.create<AffineParallelOp>(
-              /*resultTypes=*/TypeRange{type},
-              /*reductions=*/ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign},
-              /*ranges=*/type.getShape());
-          Block::BlockArgListType idxs = forOp.getBody()->getArguments();
-          OpBuilder bodyBuilder = forOp.getBodyBuilder();
-          AffineMap identityMap =
-              AffineMap::getMultiDimIdentityMap(type.getRank(), context);
-          auto loadOp =
-              bodyBuilder.create<pxa::PxaLoadOp>(loc, def, identityMap, idxs);
-          auto reduceOp = bodyBuilder.create<pxa::PxaReduceOp>(
-              loc, AtomicRMWKind::assign, loadOp, outputArg, identityMap, idxs);
-          bodyBuilder.create<AffineYieldOp>(loc, reduceOp.result());
+          copyBuffer(builder, loc, def, outputArg, context);
           operand.set(outputArg);
+        } else if (isa<memref::GetGlobalOp>(def.getDefiningOp())) {
+          auto forOp = copyBuffer(builder, loc, def, outputArg, context);
+          operand.set(forOp.getResult(0));
         } else {
           def.replaceAllUsesWith(outputArg);
         }
