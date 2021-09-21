@@ -268,7 +268,11 @@ void pipelineBuilderStage1(OpPassManager &pm) {
   // pm.addPass(stdx::createMainClosurePass());
   pm.addPass(createLoopInvariantCodeMotionPass());
   pm.addPass(createCanonicalizerPass());
-  pm.addPass(createCSEPass());
+  if (util::getEnvVar("PLAIDML_USE_LINALG") != "1") {
+    // CSE reuses the output for multiple linalg.generic. This may break the
+    // assumption of value-like program, and cause bugs later.
+    pm.addPass(createCSEPass());
+  }
 }
 
 void pipelineBuilderStage2(OpPassManager &pm, const Options &options) {
