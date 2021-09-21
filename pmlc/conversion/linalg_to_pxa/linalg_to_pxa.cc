@@ -148,13 +148,15 @@ struct ConstantOpConversion : public OpConversionPattern<ConstantOp> {
     Attribute origValue = op.getValue();
     if (auto origType = origValue.getType().dyn_cast<ShapedType>()) {
       LinalgToPXATypeConverter typeConverter;
-      Type newType = typeConverter.convertType(origType);
-      std::string name = llvm::formatv("cst_memref_{0}", constCount++).str();
+      MemRefType newType =
+          typeConverter.convertType(origType).cast<MemRefType>();
+      std::string funcName =
+          llvm::formatv("cst_memref_{0}", constCount++).str();
       auto funcOp = op->getParentOfType<FuncOp>();
       rewriter.setInsertionPoint(funcOp);
       auto globalOp = rewriter.create<memref::GlobalOp>(
           funcOp.getLoc(),
-          /*sym_name=*/name,
+          /*sym_name=*/funcName,
           /*sym_visibility=*/rewriter.getStringAttr("private"),
           /*type=*/newType,
           /*initial_value=*/origValue,

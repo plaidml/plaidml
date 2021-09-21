@@ -16,10 +16,8 @@
     localize.cc
     nest_loops.cc
     normalize.cc
-    reorder_layouts.cc
     resize_tmps.cc
     simplify_arithmetic.cc
-    simplify_with_constraints.cc
     stencil_gemm.cc
     stencil.cc
     subgroups.cc

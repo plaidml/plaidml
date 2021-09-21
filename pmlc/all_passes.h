@@ -10,6 +10,9 @@
 #include "mlir/Dialect/StandardOps/Transforms/Passes.h"
 #include "mlir/Transforms/Passes.h"
 
+#include "mlir-hlo/Dialect/mhlo/transforms/register_passes.h"
+#include "mlir-hlo/Transforms/register_passes.h"
+
 #include "pmlc/conversion/linalg_to_pxa/passes.h"
 #include "pmlc/conversion/pxa_to_affine/passes.h"
 #include "pmlc/conversion/stdx_to_llvm/passes.h"
@@ -49,6 +52,12 @@ inline void registerAllPasses() {
   mlir::LLVM::registerLLVMPasses();
   mlir::registerSCFPasses();
   mlir::registerStandardPasses();
+
+  // XLA
+  mlir::mhlo::registerAllMhloPasses();
+  mlir::lmhlo::registerAllLmhloPasses();
+  mlir::disc_ral::registerAllDiscRalPasses();
+  mlir::hlo::registerAllHloPasses();
 
   //
   // PMLC

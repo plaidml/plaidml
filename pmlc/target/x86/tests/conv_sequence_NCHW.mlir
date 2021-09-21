@@ -1,15 +1,8 @@
-// RUN: pmlc-opt  -convert-linalg-to-loops -pxa-reorder-layouts="allow-reorder=true user-layouts=true" -canonicalize -pxa-normalize -canonicalize -pxa-normalize=denest=true -canonicalize -x86-stencil-tpp-gemm %s | FileCheck %s --check-prefix=COMPILE
+// RUN: pmlc-opt  -convert-linalg-to-loops -canonicalize -pxa-normalize -canonicalize -pxa-normalize=denest=true -canonicalize -x86-stencil-tpp-gemm %s | FileCheck %s --check-prefix=COMPILE
 
-// RUN: pmlc-opt  -convert-linalg-to-loops -pxa-reorder-layouts="allow-reorder=true user-layouts=true" -canonicalize -pxa-normalize -canonicalize -pxa-normalize=denest=true -canonicalize -x86-stencil-tpp-gemm -x86-convert-pxa-to-affine --normalize-memrefs --simplify-affine-structures  -lower-affine  -canonicalize -convert-scf-to-std -x86-convert-std-to-llvm %s | pmlc-jit -e conv | FileCheck %s --check-prefix=RESULTS
+// RUN: pmlc-opt  -convert-linalg-to-loops -canonicalize -pxa-normalize -canonicalize -pxa-normalize=denest=true -canonicalize -x86-stencil-tpp-gemm -x86-convert-pxa-to-affine --normalize-memrefs --simplify-affine-structures  -lower-affine  -canonicalize -convert-scf-to-std -x86-convert-std-to-llvm %s | pmlc-jit -e conv | FileCheck %s --check-prefix=RESULTS
 
-
-
-// PLAIDML_VERBOSE=5 build-x86_64/Release/bin/pmlc-opt -convert-linalg-to-loops -pxa-reorder-layouts="allow-reorder=true user-layouts=true" -canonicalize -pxa-normalize -canonicalize -pxa-normalize=denest=true -canonicalize -x86-stencil-tpp-gemm pmlc/target/x86/tests/conv_sequence_NCHW.mlir > output
-
-// WithOUT data reordering: build-x86_64/Release/bin/pmlc-opt -convert-linalg-to-loops -canonicalize -x86-stencil-tpp-gemm -x86-convert-pxa-to-affine --normalize-memrefs --simplify-affine-structures  -lower-affine  -canonicalize -convert-scf-to-std -x86-convert-std-to-llvm pmlc/target/x86/tests/conv_sequence_NCHW.mlir | build-x86_64/Release/bin/pmlc-jit -e conv
-
-
-// WITH data reordering: build-x86_64/Release/bin/pmlc-opt -convert-linalg-to-loops -pxa-reorder-layouts="allow-reorder=true user-layouts=true" -canonicalize -pxa-normalize -canonicalize -pxa-normalize=denest=true -canonicalize -x86-stencil-tpp-gemm -x86-convert-pxa-to-affine --normalize-memrefs --simplify-affine-structures  -lower-affine  -canonicalize -convert-scf-to-std -x86-convert-std-to-llvm pmlc/target/x86/tests/conv_sequence_NCHW.mlir | build-x86_64/Release/bin/pmlc-jit -e conv
+// PLAIDML_VERBOSE=5 build-x86_64/Release/bin/pmlc-opt -convert-linalg-to-loops -canonicalize -pxa-normalize -canonicalize -pxa-normalize=denest=true -canonicalize -x86-stencil-tpp-gemm pmlc/target/x86/tests/conv_sequence_NCHW.mlir > output
 
 // cat ref | grep -v sizes > ref.cleaned 
 // cat out | grep -v sizes > out.cleaned 
@@ -104,9 +97,8 @@ func @conv() {
       affine.yield %637 : memref<1x256x56x56xf32>
     }
 
-    // COMPILE: floordiv 16
     // COMPILE: pxa.generic
-   // CONV2
+    // CONV2
     %45 = affine.parallel (%arg111, %arg112, %arg113, %arg114, %arg115, %arg116, %arg117) = (0, 0, 0, 0, 0, 0, 0) to (1, 56, 56, 256, 1, 1, 64) reduce ("assign") -> (memref<1x256x56x56xf32>) {
       %637 = pxa.load %34[%arg111, %arg117, %arg112 + %arg115, %arg113 + %arg116] : memref<1x64x56x56xf32>
       %638 = pxa.load %arg12[%arg114, %arg117, %arg115, %arg116] : memref<256x64x1x1xf32>

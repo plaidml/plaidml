@@ -345,7 +345,7 @@ void PxaLoadOp::build(OpBuilder &builder, OperationState &result, Value memref,
 }
 
 static void printPxaLoadOp(OpAsmPrinter &p, PxaLoadOp op) {
-  p << op->getName() << ' ';
+  p << ' ';
   p << op.getMemRef() << '[';
   if (AffineMapAttr mapAttr =
           op->getAttrOfType<AffineMapAttr>(op.getMapAttrName()))
@@ -401,7 +401,7 @@ void PxaVectorLoadOp::build(OpBuilder &builder, OperationState &result,
 }
 
 static void printPxaVectorLoadOp(OpAsmPrinter &p, PxaVectorLoadOp op) {
-  p << op->getName() << ' ';
+  p << ' ';
   p << op.getMemRef() << '[';
   if (AffineMapAttr mapAttr =
           op->getAttrOfType<AffineMapAttr>(op.getMapAttrName()))
@@ -450,7 +450,7 @@ OpFoldResult PxaVectorLoadOp::fold(ArrayRef<Attribute> cstOperands) {
 // ---- PxaReduceOp ----
 
 void printPxaReduceOp(OpAsmPrinter &p, PxaReduceOp op) {
-  p << op->getName() << ' ';
+  p << ' ';
   p << stringifyAtomicRMWKind(op.agg()) << ' ';
   p << op.val() << ", ";
   p << op.memref() << '[';
@@ -504,7 +504,7 @@ OpFoldResult PxaReduceOp::fold(ArrayRef<Attribute> cstOperands) {
 // ---- PxaVectorReduceOp ----
 
 void printPxaVectorReduceOp(OpAsmPrinter &p, PxaVectorReduceOp op) {
-  p << op->getName() << ' ';
+  p << ' ';
   p << stringifyAtomicRMWKind(op.agg()) << ' ';
   p << op.val() << ", ";
   p << op.memref() << '[';
@@ -749,7 +749,7 @@ static void printPxaGenericOperands(OpAsmPrinter &p, OperandRange operands,
 static void printPxaGenericOp(OpAsmPrinter &p, PxaGenericOp op) {
   auto funcType = FunctionType::get(op.getContext(), op.inputs().getTypes(),
                                     op.outputs().getTypes());
-  p << op->getName() << ' ';
+  p << ' ';
   p << '(';
   printPxaGenericOperands(p, op.outputs(), op.outputIndices(),
                           op.outputAccessMaps(), op.outputTileMaps());
