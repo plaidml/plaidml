@@ -193,8 +193,7 @@ Value ContractionOp::getSymbol(unsigned i) {
 
 void printContractionOp(OpAsmPrinter *printer, ContractionOp op) {
   SmallVector<StringRef, 3> elidedAttrs = {"agg", "combo", "name"};
-  *printer << op.getOperation()->getName() << ' ';
-  *printer << util::stringifyAggregationKind(op.agg());
+  *printer << ' ' << util::stringifyAggregationKind(op.agg());
   *printer << ", ";
   *printer << util::stringifyCombinationKind(op.combo());
   *printer << ", ";

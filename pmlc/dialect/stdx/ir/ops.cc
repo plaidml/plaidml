@@ -86,7 +86,6 @@ static ParseResult parseClosureOp(OpAsmParser &parser, OperationState &result) {
 
 static void printClosureOp(OpAsmPrinter &p, ClosureOp op) {
   FunctionType type = op.getType();
-  p << op.getOperationName();
   function_like_impl::printFunctionSignature(p, op, type.getInputs(),
                                              /*isVariadic=*/false,
                                              type.getResults());

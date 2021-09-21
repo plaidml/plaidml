@@ -35,14 +35,15 @@ struct LibMCallLowering : public ConvertOpToLLVMPattern<OpType> {
     SmallVector<Type, 2> argTypes(getArity(), f32Type);
     auto funcType =
         LLVM::LLVMFunctionType::get(f32Type, argTypes, /*isVarArg=*/false);
-    auto sym = getOrInsertFuncOp(getFuncName(), funcType, op, rewriter);
+    auto attr = rewriter.getStringAttr(getFuncName());
+    auto sym = getOrInsertFuncOp(attr, funcType, op, rewriter);
     rewriter.replaceOpWithNewOp<LLVM::CallOp>(
-        op, ArrayRef<Type>{f32Type}, rewriter.getSymbolRefAttr(sym), operands);
+        op, ArrayRef<Type>{f32Type}, SymbolRefAttr::get(attr), operands);
     return success();
   }
 
   LLVM::LLVMFuncOp
-  getOrInsertFuncOp(StringRef funcName, LLVM::LLVMFunctionType funcType,
+  getOrInsertFuncOp(StringAttr funcName, LLVM::LLVMFunctionType funcType,
                     Operation *op, ConversionPatternRewriter &rewriter) const {
     Operation *funcOp = SymbolTable::lookupNearestSymbolFrom(op, funcName);
     if (funcOp)
@@ -51,7 +52,8 @@ struct LibMCallLowering : public ConvertOpToLLVMPattern<OpType> {
     auto module = op->getParentOfType<ModuleOp>();
     OpBuilder::InsertionGuard guard(rewriter);
     rewriter.setInsertionPointToStart(module.getBody());
-    return rewriter.create<LLVM::LLVMFuncOp>(op->getLoc(), funcName, funcType);
+    return rewriter.create<LLVM::LLVMFuncOp>(op->getLoc(), funcName.getValue(),
+                                             funcType);
   }
 
 protected:
@@ -195,7 +197,7 @@ struct ReshapeLowering : public ConvertOpToLLVMPattern<stdx::ReshapeOp> {
   }
 };
 
-static LLVM::LLVMFuncOp importFunc(OpBuilder &builder, StringRef name,
+static LLVM::LLVMFuncOp importFunc(OpBuilder &builder, StringAttr name,
                                    Type funcTy) {
   // Find the enclosing module
   auto moduleOp =
@@ -206,8 +208,8 @@ static LLVM::LLVMFuncOp importFunc(OpBuilder &builder, StringRef name,
     // If not, make a declaration
     OpBuilder::InsertionGuard insertionGuard{builder};
     builder.setInsertionPointToStart(moduleOp.getBody());
-    func =
-        builder.create<LLVM::LLVMFuncOp>(builder.getUnknownLoc(), name, funcTy);
+    func = builder.create<LLVM::LLVMFuncOp>(builder.getUnknownLoc(),
+                                            name.getValue(), funcTy);
   }
   return func;
 }
@@ -239,7 +241,7 @@ struct PackLowering : public ConvertOpToLLVMPattern<stdx::PackOp> {
     // Get the size of the struct type and malloc
     auto sizeofStruct = getSizeInBytes(loc, structType, rewriter);
     auto mallocFunc =
-        importFunc(rewriter, "malloc",
+        importFunc(rewriter, rewriter.getStringAttr("malloc"),
                    LLVM::LLVMFunctionType::get(getVoidPtrType(),
                                                ArrayRef<Type>{getIndexType()},
                                                /*isVarArg=*/false));

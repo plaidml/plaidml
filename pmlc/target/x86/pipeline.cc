@@ -292,10 +292,6 @@ void pipelineBuilderStage2(OpPassManager &pm, const Options &options) {
     // If the userLayouts flag is set to true, Conv2D recognizer
     // will introduce blocked data layouts. If it is set to false, a heuristic
     // will determine the best data layouts
-    pm.addNestedPass<FuncOp>(
-        pxa::createReorderLayoutsPass(/*allowReorder=*/true,
-                                      /*userLayouts=*/true,
-                                      /*datatileSize=*/64));
     pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
     pm.addPass(createCanonicalizerPass());
     pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass(/*promote=*/true,
@@ -376,7 +372,7 @@ void pipelineBuilderStage3(OpPassManager &pm) {
   pm.addPass(createCSEPass());
 
   pm.addNestedPass<FuncOp>(createCollapseParallelLoopsPass());
-  pm.addNestedPass<FuncOp>(createConvertSCFToOpenMPPass());
+  pm.addPass(createConvertSCFToOpenMPPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 

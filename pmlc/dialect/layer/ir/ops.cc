@@ -35,8 +35,7 @@ void BoxOp::build(OpBuilder &builder, OperationState &result, StringRef op,
 }
 
 void printBoxOp(OpAsmPrinter &p, BoxOp op) {
-  p << op.getOperationName() << " \"" << op.op() << "\" ("
-    << op.getBody()->getArguments() << ") = (";
+  p << " \"" << op.op() << "\" (" << op.getBody()->getArguments() << ") = (";
   p.printOperands(op.operands());
   p << ") : ";
   p.printFunctionalType(op);
