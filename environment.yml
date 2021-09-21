@@ -3,7 +3,7 @@ channels:
 dependencies:
   - ccache=4.1
   - cffi=1.14.4
-  - cmake=3.14
+  - cmake=3.13.4
   - cython=0.29.22
   - doxygen=1.9.1
   - git=2.32.0
@@ -12,7 +12,6 @@ dependencies:
   - numpy=1.18.5
   - pip=21.0.1
   - pre_commit=2.11.1
-  - pybind11
   - python=3.7
   - pystache=0.5.4
   - pyyaml=5.4.1
