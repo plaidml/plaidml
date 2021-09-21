@@ -435,14 +435,36 @@ struct LowerLinalgToPXAPass
 
   template <typename FuncLikeOp, typename ReturnLikeOp>
   void connectResults(FuncLikeOp funcOp, ReturnLikeOp returnOp) {
+    MLIRContext *context = &getContext();
+    Location loc = returnOp->getLoc();
+    ImplicitLocOpBuilder builder(loc, returnOp);
     unsigned argNumber =
         funcOp.getType().getNumInputs() - returnOp.getNumOperands();
-    for (Value operand : returnOp.operands()) {
+    for (OpOperand &operand : returnOp->getOpOperands()) {
       // Find very initial allocation of memref
-      Value def = pxa::getIndirectDef(operand);
-      BlockArgument blockArg = funcOp.getBody().getArgument(argNumber++);
-      if (def != blockArg) {
-        def.replaceAllUsesWith(blockArg);
+      Value def = pxa::getIndirectDef(operand.get());
+      BlockArgument outputArg = funcOp.getBody().getArgument(argNumber++);
+      if (def != outputArg) {
+        if (def.isa<BlockArgument>()) {
+          // Copy the input buffer to the output buffer.
+          ShapedType type = outputArg.getType().cast<ShapedType>();
+          auto forOp = builder.create<AffineParallelOp>(
+              /*resultTypes=*/TypeRange{type},
+              /*reductions=*/ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign},
+              /*ranges=*/type.getShape());
+          Block::BlockArgListType idxs = forOp.getBody()->getArguments();
+          OpBuilder bodyBuilder = forOp.getBodyBuilder();
+          AffineMap identityMap =
+              AffineMap::getMultiDimIdentityMap(type.getRank(), context);
+          auto loadOp =
+              bodyBuilder.create<pxa::PxaLoadOp>(loc, def, identityMap, idxs);
+          auto reduceOp = bodyBuilder.create<pxa::PxaReduceOp>(
+              loc, AtomicRMWKind::assign, loadOp, outputArg, identityMap, idxs);
+          bodyBuilder.create<AffineYieldOp>(loc, reduceOp.result());
+          operand.set(outputArg);
+        } else {
+          def.replaceAllUsesWith(outputArg);
+        }
       }
     }
   }
