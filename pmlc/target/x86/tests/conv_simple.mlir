@@ -1,5 +1,4 @@
 // RUN: pmlc-opt %s \
-// RUN:   -pxa-reorder-layouts="allow-reorder=true user-layouts=true" \
 // RUN:   -canonicalize \
 // RUN:   -pxa-normalize \
 // RUN:   -canonicalize \
@@ -9,46 +8,6 @@
 // RUN:   | FileCheck %s
 
 // build-x86_64/Release/bin/pmlc-opt \
-//   -pxa-reorder-layouts="allow-reorder=true user-layouts=true" \
-//   -canonicalize \
-//   -pxa-normalize \
-//   -canonicalize \
-//   -pxa-normalize=denest=true \
-//   -canonicalize \
-//   -x86-stencil-tpp-gemm pmlc/target/x86/tests/conv_simple.mlir
-
-// WithOUT data reordering:
-// build-x86_64/Release/bin/pmlc-opt \
-//   -canonicalize \
-//   -x86-stencil-tpp-gemm \
-//   -x86-convert-pxa-to-affine \
-//   -normalize-memrefs \
-//   -simplify-affine-structures \
-//   -lower-affine \
-//   -canonicalize \
-//   -convert-scf-to-std \
-//   -x86-convert-std-to-llvm pmlc/target/x86/tests/conv_simple.mlir | build-x86_64/Release/bin/pmlc-jit -e conv
-
-// WITH data reordering:
-// build-x86_64/Release/bin/pmlc-opt \
-//   -pxa-reorder-layouts="allow-reorder=true user-layouts=true" \
-//   -canonicalize \
-//   -pxa-normalize \
-//   -canonicalize \
-//   -pxa-normalize=denest=true \
-//   -canonicalize \
-//   -x86-stencil-tpp-gemm \
-//   -x86-convert-pxa-to-affine \
-//   -normalize-memrefs \
-//   -simplify-affine-structures \
-//   -lower-affine \
-//   -canonicalize \
-//   -convert-scf-to-std \
-//   -x86-convert-std-to-llvm pmlc/target/x86/tests/conv_simple.mlir | build-x86_64/Release/bin/pmlc-jit -e conv
-
-// Specifying the data tile size:
-// build-x86_64/Release/bin/pmlc-opt \
-//   -pxa-reorder-layouts="allow-reorder=true user-layouts=true datatile-size=64" \
 //   -canonicalize \
 //   -pxa-normalize \
 //   -canonicalize \
@@ -58,7 +17,6 @@
 
 // With stenciling pass:
 // build-x86_64/Release/bin/pmlc-opt \
-//   -pxa-reorder-layouts="allow-reorder=true user-layouts=true" \
 //   -canonicalize \
 //   -pxa-normalize \
 //   -canonicalize \
@@ -118,8 +76,7 @@ func @conv() {
     }
 
     // CONV1
-// CHECK: floordiv 16
-// CHECK: pxa.generic
+    // CHECK: pxa.generic
     %34 = affine.parallel (%arg111, %arg112, %arg113, %arg114, %arg115, %arg116, %arg117) = (0, 0, 0, 0, 0, 0, 0) to (1, 56, 56, 64, 3, 3, 64) reduce ("assign") -> (memref<1x56x56x64xf32>) {
       %637 = pxa.load %31[%arg111, %arg112 + %arg115, %arg113 + %arg116, %arg117] : memref<1x58x58x64xf32>
       %638 = pxa.load %arg88[%arg115, %arg116, %arg117, %arg114] : memref<3x3x64x64xf32>
