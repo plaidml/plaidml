@@ -117,3 +117,34 @@ func @main(%arg0: tensor<1x56x56x64xf32>, %arg1: tensor<1x1x64x64xf32> {stdx.con
 //       CHECK:     linalg.yield %[[arg3]] : f32
 //       CHECK:   } -> tensor<1x56x56x64xf32>
 //       CHECK:   return %[[X9]] : tensor<1x56x56x64xf32>
+
+// -----
+
+#map0 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d3, d1 * 16 + d4)>
+#map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>
+
+func @reorder_fold(%arg0: tensor<1x4x56x56x16xf32>) -> tensor<1x4x56x56x16xf32> {
+  %0 = linalg.init_tensor [1, 56, 56, 64] : tensor<1x56x56x64xf32>
+  %1 = linalg.generic {
+    indexing_maps = [#map1, #map0],
+    iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]
+  } ins(%arg0 : tensor<1x4x56x56x16xf32>) outs(%0 : tensor<1x56x56x64xf32>) attrs = {reorder} {
+  ^bb0(%arg2: f32, %arg3: f32):  // no predecessors
+    linalg.yield %arg2 : f32
+  } -> tensor<1x56x56x64xf32>
+
+  %2 = linalg.init_tensor [1, 4, 56, 56, 16] : tensor<1x4x56x56x16xf32>
+  %3 = linalg.generic {
+    indexing_maps = [#map0, #map1],
+    iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]
+  } ins(%1 : tensor<1x56x56x64xf32>) outs(%2 : tensor<1x4x56x56x16xf32>) attrs = {reorder} {
+  ^bb0(%arg2: f32, %arg3: f32):  // no predecessors
+    linalg.yield %arg2 : f32
+  } -> tensor<1x4x56x56x16xf32>
+
+  return %3 : tensor<1x4x56x56x16xf32>
+}
+
+//       CHECK: func @reorder_fold
+//  CHECK-SAME:   %[[arg0:.*]]: tensor<1x4x56x56x16xf32>
+//  CHECK-NEXT:   return %[[arg0]] : tensor<1x4x56x56x16xf32>

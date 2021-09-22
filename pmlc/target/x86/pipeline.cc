@@ -248,7 +248,7 @@ struct Options : public PassPipelineOptions<Options> {
 
 void pipelineBuilderStage1(OpPassManager &pm) {
   pm.addNestedPass<FuncOp>(layer::createInlineLayersPass());
-  pm.addNestedPass<FuncOp>(tile::createAlgebraicOptPass());
+  // pm.addNestedPass<FuncOp>(tile::createAlgebraicOptPass());
   pm.addNestedPass<FuncOp>(tile::createComputeBoundsPass());
   pm.addNestedPass<FuncOp>(tile::createPadConstraintsPass());
   pm.addPass(createCanonicalizerPass());
@@ -263,6 +263,7 @@ void pipelineBuilderStage1(OpPassManager &pm) {
 
   if (util::getEnvVar("PLAIDML_USE_LINALG") == "1") {
     pm.addPass(pmlc::conversion::tile_to_linalg::createLowerTileToLinalgPass());
+    pm.addNestedPass<FuncOp>(createReorderLayoutsPass());
   }
 
   // pm.addPass(stdx::createMainClosurePass());
@@ -287,17 +288,6 @@ void pipelineBuilderStage2(OpPassManager &pm, const Options &options) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
   pm.addNestedPass<FuncOp>(layer::createInlineLayersPass());
-
-  if (util::getEnvVar("PLAIDML_BLOCKED_LAYOUTS") == "1") {
-    // If the userLayouts flag is set to true, Conv2D recognizer
-    // will introduce blocked data layouts. If it is set to false, a heuristic
-    // will determine the best data layouts
-    pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
-    pm.addPass(createCanonicalizerPass());
-    pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass(/*promote=*/true,
-                                                            /*denest=*/true));
-    pm.addPass(createCanonicalizerPass());
-  }
 
   if (util::getEnvVar("PLAIDML_NEW_PIPELINE") == "1") {
     pm.addNestedPass<FuncOp>(createStencilTppGemmPass(/*numThreads=*/maxThreads,
