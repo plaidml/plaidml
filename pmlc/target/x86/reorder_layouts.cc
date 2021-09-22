@@ -228,6 +228,37 @@ struct PropagateReorderThruEltwiseOpPattern
   }
 };
 
+struct FoldReordersPattern : public OpRewritePattern<linalg::GenericOp> {
+  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::GenericOp op,
+                                PatternRewriter &rewriter) const final {
+    if (!op->hasAttr("reorder"))
+      return failure();
+
+    OpOperand *input = op.getInputOperand(0);
+    linalg::GenericOp predecessor =
+        dyn_cast_or_null<linalg::GenericOp>(input->get().getDefiningOp());
+    if (!predecessor || !predecessor->hasAttr("reorder"))
+      return failure();
+
+    OpOperand *initialInput = predecessor.getInputOperand(0);
+    Type initialType = initialInput->get().getType();
+    AffineMap initialMap = predecessor.getTiedIndexingMap(initialInput);
+
+    OpOperand *finalOutput = op.getOutputOperand(0);
+    Type finalType = finalOutput->get().getType();
+    AffineMap finalMap = op.getTiedIndexingMap(finalOutput);
+
+    if (initialType != finalType || initialMap != finalMap)
+      return failure();
+
+    op.getResult(0).replaceAllUsesWith(initialInput->get());
+
+    return success();
+  }
+};
+
 struct ReorderLayoutsPass : public ReorderLayoutsBase<ReorderLayoutsPass> {
   void runOnFunction() final {
     FuncOp func = getFunction();
@@ -237,6 +268,7 @@ struct ReorderLayoutsPass : public ReorderLayoutsBase<ReorderLayoutsPass> {
 
     RewritePatternSet patterns(context);
     patterns.add<PropagateReorderThruEltwiseOpPattern>(context);
+    patterns.add<FoldReordersPattern>(context);
     (void)applyPatternsAndFoldGreedily(func, std::move(patterns));
   }
 
@@ -289,8 +321,8 @@ struct ReorderLayoutsPass : public ReorderLayoutsBase<ReorderLayoutsPass> {
     AffineMap inputSinkMap = AffineMap::getMultiDimIdentityMap(5, context);
 
     linalg::GenericOp reorderInput =
-        createReorderLoop(builder, blockedInputType, conv->input.value,
-                          inputSourceMap, inputSinkMap);
+        createReorderGeneric(builder, blockedInputType, conv->input.value,
+                             inputSourceMap, inputSinkMap);
 
     // Reorder filter
     RankedTensorType blockedFilterType = conv->getBlockedFilterType(blockSize);
@@ -310,8 +342,8 @@ struct ReorderLayoutsPass : public ReorderLayoutsBase<ReorderLayoutsPass> {
     AffineMap filterSinkMap = AffineMap::getMultiDimIdentityMap(6, context);
 
     linalg::GenericOp reorderFilter =
-        createReorderLoop(builder, blockedFilterType, conv->filter.value,
-                          filterSourceMap, filterSinkMap);
+        createReorderGeneric(builder, blockedFilterType, conv->filter.value,
+                             filterSourceMap, filterSinkMap);
 
     // Adjust convolution
     RankedTensorType blockedOutputType = conv->getBlockedOutputType(blockSize);
@@ -384,26 +416,25 @@ struct ReorderLayoutsPass : public ReorderLayoutsBase<ReorderLayoutsPass> {
 
     // Reorder output
     linalg::GenericOp reorderOutput =
-        createReorderLoop(builder, conv->output.type, newConv.getResult(0),
-                          inputSinkMap, inputSourceMap);
+        createReorderGeneric(builder, conv->output.type, newConv.getResult(0),
+                             inputSinkMap, inputSourceMap);
 
     op.getResult(0).replaceAllUsesWith(reorderOutput.getResult(0));
     op.erase();
 
-    reorderOutput->setAttr("reorder", builder.getUnitAttr());
-
     return reorderOutput.getResult(0);
   }
 
-  linalg::GenericOp createReorderLoop(ImplicitLocOpBuilder &builder,
-                                      RankedTensorType resultType, Value source,
-                                      AffineMap sourceMap, AffineMap sinkMap) {
+  linalg::GenericOp createReorderGeneric(ImplicitLocOpBuilder &builder,
+                                         RankedTensorType resultType,
+                                         Value source, AffineMap sourceMap,
+                                         AffineMap sinkMap) {
     unsigned numDims = sourceMap.getNumDims();
     auto init = builder.create<linalg::InitTensorOp>(
         resultType.getShape(), resultType.getElementType());
 
     SmallVector<StringRef> iterTypes(numDims, "parallel");
-    return builder.create<linalg::GenericOp>(
+    linalg::GenericOp op = builder.create<linalg::GenericOp>(
         /*resultTensorTypes=*/TypeRange{resultType},
         /*inputs=*/ValueRange{source},
         /*outputs=*/ValueRange{init},
@@ -414,6 +445,8 @@ struct ReorderLayoutsPass : public ReorderLayoutsBase<ReorderLayoutsPass> {
         [](OpBuilder &builder, Location loc, ValueRange args) {
           builder.create<linalg::YieldOp>(loc, args[0]);
         });
+    op->setAttr("reorder", builder.getUnitAttr());
+    return op;
   }
 };
 
