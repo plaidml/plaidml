@@ -429,30 +429,6 @@ struct ReorderLayoutsPass : public ReorderLayoutsBase<ReorderLayoutsPass> {
         resultType.getShape(), resultType.getElementType());
     return builder.create<linalgx::CopyOp>(source, init, sourceMap, sinkMap);
   }
-
-  linalg::GenericOp createReorderGeneric(ImplicitLocOpBuilder &builder,
-                                         RankedTensorType resultType,
-                                         Value source, AffineMap sourceMap,
-                                         AffineMap sinkMap) {
-    unsigned numDims = sourceMap.getNumDims();
-    auto init = builder.create<linalg::InitTensorOp>(
-        resultType.getShape(), resultType.getElementType());
-
-    SmallVector<StringRef> iterTypes(numDims, "parallel");
-    linalg::GenericOp op = builder.create<linalg::GenericOp>(
-        /*resultTensorTypes=*/TypeRange{resultType},
-        /*inputs=*/ValueRange{source},
-        /*outputs=*/ValueRange{init},
-        /*indexingMaps=*/ArrayRef<AffineMap>{sourceMap, sinkMap},
-        /*iteratorTypes=*/iterTypes,
-        /*doc=*/"",
-        /*libraryCall=*/"",
-        [](OpBuilder &builder, Location loc, ValueRange args) {
-          builder.create<linalg::YieldOp>(loc, args[0]);
-        });
-    op->setAttr("reorder", builder.getUnitAttr());
-    return op;
-  }
 };
 
 } // namespace
