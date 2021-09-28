@@ -17,6 +17,8 @@ using mlir::matchers::m_Val;
 
 namespace pmlc::target::x86 {
 
+namespace linalgx = dialect::linalgx;
+
 namespace {
 
 struct ConvOperand {
@@ -109,7 +111,7 @@ struct PropagateReorderThruEltwiseOpPattern
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
 
   struct ReorderInfo {
-    linalg::GenericOp reorderOp;
+    linalgx::CopyOp reorderOp;
     Value sourceValue;           // The value to be forwarded.
     RankedTensorType sourceType; // The type to be forwarded.
     AffineMap sourceMap;         // The indexingMap tied to the input operand.
@@ -118,18 +120,16 @@ struct PropagateReorderThruEltwiseOpPattern
 
   static Optional<ReorderInfo> getReorderInfo(linalg::GenericOp op,
                                               OpOperand *operand) {
-    if (linalg::GenericOp reorderOp = dyn_cast_or_null<linalg::GenericOp>(
-            operand->get().getDefiningOp())) {
-      if (reorderOp->hasAttr("reorder")) {
-        OpOperand *source = reorderOp.getInputOperand(0);
-        AffineMap sourceMap = reorderOp.getTiedIndexingMap(source);
-        OpOperand *sink = reorderOp.getOutputOperand(0);
-        AffineMap sinkMap = reorderOp.getTiedIndexingMap(sink);
-        Value sourceValue = source->get();
-        auto sourceType = sourceValue.getType().cast<RankedTensorType>();
-        return ReorderInfo{reorderOp, sourceValue, sourceType, sourceMap,
-                           sinkMap};
-      }
+    if (auto reorderOp =
+            dyn_cast_or_null<linalgx::CopyOp>(operand->get().getDefiningOp())) {
+      OpOperand *source = reorderOp.getInputOperand(0);
+      AffineMap sourceMap = reorderOp.getTiedIndexingMap(source);
+      OpOperand *sink = reorderOp.getOutputOperand(0);
+      AffineMap sinkMap = reorderOp.getTiedIndexingMap(sink);
+      Value sourceValue = source->get();
+      auto sourceType = sourceValue.getType().cast<RankedTensorType>();
+      return ReorderInfo{reorderOp, sourceValue, sourceType, sourceMap,
+                         sinkMap};
     }
     return None;
   }
@@ -137,15 +137,14 @@ struct PropagateReorderThruEltwiseOpPattern
   LogicalResult matchAndRewrite(linalg::GenericOp op,
                                 PatternRewriter &rewriter) const final {
     // Restrict this pattern to only simple elementwise operations.
-    if (op->hasAttr("reorder") ||
-        op.getNumParallelLoops() != op.getNumLoops() ||
+    if (op.getNumParallelLoops() != op.getNumLoops() ||
         op.getNumOutputs() != 1 || op.isInitTensor(op.getOutputOperand(0)))
       return failure();
 
     // Phase 1: Compute the primary reorder.
     // Computing a primary reorder is here to handle the case where more than
     // one operand is defined by a previous reorder. We only handle the case
-    // where a single unique sourceMap and sourceType can be found.
+    // where a single shared sourceMap and sourceType can be found.
     Optional<ReorderInfo> primary;
     DenseMap<OpOperand *, ReorderInfo> operandInfos;
     for (OpOperand *operand : op.getInputOperands()) {
@@ -154,8 +153,7 @@ struct PropagateReorderThruEltwiseOpPattern
       if (!accessMap.isProjectedPermutation())
         return failure();
 
-      Optional<ReorderInfo> info = getReorderInfo(op, operand);
-      if (info) {
+      if (Optional<ReorderInfo> info = getReorderInfo(op, operand)) {
         if (primary) {
           if (info->sourceMap != primary->sourceMap ||
               info->sourceType != primary->sourceType)
@@ -172,7 +170,7 @@ struct PropagateReorderThruEltwiseOpPattern
     if (!primary)
       return failure();
 
-    // IVLOG(1, "candidate: " << debugString(op));
+    IVLOG(1, "candidate: " << debugString(op));
 
     // Phase 2: Collect values and indexingMaps.
     SmallVector<Value, 3> inputs;
@@ -216,30 +214,27 @@ struct PropagateReorderThruEltwiseOpPattern
 
     BlockAndValueMapping mapper;
     mapper.map(primary->sourceValue, newOp.getResult(0));
-    auto newReorderOp = cast<linalg::GenericOp>(rewriter.cloneWithoutRegions(
+    auto newReorderOp = cast<linalgx::CopyOp>(rewriter.cloneWithoutRegions(
         *primary->reorderOp.getOperation(), mapper));
     rewriter.inlineRegionBefore(primary->reorderOp.region(),
                                 newReorderOp.region(),
                                 newReorderOp.region().begin());
 
-    rewriter.replaceOp(op, newReorderOp.getResults());
+    rewriter.replaceOp(op, newReorderOp.getResult());
 
     return success();
   }
 };
 
-struct FoldReordersPattern : public OpRewritePattern<linalg::GenericOp> {
-  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
+struct FoldReordersPattern : public OpRewritePattern<linalgx::CopyOp> {
+  using OpRewritePattern<linalgx::CopyOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(linalg::GenericOp op,
+  LogicalResult matchAndRewrite(linalgx::CopyOp op,
                                 PatternRewriter &rewriter) const final {
-    if (!op->hasAttr("reorder"))
-      return failure();
-
     OpOperand *input = op.getInputOperand(0);
-    linalg::GenericOp predecessor =
-        dyn_cast_or_null<linalg::GenericOp>(input->get().getDefiningOp());
-    if (!predecessor || !predecessor->hasAttr("reorder"))
+    linalgx::CopyOp predecessor =
+        dyn_cast_or_null<linalgx::CopyOp>(input->get().getDefiningOp());
+    if (!predecessor)
       return failure();
 
     OpOperand *initialInput = predecessor.getInputOperand(0);
@@ -253,7 +248,7 @@ struct FoldReordersPattern : public OpRewritePattern<linalg::GenericOp> {
     if (initialType != finalType || initialMap != finalMap)
       return failure();
 
-    op.getResult(0).replaceAllUsesWith(initialInput->get());
+    op.getResult().replaceAllUsesWith(initialInput->get());
 
     return success();
   }
@@ -269,7 +264,9 @@ struct ReorderLayoutsPass : public ReorderLayoutsBase<ReorderLayoutsPass> {
     RewritePatternSet patterns(context);
     patterns.add<PropagateReorderThruEltwiseOpPattern>(context);
     patterns.add<FoldReordersPattern>(context);
-    (void)applyPatternsAndFoldGreedily(func, std::move(patterns));
+    (void)applyPatternsAndFoldGreedily(
+        func, std::move(patterns),
+        GreedyRewriteConfig{/*useTopDownTraversal=*/true});
   }
 
   Value reorderConvolution(linalg::GenericOp op) {
@@ -320,9 +317,9 @@ struct ReorderLayoutsPass : public ReorderLayoutsBase<ReorderLayoutsPass> {
     // (n, c0, h, w, c1) -> (n, c0, h, w, c1)
     AffineMap inputSinkMap = AffineMap::getMultiDimIdentityMap(5, context);
 
-    linalg::GenericOp reorderInput =
-        createReorderGeneric(builder, blockedInputType, conv->input.value,
-                             inputSourceMap, inputSinkMap);
+    linalgx::CopyOp reorderInput =
+        createReorderOp(builder, blockedInputType, conv->input.value,
+                        inputSourceMap, inputSinkMap);
 
     // Reorder filter
     RankedTensorType blockedFilterType = conv->getBlockedFilterType(blockSize);
@@ -341,9 +338,9 @@ struct ReorderLayoutsPass : public ReorderLayoutsBase<ReorderLayoutsPass> {
     // (k1, c1, r, s, k0, c0) -> (k1, c1, r, s, k0, c0)
     AffineMap filterSinkMap = AffineMap::getMultiDimIdentityMap(6, context);
 
-    linalg::GenericOp reorderFilter =
-        createReorderGeneric(builder, blockedFilterType, conv->filter.value,
-                             filterSourceMap, filterSinkMap);
+    linalgx::CopyOp reorderFilter =
+        createReorderOp(builder, blockedFilterType, conv->filter.value,
+                        filterSourceMap, filterSinkMap);
 
     // Adjust convolution
     RankedTensorType blockedOutputType = conv->getBlockedOutputType(blockSize);
@@ -392,7 +389,7 @@ struct ReorderLayoutsPass : public ReorderLayoutsBase<ReorderLayoutsPass> {
     auto fill = builder.create<linalg::FillOp>(initValue, init);
     auto newConv = builder.create<linalg::GenericOp>(
         TypeRange{blockedOutputType},
-        ValueRange{reorderInput.getResult(0), reorderFilter.getResult(0)},
+        ValueRange{reorderInput.getResult(), reorderFilter.getResult()},
         ValueRange{fill.result()},
         ArrayRef<AffineMap>{newInputMap, newFilterMap, newOutputMap},
         ArrayRef<StringRef>{
@@ -415,38 +412,22 @@ struct ReorderLayoutsPass : public ReorderLayoutsBase<ReorderLayoutsPass> {
         });
 
     // Reorder output
-    linalg::GenericOp reorderOutput =
-        createReorderGeneric(builder, conv->output.type, newConv.getResult(0),
-                             inputSinkMap, inputSourceMap);
+    linalgx::CopyOp reorderOutput =
+        createReorderOp(builder, conv->output.type, newConv.getResult(0),
+                        inputSinkMap, inputSourceMap);
 
-    op.getResult(0).replaceAllUsesWith(reorderOutput.getResult(0));
+    op.getResult(0).replaceAllUsesWith(reorderOutput.getResult());
     op.erase();
 
-    return reorderOutput.getResult(0);
+    return reorderOutput.getResult();
   }
 
-  linalg::GenericOp createReorderGeneric(ImplicitLocOpBuilder &builder,
-                                         RankedTensorType resultType,
-                                         Value source, AffineMap sourceMap,
-                                         AffineMap sinkMap) {
-    unsigned numDims = sourceMap.getNumDims();
+  linalgx::CopyOp createReorderOp(ImplicitLocOpBuilder &builder,
+                                  RankedTensorType resultType, Value source,
+                                  AffineMap sourceMap, AffineMap sinkMap) {
     auto init = builder.create<linalg::InitTensorOp>(
         resultType.getShape(), resultType.getElementType());
-
-    SmallVector<StringRef> iterTypes(numDims, "parallel");
-    linalg::GenericOp op = builder.create<linalg::GenericOp>(
-        /*resultTensorTypes=*/TypeRange{resultType},
-        /*inputs=*/ValueRange{source},
-        /*outputs=*/ValueRange{init},
-        /*indexingMaps=*/ArrayRef<AffineMap>{sourceMap, sinkMap},
-        /*iteratorTypes=*/iterTypes,
-        /*doc=*/"",
-        /*libraryCall=*/"",
-        [](OpBuilder &builder, Location loc, ValueRange args) {
-          builder.create<linalg::YieldOp>(loc, args[0]);
-        });
-    op->setAttr("reorder", builder.getUnitAttr());
-    return op;
+    return builder.create<linalgx::CopyOp>(source, init, sourceMap, sinkMap);
   }
 };
 

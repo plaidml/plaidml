@@ -40,6 +40,9 @@ def ReorderLayouts : FunctionPass<"x86-reorder-layouts"> {
     Option<"blockSize", "block-size", "int64_t", /*default=*/"16",
            "Data block size">
   ];
+  let dependentDialects = [
+    "dialect::linalgx::LinalgXDialect",
+  ];
 }
 
 def StencilTppGemm : FunctionPass<"x86-stencil-tpp-gemm"> {

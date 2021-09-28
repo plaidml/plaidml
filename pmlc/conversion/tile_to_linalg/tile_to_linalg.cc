@@ -412,30 +412,32 @@ struct CondOp {
 
 static AffineMap
 buildBroadcastMap(OpBuilder &builder, Location loc, Value operand,
-                  unsigned outRank,
+                  ShapedType outType,
                   Optional<tile::PaddingInfo> maybePadding = llvm::None) {
-  auto context = builder.getContext();
+  MLIRContext *context = builder.getContext();
+  auto operandType = operand.getType().dyn_cast<RankedTensorType>();
+  unsigned outRank = outType.getRank();
   // Handle scalar values
-  if (!operand.getType().isa<RankedTensorType>()) {
-    return AffineMap::get(outRank, 0, {}, context);
-  }
+  if (!operandType)
+    return AffineMap::get(outRank, 0, context);
+
   // handle broadcasts
-  auto body = builder.getBlock();
-  auto operandType = operand.getType().cast<RankedTensorType>();
-  auto numDims = operandType.getRank();
+  Block *body = builder.getBlock();
+  unsigned numDims = operandType.getRank();
   assert(numDims <= outRank && "result rank < operand rank");
   ArrayRef<int64_t> shape = operandType.getShape();
+  ArrayRef<int64_t> outShape = outType.getShape();
   SmallVector<AffineExpr, 4> exprs(numDims);
   for (unsigned i = 0; i < numDims; i++) {
     unsigned j = outRank - i - 1;
     unsigned k = numDims - i - 1;
-    exprs[k] = (shape[k] == 1) ? builder.getAffineConstantExpr(0)
-                               : builder.getAffineDimExpr(j);
+    exprs[k] = (shape[k] == 1 && outShape[j] != 1)
+                   ? builder.getAffineConstantExpr(0)
+                   : builder.getAffineDimExpr(j);
   }
   auto map = AffineMap::get(outRank, 0, exprs, context);
-  if (maybePadding) {
+  if (maybePadding)
     map = updatePaddingMap(map, *maybePadding, context);
-  }
   return map;
 }
 
@@ -574,7 +576,7 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
       Optional<tile::PaddingInfo> maybePadding =
           tile::getPaddingInfo(op->getOperand(i).getDefiningOp());
       AffineMap idxMap =
-          buildBroadcastMap(rewriter, loc, operands[i], numDims, maybePadding);
+          buildBroadcastMap(rewriter, loc, operands[i], initType, maybePadding);
       idxMaps.emplace_back(idxMap);
     }
 
@@ -721,7 +723,7 @@ struct ContractionOpConversion
     if (auto tensorType = initValue.getType().dyn_cast<RankedTensorType>()) {
       if (tensorType != resultType) {
         AffineMap inputMap =
-            buildBroadcastMap(rewriter, loc, initValue, numDims);
+            buildBroadcastMap(rewriter, loc, initValue, resultType);
         AffineMap outputMap =
             AffineMap::getMultiDimIdentityMap(numDims, context);
         auto broadcastOp = rewriter.create<linalg::GenericOp>(
@@ -1000,7 +1002,7 @@ struct CastOpConversion : public OpConversionPattern<tile::CastOp> {
     RankedTensorType initType = init.getType();
     unsigned numDims = initType.getRank();
     AffineMap inputMap =
-        buildBroadcastMap(rewriter, loc, operands[0], initType.getRank());
+        buildBroadcastMap(rewriter, loc, operands[0], initType);
     AffineMap outputMap = AffineMap::getMultiDimIdentityMap(numDims, context);
 
     auto genericOp = rewriter.create<linalg::GenericOp>(
