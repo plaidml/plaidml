@@ -6,6 +6,8 @@ from tensorflow.python.framework.convert_to_constants import convert_variables_t
 from tensorflow.python.tools.optimize_for_inference_lib import optimize_for_inference
 from tensorflow.python.pywrap_mlir import import_graphdef
 
+# from transformers import GPT2Tokenizer, TFGPT2Model
+
 
 class ModelMetadata(object):
     '''Handles metadata for non-Keras SavedModels
@@ -132,6 +134,7 @@ if __name__ == '__main__':
         description='Read a TF model and produce serialized MLIR for that model')
     parser.add_argument('--model-type',
                         choices=[
+                            'hf-gpt2',
                             'keras-resnet',
                             'tfhub-bert',
                             'tfhub-i3d-kin',
@@ -159,7 +162,23 @@ if __name__ == '__main__':
     model_meta = ModelMetadata()
     populate_metadata(model_meta)
 
-    if args.model_type == 'keras-resnet':
+    if args.model_type == 'hf-gpt2':
+        # TODO: Importing here is weird, but also I don't want to force transforms to be installed for the other models
+        from transformers import TFGPT2Model
+        model = TFGPT2Model.from_pretrained('gpt2')
+        if args.src:
+            print("Warning: --src specified but unused by HuggingFace GPT-2")
+        dst_path = args.dst or "/home/tim/tmp/hf_gpt2_tf_todo.mlir"  # TODO: Change the path
+        input_shape = [256]  # I just picked an arbitrary input length
+        # dtype choices are i32 and i64
+        input_signature = [tf.TensorSpec(shape=input_shape, dtype=tf.int32)]
+
+        @tf.function()
+        def predict(inp):
+            return model.predict_step(inp)
+
+        concrete_fcn = predict.get_concrete_function(*input_signature)
+    elif args.model_type == 'keras-resnet':
         # Load ResNet50 from Keras
         if args.src:
             print("Warning: --src specified but unused by Keras ResNet50")
