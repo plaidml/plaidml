@@ -23,9 +23,14 @@ def ConvertStandardToLLVM : Pass<"x86-convert-std-to-llvm", "mlir::ModuleOp"> {
   let dependentDialects = ["mlir::LLVM::LLVMDialect"];
 }
 
-def FoldConstantCast : FunctionPass<"fold-constant-cast"> {
+def FoldConstantCast : FunctionPass<"x86-fold-constant-cast"> {
   let summary = "Materialize casts of constants to target type";
   let constructor = "pmlc::target::x86::createFoldConstantCastPass()";
+}
+
+def ProfileKernels : Pass<"x86-profile-kernels", "mlir::ModuleOp"> {
+  let summary = "Inject instrumentation points before/after kernel ops";
+  let constructor = "pmlc::target::x86::createProfileKernelsPass()";
 }
 
 def PRNGLinking : Pass<"x86-prng-linking", "mlir::ModuleOp"> {

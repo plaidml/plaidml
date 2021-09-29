@@ -15,6 +15,7 @@ pml_cc_library(
     device.h
     device_id.cc
     executable.cc
+    instrument.cc
     internal.h
     jit_executable.cc
     jit_executable.h
@@ -48,7 +49,7 @@ set_property(SOURCE xsmm.cc
 )
 
 set(_RT_DEFINES "")
-set(_RT_DEPS 
+set(_RT_DEPS
   ::rt
   pmlc::rt::llvm
 )

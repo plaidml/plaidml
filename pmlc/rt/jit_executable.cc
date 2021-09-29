@@ -38,6 +38,7 @@
 #include "mlir/Transforms/Passes.h"
 
 #include "pmlc/rt/device_id.h"
+#include "pmlc/rt/instrument.h"
 #include "pmlc/rt/internal.h"
 #include "pmlc/rt/runtime.h"
 #include "pmlc/rt/symbol_registry.h"
@@ -334,23 +335,6 @@ enum class EngineKind {
   OrcJIT,
 };
 
-struct StopWatch {
-  using fp_milliseconds =
-      std::chrono::duration<double, std::chrono::milliseconds::period>;
-
-  void start() { startTime = std::chrono::steady_clock::now(); }
-
-  void stop() { stopTime = std::chrono::steady_clock::now(); }
-
-  double delta_ms() {
-    return std::chrono::duration_cast<fp_milliseconds>(stopTime - startTime)
-        .count();
-  }
-
-  std::chrono::steady_clock::time_point startTime;
-  std::chrono::steady_clock::time_point stopTime;
-};
-
 class JitExecutable final : public Executable {
 public:
   JitExecutable(const std::shared_ptr<Program> &program,
@@ -427,6 +411,7 @@ public:
         initDescriptors.emplace_back(arg.buffer->data(), arg.type);
         initPtrs.push_back(initDescriptors.back().ptr());
       }
+      rt::initInstrument();
       initPack = jitInit(initPtrs.data());
       IVLOG(3, "Jit init complete");
 
@@ -459,6 +444,7 @@ public:
   ~JitExecutable() {
     if (jitFini) {
       IVLOG(3, "Doing jit fini");
+      rt::initInstrument();
       SmallVector<void *, 1> finiPtrs{initPack};
       jitFini(finiPtrs.data());
       IVLOG(3, "Jit fini complete");
@@ -486,16 +472,9 @@ public:
 
   double invoke(ArrayRef<util::BufferPtr> inputBuffers,
                 ArrayRef<util::BufferPtr> outputBuffers) final {
-    StopWatch stopWatch;
-    if (VLOG_IS_ON(1)) {
-      stopWatch.start();
-    }
+    rt::initInstrument();
     bindArguments(inputBuffers, outputBuffers);
     jitMain(ptrs.data());
-    if (VLOG_IS_ON(1)) {
-      stopWatch.stop();
-      IVLOG(1, "Execution time: " << stopWatch.delta_ms() << "ms");
-    }
     return device->execTimeInMS;
   }
 

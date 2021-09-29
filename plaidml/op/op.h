@@ -344,8 +344,8 @@ inline edsl::Tensor cumsum(const edsl::Tensor& I, int axis, bool exclusive = fal
   return details::op("cumsum", args).as_tensor();
 }
 
-inline edsl::Tensor dot(const edsl::Tensor& I, const edsl::Tensor& K) {
-  auto args = edsl::make_tuple(I, K);
+inline edsl::Tensor dot(const edsl::Tensor& I, const edsl::Tensor& K, const std::string& name = "") {
+  auto args = edsl::make_tuple(I, K, name);
   return details::op("dot", args).as_tensor();
 }
 
@@ -806,7 +806,8 @@ inline edsl::Tensor pool(                    //
     const std::vector<int>& manual_padding,  //
     TensorLayout input_layout,               //
     bool include_padding_in_avg = false,     //
-    bool use_ceil_for_output_shape = false   //
+    bool use_ceil_for_output_shape = false,  //
+    const std::string& name = ""             //
 ) {
   auto args = edsl::make_tuple(          //
       I,                                 //
@@ -817,7 +818,8 @@ inline edsl::Tensor pool(                    //
       edsl::make_tuple(manual_padding),  //
       static_cast<int>(input_layout),    //
       include_padding_in_avg,            //
-      use_ceil_for_output_shape);
+      use_ceil_for_output_shape,         //
+      name);
   return details::op("pool", args).as_tensor();
 }
 
@@ -845,8 +847,13 @@ class relu {
     return *this;
   }
 
+  relu& name(const std::string& name) {
+    name_ = name;
+    return *this;
+  }
+
   operator edsl::Tensor() const {
-    auto args = edsl::make_tuple(I_, alpha_, max_value_, threshold_);
+    auto args = edsl::make_tuple(I_, alpha_, max_value_, threshold_, name_);
     return details::op("relu", args).as_tensor();
   }
 
@@ -855,6 +862,7 @@ class relu {
   edsl::Tensor alpha_;
   edsl::Tensor max_value_;
   edsl::Value threshold_;
+  std::string name_;
 };
 
 inline edsl::Tensor reorg_yolo(const edsl::Tensor& I, int stride, bool decrease, const std::string& layout = "NCHW") {
@@ -938,8 +946,8 @@ class slice {
   std::vector<edsl::Value> dims_;
 };
 
-inline edsl::Tensor softmax(const edsl::Tensor& I, int axis) {
-  auto args = edsl::make_tuple(I, axis);
+inline edsl::Tensor softmax(const edsl::Tensor& I, int axis, const std::string& name = "") {
+  auto args = edsl::make_tuple(I, axis, name);
   return details::op("softmax", args).as_tensor();
 }
 

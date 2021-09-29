@@ -381,6 +381,8 @@ void pipelineBuilderStage4(OpPassManager &pm) {
 
   pm.addPass(createLowerToLLVMPass());
   pm.addPass(createTraceLinkingPass());
+  if (pmlc::util::getEnvVar("PLAIDML_PROFILE") == "1")
+    pm.addPass(createProfileKernelsPass());
 }
 
 void pipelineBuilder(OpPassManager &pm) {
