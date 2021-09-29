@@ -637,52 +637,6 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
   }
 };
 
-struct ContractionMapsAndShapes {
-  // The contraction op contains the lower and upper bounds of the loop. Each
-  // AffineMap in `maps` maps the loop dims to shape dims. The function makes
-  // lower bounds be zero.
-  ContractionMapsAndShapes(tile::ContractionOp op, ArrayRef<AffineMap> maps)
-      : numDims(maps[0].getNumDims()) {
-    MLIRContext *context = op.getContext();
-    SmallVector<int64_t> lowerBounds =
-        op.lowerBounds().getValue().getConstantResults();
-    SmallVector<int64_t> upperBounds =
-        op.upperBounds().getValue().getConstantResults();
-    SmallVector<AffineExpr, 4> dimReplacements;
-    for (unsigned i = 0; i < lowerBounds.size(); i++) {
-      shape.emplace_back(upperBounds[i] - lowerBounds[i] + 1);
-      AffineExpr repl = getAffineDimExpr(i, context) +
-                        getAffineConstantExpr(lowerBounds[i], context);
-      dimReplacements.emplace_back(simplifyAffineExpr(repl, numDims, 0));
-    }
-    for (AffineMap oldMap : maps) {
-      AffineMap newMap =
-          oldMap.replaceDimsAndSymbols(dimReplacements, {}, numDims, 0);
-      newMaps.emplace_back(simplifyAffineMap(newMap));
-    }
-  }
-
-  // This function determines if all the loop dims appear as a single dim in
-  // shape dims.
-  bool shapeHasAllLoopDims() {
-    llvm::SmallSet<unsigned, 4> dims;
-    for (AffineMap map : newMaps) {
-      assert(numDims == map.getNumDims() &&
-             "The input maps have different numbers of dimensions.");
-      for (AffineExpr expr : map.getResults()) {
-        if (auto dimExpr = expr.dyn_cast<AffineDimExpr>()) {
-          dims.insert(dimExpr.getPosition());
-        }
-      }
-    }
-    return dims.size() == numDims;
-  }
-
-  SmallVector<AffineMap, 4> newMaps;
-  SmallVector<int64_t, 4> shape;
-  unsigned numDims;
-};
-
 template <CombinationKind comboKind, typename ComboBuilder,
           typename Matcher = AlwaysTrue>
 struct ContractionOpConversion
@@ -777,40 +731,19 @@ struct ContractionOpConversion
       }
     }
 
-    // GenericOp requires that loop->shape maps can infer shape->loop maps.
-    // However the inference function simply calls
-    // AffineMap::inversePurmutation(loopToShapeMap) that is too simple to infer
-    // shape->loop maps sometimes. So we can't get shape->loop maps and then
-    // fail to verify GenericOp sometimes. In this case, we add a redundant
-    // tensor and its AffineMap to specify the loop bound explicitly. Then it
-    // can pass the GenericOp verification. Later, the redundant tensor could be
-    // optimized away because it is useless.
-    ContractionMapsAndShapes info(op, idxMaps);
-    bool needExtraMap = !info.shapeHasAllLoopDims();
-    idxMaps = info.newMaps;
-    SmallVector<Value, 4> inputs(cionOperands.begin(), cionOperands.end());
-    if (needExtraMap) {
-      // Create a synthetic tensor with the dimensions of loop bounds.
-      auto extraTensor = rewriter.create<linalg::InitTensorOp>(
-          loc, info.shape, resultType.getElementType());
-      inputs.insert(inputs.begin(), extraTensor);
-      AffineMap loopMap =
-          AffineMap::getMultiDimIdentityMap(info.numDims, context);
-      idxMaps.insert(idxMaps.begin(), loopMap);
-    }
-
-    // Create the main loop
-    auto genericOp = rewriter.create<linalg::GenericOp>(
-        loc,
-        /*resultTensorTypes=*/TypeRange{resultType},
-        /*inputs=*/inputs,
-        /*outputs=*/ValueRange{initValue},
-        /*indexingMaps=*/idxMaps,
-        /*iteratorTypes=*/iterTypes,
-        /*doc=*/"",
-        /*libraryCall=*/"",
-        [&](OpBuilder &builder, Location loc, ValueRange args) {
-          int offset = needExtraMap ? 1 : 0;
+    ContractionMapsAndShapes info(op, cionOperands, ValueRange{initValue},
+                                  idxMaps);
+    auto genericOp = createValidGenericOp(
+        /*builder=*/rewriter,
+        /*loc=*/loc,
+        /*info=*/info,
+        /*resultTypes=*/TypeRange{resultType},
+        /*rawInputs=*/cionOperands,
+        /*rawOutputs=*/ValueRange{initValue},
+        /*rawIdxMaps=*/idxMaps,
+        /*rawIterTypes=*/iterTypes,
+        /*body=*/[&](OpBuilder &builder, Location loc, ValueRange args) {
+          int offset = (info.needDummyMap() || info.needDynamicDim()) ? 1 : 0;
           ComboBuilder comboBuilder;
           ValueRange comboArgs = args.slice(offset, args.size() - offset - 1);
           Value combined =

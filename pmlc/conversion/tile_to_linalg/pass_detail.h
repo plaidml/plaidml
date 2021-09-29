@@ -26,6 +26,26 @@ struct TileToLinalgTypeConverter : public mlir::TypeConverter {
   TileToLinalgTypeConverter();
 };
 
+struct ContractionMapsAndShapes {
+  ContractionMapsAndShapes(pmlc::dialect::tile::ContractionOp op,
+                           mlir::ValueRange inputs, mlir::ValueRange outputs,
+                           llvm::ArrayRef<mlir::AffineMap> maps);
+
+  // This function determines if all the loop dims appear as a single dim in
+  // shape dims. If not, we need a dummp map to indicate the loop ranges.
+  bool needDummyMap();
+
+  // This function determines if the loop bound inferred by the indexing map
+  // matches the operand shape. If not, we need to introduce a dynamic dimension
+  // to bypass the bound check.
+  bool needDynamicDim();
+
+  llvm::ArrayRef<mlir::AffineMap> maps;
+  llvm::SmallVector<mlir::Value, 4> operands;
+  llvm::SmallVector<int64_t, 4> shape;
+  unsigned numDims;
+};
+
 mlir::Value createCastOp(mlir::OpBuilder &builder, mlir::Location loc,
                          mlir::Value from, bool fromSigned, mlir::Type intoType,
                          bool intoSigned);
@@ -41,5 +61,16 @@ updatePaddingMap(mlir::AffineMap origMap,
                  mlir::MLIRContext *context);
 
 llvm::SmallSet<int64_t, 4> getUsedDims(mlir::AffineExpr expr);
+
+mlir::linalg::GenericOp
+createValidGenericOp(mlir::OpBuilder &builder, mlir::Location loc,
+                     ContractionMapsAndShapes &info,
+                     mlir::TypeRange resultTypes, mlir::ValueRange rawInputs,
+                     mlir::ValueRange rawOutputs,
+                     llvm::ArrayRef<mlir::AffineMap> rawIdxMaps,
+                     llvm::ArrayRef<llvm::StringRef> rawIterTypes,
+                     llvm::function_ref<void(mlir::OpBuilder &, mlir::Location,
+                                             mlir::ValueRange)>
+                         body);
 
 } // namespace pmlc::conversion::tile_to_linalg

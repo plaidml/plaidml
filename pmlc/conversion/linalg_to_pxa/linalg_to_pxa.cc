@@ -220,8 +220,6 @@ struct GenericOpConversion : public OpConversionPattern<linalg::GenericOp> {
     linalg::GenericOpAdaptor adaptor(operands, op->getAttrDictionary());
     ValueRange inputs = adaptor.inputs();
     ValueRange outputs = adaptor.outputs();
-    SmallVector<AffineMap, 4> idxMaps = llvm::to_vector<4>(
-        adaptor.indexing_maps().getAsValueRange<AffineMapAttr>());
 
     // Prepare for creating the reduce ops. The operations with output arguments
     // should be converted to reduce op. We need to extract the aggregation
@@ -258,21 +256,40 @@ struct GenericOpConversion : public OpConversionPattern<linalg::GenericOp> {
       }
     }
 
-    auto ranges = op.getStaticLoopRanges();
-    if (!ranges) {
+    bool hasDummyTensor = op->hasAttr("dummy_tensor");
+    bool skipBoundCheck = op->hasAttr("skip_bound_check");
+    SmallVector<AffineMap, 4> idxMaps = llvm::to_vector<4>(
+        adaptor.indexing_maps().getAsValueRange<AffineMapAttr>());
+    if (skipBoundCheck) {
+      // Remove the last dynamic dimension of the indexing maps
+      for (auto &map : idxMaps) {
+        map = AffineMap::get(map.getNumDims() - 1, 0, map.getResults(),
+                             op.getContext());
+      }
+    }
+
+    auto staticRanges = op.getStaticLoopRanges();
+    if (!staticRanges) {
       op.emitError("LiangOp does not have static ranges.");
+    }
+    SmallVector<int64_t, 8> ranges = llvm::to_vector<8>(*staticRanges);
+    if (skipBoundCheck) {
+      ranges.pop_back();
     }
     auto forOp =
         rewriter.create<AffineParallelOp>(op.getLoc(),
                                           /*resultTypes=*/outputs.getTypes(),
                                           /*reductions=*/aggs,
-                                          /*ranges=*/*ranges);
+                                          /*ranges=*/ranges);
 
     // Create the a load op for each block argument.
     Block *forBody = forOp.getBody();
     auto idxs = forBody->getArguments();
     rewriter.setInsertionPointToStart(forBody);
     for (unsigned i = 0; i < numInputs; ++i) {
+      if (i == 0 && hasDummyTensor) {
+        continue;
+      }
       if (inputs[i].getType().isa<ShapedType>()) {
         // input is a tensor
         auto loadOp = rewriter.create<pxa::PxaLoadOp>(forOp.getLoc(), inputs[i],
@@ -349,8 +366,11 @@ struct InitTensorOpConversion
   LogicalResult
   matchAndRewrite(linalg::InitTensorOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
-    BufferAllocator allocResult(rewriter, op, op.result().getType());
-    op.replaceAllUsesWith(allocResult.resultMemRef);
+    auto type = op.result().getType().cast<RankedTensorType>();
+    if (llvm::none_of(type.getShape(), ShapedType::isDynamic)) {
+      BufferAllocator allocResult(rewriter, op, type);
+      op.replaceAllUsesWith(allocResult.resultMemRef);
+    }
     rewriter.eraseOp(op);
     return success();
   }
