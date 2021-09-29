@@ -21,6 +21,7 @@
 #include "mlir-hlo/Dialect/mhlo/IR/lhlo_ops.h"
 
 #include "pmlc/dialect/layer/ir/ops.h"
+#include "pmlc/dialect/linalgx/ir/ops.h"
 #include "pmlc/dialect/pml/ir/dialect.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/dialect/stdx/ir/ops.h"
@@ -31,25 +32,26 @@ using namespace mlir; // NOLINT [build/namespaces]
 
 // Add all the MLIR dialects to the provided registry.
 void registerAllDialects(DialectRegistry &registry) {
-  registry.insert<AffineDialect,                      //
-                  LLVM::LLVMDialect,                  //
-                  linalg::LinalgDialect,              //
-                  math::MathDialect,                  //
-                  memref::MemRefDialect,              //
-                  omp::OpenMPDialect,                 //
-                  scf::SCFDialect,                    //
-                  StandardOpsDialect,                 //
-                  tensor::TensorDialect,              //
-                  vector::VectorDialect,              //
-                  mlir::mhlo::MhloDialect,            //
-                  mlir::chlo::HloClientDialect,       //
-                  mlir::lmhlo::LmhloDialect,          //
-                  mlir::lmhlo_gpu::LmhloGpuDialect,   //
-                  mlir::disc_ral::RalDialect,         //
-                  pmlc::dialect::layer::LayerDialect, //
-                  pmlc::dialect::pml::PMLDialect,     //
-                  pmlc::dialect::pxa::PXADialect,     //
-                  pmlc::dialect::stdx::StdXDialect,   //
-                  pmlc::dialect::tile::TileDialect,   //
+  registry.insert<AffineDialect,                          //
+                  LLVM::LLVMDialect,                      //
+                  linalg::LinalgDialect,                  //
+                  math::MathDialect,                      //
+                  memref::MemRefDialect,                  //
+                  omp::OpenMPDialect,                     //
+                  scf::SCFDialect,                        //
+                  StandardOpsDialect,                     //
+                  tensor::TensorDialect,                  //
+                  vector::VectorDialect,                  //
+                  mlir::mhlo::MhloDialect,                //
+                  mlir::chlo::HloClientDialect,           //
+                  mlir::lmhlo::LmhloDialect,              //
+                  mlir::lmhlo_gpu::LmhloGpuDialect,       //
+                  mlir::disc_ral::RalDialect,             //
+                  pmlc::dialect::layer::LayerDialect,     //
+                  pmlc::dialect::linalgx::LinalgXDialect, //
+                  pmlc::dialect::pml::PMLDialect,         //
+                  pmlc::dialect::pxa::PXADialect,         //
+                  pmlc::dialect::stdx::StdXDialect,       //
+                  pmlc::dialect::tile::TileDialect,       //
                   pmlc::dialect::xsmm::XSMMDialect>();
 }

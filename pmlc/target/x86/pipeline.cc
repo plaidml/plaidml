@@ -266,10 +266,10 @@ void pipelineBuilderStage1(OpPassManager &pm) {
     pm.addNestedPass<FuncOp>(createReorderLayoutsPass());
   }
 
-  // pm.addPass(stdx::createMainClosurePass());
+  pm.addPass(stdx::createMainClosurePass());
   pm.addPass(createLoopInvariantCodeMotionPass());
-  pm.addPass(createCanonicalizerPass());
   if (util::getEnvVar("PLAIDML_USE_LINALG") != "1") {
+    pm.addPass(createCanonicalizerPass());
     // CSE reuses the output for multiple linalg.generic. This may break the
     // assumption of value-like program, and cause bugs later.
     pm.addPass(createCSEPass());

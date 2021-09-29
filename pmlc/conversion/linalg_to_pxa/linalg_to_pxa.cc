@@ -1,6 +1,7 @@
 // Copyright 2021, Intel Corporation
 
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Support/DebugStringHelper.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "pmlc/conversion/linalg_to_pxa/pass_detail.h"
@@ -461,19 +462,24 @@ struct LowerLinalgToPXAPass
         funcOp.getType().getNumInputs() - returnOp.getNumOperands();
     MLIRContext *context = &getContext();
     Location loc = returnOp->getLoc();
-    ImplicitLocOpBuilder builder(loc, returnOp);
     for (OpOperand &operand : returnOp->getOpOperands()) {
       // Find very initial allocation of memref
       Value def = pxa::getIndirectDef(operand.get());
       BlockArgument outputArg = funcOp.getBody().getArgument(argNumber++);
       if (def != outputArg) {
-        MLIRContext *context = &getContext();
-        Location loc = returnOp->getLoc();
-        ImplicitLocOpBuilder builder(loc, returnOp);
         if (def.isa<BlockArgument>() ||
             isa<memref::GetGlobalOp>(def.getDefiningOp())) {
+          OpBuilder builder(returnOp);
           auto forOp = copyBuffer(builder, loc, def, outputArg, context);
           operand.set(forOp.getResult(0));
+        } else if (Value outside =
+                       pxa::getIndirectDefOutsideScope(operand.get(), funcOp)) {
+          OpBuilder builder(funcOp.getBody());
+          auto forOp = copyBuffer(builder, loc, outside, outputArg, context);
+          outside.replaceUsesWithIf(forOp.getResult(0), [&](OpOperand &use) {
+            Operation *op = use.getOwner();
+            return !forOp->isProperAncestor(op) && funcOp->isProperAncestor(op);
+          });
         } else {
           def.replaceAllUsesWith(outputArg);
         }
