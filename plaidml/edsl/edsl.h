@@ -748,9 +748,10 @@ inline Tensor Placeholder(             //
 
 inline Tensor Zero(edsl_source_location loc = edsl_source_location::current()) { return Tensor(0, loc); }
 
-Tensor intrinsicCall(const std::string& fn, const TensorVec& args);
+Tensor intrinsicCall(const std::string& fn, const TensorVec& args, const std::string& name = "");
 
-Tensor intrinsicCall(edsl_source_location loc, const std::string& fn, const TensorVec& args);
+Tensor intrinsicCall(edsl_source_location loc, const std::string& fn, const TensorVec& args,
+                     const std::string& name = "");
 
 template <typename... Ts>
 Tensor intrinsic(const std::string& fn, Ts... args) {
@@ -1007,8 +1008,9 @@ inline Tensor reshape(const Tensor& x, const std::vector<TensorDim>& dims,
   return intrinsicCall(loc, "reshape", args);
 }
 
-inline Tensor relu(const Tensor& x, edsl_source_location loc = edsl_source_location::current()) {
-  return intrinsicCall(loc, "relu", {x});
+inline Tensor relu(const Tensor& x, const std::string& name = "",
+                   edsl_source_location loc = edsl_source_location::current()) {
+  return intrinsicCall(loc, "relu", {x}, name);
 }
 
 ///
@@ -1265,20 +1267,22 @@ PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(^, "bit_xor");
 PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(&&, "logical_and");
 PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(||, "logical_or");
 
-inline Tensor intrinsicCall(const std::string& fn, const TensorVec& args) {
+inline Tensor intrinsicCall(const std::string& fn, const TensorVec& args, const std::string& name) {
   std::vector<plaidml_expr*> ptrs(args.size());
   for (size_t i = 0; i < args.size(); i++) {
     ptrs[i] = args[i].as_ptr();
   }
-  return Tensor{ffi::call<plaidml_expr*>(plaidml_expr_intrinsic, fn.c_str(), ptrs.size(), ptrs.data())};
+  return Tensor{ffi::call<plaidml_expr*>(plaidml_expr_intrinsic, fn.c_str(), ptrs.size(), ptrs.data(), name.c_str())};
 }
 
-inline Tensor intrinsicCall(edsl_source_location loc, const std::string& fn, const TensorVec& args) {
+inline Tensor intrinsicCall(edsl_source_location loc, const std::string& fn, const TensorVec& args,
+                            const std::string& name) {
   std::vector<plaidml_expr*> ptrs(args.size());
   for (size_t i = 0; i < args.size(); i++) {
     ptrs[i] = args[i].as_ptr();
   }
-  return Tensor{ffi::call<plaidml_expr*>(loc, plaidml_expr_intrinsic, fn.c_str(), ptrs.size(), ptrs.data())};
+  return Tensor{
+      ffi::call<plaidml_expr*>(loc, plaidml_expr_intrinsic, fn.c_str(), ptrs.size(), ptrs.data(), name.c_str())};
 }
 
 class Value {

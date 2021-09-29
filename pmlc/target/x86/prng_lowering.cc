@@ -26,7 +26,7 @@ struct PRNGLinkingPass : public PRNGLinkingBase<PRNGLinkingPass> {
           UnrankedMemRefType::get(builder.getF32Type(), /*memorySpace=*/0);
       auto stateType = UnrankedMemRefType::get(builder.getIntegerType(32),
                                                /*memorySpace=*/0);
-      auto symbol = getOrInsertFunc(builder, module, builder.getF32Type(), loc,
+      auto symbol = getOrInsertFunc(builder, module, builder.getF32Type(),
                                     resultType, stateType);
 
       auto resultCast =
@@ -48,7 +48,7 @@ struct PRNGLinkingPass : public PRNGLinkingBase<PRNGLinkingPass> {
 
 private:
   static FlatSymbolRefAttr getOrInsertFunc(OpBuilder &builder, ModuleOp module,
-                                           Type elementType, Location loc,
+                                           Type elementType,
                                            UnrankedMemRefType resultType,
                                            UnrankedMemRefType stateType) {
     const char *symbol = "plaidml_rt_prng";
@@ -60,7 +60,9 @@ private:
     builder.setInsertionPointToStart(module.getBody());
     auto funcType = builder.getFunctionType(
         ArrayRef<Type>{stateType, resultType, stateType}, ArrayRef<Type>{});
-    builder.create<FuncOp>(loc, symbol, funcType, ArrayRef<NamedAttribute>{})
+    builder
+        .create<FuncOp>(builder.getUnknownLoc(), symbol, funcType,
+                        ArrayRef<NamedAttribute>{})
         .setPrivate();
     return SymbolRefAttr::get(context, symbol);
   }

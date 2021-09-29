@@ -6,6 +6,7 @@ pml_cc_library(
   SRCS
     heatmap.cc
     heatmap_impl.cc
+    instrument.cc
     pipeline.cc
     register.cc
     reorder_layouts.cc

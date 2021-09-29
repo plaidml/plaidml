@@ -149,8 +149,8 @@ def cumsum(x, axis, exclusive=False):
     return op('cumsum', [x, axis, exclusive]).as_tensor()
 
 
-def dot(x, y):
-    return op('dot', [x, y]).as_tensor()
+def dot(x, y, name=''):
+    return op('dot', [x, y, name]).as_tensor()
 
 
 def elu(x, alpha=1.0):
@@ -203,6 +203,7 @@ def pool(
         data_layout,
         use_ceil,
         include_pad_in_avg,
+        name='',
 ):
     return op("pool", [
         x,
@@ -214,11 +215,12 @@ def pool(
         data_layout,
         use_ceil,
         include_pad_in_avg,
+        name,
     ]).as_tensor()
 
 
-def relu(x, alpha=None, max_value=None, threshold=None):
-    return op('relu', [x, alpha, max_value, threshold]).as_tensor()
+def relu(x, alpha=None, max_value=None, threshold=None, name=''):
+    return op('relu', [x, alpha, max_value, threshold, name]).as_tensor()
 
 
 def reorg_yolo(x, stride, decrease, layout='NCHW'):
@@ -255,8 +257,8 @@ def slice_of(x, slices):
     return op("slice", [x, reformatted_slices]).as_tensor()
 
 
-def softmax(x, axis=None):
-    return op('softmax', [x, axis]).as_tensor()
+def softmax(x, axis=None, name=''):
+    return op('softmax', [x, axis, name]).as_tensor()
 
 
 def sort(x, axis=None, direction=edsl.SortDirection.ASC):

@@ -173,7 +173,8 @@ plaidml_expr* plaidml_expr_intrinsic(  //
     plaidml_error* err,                //
     const char* fn,                    //
     size_t nargs,                      //
-    plaidml_expr** args);
+    plaidml_expr** args,               //
+    const char* name);
 
 plaidml_expr* plaidml_expr_cast(  //
     plaidml_error* err,           //
