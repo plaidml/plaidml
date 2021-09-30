@@ -322,6 +322,8 @@ void pipelineBuilderStage2(OpPassManager &pm, const Options &options) {
   pm.addPass(createCSEPass());
 
   pm.addNestedPass<FuncOp>(createStencilTppUnaryPass());
+  if (pmlc::util::getEnvVar("PLAIDML_PROFILE") == "1")
+    pm.addPass(createProfileKernelsPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
@@ -359,8 +361,6 @@ void pipelineBuilderStage4(OpPassManager &pm) {
 
   pm.addPass(createLowerToLLVMPass());
   pm.addPass(createTraceLinkingPass());
-  if (pmlc::util::getEnvVar("PLAIDML_PROFILE") == "1")
-    pm.addPass(createProfileKernelsPass());
 }
 
 void pipelineBuilder(OpPassManager &pm) {

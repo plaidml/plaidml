@@ -37,14 +37,14 @@ void instrumentPoint(int64_t id, int64_t tag) {
 
 } // namespace pmlc::rt
 
-extern "C" void plaidml_rt_instrument(int64_t id, int64_t tag) {
+extern "C" void _mlir_ciface_plaidml_rt_instrument(int64_t id, int64_t tag) {
   pmlc::rt::instrumentPoint(id, tag);
 }
 
 namespace pmlc::rt {
 
 void registerInstrument() { //
-  REGISTER_SYMBOL(plaidml_rt_instrument);
+  REGISTER_SYMBOL(_mlir_ciface_plaidml_rt_instrument);
 }
 
 } // namespace pmlc::rt
