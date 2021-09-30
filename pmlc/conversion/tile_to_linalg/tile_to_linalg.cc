@@ -731,8 +731,7 @@ struct ContractionOpConversion
       }
     }
 
-    ContractionMapsAndShapes info(op, cionOperands, ValueRange{initValue},
-                                  idxMaps);
+    OpMapsAndShapes info(op, cionOperands, ValueRange{initValue}, idxMaps);
     auto genericOp = createValidGenericOp(
         /*builder=*/rewriter,
         /*loc=*/loc,
@@ -758,6 +757,12 @@ struct ContractionOpConversion
       genericOp->setAttr("name", attr);
     if (Attribute attr = op->getAttr("schedule"))
       genericOp->setAttr("schedule", attr);
+
+    // add constraints
+    if (op.cons()) {
+      auto cons = op.cons().getValue();
+      genericOp->setAttr("constraints", IntegerSetAttr::get(cons));
+    }
 
     // Replace output with the newly allocated buffer
     rewriter.replaceOp(op, genericOp.getResult(0));

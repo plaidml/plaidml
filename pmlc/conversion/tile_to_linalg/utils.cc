@@ -91,7 +91,8 @@ AffineMap updatePaddingMap(AffineMap origMap, const tile::PaddingInfo &padding,
   for (unsigned j = 0; j < origMap.getNumResults(); j++) {
     newExprs.push_back(origMap.getResult(j) + padding.lower[j]);
   }
-  return AffineMap::get(origMap.getNumDims(), 0, newExprs, context);
+  return simplifyAffineMap(
+      AffineMap::get(origMap.getNumDims(), 0, newExprs, context));
 }
 
 class UsedDimsVisitor : public AffineExprVisitor<UsedDimsVisitor> {
@@ -140,12 +141,9 @@ llvm::SmallSet<int64_t, 4> getUsedDims(AffineExpr expr) {
   return visitor.getUsedDims();
 }
 
-ContractionMapsAndShapes::ContractionMapsAndShapes(tile::ContractionOp op,
-                                                   ValueRange inputs,
-                                                   ValueRange outputs,
-                                                   ArrayRef<AffineMap> maps)
+OpMapsAndShapes::OpMapsAndShapes(tile::ContractionOp op, ValueRange inputs,
+                                 ValueRange outputs, ArrayRef<AffineMap> maps)
     : maps(maps), numDims(maps[0].getNumDims()) {
-  assert(operands.size() == maps.size());
   MLIRContext *context = op.getContext();
   SmallVector<int64_t> lowerBounds =
       op.lowerBounds().getValue().getConstantResults();
@@ -156,11 +154,12 @@ ContractionMapsAndShapes::ContractionMapsAndShapes(tile::ContractionOp op,
   }
   operands.insert(operands.end(), inputs.begin(), inputs.end());
   operands.insert(operands.end(), outputs.begin(), outputs.end());
+  assert(operands.size() == maps.size());
 }
 
 // This function determines if all the loop dims appear as a single dim in
 // shape dims. If not, we need a dummp map to indicate the loop ranges.
-bool ContractionMapsAndShapes::needDummyMap() {
+bool OpMapsAndShapes::needDummyMap() {
   llvm::SmallSet<unsigned, 4> dims;
   for (AffineMap map : maps) {
     assert(numDims == map.getNumDims() &&
@@ -177,7 +176,7 @@ bool ContractionMapsAndShapes::needDummyMap() {
 // This function determines if the loop bound inferred by the indexing map
 // matches the operand shape. If not, we need to introduce a dynamic dimension
 // to bypass the bound check.
-bool ContractionMapsAndShapes::needDynamicDim() {
+bool OpMapsAndShapes::needDynamicDim() {
   SmallVector<pmlc::util::Extent, 4> ranges;
   for (auto dim : shape) {
     ranges.emplace_back(pmlc::util::Extent{0, dim - 1});
@@ -186,7 +185,7 @@ bool ContractionMapsAndShapes::needDynamicDim() {
     auto map = maps[i];
     auto opShape = operands[i].getType().cast<RankedTensorType>().getShape();
     auto exprs = maps[i].getResults();
-    assert(exprs.size() == opSahpe.size());
+    assert(exprs.size() == opShape.size());
     for (unsigned j = 0; j < exprs.size(); ++j) {
       auto extent = pmlc::util::computeExtent(exprs[j], ranges);
       if (extent.max + 1 != opShape[j]) {
@@ -198,7 +197,7 @@ bool ContractionMapsAndShapes::needDynamicDim() {
 }
 
 linalg::GenericOp createValidGenericOp(
-    OpBuilder &builder, Location loc, ContractionMapsAndShapes &info,
+    OpBuilder &builder, Location loc, OpMapsAndShapes &info,
     TypeRange resultTypes, ValueRange rawInputs, ValueRange rawOutputs,
     ArrayRef<AffineMap> rawIdxMaps, ArrayRef<StringRef> rawIterTypes,
     function_ref<void(OpBuilder &, Location, ValueRange)> body) {

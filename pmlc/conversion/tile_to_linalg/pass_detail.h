@@ -26,10 +26,12 @@ struct TileToLinalgTypeConverter : public mlir::TypeConverter {
   TileToLinalgTypeConverter();
 };
 
-struct ContractionMapsAndShapes {
-  ContractionMapsAndShapes(pmlc::dialect::tile::ContractionOp op,
-                           mlir::ValueRange inputs, mlir::ValueRange outputs,
-                           llvm::ArrayRef<mlir::AffineMap> maps);
+struct OpMapsAndShapes {
+  // The constructor for ContractionOp. We may add constructors for other
+  // operations.
+  OpMapsAndShapes(pmlc::dialect::tile::ContractionOp op,
+                  mlir::ValueRange inputs, mlir::ValueRange outputs,
+                  llvm::ArrayRef<mlir::AffineMap> maps);
 
   // This function determines if all the loop dims appear as a single dim in
   // shape dims. If not, we need a dummp map to indicate the loop ranges.
@@ -64,9 +66,8 @@ llvm::SmallSet<int64_t, 4> getUsedDims(mlir::AffineExpr expr);
 
 mlir::linalg::GenericOp
 createValidGenericOp(mlir::OpBuilder &builder, mlir::Location loc,
-                     ContractionMapsAndShapes &info,
-                     mlir::TypeRange resultTypes, mlir::ValueRange rawInputs,
-                     mlir::ValueRange rawOutputs,
+                     OpMapsAndShapes &info, mlir::TypeRange resultTypes,
+                     mlir::ValueRange rawInputs, mlir::ValueRange rawOutputs,
                      llvm::ArrayRef<mlir::AffineMap> rawIdxMaps,
                      llvm::ArrayRef<llvm::StringRef> rawIterTypes,
                      llvm::function_ref<void(mlir::OpBuilder &, mlir::Location,

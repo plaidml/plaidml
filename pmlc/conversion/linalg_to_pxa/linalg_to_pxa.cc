@@ -276,8 +276,9 @@ struct GenericOpConversion : public OpConversionPattern<linalg::GenericOp> {
     if (skipBoundCheck) {
       ranges.pop_back();
     }
+    auto loc = op.getLoc();
     auto forOp =
-        rewriter.create<AffineParallelOp>(op.getLoc(),
+        rewriter.create<AffineParallelOp>(loc,
                                           /*resultTypes=*/outputs.getTypes(),
                                           /*reductions=*/aggs,
                                           /*ranges=*/ranges);
@@ -286,14 +287,27 @@ struct GenericOpConversion : public OpConversionPattern<linalg::GenericOp> {
     Block *forBody = forOp.getBody();
     auto idxs = forBody->getArguments();
     rewriter.setInsertionPointToStart(forBody);
+
+    // Add constraints
+    Block *body = forBody;
+    if (auto cons = op->getAttrOfType<IntegerSetAttr>("constraints")) {
+      auto ifOp = rewriter.create<AffineIfOp>(loc, outputs.getTypes(),
+                                              cons.getValue(), idxs, true);
+      rewriter.create<AffineYieldOp>(loc, ifOp->getResults());
+      rewriter.setInsertionPointToStart(&ifOp.elseRegion().front());
+      rewriter.create<AffineYieldOp>(loc, outputs);
+      body = &ifOp.thenRegion().front();
+      rewriter.setInsertionPointToStart(body);
+    }
+
     for (unsigned i = 0; i < numInputs; ++i) {
       if (i == 0 && hasDummyTensor) {
         continue;
       }
       if (inputs[i].getType().isa<ShapedType>()) {
         // input is a tensor
-        auto loadOp = rewriter.create<pxa::PxaLoadOp>(forOp.getLoc(), inputs[i],
-                                                      idxMaps[i], idxs);
+        auto loadOp =
+            rewriter.create<pxa::PxaLoadOp>(loc, inputs[i], idxMaps[i], idxs);
         outputArgs[i].replaceAllUsesWith(loadOp.getResult());
       } else {
         // input is a scalar
@@ -309,12 +323,12 @@ struct GenericOpConversion : public OpConversionPattern<linalg::GenericOp> {
       }
     }
     for (auto newOp : toMove) {
-      newOp->moveBefore(forBody, forBody->getOperations().end());
+      newOp->moveBefore(body, body->getOperations().end());
     }
 
     // Must insert reduce ops here. Later on, the reduce op's memref information
     // may be lost while the generic op is erased.
-    if (auto yieldOp = dyn_cast<linalg::YieldOp>(forBody->back())) {
+    if (auto yieldOp = dyn_cast<linalg::YieldOp>(body->back())) {
       SmallVector<AffineMap, 4> maps(idxMaps.begin() + numInputs,
                                      idxMaps.end());
       SmallVector<Value, 4> outs(outputs.begin(), outputs.end());
