@@ -8,6 +8,7 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include "pmlc/rt/symbol_registry.h"
+#include "pmlc/util/env.h"
 
 namespace pmlc::rt {
 
@@ -18,8 +19,10 @@ static time_point<steady_clock> globalTime;
 
 void initInstrument() { //
   initTime = globalTime = steady_clock::now();
-  llvm::outs() << "\"id\",\"tag\",\"elapsed\",\"accumulated\"\n";
-  llvm::outs().flush();
+  if (util::getEnvVar("PLAIDML_PROFILE") == "1") {
+    llvm::outs() << "\"id\",\"tag\",\"elapsed\",\"accumulated\"\n";
+    llvm::outs().flush();
+  }
 }
 
 void instrumentPoint(int64_t id, int64_t tag) {
