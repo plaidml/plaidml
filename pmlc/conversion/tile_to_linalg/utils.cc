@@ -1,6 +1,7 @@
 // Copyright 2021, Intel Corporation
 
 #include "mlir/IR/AffineExprVisitor.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "pmlc/conversion/tile_to_linalg/pass_detail.h"
 #include "pmlc/util/extent.h"
 
@@ -160,17 +161,7 @@ OpMapsAndShapes::OpMapsAndShapes(tile::ContractionOp op, ValueRange inputs,
 // This function determines if all the loop dims appear as a single dim in
 // shape dims. If not, we need a dummp map to indicate the loop ranges.
 bool OpMapsAndShapes::needDummyMap() {
-  llvm::SmallSet<unsigned, 4> dims;
-  for (AffineMap map : maps) {
-    assert(numDims == map.getNumDims() &&
-           "The input maps have different numbers of dimensions.");
-    for (AffineExpr expr : map.getResults()) {
-      if (auto dimExpr = expr.dyn_cast<AffineDimExpr>()) {
-        dims.insert(dimExpr.getPosition());
-      }
-    }
-  }
-  return dims.size() != numDims;
+  return !inversePermutation(concatAffineMaps(maps));
 }
 
 // This function determines if the loop bound inferred by the indexing map
