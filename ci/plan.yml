@@ -34,10 +34,10 @@ ACTIONS:
     - "echo --- :building_construction: configure"
     - mkdir -p logs
     - python configure --ci --temp=/tmp/{platform}/{cfg} --type={build_type} &> logs/configure.log
-    - "echo --- :hammer_and_wrench: ninja package"
-    - ninja -C {build_root}/{build_type} package
     - "echo --- :hammer_and_wrench: ninja check-{check}"
     - ninja -C {build_root}/{build_type} check-{check} &> logs/check-{check}.log
+    - "echo --- :hammer_and_wrench: ninja package"
+    - ninja -C {build_root}/{build_type} package
     - "echo --- Test devkit"
     - cd {build_root}/{build_type}/_CPack_Packages/{system}/TGZ/PlaidML-{version}-{system}/devkit
     - cmake -S . -B build -G Ninja

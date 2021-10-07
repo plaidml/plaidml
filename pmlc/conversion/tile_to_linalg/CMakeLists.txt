@@ -12,6 +12,7 @@ pml_cc_library(
     pmlc::dialect::stdx::ir
     pmlc::dialect::tile::ir
     pmlc::util
+    MLIRIR
 )
 
 pml_tblgen_library(
