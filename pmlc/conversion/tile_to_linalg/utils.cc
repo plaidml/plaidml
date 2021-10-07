@@ -13,6 +13,10 @@ namespace tile = dialect::tile;
 using namespace mlir; // NOLINT
 using namespace pmlc; // NOLINT
 
+// This is needed to workaround multiple definition linker issues on debug
+// builds in the CI environment.
+static constexpr int64_t kDynamicSize = -1;
+
 TileToLinalgTypeConverter::TileToLinalgTypeConverter() {
   addConversion([](FunctionType type) { return type; });
   addConversion([](FloatType type) { return type; });
@@ -213,9 +217,8 @@ linalg::GenericOp createValidGenericOp(
     attr.emplace_back(
         builder.getNamedAttr("dummy_tensor", builder.getUnitAttr()));
     if (needDynamicDim) {
-      shape.emplace_back(ShapedType::kDynamicSize);
-      auto dynDim =
-          builder.create<ConstantIndexOp>(loc, ShapedType::kDynamicSize);
+      shape.emplace_back(kDynamicSize);
+      auto dynDim = builder.create<ConstantIndexOp>(loc, kDynamicSize);
       dynShape.emplace_back(dynDim);
       iterTypes.emplace_back("parallel");
       for (auto &map : idxMaps) {
