@@ -48,9 +48,9 @@ func @pad_contraction(%A: tensor<10xf32>, %B: tensor<1xf32>, %C: tensor<3xf32>) 
 }
 
 //      CHECK: #[[map0:.*]] = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
-//      CHECK: #[[map1:.*]] = affine_map<(d0, d1, d2) -> (d1 + d0 - 1)>
+//      CHECK: #[[map1:.*]] = affine_map<(d0, d1, d2) -> (d0 + d1)>
 //      CHECK: #[[map2:.*]] = affine_map<(d0, d1, d2) -> (d1)>
-//      CHECK: #[[map3:.*]] = affine_map<(d0, d1, d2) -> (d0 + 1)>
+//      CHECK: #[[map3:.*]] = affine_map<(d0, d1, d2) -> (d0 + 2)>
 //      CHECK: #[[map4:.*]] = affine_map<(d0, d1) -> (d0 + d1)>
 //      CHECK: #[[map5:.*]] = affine_map<(d0, d1) -> (d1)>
 //      CHECK: #[[map6:.*]] = affine_map<(d0, d1) -> (d0)>
