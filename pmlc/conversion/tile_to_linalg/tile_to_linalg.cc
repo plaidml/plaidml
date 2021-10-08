@@ -703,6 +703,19 @@ struct ContractionOpConversion
       initValue = fillOp.result();
     }
 
+    auto lowMap = op.lowerBounds().getValue();
+    bool zeroLowBounds = true;
+    SmallVector<int64_t, 4> lowBounds;
+    for (auto expr : lowMap.getResults()) {
+      if (auto constExpr = expr.dyn_cast<AffineConstantExpr>()) {
+        int64_t low = constExpr.getValue();
+        lowBounds.emplace_back(low);
+        zeroLowBounds &= (low == 0);
+      } else {
+        op.emitError("Non-constant bound for contraction.");
+      }
+    }
+
     // Prepare for indexing maps and iterator types
     SmallVector<AffineMap, 4> idxMaps;
     ArrayRef<Attribute> srcs = op.srcs().getValue();
@@ -712,11 +725,17 @@ struct ContractionOpConversion
               tile::getPaddingInfo(op.operands()[i].getDefiningOp())) {
         map = updatePaddingMap(map, *maybePadding, context);
       }
+      if (!zeroLowBounds) {
+        map = adjustMapByBounds(map, lowBounds, context);
+      }
       idxMaps.emplace_back(map);
     }
     AffineMap sink = op.sink();
     if (Optional<tile::PaddingInfo> maybePadding = tile::getPaddingInfo(op)) {
       sink = updatePaddingMap(sink, *maybePadding, context);
+    }
+    if (!zeroLowBounds) {
+      sink = adjustMapByBounds(sink, lowBounds, context);
     }
     idxMaps.emplace_back(sink);
 
@@ -761,6 +780,9 @@ struct ContractionOpConversion
     // add constraints
     if (op.cons()) {
       auto cons = op.cons().getValue();
+      if (!zeroLowBounds) {
+        cons = adjustConstraintsByBounds(cons, lowBounds, context);
+      }
       genericOp->setAttr("constraints", IntegerSetAttr::get(cons));
     }
 
