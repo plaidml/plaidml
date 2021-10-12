@@ -410,6 +410,19 @@ struct CondOp {
   }
 };
 
+template <typename CmpOpBuilder>
+struct ContractionCondOp {
+  Value create(OpBuilder &builder, Location loc, Type resultType,
+               ValueRange operands, TypeRange types) {
+    CmpOpBuilder cmpOpBuilder;
+    auto cmp = cmpOpBuilder.create(builder, loc, resultType,
+                                   operands.take_front(2), types.take_front(2));
+    auto zero = createInit(builder, loc, resultType, AggregationKind::add);
+    return builder.create<mlir::SelectOp>(loc, cmp, operands[2], zero)
+        .getResult();
+  }
+};
+
 static AffineMap
 buildBroadcastMap(OpBuilder &builder, Location loc, Value operand,
                   ShapedType outType,
@@ -1220,11 +1233,12 @@ struct LowerTileToLinalgPass
         ContractionOpConversion<CombinationKind::eq,
                                 CmpIntOp<CmpIPredicate::eq>,
                                 ComparandsAre<EltwiseInteger>>,
+        ContractionOpConversion<
+            CombinationKind::cond,
+            ContractionCondOp<CmpFloatOp<CmpFPredicate::OEQ>>,
+            AnyComparandIs<EltwiseFloat>>,
         ContractionOpConversion<CombinationKind::cond,
-                                CondOp<CmpFloatOp<CmpFPredicate::OEQ>>,
-                                AnyComparandIs<EltwiseFloat>>,
-        ContractionOpConversion<CombinationKind::cond,
-                                CondOp<CmpIntOp<CmpIPredicate::eq>>,
+                                ContractionCondOp<CmpIntOp<CmpIPredicate::eq>>,
                                 AnyComparandIs<EltwiseInteger>>,
         EltwiseOpConversion<tile::ExpOp, StdOp<math::ExpOp>>,
         EltwiseOpConversion<tile::LogOp, StdOp<math::LogOp>,
