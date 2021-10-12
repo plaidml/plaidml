@@ -62,6 +62,14 @@ updatePaddingMap(mlir::AffineMap origMap,
                  const pmlc::dialect::tile::PaddingInfo &padding,
                  mlir::MLIRContext *context);
 
+mlir::AffineMap adjustMapByBounds(mlir::AffineMap origMap,
+                                  llvm::ArrayRef<int64_t> lowBounds,
+                                  mlir::MLIRContext *context);
+
+mlir::IntegerSet adjustConstraintsByBounds(mlir::IntegerSet origSet,
+                                           llvm::ArrayRef<int64_t> lowBounds,
+                                           mlir::MLIRContext *context);
+
 llvm::SmallSet<int64_t, 4> getUsedDims(mlir::AffineExpr expr);
 
 mlir::linalg::GenericOp
