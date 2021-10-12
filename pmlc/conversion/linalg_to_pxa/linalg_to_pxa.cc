@@ -506,17 +506,19 @@ struct LowerLinalgToPXAPass
           OpBuilder builder(returnOp);
           auto forOp = copyBuffer(builder, loc, def, outputArg, context);
           operand.set(forOp.getResult(0));
-        } else if (Value outside =
-                       pxa::getIndirectDefOutsideScope(operand.get(), funcOp)) {
+          continue;
+        }
+        Value outside = pxa::getIndirectDefOutsideScope(operand.get(), funcOp);
+        if (outside && !isa<memref::AllocOp>(outside.getDefiningOp())) {
           OpBuilder builder(funcOp.getBody());
           auto forOp = copyBuffer(builder, loc, outside, outputArg, context);
           outside.replaceUsesWithIf(forOp.getResult(0), [&](OpOperand &use) {
             Operation *op = use.getOwner();
             return !forOp->isProperAncestor(op) && funcOp->isProperAncestor(op);
           });
-        } else {
-          def.replaceAllUsesWith(outputArg);
+          continue;
         }
+        def.replaceAllUsesWith(outputArg);
       }
     }
   }
