@@ -93,11 +93,42 @@ AffineMap updatePaddingMap(AffineMap origMap, const tile::PaddingInfo &padding,
                            MLIRContext *context) {
   assert(padding.lower.size() == origMap.getNumResults());
   SmallVector<AffineExpr, 4> newExprs;
-  for (unsigned j = 0; j < origMap.getNumResults(); j++) {
-    newExprs.push_back(origMap.getResult(j) + padding.lower[j]);
+  for (unsigned i = 0; i < origMap.getNumResults(); i++) {
+    newExprs.push_back(origMap.getResult(i) + padding.lower[i]);
   }
   return simplifyAffineMap(
       AffineMap::get(origMap.getNumDims(), 0, newExprs, context));
+}
+
+static SmallVector<AffineExpr, 4>
+getExprReplacements(ArrayRef<int64_t> lowBounds, MLIRContext *context) {
+  SmallVector<AffineExpr, 4> replDims;
+  for (unsigned i = 0; i < lowBounds.size(); ++i) {
+    if (lowBounds[i] == 0) {
+      replDims.emplace_back(getAffineDimExpr(i, context));
+    } else {
+      replDims.emplace_back(getAffineDimExpr(i, context) +
+                            getAffineConstantExpr(lowBounds[i], context));
+    }
+  }
+  return replDims;
+}
+
+AffineMap adjustMapByBounds(AffineMap origMap, ArrayRef<int64_t> lowBounds,
+                            MLIRContext *context) {
+  assert(lowBounds.size() == origMap.getNumDims());
+  SmallVector<AffineExpr, 4> replDims = getExprReplacements(lowBounds, context);
+  return simplifyAffineMap(origMap.replaceDimsAndSymbols(
+      replDims, {}, origMap.getNumDims(), origMap.getNumSymbols()));
+}
+
+IntegerSet adjustConstraintsByBounds(IntegerSet origSet,
+                                     ArrayRef<int64_t> lowBounds,
+                                     MLIRContext *context) {
+  assert(lowBounds.size() == origSet.getNumDims());
+  SmallVector<AffineExpr, 4> replDims = getExprReplacements(lowBounds, context);
+  return origSet.replaceDimsAndSymbols(replDims, {}, origSet.getNumDims(),
+                                       origSet.getNumSymbols());
 }
 
 class UsedDimsVisitor : public AffineExprVisitor<UsedDimsVisitor> {
