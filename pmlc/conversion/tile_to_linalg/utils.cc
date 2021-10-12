@@ -214,7 +214,7 @@ bool OpMapsAndShapes::needDynamicDim() {
     assert(exprs.size() == opShape.size());
     for (unsigned j = 0; j < exprs.size(); ++j) {
       auto extent = pmlc::util::computeExtent(exprs[j], ranges);
-      if (extent.max + 1 != opShape[j]) {
+      if (extent.min < 0 || extent.max + 1 != opShape[j]) {
         return true;
       }
     }
