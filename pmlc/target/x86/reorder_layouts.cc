@@ -285,7 +285,7 @@ struct ReorderLayoutsPass : public ReorderLayoutsBase<ReorderLayoutsPass> {
     }
 
     // check that we have (channels-last logical ordering):
-    // (n, h, w, c), (r, s, c, k) -> (n, h, w, c)
+    // (n, h, w, c), (r, s, c, k) -> (n, h, w, k)
     if (conv->input.idxMap.getResult(3) != conv->filter.idxMap.getResult(2) ||
         conv->filter.idxMap.getResult(3) != conv->output.idxMap.getResult(3)) {
       op.emitWarning(
