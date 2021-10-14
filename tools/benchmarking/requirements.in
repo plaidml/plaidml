@@ -1,0 +1,7 @@
+click>=8.0
+onnx
+openvino-dev>=2021.4.1
+sh>=1.14
+tensorflow>=2.0
+torch
+
