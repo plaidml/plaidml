@@ -11,6 +11,7 @@ func @main(%arg0: tensor<1x56x56x64xf32>, %arg1: tensor<1x1x64x64xf32> {stdx.con
   %T0 = linalg.init_tensor [1, 56, 56, 64] : tensor<1x56x56x64xf32>
   %1 = linalg.fill(%cst, %T0) : f32, tensor<1x56x56x64xf32> -> tensor<1x56x56x64xf32>
 
+  // convolution
   %2 = linalg.generic {
     indexing_maps = [#input, #filter, #output],
     iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]
@@ -58,52 +59,57 @@ func @main(%arg0: tensor<1x56x56x64xf32>, %arg1: tensor<1x1x64x64xf32> {stdx.con
 //  CHECK-SAME:   %[[arg1:.*]]: tensor<1x1x64x64xf32> {stdx.const}
 //  CHECK-SAME:   %[[arg2:.*]]: tensor<64xf32> {stdx.const}) -> tensor<1x56x56x64xf32>
 //       CHECK:   %[[zero:.*]] = constant 0.000000e+00 : f32
+// original init
+//       CHECK:   %[[X0:.*]] = linalg.init_tensor [1, 56, 56, 64] : tensor<1x56x56x64xf32>
+//       CHECK:   %[[X1:.*]] = linalg.fill(%[[zero]], %[[X0]]) : f32, tensor<1x56x56x64xf32> -> tensor<1x56x56x64xf32>
 // reorder input
-//       CHECK:   %[[X0:.*]] = linalg.init_tensor [1, 4, 56, 56, 16] : tensor<1x4x56x56x16xf32>
-//       CHECK:   %[[X1:.*]] = linalgx.copy(%[[arg0]], %[[X0]])
+//       CHECK:   %[[X2:.*]] = linalg.init_tensor [1, 4, 56, 56, 16] : tensor<1x4x56x56x16xf32>
+//       CHECK:   %[[X3:.*]] = linalgx.copy(%[[arg0]], %[[X2]])
 //  CHECK-SAME:     inputMap = #[[map0]], outputMap = #[[map1]]
 //  CHECK-SAME:     tensor<1x56x56x64xf32>, tensor<1x4x56x56x16xf32> -> tensor<1x4x56x56x16xf32>
 // reorder filter
-//       CHECK:   %[[X2:.*]] = linalg.init_tensor [4, 4, 1, 1, 16, 16] : tensor<4x4x1x1x16x16xf32>
-//       CHECK:   %[[X3:.*]] = linalgx.copy(%[[arg1]], %[[X2]])
+//       CHECK:   %[[X4:.*]] = linalg.init_tensor [4, 4, 1, 1, 16, 16] : tensor<4x4x1x1x16x16xf32>
+//       CHECK:   %[[X5:.*]] = linalgx.copy(%[[arg1]], %[[X4]])
 //  CHECK-SAME:     inputMap = #[[map2]], outputMap = #[[map3]]
 //  CHECK-SAME:     tensor<1x1x64x64xf32>, tensor<4x4x1x1x16x16xf32> -> tensor<4x4x1x1x16x16xf32>
+// reorder init
+//       CHECK:   %[[X6:.*]] = linalgx.copy(%[[X1]], %[[X2]])
+//  CHECK-SAME:     inputMap = #[[map0]], outputMap = #[[map1]]
+//  CHECK-SAME:     tensor<1x56x56x64xf32>, tensor<1x4x56x56x16xf32> -> tensor<1x4x56x56x16xf32>
 // convolution
-//       CHECK:   %[[X4:.*]] = linalg.fill(%[[zero]], %[[X0]]) : f32, tensor<1x4x56x56x16xf32> -> tensor<1x4x56x56x16xf32>
-//       CHECK:   %[[X5:.*]] = linalg.generic
+//       CHECK:   %[[X7:.*]] = linalg.generic
 //  CHECK-SAME:     indexing_maps = [#[[map4]], #[[map5]], #[[map6]]]
 //  CHECK-SAME:     iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction", "parallel", "reduction"]
-//  CHECK-SAME:     ins(%[[X1]], %[[X3]] : tensor<1x4x56x56x16xf32>, tensor<4x4x1x1x16x16xf32>)
-//  CHECK-SAME:     outs(%[[X4]] : tensor<1x4x56x56x16xf32>)
+//  CHECK-SAME:     ins(%[[X3]], %[[X5]] : tensor<1x4x56x56x16xf32>, tensor<4x4x1x1x16x16xf32>)
+//  CHECK-SAME:     outs(%[[X6]] : tensor<1x4x56x56x16xf32>)
 //       CHECK:   ^bb0(%[[arg3:[a-z0-9]+]]: f32, %[[arg4:[a-z0-9]+]]: f32, %[[arg5:[a-z0-9]+]]: f32):  // no predecessors
 //       CHECK:     %[[X10:.*]] = mulf %[[arg3]], %[[arg4]] : f32
 //       CHECK:     %[[X11:.*]] = addf %[[arg5]], %[[X10]] : f32
 //       CHECK:     linalg.yield %[[X11]] : f32
 //       CHECK:   } -> tensor<1x4x56x56x16xf32>
 // bias add
-//       CHECK:   %[[X6:.*]] = linalg.init_tensor [1, 56, 56, 64] : tensor<1x56x56x64xf32>
-//       CHECK:   %[[X7:.*]] = linalg.generic
+//       CHECK:   %[[X8:.*]] = linalg.generic
 //  CHECK-SAME:     indexing_maps = [#[[map1]], #[[map7]], #[[map1]]]
 //  CHECK-SAME:     iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]
-//  CHECK-SAME:     ins(%[[X5]], %[[arg2]] : tensor<1x4x56x56x16xf32>, tensor<64xf32>)
-//  CHECK-SAME:     outs(%[[X0]] : tensor<1x4x56x56x16xf32>)
+//  CHECK-SAME:     ins(%[[X7]], %[[arg2]] : tensor<1x4x56x56x16xf32>, tensor<64xf32>)
+//  CHECK-SAME:     outs(%[[X2]] : tensor<1x4x56x56x16xf32>)
 //       CHECK:     addf
 //       CHECK:     linalg.yield
 //       CHECK:   } -> tensor<1x4x56x56x16xf32>
 // relu
-//       CHECK:   %[[X8:.*]] = linalg.generic
+//       CHECK:   %[[X9:.*]] = linalg.generic
 //  CHECK-SAME:     indexing_maps = [#[[map1]], #[[map1]]]
 //  CHECK-SAME:     iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]
-//  CHECK-SAME:     ins(%[[X7]] : tensor<1x4x56x56x16xf32>)
-//  CHECK-SAME:     outs(%[[X0]] : tensor<1x4x56x56x16xf32>)
+//  CHECK-SAME:     ins(%[[X8]] : tensor<1x4x56x56x16xf32>)
+//  CHECK-SAME:     outs(%[[X2]] : tensor<1x4x56x56x16xf32>)
 //       CHECK:     stdx.relu
 //       CHECK:     linalg.yield
 //       CHECK:   } -> tensor<1x4x56x56x16xf32>
 // reorder output
-//       CHECK:   %[[X9:.*]] = linalgx.copy(%[[X8]], %[[X6]])
+//       CHECK:   %[[X10:.*]] = linalgx.copy(%[[X9]], %[[X0]])
 //  CHECK-SAME:     inputMap = #[[map1]], outputMap = #[[map0]]
 //  CHECK-SAME:     tensor<1x4x56x56x16xf32>, tensor<1x56x56x64xf32> -> tensor<1x56x56x64xf32>
-//       CHECK:   return %[[X9]] : tensor<1x56x56x64xf32>
+//       CHECK:   return %[[X10]] : tensor<1x56x56x64xf32>
 
 // -----
 
@@ -231,34 +237,49 @@ func @residual_add(
 //      CHECK: #[[map2:.*]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d2, d3, d0 * 16 + d4, d1 * 16 + d5)>
 //      CHECK: #[[map3:.*]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3, d4, d5)>
 //      CHECK: func @residual_add
+//      CHECK:   linalg.fill
+// reorder input
 //      CHECK:   linalgx.copy(%{{.*}}, %{{.*}}) {inputMap = #[[map0]], outputMap = #[[map1]]}
 // CHECK-SAME:     tensor<1x56x56x64xf32>, tensor<1x4x56x56x16xf32> -> tensor<1x4x56x56x16xf32>
+// reorder filter
 //      CHECK:   linalgx.copy(%{{.*}}, %{{.*}}) {inputMap = #[[map2]], outputMap = #[[map3]]}
 // CHECK-SAME:     tensor<1x1x64x256xf32>, tensor<4x16x1x1x16x16xf32> -> tensor<4x16x1x1x16x16xf32>
-//      CHECK:   linalg.fill
+// reorder init
+//      CHECK:   linalgx.copy(%{{.*}}, %{{.*}}) {inputMap = #[[map0]], outputMap = #[[map1]]}
+// CHECK-SAME:     tensor<1x56x56x256xf32>, tensor<1x16x56x56x16xf32> -> tensor<1x16x56x56x16xf32>
+// convolution
 //      CHECK:   linalg.generic
 // CHECK-SAME:     ins(%{{.*}}, %{{.*}} : tensor<1x4x56x56x16xf32>, tensor<4x16x1x1x16x16xf32>)
 // CHECK-SAME:     outs(%{{.*}} : tensor<1x16x56x56x16xf32>)
 //      CHECK:     mulf
 //      CHECK:     addf
+// add
 //      CHECK:   linalg.generic
 // CHECK-SAME:     ins(%{{.*}}, %{{.*}} : tensor<1x16x56x56x16xf32>, tensor<256xf32>)
 // CHECK-SAME:     outs(%{{.*}} : tensor<1x16x56x56x16xf32>)
 //      CHECK:     addf
+//      CHECK:   linalg.fill
+// reorder input
 //      CHECK:   linalgx.copy(%{{.*}}, %{{.*}}) {inputMap = #[[map0]], outputMap = #[[map1]]}
 // CHECK-SAME:     tensor<1x56x56x64xf32>, tensor<1x4x56x56x16xf32> -> tensor<1x4x56x56x16xf32>
+// reorder filter
 //      CHECK:   linalgx.copy(%{{.*}}, %{{.*}}) {inputMap = #[[map2]], outputMap = #[[map3]]}
 // CHECK-SAME:     tensor<1x1x64x256xf32>, tensor<4x16x1x1x16x16xf32> -> tensor<4x16x1x1x16x16xf32>
-//      CHECK:   linalg.fill
+// reorder init
+//      CHECK:   linalgx.copy(%{{.*}}, %{{.*}}) {inputMap = #[[map0]], outputMap = #[[map1]]}
+// CHECK-SAME:     tensor<1x56x56x256xf32>, tensor<1x16x56x56x16xf32> -> tensor<1x16x56x56x16xf32>
+// convolution
 //      CHECK:   linalg.generic
 // CHECK-SAME:     ins(%{{.*}}, %{{.*}} : tensor<1x4x56x56x16xf32>, tensor<4x16x1x1x16x16xf32>)
 // CHECK-SAME:     outs(%{{.*}} : tensor<1x16x56x56x16xf32>)
 //      CHECK:     mulf
 //      CHECK:     addf
+// add
 //      CHECK:   linalg.generic
 // CHECK-SAME:     ins(%{{.*}}, %{{.*}} : tensor<1x16x56x56x16xf32>, tensor<256xf32>)
 // CHECK-SAME:     outs(%{{.*}} : tensor<1x16x56x56x16xf32>)
 //      CHECK:     addf
+// residual add
 //      CHECK:   linalg.generic
 // CHECK-SAME:     ins(%{{.*}}, %{{.*}} : tensor<1x16x56x56x16xf32>, tensor<1x16x56x56x16xf32>)
 // CHECK-SAME:     outs(%{{.*}} : tensor<1x16x56x56x16xf32>)

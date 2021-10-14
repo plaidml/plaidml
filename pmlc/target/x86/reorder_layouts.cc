@@ -99,10 +99,10 @@ static Optional<ConvCapture> detectConv(linalg::GenericOp op) {
   return None;
 }
 
-static AffineExpr getBlockedExpr(MLIRContext *context, int64_t hiDim,
-                                 int64_t loDim, int64_t blockSize) {
-  return getAffineDimExpr(hiDim, context) * blockSize +
-         getAffineDimExpr(loDim, context);
+static AffineExpr getBlockedExpr(MLIRContext *context, int64_t highDim,
+                                 int64_t lowDim, int64_t blockSize) {
+  return getAffineDimExpr(highDim, context) * blockSize +
+         getAffineDimExpr(lowDim, context);
 }
 
 // Forward a reorder thru simple elementwise operations.
@@ -170,7 +170,7 @@ struct PropagateReorderThruEltwiseOpPattern
     if (!primary)
       return failure();
 
-    IVLOG(1, "candidate: " << debugString(op));
+    IVLOG(3, "candidate: " << debugString(op));
 
     // Phase 2: Collect values and indexingMaps.
     SmallVector<Value, 3> inputs;
@@ -269,33 +269,41 @@ struct ReorderLayoutsPass : public ReorderLayoutsBase<ReorderLayoutsPass> {
         GreedyRewriteConfig{/*useTopDownTraversal=*/true});
   }
 
-  Value reorderConvolution(linalg::GenericOp op) {
+  void reorderConvolution(linalg::GenericOp op) {
     constexpr int64_t blockSize = 16;
 
     Optional<ConvCapture> conv = detectConv(op);
     if (!conv)
-      return nullptr;
+      return;
 
-    // IVLOG(1, "Conv: " << debugString(op));
-    Value initValue;
-    if (!matchPattern(op.getOutputOperand(0)->get(),
-                      m_Op<linalg::FillOp>(m_Capture(&initValue),
-                                           m_Op<linalg::InitTensorOp>()))) {
-      op.emitWarning("GenericOp uses an unrecognized init pattern.");
-      return nullptr;
+    // check that this is a 2D convolution
+    if (conv->input.idxMap.getNumResults() != 4 ||
+        conv->filter.idxMap.getNumResults() != 4 ||
+        conv->output.idxMap.getNumResults() != 4) {
+      op.emitWarning("Cannot reorder: expected 2D convolution.");
+      return;
+    }
+
+    // check that we have (channels-last logical ordering):
+    // (n, h, w, c), (r, s, c, k) -> (n, h, w, k)
+    if (conv->input.idxMap.getResult(3) != conv->filter.idxMap.getResult(2) ||
+        conv->filter.idxMap.getResult(3) != conv->output.idxMap.getResult(3)) {
+      op.emitWarning(
+          "Cannot reorder: expected channels-last logical ordering.");
+      return;
     }
 
     // dims: (n, h, w, c, r, s, k)
     Optional<SmallVector<int64_t, 4>> ranges = op.getStaticLoopRanges();
     if (!ranges) {
-      op.emitWarning("GenericOp does not have static ranges.");
-      return nullptr;
+      op.emitWarning("Cannot reorder: expected static ranges.");
+      return;
     }
 
     if (ranges->size() != 7 ||           //
         (*ranges)[3] % blockSize != 0 || // C
         (*ranges)[6] % blockSize != 0)   // K
-      return nullptr;
+      return;
 
     MLIRContext *context = &getContext();
     ImplicitLocOpBuilder builder(op->getLoc(), op);
@@ -384,13 +392,13 @@ struct ReorderLayoutsPass : public ReorderLayoutsBase<ReorderLayoutsPass> {
                        },
                        context);
 
-    auto init = builder.create<linalg::InitTensorOp>(
-        blockedOutputType.getShape(), blockedOutputType.getElementType());
-    auto fill = builder.create<linalg::FillOp>(initValue, init);
+    linalgx::CopyOp reorderInit =
+        createReorderOp(builder, blockedOutputType, conv->output.value,
+                        inputSourceMap, inputSinkMap);
     auto newConv = builder.create<linalg::GenericOp>(
         TypeRange{blockedOutputType},
         ValueRange{reorderInput.getResult(), reorderFilter.getResult()},
-        ValueRange{fill.result()},
+        ValueRange{reorderInit.getResult()},
         ArrayRef<AffineMap>{newInputMap, newFilterMap, newOutputMap},
         ArrayRef<StringRef>{
             "parallel",  // N
@@ -418,8 +426,6 @@ struct ReorderLayoutsPass : public ReorderLayoutsBase<ReorderLayoutsPass> {
 
     op.getResult(0).replaceAllUsesWith(reorderOutput.getResult());
     op.erase();
-
-    return reorderOutput.getResult();
   }
 
   linalgx::CopyOp createReorderOp(ImplicitLocOpBuilder &builder,
