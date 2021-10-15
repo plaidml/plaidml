@@ -239,4 +239,18 @@ void Program::parseIOTypes(std::unique_ptr<llvm::MemoryBuffer> buffer) {
   }
 }
 
+std::shared_ptr<Program> loadProgram(llvm::StringRef code,
+                                     std::unique_ptr<MLIRContext> context,
+                                     llvm::StringRef entry) {
+  // TODO: The `entry` of the PlaidML module likely needs to be "main";
+  // if we want to allow loading source code with other `entry` names, we
+  // likely want to split `entry` to an "internal" entry that == "main" and
+  // an "external" entry passed by the caller that says what to load.
+  auto buffer = llvm::MemoryBuffer::getMemBuffer(code);
+  auto program = std::make_shared<Program>(context, buffer, entry);
+  program.parseIOTypes(buffer);
+
+  return program;
+}
+
 } // namespace pmlc::compiler

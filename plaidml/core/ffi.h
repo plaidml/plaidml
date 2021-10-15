@@ -259,6 +259,11 @@ void plaidml_program_compile(  //
     bool debug,                //
     const char* target);
 
+plaidml_program* plaidml_program_load(  //
+    plaidml_error* err,                 //
+    const char* code,                   //
+    TODO);
+
 plaidml_buffer* plaidml_program_save(  //
     plaidml_error* err,                //
     plaidml_program* program,          //

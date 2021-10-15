@@ -45,14 +45,15 @@ public:
 using TargetPtr = std::shared_ptr<Target>;
 
 struct Program {
-  std::string entry;
-  std::string tileIR;
+  std::string entry;  // TODO: Temp note: Needed (as `"main"` ... may come from
+                      // caller as such?)
+  std::string tileIR; // TODO: Temp note: May Ignore
   std::unique_ptr<mlir::MLIRContext> context;
-  mlir::OwningModuleRef module;
-  std::vector<mlir::Type> inputs;
-  std::vector<mlir::Type> outputs;
-  std::vector<ConstantArgument> constants;
-  std::vector<PassInfo> passes;
+  mlir::OwningModuleRef module;            // TODO: Temp note: Needed
+  std::vector<mlir::Type> inputs;          // TODO: Temp note: Needed
+  std::vector<mlir::Type> outputs;         // TODO: Temp note: Needed
+  std::vector<ConstantArgument> constants; // TODO: Temp note: May Delay
+  std::vector<PassInfo> passes;            // TODO: Temp note: May Ignore
   TargetPtr target;
 
   explicit Program(llvm::StringRef name = "");
@@ -70,6 +71,9 @@ struct Program {
   void parseIOTypes(std::unique_ptr<llvm::MemoryBuffer> buffer);
 };
 
+std::shared_ptr<Program> loadProgram(llvm::StringRef code,
+                                     std::unique_ptr<MLIRContext> context,
+                                     llvm::StringRef entry);
 void registerTargets();
 
 } // namespace pmlc::compiler

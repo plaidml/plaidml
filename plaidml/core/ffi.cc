@@ -388,6 +388,19 @@ void plaidml_program_compile(  //
   });
 }
 
+plaidml_program* plaidml_program_load(  //
+    plaidml_error* err,                 //
+    const char* code,                   //
+    TODO) {
+  return ffi_wrap<plaidml_program*>(err, nullptr, [&] {
+    // TODO entry = "main" or let it be passed?
+    return new plaidml_program{pmlc::compiler::loadProgram(code, /*TODO ctx*/, entry)};
+    // llvm::StringRef code,
+    // std::unique_ptr<MLIRContext> context,
+    // llvm::StringRef entry
+  });
+}
+
 plaidml_buffer* plaidml_program_save(  //
     plaidml_error* err,                //
     plaidml_program* program,          //
