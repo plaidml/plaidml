@@ -391,10 +391,12 @@ void plaidml_program_compile(  //
 plaidml_program* plaidml_program_load(  //
     plaidml_error* err,                 //
     const char* code,                   //
+    const char* name,                   //
     TODO) {
   return ffi_wrap<plaidml_program*>(err, nullptr, [&] {
     // TODO entry = "main" or let it be passed?
-    return new plaidml_program{pmlc::compiler::loadProgram(code, /*TODO ctx*/, entry)};
+    const char* entry = "main";
+    return new plaidml_program{pmlc::compiler::loadProgram(code, name, entry)};
     // llvm::StringRef code,
     // std::unique_ptr<MLIRContext> context,
     // llvm::StringRef entry

@@ -289,8 +289,17 @@ class Program(ForeignObject):
     __ffi_del__ = lib.plaidml_program_free
     __ffi_repr__ = lib.plaidml_program_repr
 
-    def __init__(self, name, inputs, outputs, shapes=None):
+    def __init__(self, name, inputs, outputs, shapes=None, code=None):
         # logger.debug('Program({}, {}, {}, {})'.format(name, inputs, outputs, shapes))
+        if code:
+            # Override creating Program with plaidml_build and instead create with plaidml_program_load
+            ffi_obj = ffi_call(
+                lib.plaidml_program_load,
+                code.encode(),
+                name.encode(),
+            )
+            super(Program, self).__init__(ffi_obj)
+            return
         raw_inputs = [x.as_ptr() for x in inputs]
         raw_outputs = [x.as_ptr() for x in outputs]
         if shapes:
@@ -313,6 +322,11 @@ class Program(ForeignObject):
 
     def save(self):
         return Buffer(ptr=self._methodcall(lib.plaidml_program_save))
+
+    @classmethod
+    def load(cls, code, name):
+        # TODO: Status quo doesn't expose in/out info to Python; Determine how to set up inputs / outputs
+        return cls(name, [], [], code=code)
 
     @property
     def inputs(self):

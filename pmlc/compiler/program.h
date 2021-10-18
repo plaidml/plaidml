@@ -71,8 +71,7 @@ struct Program {
   void parseIOTypes(std::unique_ptr<llvm::MemoryBuffer> buffer);
 };
 
-std::shared_ptr<Program> loadProgram(llvm::StringRef code,
-                                     std::unique_ptr<MLIRContext> context,
+std::shared_ptr<Program> loadProgram(llvm::StringRef code, llvm::StringRef name,
                                      llvm::StringRef entry);
 void registerTargets();
 
