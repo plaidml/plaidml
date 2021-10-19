@@ -15,6 +15,7 @@ set(API_SYMBOLS
   plaidml_program_get_inputs
   plaidml_program_get_outputs
   plaidml_program_get_passes
+  plaidml_program_load
   plaidml_program_repr
   plaidml_program_save
   plaidml_settings_get

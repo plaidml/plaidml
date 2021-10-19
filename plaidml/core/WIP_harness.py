@@ -26,8 +26,8 @@ def make_conv_test_buffers():
 # TODO: Non-silly `src_path`
 def make_program(src_path='/home/tim/plaidml/pmlc/conversion/linalg_to_pxa/test/conv.mlir'):
     code = None
-    with open(filepath) as code_file:
-        code = codefile.read()
+    with open(src_path) as code_file:
+        code = code_file.read()
     name = 'test_conv'
     program = plaidml.Program.load(code, name)
     return program

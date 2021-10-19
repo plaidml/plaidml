@@ -248,16 +248,9 @@ std::shared_ptr<Program> loadProgram(llvm::StringRef code, llvm::StringRef name,
   auto buffer = llvm::MemoryBuffer::getMemBuffer(code);
   // TODO: So how does `entry` get set?
   auto program = std::make_shared<Program>(name);
-  program.parseIOTypes(buffer);
+  program->parseIOTypes(std::move(buffer));
 
   return program;
 }
-
-Program::Program(ModuleOp module)
-    : context(std::make_unique<MLIRContext>()), module(module) {}
-
-Program::Program(StringRef name)
-    : context(std::make_unique<MLIRContext>()),
-      module(ModuleOp::create(UnknownLoc::get(context.get()), name)) {}
 
 } // namespace pmlc::compiler

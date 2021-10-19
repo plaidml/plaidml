@@ -40,5 +40,16 @@ pml_py_library(
     settings.py
 )
 
+pml_py_test(
+  NAME WIP_program_test
+  SRC WIP_harness.py
+  DEPS
+    ::py
+  CHECKS
+    core
+    smoke
+    test
+)
+
 configure_file(version.in.cc version.cc)
 configure_file(_version.in.py _version.py)

@@ -391,8 +391,7 @@ void plaidml_program_compile(  //
 plaidml_program* plaidml_program_load(  //
     plaidml_error* err,                 //
     const char* code,                   //
-    const char* name,                   //
-    TODO) {
+    const char* name) {                 // TODO
   return ffi_wrap<plaidml_program*>(err, nullptr, [&] {
     // TODO entry = "main" or let it be passed?
     const char* entry = "main";
