@@ -165,7 +165,7 @@ def _poly_op(op, *args):
 
 class TensorIndex(ForeignObject):
     """Represents an index in a polynomial expression.
-    
+
     Args:
         name (str, optional): The name to give this TensorIndex.
     """
@@ -746,10 +746,12 @@ def _wrap_tensor(x):
         type(x), fn, args, x))
 
 
-def intrinsic(fn, *args):
+def intrinsic(fn, *args, **kwargs):
     args = [_wrap_tensor(x) for x in args]
     raw_args = [x.as_ptr() for x in args]
-    return Tensor(expr=ffi_call(lib.plaidml_expr_intrinsic, fn.encode(), len(args), raw_args))
+    name = kwargs.get('name', '')
+    return Tensor(
+        expr=ffi_call(lib.plaidml_expr_intrinsic, fn.encode(), len(args), raw_args, name.encode()))
 
 
 def abs(x):

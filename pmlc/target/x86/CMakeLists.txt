@@ -6,8 +6,10 @@ pml_cc_library(
   SRCS
     heatmap.cc
     heatmap_impl.cc
+    instrument.cc
     pipeline.cc
     register.cc
+    reorder_layouts.cc
     stencil_tpp_unary.cc
     trace_linking.cc
     xsmm_lowering.cc
@@ -15,18 +17,23 @@ pml_cc_library(
     ::passes-gen
     ::prng_lowering
     pmlc::compiler
+    pmlc::conversion::linalg_to_pxa
     pmlc::conversion::pxa_to_affine
     pmlc::conversion::stdx_to_llvm
+    pmlc::conversion::tile_to_linalg
     pmlc::conversion::tile_to_pxa
     pmlc::dialect::layer::transforms
+    pmlc::dialect::linalgx::ir
     pmlc::dialect::pml::transforms
     pmlc::dialect::pxa::analysis
     pmlc::dialect::pxa::transforms
     pmlc::dialect::stdx::transforms
     pmlc::dialect::tile::transforms
     pmlc::dialect::xsmm::ir
+    pmlc::transforms
     MLIRAffineToStandard
     MLIRAffineTransforms
+    MLIRLinalgTransforms
     MLIRLLVMCommonConversion
     MLIRLLVMIRTransforms
     MLIRMathToLLVM

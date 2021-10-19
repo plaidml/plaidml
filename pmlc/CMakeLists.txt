@@ -6,6 +6,7 @@ add_subdirectory(rt)
 add_subdirectory(target)
 add_subdirectory(testing)
 add_subdirectory(tools)
+add_subdirectory(transforms)
 add_subdirectory(util)
 
 get_property(MLIR_DIALECT_LIBS GLOBAL PROPERTY MLIR_DIALECT_LIBS)
@@ -21,6 +22,11 @@ pml_cc_library(
   DEPS
     ${MLIR_DIALECT_LIBS}
     ${MLIR_CONVERSION_LIBS}
+    AllMhloPasses
+    MhloRegisterDialects
+    MLIRBufferTransforms
+    MLIRHLOAnalysis
+    MLIRHLOTestAnalysis
     MLIRTransforms
     pmlc::conversion::linalg_to_pxa
     pmlc::conversion::pxa_to_affine
@@ -30,6 +36,7 @@ pml_cc_library(
     pmlc::dialect::affinex::transforms
     pmlc::dialect::layer::ir
     pmlc::dialect::layer::transforms
+    pmlc::dialect::linalgx::ir
     pmlc::dialect::pml::ir
     pmlc::dialect::pml::transforms
     pmlc::dialect::pxa::ir
@@ -41,6 +48,7 @@ pml_cc_library(
     pmlc::dialect::xsmm::ir
     pmlc::rt::all_runtimes
     pmlc::target::all
+    pmlc::transforms
 )
 
 pml_lit_test(

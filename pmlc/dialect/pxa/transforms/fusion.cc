@@ -501,8 +501,9 @@ struct FusionInfo {
     // Construct the new outer parallel op
     SmallVector<AtomicRMWKind, 8> reductions(typesC.size(),
                                              AtomicRMWKind::assign);
+    MLIRContext *context = aInfo.op.getContext();
     auto apC = builder.create<AffineParallelOp>(
-        aInfo.op.getLoc(),
+        FusedLoc::get(context, {aInfo.op.getLoc(), bInfo.op.getLoc()}),
         /*resultTypes=*/typesC,
         /*reductions=*/reductions,
         /*lbMaps=*/lowerMapsC, /*lbArgs=*/aInfo.op.getLowerBoundsOperands(),

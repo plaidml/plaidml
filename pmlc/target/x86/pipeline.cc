@@ -32,8 +32,10 @@
 #include "mlir/Transforms/RegionUtils.h"
 
 #include "pmlc/compiler/registry.h"
+#include "pmlc/conversion/linalg_to_pxa/passes.h"
 #include "pmlc/conversion/pxa_to_affine/passes.h"
 #include "pmlc/conversion/stdx_to_llvm/passes.h"
+#include "pmlc/conversion/tile_to_linalg/passes.h"
 #include "pmlc/conversion/tile_to_pxa/passes.h"
 #include "pmlc/dialect/layer/transforms/passes.h"
 #include "pmlc/dialect/pml/transforms/passes.h"
@@ -259,78 +261,54 @@ void pipelineBuilderStage1(OpPassManager &pm) {
     pm.addPass(pml::createApplyRulesPass(/*module=*/"schedule"));
   }
 
+  if (util::getEnvVar("PLAIDML_USE_LINALG") == "1") {
+    pm.addPass(pmlc::conversion::tile_to_linalg::createLowerTileToLinalgPass());
+    pm.addNestedPass<FuncOp>(createReorderLayoutsPass());
+  }
+
   pm.addPass(stdx::createMainClosurePass());
   pm.addPass(createLoopInvariantCodeMotionPass());
-  pm.addPass(createCanonicalizerPass());
-  pm.addPass(createCSEPass());
+  if (util::getEnvVar("PLAIDML_USE_LINALG") != "1") {
+    pm.addPass(createCanonicalizerPass());
+    // CSE reuses the output for multiple linalg.generic. This may break the
+    // assumption of value-like program, and cause bugs later.
+    pm.addPass(createCSEPass());
+  }
 }
 
 void pipelineBuilderStage2(OpPassManager &pm, const Options &options) {
   unsigned maxThreads = options.getNumThreads();
   IVLOG(1, "Number of threads: " << maxThreads);
 
-  pm.addPass(pmlc::conversion::tile_to_pxa::createLowerTileToPXAPass());
+  if (util::getEnvVar("PLAIDML_USE_LINALG") == "1") {
+    pm.addPass(pmlc::conversion::linalg_to_pxa::createLowerLinalgToPXAPass());
+  } else {
+    pm.addPass(pmlc::conversion::tile_to_pxa::createLowerTileToPXAPass());
+  }
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
   pm.addNestedPass<FuncOp>(layer::createInlineLayersPass());
 
-  if (util::getEnvVar("PLAIDML_BLOCKED_LAYOUTS") == "1") {
-    // If the userLayouts flag is set to true, Conv2D recognizer
-    // will introduce blocked data layouts. If it is set to false, a heuristic
-    // will determine the best data layouts
-    pm.addNestedPass<FuncOp>(
-        pxa::createReorderLayoutsPass(/*allowReorder=*/true,
-                                      /*userLayouts=*/true,
-                                      /*datatileSize=*/64));
-    pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
-    pm.addPass(createCanonicalizerPass());
-    pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass(/*promote=*/true,
-                                                            /*denest=*/true));
-    pm.addPass(createCanonicalizerPass());
-  }
+  pm.addNestedPass<FuncOp>(createStencilTppGemmPass(/*numThreads=*/maxThreads,
+                                                    /*isBatched=*/true));
+  pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
+  pm.addPass(createCanonicalizerPass());
 
-  if (util::getEnvVar("PLAIDML_NEW_PIPELINE") == "1") {
-    pm.addNestedPass<FuncOp>(createStencilTppGemmPass(/*numThreads=*/maxThreads,
-                                                      /*isBatched=*/true));
-    pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
-    pm.addPass(createCanonicalizerPass());
+  pm.addNestedPass<FuncOp>(pxa::createFusionPass(/*memoryActivityThreshold=*/0,
+                                                 /*exactlyMatch=*/false,
+                                                 /*tiledFusion=*/true,
+                                                 /*loopDepth=*/0,
+                                                 /*singleOutput=*/true));
+  pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
+  pm.addPass(createCanonicalizerPass());
 
-    pm.addNestedPass<FuncOp>(
-        pxa::createFusionPass(/*memoryActivityThreshold=*/0,
-                              /*exactlyMatch=*/false,
-                              /*tiledFusion=*/true));
-    pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
-    pm.addPass(createCanonicalizerPass());
+  pm.addNestedPass<FuncOp>(pxa::createTileAccumulatePass());
+  pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass(/*promote=*/false));
+  pm.addPass(createCanonicalizerPass());
 
-    pm.addNestedPass<FuncOp>(pxa::createTileAccumulatePass());
-    pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass(/*promote=*/false));
-    pm.addPass(createCanonicalizerPass());
-
-    pm.addNestedPass<FuncOp>(pxa::createCPUThreadPass(maxThreads));
-    pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
-    pm.addPass(createCanonicalizerPass());
-  } else {
-    pm.addNestedPass<FuncOp>(createStencilTppGemmPass(/*numThreads=*/maxThreads,
-                                                      /*isBatched=*/true));
-    pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
-    pm.addPass(createCanonicalizerPass());
-
-    pm.addNestedPass<FuncOp>(pxa::createTileAccumulatePass());
-    pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass(/*promote=*/false));
-    pm.addPass(createCanonicalizerPass());
-
-    pm.addNestedPass<FuncOp>(pxa::createCPUThreadPass(maxThreads));
-    pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
-    pm.addPass(createCanonicalizerPass());
-
-    pm.addNestedPass<FuncOp>(
-        pxa::createFusionPass(/*memoryActivityThreshold=*/0,
-                              /*exactlyMatch=*/false,
-                              /*tiledFusion=*/true,
-                              /*loopDepth=*/3));
-    pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
-    pm.addPass(createCanonicalizerPass());
-  }
+  pm.addNestedPass<FuncOp>(pxa::createCPUThreadPass(maxThreads));
+  pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
+  pm.addPass(createCanonicalizerPass());
 
   pm.addNestedPass<FuncOp>(pxa::createMemRefDataFlowOptPass());
   pm.addPass(createCanonicalizerPass());
@@ -344,6 +322,8 @@ void pipelineBuilderStage2(OpPassManager &pm, const Options &options) {
   pm.addPass(createCSEPass());
 
   pm.addNestedPass<FuncOp>(createStencilTppUnaryPass());
+  if (pmlc::util::getEnvVar("PLAIDML_PROFILE") == "1")
+    pm.addPass(createProfileKernelsPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
@@ -362,7 +342,7 @@ void pipelineBuilderStage3(OpPassManager &pm) {
   pm.addPass(createCSEPass());
 
   pm.addNestedPass<FuncOp>(createCollapseParallelLoopsPass());
-  pm.addNestedPass<FuncOp>(createConvertSCFToOpenMPPass());
+  pm.addPass(createConvertSCFToOpenMPPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 

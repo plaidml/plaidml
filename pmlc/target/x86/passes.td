@@ -23,9 +23,31 @@ def ConvertStandardToLLVM : Pass<"x86-convert-std-to-llvm", "mlir::ModuleOp"> {
   let dependentDialects = ["mlir::LLVM::LLVMDialect"];
 }
 
+def FoldConstantCast : FunctionPass<"x86-fold-constant-cast"> {
+  let summary = "Materialize casts of constants to target type";
+  let constructor = "pmlc::target::x86::createFoldConstantCastPass()";
+}
+
+def ProfileKernels : Pass<"x86-profile-kernels", "mlir::ModuleOp"> {
+  let summary = "Inject instrumentation points before/after kernel ops";
+  let constructor = "pmlc::target::x86::createProfileKernelsPass()";
+}
+
 def PRNGLinking : Pass<"x86-prng-linking", "mlir::ModuleOp"> {
   let summary = "Link prng ops to runtime functions";
   let constructor = "pmlc::target::x86::createPRNGLinkingPass()";
+}
+
+def ReorderLayouts : FunctionPass<"x86-reorder-layouts"> {
+  let summary = "Optimize data layouts for efficient reading";
+  let constructor = "pmlc::target::x86::createReorderLayoutsPass()";
+  let options = [
+    Option<"blockSize", "block-size", "int64_t", /*default=*/"16",
+           "Data block size">
+  ];
+  let dependentDialects = [
+    "dialect::linalgx::LinalgXDialect",
+  ];
 }
 
 def StencilTppGemm : FunctionPass<"x86-stencil-tpp-gemm"> {
@@ -47,11 +69,6 @@ def StencilTppUnary : FunctionPass<"x86-stencil-tpp-unary"> {
 def TraceLinking : Pass<"x86-trace-linking", "mlir::ModuleOp"> {
   let summary = "Link trace ops to runtime functions";
   let constructor = "pmlc::target::x86::createTraceLinkingPass()";
-}
-
-def FoldConstantCast : FunctionPass<"fold-constant-cast"> {
-  let summary = "Materialize casts of constants to target type";
-  let constructor = "pmlc::target::x86::createFoldConstantCastPass()";
 }
 
 #endif // __PMLC_TARGET_X86_PASSES__

@@ -3,15 +3,16 @@ pml_cc_library(
   HDRS
     passes.h
   SRCS
-    specials.cc
     tile_to_linalg.cc
     utils.cc
   DEPS
     ::passes-gen
     pmlc::dialect::layer::ir
+    pmlc::dialect::pxa::analysis
     pmlc::dialect::stdx::ir
     pmlc::dialect::tile::ir
     pmlc::util
+    MLIRIR
 )
 
 pml_tblgen_library(

@@ -57,12 +57,16 @@ private:
       topLevelOp = parentOp;
     }
 
+    OpPrintingFlags flags;
+    if (pmlc::util::getEnvVar("PLAIDML_DEBUG") == "1")
+      flags.enableDebugInfo(/*prettyForm=*/true);
+
     // Check to see if the top-level operation is actually a module in the case
     // of invalid-ir.
     if (auto module = dyn_cast<ModuleOp>(topLevelOp)) {
-      module.print(os);
+      module.print(os, flags);
     } else {
-      topLevelOp->print(os);
+      topLevelOp->print(os, flags);
     }
 
     os.flush();
@@ -137,7 +141,10 @@ void Program::compile(StringRef targetNameAndOptions, bool collectPasses,
   if (collectPasses || dumpDir.size()) {
     std::string ir;
     llvm::raw_string_ostream os(ir);
-    module->print(os);
+    OpPrintingFlags flags;
+    if (pmlc::util::getEnvVar("PLAIDML_DEBUG") == "1")
+      flags.enableDebugInfo(/*prettyForm=*/true);
+    module->print(os, flags);
     passes.emplace_back(PassInfo{"tile", os.str()});
     pm.addInstrumentation(std::make_unique<IRCollector>(&passes));
     pm.getContext()->disableMultithreading();
@@ -154,11 +161,15 @@ void Program::compile(StringRef targetNameAndOptions, bool collectPasses,
       return VLOG_IS_ON(3);
     };
     pm.getContext()->disableMultithreading();
+    OpPrintingFlags flags;
+    if (pmlc::util::getEnvVar("PLAIDML_DEBUG") == "1")
+      flags.enableDebugInfo(/*prettyForm=*/true);
     pm.enableIRPrinting(shouldPrintBeforePass, shouldPrintAfterPass,
                         /*printModuleScope=*/true,
                         /*printAfterOnlyOnChange=*/false,
                         /*printAfterOnlyOnFailure=*/false,
-                        /*out=*/llvm::errs());
+                        /*out=*/llvm::errs(),
+                        /*opPrintingFlags=*/flags);
   }
 
   auto begOpts = targetNameAndOptions.find('{');

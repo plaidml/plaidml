@@ -10,6 +10,9 @@
 #include "mlir/Dialect/StandardOps/Transforms/Passes.h"
 #include "mlir/Transforms/Passes.h"
 
+#include "mlir-hlo/Dialect/mhlo/transforms/register_passes.h"
+#include "mlir-hlo/Transforms/register_passes.h"
+
 #include "pmlc/conversion/linalg_to_pxa/passes.h"
 #include "pmlc/conversion/pxa_to_affine/passes.h"
 #include "pmlc/conversion/stdx_to_llvm/passes.h"
@@ -23,6 +26,7 @@
 #include "pmlc/dialect/tile/transforms/passes.h"
 #include "pmlc/rt/runtime_registry.h"
 #include "pmlc/target/x86/passes.h"
+#include "pmlc/transforms/passes.h"
 
 // This function may be called to register the MLIR passes with the
 // global registry.
@@ -49,6 +53,12 @@ inline void registerAllPasses() {
   mlir::registerSCFPasses();
   mlir::registerStandardPasses();
 
+  // XLA
+  mlir::mhlo::registerAllMhloPasses();
+  mlir::lmhlo::registerAllLmhloPasses();
+  mlir::disc_ral::registerAllDiscRalPasses();
+  mlir::hlo::registerAllHloPasses();
+
   //
   // PMLC
   //
@@ -70,6 +80,9 @@ inline void registerAllPasses() {
 
   // Target passes
   pmlc::target::x86::registerPasses();
+
+  // Generic transforms
+  pmlc::transforms::registerPasses();
 
   pmlc::rt::registerRuntimes();
 }

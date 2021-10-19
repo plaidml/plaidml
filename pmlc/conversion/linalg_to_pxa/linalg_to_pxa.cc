@@ -1,17 +1,22 @@
 // Copyright 2021, Intel Corporation
 
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Support/DebugStringHelper.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "pmlc/conversion/linalg_to_pxa/pass_detail.h"
+#include "pmlc/conversion/tile_to_pxa/pass_detail.h"
 #include "pmlc/dialect/pxa/analysis/uses.h"
+#include "pmlc/dialect/tile/ir/ops.h"
 #include "pmlc/util/matchers.h"
 #include "pmlc/util/util.h"
 
 namespace pmlc::conversion::linalg_to_pxa {
 
+namespace layer = dialect::layer;
 namespace pxa = dialect::pxa;
 namespace stdx = dialect::stdx;
+namespace tile = dialect::tile;
 
 using namespace mlir; // NOLINT
 
@@ -144,13 +149,15 @@ struct ConstantOpConversion : public OpConversionPattern<ConstantOp> {
     Attribute origValue = op.getValue();
     if (auto origType = origValue.getType().dyn_cast<ShapedType>()) {
       LinalgToPXATypeConverter typeConverter;
-      Type newType = typeConverter.convertType(origType);
-      std::string name = llvm::formatv("cst_memref_{0}", constCount++).str();
+      MemRefType newType =
+          typeConverter.convertType(origType).cast<MemRefType>();
+      std::string funcName =
+          llvm::formatv("cst_memref_{0}", constCount++).str();
       auto funcOp = op->getParentOfType<FuncOp>();
       rewriter.setInsertionPoint(funcOp);
       auto globalOp = rewriter.create<memref::GlobalOp>(
           funcOp.getLoc(),
-          /*sym_name=*/name,
+          /*sym_name=*/funcName,
           /*sym_visibility=*/rewriter.getStringAttr("private"),
           /*type=*/newType,
           /*initial_value=*/origValue,
@@ -213,8 +220,6 @@ struct GenericOpConversion : public OpConversionPattern<linalg::GenericOp> {
     linalg::GenericOpAdaptor adaptor(operands, op->getAttrDictionary());
     ValueRange inputs = adaptor.inputs();
     ValueRange outputs = adaptor.outputs();
-    SmallVector<AffineMap, 4> idxMaps = llvm::to_vector<4>(
-        adaptor.indexing_maps().getAsValueRange<AffineMapAttr>());
 
     // Prepare for creating the reduce ops. The operations with output arguments
     // should be converted to reduce op. We need to extract the aggregation
@@ -251,25 +256,58 @@ struct GenericOpConversion : public OpConversionPattern<linalg::GenericOp> {
       }
     }
 
-    auto ranges = op.getStaticLoopRanges();
-    if (!ranges) {
+    bool hasDummyTensor = op->hasAttr("dummy_tensor");
+    bool skipBoundCheck = op->hasAttr("skip_bound_check");
+    SmallVector<AffineMap, 4> idxMaps = llvm::to_vector<4>(
+        adaptor.indexing_maps().getAsValueRange<AffineMapAttr>());
+    if (skipBoundCheck) {
+      // Remove the last dynamic dimension of the indexing maps
+      for (auto &map : idxMaps) {
+        map = AffineMap::get(map.getNumDims() - 1, 0, map.getResults(),
+                             op.getContext());
+      }
+    }
+
+    auto staticRanges = op.getStaticLoopRanges();
+    if (!staticRanges) {
       op.emitError("LiangOp does not have static ranges.");
     }
+    SmallVector<int64_t, 8> ranges = llvm::to_vector<8>(*staticRanges);
+    if (skipBoundCheck) {
+      ranges.pop_back();
+    }
+    auto loc = op.getLoc();
     auto forOp =
-        rewriter.create<AffineParallelOp>(op.getLoc(),
+        rewriter.create<AffineParallelOp>(loc,
                                           /*resultTypes=*/outputs.getTypes(),
                                           /*reductions=*/aggs,
-                                          /*ranges=*/*ranges);
+                                          /*ranges=*/ranges);
 
     // Create the a load op for each block argument.
     Block *forBody = forOp.getBody();
     auto idxs = forBody->getArguments();
     rewriter.setInsertionPointToStart(forBody);
+
+    // Add constraints
+    Block *body = forBody;
+    if (auto cons = op->getAttrOfType<IntegerSetAttr>("constraints")) {
+      auto ifOp = rewriter.create<AffineIfOp>(loc, outputs.getTypes(),
+                                              cons.getValue(), idxs, true);
+      rewriter.create<AffineYieldOp>(loc, ifOp->getResults());
+      rewriter.setInsertionPointToStart(&ifOp.elseRegion().front());
+      rewriter.create<AffineYieldOp>(loc, outputs);
+      body = &ifOp.thenRegion().front();
+      rewriter.setInsertionPointToStart(body);
+    }
+
     for (unsigned i = 0; i < numInputs; ++i) {
+      if (i == 0 && hasDummyTensor) {
+        continue;
+      }
       if (inputs[i].getType().isa<ShapedType>()) {
         // input is a tensor
-        auto loadOp = rewriter.create<pxa::PxaLoadOp>(forOp.getLoc(), inputs[i],
-                                                      idxMaps[i], idxs);
+        auto loadOp =
+            rewriter.create<pxa::PxaLoadOp>(loc, inputs[i], idxMaps[i], idxs);
         outputArgs[i].replaceAllUsesWith(loadOp.getResult());
       } else {
         // input is a scalar
@@ -285,12 +323,12 @@ struct GenericOpConversion : public OpConversionPattern<linalg::GenericOp> {
       }
     }
     for (auto newOp : toMove) {
-      newOp->moveBefore(forBody, forBody->getOperations().end());
+      newOp->moveBefore(body, body->getOperations().end());
     }
 
     // Must insert reduce ops here. Later on, the reduce op's memref information
     // may be lost while the generic op is erased.
-    if (auto yieldOp = dyn_cast<linalg::YieldOp>(forBody->back())) {
+    if (auto yieldOp = dyn_cast<linalg::YieldOp>(body->back())) {
       SmallVector<AffineMap, 4> maps(idxMaps.begin() + numInputs,
                                      idxMaps.end());
       SmallVector<Value, 4> outs(outputs.begin(), outputs.end());
@@ -342,8 +380,11 @@ struct InitTensorOpConversion
   LogicalResult
   matchAndRewrite(linalg::InitTensorOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
-    BufferAllocator allocResult(rewriter, op, op.result().getType());
-    op.replaceAllUsesWith(allocResult.resultMemRef);
+    auto type = op.result().getType().cast<RankedTensorType>();
+    if (llvm::none_of(type.getShape(), ShapedType::isDynamic)) {
+      BufferAllocator allocResult(rewriter, op, type);
+      op.replaceAllUsesWith(allocResult.resultMemRef);
+    }
     rewriter.eraseOp(op);
     return success();
   }
@@ -359,6 +400,28 @@ struct YieldOpConversion : public OpConversionPattern<linalg::YieldOp> {
     return success();
   }
 };
+
+// Copy the input buffer to the output buffer.
+static AffineParallelOp copyBuffer(OpBuilder &builder, Location loc,
+                                   Value input, Value output,
+                                   MLIRContext *context) {
+  ShapedType type = output.getType().cast<ShapedType>();
+  auto forOp = builder.create<AffineParallelOp>(
+      loc,
+      /*resultTypes=*/TypeRange{type},
+      /*reductions=*/ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign},
+      /*ranges=*/type.getShape());
+  Block::BlockArgListType idxs = forOp.getBody()->getArguments();
+  OpBuilder bodyBuilder = forOp.getBodyBuilder();
+  AffineMap identityMap =
+      AffineMap::getMultiDimIdentityMap(type.getRank(), context);
+  auto loadOp =
+      bodyBuilder.create<pxa::PxaLoadOp>(loc, input, identityMap, idxs);
+  auto reduceOp = bodyBuilder.create<pxa::PxaReduceOp>(
+      loc, AtomicRMWKind::assign, loadOp, output, identityMap, idxs);
+  bodyBuilder.create<AffineYieldOp>(loc, reduceOp.result());
+  return forOp;
+}
 
 struct LowerLinalgToPXAPass
     : public LowerLinalgToPXABase<LowerLinalgToPXAPass> {
@@ -387,6 +450,7 @@ struct LowerLinalgToPXAPass
                            math::MathDialect,     //
                            memref::MemRefDialect, //
                            scf::SCFDialect,       //
+                           layer::LayerDialect,   //
                            pxa::PXADialect,       //
                            stdx::StdXDialect>();
     target.addLegalOp<ModuleOp>();
@@ -406,6 +470,8 @@ struct LowerLinalgToPXAPass
                     IndexOpConversion,                 //
                     InitTensorOpConversion,            //
                     YieldOpConversion>(&getContext());
+
+    tile_to_pxa::populateTileToPXASpecialPatterns(patterns);
 
     if (failed(applyFullConversion(module, target, std::move(patterns)))) {
       signalPassFailure();
@@ -428,12 +494,31 @@ struct LowerLinalgToPXAPass
   void connectResults(FuncLikeOp funcOp, ReturnLikeOp returnOp) {
     unsigned argNumber =
         funcOp.getType().getNumInputs() - returnOp.getNumOperands();
-    for (Value operand : returnOp.operands()) {
+    MLIRContext *context = &getContext();
+    Location loc = returnOp->getLoc();
+    for (OpOperand &operand : returnOp->getOpOperands()) {
       // Find very initial allocation of memref
-      Value def = pxa::getIndirectDef(operand);
-      BlockArgument blockArg = funcOp.getBody().getArgument(argNumber++);
-      if (def != blockArg) {
-        def.replaceAllUsesWith(blockArg);
+      Value def = pxa::getIndirectDef(operand.get());
+      BlockArgument outputArg = funcOp.getBody().getArgument(argNumber++);
+      if (def != outputArg) {
+        if (def.isa<BlockArgument>() ||
+            isa<memref::GetGlobalOp>(def.getDefiningOp())) {
+          OpBuilder builder(returnOp);
+          auto forOp = copyBuffer(builder, loc, def, outputArg, context);
+          operand.set(forOp.getResult(0));
+          continue;
+        }
+        Value outside = pxa::getIndirectDefOutsideScope(operand.get(), funcOp);
+        if (outside && !isa<memref::AllocOp>(outside.getDefiningOp())) {
+          OpBuilder builder(funcOp.getBody());
+          auto forOp = copyBuffer(builder, loc, outside, outputArg, context);
+          outside.replaceUsesWithIf(forOp.getResult(0), [&](OpOperand &use) {
+            Operation *op = use.getOwner();
+            return !forOp->isProperAncestor(op) && funcOp->isProperAncestor(op);
+          });
+          continue;
+        }
+        def.replaceAllUsesWith(outputArg);
       }
     }
   }

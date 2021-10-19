@@ -213,7 +213,8 @@ struct ExprNodeIntrinsic : NodeBase<ExprNodeIntrinsic, ExprNode> {
   std::string op;
   std::vector<ExprNodePtr> operands;
 
-  ExprNodeIntrinsic(llvm::StringRef op, llvm::ArrayRef<ExprNodePtr> operands);
+  ExprNodeIntrinsic(llvm::StringRef op, llvm::ArrayRef<ExprNodePtr> operands,
+                    llvm::StringRef name = "");
   std::string str() const final;
 };
 
