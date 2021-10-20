@@ -49,6 +49,7 @@ pml_py_test(
     core
     smoke
     test
+    WIP
 )
 
 configure_file(version.in.cc version.cc)
