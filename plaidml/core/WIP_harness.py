@@ -1,6 +1,7 @@
 import numpy as np
 
 import plaidml
+import plaidml.exec
 
 
 def _create_buffer(value):

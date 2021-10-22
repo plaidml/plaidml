@@ -20,6 +20,8 @@
 #include "pmlc/util/env.h"
 #include "pmlc/util/logging.h"
 
+#include "pmlc/all_dialects.h"
+
 // TODO: new headers
 
 using namespace mlir; // NOLINT[build/namespaces]
@@ -250,6 +252,7 @@ std::shared_ptr<Program> loadProgram(llvm::StringRef code, llvm::StringRef name,
   auto buffer = llvm::MemoryBuffer::getMemBuffer(code);
   // TODO: So how does `entry` get set?
   auto program = std::make_shared<Program>(name);
+  program->entry = "main";
   // TODO: Is this the right place to be setting dialects?
   MLIRContext *context = program->context.get();
   DialectRegistry registry;

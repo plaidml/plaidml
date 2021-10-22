@@ -8,5 +8,6 @@ pml_cc_library(
     registry.cc
   DEPS
     pmlc::util
+    pmlc::init_passes_and_dialects
     MLIRParser
 )
