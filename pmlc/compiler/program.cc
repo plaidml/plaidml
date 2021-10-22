@@ -255,6 +255,8 @@ std::shared_ptr<Program> loadProgram(llvm::StringRef code, llvm::StringRef name,
   program->entry = "main";
   // TODO: Is this the right place to be setting dialects?
   MLIRContext *context = program->context.get();
+  // TODO: Architecturally the dialects need to be moved, but putting here for
+  // now while debugging other aspects
   DialectRegistry registry;
   registerAllDialects(registry);
   context->appendDialectRegistry(registry);

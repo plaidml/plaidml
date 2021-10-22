@@ -31,6 +31,7 @@ def make_program(src_path='/home/tim/plaidml/pmlc/conversion/linalg_to_pxa/test/
         code = code_file.read()
     name = 'test_conv'
     program = plaidml.Program.load(code, name)
+    program.compile()
     return program
 
 
