@@ -56,6 +56,8 @@ void wrapFunctionAndPackArguments(llvm::Module *module, StringRef funcName,
   auto &ctx = module->getContext();
   llvm::IRBuilder<> builder(ctx);
   auto *func = module->getFunction(funcName);
+  // size_t func_count = module->size(); // TODO for debug
+  // IVLOG(1, "TODO function count: " + func_count);  // TODO: This is busted
   if (!func) {
     throw std::runtime_error("Could not find function: " + funcName.str());
   }

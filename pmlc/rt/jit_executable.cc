@@ -93,6 +93,8 @@ static std::string packFunctionArguments(llvm::Module *module,
                                          StringRef entry) {
   auto funcName = makeCWrapperFunctionName(entry);
   auto newName = makePackedFunctionName(entry);
+  IVLOG(1, "TODO About to call wrapFunctionAndPackArguments on " + funcName);
+  // IVLOG(1, "TODO OVERRIDING! To just call on " + entry);
   util::wrapFunctionAndPackArguments(module, funcName, newName);
   return newName;
 }
@@ -378,6 +380,9 @@ public:
 
     setupTargetTriple(llvmModule.get());
     auto entryPoint = packFunctionArguments(llvmModule.get(), program->entry);
+    // TODO: This is a forced manual override -- UNDO IT
+    // entryPoint = "main";
+    // /TODO
     std::string initPacked;
     std::string finiPacked;
     if (llvmModule->getFunction(kInitName) &&
