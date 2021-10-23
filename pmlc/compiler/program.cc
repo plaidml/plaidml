@@ -251,17 +251,20 @@ std::shared_ptr<Program> loadProgram(llvm::StringRef code, llvm::StringRef name,
   // an "external" entry passed by the caller that says what to load.
   auto buffer = llvm::MemoryBuffer::getMemBuffer(code);
   // TODO: So how does `entry` get set?
-  auto program = std::make_shared<Program>(name);
-  program->entry = "main";
-  // TODO: Is this the right place to be setting dialects?
-  MLIRContext *context = program->context.get();
+  StringRef entry_name = "main";
+  auto context = std::make_unique<MLIRContext>();
   // TODO: Architecturally the dialects need to be moved, but putting here for
   // now while debugging other aspects
   DialectRegistry registry;
   registerAllDialects(registry);
   context->appendDialectRegistry(registry);
 
-  program->parseIOTypes(std::move(buffer));
+  auto program = std::make_shared<Program>(std::move(context),
+                                           std::move(buffer), entry_name);
+
+  // TODO: Is setting buffer twice the way LLVM wants this to go?
+  buffer = llvm::MemoryBuffer::getMemBuffer(code);
+  program->parseIOTypes(std::move(buffer)); // TODO: Re-enable
 
   return program;
 }
