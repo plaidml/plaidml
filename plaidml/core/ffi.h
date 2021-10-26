@@ -266,8 +266,6 @@ plaidml_buffer* plaidml_program_save(  //
     const char** keys,                 //
     const char** values);
 
-plaidml_program* plaidml_program_import_mlir(const char* program)
-
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus
