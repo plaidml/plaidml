@@ -15,7 +15,6 @@
 #include "pmlc/dialect/pxa/transforms/tile.h"
 #include "pmlc/dialect/pxa/transforms/tile_accumulate.h"
 #include "pmlc/dialect/pxa/transforms/vectorize.h"
-#include "pmlc/dialect/stdx/ir/ops.h"
 #include "pmlc/util/logging.h"
 #include "pmlc/util/tags.h"
 #include "pmlc/util/util.h"
