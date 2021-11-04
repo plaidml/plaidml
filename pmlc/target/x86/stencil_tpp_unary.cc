@@ -72,9 +72,11 @@ private:
         !reduce.getType().cast<MemRefType>().getElementType().isF32())
       return None;
 
-    if (!load.isa<BlockArgument>()) {
-      // If the definition of load is in "op", it is too complex to stencil
-      auto defOp = load.getDefiningOp();
+    auto source = cast<pxa::PxaLoadOp>(load.getDefiningOp()).memref();
+    if (!source.isa<BlockArgument>()) {
+      // If the definition of load's source is in "op", it is too complex to
+      // stencil
+      auto defOp = source.getDefiningOp();
       while (!isa<FuncOp>(defOp)) {
         if (defOp == op.getOperation())
           return None;
