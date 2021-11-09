@@ -103,3 +103,30 @@ func @resnet_conv1_relu(%arg0: memref<1x112x112x64xf32>, %arg1: memref<1x112x112
   }
   return %0 : memref<1x112x112x64xf32>
 }
+
+// CHECK-LABEL: func @stencil_unary_do_nothing
+func @stencil_unary_do_nothing(%arg0: memref<1x64x56x56xf32>) -> memref<1x64x56x56xf32> {
+  %0 = memref.alloc() : memref<1x64x56x56xf32>
+  // CHECK: affine.parallel
+  %1 = affine.parallel (%arg1, %arg2) = (0, 0) to (56, 2) reduce ("assign") -> (memref<1x64x56x56xf32>) {
+    // CHECK: affine.parallel
+    %2 = affine.parallel (%arg3, %arg4) = (0, 0) to (64, 28) reduce ("assign") -> (memref<1x64x56x56xf32>) {
+      %3 = memref.alloc() : memref<1x64x56x56xf32>
+      // CHECK: affine.parallel
+      %4 = affine.parallel (%arg5, %arg6, %arg7) = (0, 0, 0) to (64, 56, 56) reduce ("assign") -> (memref<1x64x56x56xf32>) {
+        %8 = pxa.load %arg0[0, %arg5, %arg6, %arg7] : memref<1x64x56x56xf32>
+        %9 = pxa.reduce assign %8, %3[0, %arg5, %arg6, %arg7] : memref<1x64x56x56xf32>
+        affine.yield %9 : memref<1x64x56x56xf32>
+      }
+      // CHECK: pxa.load
+      %5 = pxa.load %4[0, %arg3, %arg1, %arg4 + %arg2 * 28] : memref<1x64x56x56xf32>
+      // CHECK: stdx.relu
+      %6 = stdx.relu(%5) : (f32) -> f32
+      // CHECK: pxa.reduce
+      %7 = pxa.reduce assign %6, %0[0, %arg3, %arg1, %arg4 + %arg2 * 28] : memref<1x64x56x56xf32>
+      affine.yield %7 : memref<1x64x56x56xf32>
+    }
+    affine.yield %2 : memref<1x64x56x56xf32>
+  }
+  return %1 : memref<1x64x56x56xf32>
+}

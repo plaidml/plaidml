@@ -72,6 +72,18 @@ private:
         !reduce.getType().cast<MemRefType>().getElementType().isF32())
       return None;
 
+    auto source = cast<pxa::PxaLoadOp>(load.getDefiningOp()).memref();
+    if (!source.isa<BlockArgument>()) {
+      // If the definition of load's source is in "op", it is too complex to
+      // stencil
+      auto defOp = source.getDefiningOp();
+      while (!isa<FuncOp>(defOp)) {
+        if (defOp == op.getOperation())
+          return None;
+        defOp = defOp->getParentOp();
+      }
+    }
+
     return pxa::StencilCapture{{reduce}, {load}};
   }
 

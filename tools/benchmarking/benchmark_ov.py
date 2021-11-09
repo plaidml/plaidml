@@ -13,17 +13,19 @@ import sh
               type=int,
               help='number of threads to use, defaults to #hyperthreads')
 @click.option('-p', '--precision', default='FP32')  # TODO options
+@click.option('-d', '--device', default='CPU')  # TODO options
 @click.option('--cache_dir', default='~/.cache', help='cache directory')
 @click.option('--model_dir', default='~/.cache/omz_models', help='model directory')
 @click.option('--report_dir', default='reports', help='cache directory')
-def benchmark_app(omz_network, skip, batch_size, num_threads, precision, cache_dir, model_dir,
-                  report_dir):
+def benchmark_app(omz_network, skip, batch_size, num_threads, precision, device, cache_dir,
+                  model_dir, report_dir):
     """Downloads models from openmodelzoo and runs them in benchmark_app, optionally creating a report
   
   \b
   Examples:
-    ./benchmark_ov resnet-50-tf
-    ./benchmark_ov -bs 16 -nt 28 -p FP16 bert-base-ner
+    ./benchmark_ov.py resnet-50-tf
+    ./benchmark_ov.py -bs 16 -nt 28 -p FP16 bert-base-ner
+    ./benchmark_ov.py -d PLAIDML bert-base-ner
   """
     model_dir = os.path.expanduser(os.path.normpath(model_dir))
     cache_dir = os.path.expanduser(os.path.normpath(cache_dir))
@@ -33,16 +35,23 @@ def benchmark_app(omz_network, skip, batch_size, num_threads, precision, cache_d
             'Downloading {0}'.format(omz_network))  #TODO(brian): make this spit out output easily
         sh.omz_downloader('--cache_dir={0}'.format(cache_dir), name=omz_network, o=model_dir)
         print('Running model optimizer on {0}'.format(omz_network))
+        # add_mo_arg='--disable_nhwc_to_nchw',
         sh.omz_converter(name=omz_network, d=model_dir, o=model_dir, precision=precision)
     else:
         print('Skipping download & conversion')
 
     print('Benchmarking...')
     model_path = os.path.join(model_dir, 'public', omz_network, precision, omz_network + '.xml')
-    ba = sh.Command('benchmark_app')
-    ba = ba.bake(m=model_path, api='sync', t='15', b=batch_size, _long_prefix='-', _long_sep=' ')
+    ba = sh.Command('../.././vendor/openvino/bin/intel64/Release/benchmark_app')
+    ba = ba.bake(m=model_path,
+                 api='sync',
+                 t='15',
+                 b=batch_size,
+                 d=device,
+                 _long_prefix='-',
+                 _long_sep=' ')
     if num_threads:
-        ba = ba.bake(nstreams=num_threads)
+        ba = ba.bake(nstreams=num_threads, _long_prefix='-')
     for line in ba(_iter=True):
         print(line, end='')
 

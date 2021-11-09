@@ -682,33 +682,33 @@ struct FusionPass : public FusionBase<FusionPass> {
     }
   }
 
+  int64_t getOpLoopNest(AffineParallelOp affineParallelOp) {
+    auto opLoopNest = 0;
+    auto parentOp = dyn_cast<AffineParallelOp>(affineParallelOp->getParentOp());
+    while (parentOp) {
+      parentOp = dyn_cast<AffineParallelOp>(parentOp->getParentOp());
+      opLoopNest++;
+    }
+    return opLoopNest;
+  }
+
   void runOnFunction() final {
     FuncOp func = getFunction();
 
-    Block *block = nullptr;
-    func.walk<WalkOrder::PreOrder>([&](AffineParallelOp op) {
-      block = op->getBlock();
-      return WalkResult::interrupt();
+    // Collect the blocks contain the top-level AffineParallelOps
+    SmallPtrSet<Block *, 4> outermost;
+    func.walk([&](AffineParallelOp affineParallelOp) {
+      if (getOpLoopNest(affineParallelOp) == 0)
+        outermost.insert(affineParallelOp->getBlock());
     });
-
-    if (!block)
-      return;
-
-    // Always run on outer blocks, inner will be also
-    // fused based on the loopDepth parameter
-    performFusion(*block);
+    for (auto block : outermost) {
+      performFusion(*block);
+    }
 
     int64_t loopDepthVal = loopDepth.getValue();
     for (auto it = 0; it < loopDepthVal; it++) {
       func.walk([&](AffineParallelOp affineParallelOp) {
-        auto opLoopNest = 0;
-        auto parentOp =
-            dyn_cast<AffineParallelOp>(affineParallelOp->getParentOp());
-        while (parentOp) {
-          parentOp = dyn_cast<AffineParallelOp>(parentOp->getParentOp());
-          opLoopNest++;
-        }
-        if (opLoopNest >= loopDepthVal)
+        if (getOpLoopNest(affineParallelOp) >= loopDepthVal)
           return;
         performFusion(*affineParallelOp.getBody());
       });
