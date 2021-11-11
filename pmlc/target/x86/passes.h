@@ -24,6 +24,8 @@ std::unique_ptr<mlir::Pass> createLowerToLLVMPass();
 
 std::unique_ptr<mlir::Pass> createProfileKernelsPass();
 
+std::unique_ptr<mlir::Pass> createProfileLinkingPass();
+
 std::unique_ptr<mlir::Pass> createPRNGLinkingPass();
 
 std::unique_ptr<mlir::Pass> createReorderLayoutsPass();
