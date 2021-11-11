@@ -33,6 +33,11 @@ def ProfileKernels : Pass<"x86-profile-kernels", "mlir::ModuleOp"> {
   let constructor = "pmlc::target::x86::createProfileKernelsPass()";
 }
 
+def ProfileLinking : Pass<"x86-profile-linking", "mlir::ModuleOp"> {
+  let summary = "Link profile ops to runtime functions";
+  let constructor = "pmlc::target::x86::createProfileLinkingPass()";
+}
+
 def PRNGLinking : Pass<"x86-prng-linking", "mlir::ModuleOp"> {
   let summary = "Link prng ops to runtime functions";
   let constructor = "pmlc::target::x86::createPRNGLinkingPass()";
