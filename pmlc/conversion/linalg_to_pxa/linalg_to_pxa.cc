@@ -227,7 +227,6 @@ struct GenericOpConversion : public OpConversionPattern<linalg::GenericOp> {
     llvm::SmallSet<Operation *, 4> toRemove;
     auto numInputs = inputs.size();
     auto numOutputs = outputs.size();
-    // Make a parallel for loop to fill the result
     SmallVector<AtomicRMWKind, 4> aggs(outputs.size(), AtomicRMWKind::assign);
     auto outputArgs = op.getBody()->getArguments();
     for (unsigned i = 0; i < outputs.size(); ++i) {
@@ -380,10 +379,14 @@ struct InitTensorOpConversion
   LogicalResult
   matchAndRewrite(linalg::InitTensorOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
-    auto type = op.result().getType().cast<RankedTensorType>();
+    auto value = op.result();
+    auto type = value.getType().cast<RankedTensorType>();
     if (llvm::none_of(type.getShape(), ShapedType::isDynamic)) {
-      BufferAllocator allocResult(rewriter, op, type);
-      op.replaceAllUsesWith(allocResult.resultMemRef);
+      while (value.use_begin() != value.use_end()) {
+        // For each use of InitTensorOp, we need an independent allocation
+        BufferAllocator allocResult(rewriter, op, type);
+        value.use_begin()->set(allocResult.resultMemRef);
+      }
     }
     rewriter.eraseOp(op);
     return success();
