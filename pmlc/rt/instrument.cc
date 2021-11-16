@@ -20,25 +20,26 @@ static time_point<steady_clock> globalTime;
 void initInstrument() { //
   initTime = globalTime = steady_clock::now();
   if (util::getEnvVar("PLAIDML_PROFILE") == "1") {
-    llvm::outs() << "\"id\",\"tag\",\"elapsed\",\"accumulated\"\n";
+    llvm::outs() << "\"id\",\"loc\",\"tag\",\"elapsed\",\"accumulated\"\n";
     llvm::outs().flush();
   }
 }
 
-void instrumentPoint(int64_t id, int64_t tag) {
+void instrumentPoint(int64_t id, int64_t tag, const char *loc) {
   auto now = steady_clock::now();
   auto lastDuration = duration_cast<duration<double>>(now - globalTime).count();
   auto initDuration = duration_cast<duration<double>>(now - initTime).count();
-  llvm::outs() << llvm::format("%03d,%d,%7.6f,%7.6f\n", id, tag, lastDuration,
-                               initDuration);
+  llvm::outs() << llvm::format("%03d,%s,%d,%7.6f,%7.6f\n", id, loc, tag,
+                               lastDuration, initDuration);
   llvm::outs().flush();
   globalTime = now;
 }
 
 } // namespace pmlc::rt
 
-extern "C" void _mlir_ciface_plaidml_rt_instrument(int64_t id, int64_t tag) {
-  pmlc::rt::instrumentPoint(id, tag);
+extern "C" void _mlir_ciface_plaidml_rt_instrument(int64_t id, int64_t tag,
+                                                   const char *loc) {
+  pmlc::rt::instrumentPoint(id, tag, loc);
 }
 
 namespace pmlc::rt {

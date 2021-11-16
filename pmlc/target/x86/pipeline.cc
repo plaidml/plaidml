@@ -263,7 +263,8 @@ void pipelineBuilderStage1(OpPassManager &pm) {
 
   if (util::getEnvVar("PLAIDML_USE_LINALG") == "1") {
     pm.addPass(pmlc::conversion::tile_to_linalg::createLowerTileToLinalgPass());
-    pm.addNestedPass<FuncOp>(createReorderLayoutsPass());
+    if (pmlc::util::getEnvVar("PLAIDML_REORDER") == "1")
+      pm.addNestedPass<FuncOp>(createReorderLayoutsPass());
   }
 
   pm.addPass(stdx::createMainClosurePass());
@@ -361,6 +362,8 @@ void pipelineBuilderStage4(OpPassManager &pm) {
 
   pm.addPass(createLowerToLLVMPass());
   pm.addPass(createTraceLinkingPass());
+  if (pmlc::util::getEnvVar("PLAIDML_PROFILE") == "1")
+    pm.addPass(createProfileLinkingPass());
 }
 
 void pipelineBuilder(OpPassManager &pm) {
