@@ -388,13 +388,7 @@ struct GenericOpConversion : public OpConversionPattern<linalg::GenericOp> {
       op->emitError("No linalg.yield in generic op.");
     }
 
-    if (op.getNumResults() == forOp.getNumResults()) {
-      // Explicitly replace the results to avoid possbile inconsistent types
-      for (unsigned i = 0; i < op.getNumResults(); ++i) {
-        op.getResult(i).replaceAllUsesWith(forOp.getResult(i));
-      }
-    }
-    rewriter.eraseOp(op);
+    rewriter.replaceOp(op, forOp.getResults());
     return success();
   }
 };
