@@ -27,6 +27,7 @@ func @closure() {
 
 // CHECK-LABEL: func @closure()
 //       CHECK:   memref.alloc
+//       CHECK:   affine.parallel
 //       CHECK:   %[[fill:.*]] = affine.parallel
 //       CHECK:   stdx.closure(
 //  CHECK-SAME:     %[[arg0:.*]]: memref<8x16xf32>
@@ -62,10 +63,11 @@ func @closure_yield(%arg0: tensor<3x3xf32> {stdx.const}) {
 // CHECK-LABEL: func @closure_yield
 //  CHECK-SAME: (%[[arg0:.*]]: memref<3x3xf32> {stdx.const})
 //       CHECK:   stdx.closure(%[[arg1:.*]]: memref<3x3xf32>)
+//       CHECK:     %[[init:.*]] = affine.parallel
 //       CHECK:     %[[t0:.*]] = affine.parallel
 //       CHECK:       pxa.load %[[arg0]]
 //       CHECK:       stdx.relu
-//       CHECK:       pxa.reduce assign {{.*}}, %[[arg1]]
+//       CHECK:       pxa.reduce assign {{.*}}, %[[init]]
 //       CHECK:       affine.yield
 //       CHECK:     stdx.yield %[[t0]]
 //       CHECK:   return

@@ -31,21 +31,26 @@ static RankedTensorType getRankedTensorType(Type type) {
 
 struct BufferAllocator {
   Value resultMemRef;
-  RankedTensorType rankedTensorType;
   MemRefType memRefType;
   Type elementType;
 
   BufferAllocator(OpBuilder &builder, Operation *op, Type resultType) {
     // Gather some basic info
-    LinalgToPXATypeConverter typeConverter;
     Location loc = op->getLoc();
-    rankedTensorType = getRankedTensorType(resultType);
-    elementType = typeConverter.convertType(rankedTensorType.getElementType());
-    ArrayRef<int64_t> originalShape = rankedTensorType.getShape();
-    auto shape = llvm::to_vector<8>(originalShape);
 
-    // Make an allocation for the output
-    memRefType = MemRefType::get(shape, elementType);
+    if (resultType.isa<RankedTensorType>()) {
+      LinalgToPXATypeConverter typeConverter;
+      auto rankedTensorType = getRankedTensorType(resultType);
+      elementType =
+          typeConverter.convertType(rankedTensorType.getElementType());
+      ArrayRef<int64_t> originalShape = rankedTensorType.getShape();
+      auto shape = llvm::to_vector<8>(originalShape);
+      // Make an allocation for the output
+      memRefType = MemRefType::get(shape, elementType);
+    } else if (resultType.isa<MemRefType>()) {
+      memRefType = resultType.cast<MemRefType>();
+      elementType = memRefType.getElementType();
+    }
     resultMemRef = builder.create<memref::AllocOp>(loc, memRefType);
   }
 };
@@ -139,6 +144,28 @@ private:
   Operation *relatedOp;
 };
 
+// Copy the input buffer to the output buffer.
+static AffineParallelOp copyBuffer(OpBuilder &builder, Location loc,
+                                   Value input, Value output,
+                                   MLIRContext *context) {
+  ShapedType type = output.getType().cast<ShapedType>();
+  auto forOp = builder.create<AffineParallelOp>(
+      loc,
+      /*resultTypes=*/TypeRange{type},
+      /*reductions=*/ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign},
+      /*ranges=*/type.getShape());
+  Block::BlockArgListType idxs = forOp.getBody()->getArguments();
+  OpBuilder bodyBuilder = forOp.getBodyBuilder();
+  AffineMap identityMap =
+      AffineMap::getMultiDimIdentityMap(type.getRank(), context);
+  auto loadOp =
+      bodyBuilder.create<pxa::PxaLoadOp>(loc, input, identityMap, idxs);
+  auto reduceOp = bodyBuilder.create<pxa::PxaReduceOp>(
+      loc, AtomicRMWKind::assign, loadOp, output, identityMap, idxs);
+  bodyBuilder.create<AffineYieldOp>(loc, reduceOp.result());
+  return forOp;
+}
+
 struct ConstantOpConversion : public OpConversionPattern<ConstantOp> {
   using OpConversionPattern<ConstantOp>::OpConversionPattern;
 
@@ -219,7 +246,20 @@ struct GenericOpConversion : public OpConversionPattern<linalg::GenericOp> {
                   ConversionPatternRewriter &rewriter) const final {
     linalg::GenericOpAdaptor adaptor(operands, op->getAttrDictionary());
     ValueRange inputs = adaptor.inputs();
-    ValueRange outputs = adaptor.outputs();
+    SmallVector<Value, 4> outputs;
+    SmallVector<Type, 4> outputTypes;
+
+    // Copy all output operands in case they are shared with others
+    for (auto out : op.getOutputOperands()) {
+      Value operand = out->get();
+      BufferAllocator allocResult(rewriter, op, operand.getType());
+      auto copyOp = copyBuffer(rewriter, op.getLoc(), operand,
+                               allocResult.resultMemRef, op.getContext());
+      auto newOut = copyOp.getResult(0);
+      out->set(newOut);
+      outputs.emplace_back(newOut);
+      outputTypes.emplace_back(newOut.getType());
+    }
 
     // Prepare for creating the reduce ops. The operations with output arguments
     // should be converted to reduce op. We need to extract the aggregation
@@ -277,11 +317,10 @@ struct GenericOpConversion : public OpConversionPattern<linalg::GenericOp> {
       ranges.pop_back();
     }
     auto loc = op.getLoc();
-    auto forOp =
-        rewriter.create<AffineParallelOp>(loc,
-                                          /*resultTypes=*/outputs.getTypes(),
-                                          /*reductions=*/aggs,
-                                          /*ranges=*/ranges);
+    auto forOp = rewriter.create<AffineParallelOp>(loc,
+                                                   /*resultTypes=*/outputTypes,
+                                                   /*reductions=*/aggs,
+                                                   /*ranges=*/ranges);
 
     // Create the a load op for each block argument.
     Block *forBody = forOp.getBody();
@@ -291,8 +330,8 @@ struct GenericOpConversion : public OpConversionPattern<linalg::GenericOp> {
     // Add constraints
     Block *body = forBody;
     if (auto cons = op->getAttrOfType<IntegerSetAttr>("constraints")) {
-      auto ifOp = rewriter.create<AffineIfOp>(loc, outputs.getTypes(),
-                                              cons.getValue(), idxs, true);
+      auto ifOp = rewriter.create<AffineIfOp>(loc, outputTypes, cons.getValue(),
+                                              idxs, true);
       rewriter.create<AffineYieldOp>(loc, ifOp->getResults());
       rewriter.setInsertionPointToStart(&ifOp.elseRegion().front());
       rewriter.create<AffineYieldOp>(loc, outputs);
@@ -349,13 +388,7 @@ struct GenericOpConversion : public OpConversionPattern<linalg::GenericOp> {
       op->emitError("No linalg.yield in generic op.");
     }
 
-    if (op.getNumResults() == forOp.getNumResults()) {
-      rewriter.replaceOp(op, forOp.getResults());
-    } else {
-      // For some original ops such as conv and copy, they don't return
-      // anything. So we erase the original op directly.
-      rewriter.eraseOp(op);
-    }
+    rewriter.replaceOp(op, forOp.getResults());
     return success();
   }
 };
@@ -400,28 +433,6 @@ struct YieldOpConversion : public OpConversionPattern<linalg::YieldOp> {
     return success();
   }
 };
-
-// Copy the input buffer to the output buffer.
-static AffineParallelOp copyBuffer(OpBuilder &builder, Location loc,
-                                   Value input, Value output,
-                                   MLIRContext *context) {
-  ShapedType type = output.getType().cast<ShapedType>();
-  auto forOp = builder.create<AffineParallelOp>(
-      loc,
-      /*resultTypes=*/TypeRange{type},
-      /*reductions=*/ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign},
-      /*ranges=*/type.getShape());
-  Block::BlockArgListType idxs = forOp.getBody()->getArguments();
-  OpBuilder bodyBuilder = forOp.getBodyBuilder();
-  AffineMap identityMap =
-      AffineMap::getMultiDimIdentityMap(type.getRank(), context);
-  auto loadOp =
-      bodyBuilder.create<pxa::PxaLoadOp>(loc, input, identityMap, idxs);
-  auto reduceOp = bodyBuilder.create<pxa::PxaReduceOp>(
-      loc, AtomicRMWKind::assign, loadOp, output, identityMap, idxs);
-  bodyBuilder.create<AffineYieldOp>(loc, reduceOp.result());
-  return forOp;
-}
 
 struct LowerLinalgToPXAPass
     : public LowerLinalgToPXABase<LowerLinalgToPXAPass> {
