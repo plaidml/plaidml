@@ -104,19 +104,21 @@ func @resnet50_tail(%arg0: memref<1000xf32>, %arg1: memref<1x1000xf32>, %out: me
 }
 
 // CHECK-LABEL: func @resnet50_tail
-// CHECK:         %{{.*}}:2 = affine.parallel (%{{.*}}) = (0) to (1000) reduce ("assign", "assign") -> (memref<1x1000xf32>, memref<1x1xf32>)
+// CHECK:         %[[out0:.*]] = affine.parallel (%{{.*}}) = (0) to (1000) reduce ("assign") -> (memref<1x1000xf32>)
 // CHECK:           pxa.load
 // CHECK:           pxa.load
 // CHECK:           addf
 // CHECK:           pxa.reduce assign
 // CHECK:           pxa.load
 // CHECK:           pxa.reduce assign
+// CEHCK:           affine.yield %{{.*}} : memref<1x1000xf32>
+// CHECK:         %[[out1:.*]] = affine.parallel (%{{.*}}) = (0) to (1000) reduce ("assign") -> (memref<1x1xf32>)
 // CHECK:           pxa.load
 // CHECK:           pxa.reduce maxf
-// CHECK:           affine.yield %{{.*}}, %{{.*}} : memref<1x1000xf32>, memref<1x1xf32>
+// CHECK:           affine.yield %{{.*}} : memref<1x1xf32>
 // CHECK:         affine.parallel (%{{.*}}) = (0) to (1000) reduce ("assign") -> (memref<1x1000xf32>)
-// CHECK:           pxa.load %{{.*}}#0[0, %{{.*}}] : memref<1x1000xf32>
-// CHECK:           pxa.load %{{.*}}#1[0, 0] : memref<1x1xf32>
+// CHECK:           pxa.load %[[out0]][0, %{{.*}}] : memref<1x1000xf32>
+// CHECK:           pxa.load %[[out1]][0, 0] : memref<1x1xf32>
 // CHECK:           subf
 // CHECK:           pxa.reduce assign
 // CHECK:           affine.yield

@@ -64,12 +64,14 @@ struct FusionInfo {
   bool avoidReductionIndexes;
 
   FusionInfo(AffineParallelOp aBand, AffineParallelOp bBand,
+             DenseSet<BlockArgument> &reductionIdxs,
              int64_t memoryActivityThreshold, bool exactlyMatch,
-             bool tiledFusion, bool singleOutput)
-      : aInfo{aBand}, bInfo{bBand}, hasPlan(false),
-        memoryActivityThreshold(memoryActivityThreshold),
+             bool tiledFusion, bool singleOutput, bool avoidReductionIndexes)
+      : aInfo{aBand}, bInfo{bBand}, reductionIdxs(reductionIdxs),
+        hasPlan(false), memoryActivityThreshold(memoryActivityThreshold),
         exactlyMatch(exactlyMatch), tiledFusion(tiledFusion),
-        singleOutput(singleOutput) {}
+        singleOutput(singleOutput),
+        avoidReductionIndexes(avoidReductionIndexes) {}
 
   // Helper method to find the original source write of a state update.
   static Optional<PxaMemAccessOperand> findSourceWrite(Value value) {
@@ -105,28 +107,6 @@ struct FusionInfo {
       if (bInfo.needsTiling)
         undoTiling(bInfo.op, bInfo.tileSizes);
     }
-  }
-
-  void collectReductionIdxs(SmallVectorImpl<StrideInfo> &strides,
-                            AffineParallelOp ap) {
-    DenseSet<BlockArgument> idxs;
-    // Get all outer loop idxs
-    Operation *currOp = ap.getOperation();
-    do {
-      if (auto loop = dyn_cast<AffineParallelOp>(currOp)) {
-        for (auto arg : loop.getBody()->getArguments()) {
-          idxs.insert(arg);
-        }
-      }
-      currOp = currOp->getParentOp();
-    } while (!isa<FuncOp>(currOp));
-    // Remove the idxs that appear in the reduction operation
-    for (StrideInfo si : strides) {
-      for (auto arg : si.strides) {
-        idxs.erase(arg.first);
-      }
-    }
-    reductionIdxs.insert(idxs.begin(), idxs.end());
   }
 
   // Helper to get a clean version of the strides for a specific op (or fail)
@@ -166,19 +146,6 @@ struct FusionInfo {
     SmallVector<StrideInfo, 4> stridesB;
     if (!getStrides(stridesB, opB, bInfo.op))
       return false;
-
-    // If the operation is non-assign reduction, collect the reduction indexes
-    reductionIdxs.clear();
-    if (auto reduce = dyn_cast<PxaReduceOp>(opA.getOperation())) {
-      if (reduce.agg() != AtomicRMWKind::assign) {
-        collectReductionIdxs(stridesA, aInfo.op);
-      }
-    }
-    if (auto reduce = dyn_cast<PxaReduceOp>(opB.getOperation())) {
-      if (reduce.agg() != AtomicRMWKind::assign) {
-        collectReductionIdxs(stridesB, bInfo.op);
-      }
-    }
 
     assert(stridesA.size() == stridesB.size() &&
            "Fusion ops should read/write the same memref and thus have the "
@@ -665,8 +632,9 @@ struct FusionPass : public FusionBase<FusionPass> {
     IVLOG(4, "Attempt fusion:\nA:\n"
                  << debugString(*aBand) << "\nB:\n"
                  << debugString(*bBand));
-    FusionInfo fusionInfo(aBand, bBand, memoryActivityThreshold.getValue(),
-                          exactlyMatch, tiledFusion, singleOutput);
+    FusionInfo fusionInfo(aBand, bBand, reductionIdxs,
+                          memoryActivityThreshold.getValue(), exactlyMatch,
+                          tiledFusion, singleOutput, avoidReductionIndexes);
     bool canFuse = fusionInfo.computeFusion();
     if (!canFuse) {
       IVLOG(3, "Could not fuse");
@@ -740,8 +708,38 @@ struct FusionPass : public FusionBase<FusionPass> {
     return opLoopNest;
   }
 
+  void collectReductionIdxs(PxaReduceOp reduce) {
+    if (reduce.agg() == AtomicRMWKind::assign) {
+      return;
+    }
+    DenseSet<BlockArgument> idxs;
+    // Get all outer loop idxs
+    Operation *currOp = reduce.getOperation();
+    do {
+      if (auto loop = dyn_cast<AffineParallelOp>(currOp)) {
+        for (auto arg : loop.getBody()->getArguments()) {
+          idxs.insert(arg);
+        }
+      }
+      currOp = currOp->getParentOp();
+    } while (!isa<FuncOp>(currOp));
+    // Remove all indexes that appear in the reduction op
+    auto args = reduce.getIdxs();
+    reduce.getAffineMap().walkExprs([&](AffineExpr expr) {
+      if (auto dim = expr.dyn_cast<AffineDimExpr>()) {
+        if (auto arg = args[dim.getPosition()].dyn_cast<BlockArgument>()) {
+          idxs.erase(arg);
+        }
+      }
+    });
+    reductionIdxs.insert(idxs.begin(), idxs.end());
+  }
+
   void runOnFunction() final {
     FuncOp func = getFunction();
+
+    // Collect reduction idxs
+    func.walk([&](PxaReduceOp reduce) { collectReductionIdxs(reduce); });
 
     // Collect the blocks contain the top-level AffineParallelOps
     SmallPtrSet<Block *, 4> outermost;
@@ -762,6 +760,10 @@ struct FusionPass : public FusionBase<FusionPass> {
       });
     }
   }
+
+private:
+  // Reduction Idxs
+  DenseSet<BlockArgument> reductionIdxs;
 };
 
 } // namespace
