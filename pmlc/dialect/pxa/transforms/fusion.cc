@@ -50,6 +50,8 @@ struct FusionInfo {
   // tiling)
   DenseMap<BlockArgument, BlockArgument> aToB;
   DenseMap<BlockArgument, BlockArgument> bToA;
+  // Reduction Idxs
+  DenseSet<BlockArgument> reductionIdxs;
   // Over-fusion prevention parameter
   int64_t memoryActivityThreshold;
   // Fuse the ops with exactly matched idxs
@@ -58,14 +60,18 @@ struct FusionInfo {
   bool tiledFusion;
   // Allow single output only
   bool singleOutput;
+  // Avoid reduction idxs
+  bool avoidReductionIndexes;
 
   FusionInfo(AffineParallelOp aBand, AffineParallelOp bBand,
+             DenseSet<BlockArgument> &reductionIdxs,
              int64_t memoryActivityThreshold, bool exactlyMatch,
-             bool tiledFusion, bool singleOutput)
-      : aInfo{aBand}, bInfo{bBand}, hasPlan(false),
-        memoryActivityThreshold(memoryActivityThreshold),
+             bool tiledFusion, bool singleOutput, bool avoidReductionIndexes)
+      : aInfo{aBand}, bInfo{bBand}, reductionIdxs(reductionIdxs),
+        hasPlan(false), memoryActivityThreshold(memoryActivityThreshold),
         exactlyMatch(exactlyMatch), tiledFusion(tiledFusion),
-        singleOutput(singleOutput) {}
+        singleOutput(singleOutput),
+        avoidReductionIndexes(avoidReductionIndexes) {}
 
   // Helper method to find the original source write of a state update.
   static Optional<PxaMemAccessOperand> findSourceWrite(Value value) {
@@ -106,12 +112,13 @@ struct FusionInfo {
   // Helper to get a clean version of the strides for a specific op (or fail)
   static bool getStrides(SmallVectorImpl<StrideInfo> &out,
                          PxaMemAccessOperand access, AffineParallelOp ap) {
-    SmallVector<StrideInfo> strides;
+    SmallVector<StrideInfo, 4> strides;
     if (failed(
             computeMultiDimStrideInfo(access.getAffineValueMap(), strides))) {
       access.getOperation()->emitRemark("Failed to compute strides");
       return false;
     }
+
     for (StrideInfo si : strides) {
       cleanStrideInfo(ap.getBody(), si);
       out.push_back(si);
@@ -187,6 +194,12 @@ struct FusionInfo {
         opB.getOperation()->emitRemark(
             "Failed to fuse with def due to multiple high stride indexes");
         return false;
+      }
+
+      if (avoidReductionIndexes &&
+          (reductionIdxs.contains(argA) || reductionIdxs.contains(argB))) {
+        // Do not consider reduction indexes
+        continue;
       }
 
       // Extract the details we care about
@@ -602,12 +615,14 @@ struct FusionPass : public FusionBase<FusionPass> {
   FusionPass() = default;
 
   explicit FusionPass(int64_t memoryActivityThreshold, bool exactlyMatch,
-                      bool tiledFusion, int64_t loopDepth, bool singleOutput) {
+                      bool tiledFusion, int64_t loopDepth, bool singleOutput,
+                      bool avoidReductionIndexes) {
     this->memoryActivityThreshold = memoryActivityThreshold;
     this->exactlyMatch = exactlyMatch;
     this->tiledFusion = tiledFusion;
     this->loopDepth = loopDepth;
     this->singleOutput = singleOutput;
+    this->avoidReductionIndexes = avoidReductionIndexes;
   }
 
   // Attempts to fuse two ops if they look good.  Returns the new fused loop
@@ -617,8 +632,9 @@ struct FusionPass : public FusionBase<FusionPass> {
     IVLOG(4, "Attempt fusion:\nA:\n"
                  << debugString(*aBand) << "\nB:\n"
                  << debugString(*bBand));
-    FusionInfo fusionInfo(aBand, bBand, memoryActivityThreshold.getValue(),
-                          exactlyMatch, tiledFusion, singleOutput);
+    FusionInfo fusionInfo(aBand, bBand, reductionIdxs,
+                          memoryActivityThreshold.getValue(), exactlyMatch,
+                          tiledFusion, singleOutput, avoidReductionIndexes);
     bool canFuse = fusionInfo.computeFusion();
     if (!canFuse) {
       IVLOG(3, "Could not fuse");
@@ -692,8 +708,38 @@ struct FusionPass : public FusionBase<FusionPass> {
     return opLoopNest;
   }
 
+  void collectReductionIdxs(PxaReduceOp reduce) {
+    if (reduce.agg() == AtomicRMWKind::assign) {
+      return;
+    }
+    DenseSet<BlockArgument> idxs;
+    // Get all outer loop idxs
+    Operation *currOp = reduce.getOperation();
+    do {
+      if (auto loop = dyn_cast<AffineParallelOp>(currOp)) {
+        for (auto arg : loop.getBody()->getArguments()) {
+          idxs.insert(arg);
+        }
+      }
+      currOp = currOp->getParentOp();
+    } while (!isa<FuncOp>(currOp));
+    // Remove all indexes that appear in the reduction op
+    auto args = reduce.getIdxs();
+    reduce.getAffineMap().walkExprs([&](AffineExpr expr) {
+      if (auto dim = expr.dyn_cast<AffineDimExpr>()) {
+        if (auto arg = args[dim.getPosition()].dyn_cast<BlockArgument>()) {
+          idxs.erase(arg);
+        }
+      }
+    });
+    reductionIdxs.insert(idxs.begin(), idxs.end());
+  }
+
   void runOnFunction() final {
     FuncOp func = getFunction();
+
+    // Collect reduction idxs
+    func.walk([&](PxaReduceOp reduce) { collectReductionIdxs(reduce); });
 
     // Collect the blocks contain the top-level AffineParallelOps
     SmallPtrSet<Block *, 4> outermost;
@@ -714,15 +760,21 @@ struct FusionPass : public FusionBase<FusionPass> {
       });
     }
   }
+
+private:
+  // Reduction Idxs
+  DenseSet<BlockArgument> reductionIdxs;
 };
 
 } // namespace
 
 std::unique_ptr<Pass> createFusionPass(int64_t memoryActivityThreshold,
                                        bool exactlyMatch, bool tiledFusion,
-                                       int64_t loopDepth, bool singleOutput) {
+                                       int64_t loopDepth, bool singleOutput,
+                                       bool avoidReductionIndexes) {
   return std::make_unique<FusionPass>(memoryActivityThreshold, exactlyMatch,
-                                      tiledFusion, loopDepth, singleOutput);
+                                      tiledFusion, loopDepth, singleOutput,
+                                      avoidReductionIndexes);
 }
 
 } // namespace pmlc::dialect::pxa
