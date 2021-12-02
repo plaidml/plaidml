@@ -80,6 +80,9 @@ def Fusion : FunctionPass<"pxa-fusion"> {
     Option<"singleOutput", "single-output", "bool",
            /*default=*/"false",
            "Allow single output only">,
+    Option<"avoidReductionIndexes", "avoid-reduction-indexes", "bool",
+           /*default*/"true",
+           "Avoid fusion on reduction indexes">
   ];
 }
 
