@@ -66,8 +66,8 @@ struct FusionInfo {
   FusionInfo(AffineParallelOp aBand, AffineParallelOp bBand,
              int64_t memoryActivityThreshold, bool exactlyMatch,
              bool tiledFusion, bool singleOutput, bool avoidReductionIndexes)
-      : aInfo{aBand}, bInfo{bBand}, reductionIdxs(reductionIdxs),
-        hasPlan(false), memoryActivityThreshold(memoryActivityThreshold),
+      : aInfo{aBand}, bInfo{bBand}, hasPlan(false),
+        memoryActivityThreshold(memoryActivityThreshold),
         exactlyMatch(exactlyMatch), tiledFusion(tiledFusion),
         singleOutput(singleOutput),
         avoidReductionIndexes(avoidReductionIndexes) {
@@ -90,15 +90,15 @@ struct FusionInfo {
       }
       currOp = currOp->getParentOp();
     } while (!isa<FuncOp>(currOp));
-    // Remove all indexes that appear in the reduction op
-    auto args = reduce.getIdxs();
-    reduce.getAffineMap().walkExprs([&](AffineExpr expr) {
-      if (auto dim = expr.dyn_cast<AffineDimExpr>()) {
-        if (auto arg = args[dim.getPosition()].dyn_cast<BlockArgument>()) {
-          idxs.erase(arg);
-        }
+
+    auto maybeStrideInfo = computeStrideInfo(reduce);
+    if (maybeStrideInfo) {
+      // Remove all indexes that appear in the reduction op
+      auto si = *maybeStrideInfo;
+      for (auto kvp : si.strides) {
+        idxs.erase(kvp.first);
       }
-    });
+    }
     reductionIdxs.insert(idxs.begin(), idxs.end());
   }
 
