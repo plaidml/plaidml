@@ -65,6 +65,8 @@ struct FusionInfo {
   bool singleOutput;
   // Avoid reduction idxs
   bool avoidReductionIndexes;
+  // If either loop is outermost
+  bool isOutermost;
 
   FusionInfo(AffineParallelOp aBand, AffineParallelOp bBand,
              int64_t memoryActivityThreshold, int64_t minimumThreads,
@@ -77,6 +79,7 @@ struct FusionInfo {
         avoidReductionIndexes(avoidReductionIndexes) {
     aBand.walk([&](PxaReduceOp reduce) { collectReductionIdxs(reduce); });
     bBand.walk([&](PxaReduceOp reduce) { collectReductionIdxs(reduce); });
+    isOutermost = isOutermostLoop(aInfo.op) || isOutermostLoop(bInfo.op);
   }
 
   void collectReductionIdxs(PxaReduceOp reduce) {
@@ -240,7 +243,7 @@ struct FusionInfo {
         return false;
       }
 
-      if (avoidReductionIndexes &&
+      if (avoidReductionIndexes && isOutermost &&
           (reductionIdxs.contains(argA) || reductionIdxs.contains(argB))) {
         // Do not consider reduction indexes
         continue;
@@ -316,9 +319,8 @@ struct FusionInfo {
       return false;
     }
 
-    if (minimumThreads > 0 &&
-        (productA < minimumThreads || productB < minimumThreads) &&
-        (isOutermostLoop(aInfo.op) || isOutermostLoop(bInfo.op))) {
+    if (minimumThreads > 0 && isOutermost &&
+        (productA < minimumThreads || productB < minimumThreads)) {
       aInfo.op.emitRemark("Too few threads for the outermost loop.");
       return false;
     }

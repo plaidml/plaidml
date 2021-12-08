@@ -20,11 +20,9 @@ func @test_index() -> (tensor<16x16xindex>, tensor<16x16xi64>) {
 
 // CHECK-LABEL: func @test_index
 //  CHECK-SAME: (%[[arg0:.*]]: memref<16x16xindex>, %[[arg1:.*]]: memref<16x16xi64>) -> (memref<16x16xindex>, memref<16x16xi64>)
-//       CHECK:   %[[init0:.*]] = affine.parallel
-//       CHECK:   %[[init1:.*]] = affine.parallel
 //       CHECK:   %[[out0:.*]]:2 = affine.parallel (%[[arg2:.*]], %[[arg3:.*]]) = (0, 0) to (16, 16) reduce ("assign", "assign") -> (memref<16x16xindex>, memref<16x16xi64>)
 //       CHECK:     %[[t0:.*]] = index_cast %[[arg3]] : index to i64
-//       CHECK:     %[[t1:.*]] = pxa.reduce assign %[[arg2]], %[[init0]][%[[arg2]], %[[arg3]]] : memref<16x16xindex>
-//       CHECK:     %[[t2:.*]] = pxa.reduce assign %[[t0]], %[[init1]][%[[arg2]], %[[arg3]]] : memref<16x16xi64>
+//       CHECK:     %[[t1:.*]] = pxa.reduce assign %[[arg2]], %[[arg0]][%[[arg2]], %[[arg3]]] : memref<16x16xindex>
+//       CHECK:     %[[t2:.*]] = pxa.reduce assign %[[t0]], %[[arg1]][%[[arg2]], %[[arg3]]] : memref<16x16xi64>
 //       CHECK:     affine.yield %[[t1]], %[[t2]] : memref<16x16xindex>, memref<16x16xi64>
 //       CHECK:   return %[[out0]]#0, %[[out0]]#1 : memref<16x16xindex>, memref<16x16xi64>
