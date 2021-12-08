@@ -54,6 +54,9 @@ struct FusionInfo {
   DenseSet<BlockArgument> reductionIdxs;
   // Over-fusion prevention parameter
   int64_t memoryActivityThreshold;
+  // The minimum number of threads, i.e., the ranges' product of the outermost
+  // loop
+  int64_t minimumThreads;
   // Fuse the ops with exactly matched idxs
   bool exactlyMatch;
   // Perform tiled fusions
@@ -64,12 +67,13 @@ struct FusionInfo {
   bool avoidReductionIndexes;
 
   FusionInfo(AffineParallelOp aBand, AffineParallelOp bBand,
-             int64_t memoryActivityThreshold, bool exactlyMatch,
-             bool tiledFusion, bool singleOutput, bool avoidReductionIndexes)
+             int64_t memoryActivityThreshold, int64_t minimumThreads,
+             bool exactlyMatch, bool tiledFusion, bool singleOutput,
+             bool avoidReductionIndexes)
       : aInfo{aBand}, bInfo{bBand}, hasPlan(false),
         memoryActivityThreshold(memoryActivityThreshold),
-        exactlyMatch(exactlyMatch), tiledFusion(tiledFusion),
-        singleOutput(singleOutput),
+        minimumThreads(minimumThreads), exactlyMatch(exactlyMatch),
+        tiledFusion(tiledFusion), singleOutput(singleOutput),
         avoidReductionIndexes(avoidReductionIndexes) {
     aBand.walk([&](PxaReduceOp reduce) { collectReductionIdxs(reduce); });
     bBand.walk([&](PxaReduceOp reduce) { collectReductionIdxs(reduce); });
@@ -155,6 +159,14 @@ struct FusionInfo {
     return true;
   }
 
+  static bool isOutermostLoop(AffineParallelOp ap) {
+    auto currOp = ap->getParentOp();
+    while (!isa<AffineParallelOp>(currOp) && !isa<FuncOp>(currOp)) {
+      currOp = currOp->getParentOp();
+    }
+    return !isa<AffineParallelOp>(currOp);
+  }
+
   bool considerPlan(PxaMemAccessOperand opA, PxaMemAccessOperand opB) {
     // Early exit is we already have a plan
     if (hasPlan)
@@ -179,6 +191,9 @@ struct FusionInfo {
     assert(stridesA.size() == stridesB.size() &&
            "Fusion ops should read/write the same memref and thus have the "
            "same rank");
+
+    int64_t productA = 1;
+    int64_t productB = 1;
 
     // Try to relate the block arguments
     for (size_t i = 0; i < stridesA.size(); i++) {
@@ -245,12 +260,19 @@ struct FusionInfo {
         return false;
       }
 
+      productA *= sizeA;
+      productB *= sizeB;
+
       // If sizes do not match, apply tiling later.
       if (mulA > mulB) {
-        bInfo.tileSizes[argB.getArgNumber()] = (mulA / mulB);
+        auto multiple = mulA / mulB;
+        bInfo.tileSizes[argB.getArgNumber()] = multiple;
+        productB /= multiple;
         bInfo.needsTiling = true;
       } else if (mulB > mulA) {
-        aInfo.tileSizes[argA.getArgNumber()] = (mulB / mulA);
+        auto multiple = mulB / mulA;
+        aInfo.tileSizes[argA.getArgNumber()] = multiple;
+        productA /= multiple;
         aInfo.needsTiling = true;
       }
 
@@ -291,6 +313,13 @@ struct FusionInfo {
     if (exactlyMatch && (aToB.size() != aInfo.sizes.size() ||
                          bToA.size() != bInfo.sizes.size())) {
       bInfo.op.emitRemark("Loops do not match exactly.");
+      return false;
+    }
+
+    if (minimumThreads > 0 &&
+        (productA < minimumThreads || productB < minimumThreads) &&
+        (isOutermostLoop(aInfo.op) || isOutermostLoop(bInfo.op))) {
+      aInfo.op.emitRemark("Too few threads for the outermost loop.");
       return false;
     }
 
@@ -643,10 +672,11 @@ struct FusionInfo {
 struct FusionPass : public FusionBase<FusionPass> {
   FusionPass() = default;
 
-  explicit FusionPass(int64_t memoryActivityThreshold, bool exactlyMatch,
-                      bool tiledFusion, int64_t loopDepth, bool singleOutput,
-                      bool avoidReductionIndexes) {
+  explicit FusionPass(int64_t memoryActivityThreshold, int64_t minimumThreads,
+                      bool exactlyMatch, bool tiledFusion, int64_t loopDepth,
+                      bool singleOutput, bool avoidReductionIndexes) {
     this->memoryActivityThreshold = memoryActivityThreshold;
+    this->minimumThreads = minimumThreads;
     this->exactlyMatch = exactlyMatch;
     this->tiledFusion = tiledFusion;
     this->loopDepth = loopDepth;
@@ -662,8 +692,8 @@ struct FusionPass : public FusionBase<FusionPass> {
                  << debugString(*aBand) << "\nB:\n"
                  << debugString(*bBand));
     FusionInfo fusionInfo(aBand, bBand, memoryActivityThreshold.getValue(),
-                          exactlyMatch, tiledFusion, singleOutput,
-                          avoidReductionIndexes);
+                          minimumThreads.getValue(), exactlyMatch, tiledFusion,
+                          singleOutput, avoidReductionIndexes);
     bool canFuse = fusionInfo.computeFusion();
     if (!canFuse) {
       IVLOG(3, "Could not fuse");
@@ -764,12 +794,13 @@ struct FusionPass : public FusionBase<FusionPass> {
 } // namespace
 
 std::unique_ptr<Pass> createFusionPass(int64_t memoryActivityThreshold,
+                                       int64_t minimumThreads,
                                        bool exactlyMatch, bool tiledFusion,
                                        int64_t loopDepth, bool singleOutput,
                                        bool avoidReductionIndexes) {
-  return std::make_unique<FusionPass>(memoryActivityThreshold, exactlyMatch,
-                                      tiledFusion, loopDepth, singleOutput,
-                                      avoidReductionIndexes);
+  return std::make_unique<FusionPass>(memoryActivityThreshold, minimumThreads,
+                                      exactlyMatch, tiledFusion, loopDepth,
+                                      singleOutput, avoidReductionIndexes);
 }
 
 } // namespace pmlc::dialect::pxa

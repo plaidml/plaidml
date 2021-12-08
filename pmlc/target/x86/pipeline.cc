@@ -293,6 +293,7 @@ void pipelineBuilderStage2(OpPassManager &pm, const Options &options) {
 
   pm.addNestedPass<FuncOp>(
       pxa::createFusionPass(/*memoryActivityThreshold=*/0,
+                            /*minimumThreads=*/maxThreads,
                             /*exactlyMatch=*/false,
                             /*tiledFusion=*/true,
                             /*loopDepth=*/0,

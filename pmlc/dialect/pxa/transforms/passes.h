@@ -26,7 +26,8 @@ std::unique_ptr<mlir::Pass> createCPUThreadPass();
 std::unique_ptr<mlir::Pass> createCPUThreadPass(unsigned threads);
 
 std::unique_ptr<mlir::Pass>
-createFusionPass(int64_t memoryActivityThreshold = 0, bool exactlyMatch = false,
+createFusionPass(int64_t memoryActivityThreshold = 0,
+                 int64_t minimumThreads = 0, bool exactlyMatch = false,
                  bool tiledFusion = false, int64_t loopDepth = 0,
                  bool singleOutput = false, bool avoidReductionIndexes = true);
 
