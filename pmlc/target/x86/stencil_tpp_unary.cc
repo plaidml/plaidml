@@ -54,23 +54,30 @@ Optional<TppOperand> getTppOperand(TOp op, Block *block,
 
 class StencilImpl : public pxa::StencilBase {
 private:
-  Optional<pxa::StencilCapture> capture() {
+  std::string opName;
+  template <typename OpTy>
+  void maybeCaptureGeneric(Optional<pxa::StencilCapture> &capture,
+                           const std::string &inName) {
+    // Optional<pxa::StencilCapture> capture() {
+    if (capture)
+      return;
+
     using matchers::m_Any;
 
     Value load, reduce;
     auto pattern = m_Op<AffineYieldOp>(m_Capture(
-        &reduce, pxa::m_PxaReduceOp(AtomicRMWKind::assign,
-                                    m_Op<stdx::ReluOp>(m_Capture(
-                                        &load, m_Op<pxa::PxaLoadOp>())),
-                                    m_Any())));
+        &reduce,
+        pxa::m_PxaReduceOp(AtomicRMWKind::assign,
+                           m_Op<OpTy>(m_Capture(&load, m_Op<pxa::PxaLoadOp>())),
+                           m_Any())));
 
     Operation *yield = op.getBody()->getTerminator();
     if (!matchPattern(yield, pattern))
-      return None;
+      return;
 
     if (!load.getType().isF32() ||
         !reduce.getType().cast<MemRefType>().getElementType().isF32())
-      return None;
+      return;
 
     auto source = cast<pxa::PxaLoadOp>(load.getDefiningOp()).memref();
     if (!source.isa<BlockArgument>()) {
@@ -79,12 +86,22 @@ private:
       auto defOp = source.getDefiningOp();
       while (!isa<FuncOp>(defOp)) {
         if (defOp == op.getOperation())
-          return None;
+          return;
         defOp = defOp->getParentOp();
       }
     }
 
-    return pxa::StencilCapture{{reduce}, {load}};
+    capture = pxa::StencilCapture{{reduce}, {load}};
+    this->opName = inName;
+  }
+
+  Optional<pxa::StencilCapture> capture() {
+    Optional<pxa::StencilCapture> ret;
+
+    maybeCaptureGeneric<stdx::ReluOp>(ret, "tpp_relu");
+    maybeCaptureGeneric<math::TanhOp>(ret, "tpp_tanh");
+    maybeCaptureGeneric<math::ExpOp>(ret, "tpp_exp");
+    return ret;
   }
 
   double getCost(const pxa::StencilOption &stencil,
@@ -133,7 +150,7 @@ private:
         /*inputTileMaps=*/inputTileMaps,
         /*outputAccessMaps=*/outputAccessMaps,
         /*outputTileMaps=*/outputTileMaps,
-        /*kernel=*/builder.getStringAttr("tpp_relu"),
+        /*kernel=*/builder.getStringAttr(opName),
         /*tile=*/builder.getI64ArrayAttr(tileSizes),
         /*reductions=*/reductions);
 
