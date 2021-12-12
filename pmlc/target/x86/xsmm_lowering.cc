@@ -1215,7 +1215,6 @@ void populatePXAGemmToXSMMConversionPatterns(RewritePatternSet &patterns) {
                                                xsmm::UnaryKind::EXP);
   patterns.insert<UnaryPxaGenericOpConversion>(context, "tpp_tanh",
                                                xsmm::UnaryKind::TANH);
-
   patterns.insert<BinaryPxaGenericOpConversion>(context, "tpp_add",
                                                 xsmm::BinaryKind::ADD);
   patterns.insert<BinaryPxaGenericOpConversion>(context, "tpp_mul",
