@@ -58,7 +58,6 @@ private:
   template <typename OpTy>
   void maybeCaptureGeneric(Optional<pxa::StencilCapture> &capture,
                            const std::string &inName) {
-    // Optional<pxa::StencilCapture> capture() {
     if (capture)
       return;
 

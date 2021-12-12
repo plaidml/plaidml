@@ -140,12 +140,6 @@ plaidml_rt_xsmm_binary_dispatch(int32_t m, int32_t n, int32_t ldi1,
       static_cast<libxsmm_datatype>(out_type),
       LIBXSMM_MELTW_FLAG_BINARY_NONE, // TODO: add flags to op definition
       static_cast<libxsmm_meltw_binary_type>(type));
-  IVLOG(3, "intype is " << in_type1);
-  IVLOG(3, "intype is " << in_type2);
-  IVLOG(3, "outtype is " << out_type);
-  IVLOG(3, "f32 is " << LIBXSMM_DATATYPE_F32);
-  IVLOG(3, "kernel addr is " << (int64_t)(kernel));
-
   return reinterpret_cast<int64_t>(kernel);
 }
 
@@ -157,8 +151,6 @@ extern "C" void plaidml_rt_xsmm_binary_invoke(int64_t addr, void *input1,
   param.in0.primary = input1;
   param.in1.primary = input2;
   param.out.primary = output;
-  if (addr == 0)
-    return;
   kernel(&param);
 }
 

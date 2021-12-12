@@ -88,62 +88,6 @@ private:
 
     return ret;
   }
-  /*
-  if (matchPattern(
-          yield,
-          m_Op<AffineYieldOp>(m_Capture(
-              &reduce, m_PxaReduceOp(
-                           AtomicRMWKind::assign,
-                           m_Op<AddFOp>(m_Capture(&load1,
-  m_Op<pxa::PxaLoadOp>()), m_Capture(&load2, m_Op<pxa::PxaLoadOp>())),
-                           m_Any())))) ||
-      matchPattern(
-          yield,
-          m_Op<AffineYieldOp>(m_Capture(
-              &reduce, m_PxaReduceOp(
-                           AtomicRMWKind::assign,
-                           m_Op<AddIOp>(m_Capture(&load1,
-  m_Op<pxa::PxaLoadOp>()), m_Capture(&load2, m_Op<pxa::PxaLoadOp>())),
-                           m_Any()))))) {
-    return pxa::StencilCapture{{reduce}, {load1, load2}};
-  }
-  return llvm::None;
-  */
-  //}
-
-  /*
-
-
-
-      auto pattern = m_Op<AffineYieldOp>(m_Capture(
-          &reduce, pxa::m_PxaReduceOp(AtomicRMWKind::assign,
-                                      m_Op<stdx::ReluOp>(m_Capture(
-                                          &load, m_Op<pxa::PxaLoadOp>())),
-                                      m_Any())));
-
-      Operation *yield = op.getBody()->getTerminator();
-      if (!matchPattern(yield, pattern))
-        return None;
-
-      if (!load.getType().isF32() ||
-          !reduce.getType().cast<MemRefType>().getElementType().isF32())
-        return None;
-
-      auto source = cast<pxa::PxaLoadOp>(load.getDefiningOp()).memref();
-      if (!source.isa<BlockArgument>()) {
-        // If the definition of load's source is in "op", it is too complex to
-        // stencil
-        auto defOp = source.getDefiningOp();
-        while (!isa<FuncOp>(defOp)) {
-          if (defOp == op.getOperation())
-            return None;
-          defOp = defOp->getParentOp();
-        }
-      }
-
-      return pxa::StencilCapture{{reduce}, {load}};
-    }
-  */
   double getCost(const pxa::StencilOption &stencil,
                  ArrayRef<int64_t> tileSizes) {
     return 0.0;

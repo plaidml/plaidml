@@ -71,6 +71,11 @@ def StencilTppUnary : FunctionPass<"x86-stencil-tpp-unary"> {
   let constructor = "pmlc::target::x86::createStencilTppUnaryPass()";
 }
 
+def StencilTppBinary : FunctionPass<"x86-stencil-tpp-binary"> {
+  let summary = "Find a stencil for TPP binary ops";
+  let constructor = "pmlc::target::x86::createStencilTppBinaryPass()";
+}
+
 def TraceLinking : Pass<"x86-trace-linking", "mlir::ModuleOp"> {
   let summary = "Link trace ops to runtime functions";
   let constructor = "pmlc::target::x86::createTraceLinkingPass()";
