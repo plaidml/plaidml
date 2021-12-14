@@ -84,7 +84,7 @@ private:
 
     maybeCaptureGeneric<AddFOp>(ret, "tpp_add");
     maybeCaptureGeneric<MulFOp>(ret, "tpp_mul");
-    maybeCaptureGeneric<AddFOp>(ret, "tpp_sub");
+    maybeCaptureGeneric<SubFOp>(ret, "tpp_sub");
     maybeCaptureGeneric<DivFOp>(ret, "tpp_div");
 
     return ret;
