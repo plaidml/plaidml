@@ -52,6 +52,19 @@ Optional<TppOperand> getTppOperand(TOp op, Block *block,
 
   return TppOperand{op.getMemRef(), outerValueMap.getAffineMap(), tileMap};
 }
+bool isLocallyDefined(AffineParallelOp &op, Value &source) {
+  if (!source.isa<BlockArgument>()) {
+    // If the definition of load's source is in "op", it is too complex to
+    // stencil
+    auto defOp = source.getDefiningOp();
+    while (!isa<FuncOp>(defOp)) {
+      if (defOp == op.getOperation())
+        return true;
+      defOp = defOp->getParentOp();
+    }
+  }
+  return false;
+}
 
 class StencilImpl : public pxa::StencilBase {
 private:
@@ -73,6 +86,16 @@ private:
 
     Operation *yield = op.getBody()->getTerminator();
     if (!matchPattern(yield, pattern))
+      return;
+
+    if (!load1.getType().isF32() || !load2.getType().isF32() ||
+        !reduce.getType().cast<MemRefType>().getElementType().isF32())
+      return;
+
+    auto source1 = cast<pxa::PxaLoadOp>(load1.getDefiningOp()).memref();
+    auto source2 = cast<pxa::PxaLoadOp>(load2.getDefiningOp()).memref();
+
+    if (isLocallyDefined(op, source1) || isLocallyDefined(op, source2))
       return;
 
     capture = pxa::StencilCapture{{reduce}, {load1, load2}};
@@ -110,8 +133,6 @@ private:
         getTppOperand(outputOp, op->getBlock(), stencil.indexes, outputIndices);
     if (!output)
       return;
-
-    IVLOG(3, "stencil tpp binary: output parsed  ");
 
     Optional<TppOperand> input1 =
         getTppOperand(inputOp1, op->getBlock(), stencil.indexes, inputIndices);

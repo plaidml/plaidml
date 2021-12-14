@@ -56,7 +56,6 @@ extern "C" int64_t plaidml_rt_xsmm_brgemm_dispatch_f32(int32_t lda, int32_t ldb,
   libxsmm_blasint stride_b = ldb * k * sizeof(float);
 
   auto sgemm = libxsmm_smmdispatch_reducebatch_strd(
-      // assert(kernel);
       n_int, m_int, k_int, stride_b, stride_a, &ldb_int, &lda_int, &ldc_int,
       /*alpha=*/nullptr, /*beta=*/nullptr,
       /*flags=*/nullptr, /*prefetch=*/nullptr);
@@ -130,8 +129,6 @@ plaidml_rt_xsmm_binary_dispatch(int32_t m, int32_t n, int32_t ldi1,
   libxsmm_blasint ldi2_int = ldi2;
   libxsmm_blasint ldo_int = ldo;
 
-  assert(static_cast<libxsmm_datatype>(in_type) == LIBXSMM_DATATYPE_F32);
-  assert(static_cast<libxsmm_datatype>(out_type) == LIBXSMM_DATATYPE_F32);
   libxsmm_meltwfunction_binary kernel = libxsmm_dispatch_meltw_binary(
       static_cast<libxsmm_blasint>(n), static_cast<libxsmm_blasint>(m),
       &ldi1_int, &ldi2_int, &ldo_int, // leading dimensions
