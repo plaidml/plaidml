@@ -48,7 +48,7 @@ struct BufferAllocator {
       // Make an allocation for the output
       memRefType = MemRefType::get(shape, elementType);
     } else if (resultType.isa<MemRefType>()) {
-      memRefType = cast<MemRefType>(resultType);
+      memRefType = resultType.cast<MemRefType>();
       elementType = memRefType.getElementType();
     }
     resultMemRef = builder.create<memref::AllocOp>(loc, memRefType);
@@ -253,9 +253,15 @@ struct GenericOpConversion : public OpConversionPattern<linalg::GenericOp> {
     for (auto out : op.getOutputOperands()) {
       Value operand = out->get();
       BufferAllocator allocResult(rewriter, op, operand.getType());
-      auto copyOp = copyBuffer(rewriter, op.getLoc(), operand,
-                               allocResult.resultMemRef, op.getContext());
-      auto newOut = copyOp.getResult(0);
+      Value newOut;
+      if (operand.isa<BlockArgument>() ||
+          !isa<memref::AllocOp>(operand.getDefiningOp())) {
+        auto copyOp = copyBuffer(rewriter, op.getLoc(), operand,
+                                 allocResult.resultMemRef, op.getContext());
+        newOut = copyOp.getResult(0);
+      } else {
+        newOut = allocResult.resultMemRef;
+      }
       out->set(newOut);
       outputs.emplace_back(newOut);
       outputTypes.emplace_back(newOut.getType());
@@ -388,13 +394,7 @@ struct GenericOpConversion : public OpConversionPattern<linalg::GenericOp> {
       op->emitError("No linalg.yield in generic op.");
     }
 
-    if (op.getNumResults() == forOp.getNumResults()) {
-      rewriter.replaceOp(op, forOp.getResults());
-    } else {
-      // For some original ops such as conv and copy, they don't return
-      // anything. So we erase the original op directly.
-      rewriter.eraseOp(op);
-    }
+    rewriter.replaceOp(op, forOp.getResults());
     return success();
   }
 };
