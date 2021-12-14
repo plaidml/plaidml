@@ -302,6 +302,17 @@ void pipelineBuilderStage2(OpPassManager &pm, const Options &options) {
   pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
 
+  pm.addNestedPass<FuncOp>(
+      pxa::createFusionPass(/*memoryActivityThreshold=*/0,
+                            /*minimumThreads=*/maxThreads,
+                            /*exactlyMatch=*/false,
+                            /*tiledFusion=*/false,
+                            /*loopDepth=*/1,
+                            /*singleOutput=*/false,
+                            /*avoidReductionIndexes=*/true));
+  pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
+  pm.addPass(createCanonicalizerPass());
+
   pm.addNestedPass<FuncOp>(pxa::createTileAccumulatePass());
   pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass(/*promote=*/false));
   pm.addPass(createCanonicalizerPass());
