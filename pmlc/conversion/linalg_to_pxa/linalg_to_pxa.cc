@@ -253,9 +253,15 @@ struct GenericOpConversion : public OpConversionPattern<linalg::GenericOp> {
     for (auto out : op.getOutputOperands()) {
       Value operand = out->get();
       BufferAllocator allocResult(rewriter, op, operand.getType());
-      auto copyOp = copyBuffer(rewriter, op.getLoc(), operand,
-                               allocResult.resultMemRef, op.getContext());
-      auto newOut = copyOp.getResult(0);
+      Value newOut;
+      if (operand.isa<BlockArgument>() ||
+          !isa<memref::AllocOp>(operand.getDefiningOp())) {
+        auto copyOp = copyBuffer(rewriter, op.getLoc(), operand,
+                                 allocResult.resultMemRef, op.getContext());
+        newOut = copyOp.getResult(0);
+      } else {
+        newOut = allocResult.resultMemRef;
+      }
       out->set(newOut);
       outputs.emplace_back(newOut);
       outputTypes.emplace_back(newOut.getType());

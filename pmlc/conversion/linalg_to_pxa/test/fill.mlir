@@ -10,8 +10,7 @@ func @main() -> tensor<16x16xf32> {
 // CHECK-LABEL: func @main
 //  CHECK-SAME: (%[[arg0:.*]]: memref<16x16xf32>) -> memref<16x16xf32>
 //       CHECK:   %[[cst:.*]] = constant 0.000000e+00 : f32
-//       CHECK:   %[[init:.*]] = affine.parallel
 //       CHECK:   %[[out0:.*]] = affine.parallel (%[[arg1:.*]], %[[arg2:.*]]) = (0, 0) to (16, 16) reduce ("assign") -> (memref<16x16xf32>)
-//       CHECK:     %[[t0:.*]] = pxa.reduce assign %[[cst]], %[[init]][%[[arg1]], %[[arg2]]] : memref<16x16xf32>
+//       CHECK:     %[[t0:.*]] = pxa.reduce assign %[[cst]], %[[arg0]][%[[arg1]], %[[arg2]]] : memref<16x16xf32>
 //       CHECK:     affine.yield %[[t0]] : memref<16x16xf32>
 //       CHECK:   return %[[out0]] : memref<16x16xf32>
