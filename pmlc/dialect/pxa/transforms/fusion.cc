@@ -319,6 +319,21 @@ struct FusionInfo {
       return false;
     }
 
+    auto aArgs = aInfo.op.getIVs();
+    for (int i = 0; i < aArgs.size(); ++i) {
+      auto arg = aArgs[i];
+      if (aToB.find(arg) == aToB.end()) {
+        aInfo.tileSizes[i] = aInfo.sizes[i];
+      }
+    }
+    auto bArgs = bInfo.op.getIVs();
+    for (int i = 0; i < bArgs.size(); ++i) {
+      auto arg = bArgs[i];
+      if (bToA.find(arg) == bToA.end()) {
+        bInfo.tileSizes[i] = bInfo.sizes[i];
+      }
+    }
+
     if (minimumThreads > 0 && isOutermost &&
         (productA < minimumThreads || productB < minimumThreads)) {
       aInfo.op.emitRemark("Too few threads for the outermost loop.");
@@ -404,6 +419,7 @@ struct FusionInfo {
       bInfo.op.walk(elideSingleIterationIndexes);
       bInfo.op.walk(promoteIfEmptyIVs);
     }
+
     hasPlan = true;
     return true;
   }
