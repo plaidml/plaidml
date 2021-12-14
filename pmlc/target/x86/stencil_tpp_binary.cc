@@ -10,6 +10,7 @@
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/dialect/pxa/transforms/autotile.h"
 #include "pmlc/dialect/pxa/transforms/stencil.h"
+#include "pmlc/dialect/pxa/transforms/tile.h"
 #include "pmlc/dialect/stdx/ir/ops.h"
 #include "pmlc/target/x86/pass_detail.h"
 #include "pmlc/target/x86/passes.h"
@@ -96,7 +97,6 @@ private:
   void transform(const pxa::StencilOption &stencil,
                  ArrayRef<int64_t> tileSizes) {
     OpBuilder builder(op);
-
     auto outputOp =
         cast<pxa::PxaReduceOp>(stencil.values[0].value.getDefiningOp());
     auto inputOp1 =
@@ -183,10 +183,10 @@ struct StencilTppBinaryPass
     : public StencilTppBinaryBase<StencilTppBinaryPass> {
   void runOnFunction() final {
     getFunction().walk([](AffineParallelOp op) {
-      // if (op.getIVs().size() == 2) {
-      StencilImpl stencil(op);
-      stencil.performStenciling();
-      //}
+      if (op.getIVs().size() == 2) {
+        StencilImpl stencil(op);
+        stencil.performStenciling();
+      }
     });
   }
 };
