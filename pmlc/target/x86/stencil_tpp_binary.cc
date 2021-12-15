@@ -1,7 +1,5 @@
 // Copyright 2020 Intel Corporation
 
-#include <string>
-
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/DebugStringHelper.h"
@@ -52,7 +50,7 @@ Optional<TppOperand> getTppOperand(TOp op, Block *block,
 
   return TppOperand{op.getMemRef(), outerValueMap.getAffineMap(), tileMap};
 }
-bool isLocallyDefined(AffineParallelOp &op, Value &source) {
+bool isLocallyDefined(AffineParallelOp op, Value source) {
   if (!source.isa<BlockArgument>()) {
     // If the definition of load's source is in "op", it is too complex to
     // stencil
@@ -68,10 +66,10 @@ bool isLocallyDefined(AffineParallelOp &op, Value &source) {
 
 class StencilImpl : public pxa::StencilBase {
 private:
-  std::string opName;
+  StringRef opName;
   template <typename OpTy>
   void maybeCaptureGeneric(Optional<pxa::StencilCapture> &capture,
-                           const std::string &inName) {
+                           const StringRef &inName) {
     if (capture)
       return;
     using matchers::m_Any;
