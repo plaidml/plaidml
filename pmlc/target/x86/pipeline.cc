@@ -291,11 +291,25 @@ void pipelineBuilderStage2(OpPassManager &pm, const Options &options) {
   pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
 
-  pm.addNestedPass<FuncOp>(pxa::createFusionPass(/*memoryActivityThreshold=*/0,
-                                                 /*exactlyMatch=*/false,
-                                                 /*tiledFusion=*/true,
-                                                 /*loopDepth=*/0,
-                                                 /*singleOutput=*/true));
+  pm.addNestedPass<FuncOp>(
+      pxa::createFusionPass(/*memoryActivityThreshold=*/0,
+                            /*minimumThreads=*/maxThreads,
+                            /*exactlyMatch=*/false,
+                            /*tiledFusion=*/true,
+                            /*loopDepth=*/0,
+                            /*singleOutput=*/false,
+                            /*avoidReductionIndexes=*/true));
+  pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
+  pm.addPass(createCanonicalizerPass());
+
+  pm.addNestedPass<FuncOp>(
+      pxa::createFusionPass(/*memoryActivityThreshold=*/0,
+                            /*minimumThreads=*/maxThreads,
+                            /*exactlyMatch=*/false,
+                            /*tiledFusion=*/false,
+                            /*loopDepth=*/1,
+                            /*singleOutput=*/false,
+                            /*avoidReductionIndexes=*/true));
   pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
 
@@ -319,6 +333,8 @@ void pipelineBuilderStage2(OpPassManager &pm, const Options &options) {
   pm.addPass(createCSEPass());
 
   pm.addNestedPass<FuncOp>(createStencilTppUnaryPass());
+  pm.addNestedPass<FuncOp>(createStencilTppBinaryPass());
+
   if (pmlc::util::getEnvVar("PLAIDML_PROFILE") == "1")
     pm.addPass(createProfileKernelsPass());
   pm.addPass(createCanonicalizerPass());

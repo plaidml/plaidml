@@ -208,7 +208,6 @@ def XSMM_UnaryInvokeOp : XSMM_Op<"unary.invoke"> {
   }];
 }
 
-
 def XSMM_BinaryDispatchOp : XSMM_Op<"binary.dispatch", [NoSideEffect]> {
   let summary = "Generate a binary kernel for a specific tile size.";
   let arguments = (ins
@@ -224,10 +223,6 @@ def XSMM_BinaryDispatchOp : XSMM_Op<"binary.dispatch", [NoSideEffect]> {
   let printer = ?;
   let parser = ?;
 }
-
-
-
-
  
 def XSMM_BinaryInvokeOp : XSMM_Op<"binary.invoke"> {
   let summary = "Invoke a previously generated binary kernel.";
@@ -240,12 +235,5 @@ def XSMM_BinaryInvokeOp : XSMM_Op<"binary.invoke"> {
   );
   let printer = ?;
   let parser = ?;
-
-
 }
- 
-
-
-
-
 #endif // __PML_XSMM_OPS__

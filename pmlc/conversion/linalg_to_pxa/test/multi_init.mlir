@@ -28,19 +28,11 @@ func @multi_init() -> tensor<1x112x112x32xf32> {
 //       CHECK: %[[buf0:.*]] = memref.alloc() : memref<1x112x112x32xf32>
 //       CHECK: %[[buf1:.*]] = memref.alloc() : memref<1x112x112x32xf32>
 //       CHECK: %[[buf2:.*]] = affine.parallel
-//       CHECK:   %[[t0:.*]] = pxa.load %[[buf0]]
-//       CHECK:   %[[t1:.*]] = pxa.reduce assign %[[t0]], %[[buf1]]
-//       CHECK:   affine.yield %[[t1]]
-//       CHECK: %[[buf3:.*]] = affine.parallel
-//       CHECK:   %[[t2:.*]] = pxa.reduce assign {{.*}}, %[[buf2]]
+//       CHECK:   %[[t2:.*]] = pxa.reduce assign {{.*}}, %[[buf1]]
 //       CHECK:   affine.yield %[[t2]]
 //       CHECK: memref.alloc() : memref<1x112x112x32xf32>
-//       CHECK: %[[buf4:.*]] = affine.parallel
-//       CHECK:   %[[t3:.*]] = pxa.load %[[buf0]]
-//       CHECK:   %[[t4:.*]] = pxa.reduce assign %[[t3]], %[[arg0]]
-//       CHECK:   affine.yield %[[t4]]
-//       CHECK: %[[buf5:.*]] = affine.parallel
-//       CHECK:   %[[t5:.*]] = pxa.load %[[buf3]]
-//       CHECK:   %[[t6:.*]] = pxa.reduce assign %[[t5]], %[[buf4]]
+//       CHECK: %[[buf3:.*]] = affine.parallel
+//       CHECK:   %[[t5:.*]] = pxa.load %[[buf2]]
+//       CHECK:   %[[t6:.*]] = pxa.reduce assign %[[t5]], %[[arg0]]
 //       CHECK:   affine.yield %[[t6]]
-//       CHECK: return %[[buf5]]
+//       CHECK: return %[[buf3]]

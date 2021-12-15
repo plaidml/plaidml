@@ -1,7 +1,4 @@
 // Copyright 2020 Intel Corporation
-
-#include <string>
-
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/DebugStringHelper.h"
@@ -54,11 +51,10 @@ Optional<TppOperand> getTppOperand(TOp op, Block *block,
 
 class StencilImpl : public pxa::StencilBase {
 private:
-  std::string opName;
+  StringRef opName;
   template <typename OpTy>
   void maybeCaptureGeneric(Optional<pxa::StencilCapture> &capture,
-                           const std::string &inName) {
-    // Optional<pxa::StencilCapture> capture() {
+                           StringRef inName) {
     if (capture)
       return;
 
