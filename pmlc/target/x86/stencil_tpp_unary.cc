@@ -54,7 +54,7 @@ private:
   StringRef opName;
   template <typename OpTy>
   void maybeCaptureGeneric(Optional<pxa::StencilCapture> &capture,
-                           const StringRef &inName) {
+                           StringRef inName) {
     if (capture)
       return;
 

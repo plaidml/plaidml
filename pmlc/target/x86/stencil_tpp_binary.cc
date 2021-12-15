@@ -69,7 +69,7 @@ private:
   StringRef opName;
   template <typename OpTy>
   void maybeCaptureGeneric(Optional<pxa::StencilCapture> &capture,
-                           const StringRef &inName) {
+                           StringRef inName) {
     if (capture)
       return;
     using matchers::m_Any;
