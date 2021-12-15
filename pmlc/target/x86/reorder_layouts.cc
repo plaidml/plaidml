@@ -9,6 +9,7 @@
 
 #include "pmlc/target/x86/pass_detail.h"
 #include "pmlc/target/x86/passes.h"
+#include "pmlc/util/env.h"
 #include "pmlc/util/logging.h"
 #include "pmlc/util/matchers.h"
 
@@ -263,7 +264,11 @@ struct ReorderLayoutsPass : public ReorderLayoutsBase<ReorderLayoutsPass> {
   }
 
   void reorderConvolution(linalg::GenericOp op) {
-    constexpr int64_t blockSize = 16;
+    int64_t blockSize = 32;
+    std::string blockSizeStr = util::getEnvVar("PLAIDML_BLOCK_SIZE");
+    if (!blockSizeStr.empty()) {
+      blockSize = std::stoi(blockSizeStr);
+    }
 
     Optional<ConvCapture> conv = detectConv(op);
     if (!conv)
