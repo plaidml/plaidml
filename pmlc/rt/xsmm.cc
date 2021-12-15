@@ -120,6 +120,37 @@ extern "C" void plaidml_rt_xsmm_unary_invoke(int64_t addr, void *input,
   kernel(&param);
 }
 
+extern "C" int64_t
+plaidml_rt_xsmm_binary_dispatch(int32_t m, int32_t n, int32_t ldi1,
+                                int32_t ldi2, int32_t ldo, int32_t in_type1,
+                                int32_t in_type2, int32_t compute_type,
+                                int32_t out_type, int32_t type) {
+  libxsmm_blasint ldi1_int = ldi1;
+  libxsmm_blasint ldi2_int = ldi2;
+  libxsmm_blasint ldo_int = ldo;
+
+  libxsmm_meltwfunction_binary kernel = libxsmm_dispatch_meltw_binary(
+      static_cast<libxsmm_blasint>(n), static_cast<libxsmm_blasint>(m),
+      &ldi1_int, &ldi2_int, &ldo_int, // leading dimensions
+      static_cast<libxsmm_datatype>(in_type1),
+      static_cast<libxsmm_datatype>(in_type2),
+      static_cast<libxsmm_datatype>(out_type),
+      LIBXSMM_MELTW_FLAG_BINARY_NONE, // TODO: add flags to op definition
+      static_cast<libxsmm_meltw_binary_type>(type));
+  return reinterpret_cast<int64_t>(kernel);
+}
+
+extern "C" void plaidml_rt_xsmm_binary_invoke(int64_t addr, void *input1,
+                                              void *input2, void *output) {
+  libxsmm_meltwfunction_binary kernel =
+      reinterpret_cast<libxsmm_meltwfunction_binary>(addr);
+  libxsmm_meltw_binary_param param;
+  param.in0.primary = input1;
+  param.in1.primary = input2;
+  param.out.primary = output;
+  kernel(&param);
+}
+
 namespace pmlc::rt {
 
 void registerXsmm() {
@@ -133,6 +164,8 @@ void registerXsmm() {
   REGISTER_SYMBOL(plaidml_rt_xsmm_brgemm_offs_dispatch_f32);
   REGISTER_SYMBOL(plaidml_rt_xsmm_unary_dispatch);
   REGISTER_SYMBOL(plaidml_rt_xsmm_unary_invoke);
+  REGISTER_SYMBOL(plaidml_rt_xsmm_binary_dispatch);
+  REGISTER_SYMBOL(plaidml_rt_xsmm_binary_invoke);
 }
 
 } // namespace pmlc::rt
