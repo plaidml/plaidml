@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [ plaidml-v1 ]
+  pull_request:
+    branches: [ plaidml-v1 ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: self-hosted
+
+    strategy:
+      matrix:
+        include:
+          - build_type: Debug
+            check: core
+          - build_type: Release
+            check: smoke
+
+    env:
+      build_type: ${{ matrix.build_type }}
+      build_root: build-x86_64
+      check: ${{ matrix.check }}
+      system: Linux
+      version: "1.0.0"
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: conda-incubator/setup-miniconda@v2
+        with:
+          activate-environment: .cenv/
+          channels: conda-forge,defaults
+          environment-file: environment.yml
+          mamba-version: "*"
+
+      - run: |
+          conda info
+          conda list
+          conda config --show-sources
+          conda config --show
+
+      - name: Build & test
+        run: |
+          mkdir -p logs
+          python configure --ci --temp=/tmp/${build_root}/${build_type} --type=${build_type} &> logs/configure.log
+          ninja -C ${build_root}/${build_type} check-${check} &> logs/check-${check}.log
+          ninja -C ${build_root}/${build_type} package
+          cd {build_root}/${build_type}/_CPack_Packages/${system}/TGZ/PlaidML-${version}-${system}/devkit
+          cmake -S . -B build -G Ninja
+          ninja -C build
+          build/edsl_test
+
+      - uses: actions/upload-artifact@v2
+        with:
+          name: ${{ env.build_root }}/${{ build_type }}
+          path: |
+            logs/*.log
+            "${{ env.build_root }}/${{ env.build_type }}/*.whl"
+            "${{ env.build_root }}/${{ env.build_type }}/*.tar.gz"
