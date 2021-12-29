@@ -55,7 +55,7 @@ jobs:
 
       - uses: actions/upload-artifact@v2
         with:
-          name: ${{ env.build_root }}/${{ build_type }}
+          name: ${{ env.build_root }}/${{ env.build_type }}
           path: |
             logs/*.log
             "${{ env.build_root }}/${{ env.build_type }}/*.whl"
