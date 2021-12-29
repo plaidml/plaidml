@@ -68,7 +68,7 @@ jobs:
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v2
-        if: always()
+        if: success() || failure()
         with:
           name: ${{ env.build_root }},${{ env.build_type }}
           path: |
