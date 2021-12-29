@@ -60,10 +60,20 @@ jobs:
           ninja -C ${build_root}/${build_type} package
           echo "::endgroup::"
           echo "::group::Test devkit"
-          cd {build_root}/${build_type}/_CPack_Packages/${system}/TGZ/PlaidML-${version}-${system}/devkit
+          cd ${build_root}/${build_type}/_CPack_Packages/${system}/TGZ/PlaidML-${version}-${system}/devkit
           cmake -S . -B build -G Ninja
           ninja -C build
           build/edsl_test
+          echo "::endgroup::"
+
+      - name: Report failures
+        if: failure()
+        run: |
+          echo "::group::configure"
+          tail -n 1000 logs/configure.log
+          echo "::endgroup::"
+          echo "::group::ninja check-${check}"
+          tail -n 1000 logs/check-${check}.log
           echo "::endgroup::"
 
       - name: Upload artifacts
