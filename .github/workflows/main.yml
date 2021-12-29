@@ -10,8 +10,8 @@ on:
 jobs:
   build:
     runs-on: self-hosted
-
     strategy:
+      fail-fast: false
       matrix:
         include:
           - build_type: Debug
@@ -49,11 +49,12 @@ jobs:
 
       - name: Build & test
         run: |
+          mkdir -p logs
           echo "::group::configure"
-          python configure --ci --temp=/tmp/${build_root}/${build_type} --type=${build_type}
+          python configure --ci --temp=/tmp/${build_root}/${build_type} --type=${build_type} &> logs/configure.log
           echo "::endgroup::"
           echo "::group::ninja check-${check}"
-          ninja -C ${build_root}/${build_type} check-${check}
+          ninja -C ${build_root}/${build_type} check-${check} &> logs/check-${check}.log
           echo "::endgroup::"
           echo "::group::ninja package"
           ninja -C ${build_root}/${build_type} package
@@ -65,9 +66,12 @@ jobs:
           build/edsl_test
           echo "::endgroup::"
 
-      - uses: actions/upload-artifact@v2
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v2
+        if: always()
         with:
           name: ${{ env.build_root }}/${{ env.build_type }}
           path: |
+            logs/*.log
             "${{ env.build_root }}/${{ env.build_type }}/*.whl"
             "${{ env.build_root }}/${{ env.build_type }}/*.tar.gz"
