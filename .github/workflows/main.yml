@@ -32,16 +32,16 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
+        with:
+          submodules: true
 
       - uses: conda-incubator/setup-miniconda@v2
         with:
-          activate-environment: .cenv/
-          auto-activate-base: false
-          auto-update-conda: true
+          activate-environment: ${{ github.workspace }}/.cenv/
           channels: conda-forge,defaults
           environment-file: environment.yml
           mamba-version: "*"
-          miniconda-version: "latest"
+          # miniconda-version: "latest"
 
       - run: |
           conda info
@@ -50,9 +50,10 @@ jobs:
       - name: Build & test
         run: |
           set -x
-          mkdir -p logs
-          python configure --ci --temp=/tmp/${build_root}/${build_type} --type=${build_type} &> logs/configure.log
-          ninja -C ${build_root}/${build_type} check-${check} &> logs/check-${check}.log
+          env
+          which python
+          python configure --ci --temp=/tmp/${build_root}/${build_type} --type=${build_type}
+          ninja -C ${build_root}/${build_type} check-${check}
           ninja -C ${build_root}/${build_type} package
           cd {build_root}/${build_type}/_CPack_Packages/${system}/TGZ/PlaidML-${version}-${system}/devkit
           cmake -S . -B build -G Ninja
@@ -63,6 +64,5 @@ jobs:
         with:
           name: ${{ env.build_root }}/${{ env.build_type }}
           path: |
-            logs/*.log
             "${{ env.build_root }}/${{ env.build_type }}/*.whl"
             "${{ env.build_root }}/${{ env.build_type }}/*.tar.gz"
