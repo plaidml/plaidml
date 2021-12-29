@@ -41,7 +41,7 @@ jobs:
           channels: conda-forge,defaults
           environment-file: environment.yml
           mamba-version: "*"
-          # miniconda-version: "latest"
+          miniconda-version: "latest"
 
       - run: |
           conda info
