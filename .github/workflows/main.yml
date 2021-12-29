@@ -70,7 +70,7 @@ jobs:
         uses: actions/upload-artifact@v2
         if: always()
         with:
-          name: ${{ env.build_root }}/${{ env.build_type }}
+          name: ${{ env.build_root }},${{ env.build_type }}
           path: |
             logs/*.log
             "${{ env.build_root }}/${{ env.build_type }}/*.whl"
