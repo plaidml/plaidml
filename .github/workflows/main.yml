@@ -49,16 +49,21 @@ jobs:
 
       - name: Build & test
         run: |
-          set -x
-          env
-          which python
+          echo "::group::configure"
           python configure --ci --temp=/tmp/${build_root}/${build_type} --type=${build_type}
+          echo "::endgroup::"
+          echo "::group::ninja check-${check}"
           ninja -C ${build_root}/${build_type} check-${check}
+          echo "::endgroup::"
+          echo "::group::ninja package"
           ninja -C ${build_root}/${build_type} package
+          echo "::endgroup::"
+          echo "::group::Test devkit"
           cd {build_root}/${build_type}/_CPack_Packages/${system}/TGZ/PlaidML-${version}-${system}/devkit
           cmake -S . -B build -G Ninja
           ninja -C build
           build/edsl_test
+          echo "::endgroup::"
 
       - uses: actions/upload-artifact@v2
         with:
