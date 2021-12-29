@@ -26,6 +26,10 @@ jobs:
       system: Linux
       version: "1.0.0"
 
+    defaults:
+      run:
+        shell: bash -l {0}
+
     steps:
       - uses: actions/checkout@v2
 
@@ -42,8 +46,6 @@ jobs:
       - run: |
           conda info
           conda list
-          conda config --show-sources
-          conda config --show
 
       - name: Build & test
         run: |
