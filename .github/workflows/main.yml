@@ -49,6 +49,7 @@ jobs:
 
       - name: Build & test
         run: |
+          set -x
           mkdir -p logs
           python configure --ci --temp=/tmp/${build_root}/${build_type} --type=${build_type} &> logs/configure.log
           ninja -C ${build_root}/${build_type} check-${check} &> logs/check-${check}.log
