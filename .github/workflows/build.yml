@@ -70,19 +70,19 @@ jobs:
         uses: actions/upload-artifact@v2
         if: success() || failure()
         with:
-          name: ${{inputs.build_root}},${{inputs.build_type}},logs,${{github.run_id}}
+          name: ${{env.build_root}},${{inputs.build_type}},logs,${{github.run_id}}
           path: logs/*.log
 
       - name: Upload wheels
         uses: actions/upload-artifact@v2
         if: inputs.build_type == 'Release'
         with:
-          name: ${{inputs.build_root}},${{inputs.build_type}},wheels
-          path: ${{inputs.build_root}}/${{inputs.build_type}}/*.whl
+          name: ${{env.build_root}},${{inputs.build_type}},wheels
+          path: ${{env.build_root}}/${{inputs.build_type}}/*.whl
 
       - name: Upload kits
         uses: actions/upload-artifact@v2
         if: inputs.build_type == 'Release'
         with:
-          name: ${{inputs.build_root}},${{inputs.build_type}},kits
-          path: ${{inputs.build_root}}/${{inputs.build_type}}/*.tar.gz
+          name: ${{env.build_root}},${{inputs.build_type}},kits
+          path: ${{env.build_root}}/${{inputs.build_type}}/*.tar.gz
