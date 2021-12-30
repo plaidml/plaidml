@@ -1,0 +1,73 @@
+name: Build
+
+inputs:
+  build_root:
+    required: true
+  build_type:
+    required: true
+  check:
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/checkout@v2
+      with:
+        submodules: recursive
+
+    - uses: conda-incubator/setup-miniconda@v2
+      with:
+        activate-environment: ${{ github.workspace }}/.cenv/
+        channels: conda-forge,defaults
+        environment-file: environment.yml
+        mamba-version: "*"
+        miniconda-version: "latest"
+
+    - name: Configure
+      run: |
+        mkdir -p logs
+        python configure --ci --temp=/tmp/${build_root}/${build_type} --type=${build_type} &> logs/configure.log
+
+    - name: ninja check-${{inputs.check}}
+      run: ninja -C ${build_root}/${build_type} check-${check} &> logs/check-${check}.log
+
+    - name: ninja package
+      run: ninja -C ${build_root}/${build_type} package
+
+    - name: Test devkit
+      run: |
+        cd ${build_root}/${build_type}/_CPack_Packages/${system}/TGZ/PlaidML-${version}-${system}/devkit
+        cmake -S . -B build -G Ninja
+        ninja -C build
+        build/edsl_test
+
+    - name: Report failures
+      if: failure()
+      run: |
+        echo "::group::configure"
+        tail -n 1000 logs/configure.log
+        echo "::endgroup::"
+        echo "::group::ninja check-${check}"
+        tail -n 1000 logs/check-${check}.log
+        echo "::endgroup::"
+
+    - name: Upload logs
+      uses: actions/upload-artifact@v2
+      if: success() || failure()
+      with:
+        name: ${{inputs.build_root}},${{inputs.build_type}},logs,${{github.run_id}}
+        path: logs/*.log
+
+    - name: Upload wheels
+      uses: actions/upload-artifact@v2
+      if: inputs.build_type == 'Release'
+      with:
+        name: ${{inputs.build_root}},${{inputs.build_type}},wheels
+        path: ${{inputs.build_root}}/${{inputs.build_type}}/*.whl
+
+    - name: Upload kits
+      uses: actions/upload-artifact@v2
+      if: inputs.build_type == 'Release'
+      with:
+        name: ${{inputs.build_root}},${{inputs.build_type}},kits
+        path: ${{inputs.build_root}}/${{inputs.build_type}}/*.tar.gz
