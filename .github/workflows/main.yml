@@ -42,7 +42,7 @@ jobs:
 
       - uses: conda-incubator/setup-miniconda@v2
         with:
-          activate-environment: build
+          activate-environment: ${{ github.workspace }}/.cenv/
           channels: conda-forge,defaults
           environment-file: environment.yml
           mamba-version: "*"
