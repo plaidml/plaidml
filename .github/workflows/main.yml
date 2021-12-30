@@ -7,28 +7,33 @@ on:
     branches: [ plaidml-v1 ]
   workflow_dispatch:
 
+defaults:
+  run:
+    shell: bash -l {0}
+
+env:
+  build_root: build-x86_64
+  system: Linux
+  version: "1.0.0"
+  python_arch: manylinux1_x86_64
+
 jobs:
   build:
-    runs-on: self-hosted
+    runs-on: [self-hosted, "build=${{matrix.platform}}"]
     strategy:
       fail-fast: false
       matrix:
         include:
           - build_type: Debug
             check: core
+            platform: linux_x86_64
           - build_type: Release
             check: smoke
+            platform: linux_x86_64
 
     env:
-      build_type: ${{ matrix.build_type }}
-      build_root: build-x86_64
-      check: ${{ matrix.check }}
-      system: Linux
-      version: "1.0.0"
-
-    defaults:
-      run:
-        shell: bash -l {0}
+      build_type: ${{matrix.build_type}}
+      check: ${{matrix.check}}
 
     steps:
       - uses: actions/checkout@v2
@@ -37,34 +42,23 @@ jobs:
 
       - uses: conda-incubator/setup-miniconda@v2
         with:
-          activate-environment: ${{ github.workspace }}/.cenv/
+          activate-environment: build
           channels: conda-forge,defaults
           environment-file: environment.yml
           mamba-version: "*"
           miniconda-version: "latest"
 
-      - run: |
-          conda info
-          conda list
-
-      - name: Build & test
-        run: |
+      - name: Configure
           mkdir -p logs
-          echo "::group::configure"
           python configure --ci --temp=/tmp/${build_root}/${build_type} --type=${build_type} &> logs/configure.log
-          echo "::endgroup::"
-          echo "::group::ninja check-${check}"
-          ninja -C ${build_root}/${build_type} check-${check} &> logs/check-${check}.log
-          echo "::endgroup::"
-          echo "::group::ninja package"
-          ninja -C ${build_root}/${build_type} package
-          echo "::endgroup::"
-          echo "::group::Test devkit"
+      - run: ninja -C ${build_root}/${build_type} check-${check} &> logs/check-${check}.log
+      - run: ninja -C ${build_root}/${build_type} package
+      - name: Test devkit
+        run: |
           cd ${build_root}/${build_type}/_CPack_Packages/${system}/TGZ/PlaidML-${version}-${system}/devkit
           cmake -S . -B build -G Ninja
           ninja -C build
           build/edsl_test
-          echo "::endgroup::"
 
       - name: Report failures
         if: failure()
@@ -76,12 +70,179 @@ jobs:
           tail -n 1000 logs/check-${check}.log
           echo "::endgroup::"
 
-      - name: Upload artifacts
+      - name: Upload logs
         uses: actions/upload-artifact@v2
         if: success() || failure()
         with:
-          name: ${{ env.build_root }},${{ env.build_type }}
-          path: |
-            logs/*.log
-            "${{ env.build_root }}/${{ env.build_type }}/*.whl"
-            "${{ env.build_root }}/${{ env.build_type }}/*.tar.gz"
+          name: ${{env.build_root}},${{env.build_type}},logs,${{github.run_id}}
+          path: logs/*.log
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@v2
+        if: matrix.build_type == 'Release'
+        with:
+          name: ${{env.build_root}},${{env.build_type}},wheels
+          path: ${{env.build_root}}/${{env.build_type}}/*.whl
+
+      - name: Upload kits
+        uses: actions/upload-artifact@v2
+        if: matrix.build_type == 'Release'
+        with:
+          name: ${{env.build_root}},${{env.build_type}},kits
+          path: ${{env.build_root}}/${{env.build_type}}/*.tar.gz
+
+  keras:
+    needs: build
+    runs-on: [self-hosted, "target=${{matrix.platform}}"]
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        test:
+          - backend_test
+          - trivial_model_test
+        platform: [pml-llvm-cpu]
+
+    env:
+      test: ${{matrix.test}}
+      platform: ${{matrix.platform}}
+      build_type: Release
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: conda-incubator/setup-miniconda@v2
+        with:
+          activate-environment: keras
+          channels: conda-forge,defaults
+          environment-file: ci/conda/keras.yml
+          mamba-version: "*"
+          miniconda-version: "latest"
+
+      - uses: actions/download-artifact@v2
+        with:
+          name: ${{env.build_root}},${{env.build_type}},wheels
+
+      - name: Installing packages
+        run: |
+          pip install ${build_root}/${build_type}/plaidml-${version}-py3-none-${python_arch}.whl
+          pip install ${build_root}/${build_type}/plaidml_keras-${version}-py3-none-any.whl
+
+      - name: "Running test: ${{matrix.test}}"
+        run: python plaidml/bridge/keras/${test}.py
+
+  plaidbench:
+    needs: build
+    runs-on: [self-hosted, "target=${{matrix.platform}}"]
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        model:
+          - inception_v3
+          - mobilenet
+          - mobilenet_v2
+          - resnet50
+          - vgg19
+          - xception
+        platform: [pml-llvm-cpu]
+        batch_size: [1]
+        examples: [1024]
+        include:
+          - platform: pml-llvm-cpu
+            model: inception_v3
+            batch_size: 1
+            examples: 64
+          - platform: pml-llvm-cpu
+            model: resnet50
+            batch_size: 1
+            examples: 128
+          - platform: pml-llvm-cpu
+            model: vgg19
+            batch_size: 1
+            examples: 64
+          - platform: pml-llvm-cpu
+            model: xception
+            batch_size: 1
+            examples: 64
+
+    env:
+      batch_size: ${{matrix.batch_size}}
+      build_type: Release
+      examples: ${{matrix.examples}}
+      model: ${{matrix.model}}
+      path: ${{matrix.platform}}/infer/${{matrix.model}}}/bs=${{matrix.batch_size}}
+      platform: ${{matrix.platform}}
+      precision: high
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: conda-incubator/setup-miniconda@v2
+        with:
+          activate-environment: keras
+          channels: conda-forge,defaults
+          environment-file: ci/conda/keras.yml
+          mamba-version: "*"
+          miniconda-version: "latest"
+
+      - uses: actions/download-artifact@v2
+        with:
+          name: ${{env.build_root}},${{env.build_type}},wheels
+
+      - name: Installing packages
+        run: |
+          pip install ${build_root}/${build_type}/plaidml-${version}-py3-none-${python_arch}.whl
+          pip install ${build_root}/${build_type}/plaidml_keras-${version}-py3-none-any.whl
+          pip install ${build_root}/${build_type}/plaidbench-${version}-py3-none-any.whl
+
+      - name: "Running model: ${{matrix.model}}"
+        run: plaidbench --examples=${examples} --batch-size=${batch_size} --results=ci/test/${path} keras ${model}
+
+      - name: Analysis
+        run: python ci/analysis.py ci/test ${path} --precision=${precision}
+
+  openvino:
+    needs: build
+    runs-on: [self-hosted, "target=${{matrix.platform}}"]
+    strategy:
+      fail-fast: false
+      matrix:
+        model:
+          - mobilenet-v2
+          - resnet-50-pytorch
+          - yolo-v2-tiny-ava-0001
+        test:
+          - benchmark_app
+          # - accuracy_check # FIXME: this seems to fail currently
+        dtype: [FP16]
+        platform: [pml-llvm-cpu]
+
+    env:
+      build_type: Release
+      dtype: ${{matrix.dtype}}
+      model: ${{matrix.model}}
+      model_path: "networks/openvino/${{matrix.model}}/${{matrix.dtype}}/${{matrix.model}}.xml"
+      platform: ${{matrix.platform}}
+      test: ${{matrix.test}}
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: conda-incubator/setup-miniconda@v2
+        with:
+          activate-environment: build
+          channels: conda-forge,defaults
+          environment-file: environment.yml
+          mamba-version: "*"
+          miniconda-version: "latest"
+
+      - uses: actions/download-artifact@v2
+        with:
+          name: ${{env.build_root}},${{env.build_type}},kits
+
+      - name: Extract testkit
+        run: tar xvf ${build_root}/${build_type}/PlaidML-${version}-${system}-testkit.tar.gz
+
+      - name: "Running model: ${{matrix.model}}"
+        run: python ci/openvino.py ${test} ${model_path} --pkgdir=testkit --outdir=ci/test/${path}
