@@ -186,6 +186,8 @@ jobs:
 
   report:
     needs:
+      - build-linux_x86_64-debug
+      - build-linux_x86_64-release
       - keras
       - plaidbench
       - openvino
