@@ -77,21 +77,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [pml-llvm-cpu]
-        model:
-          - inception_v3
-          - mobilenet
-          - mobilenet_v2
-          - resnet50
-          - vgg19
-          - xception
-        batch_size: [1]
-        examples: [1024]
         include:
           - platform: pml-llvm-cpu
             model: inception_v3
             batch_size: 1
             examples: 64
+          - platform: pml-llvm-cpu
+            model: mobilenet
+            batch_size: 1
+            examples: 1024
+          - platform: pml-llvm-cpu
+            model: mobilenet_v2
+            batch_size: 1
+            examples: 1024
           - platform: pml-llvm-cpu
             model: resnet50
             batch_size: 1
@@ -110,7 +108,7 @@ jobs:
       build_type: Release
       examples: ${{matrix.examples}}
       model: ${{matrix.model}}
-      path: ${{matrix.platform}}/infer/${{matrix.model}}}/bs=${{matrix.batch_size}}
+      path: ${{matrix.platform}}/infer/${{matrix.model}}/bs=${{matrix.batch_size}}
       platform: ${{matrix.platform}}
       precision: high
 
