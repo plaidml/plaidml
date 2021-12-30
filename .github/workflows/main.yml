@@ -189,3 +189,6 @@ jobs:
       - keras
       - plaidbench
       - openvino
+
+    steps:
+      - run: echo "OK"
