@@ -20,14 +20,14 @@ env:
 jobs:
   build-linux_x86_64-debug:
     runs-on: [self-hosted, build=linux_x86_64]
-    uses: plaidml/plaidml/.github/workflows/build.yml@${{github.sha}}
+    uses: plaidml/plaidml/.github/workflows/build.yml@flaub/ghrun
     with:
       build_type: Debug
       check: core
 
   build-linux_x86_64-release:
     runs-on: [self-hosted, build=linux_x86_64]
-    uses: plaidml/plaidml/.github/workflows/build.yml@${{github.sha}}
+    uses: plaidml/plaidml/.github/workflows/build.yml@flaub/ghrun
     with:
       build_type: Release
       check: smoke
