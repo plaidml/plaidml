@@ -49,6 +49,7 @@ jobs:
           miniconda-version: "latest"
 
       - name: Configure
+        run: |
           mkdir -p logs
           python configure --ci --temp=/tmp/${build_root}/${build_type} --type=${build_type} &> logs/configure.log
       - run: ninja -C ${build_root}/${build_type} check-${check} &> logs/check-${check}.log
