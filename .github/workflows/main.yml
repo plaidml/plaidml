@@ -20,27 +20,17 @@ env:
 jobs:
   build-linux_x86_64-debug:
     runs-on: [self-hosted, build=linux_x86_64]
-    steps:
-      - uses: actions/checkout@v2
-        with:
-          submodules: recursive
-      - uses: ./.github/actions/build
-        with:
-          build_root: ${{env.build_root}}
-          build_type: Debug
-          check: core
+    uses: plaidml/plaidml/.github/workflows/build.yml@${{github.sha}}
+    with:
+      build_type: Debug
+      check: core
 
   build-linux_x86_64-release:
     runs-on: [self-hosted, build=linux_x86_64]
-    steps:
-      - uses: actions/checkout@v2
-        with:
-          submodules: recursive
-      - uses: ./.github/actions/build
-        with:
-          build_root: ${{env.build_root}}
-          build_type: Release
-          check: smoke
+    uses: plaidml/plaidml/.github/workflows/build.yml@${{github.sha}}
+    with:
+      build_type: Release
+      check: smoke
 
   keras:
     needs: build-linux_x86_64-release
