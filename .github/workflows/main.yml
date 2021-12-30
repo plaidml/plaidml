@@ -189,6 +189,6 @@ jobs:
       - keras
       - plaidbench
       - openvino
-
+    runs-on: [self-hosted, build=linux_x86_64]
     steps:
       - run: echo "OK"
