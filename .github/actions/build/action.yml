@@ -20,17 +20,21 @@ runs:
         miniconda-version: "latest"
 
     - name: Configure
+      shell: bash -l {0}
       run: |
         mkdir -p logs
         python configure --ci --temp=/tmp/${build_root}/${build_type} --type=${build_type} &> logs/configure.log
 
     - name: ninja check-${{inputs.check}}
+      shell: bash -l {0}
       run: ninja -C ${build_root}/${build_type} check-${check} &> logs/check-${check}.log
 
     - name: ninja package
+      shell: bash -l {0}
       run: ninja -C ${build_root}/${build_type} package
 
     - name: Test devkit
+      shell: bash -l {0}
       run: |
         cd ${build_root}/${build_type}/_CPack_Packages/${system}/TGZ/PlaidML-${version}-${system}/devkit
         cmake -S . -B build -G Ninja
@@ -39,6 +43,7 @@ runs:
 
     - name: Report failures
       if: failure()
+      shell: bash -l {0}
       run: |
         echo "::group::configure"
         tail -n 1000 logs/configure.log
