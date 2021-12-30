@@ -183,3 +183,9 @@ jobs:
 
       - name: "Running model: ${{matrix.model}}"
         run: python ci/openvino.py ${test} ${model_path} --pkgdir=testkit --outdir=ci/test/${path}
+
+  report:
+    needs:
+      - keras
+      - plaidbench
+      - openvino
