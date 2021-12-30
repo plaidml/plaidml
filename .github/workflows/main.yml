@@ -21,6 +21,9 @@ jobs:
   build-linux_x86_64-debug:
     runs-on: [self-hosted, build=linux_x86_64]
     steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: recursive
       - uses: ./.github/actions/build
         with:
           build_root: ${{env.build_root}}
@@ -30,6 +33,9 @@ jobs:
   build-linux_x86_64-release:
     runs-on: [self-hosted, build=linux_x86_64]
     steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: recursive
       - uses: ./.github/actions/build
         with:
           build_root: ${{env.build_root}}

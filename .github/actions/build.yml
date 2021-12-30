@@ -11,10 +11,6 @@ inputs:
 runs:
   using: composite
   steps:
-    - uses: actions/checkout@v2
-      with:
-        submodules: recursive
-
     - uses: conda-incubator/setup-miniconda@v2
       with:
         activate-environment: ${{ github.workspace }}/.cenv/
