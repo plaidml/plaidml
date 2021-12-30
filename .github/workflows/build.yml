@@ -5,8 +5,10 @@ on:
     inputs:
       build_type:
         required: true
+        type: string
       check:
         required: true
+        type: string
 
 defaults:
   run:
