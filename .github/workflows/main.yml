@@ -18,91 +18,35 @@ env:
   python_arch: manylinux1_x86_64
 
 jobs:
-  build:
-    runs-on: [self-hosted, "build=${{matrix.platform}}"]
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - build_type: Debug
-            check: core
-            platform: linux_x86_64
-          - build_type: Release
-            check: smoke
-            platform: linux_x86_64
-
-    env:
-      build_type: ${{matrix.build_type}}
-      check: ${{matrix.check}}
-
+  build-linux_x86_64-debug:
+    runs-on: [self-hosted, build=linux_x86_64]
     steps:
-      - uses: actions/checkout@v2
+      - uses: ./.github/actions/build
         with:
-          submodules: recursive
+          build_root: ${{env.build_root}}
+          build_type: Debug
+          check: core
 
-      - uses: conda-incubator/setup-miniconda@v2
+  build-linux_x86_64-release:
+    runs-on: [self-hosted, build=linux_x86_64]
+    steps:
+      - uses: ./.github/actions/build
         with:
-          activate-environment: ${{ github.workspace }}/.cenv/
-          channels: conda-forge,defaults
-          environment-file: environment.yml
-          mamba-version: "*"
-          miniconda-version: "latest"
-
-      - name: Configure
-        run: |
-          mkdir -p logs
-          python configure --ci --temp=/tmp/${build_root}/${build_type} --type=${build_type} &> logs/configure.log
-      - run: ninja -C ${build_root}/${build_type} check-${check} &> logs/check-${check}.log
-      - run: ninja -C ${build_root}/${build_type} package
-      - name: Test devkit
-        run: |
-          cd ${build_root}/${build_type}/_CPack_Packages/${system}/TGZ/PlaidML-${version}-${system}/devkit
-          cmake -S . -B build -G Ninja
-          ninja -C build
-          build/edsl_test
-
-      - name: Report failures
-        if: failure()
-        run: |
-          echo "::group::configure"
-          tail -n 1000 logs/configure.log
-          echo "::endgroup::"
-          echo "::group::ninja check-${check}"
-          tail -n 1000 logs/check-${check}.log
-          echo "::endgroup::"
-
-      - name: Upload logs
-        uses: actions/upload-artifact@v2
-        if: success() || failure()
-        with:
-          name: ${{env.build_root}},${{env.build_type}},logs,${{github.run_id}}
-          path: logs/*.log
-
-      - name: Upload wheels
-        uses: actions/upload-artifact@v2
-        if: matrix.build_type == 'Release'
-        with:
-          name: ${{env.build_root}},${{env.build_type}},wheels
-          path: ${{env.build_root}}/${{env.build_type}}/*.whl
-
-      - name: Upload kits
-        uses: actions/upload-artifact@v2
-        if: matrix.build_type == 'Release'
-        with:
-          name: ${{env.build_root}},${{env.build_type}},kits
-          path: ${{env.build_root}}/${{env.build_type}}/*.tar.gz
+          build_root: ${{env.build_root}}
+          build_type: Release
+          check: smoke
 
   keras:
-    needs: build
+    needs: build-linux_x86_64-release
     runs-on: [self-hosted, "target=${{matrix.platform}}"]
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
+        platform: [pml-llvm-cpu]
         test:
           - backend_test
           - trivial_model_test
-        platform: [pml-llvm-cpu]
 
     env:
       test: ${{matrix.test}}
@@ -126,19 +70,20 @@ jobs:
 
       - name: Installing packages
         run: |
-          pip install ${build_root}/${build_type}/plaidml-${version}-py3-none-${python_arch}.whl
-          pip install ${build_root}/${build_type}/plaidml_keras-${version}-py3-none-any.whl
+          pip install plaidml-${version}-py3-none-${python_arch}.whl
+          pip install plaidml_keras-${version}-py3-none-any.whl
 
       - name: "Running test: ${{matrix.test}}"
         run: python plaidml/bridge/keras/${test}.py
 
   plaidbench:
-    needs: build
+    needs: build-linux_x86_64-release
     runs-on: [self-hosted, "target=${{matrix.platform}}"]
     timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
+        platform: [pml-llvm-cpu]
         model:
           - inception_v3
           - mobilenet
@@ -146,7 +91,6 @@ jobs:
           - resnet50
           - vgg19
           - xception
-        platform: [pml-llvm-cpu]
         batch_size: [1]
         examples: [1024]
         include:
@@ -193,9 +137,9 @@ jobs:
 
       - name: Installing packages
         run: |
-          pip install ${build_root}/${build_type}/plaidml-${version}-py3-none-${python_arch}.whl
-          pip install ${build_root}/${build_type}/plaidml_keras-${version}-py3-none-any.whl
-          pip install ${build_root}/${build_type}/plaidbench-${version}-py3-none-any.whl
+          pip install plaidml-${version}-py3-none-${python_arch}.whl
+          pip install plaidml_keras-${version}-py3-none-any.whl
+          pip install plaidbench-${version}-py3-none-any.whl
 
       - name: "Running model: ${{matrix.model}}"
         run: plaidbench --examples=${examples} --batch-size=${batch_size} --results=ci/test/${path} keras ${model}
@@ -204,20 +148,20 @@ jobs:
         run: python ci/analysis.py ci/test ${path} --precision=${precision}
 
   openvino:
-    needs: build
+    needs: build-linux_x86_64-release
     runs-on: [self-hosted, "target=${{matrix.platform}}"]
     strategy:
       fail-fast: false
       matrix:
+        platform: [pml-llvm-cpu]
+        test:
+          - benchmark_app
+          # - accuracy_check # FIXME: this seems to fail currently
         model:
           - mobilenet-v2
           - resnet-50-pytorch
           - yolo-v2-tiny-ava-0001
-        test:
-          - benchmark_app
-          # - accuracy_check # FIXME: this seems to fail currently
         dtype: [FP16]
-        platform: [pml-llvm-cpu]
 
     env:
       build_type: Release
@@ -243,7 +187,7 @@ jobs:
           name: ${{env.build_root}},${{env.build_type}},kits
 
       - name: Extract testkit
-        run: tar xvf ${build_root}/${build_type}/PlaidML-${version}-${system}-testkit.tar.gz
+        run: tar xvf PlaidML-${version}-${system}-testkit.tar.gz
 
       - name: "Running model: ${{matrix.model}}"
         run: python ci/openvino.py ${test} ${model_path} --pkgdir=testkit --outdir=ci/test/${path}
