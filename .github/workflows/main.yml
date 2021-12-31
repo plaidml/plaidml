@@ -1,0 +1,196 @@
+name: CI
+
+on:
+  push:
+    branches: [ plaidml-v1 ]
+  pull_request:
+    branches: [ plaidml-v1 ]
+  workflow_dispatch:
+
+defaults:
+  run:
+    shell: bash -l {0}
+
+env:
+  build_root: build-x86_64
+  system: Linux
+  version: "1.0.0"
+  python_arch: manylinux1_x86_64
+
+jobs:
+  build-linux_x86_64-debug:
+    uses: plaidml/plaidml/.github/workflows/build.yml@flaub/ghrun
+    with:
+      build_type: Debug
+      check: core
+
+  build-linux_x86_64-release:
+    uses: plaidml/plaidml/.github/workflows/build.yml@flaub/ghrun
+    with:
+      build_type: Release
+      check: smoke
+
+  keras:
+    needs: build-linux_x86_64-release
+    runs-on: [self-hosted, "target=${{matrix.platform}}"]
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [pml-llvm-cpu]
+        test:
+          - backend_test
+          - trivial_model_test
+
+    env:
+      test: ${{matrix.test}}
+      platform: ${{matrix.platform}}
+      build_type: Release
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: conda-incubator/setup-miniconda@v2
+        with:
+          activate-environment: keras
+          channels: conda-forge,defaults
+          environment-file: ci/conda/keras.yml
+          mamba-version: "*"
+          miniconda-version: "latest"
+
+      - uses: actions/download-artifact@v2
+        with:
+          name: ${{env.build_root}},${{env.build_type}},wheels
+
+      - name: Installing packages
+        run: |
+          pip install plaidml-${version}-py3-none-${python_arch}.whl
+          pip install plaidml_keras-${version}-py3-none-any.whl
+
+      - name: "Running test: ${{matrix.test}}"
+        run: python plaidml/bridge/keras/${test}.py
+
+  plaidbench:
+    needs: build-linux_x86_64-release
+    runs-on: [self-hosted, "target=${{matrix.platform}}"]
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: pml-llvm-cpu
+            model: inception_v3
+            batch_size: 1
+            examples: 64
+          - platform: pml-llvm-cpu
+            model: mobilenet
+            batch_size: 1
+            examples: 1024
+          - platform: pml-llvm-cpu
+            model: mobilenet_v2
+            batch_size: 1
+            examples: 1024
+          - platform: pml-llvm-cpu
+            model: resnet50
+            batch_size: 1
+            examples: 128
+          - platform: pml-llvm-cpu
+            model: vgg19
+            batch_size: 1
+            examples: 64
+          - platform: pml-llvm-cpu
+            model: xception
+            batch_size: 1
+            examples: 64
+
+    env:
+      batch_size: ${{matrix.batch_size}}
+      build_type: Release
+      examples: ${{matrix.examples}}
+      model: ${{matrix.model}}
+      path: ${{matrix.platform}}/infer/${{matrix.model}}/bs=${{matrix.batch_size}}
+      platform: ${{matrix.platform}}
+      precision: high
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: conda-incubator/setup-miniconda@v2
+        with:
+          activate-environment: keras
+          channels: conda-forge,defaults
+          environment-file: ci/conda/keras.yml
+          mamba-version: "*"
+          miniconda-version: "latest"
+
+      - uses: actions/download-artifact@v2
+        with:
+          name: ${{env.build_root}},${{env.build_type}},wheels
+
+      - name: Installing packages
+        run: |
+          pip install plaidml-${version}-py3-none-${python_arch}.whl
+          pip install plaidml_keras-${version}-py3-none-any.whl
+          pip install plaidbench-${version}-py3-none-any.whl
+
+      - name: "Running model: ${{matrix.model}}"
+        run: plaidbench --examples=${examples} --batch-size=${batch_size} --results=ci/test/${path} keras ${model}
+
+      - name: Analysis
+        run: python ci/analysis.py ci/test ${path} --precision=${precision}
+
+  openvino:
+    needs: build-linux_x86_64-release
+    runs-on: [self-hosted, "target=${{matrix.platform}}"]
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [pml-llvm-cpu]
+        test:
+          - benchmark_app
+          # - accuracy_check # FIXME: this seems to fail currently
+        model:
+          - mobilenet-v2
+          - resnet-50-pytorch
+          - yolo-v2-tiny-ava-0001
+        dtype: [FP16]
+
+    env:
+      build_type: Release
+      dtype: ${{matrix.dtype}}
+      model: ${{matrix.model}}
+      model_path: "networks/openvino/${{matrix.model}}/${{matrix.dtype}}/${{matrix.model}}.xml"
+      platform: ${{matrix.platform}}
+      test: ${{matrix.test}}
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: conda-incubator/setup-miniconda@v2
+        with:
+          activate-environment: build
+          channels: conda-forge,defaults
+          environment-file: environment.yml
+          mamba-version: "*"
+          miniconda-version: "latest"
+
+      - uses: actions/download-artifact@v2
+        with:
+          name: ${{env.build_root}},${{env.build_type}},kits
+
+      - name: Extract testkit
+        run: tar xvf PlaidML-${version}-${system}-testkit.tar.gz
+
+      - name: "Running model: ${{matrix.model}}"
+        run: python ci/openvino.py ${test} ${model_path} --pkgdir=testkit --outdir=ci/test/${path}
+
+  report:
+    needs:
+      - build-linux_x86_64-debug
+      - build-linux_x86_64-release
+      - keras
+      - plaidbench
+      - openvino
+    runs-on: [self-hosted, build=linux_x86_64]
+    steps:
+      - run: echo "OK"
