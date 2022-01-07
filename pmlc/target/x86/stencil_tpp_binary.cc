@@ -63,12 +63,7 @@ bool shapeCompatible(MemRefType output, MemRefType input1, MemRefType input2) {
   ArrayRef<int64_t> inputShape1 = input1.getShape();
   ArrayRef<int64_t> inputShape2 = input2.getShape();
 
-  for (int64_t i = 0; i < outShape.size(); i++) {
-    if (outShape[i] != inputShape1[i] || outShape[i] != inputShape2[i])
-      return false;
-  }
-
-  return true;
+  return (outShape == inputShape1 && outShape == inputShape2);
 }
 
 bool isLocallyDefined(AffineParallelOp op, Value source) {
