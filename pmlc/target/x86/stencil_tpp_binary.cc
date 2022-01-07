@@ -50,6 +50,27 @@ Optional<TppOperand> getTppOperand(TOp op, Block *block,
 
   return TppOperand{op.getMemRef(), outerValueMap.getAffineMap(), tileMap};
 }
+
+bool shapeCompatible(MemRefType output, MemRefType input1, MemRefType input2) {
+  if (!output.hasStaticShape() || !input1.hasStaticShape() ||
+      !input2.hasStaticShape())
+    return false;
+  if (output.getRank() != input1.getRank() ||
+      output.getRank() != input2.getRank())
+    return false;
+
+  ArrayRef<int64_t> outShape = output.getShape();
+  ArrayRef<int64_t> inputShape1 = input1.getShape();
+  ArrayRef<int64_t> inputShape2 = input2.getShape();
+
+  for (int64_t i = 0; i < outShape.size(); i++) {
+    if (outShape[i] != inputShape1[i] || outShape[i] != inputShape2[i])
+      return false;
+  }
+
+  return true;
+}
+
 bool isLocallyDefined(AffineParallelOp op, Value source) {
   if (!source.isa<BlockArgument>()) {
     // If the definition of load's source is in "op", it is too complex to
@@ -92,8 +113,14 @@ private:
 
     auto source1 = cast<pxa::PxaLoadOp>(load1.getDefiningOp()).memref();
     auto source2 = cast<pxa::PxaLoadOp>(load2.getDefiningOp()).memref();
-
+    auto outputSource = cast<pxa::PxaReduceOp>(reduce.getDefiningOp()).memref();
     if (isLocallyDefined(op, source1) || isLocallyDefined(op, source2))
+      return;
+    auto outputType = outputSource.getType().cast<MemRefType>();
+    auto input1Type = source1.getType().cast<MemRefType>();
+    auto input2Type = source2.getType().cast<MemRefType>();
+
+    if (!shapeCompatible(outputType, input1Type, input2Type))
       return;
 
     capture = pxa::StencilCapture{{reduce}, {load1, load2}};
