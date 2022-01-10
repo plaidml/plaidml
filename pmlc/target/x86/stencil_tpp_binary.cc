@@ -51,21 +51,6 @@ Optional<TppOperand> getTppOperand(TOp op, Block *block,
   return TppOperand{op.getMemRef(), outerValueMap.getAffineMap(), tileMap};
 }
 
-bool shapeCompatible(MemRefType output, MemRefType input1, MemRefType input2) {
-  if (!output.hasStaticShape() || !input1.hasStaticShape() ||
-      !input2.hasStaticShape())
-    return false;
-  if (output.getRank() != input1.getRank() ||
-      output.getRank() != input2.getRank())
-    return false;
-
-  ArrayRef<int64_t> outShape = output.getShape();
-  ArrayRef<int64_t> inputShape1 = input1.getShape();
-  ArrayRef<int64_t> inputShape2 = input2.getShape();
-
-  return (outShape == inputShape1 && outShape == inputShape2);
-}
-
 bool isLocallyDefined(AffineParallelOp op, Value source) {
   if (!source.isa<BlockArgument>()) {
     // If the definition of load's source is in "op", it is too complex to
@@ -115,9 +100,9 @@ private:
     auto input1Type = source1.getType().cast<MemRefType>();
     auto input2Type = source2.getType().cast<MemRefType>();
 
-    if (!shapeCompatible(outputType, input1Type, input2Type))
+    if (outputType.getShape() != input1Type.getShape() ||
+        outputType.getShape() != input2Type.getShape())
       return;
-
     capture = pxa::StencilCapture{{reduce}, {load1, load2}};
     this->opName = inName;
   }
