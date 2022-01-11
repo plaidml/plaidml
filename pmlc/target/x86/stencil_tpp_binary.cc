@@ -50,6 +50,7 @@ Optional<TppOperand> getTppOperand(TOp op, Block *block,
 
   return TppOperand{op.getMemRef(), outerValueMap.getAffineMap(), tileMap};
 }
+
 bool isLocallyDefined(AffineParallelOp op, Value source) {
   if (!source.isa<BlockArgument>()) {
     // If the definition of load's source is in "op", it is too complex to
@@ -92,10 +93,16 @@ private:
 
     auto source1 = cast<pxa::PxaLoadOp>(load1.getDefiningOp()).memref();
     auto source2 = cast<pxa::PxaLoadOp>(load2.getDefiningOp()).memref();
-
+    auto outputSource = cast<pxa::PxaReduceOp>(reduce.getDefiningOp()).memref();
     if (isLocallyDefined(op, source1) || isLocallyDefined(op, source2))
       return;
+    auto outputType = outputSource.getType().cast<MemRefType>();
+    auto input1Type = source1.getType().cast<MemRefType>();
+    auto input2Type = source2.getType().cast<MemRefType>();
 
+    if (outputType.getShape() != input1Type.getShape() ||
+        outputType.getShape() != input2Type.getShape())
+      return;
     capture = pxa::StencilCapture{{reduce}, {load1, load2}};
     this->opName = inName;
   }
