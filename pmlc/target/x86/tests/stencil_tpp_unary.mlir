@@ -130,3 +130,37 @@ func @stencil_unary_do_nothing(%arg0: memref<1x64x56x56xf32>) -> memref<1x64x56x
   }
   return %1 : memref<1x64x56x56xf32>
 }
+
+// CHECK-LABEL: func @tanh
+func @tanh(%I: memref<10x20xf32>, %O: memref<10x20xf32>) -> memref<10x20xf32> {
+  // CHECK: affine.parallel
+  %0 = affine.parallel (%ox, %oy) = (0, 0) to (5, 10) reduce ("assign") -> (memref<10x20xf32>) {
+    // CHECK: pxa.generic (%{{.*}}[%{{.*}} * 2, %{{.*}} * 2]: #{{.*}}) <assign> @tpp_tanh(%{{.*}}[%{{.*}} * 2, %{{.*}} * 2]: #{{.*}}) tile: [2, 2] : (memref<10x20xf32>) -> memref<10x20xf32>
+    %1 = affine.parallel (%ix, %iy) = (0, 0) to (2, 2) reduce ("assign") -> (memref<10x20xf32>) {
+      %2 = pxa.load %I[%ix + %ox * 2, %iy + %oy * 2] : memref<10x20xf32>
+      %3 = math.tanh %2 : f32
+      %4 = pxa.reduce assign %3, %O[%ix + %ox * 2, %iy + %oy * 2] : memref<10x20xf32>
+      affine.yield %4 : memref<10x20xf32>
+    }
+    affine.yield %1 : memref<10x20xf32>
+  }
+  return %0 : memref<10x20xf32>
+}
+
+// CHECK-LABEL: func @exp
+func @exp(%I: memref<10x20xf32>, %O: memref<10x20xf32>) -> memref<10x20xf32> {
+  // CHECK: affine.parallel
+  %0 = affine.parallel (%ox, %oy) = (0, 0) to (5, 10) reduce ("assign") -> (memref<10x20xf32>) {
+    // CHECK: pxa.generic (%{{.*}}[%{{.*}} * 2, %{{.*}} * 2]: #{{.*}}) <assign> @tpp_exp(%{{.*}}[%{{.*}} * 2, %{{.*}} * 2]: #{{.*}}) tile: [2, 2] : (memref<10x20xf32>) -> memref<10x20xf32>
+    %1 = affine.parallel (%ix, %iy) = (0, 0) to (2, 2) reduce ("assign") -> (memref<10x20xf32>) {
+      %2 = pxa.load %I[%ix + %ox * 2, %iy + %oy * 2] : memref<10x20xf32>
+      %3 = math.exp %2 : f32
+      %4 = pxa.reduce assign %3, %O[%ix + %ox * 2, %iy + %oy * 2] : memref<10x20xf32>
+      affine.yield %4 : memref<10x20xf32>
+    }
+    affine.yield %1 : memref<10x20xf32>
+  }
+  return %0 : memref<10x20xf32>
+}
+
+
