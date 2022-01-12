@@ -261,11 +261,8 @@ void pipelineBuilderStage1(OpPassManager &pm) {
     pm.addPass(pml::createApplyRulesPass(/*module=*/"schedule"));
   }
 
-  if (util::getEnvVar("PLAIDML_USE_LINALG") == "1") {
-    pm.addPass(pmlc::conversion::tile_to_linalg::createLowerTileToLinalgPass());
-    if (pmlc::util::getEnvVar("PLAIDML_REORDER") == "1")
-      pm.addNestedPass<FuncOp>(createReorderLayoutsPass());
-  }
+  pm.addPass(pmlc::conversion::tile_to_linalg::createLowerTileToLinalgPass());
+  pm.addNestedPass<FuncOp>(createReorderLayoutsPass());
 
   pm.addPass(stdx::createMainClosurePass());
   pm.addPass(createLoopInvariantCodeMotionPass());
@@ -277,11 +274,7 @@ void pipelineBuilderStage2(OpPassManager &pm, const Options &options) {
   unsigned maxThreads = options.getNumThreads();
   IVLOG(1, "Number of threads: " << maxThreads);
 
-  if (util::getEnvVar("PLAIDML_USE_LINALG") == "1") {
-    pm.addPass(pmlc::conversion::linalg_to_pxa::createLowerLinalgToPXAPass());
-  } else {
-    pm.addPass(pmlc::conversion::tile_to_pxa::createLowerTileToPXAPass());
-  }
+  pm.addPass(pmlc::conversion::linalg_to_pxa::createLowerLinalgToPXAPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
   pm.addNestedPass<FuncOp>(layer::createInlineLayersPass());
