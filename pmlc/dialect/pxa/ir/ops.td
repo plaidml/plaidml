@@ -15,6 +15,11 @@ def PXA_Dialect : Dialect {
   let cppNamespace = "pmlc::dialect::pxa";
 }
 
+def AnyFloatOrMemRef : Type<Or<[
+    AnyFloat.predicate,
+    AnyMemRef.predicate,
+  ]>, "scalarOrMemRef">;
+
 class PXA_Op<string mnemonic, list<OpTrait> traits = []> :
     Op<PXA_Dialect, mnemonic, traits>;
 
@@ -368,7 +373,7 @@ def PxaGenericOp : PXA_OpWithPP<"generic", [
     AttrSizedOperandSegments]> {
   let summary = "PXA generic operation";
   let arguments = (ins
-    Variadic<AnyMemRef>:$inputs,
+    Variadic<AnyFloatOrMemRef>:$inputs,
     Variadic<AnyMemRef>:$outputs,
     Variadic<Index>:$inputIndices,
     Variadic<Index>:$outputIndices,
