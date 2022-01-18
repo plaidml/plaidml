@@ -52,6 +52,7 @@ Optional<TppOperand> getTppOperand(TOp op, Block *block,
 class StencilImpl : public pxa::StencilBase {
 private:
   StringRef opName;
+  Value scalar;
   template <typename OpTy>
   void maybeCaptureGeneric(Optional<pxa::StencilCapture> &capture,
                            StringRef inName) {
@@ -64,7 +65,7 @@ private:
     auto pattern = m_Op<AffineYieldOp>(m_Capture(
         &reduce,
         pxa::m_PxaReduceOp(AtomicRMWKind::assign,
-                           m_Op<OpTy>(m_Capture(&load, m_Op<pxa::PxaLoadOp>())),
+                           m_Op<OpTy>(m_Capture(&load, m_Op<ConstantOp>())),
                            m_Any())));
 
     Operation *yield = op.getBody()->getTerminator();
@@ -75,20 +76,9 @@ private:
         !reduce.getType().cast<MemRefType>().getElementType().isF32())
       return;
 
-    auto source = cast<pxa::PxaLoadOp>(load.getDefiningOp()).memref();
-    if (!source.isa<BlockArgument>()) {
-      // If the definition of load's source is in "op", it is too complex to
-      // stencil
-      auto defOp = source.getDefiningOp();
-      while (!isa<FuncOp>(defOp)) {
-        if (defOp == op.getOperation())
-          return;
-        defOp = defOp->getParentOp();
-      }
-    }
-
-    capture = pxa::StencilCapture{{reduce}, {load}};
+    capture = pxa::StencilCapture{{reduce}, {}};
     this->opName = inName;
+    this->scalar = load;
   }
 
   void maybeCaptureIdentityOp(Optional<pxa::StencilCapture> &capture,
@@ -102,7 +92,7 @@ private:
     auto pattern = m_Op<AffineYieldOp>(m_Capture(
         &reduce,
         pxa::m_PxaReduceOp(AtomicRMWKind::assign,
-                           m_Capture(&load, m_Op<pxa::PxaLoadOp>()), m_Any())));
+                           m_Capture(&load, m_Op<ConstantOp>()), m_Any())));
 
     Operation *yield = op.getBody()->getTerminator();
     if (!matchPattern(yield, pattern))
@@ -112,20 +102,9 @@ private:
         !reduce.getType().cast<MemRefType>().getElementType().isF32())
       return;
 
-    auto source = cast<pxa::PxaLoadOp>(load.getDefiningOp()).memref();
-    if (!source.isa<BlockArgument>()) {
-      // If the definition of load's source is in "op", it is too complex to
-      // stencil
-      auto defOp = source.getDefiningOp();
-      while (!isa<FuncOp>(defOp)) {
-        if (defOp == op.getOperation())
-          return;
-        defOp = defOp->getParentOp();
-      }
-    }
-
-    capture = pxa::StencilCapture{{reduce}, {load}};
+    capture = pxa::StencilCapture{{reduce}, {}};
     this->opName = inName;
+    this->scalar = load;
   }
 
   Optional<pxa::StencilCapture> capture() {
@@ -149,8 +128,6 @@ private:
 
     auto outputOp =
         cast<pxa::PxaReduceOp>(stencil.values[0].value.getDefiningOp());
-    auto inputOp =
-        cast<pxa::PxaLoadOp>(stencil.values[1].value.getDefiningOp());
 
     SmallVector<Value> inputIndices, outputIndices;
     Optional<TppOperand> output =
@@ -158,25 +135,19 @@ private:
     if (!output)
       return;
 
-    Optional<TppOperand> input =
-        getTppOperand(inputOp, op->getBlock(), stencil.indexes, inputIndices);
-    if (!input)
-      return;
-
     ArrayAttr outputAccessMaps =
         builder.getAffineMapArrayAttr({output->accessMap});
     ArrayAttr outputTileMaps = builder.getAffineMapArrayAttr({output->tileMap});
 
-    ArrayAttr inputAccessMaps =
-        builder.getAffineMapArrayAttr({input->accessMap});
-    ArrayAttr inputTileMaps = builder.getAffineMapArrayAttr({input->tileMap});
+    ArrayAttr inputAccessMaps = builder.getAffineMapArrayAttr({});
+    ArrayAttr inputTileMaps = builder.getAffineMapArrayAttr({});
 
     ArrayAttr reductions =
         builder.getI64ArrayAttr({static_cast<int64_t>(outputOp.agg())});
 
     auto genericOp = builder.create<pxa::PxaGenericOp>(
         op.getLoc(), output->memref.getType(),
-        /*inputs=*/ArrayRef<Value>{input->memref},
+        /*inputs=*/ArrayRef<Value>{scalar},
         /*outputs=*/ArrayRef<Value>{output->memref},
         /*inputIndices=*/inputIndices,
         /*outputIndices=*/outputIndices,
@@ -202,23 +173,20 @@ public:
                     /*tilingGenerator=*/pxa::ExactRangeGenerator(),
                     pxa::IndexStridePredicates{
                         [](int64_t stride) { return stride > 1; }, // output
-                        [](int64_t stride) {
-                          return stride == 0 || stride > 1;
-                        }, // input
                     }},
                 pxa::StencilIndexRequirement{
                     /*idxName=*/"eltwise_j",
                     /*tilingGenerator=*/pxa::ExactRangeGenerator(),
                     pxa::IndexStridePredicates{
                         [](int64_t stride) { return stride == 1; }, // output
-                        [](int64_t stride) { return stride == 1; }, // input
                     }},
             }) {}
 };
 
 } // namespace
 
-struct StencilTppUnaryPass : public StencilTppUnaryBase<StencilTppUnaryPass> {
+struct StencilTppUnaryScalarPass
+    : public StencilTppUnaryScalarBase<StencilTppUnaryScalarPass> {
   void runOnFunction() final {
     getFunction().walk([](AffineParallelOp op) {
       if (op.getIVs().size() == 2) {
@@ -229,8 +197,8 @@ struct StencilTppUnaryPass : public StencilTppUnaryBase<StencilTppUnaryPass> {
   }
 };
 
-std::unique_ptr<Pass> createStencilTppUnaryPass() {
-  return std::make_unique<StencilTppUnaryPass>();
+std::unique_ptr<Pass> createStencilTppUnaryScalarPass() {
+  return std::make_unique<StencilTppUnaryScalarPass>();
 }
 
 } // namespace pmlc::target::x86
