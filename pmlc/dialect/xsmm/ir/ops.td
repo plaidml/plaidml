@@ -13,6 +13,13 @@ def FuncTypeAttr : TypeAttrBase<"::mlir::FunctionType", "function type attribute
   let constBuilderCall = "::mlir::TypeAttr::get($0)";
 }
 
+def AnyFloatOrMemRef : Type<Or<[
+    AnyFloat.predicate,
+    AnyMemRef.predicate,
+  ]>, "scalarOrMemRef">;
+
+
+
 def XSMM_UnaryKind : I64EnumAttr<
     "UnaryKind",
     "Operation to aggregate with",
@@ -184,7 +191,8 @@ def XSMM_UnaryDispatchOp : XSMM_Op<"unary.dispatch", [NoSideEffect]> {
     I64ArrayAttr:$tile,
     I64Attr:$ldi,
     I64Attr:$ldo,
-    FuncTypeAttr:$func_type
+    FuncTypeAttr:$func_type,
+    I32Attr:$bcastType
   );
   let results = (outs I64:$ptr);
   let assemblyFormat = [{
@@ -198,7 +206,7 @@ def XSMM_UnaryInvokeOp : XSMM_Op<"unary.invoke"> {
   let arguments = (ins
     I64:$ptr,
     Arg<AnyMemRef, "the output memref to store to", [MemWrite]>:$output,
-    Arg<AnyMemRef, "the input memref to load from", [MemRead]>:$input,
+    Arg<AnyFloatOrMemRef>:$input,
     Variadic<Index>:$indices
   );
 
