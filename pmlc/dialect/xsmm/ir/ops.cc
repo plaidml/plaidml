@@ -140,9 +140,13 @@ Operation::operand_range UnaryInvokeOp::getOperandsForOutput() {
 }
 
 Operation::operand_range UnaryInvokeOp::getOperandsForInput() {
-  auto inputType = input().getType().cast<MemRefType>();
+  auto inputType = input().getType().dyn_cast<MemRefType>();
   auto outputType = output().getType().cast<MemRefType>();
-  return getOperands().slice(3 + outputType.getRank(), inputType.getRank());
+
+  if (inputType)
+    return getOperands().slice(3 + outputType.getRank(), inputType.getRank());
+  else // scalar
+    return getOperands().slice(3 + outputType.getRank(), 0);
 }
 
 void printUnaryInvokeOp(OpAsmPrinter &p, UnaryInvokeOp op) {
