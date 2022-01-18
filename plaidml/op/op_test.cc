@@ -264,7 +264,7 @@ ConvolutionParams convParams[] = {
 
 INSTANTIATE_TEST_CASE_P(Suite, ConvolutionTest, ::testing::ValuesIn(convParams));
 
-TEST_F(OpTest, CastConv) {
+TEST_F(OpTest, DISABLED_CastConv) {
   auto I = Placeholder(DType::UINT8, {1, 3, 256, 256});
   auto K = Placeholder(DType::UINT8, {64, 3, 3, 3});
   auto I_f16 = edsl::cast(I, DType::FLOAT16);
