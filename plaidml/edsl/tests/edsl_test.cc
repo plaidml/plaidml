@@ -541,51 +541,6 @@ TEST_F(CppEdsl, EltwiseAdd) {
   runProgram(program);
 }
 
-TEST_F(CppEdsl, EltwiseAddTensor) {
-  // const int64_t N = 32;
-  // const int64_t H = 14;
-  const int64_t W = 256;
-  const int64_t C = 256;
-
-  auto A = Placeholder(DType::FLOAT32, {W, C});
-  auto B = Placeholder(DType::FLOAT32, {W, C});
-  auto program = makeProgram("eltwise_add", {A, B}, {A + B});
-
-  // clang-format off
-  // CHECK-LABEL: CppEdsl.EltwiseAdd
-  // CHECK: module @eltwise_add
-  // CHECK: tile.add %{{.*}}, %{{.*}} : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
-  // CHECK: return %{{.*}} : tensor<10x20xf32>
-  // clang-format on
-
-  // runProgram(program);
-
-  std::default_random_engine rng(2);
-  std::normal_distribution<float> normal_dist(0.0, 1.0);
-
-  std::vector<float> in1(W * C);
-  for (unsigned i = 0; i < in1.size(); i++) {
-    in1[i] = normal_dist(rng);
-  }
-  std::vector<float> in2(W * C);
-  for (unsigned i = 0; i < in2.size(); i++) {
-    in2[i] = normal_dist(rng);
-  }
-  std::vector<float> expected(W * C);
-  // for (int i = 0; i < N; i++) {
-  //  for (int j = 0; j < H; j++) {
-  for (int k = 0; k < W; k++) {
-    for (int l = 0; l < C; l++) {
-      expected[k * C + l] = in1[k * C + l] + in2[k * C + l];
-      // expected[i * H * W * C + j *W * C + k * C + l ] = in1[i * H * W * C + j * W * C + k * C + l] + in2[i * H * W *
-      // C + j * W * C + k * C + l];
-    }
-  }
-  //  }
-  //}
-  checkClose(program, {in1, in2}, {expected});
-}
-
 TEST_F(CppEdsl, EltwiseMod) {
   auto A = Placeholder(DType::INT32, {3, 3});
   auto B = Placeholder(DType::INT32, {3, 3});
