@@ -345,28 +345,68 @@ struct UnaryPxaGenericOpConversion
     Location loc = op.getLoc();
     pxa::PxaGenericOp::Adaptor adaptor(operands, op->getAttrDictionary());
     Type resultType = rewriter.getI64Type();
-    SmallVector<util::StrideArray> inputs =
-        getStrideArrays(adaptor.inputs(), op.inputTileMaps());
+    SmallVector<util::StrideArray> inputs;
+    auto inputType = adaptor.inputs()[0].getType().dyn_cast<MemRefType>();
+    if (inputType) {
+      inputs = getStrideArrays(adaptor.inputs(), op.inputTileMaps());
+    }
     SmallVector<util::StrideArray> outputs =
         getStrideArrays(adaptor.outputs(), op.outputTileMaps());
     IndicesCollector collector(loc, rewriter);
-    if (!collector.collect(op.outputAccessMaps(), adaptor.outputIndices()) ||
-        !collector.collect(op.inputAccessMaps(), adaptor.inputIndices()))
+    int32_t bcastType = 0; // no broadcast
+    AffineMap inputTileMap;
+
+    if (inputType) {
+      inputTileMap = op.inputTileMaps()[0].cast<AffineMapAttr>().getValue();
+    }
+    AffineMap outputTileMap =
+        op.outputTileMaps()[0].cast<AffineMapAttr>().getValue();
+    int32_t ldi;
+    int32_t ldo = outputs[0].strides[0];
+
+    if (inputType) {
+      ldi = inputs[0].strides[0];
+      if (inputTileMap.getNumResults() < outputTileMap.getNumResults()) {
+        if (inputTileMap.getNumResults() == 1) {
+          bcastType = 2; // col broadcast
+          ldi = ldo;
+        }
+      }
+    } else {
+      ldi = ldo;
+      bcastType = 3; // scalar broadcast
+    }
+
+    if (!collector.collect(op.outputAccessMaps(), adaptor.outputIndices()))
       return failure();
 
-    SmallVector<Type> inputTypes = getElementTypes(op.inputs().getTypes());
+    if (inputType) {
+      if (!collector.collect(op.inputAccessMaps(), adaptor.inputIndices()))
+        return failure();
+    }
+
+    SmallVector<Type> inputTypes; // = getElementTypes(op.inputs().getTypes());
     SmallVector<Type> outputTypes = getElementTypes(op.outputs().getTypes());
     Type computeType = outputTypes[0]; // just use the output type for now
-    FunctionType funcType = rewriter.getFunctionType(inputTypes, outputTypes);
+    FunctionType funcType;
 
-    auto dispatchOp =
-        rewriter.create<xsmm::UnaryDispatchOp>(loc, resultType,
-                                               /*kind=*/kind,
-                                               /*compute_type=*/computeType,
-                                               /*tile=*/op.tile(),
-                                               /*ldi=*/inputs[0].strides[0],
-                                               /*ldo=*/outputs[0].strides[0],
-                                               /*func_type=*/funcType);
+    if (inputType) {
+      inputTypes = getElementTypes(op.inputs().getTypes());
+      funcType = rewriter.getFunctionType(inputTypes, outputTypes);
+    } else {
+      inputTypes.push_back(adaptor.inputs()[0].getType());
+      funcType = rewriter.getFunctionType(inputTypes, outputTypes);
+    }
+
+    auto dispatchOp = rewriter.create<xsmm::UnaryDispatchOp>(
+        loc, resultType,
+        /*kind=*/kind,
+        /*compute_type=*/computeType,
+        /*tile=*/op.tile(),
+        /*ldi=*/ldi, // inputs[0].strides[0],
+        /*ldo=*/ldo, // outputs[0].strides[0],
+        /*func_type=*/funcType,
+        /*bcast_type=*/bcastType);
 
     rewriter.create<xsmm::UnaryInvokeOp>(loc, ArrayRef<Type>(),
                                          /*ptr=*/dispatchOp,
@@ -889,22 +929,20 @@ struct XSMMUnaryDispatchLowering
     IntegerType int32Type = rewriter.getI32Type();
     IntegerType int64Type = rewriter.getI64Type();
     SmallVector<Value, 8> callOperands;
-
     // m, n
     for (Attribute attr : op.tile().getValue()) {
       callOperands.push_back(
           rewriter.create<LLVM::ConstantOp>(loc, int32Type, attr));
     }
-
     // ldi
     callOperands.push_back(
         rewriter.create<LLVM::ConstantOp>(loc, int32Type, op.ldiAttr()));
-
     // ldo
     callOperands.push_back(
         rewriter.create<LLVM::ConstantOp>(loc, int32Type, op.ldoAttr()));
 
     FunctionType funcType = op.func_type();
+
     Type inputType = funcType.getInput(0);
     Type outputType = funcType.getResult(0);
 
@@ -928,6 +966,10 @@ struct XSMMUnaryDispatchLowering
         loc, int32Type,
         rewriter.getI32IntegerAttr(
             static_cast<int32_t>(op.kindAttr().getValue()))));
+
+    // type
+    callOperands.push_back(
+        rewriter.create<LLVM::ConstantOp>(loc, int32Type, op.bcastTypeAttr()));
 
     rewriter.replaceOpWithNewOp<LLVM::CallOp>(
         op, int64Type, SymbolRefAttr::get(func), callOperands);
@@ -960,6 +1002,7 @@ struct XSMMUnaryDispatchLowering
                                         int32Type, // compute_type
                                         int32Type, // out_type
                                         int32Type, // type
+                                        int32Type, // bcastType
                                     },
                                     /*isVarArg=*/false));
   }
@@ -973,21 +1016,49 @@ struct XSMMUnaryInvokeLowering
   matchAndRewrite(xsmm::UnaryInvokeOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
     Location loc = op->getLoc();
+    static int constantGlobalCount = 0;
+
     xsmm::UnaryInvokeOp::Adaptor transformed(operands);
-    auto inputType = op.input().getType().cast<MemRefType>();
+
+    auto inputType = op.input().getType().dyn_cast<MemRefType>();
     auto outputType = op.output().getType().cast<MemRefType>();
     Type voidPtrType = getVoidPtrType();
 
-    auto inputIndices =
-        transformed.indices().slice(outputType.getRank(), inputType.getRank());
-    Value inputPtr = getStridedElementPtr(loc, inputType, transformed.input(),
-                                          inputIndices, rewriter);
+    auto outputIndices = transformed.indices().slice(0, outputType.getRank());
+
+    Value outputPtr = getStridedElementPtr(
+        loc, outputType, transformed.output(), outputIndices, rewriter);
+
+    Value inputPtr;
+    if (inputType) {
+      auto inputIndices = transformed.indices().slice(outputType.getRank(),
+                                                      inputType.getRank());
+      inputPtr = getStridedElementPtr(loc, inputType, transformed.input(),
+                                      inputIndices, rewriter);
+    } else {
+      if (auto constOp = cast<ConstantOp>(op.input().getDefiningOp())) {
+        std::string constGlobalVar =
+            "constGlobal" + std::to_string(constantGlobalCount++);
+        auto module = op->getParentOfType<ModuleOp>();
+        OpBuilder builder(module.getBodyRegion());
+
+        LLVM::GlobalOp constGlobal = builder.create<LLVM::GlobalOp>(
+            rewriter.getUnknownLoc(), rewriter.getF32Type(),
+            /*isConstant=*/true, LLVM::Linkage::Internal,
+            StringRef(constGlobalVar), constOp.getValue());
+        inputPtr =
+            rewriter.create<LLVM::AddressOfOp>(op->getLoc(), constGlobal);
+        // TODO: Create a hashmap from value to nameof variable for lookup
+        // before creating a new var
+      }
+      // else
+      //  inputPtr = rewriter.create<LLVM::AddressOfOp>(op->getLoc(),
+      //  op.input());
+    }
+
     Value inputVoidPtr =
         rewriter.create<LLVM::BitcastOp>(loc, voidPtrType, inputPtr);
 
-    auto outputIndices = transformed.indices().slice(0, outputType.getRank());
-    Value outputPtr = getStridedElementPtr(
-        loc, outputType, transformed.output(), outputIndices, rewriter);
     Value outputVoidPtr =
         rewriter.create<LLVM::BitcastOp>(loc, voidPtrType, outputPtr);
 
@@ -999,6 +1070,7 @@ struct XSMMUnaryInvokeLowering
                                       inputVoidPtr,
                                       outputVoidPtr,
                                   });
+
     rewriter.eraseOp(op);
 
     return success();
@@ -1017,6 +1089,7 @@ struct XSMMUnaryInvokeLowering
     rewriter.setInsertionPointToStart(module.getBody());
     IntegerType int64Type = rewriter.getI64Type();
     Type voidPtrType = getVoidPtrType();
+
     return rewriter.create<LLVM::LLVMFuncOp>(
         rewriter.getUnknownLoc(), symbolName,
         LLVM::LLVMFunctionType::get(getVoidType(),
@@ -1215,6 +1288,8 @@ void populatePXAGemmToXSMMConversionPatterns(RewritePatternSet &patterns) {
                                                xsmm::UnaryKind::EXP);
   patterns.insert<UnaryPxaGenericOpConversion>(context, "tpp_tanh",
                                                xsmm::UnaryKind::TANH);
+  patterns.insert<UnaryPxaGenericOpConversion>(context, "tpp_identity",
+                                               xsmm::UnaryKind::IDENTITY);
   patterns.insert<BinaryPxaGenericOpConversion>(context, "tpp_add",
                                                 xsmm::BinaryKind::ADD);
   patterns.insert<BinaryPxaGenericOpConversion>(context, "tpp_mul",
