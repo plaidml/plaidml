@@ -1,9 +1,11 @@
 // Copyright 2020 Intel Corporation
 
-#include "mlir/ExecutionEngine/RunnerUtils.h"
-
+#define NO_BCAST 0
+#define ROW_BCAST 1
+#define COL_BCAST 2
+#define SCALAR_BCAST 3
 #include "libxsmm.h" // NOLINT [build/include_subdir]
-
+#include "mlir/ExecutionEngine/RunnerUtils.h"
 #include "pmlc/rt/symbol_registry.h"
 #include "pmlc/util/logging.h"
 
@@ -94,19 +96,28 @@ plaidml_rt_xsmm_brgemm_offs_dispatch_f32(int32_t lda, int32_t ldb, int32_t ldc,
   return reinterpret_cast<int64_t>(sgemm);
 }
 
-extern "C" int64_t
-plaidml_rt_xsmm_unary_dispatch(int32_t m, int32_t n, int32_t ldi, int32_t ldo,
-                               int32_t in_type, int32_t compute_type,
-                               int32_t out_type, int32_t type) {
+extern "C" int64_t plaidml_rt_xsmm_unary_dispatch(
+    int32_t m, int32_t n, int32_t ldi, int32_t ldo, int32_t in_type,
+    int32_t compute_type, int32_t out_type, int32_t type, int32_t bcast_type) {
   libxsmm_blasint ldi_int = ldi;
   libxsmm_blasint ldo_int = ldo;
+  unsigned int use_bcast = (unsigned int)bcast_type;
+  libxsmm_meltw_unary_flags unary_flags = LIBXSMM_MELTW_FLAG_UNARY_NONE;
+
+  if (use_bcast == ROW_BCAST) {
+    unary_flags = LIBXSMM_MELTW_FLAG_UNARY_BCAST_ROW;
+  } else if (use_bcast == COL_BCAST) {
+    unary_flags = LIBXSMM_MELTW_FLAG_UNARY_BCAST_COL;
+  } else if (use_bcast == SCALAR_BCAST) {
+    unary_flags = LIBXSMM_MELTW_FLAG_UNARY_BCAST_SCALAR;
+  }
   libxsmm_meltwfunction_unary kernel = libxsmm_dispatch_meltw_unary(
       static_cast<libxsmm_blasint>(n), static_cast<libxsmm_blasint>(m),
       &ldi_int, &ldo_int, // leading dimensions
       static_cast<libxsmm_datatype>(in_type),
       static_cast<libxsmm_datatype>(compute_type),
       static_cast<libxsmm_datatype>(out_type),
-      LIBXSMM_MELTW_FLAG_UNARY_NONE, // TODO: add flags to op definition
+      unary_flags, // TODO: add flags to op definition
       static_cast<libxsmm_meltw_unary_type>(type));
   return reinterpret_cast<int64_t>(kernel);
 }
