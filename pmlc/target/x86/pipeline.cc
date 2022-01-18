@@ -333,6 +333,7 @@ void pipelineBuilderStage2(OpPassManager &pm, const Options &options) {
   pm.addPass(createCSEPass());
 
   pm.addNestedPass<FuncOp>(createStencilTppUnaryPass());
+  pm.addNestedPass<FuncOp>(createStencilTppUnaryScalarPass());
   pm.addNestedPass<FuncOp>(createStencilTppBinaryPass());
 
   if (pmlc::util::getEnvVar("PLAIDML_PROFILE") == "1")

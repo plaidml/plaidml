@@ -34,6 +34,8 @@ std::unique_ptr<mlir::Pass> createStencilTppGemmPass();
 
 std::unique_ptr<mlir::Pass> createStencilTppUnaryPass();
 
+std::unique_ptr<mlir::Pass> createStencilTppUnaryScalarPass();
+
 std::unique_ptr<mlir::Pass> createStencilTppBinaryPass();
 
 std::unique_ptr<mlir::Pass> createTraceLinkingPass();

@@ -71,6 +71,11 @@ def StencilTppUnary : FunctionPass<"x86-stencil-tpp-unary"> {
   let constructor = "pmlc::target::x86::createStencilTppUnaryPass()";
 }
 
+def StencilTppUnaryScalar : FunctionPass<"x86-stencil-tpp-unary-scalar"> {
+  let summary = "Find a stencil for TPP unary with scalar input";
+  let constructor = "pmlc::target::x86::createStencilTppUnaryScalarPass()";
+}
+
 def StencilTppBinary : FunctionPass<"x86-stencil-tpp-binary"> {
   let summary = "Find a stencil for TPP binary ops";
   let constructor = "pmlc::target::x86::createStencilTppBinaryPass()";
