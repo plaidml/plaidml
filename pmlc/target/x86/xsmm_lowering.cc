@@ -350,6 +350,25 @@ struct UnaryPxaGenericOpConversion
     SmallVector<util::StrideArray> outputs =
         getStrideArrays(adaptor.outputs(), op.outputTileMaps());
     IndicesCollector collector(loc, rewriter);
+    int32_t bcastType = 0; // no broadcast
+    AffineMap inputTileMap;
+    inputTileMap = op.inputTileMaps()[0].cast<AffineMapAttr>().getValue();
+    AffineMap outputTileMap =
+        op.outputTileMaps()[0].cast<AffineMapAttr>().getValue();
+    int32_t ldi;
+    int32_t ldo = outputs[0].strides[0];
+
+    ldi = inputs[0].strides[0];
+    if (inputTileMap.getNumResults() < outputTileMap.getNumResults()) {
+      if (inputTileMap.getNumResults() == 1) {
+        bcastType = 2; // col broadcast
+        ldi = ldo;
+      } else if (inputTileMap.getNumResults() == 0) {
+        bcastType = 3;
+        ldi = ldo;
+      }
+    }
+
     if (!collector.collect(op.outputAccessMaps(), adaptor.outputIndices()) ||
         !collector.collect(op.inputAccessMaps(), adaptor.inputIndices()))
       return failure();
@@ -358,15 +377,15 @@ struct UnaryPxaGenericOpConversion
     SmallVector<Type> outputTypes = getElementTypes(op.outputs().getTypes());
     Type computeType = outputTypes[0]; // just use the output type for now
     FunctionType funcType = rewriter.getFunctionType(inputTypes, outputTypes);
-
-    auto dispatchOp =
-        rewriter.create<xsmm::UnaryDispatchOp>(loc, resultType,
-                                               /*kind=*/kind,
-                                               /*compute_type=*/computeType,
-                                               /*tile=*/op.tile(),
-                                               /*ldi=*/inputs[0].strides[0],
-                                               /*ldo=*/outputs[0].strides[0],
-                                               /*func_type=*/funcType);
+    auto dispatchOp = rewriter.create<xsmm::UnaryDispatchOp>(
+        loc, resultType,
+        /*kind=*/kind,
+        /*compute_type=*/computeType,
+        /*tile=*/op.tile(),
+        /*ldi=*/ldi, // inputs[0].strides[0],
+        /*ldo=*/ldo, // outputs[0].strides[0],
+        /*func_type=*/funcType,
+        /*bcast_type=*/bcastType);
 
     rewriter.create<xsmm::UnaryInvokeOp>(loc, ArrayRef<Type>(),
                                          /*ptr=*/dispatchOp,
@@ -929,6 +948,10 @@ struct XSMMUnaryDispatchLowering
         rewriter.getI32IntegerAttr(
             static_cast<int32_t>(op.kindAttr().getValue()))));
 
+    // broadcast type
+    callOperands.push_back(
+        rewriter.create<LLVM::ConstantOp>(loc, int32Type, op.bcastTypeAttr()));
+
     rewriter.replaceOpWithNewOp<LLVM::CallOp>(
         op, int64Type, SymbolRefAttr::get(func), callOperands);
 
@@ -960,6 +983,7 @@ struct XSMMUnaryDispatchLowering
                                         int32Type, // compute_type
                                         int32Type, // out_type
                                         int32Type, // type
+                                        int32Type, // bcastType
                                     },
                                     /*isVarArg=*/false));
   }
@@ -1215,6 +1239,8 @@ void populatePXAGemmToXSMMConversionPatterns(RewritePatternSet &patterns) {
                                                xsmm::UnaryKind::EXP);
   patterns.insert<UnaryPxaGenericOpConversion>(context, "tpp_tanh",
                                                xsmm::UnaryKind::TANH);
+  patterns.insert<UnaryPxaGenericOpConversion>(context, "tpp_identity",
+                                               xsmm::UnaryKind::IDENTITY);
   patterns.insert<BinaryPxaGenericOpConversion>(context, "tpp_add",
                                                 xsmm::BinaryKind::ADD);
   patterns.insert<BinaryPxaGenericOpConversion>(context, "tpp_mul",

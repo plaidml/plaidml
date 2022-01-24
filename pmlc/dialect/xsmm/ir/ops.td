@@ -176,6 +176,7 @@ def XSMM_BRGemmOffsInvokeF32Op : XSMM_Op<"brgemm.offs.invoke.f32"> {
   }];
 }
 
+
 def XSMM_UnaryDispatchOp : XSMM_Op<"unary.dispatch", [NoSideEffect]> {
   let summary = "Generate a unary kernel for a specific tile size.";
   let arguments = (ins
@@ -184,14 +185,16 @@ def XSMM_UnaryDispatchOp : XSMM_Op<"unary.dispatch", [NoSideEffect]> {
     I64ArrayAttr:$tile,
     I64Attr:$ldi,
     I64Attr:$ldo,
-    FuncTypeAttr:$func_type
+    FuncTypeAttr:$func_type,
+    I32Attr:$bcastType
   );
   let results = (outs I64:$ptr);
   let assemblyFormat = [{
-    $kind `(` $compute_type `,` $tile `,` $ldi `,` $ldo `)`
+    $kind `(` $compute_type `,` $tile `,` $ldi `,` $ldo `,` $bcastType `)`
     `:` $func_type attr-dict
   }];
 }
+
 
 def XSMM_UnaryInvokeOp : XSMM_Op<"unary.invoke"> {
   let summary = "Invoke a previously generated unary kernel.";
