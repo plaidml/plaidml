@@ -2,6 +2,7 @@
 
 #include "mlir/IR/AffineExprVisitor.h"
 #include "mlir/IR/BuiltinTypes.h"
+
 #include "pmlc/conversion/tile_to_linalg/pass_detail.h"
 #include "pmlc/util/extent.h"
 
@@ -209,13 +210,15 @@ bool OpMapsAndShapes::needDynamicDim() {
   }
   for (unsigned i = 0; i < operands.size(); ++i) {
     auto map = maps[i];
-    auto opShape = operands[i].getType().cast<RankedTensorType>().getShape();
-    auto exprs = maps[i].getResults();
-    assert(exprs.size() == opShape.size());
-    for (unsigned j = 0; j < exprs.size(); ++j) {
-      auto extent = pmlc::util::computeExtent(exprs[j], ranges);
-      if (extent.min < 0 || extent.max + 1 != opShape[j]) {
-        return true;
+    if (auto tensorType = operands[i].getType().dyn_cast<RankedTensorType>()) {
+      auto opShape = tensorType.getShape();
+      auto exprs = maps[i].getResults();
+      assert(exprs.size() == opShape.size());
+      for (unsigned j = 0; j < exprs.size(); ++j) {
+        auto extent = pmlc::util::computeExtent(exprs[j], ranges);
+        if (extent.min < 0 || extent.max + 1 != opShape[j]) {
+          return true;
+        }
       }
     }
   }

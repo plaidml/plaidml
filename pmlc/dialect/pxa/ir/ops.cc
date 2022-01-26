@@ -48,7 +48,7 @@ ParseResult parseKeywordIntoEnumAttr(OpAsmParser &parser,
 /// AffineSymbolExpr@[pos - dims.size()] is replaced.
 /// Mutate `map`,`dims` and `syms` in place as follows:
 ///   1. `dims` and `syms` are only appended to.
-///   2. `map` dim and symbols are gradually shifted to higer positions.
+///   2. `map` dim and symbols are gradually shifted to higher positions.
 ///   3. Old `dim` and `sym` entries are replaced by nullptr
 /// This avoids the need for any bookkeeping.
 static LogicalResult replaceDimOrSym(AffineMap *map,
