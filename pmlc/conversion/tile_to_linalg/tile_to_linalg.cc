@@ -679,7 +679,8 @@ struct ContractionOpConversion
     tile::ContractionOpAdaptor adaptor(operands);
     ValueRange cionOperands = adaptor.operands();
 
-    TensorInitializer init(rewriter, op, op.result().getType());
+    TensorInitializer init(rewriter, op, op.result().getType(),
+                           /*padding=*/false);
     RankedTensorType resultType = init.getType();
     unsigned numDims = resultType.getRank();
 
@@ -716,6 +717,26 @@ struct ContractionOpConversion
       initValue = fillOp.result();
     }
 
+    Optional<tile::PaddingInfo> maybeOpPadding = tile::getPaddingInfo(op);
+    if (maybeOpPadding) {
+      Value exteriorValue = createInit(
+          rewriter, loc, resultType.getElementType(), maybeOpPadding->agg);
+      auto pad = rewriter.create<linalg::PadTensorOp>(
+          loc,
+          /*source=*/initValue,
+          /*staticLow=*/maybeOpPadding->lower,
+          /*staticHigh=*/maybeOpPadding->upper,
+          /*low=*/ValueRange{},
+          /*high=*/ValueRange{});
+      SmallVector<Type, 4> padArgs(numDims, rewriter.getIndexType());
+      OpBuilder::InsertionGuard guard(rewriter);
+      Block *padBody =
+          rewriter.createBlock(&pad.region(), pad.region().begin(), padArgs);
+      rewriter.create<linalg::YieldOp>(loc, ValueRange{exteriorValue});
+      initValue = pad.getResult();
+      resultType = initValue.getType().cast<RankedTensorType>();
+    }
+
     auto lowMap = op.lowerBounds().getValue();
     bool zeroLowBounds = true;
     SmallVector<int64_t, 4> lowBounds;
@@ -734,9 +755,9 @@ struct ContractionOpConversion
     ArrayRef<Attribute> srcs = op.srcs().getValue();
     for (size_t i = 0; i < srcs.size(); i++) {
       AffineMap map = srcs[i].cast<AffineMapAttr>().getValue();
-      if (Optional<tile::PaddingInfo> maybePadding =
+      if (Optional<tile::PaddingInfo> maybeOperandPadding =
               tile::getPaddingInfo(op.operands()[i].getDefiningOp())) {
-        map = updatePaddingMap(map, *maybePadding, context);
+        map = updatePaddingMap(map, *maybeOperandPadding, context);
       }
       if (!zeroLowBounds) {
         map = adjustMapByBounds(map, lowBounds, context);
@@ -744,8 +765,8 @@ struct ContractionOpConversion
       idxMaps.emplace_back(map);
     }
     AffineMap sink = op.sink();
-    if (Optional<tile::PaddingInfo> maybePadding = tile::getPaddingInfo(op)) {
-      sink = updatePaddingMap(sink, *maybePadding, context);
+    if (maybeOpPadding) {
+      sink = updatePaddingMap(sink, *maybeOpPadding, context);
     }
     if (!zeroLowBounds) {
       sink = adjustMapByBounds(sink, lowBounds, context);
