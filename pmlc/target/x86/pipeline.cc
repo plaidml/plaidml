@@ -262,8 +262,7 @@ void pipelineBuilderStage1(OpPassManager &pm) {
   }
 
   pm.addPass(pmlc::conversion::tile_to_linalg::createLowerTileToLinalgPass());
-  if (pmlc::util::getEnvVar("PLAIDML_REORDER") == "1")
-    pm.addNestedPass<FuncOp>(createReorderLayoutsPass());
+  pm.addNestedPass<FuncOp>(createReorderLayoutsPass());
 
   pm.addPass(stdx::createMainClosurePass());
   pm.addPass(createLoopInvariantCodeMotionPass());
