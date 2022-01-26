@@ -323,9 +323,11 @@ struct GenericOpConversion : public OpConversionPattern<linalg::GenericOp> {
       ranges.pop_back();
     }
     auto loc = op.getLoc();
+    SmallVector<AtomicRMWKind, 4> reductions(outputs.size(),
+                                             AtomicRMWKind::assign);
     auto forOp = rewriter.create<AffineParallelOp>(loc,
                                                    /*resultTypes=*/outputTypes,
-                                                   /*reductions=*/aggs,
+                                                   /*reductions=*/reductions,
                                                    /*ranges=*/ranges);
 
     // Create the a load op for each block argument.
