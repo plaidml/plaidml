@@ -15,9 +15,6 @@
 
 namespace pmlc::conversion::tile_to_pxa {
 
-#define GEN_PASS_CLASSES
-#include "pmlc/conversion/tile_to_pxa/passes.h.inc"
-
 struct TileToPXATypeConverter : public mlir::TypeConverter {
   TileToPXATypeConverter();
 };
