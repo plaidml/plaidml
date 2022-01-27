@@ -13,7 +13,7 @@ func @closure() {
     %2 = linalg.generic {
       indexing_maps = [#map0, #map1, #map2],
       iterator_types = ["parallel", "parallel", "reduction"]
-    } ins(%arg0, %arg1 : tensor<8x16xf32>, tensor<16x32xf32>) 
+    } ins(%arg0, %arg1 : tensor<8x16xf32>, tensor<16x32xf32>)
       outs(%1 : tensor<8x32xf32>) {
     ^bb0(%arg2: f32, %arg3: f32, %arg4: f32):  // no predecessors
       %3 = mulf %arg2, %arg3 : f32
@@ -27,11 +27,13 @@ func @closure() {
 
 // CHECK-LABEL: func @closure()
 //       CHECK:   memref.alloc
+//       CHECK:   memref.alloc
 //       CHECK:   %[[fill:.*]] = affine.parallel
 //       CHECK:   stdx.closure(
 //  CHECK-SAME:     %[[arg0:.*]]: memref<8x16xf32>
 //  CHECK-SAME:     %[[arg1:.*]]: memref<16x32xf32>
 //  CHECK-SAME:     %[[arg2:.*]]: memref<8x32xf32>
+//       CHECK:     memref.alloc
 //       CHECK:     %[[copy:.*]] = affine.parallel
 //       CHECK:       pxa.load %[[fill]]
 //       CHECK:       pxa.reduce assign %{{.*}}, %[[arg2]]
@@ -43,7 +45,9 @@ func @closure() {
 //       CHECK:     stdx.yield
 //       CHEC:    return
 
-#map = affine_map<(d0, d1) -> (d0, d1)> 
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+
 func @closure_yield(%arg0: tensor<3x3xf32> {stdx.const}) {
   %0 = linalg.init_tensor [3, 3] : tensor<3x3xf32>
   stdx.closure() -> tensor<3x3xf32> {
@@ -69,4 +73,3 @@ func @closure_yield(%arg0: tensor<3x3xf32> {stdx.const}) {
 //       CHECK:       affine.yield
 //       CHECK:     stdx.yield %[[t0]]
 //       CHECK:   return
-

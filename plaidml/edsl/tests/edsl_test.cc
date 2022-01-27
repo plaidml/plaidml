@@ -376,7 +376,7 @@ TEST_F(CppEdsl, MixedAdd) {
   checkExact(program, {A_input}, {expected});
 }
 
-TEST_F(CppEdsl, ConstCast) {
+TEST_F(CppEdsl, DISABLED_ConstCast) {
   auto O = cast(Tensor{3}, DType::FLOAT32);
   auto program = makeProgram("const_cast", {}, {O});
   std::vector<float> expected = {3.0};

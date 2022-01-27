@@ -9,6 +9,7 @@
 
 #include "pmlc/target/x86/pass_detail.h"
 #include "pmlc/target/x86/passes.h"
+#include "pmlc/util/env.h"
 #include "pmlc/util/logging.h"
 #include "pmlc/util/matchers.h"
 
@@ -185,9 +186,9 @@ struct PropagateReorderThruEltwiseOpPattern
         // indexingMap for the bias tensor might be:
         //   (n, h, w, c) -> (c)
         // The primary sinkMap might be:
-        //   (n, c0, h, w, c1) -> (n, h, w, c0 * 16 + c1)
+        //   (n, c0, h, w, c1) -> (n, h, w, c0 * B + c1)
         // Thus the composition will be:
-        //   (n, c0, h, w, c1) -> (c0 * 16 + c1)
+        //   (n, c0, h, w, c1) -> (c0 * B + c1)
         indexingMaps.push_back(accessMap.compose(primary->sinkMap));
       } else {
         inputs.push_back(it->second.sourceValue);
@@ -260,17 +261,14 @@ struct ReorderLayoutsPass : public ReorderLayoutsBase<ReorderLayoutsPass> {
     MLIRContext *context = func.getContext();
 
     func.walk([&](linalg::GenericOp op) { reorderConvolution(op); });
-
-    RewritePatternSet patterns(context);
-    patterns.add<PropagateReorderThruEltwiseOpPattern>(context);
-    patterns.add<FoldReordersPattern>(context);
-    (void)applyPatternsAndFoldGreedily(
-        func, std::move(patterns),
-        GreedyRewriteConfig{/*useTopDownTraversal=*/true});
   }
 
   void reorderConvolution(linalg::GenericOp op) {
-    constexpr int64_t blockSize = 16;
+    int64_t blockSize = 32;
+    std::string blockSizeStr = util::getEnvVar("PLAIDML_BLOCK_SIZE");
+    if (!blockSizeStr.empty()) {
+      blockSize = std::stoi(blockSizeStr);
+    }
 
     Optional<ConvCapture> conv = detectConv(op);
     if (!conv)
@@ -311,28 +309,10 @@ struct ReorderLayoutsPass : public ReorderLayoutsBase<ReorderLayoutsPass> {
     // Reorder input
     RankedTensorType blockedInputType = conv->getBlockedInputType(blockSize);
 
-    // (n, c0, h, w, c1) -> (n, h, w, c0 * 16 + c1)
-    AffineMap inputSourceMap =
-        AffineMap::get(5, 0,
-                       ArrayRef<AffineExpr>{
-                           getAffineDimExpr(0, context),
-                           getAffineDimExpr(2, context),
-                           getAffineDimExpr(3, context),
-                           getBlockedExpr(context, 1, 4, blockSize),
-                       },
-                       context);
-
-    // (n, c0, h, w, c1) -> (n, c0, h, w, c1)
-    AffineMap inputSinkMap = AffineMap::getMultiDimIdentityMap(5, context);
-
-    linalgx::CopyOp reorderInput =
-        createReorderOp(builder, blockedInputType, conv->input.value,
-                        inputSourceMap, inputSinkMap);
-
     // Reorder filter
     RankedTensorType blockedFilterType = conv->getBlockedFilterType(blockSize);
 
-    // (k1, c1, r, s, k0, c0) -> (r, s, k1 * 16 + k0, c1 * 16 + c0)
+    // (k1, c1, r, s, k0, c0) -> (r, s, k1 * B + k0, c1 * B + c0)
     AffineMap filterSourceMap =
         AffineMap::get(6, 0,
                        ArrayRef<AffineExpr>{
@@ -354,16 +334,17 @@ struct ReorderLayoutsPass : public ReorderLayoutsBase<ReorderLayoutsPass> {
     RankedTensorType blockedOutputType = conv->getBlockedOutputType(blockSize);
 
     // oldInput = (n, h, w, c0, r, s, k0) -> (n, h + r, w + s, k0)
-    // newInput = (n, h, w, c0, r, s, k0, c1, k1) -> (n, k1, h + r, w + s, k0)
-    AffineMap newInputMap = AffineMap::get(9, 0,
-                                           ArrayRef<AffineExpr>{
-                                               conv->input.idxMap.getResult(0),
-                                               getAffineDimExpr(8, context),
-                                               conv->input.idxMap.getResult(1),
-                                               conv->input.idxMap.getResult(2),
-                                               conv->input.idxMap.getResult(3),
-                                           },
-                                           context);
+    // newInput = (n, h, w, c0, r, s, k0, c1, k1) ->
+    //            (n, h + r, w + s, k1 * B + k0)
+    AffineMap newInputMap =
+        AffineMap::get(9, 0,
+                       ArrayRef<AffineExpr>{
+                           conv->input.idxMap.getResult(0),
+                           conv->input.idxMap.getResult(1),
+                           conv->input.idxMap.getResult(2),
+                           getBlockedExpr(context, 8, 6, blockSize),
+                       },
+                       context);
 
     // oldFilter = (n, h, w, c, r, s, k) -> (r, s, k, c)
     // newFilter = (n, h, w, c0, r, s, k0, c1, k1) -> (k1, c1, r, s, k0, c0)
@@ -380,25 +361,21 @@ struct ReorderLayoutsPass : public ReorderLayoutsBase<ReorderLayoutsPass> {
                        context);
 
     // oldOutput = (n, h, w, c, r, s, k) -> (n, h, w, c)
-    // newOutput = (n, h, w, c0, r, s, k0, c1, k1) -> (n, c1, h, w, c0)
+    // newOutput = (n, h, w, c0, r, s, k0, c1, k1) -> (n, h, w, c1 * B + c0)
     AffineMap newOutputMap =
         AffineMap::get(9, 0,
                        ArrayRef<AffineExpr>{
                            conv->output.idxMap.getResult(0),
-                           getAffineDimExpr(7, context),
                            conv->output.idxMap.getResult(1),
                            conv->output.idxMap.getResult(2),
-                           conv->output.idxMap.getResult(3),
+                           getBlockedExpr(context, 7, 3, blockSize),
                        },
                        context);
 
-    linalgx::CopyOp reorderInit =
-        createReorderOp(builder, blockedOutputType, conv->output.value,
-                        inputSourceMap, inputSinkMap);
     auto newConv = builder.create<linalg::GenericOp>(
-        TypeRange{blockedOutputType},
-        ValueRange{reorderInput.getResult(), reorderFilter.getResult()},
-        ValueRange{reorderInit.getResult()},
+        TypeRange{conv->output.type},
+        ValueRange{conv->input.value, reorderFilter.getResult()},
+        ValueRange{conv->output.value},
         ArrayRef<AffineMap>{newInputMap, newFilterMap, newOutputMap},
         ArrayRef<StringRef>{
             "parallel",  // N
@@ -419,12 +396,7 @@ struct ReorderLayoutsPass : public ReorderLayoutsBase<ReorderLayoutsPass> {
           builder.create<linalg::YieldOp>(loc, ValueRange{add});
         });
 
-    // Reorder output
-    linalgx::CopyOp reorderOutput =
-        createReorderOp(builder, conv->output.type, newConv.getResult(0),
-                        inputSinkMap, inputSourceMap);
-
-    op.getResult(0).replaceAllUsesWith(reorderOutput.getResult());
+    op.getResult(0).replaceAllUsesWith(newConv.getResult(0));
     op.erase();
   }
 
