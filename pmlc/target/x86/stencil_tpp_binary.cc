@@ -25,6 +25,21 @@ namespace stdx = dialect::stdx;
 
 namespace {
 
+struct GemmOperand {
+  Value memref;
+  AffineMap accessMap;
+  AffineMap tileMap;
+
+  template <typename TOp>
+  GemmOperand(TOp op, ArrayRef<BlockArgument> idxs,
+              SmallVectorImpl<Value> &mapOperands)
+      : memref(op.getMemRef()), accessMap(op.getAffineMap()),
+        tileMap(pxa::makeTileMap(op.getContext(), op.getAffineMap(),
+                                 op.getMapOperands(), idxs)) {
+    mapOperands.append(op.getMapOperands().begin(), op.getMapOperands().end());
+  }
+};
+
 struct TppOperand {
   Value memref;
   AffineMap accessMap;
@@ -96,13 +111,7 @@ private:
     auto outputSource = cast<pxa::PxaReduceOp>(reduce.getDefiningOp()).memref();
     if (isLocallyDefined(op, source1) || isLocallyDefined(op, source2))
       return;
-    auto outputType = outputSource.getType().cast<MemRefType>();
-    auto input1Type = source1.getType().cast<MemRefType>();
-    auto input2Type = source2.getType().cast<MemRefType>();
 
-    if (outputType.getShape() != input1Type.getShape() ||
-        outputType.getShape() != input2Type.getShape())
-      return;
     capture = pxa::StencilCapture{{reduce}, {load1, load2}};
     this->opName = inName;
   }
@@ -124,7 +133,6 @@ private:
 
   void transform(const pxa::StencilOption &stencil,
                  ArrayRef<int64_t> tileSizes) {
-    OpBuilder builder(op);
     auto outputOp =
         cast<pxa::PxaReduceOp>(stencil.values[0].value.getDefiningOp());
     auto inputOp1 =
@@ -133,38 +141,43 @@ private:
     auto inputOp2 =
         cast<pxa::PxaLoadOp>(stencil.values[2].value.getDefiningOp());
 
+    OpBuilder builder = op.getBodyBuilder();
     SmallVector<Value> inputIndices, outputIndices;
-    Optional<TppOperand> output =
-        getTppOperand(outputOp, op->getBlock(), stencil.indexes, outputIndices);
-    if (!output)
-      return;
 
-    Optional<TppOperand> input1 =
-        getTppOperand(inputOp1, op->getBlock(), stencil.indexes, inputIndices);
-    if (!input1)
-      return;
+    GemmOperand output(outputOp, stencil.indexes, outputIndices);
 
-    Optional<TppOperand> input2 =
-        getTppOperand(inputOp2, op->getBlock(), stencil.indexes, inputIndices);
-    if (!input2)
-      return;
+    GemmOperand input1(inputOp1, stencil.indexes, inputIndices);
+
+    GemmOperand input2(inputOp2, stencil.indexes, inputIndices);
+    SmallVector<int64_t, 8> steps = op.getSteps();
+    for (size_t i = 0; i < steps.size(); i++) {
+      BlockArgument idx = op.getBody()->getArgument(i);
+      int64_t idxRange = getIdxRange(idx);
+
+      for (size_t j = 0; j < getTiledIdxCount(); j++) {
+        if (stencil.indexes[j] == idx) {
+          steps[i] *= tileSizes[j];
+        }
+      }
+    }
+    op.setSteps(steps);
 
     ArrayAttr outputAccessMaps =
-        builder.getAffineMapArrayAttr({output->accessMap});
-    ArrayAttr outputTileMaps = builder.getAffineMapArrayAttr({output->tileMap});
+        builder.getAffineMapArrayAttr({output.accessMap});
+    ArrayAttr outputTileMaps = builder.getAffineMapArrayAttr({output.tileMap});
 
     ArrayAttr inputAccessMaps =
-        builder.getAffineMapArrayAttr({input1->accessMap, input2->accessMap});
+        builder.getAffineMapArrayAttr({input1.accessMap, input2.accessMap});
     ArrayAttr inputTileMaps =
-        builder.getAffineMapArrayAttr({input1->tileMap, input2->tileMap});
+        builder.getAffineMapArrayAttr({input1.tileMap, input2.tileMap});
 
     ArrayAttr reductions =
         builder.getI64ArrayAttr({static_cast<int64_t>(outputOp.agg())});
 
     auto genericOp = builder.create<pxa::PxaGenericOp>(
-        op.getLoc(), output->memref.getType(),
-        /*inputs=*/ArrayRef<Value>{input1->memref, input2->memref},
-        /*outputs=*/ArrayRef<Value>{output->memref},
+        op.getLoc(), output.memref.getType(),
+        /*inputs=*/ArrayRef<Value>{input1.memref, input2.memref},
+        /*outputs=*/ArrayRef<Value>{output.memref},
         /*inputIndices=*/inputIndices,
         /*outputIndices=*/outputIndices,
         /*inputAccessMaps=*/inputAccessMaps,
@@ -175,8 +188,8 @@ private:
         /*tile=*/builder.getI64ArrayAttr(tileSizes),
         /*reductions=*/reductions);
 
-    op.getResult(0).replaceAllUsesWith(genericOp.getResult(0));
-    op.erase();
+    outputOp.result().replaceAllUsesWith(genericOp.getResult(0));
+    outputOp.erase();
   }
 
 public:
@@ -189,16 +202,24 @@ public:
                     /*tilingGenerator=*/pxa::ExactRangeGenerator(),
                     pxa::IndexStridePredicates{
                         [](int64_t stride) { return stride > 1; }, // output
-                        [](int64_t stride) { return stride > 1; }, // input
-                        [](int64_t stride) { return stride > 1; }, // input
+                        [](int64_t stride) {
+                          return stride == 0 || stride > 1;
+                        }, // input
+                        [](int64_t stride) {
+                          return stride == 0 || stride > 1;
+                        }, // input
                     }},
                 pxa::StencilIndexRequirement{
                     /*idxName=*/"eltwise_j",
                     /*tilingGenerator=*/pxa::ExactRangeGenerator(),
                     pxa::IndexStridePredicates{
                         [](int64_t stride) { return stride == 1; }, // output
-                        [](int64_t stride) { return stride == 1; }, // input
-                        [](int64_t stride) { return stride == 1; }, // input
+                        [](int64_t stride) {
+                          return stride == 0 || stride == 1;
+                        }, // input
+                        [](int64_t stride) {
+                          return stride == 0 || stride == 1;
+                        }, // input
                     }},
             }) {}
 };
@@ -209,7 +230,7 @@ struct StencilTppBinaryPass
     : public StencilTppBinaryBase<StencilTppBinaryPass> {
   void runOnFunction() final {
     getFunction().walk([](AffineParallelOp op) {
-      if (op.getIVs().size() == 2) {
+      if (op.getIVs().size() >= 2) {
         StencilImpl stencil(op);
         stencil.performStenciling();
       }

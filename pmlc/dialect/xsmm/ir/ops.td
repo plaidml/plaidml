@@ -220,7 +220,9 @@ def XSMM_BinaryDispatchOp : XSMM_Op<"binary.dispatch", [NoSideEffect]> {
     I64Attr:$ldi1,
     I64Attr:$ldi2,
     I64Attr:$ldo,
-    FuncTypeAttr:$func_type
+    FuncTypeAttr:$func_type,
+    I32Attr:$bcastType1,
+    I32Attr:$bcastType2
   );
   let results = (outs I64:$ptr);
   let printer = ?;

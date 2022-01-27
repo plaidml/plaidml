@@ -7,12 +7,12 @@
 #include "pmlc/rt/symbol_registry.h"
 #include "pmlc/util/logging.h"
 
-static constexpr int NO_BCAST = 0;
-static constexpr int ROW_BCAST = 1;
-static constexpr int COL_BCAST = 2;
-static constexpr int SCALAR_BCAST = 3;
+static constexpr unsigned int NO_BCAST = 0;
+static constexpr unsigned int ROW_BCAST = 1;
+static constexpr unsigned int COL_BCAST = 2;
+static constexpr unsigned int SCALAR_BCAST = 3;
 
-using FunctionPtr = void (*)(const void *, const void *, void *, ...);
+using FunctionPtr = void (*)(const void *, const void *, void *);
 
 extern "C" void plaidml_rt_xsmm_gemm_invoke_f32(int64_t funcAddr, float *a,
                                                 float *b, float *c) {
@@ -134,22 +134,52 @@ extern "C" void plaidml_rt_xsmm_unary_invoke(int64_t addr, void *input,
   kernel(&param);
 }
 
-extern "C" int64_t
-plaidml_rt_xsmm_binary_dispatch(int32_t m, int32_t n, int32_t ldi1,
-                                int32_t ldi2, int32_t ldo, int32_t in_type1,
-                                int32_t in_type2, int32_t compute_type,
-                                int32_t out_type, int32_t type) {
+extern "C" int64_t plaidml_rt_xsmm_binary_dispatch(
+    int32_t m, int32_t n, int32_t ldi1, int32_t ldi2, int32_t ldo,
+    int32_t in_type1, int32_t in_type2, int32_t compute_type, int32_t out_type,
+    int32_t type, int32_t bcast_type1, int32_t bcast_type2) {
   libxsmm_blasint ldi1_int = ldi1;
   libxsmm_blasint ldi2_int = ldi2;
   libxsmm_blasint ldo_int = ldo;
+  libxsmm_meltw_binary_flags binary_flags = LIBXSMM_MELTW_FLAG_BINARY_NONE;
+
+  unsigned int use_bcast1 = (unsigned int)bcast_type1;
+  unsigned int use_bcast2 = (unsigned int)bcast_type2;
+
+  if (use_bcast1 == ROW_BCAST) {
+    binary_flags = static_cast<libxsmm_meltw_binary_flags>(
+        static_cast<int>(binary_flags) |
+        static_cast<int>(LIBXSMM_MELTW_FLAG_BINARY_BCAST_ROW_IN_0));
+  } else if (use_bcast1 == COL_BCAST) {
+    binary_flags = static_cast<libxsmm_meltw_binary_flags>(
+        static_cast<int>(binary_flags) |
+        static_cast<int>(LIBXSMM_MELTW_FLAG_BINARY_BCAST_COL_IN_0));
+  } else if (use_bcast1 == SCALAR_BCAST) {
+    binary_flags = static_cast<libxsmm_meltw_binary_flags>(
+        static_cast<int>(binary_flags) |
+        static_cast<int>(LIBXSMM_MELTW_FLAG_BINARY_BCAST_SCALAR_IN_0));
+  }
+
+  if (use_bcast2 == ROW_BCAST) {
+    binary_flags = static_cast<libxsmm_meltw_binary_flags>(
+        static_cast<int>(binary_flags) |
+        static_cast<int>(LIBXSMM_MELTW_FLAG_BINARY_BCAST_ROW_IN_1));
+  } else if (use_bcast2 == COL_BCAST) {
+    binary_flags = static_cast<libxsmm_meltw_binary_flags>(
+        static_cast<int>(binary_flags) |
+        static_cast<int>(LIBXSMM_MELTW_FLAG_BINARY_BCAST_COL_IN_1));
+  } else if (use_bcast2 == SCALAR_BCAST) {
+    binary_flags = static_cast<libxsmm_meltw_binary_flags>(
+        static_cast<int>(binary_flags) |
+        static_cast<int>(LIBXSMM_MELTW_FLAG_BINARY_BCAST_SCALAR_IN_1));
+  }
 
   libxsmm_meltwfunction_binary kernel = libxsmm_dispatch_meltw_binary(
       static_cast<libxsmm_blasint>(n), static_cast<libxsmm_blasint>(m),
       &ldi1_int, &ldi2_int, &ldo_int, // leading dimensions
       static_cast<libxsmm_datatype>(in_type1),
       static_cast<libxsmm_datatype>(in_type2),
-      static_cast<libxsmm_datatype>(out_type),
-      LIBXSMM_MELTW_FLAG_BINARY_NONE, // TODO: add flags to op definition
+      static_cast<libxsmm_datatype>(out_type), binary_flags,
       static_cast<libxsmm_meltw_binary_type>(type));
   return reinterpret_cast<int64_t>(kernel);
 }

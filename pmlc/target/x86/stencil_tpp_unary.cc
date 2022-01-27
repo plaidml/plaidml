@@ -89,7 +89,6 @@ private:
     if (!load.getType().isF32() ||
         !reduce.getType().cast<MemRefType>().getElementType().isF32())
       return;
-
     auto source = cast<pxa::PxaLoadOp>(load.getDefiningOp()).memref();
     if (!source.isa<BlockArgument>()) {
       // If the definition of load's source is in "op", it is too complex to
@@ -125,7 +124,6 @@ private:
     if (!load.getType().isF32() ||
         !reduce.getType().cast<MemRefType>().getElementType().isF32())
       return;
-
     auto source = cast<pxa::PxaLoadOp>(load.getDefiningOp()).memref();
     if (!source.isa<BlockArgument>()) {
       // If the definition of load's source is in "op", it is too complex to
@@ -162,98 +160,53 @@ private:
     auto inputOp =
         cast<pxa::PxaLoadOp>(stencil.values[1].value.getDefiningOp());
 
-    if (op.getIVs().size() == 2) {
-      OpBuilder builder(op);
+    OpBuilder builder = op.getBodyBuilder();
+    SmallVector<Value> inputIndices, outputIndices;
 
-      SmallVector<Value> inputIndices, outputIndices;
-      Optional<TppOperand> output = getTppOperand(
-          outputOp, op->getBlock(), stencil.indexes, outputIndices);
-      if (!output)
-        return;
+    GemmOperand output(outputOp, stencil.indexes, outputIndices);
 
-      Optional<TppOperand> input =
-          getTppOperand(inputOp, op->getBlock(), stencil.indexes, inputIndices);
-      if (!input)
-        return;
+    GemmOperand input(inputOp, stencil.indexes, inputIndices);
 
-      ArrayAttr outputAccessMaps =
-          builder.getAffineMapArrayAttr({output->accessMap});
-      ArrayAttr outputTileMaps =
-          builder.getAffineMapArrayAttr({output->tileMap});
+    SmallVector<int64_t, 8> steps = op.getSteps();
+    for (size_t i = 0; i < steps.size(); i++) {
+      BlockArgument idx = op.getBody()->getArgument(i);
+      int64_t idxRange = getIdxRange(idx);
 
-      ArrayAttr inputAccessMaps =
-          builder.getAffineMapArrayAttr({input->accessMap});
-      ArrayAttr inputTileMaps = builder.getAffineMapArrayAttr({input->tileMap});
-
-      ArrayAttr reductions =
-          builder.getI64ArrayAttr({static_cast<int64_t>(outputOp.agg())});
-      auto genericOp = builder.create<pxa::PxaGenericOp>(
-          op.getLoc(), output->memref.getType(),
-          /*inputs=*/ArrayRef<Value>{input->memref},
-          /*outputs=*/ArrayRef<Value>{output->memref},
-          /*inputIndices=*/inputIndices,
-          /*outputIndices=*/outputIndices,
-          /*inputAccessMaps=*/inputAccessMaps,
-          /*inputTileMaps=*/inputTileMaps,
-          /*outputAccessMaps=*/outputAccessMaps,
-          /*outputTileMaps=*/outputTileMaps,
-          /*kernel=*/builder.getStringAttr(opName),
-          /*tile=*/builder.getI64ArrayAttr(tileSizes),
-          /*reductions=*/reductions);
-
-      op.getResult(0).replaceAllUsesWith(genericOp.getResult(0));
-      op.erase();
-
-    } else {
-      OpBuilder builder = op.getBodyBuilder();
-      SmallVector<Value> inputIndices, outputIndices;
-
-      GemmOperand output(outputOp, stencil.indexes, outputIndices);
-
-      GemmOperand input(inputOp, stencil.indexes, inputIndices);
-
-      SmallVector<int64_t, 8> steps = op.getSteps();
-      for (size_t i = 0; i < steps.size(); i++) {
-        BlockArgument idx = op.getBody()->getArgument(i);
-        int64_t idxRange = getIdxRange(idx);
-
-        for (size_t j = 0; j < getTiledIdxCount(); j++) {
-          if (stencil.indexes[j] == idx) {
-            steps[i] *= tileSizes[j];
-          }
+      for (size_t j = 0; j < getTiledIdxCount(); j++) {
+        if (stencil.indexes[j] == idx) {
+          steps[i] *= tileSizes[j];
         }
       }
-      op.setSteps(steps);
-
-      ArrayAttr outputAccessMaps =
-          builder.getAffineMapArrayAttr({output.accessMap});
-      ArrayAttr outputTileMaps =
-          builder.getAffineMapArrayAttr({output.tileMap});
-
-      ArrayAttr inputAccessMaps =
-          builder.getAffineMapArrayAttr({input.accessMap});
-      ArrayAttr inputTileMaps = builder.getAffineMapArrayAttr({input.tileMap});
-
-      ArrayAttr reductions =
-          builder.getI64ArrayAttr({static_cast<int64_t>(outputOp.agg())});
-
-      auto genericOp = builder.create<pxa::PxaGenericOp>(
-          op.getLoc(), output.memref.getType(),
-          /*inputs=*/ArrayRef<Value>{input.memref},
-          /*outputs=*/ArrayRef<Value>{output.memref},
-          /*inputIndices=*/inputIndices,
-          /*outputIndices=*/outputIndices,
-          /*inputAccessMaps=*/inputAccessMaps,
-          /*inputTileMaps=*/inputTileMaps,
-          /*outputAccessMaps=*/outputAccessMaps,
-          /*outputTileMaps=*/outputTileMaps,
-          /*kernel=*/builder.getStringAttr(opName),
-          /*tile=*/builder.getI64ArrayAttr(tileSizes),
-          /*reductions=*/reductions);
-
-      outputOp.result().replaceAllUsesWith(genericOp.getResult(0));
-      outputOp.erase();
     }
+    op.setSteps(steps);
+
+    ArrayAttr outputAccessMaps =
+        builder.getAffineMapArrayAttr({output.accessMap});
+    ArrayAttr outputTileMaps = builder.getAffineMapArrayAttr({output.tileMap});
+
+    ArrayAttr inputAccessMaps =
+        builder.getAffineMapArrayAttr({input.accessMap});
+    ArrayAttr inputTileMaps = builder.getAffineMapArrayAttr({input.tileMap});
+
+    ArrayAttr reductions =
+        builder.getI64ArrayAttr({static_cast<int64_t>(outputOp.agg())});
+
+    auto genericOp = builder.create<pxa::PxaGenericOp>(
+        op.getLoc(), output.memref.getType(),
+        /*inputs=*/ArrayRef<Value>{input.memref},
+        /*outputs=*/ArrayRef<Value>{output.memref},
+        /*inputIndices=*/inputIndices,
+        /*outputIndices=*/outputIndices,
+        /*inputAccessMaps=*/inputAccessMaps,
+        /*inputTileMaps=*/inputTileMaps,
+        /*outputAccessMaps=*/outputAccessMaps,
+        /*outputTileMaps=*/outputTileMaps,
+        /*kernel=*/builder.getStringAttr(opName),
+        /*tile=*/builder.getI64ArrayAttr(tileSizes),
+        /*reductions=*/reductions);
+
+    outputOp.result().replaceAllUsesWith(genericOp.getResult(0));
+    outputOp.erase();
   }
 
 public:
@@ -267,7 +220,7 @@ public:
                     pxa::IndexStridePredicates{
                         [](int64_t stride) { return stride > 1; }, // output
                         [](int64_t stride) {
-                          return stride == 0 || stride > 1;
+                          return (stride == 0 || stride > 1);
                         }, // input
                     }},
                 pxa::StencilIndexRequirement{
@@ -276,7 +229,7 @@ public:
                     pxa::IndexStridePredicates{
                         [](int64_t stride) { return stride == 1; }, // output
                         [](int64_t stride) {
-                          return stride == 1 || stride == 0;
+                          return (stride == 1 || stride == 0);
                         }, // input
                     }},
             }) {}
