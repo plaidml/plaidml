@@ -9,12 +9,15 @@ func @test_pad(%arg0: tensor<4x8x8x16xf32>) -> tensor<8x10x14x20xf32> {
   return %0 : tensor<8x10x14x20xf32>
 }
 
+
+// CHECK memref.global "private" constant @cst_scalar_memref_0 : memref<f32> = dense<0.000000e+00>
 // CHECK-LABEL: func @test_pad
 //  CHECK-SAME: (%[[arg0:.*]]: memref<4x8x8x16xf32>, %[[arg1:.*]]: memref<8x10x14x20xf32>) -> memref<8x10x14x20xf32>
-//       CHECK:   %[[cst:.*]] = constant 0.000000e+00 : f32
+//	 CHECK: %[[cst_0:.*]] = memref.get_global @cst_scalar_memref_0 : memref<f32>
+//	 CHECK: %[[c0:.*]] = pxa.load %[[cst_0]][] : memref<f32>
 //       CHECK:   %[[init:.*]] = memref.alloc()
 //       CHECK:   %[[out1:.*]] = affine.parallel (%[[arg2:.*]], %[[arg3:.*]], %[[arg4:.*]], %[[arg5:.*]]) = (0, 0, 0, 0) to (8, 10, 14, 20)
-//       CHECK:     %[[t0:.*]] = pxa.reduce assign %[[cst]], %[[init]][%[[arg2]], %[[arg3]], %[[arg4]], %[[arg5]]] : memref<8x10x14x20xf32>
+//       CHECK:     %[[t0:.*]] = pxa.reduce assign %[[c0]], %[[init]][%[[arg2]], %[[arg3]], %[[arg4]], %[[arg5]]] : memref<8x10x14x20xf32>
 //       CHECK:     affine.yield %[[t0]] : memref<8x10x14x20xf32>
 //       CHECK:   %[[out2:.*]] = affine.parallel (%[[arg2:.*]], %[[arg3:.*]], %[[arg4:.*]], %[[arg5:.*]]) = (0, 0, 0, 0) to (8, 10, 14, 20)
 //       CHECK:     %[[t1:.*]] = pxa.load %[[out1]][%arg2, %arg3, %arg4, %arg5] : memref<8x10x14x20xf32>
@@ -25,3 +28,6 @@ func @test_pad(%arg0: tensor<4x8x8x16xf32>) -> tensor<8x10x14x20xf32> {
 //       CHECK:     %[[t4:.*]] = pxa.reduce assign %[[t3]], %[[out2]][%[[arg2]] + 2, %[[arg3]] + 2, %[[arg4]] + 4, %[[arg5]] + 4] : memref<8x10x14x20xf32>
 //       CHECK:     affine.yield %[[t4]] : memref<8x10x14x20xf32>
 //       CHECK:   return %[[out3]] : memref<8x10x14x20xf32>
+
+
+

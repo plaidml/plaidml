@@ -193,6 +193,37 @@ struct ConstantOpConversion : public OpConversionPattern<ConstantOp> {
       rewriter.replaceOpWithNewOp<memref::GetGlobalOp>(op, newType,
                                                        globalOp.sym_name());
       return success();
+    } else if (origValue.getType().isF32()) {
+      Type elementType = origValue.getType();
+      MemRefType memRefType = MemRefType::get({}, elementType);
+      auto shapeType = RankedTensorType::get({}, elementType);
+      std::string funcName =
+          llvm::formatv("cst_scalar_memref_{0}", constCount++).str();
+
+      auto funcOp = op->getParentOfType<FuncOp>();
+      rewriter.setInsertionPoint(funcOp);
+
+      auto globalOp = rewriter.create<memref::GlobalOp>(
+          funcOp.getLoc(),
+          /*sym_name=*/funcName,
+          /*sym_visibility=*/rewriter.getStringAttr("private"),
+          /*type=*/memRefType,
+          /*initial_value=*/
+          DenseElementsAttr::get(shapeType, {origValue}),
+          /*constant=*/true);
+
+      rewriter.setInsertionPoint(op);
+
+      auto getGlobalOp = rewriter.create<memref::GetGlobalOp>(
+          op.getLoc(), memRefType, globalOp.sym_name());
+      SmallVector<Value, 8> idxs;
+      auto loadOp =
+          rewriter.create<pxa::PxaLoadOp>(op.getLoc(), getGlobalOp, idxs);
+      op.replaceAllUsesWith(loadOp.getResult());
+
+      rewriter.eraseOp(op);
+
+      return success();
     }
     return failure();
   }
@@ -478,8 +509,13 @@ struct LowerLinalgToPXAPass
     target.addDynamicallyLegalOp<stdx::ClosureOp>([&](stdx::ClosureOp op) {
       return converter.isSignatureLegal(op.getType());
     });
-    target.addDynamicallyLegalOp<ConstantOp>(
-        [&](ConstantOp op) { return !op.getType().isa<TensorType>(); });
+
+    target.addDynamicallyLegalOp<ConstantOp>([&](ConstantOp op) {
+      return (!op.getType().isa<TensorType>() && !op.getType().isF32());
+    });
+
+    // target.addDynamicallyLegalOp<ConstantOp>(
+    //    [&](ConstantOp op) { return !op.getType().isa<TensorType>(); });
 
     RewritePatternSet patterns(&getContext());
     patterns.insert<ConstantOpConversion,              //
