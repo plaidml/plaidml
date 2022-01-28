@@ -38,6 +38,19 @@ struct GemmOperand {
   }
 };
 
+double getStride(ArrayRef<int64_t> tileSizes, int tiledIdxCount,
+                 DenseMap<mlir::BlockArgument, int64_t> strides,
+                 SmallVector<mlir::BlockArgument, 8> indexes) {
+  for (size_t j = 0; j < tiledIdxCount; j++) {
+    for (const auto &kvp : strides) {
+      if (indexes[j] == kvp.first) {
+        return static_cast<double>(kvp.second);
+      }
+    }
+  }
+  return 0.0;
+}
+
 class StencilImpl : public pxa::StencilBase {
 private:
   StringRef opName;
@@ -126,7 +139,15 @@ private:
 
   double getCost(const pxa::StencilOption &stencil,
                  ArrayRef<int64_t> tileSizes) {
-    return 0.0;
+    int64_t tiledIdxCount = getTiledIdxCount();
+    double inputStride =
+        getStride(tileSizes, tiledIdxCount,
+                  stencil.values[1].strideInfo.strides, stencil.indexes);
+    double outputStride =
+        getStride(tileSizes, tiledIdxCount,
+                  stencil.values[0].strideInfo.strides, stencil.indexes);
+
+    return (inputStride + outputStride);
   }
 
   void transform(const pxa::StencilOption &stencil,
