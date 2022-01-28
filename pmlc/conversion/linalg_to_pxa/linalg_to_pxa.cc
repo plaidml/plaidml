@@ -217,7 +217,6 @@ struct ConstantOpConversion : public OpConversionPattern<ConstantOp> {
       auto getGlobalOp = rewriter.create<memref::GetGlobalOp>(
           op.getLoc(), memRefType, globalOp.sym_name());
       SmallVector<Value, 8> idxs;
-      // idxs[0] = rewriter.create<mlir::ConstantIndexOp>(op.getLoc(), 0);
       auto loadOp =
           rewriter.create<pxa::PxaLoadOp>(op.getLoc(), getGlobalOp, idxs);
       op.replaceAllUsesWith(loadOp.getResult());
