@@ -40,32 +40,6 @@ struct GemmOperand {
   }
 };
 
-struct TppOperand {
-  Value memref;
-  AffineMap accessMap;
-  AffineMap tileMap;
-};
-
-template <typename TOp>
-Optional<TppOperand> getTppOperand(TOp op, Block *block,
-                                   ArrayRef<BlockArgument> idxs,
-                                   SmallVectorImpl<Value> &mapOperands) {
-  Optional<pxa::RelativeAccessPattern> rap =
-      pxa::computeRelativeAccess(op, block);
-  if (!rap)
-    return None;
-
-  AffineValueMap outerValueMap =
-      pxa::convertToValueMap(op.getContext(), rap->outer);
-  mapOperands.append(outerValueMap.getOperands().begin(),
-                     outerValueMap.getOperands().end());
-
-  AffineMap tileMap = pxa::makeTileMap(op.getContext(), op.getAffineMap(),
-                                       op.getMapOperands(), idxs);
-
-  return TppOperand{op.getMemRef(), outerValueMap.getAffineMap(), tileMap};
-}
-
 bool isLocallyDefined(AffineParallelOp op, Value source) {
   if (!source.isa<BlockArgument>()) {
     // If the definition of load's source is in "op", it is too complex to
@@ -108,7 +82,6 @@ private:
 
     auto source1 = cast<pxa::PxaLoadOp>(load1.getDefiningOp()).memref();
     auto source2 = cast<pxa::PxaLoadOp>(load2.getDefiningOp()).memref();
-    auto outputSource = cast<pxa::PxaReduceOp>(reduce.getDefiningOp()).memref();
     if (isLocallyDefined(op, source1) || isLocallyDefined(op, source2))
       return;
 
@@ -126,6 +99,7 @@ private:
 
     return ret;
   }
+
   double getCost(const pxa::StencilOption &stencil,
                  ArrayRef<int64_t> tileSizes) {
     return 0.0;
@@ -204,10 +178,10 @@ public:
                         [](int64_t stride) { return stride > 1; }, // output
                         [](int64_t stride) {
                           return stride == 0 || stride > 1;
-                        }, // input
+                        }, // input1
                         [](int64_t stride) {
                           return stride == 0 || stride > 1;
-                        }, // input
+                        }, // input2
                     }},
                 pxa::StencilIndexRequirement{
                     /*idxName=*/"eltwise_j",
@@ -216,10 +190,10 @@ public:
                         [](int64_t stride) { return stride == 1; }, // output
                         [](int64_t stride) {
                           return stride == 0 || stride == 1;
-                        }, // input
+                        }, // input1
                         [](int64_t stride) {
                           return stride == 0 || stride == 1;
-                        }, // input
+                        }, // input2
                     }},
             }) {}
 };

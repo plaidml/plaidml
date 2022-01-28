@@ -38,35 +38,10 @@ struct GemmOperand {
   }
 };
 
-struct TppOperand {
-  Value memref;
-  AffineMap accessMap;
-  AffineMap tileMap;
-};
-
-template <typename TOp>
-Optional<TppOperand> getTppOperand(TOp op, Block *block,
-                                   ArrayRef<BlockArgument> idxs,
-                                   SmallVectorImpl<Value> &mapOperands) {
-  Optional<pxa::RelativeAccessPattern> rap =
-      pxa::computeRelativeAccess(op, block);
-  if (!rap)
-    return None;
-
-  AffineValueMap outerValueMap =
-      pxa::convertToValueMap(op.getContext(), rap->outer);
-  mapOperands.append(outerValueMap.getOperands().begin(),
-                     outerValueMap.getOperands().end());
-
-  AffineMap tileMap = pxa::makeTileMap(op.getContext(), op.getAffineMap(),
-                                       op.getMapOperands(), idxs);
-
-  return TppOperand{op.getMemRef(), outerValueMap.getAffineMap(), tileMap};
-}
-
 class StencilImpl : public pxa::StencilBase {
 private:
   StringRef opName;
+
   template <typename OpTy>
   void maybeCaptureGeneric(Optional<pxa::StencilCapture> &capture,
                            StringRef inName) {
@@ -135,6 +110,7 @@ private:
         defOp = defOp->getParentOp();
       }
     }
+
     capture = pxa::StencilCapture{{reduce}, {load}};
     this->opName = inName;
   }

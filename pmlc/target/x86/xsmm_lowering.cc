@@ -50,13 +50,13 @@ void getLdi(util::StrideArray inputs, int32_t ldo, int32_t &ldi,
             int32_t &bcastType) {
   if (inputs.strides[0] == 0 && inputs.strides[1] == 0) {
     bcastType = 3; // scalar broadcast
-    ldi = ldo;
+    ldi = ldo;     // 1
   } else if (inputs.strides[0] == 0) {
     bcastType = 2; // col broadcast
     ldi = ldo;
   } else if (inputs.strides[1] == 0) {
-    bcastType = 1;
-    ldi = ldo;
+    bcastType = 1; // row broadcast
+    ldi = inputs.strides[0];
   } else {
     bcastType = 0;
     ldi = inputs.strides[0];
