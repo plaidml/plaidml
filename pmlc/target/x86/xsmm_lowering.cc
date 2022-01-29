@@ -46,6 +46,23 @@ util::StrideArray getStrideArray(Value operand, AffineMap tileMap) {
   return *info;
 }
 
+void getLdi(util::StrideArray inputs, int32_t ldo, int32_t &ldi,
+            int32_t &bcastType) {
+  if (inputs.strides[0] == 0 && inputs.strides[1] == 0) {
+    bcastType = 3; // scalar broadcast
+    ldi = ldo;     // 1
+  } else if (inputs.strides[0] == 0) {
+    bcastType = 2; // col broadcast
+    ldi = ldo;
+  } else if (inputs.strides[1] == 0) {
+    bcastType = 1; // row broadcast
+    ldi = inputs.strides[0];
+  } else {
+    bcastType = 0;
+    ldi = inputs.strides[0];
+  }
+}
+
 SmallVector<util::StrideArray> getStrideArrays(ValueRange operands,
                                                ArrayAttr tileMapsAttr) {
   SmallVector<util::StrideArray> result;
@@ -350,6 +367,10 @@ struct UnaryPxaGenericOpConversion
     SmallVector<util::StrideArray> outputs =
         getStrideArrays(adaptor.outputs(), op.outputTileMaps());
     IndicesCollector collector(loc, rewriter);
+    int32_t ldo = outputs[0].strides[0];
+    int32_t ldi, bcastType;
+    getLdi(inputs[0], ldo, ldi, bcastType);
+
     if (!collector.collect(op.outputAccessMaps(), adaptor.outputIndices()) ||
         !collector.collect(op.inputAccessMaps(), adaptor.inputIndices()))
       return failure();
@@ -358,15 +379,15 @@ struct UnaryPxaGenericOpConversion
     SmallVector<Type> outputTypes = getElementTypes(op.outputs().getTypes());
     Type computeType = outputTypes[0]; // just use the output type for now
     FunctionType funcType = rewriter.getFunctionType(inputTypes, outputTypes);
-
     auto dispatchOp =
         rewriter.create<xsmm::UnaryDispatchOp>(loc, resultType,
                                                /*kind=*/kind,
                                                /*compute_type=*/computeType,
                                                /*tile=*/op.tile(),
-                                               /*ldi=*/inputs[0].strides[0],
-                                               /*ldo=*/outputs[0].strides[0],
-                                               /*func_type=*/funcType);
+                                               /*ldi=*/ldi,
+                                               /*ldo=*/ldo,
+                                               /*func_type=*/funcType,
+                                               /*bcast_type=*/bcastType);
 
     rewriter.create<xsmm::UnaryInvokeOp>(loc, ArrayRef<Type>(),
                                          /*ptr=*/dispatchOp,
@@ -415,15 +436,23 @@ struct BinaryPxaGenericOpConversion
     Type computeType = outputTypes[0]; // just use the output type for now
     FunctionType funcType = rewriter.getFunctionType(inputTypes, outputTypes);
 
+    int32_t inputBcast1, inputBcast2;
+    int32_t ldo = outputs[0].strides[0];
+    int32_t ldi1, ldi2;
+    getLdi(inputs[0], ldo, ldi1, inputBcast1);
+    getLdi(inputs[1], ldo, ldi2, inputBcast2);
+
     auto dispatchOp =
         rewriter.create<xsmm::BinaryDispatchOp>(loc, resultType,
                                                 /*kind=*/kind,
                                                 /*compute_type=*/computeType,
                                                 /*tile=*/op.tile(),
-                                                /*ldi=*/inputs[0].strides[0],
-                                                /*ldi=*/inputs[1].strides[0],
+                                                /*ldi1=*/ldi1,
+                                                /*ldi2=*/ldi2,
                                                 /*ldo=*/outputs[0].strides[0],
-                                                /*func_type=*/funcType);
+                                                /*func_type=*/funcType,
+                                                /*bcast_type1=*/inputBcast1,
+                                                /*bcast_type2=*/inputBcast2);
 
     rewriter.create<xsmm::BinaryInvokeOp>(loc, ArrayRef<Type>(),
                                           /*ptr=*/dispatchOp,
@@ -929,6 +958,10 @@ struct XSMMUnaryDispatchLowering
         rewriter.getI32IntegerAttr(
             static_cast<int32_t>(op.kindAttr().getValue()))));
 
+    // broadcast type
+    callOperands.push_back(
+        rewriter.create<LLVM::ConstantOp>(loc, int32Type, op.bcastTypeAttr()));
+
     rewriter.replaceOpWithNewOp<LLVM::CallOp>(
         op, int64Type, SymbolRefAttr::get(func), callOperands);
 
@@ -960,6 +993,7 @@ struct XSMMUnaryDispatchLowering
                                         int32Type, // compute_type
                                         int32Type, // out_type
                                         int32Type, // type
+                                        int32Type, // bcastType
                                     },
                                     /*isVarArg=*/false));
   }
@@ -1091,6 +1125,13 @@ struct XSMMBinaryDispatchLowering
         rewriter.getI32IntegerAttr(
             static_cast<int32_t>(op.kindAttr().getValue()))));
 
+    // broadcast type
+    callOperands.push_back(
+        rewriter.create<LLVM::ConstantOp>(loc, int32Type, op.bcastType1Attr()));
+    // broadcast type
+    callOperands.push_back(
+        rewriter.create<LLVM::ConstantOp>(loc, int32Type, op.bcastType2Attr()));
+
     rewriter.replaceOpWithNewOp<LLVM::CallOp>(
         op, int64Type, SymbolRefAttr::get(func), callOperands);
 
@@ -1124,6 +1165,8 @@ struct XSMMBinaryDispatchLowering
                                         int32Type, // compute_type
                                         int32Type, // out_type
                                         int32Type, // type
+                                        int32Type, // bcastType1
+                                        int32Type, // bcastType2
                                     },
                                     /*isVarArg=*/false));
   }
@@ -1150,8 +1193,8 @@ struct XSMMBinaryInvokeLowering
     Value inputVoidPtr1 =
         rewriter.create<LLVM::BitcastOp>(loc, voidPtrType, inputPtr1);
 
-    auto inputIndices2 =
-        transformed.indices().slice(outputType.getRank(), inputType2.getRank());
+    auto inputIndices2 = transformed.indices().slice(
+        outputType.getRank() + inputType1.getRank(), inputType2.getRank());
 
     Value inputPtr2 = getStridedElementPtr(
         loc, inputType2, transformed.input2(), inputIndices2, rewriter);
@@ -1215,6 +1258,8 @@ void populatePXAGemmToXSMMConversionPatterns(RewritePatternSet &patterns) {
                                                xsmm::UnaryKind::EXP);
   patterns.insert<UnaryPxaGenericOpConversion>(context, "tpp_tanh",
                                                xsmm::UnaryKind::TANH);
+  patterns.insert<UnaryPxaGenericOpConversion>(context, "tpp_identity",
+                                               xsmm::UnaryKind::IDENTITY);
   patterns.insert<BinaryPxaGenericOpConversion>(context, "tpp_add",
                                                 xsmm::BinaryKind::ADD);
   patterns.insert<BinaryPxaGenericOpConversion>(context, "tpp_mul",
