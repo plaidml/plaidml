@@ -1,4 +1,4 @@
-// RUN: pmlc-opt -x86-stencil-tpp-unary %s | FileCheck %s
+// RUN: pmlc-opt -x86-stencil-tpp-unary -pxa-normalize -canonicalize %s | FileCheck %s
 
 // CHECK-LABEL: func @relu
 func @relu(%I: memref<10x20xf32>, %O: memref<10x20xf32>) -> memref<10x20xf32> {
@@ -32,14 +32,13 @@ func @resnet_2d(%I: memref<1x7x1x64xf32>, %O: memref<1x7x7x512xf32>) -> memref<1
   return %257 : memref<1x7x7x512xf32>
 }
 
-// CHECK-LABEL: func @resnet_3d_illegal
-func @resnet_3d_illegal(%I: memref<1x112x16x8xf32>, %O: memref<1x112x16x8xf32>) -> memref<1x112x16x8xf32> {
+// CHECK-LABEL: func @resnet_3d_legal
+func @resnet_3d_legal(%I: memref<1x112x16x8xf32>, %O: memref<1x112x16x8xf32>) -> memref<1x112x16x8xf32> {
     // CHECK: affine.parallel
     %8 = affine.parallel (%arg111, %arg112) = (0, 0) to (7, 8) reduce ("assign") -> (memref<1x112x16x8xf32>) {
-      // CHECK: affine.parallel
+      // CHECK: pxa.generic
       %298 = affine.parallel (%arg113, %arg114, %arg115) = (0, 0, 0) to (112, 16, 8) reduce ("assign") -> (memref<1x112x16x8xf32>) {
         %300 = pxa.load %I[0, %arg113, %arg114, %arg115] : memref<1x112x16x8xf32>
-        // CHECK: stdx.relu
         %301 = stdx.relu(%300) : (f32) -> f32
         %302 = pxa.reduce assign %301, %O[0, %arg113, %arg114, %arg115] : memref<1x112x16x8xf32>
         affine.yield %302 : memref<1x112x16x8xf32>
