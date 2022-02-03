@@ -47,7 +47,19 @@ def ReorderLayouts : FunctionPass<"x86-reorder-layouts"> {
   let summary = "Optimize data layouts for efficient reading";
   let constructor = "pmlc::target::x86::createReorderLayoutsPass()";
   let options = [
-    Option<"blockSize", "block-size", "int64_t", /*default=*/"16",
+    Option<"blockSize", "block-size", "int64_t", /*default=*/"32",
+           "Data block size">
+  ];
+  let dependentDialects = [
+    "dialect::linalgx::LinalgXDialect",
+  ];
+}
+
+def ReorderWeightLayouts : FunctionPass<"x86-reorder-weight-layouts"> {
+  let summary = "Optimize weight layouts for efficient reading";
+  let constructor = "pmlc::target::x86::createReorderWeightLayoutsPass()";
+  let options = [
+    Option<"blockSize", "block-size", "int64_t", /*default=*/"32",
            "Data block size">
   ];
   let dependentDialects = [
