@@ -248,7 +248,7 @@ struct Options : public PassPipelineOptions<Options> {
 
 void pipelineBuilderStage1(OpPassManager &pm) {
   pm.addNestedPass<FuncOp>(layer::createInlineLayersPass());
-  // pm.addNestedPass<FuncOp>(tile::createAlgebraicOptPass());
+  pm.addNestedPass<FuncOp>(tile::createAlgebraicOptPass());
   pm.addNestedPass<FuncOp>(tile::createComputeBoundsPass());
   pm.addNestedPass<FuncOp>(tile::createPadConstraintsPass());
   pm.addPass(createCanonicalizerPass());
@@ -262,10 +262,10 @@ void pipelineBuilderStage1(OpPassManager &pm) {
   }
 
   pm.addPass(pmlc::conversion::tile_to_linalg::createLowerTileToLinalgPass());
-  if (!util::getEnvVar("PLAIDML_REORDER_WEIGHTS").empty())
-    pm.addNestedPass<FuncOp>(createReorderWeightLayoutsPass());
-  else
+  if (!util::getEnvVar("PLAIDML_REORDER").empty())
     pm.addNestedPass<FuncOp>(createReorderLayoutsPass());
+  else
+    pm.addNestedPass<FuncOp>(createReorderWeightLayoutsPass());
 
   pm.addPass(stdx::createMainClosurePass());
   pm.addPass(createLoopInvariantCodeMotionPass());
