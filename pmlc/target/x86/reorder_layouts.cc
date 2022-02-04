@@ -211,7 +211,9 @@ struct PropagateReorderThruEltwiseOpPattern
       return failure();
     }
 
-    auto initType = initOperand->get().getType().cast<RankedTensorType>();
+    auto initType = initOperand->get().getType().dyn_cast<RankedTensorType>();
+    if (!initType || !initType.getRank())
+      return failure();
     int64_t channels = initType.getShape().back();
 
     // Phase 1: Compute the primary reorder.
@@ -231,7 +233,8 @@ struct PropagateReorderThruEltwiseOpPattern
 
       if (auto operandType =
               operand->get().getType().dyn_cast<RankedTensorType>()) {
-        if (operandType.getShape().back() != channels) {
+        if (!operandType.getRank() ||
+            operandType.getShape().back() != channels) {
           IVLOG(0, "Cannot propagate reorder thru op with mismatched channels: "
                        << debugString(op));
           return failure();
