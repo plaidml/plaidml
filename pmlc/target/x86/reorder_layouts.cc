@@ -205,10 +205,14 @@ struct PropagateReorderThruEltwiseOpPattern
 
     OpOperand *initOperand = op.getOutputOperand(0);
     AffineMap initMap = op.getTiedIndexingMap(initOperand);
-    if (!initMap.isProjectedPermutation()) {
-      IVLOG(0, "Cannot propagate reorder thru: " << debugString(op));
+    if (!initMap.isMinorIdentity()) {
+      IVLOG(0, "Cannot propagate reorder thru op with complex result: "
+                   << debugString(op));
       return failure();
     }
+
+    auto initType = initOperand->get().getType().cast<RankedTensorType>();
+    int64_t channels = initType.getShape().back();
 
     // Phase 1: Compute the primary reorder.
     // Computing a primary reorder is here to handle the case where more than
@@ -219,8 +223,20 @@ struct PropagateReorderThruEltwiseOpPattern
     for (OpOperand *operand : op.getInputOperands()) {
       // Check that all accesses are 'simple'.
       AffineMap accessMap = op.getTiedIndexingMap(operand);
-      if (!accessMap.isProjectedPermutation())
+      if (!accessMap.isProjectedPermutation()) {
+        IVLOG(0, "Cannot propagate reorder thru op with complex operand: "
+                     << debugString(op));
         return failure();
+      }
+
+      if (auto operandType =
+              operand->get().getType().dyn_cast<RankedTensorType>()) {
+        if (operandType.getShape().back() != channels) {
+          IVLOG(0, "Cannot propagate reorder thru op with mismatched channels: "
+                       << debugString(op));
+          return failure();
+        }
+      }
 
       if (Optional<ReorderInfo> info = getReorderInfo(operand)) {
         if (primary) {
