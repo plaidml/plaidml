@@ -206,7 +206,7 @@ struct PropagateReorderThruEltwiseOpPattern
     OpOperand *initOperand = op.getOutputOperand(0);
     AffineMap initMap = op.getTiedIndexingMap(initOperand);
     if (!initMap.isMinorIdentity()) {
-      IVLOG(0, "Cannot propagate reorder thru op with complex result: "
+      IVLOG(1, "Cannot propagate reorder thru op with complex result: "
                    << debugString(op));
       return failure();
     }
@@ -226,7 +226,7 @@ struct PropagateReorderThruEltwiseOpPattern
       // Check that all accesses are 'simple'.
       AffineMap accessMap = op.getTiedIndexingMap(operand);
       if (!accessMap.isProjectedPermutation()) {
-        IVLOG(0, "Cannot propagate reorder thru op with complex operand: "
+        IVLOG(1, "Cannot propagate reorder thru op with complex operand: "
                      << debugString(op));
         return failure();
       }
@@ -235,7 +235,7 @@ struct PropagateReorderThruEltwiseOpPattern
               operand->get().getType().dyn_cast<RankedTensorType>()) {
         if (!operandType.getRank() ||
             operandType.getShape().back() != channels) {
-          IVLOG(0, "Cannot propagate reorder thru op with mismatched channels: "
+          IVLOG(1, "Cannot propagate reorder thru op with mismatched channels: "
                        << debugString(op));
           return failure();
         }
@@ -387,14 +387,14 @@ struct ReorderLayoutsPass : public ReorderLayoutsBase<ReorderLayoutsPass> {
     // (n, h, w, c), (r, s, c, k) -> (n, h, w, k)
     if (conv->input.idxMap.getResult(3) != conv->filter.idxMap.getResult(2) ||
         conv->filter.idxMap.getResult(3) != conv->output.idxMap.getResult(3)) {
-      IVLOG(0, "Cannot reorder: expected channels-last logical ordering.");
+      IVLOG(1, "Cannot reorder: expected channels-last logical ordering.");
       return;
     }
 
     // dims: (n, h, w, c, r, s, k)
     Optional<SmallVector<int64_t, 4>> ranges = op.getStaticLoopRanges();
     if (!ranges) {
-      IVLOG(0, "Cannot reorder: expected static ranges.");
+      IVLOG(1, "Cannot reorder: expected static ranges.");
       return;
     }
 
@@ -402,7 +402,7 @@ struct ReorderLayoutsPass : public ReorderLayoutsBase<ReorderLayoutsPass> {
         (*ranges)[3] % blockSize != 0 || // C
         (*ranges)[6] % blockSize != 0)   // K
     {
-      IVLOG(0, "Cannot reorder: incompatible layout. op: " << debugString(op));
+      IVLOG(1, "Cannot reorder: incompatible layout. op: " << debugString(op));
       return;
     }
 
