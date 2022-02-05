@@ -604,7 +604,8 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
         /*inputs=*/operands,
         /*outputs=*/ValueRange{init.resultTensor},
         /*indexingMaps=*/idxMaps,
-        /*iteratorTypes=*/SmallVector<StringRef, 4>(numDims, "parallel"),
+        /*iteratorTypes=*/
+        SmallVector<StringRef, 4>(numDims, getParallelIteratorTypeName()),
         /*doc=*/"",
         /*libraryCall=*/"",
         [&](OpBuilder &builder, Location loc, ValueRange args) {
@@ -700,7 +701,8 @@ struct ContractionOpConversion
             /*inputs=*/ValueRange{initValue},
             /*outputs=*/ValueRange{init.resultTensor},
             /*indexingMaps=*/ArrayRef<AffineMap>{inputMap, outputMap},
-            /*iteratorTypes=*/SmallVector<StringRef, 4>(numDims, "parallel"),
+            /*iteratorTypes=*/
+            SmallVector<StringRef, 4>(numDims, getParallelIteratorTypeName()),
             /*doc=*/"",
             /*libraryCall=*/"",
             [&](OpBuilder &builder, Location loc, ValueRange args) {
@@ -773,13 +775,14 @@ struct ContractionOpConversion
     }
     idxMaps.emplace_back(sink);
 
-    SmallVector<StringRef, 4> iterTypes(sink.getNumDims(), "reduction");
+    SmallVector<StringRef, 4> iterTypes(sink.getNumDims(),
+                                        getReductionIteratorTypeName());
     for (AffineExpr expr : sink.getResults()) {
       if (auto dimExpr = expr.dyn_cast<AffineDimExpr>()) {
-        iterTypes[dimExpr.getPosition()] = "parallel";
+        iterTypes[dimExpr.getPosition()] = getParallelIteratorTypeName();
       } else {
         for (int64_t dim : getUsedDims(expr)) {
-          iterTypes[dim] = "window";
+          iterTypes[dim] = getWindowIteratorTypeName();
         }
       }
     }
@@ -855,7 +858,8 @@ struct IndexOpConversion : public OpConversionPattern<tile::IndexOp> {
         /*inputs=*/ValueRange{},
         /*outputs=*/ValueRange{init.getResult()},
         /*indexingMaps=*/ArrayRef<AffineMap>{identMap},
-        /*iteratorTypes=*/SmallVector<StringRef, 4>(numDims, "parallel"),
+        /*iteratorTypes=*/
+        SmallVector<StringRef, 4>(numDims, getParallelIteratorTypeName()),
         /*doc=*/"",
         /*libraryCall=*/"",
         [&](OpBuilder &builder, Location loc, ValueRange args) {
@@ -1011,7 +1015,8 @@ struct CastOpConversion : public OpConversionPattern<tile::CastOp> {
         /*inputs=*/operands,
         /*outputs=*/ValueRange{init.resultTensor},
         /*indexingMaps=*/ArrayRef<AffineMap>{inputMap, outputMap},
-        /*iteratorTypes=*/SmallVector<StringRef, 4>(numDims, "parallel"),
+        /*iteratorTypes=*/
+        SmallVector<StringRef, 4>(numDims, getParallelIteratorTypeName()),
         /*doc=*/"",
         /*libraryCall=*/"",
         [&](OpBuilder &builder, Location loc, ValueRange args) {

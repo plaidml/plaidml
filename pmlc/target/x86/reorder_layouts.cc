@@ -345,6 +345,69 @@ struct FoldReordersPattern : public OpRewritePattern<linalgx::CopyOp> {
   }
 };
 
+struct FoldBroadcastReordersPattern : public OpRewritePattern<linalgx::CopyOp> {
+  using OpRewritePattern<linalgx::CopyOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalgx::CopyOp op,
+                                PatternRewriter &rewriter) const final {
+    OpOperand *input = op.getInputOperand(0);
+    linalg::GenericOp predecessor =
+        dyn_cast_or_null<linalg::GenericOp>(input->get().getDefiningOp());
+    if (!predecessor)
+      return failure();
+
+    if (predecessor.getNumInputs() != 1 || predecessor.getNumOutputs() != 1 ||
+        predecessor.getNumParallelLoops() != predecessor.getNumLoops())
+      return failure();
+
+    MLIRContext *context = getContext();
+
+    OpOperand *initialInput = predecessor.getInputOperand(0);
+    AffineMap initialInputMap = predecessor.getTiedIndexingMap(initialInput);
+    AffineMap initialInputPattern =
+        AffineMap::get(4, 0,
+                       ArrayRef<AffineExpr>{
+                           getAffineDimExpr(3, context),
+                       },
+                       context);
+    if (initialInputMap != initialInputPattern)
+      return failure();
+
+    OpOperand *initialOutput = predecessor.getOutputOperand(0);
+    AffineMap initialOutputMap = predecessor.getTiedIndexingMap(initialOutput);
+    if (!initialOutputMap.isIdentity())
+      return failure();
+
+    Block *block = predecessor.getBody();
+    Block::BlockArgListType args = block->getArguments();
+    if (args.size() != 2)
+      return failure();
+
+    Operation *yieldOp = block->getTerminator();
+    if (!matchPattern(yieldOp, m_Op<linalg::YieldOp>(m_Val(args[0]))))
+      return failure();
+
+    AffineMap newInputMap = initialInputMap.compose(*op.inputMap());
+    SmallVector<AffineMap, 2> indexingMaps = {newInputMap, *op.outputMap()};
+
+    SmallVector<StringRef, 4> iterTypes(newInputMap.getNumDims(),
+                                        getParallelIteratorTypeName());
+    auto newOp = rewriter.create<linalg::GenericOp>(
+        op->getLoc(),
+        /*resultTensorTypes=*/op->getResultTypes(),
+        /*inputs=*/predecessor.inputs(),
+        /*outputs=*/op.outputs(),
+        /*indexingMaps=*/indexingMaps,
+        /*iteratorTypes=*/iterTypes);
+    rewriter.cloneRegionBefore(op.region(), newOp.region(),
+                               newOp.region().end());
+
+    rewriter.replaceOp(op, newOp.getResults());
+
+    return success();
+  }
+};
+
 struct ReorderLayoutsPass : public ReorderLayoutsBase<ReorderLayoutsPass> {
   void runOnFunction() final {
     FuncOp func = getFunction();
@@ -356,6 +419,7 @@ struct ReorderLayoutsPass : public ReorderLayoutsBase<ReorderLayoutsPass> {
     patterns.add<PropagateReorderThruEltwiseOpPattern>(context);
     patterns.add<PropagateReorderThruPadTensorOpPattern>(context);
     patterns.add<FoldReordersPattern>(context);
+    patterns.add<FoldBroadcastReordersPattern>(context);
     (void)applyPatternsAndFoldGreedily(
         func, std::move(patterns),
         GreedyRewriteConfig{/*useTopDownTraversal=*/true});
