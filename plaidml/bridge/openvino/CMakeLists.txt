@@ -55,6 +55,16 @@ install(
   COMPONENT testkit
 )
 
+install(
+  DIRECTORY ${OpenCV_INSTALL_PATH}/lib/
+  DESTINATION "testkit"
+  COMPONENT testkit
+  USE_SOURCE_PERMISSIONS
+  FILES_MATCHING
+    PATTERN "libopencv_core.so*"
+    PATTERN "libopencv_img*.so*"
+)
+
 add_custom_target(benchmark_app ALL)
 
 add_custom_command(
