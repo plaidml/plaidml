@@ -1,6 +1,7 @@
 import argparse
 import atexit
 import os
+import pathlib
 import subprocess
 import sys
 import tarfile
@@ -18,8 +19,12 @@ DATASET_DIR = Path('tmp/ac').resolve()
 
 
 def benchmark_app(args):
+    CONDA_PREFIX = Path(os.getenv('CONDA_PREFIX'))
     env = os.environ.copy()
-    env['LD_LIBRARY_PATH'] = args.pkgdir.resolve()
+    env['LD_LIBRARY_PATH'] = os.pathsep.join([
+        str(CONDA_PREFIX / 'lib'),
+        str(args.pkgdir.resolve()),
+    ])
     cmd = [args.pkgdir / 'benchmark_app']
     cmd += ['-d', 'PLAIDML']
     cmd += ['-m', args.model]
