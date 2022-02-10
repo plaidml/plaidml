@@ -118,6 +118,7 @@ class Configure:
         build_dir = pathlib.Path(f'build-{args.target}').resolve() / args.type
 
         if not args.no_openvino:
+            opencv_dir = pathlib.Path('.cenv/lib/cmake/opencv4').resolve()
             openvino_dir = build_dir / '_deps/openvino-build'
             if args.temp:
                 temp_dir = args.temp / args.target
@@ -145,6 +146,7 @@ class Configure:
                 '-DENABLE_VPU=OFF',
                 '-DFETCHCONTENT_QUIET=OFF',
                 f'-DOUTPUT_ROOT={build_dir}',
+                f'-DOpenCV_DIR={opencv_dir}',
             ]
             if args.temp:
                 cmd.append(f'-DFETCHCONTENT_BASE_DIR={fc_dir}')
