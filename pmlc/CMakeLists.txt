@@ -22,14 +22,21 @@ pml_cc_library(
   DEPS
     ${MLIR_DIALECT_LIBS}
     ${MLIR_CONVERSION_LIBS}
+    AllMhloPasses
+    MhloRegisterDialects
+    MLIRBufferTransforms
+    MLIRHLOAnalysis
+    MLIRHLOTestAnalysis
     MLIRTransforms
+    pmlc::conversion::linalg_to_pxa
     pmlc::conversion::pxa_to_affine
-    pmlc::conversion::scf_to_omp
     pmlc::conversion::stdx_to_llvm
+    pmlc::conversion::tile_to_linalg
     pmlc::conversion::tile_to_pxa
     pmlc::dialect::affinex::transforms
     pmlc::dialect::layer::ir
     pmlc::dialect::layer::transforms
+    pmlc::dialect::linalgx::ir
     pmlc::dialect::pml::ir
     pmlc::dialect::pml::transforms
     pmlc::dialect::pxa::ir

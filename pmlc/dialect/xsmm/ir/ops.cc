@@ -51,8 +51,7 @@ void printGemmInvokeF32Op(OpAsmPrinter &p, GemmInvokeF32Op op) {
   auto funcType =
       FunctionType::get(op.getContext(), {op.a().getType(), op.b().getType()},
                         {op.c().getType()});
-  p << op->getName() << ' ';
-  p << op.ptr() << ", ";
+  p << ' ' << op.ptr() << ", ";
   p << op.c() << '[';
   p.printOperands(op.getOperandsForC());
   p << "] = " << op.a() << '[';
@@ -149,8 +148,7 @@ Operation::operand_range UnaryInvokeOp::getOperandsForInput() {
 void printUnaryInvokeOp(OpAsmPrinter &p, UnaryInvokeOp op) {
   auto funcType = FunctionType::get(op.getContext(), {op.input().getType()},
                                     {op.output().getType()});
-  p << op->getName() << ' ';
-  p << op.output() << '[';
+  p << ' ' << op.output() << '[';
   p.printOperands(op.getOperandsForOutput());
   p << "] = " << op.ptr() << '(' << op.input() << '[';
   p.printOperands(op.getOperandsForInput());
@@ -181,6 +179,8 @@ ParseResult parseUnaryInvokeOp(OpAsmParser &parser, OperationState &result) {
 }
 
 } // namespace pmlc::dialect::xsmm
+
+#include "pmlc/dialect/xsmm/ir/dialect.cc.inc" // NOLINT
 
 #define GET_OP_CLASSES
 #include "pmlc/dialect/xsmm/ir/ops.cc.inc" // NOLINT

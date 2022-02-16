@@ -27,8 +27,9 @@ namespace pmlc::dialect::pxa {
 
 AffineParallelOp tileAccumulations(AffineParallelOp op, bool skipTrivial) {
   // Find the originating write and its StrideInfo
-  Optional<StrideInfo> maybeStrideInfo;
-  if (op.getNumResults() == 1) {
+  SmallVector<StrideInfo, 4> strides;
+  for (auto result : op.getResults()) {
+    Optional<StrideInfo> maybeStrideInfo;
     Operation *srcDef = getPrevWriter(op.getResult(0));
     if (auto genericOpInterface =
             dyn_cast_or_null<PxaGenericOpInterface>(srcDef)) {
@@ -38,21 +39,21 @@ AffineParallelOp tileAccumulations(AffineParallelOp op, bool skipTrivial) {
           computeStrideInfo(access.getMemRefType(), valueMap.getAffineMap(),
                             valueMap.getOperands());
     }
-  }
 
-  // If we can't fall back to adding a nesting level (to guarentee all
-  // accumulations are in the 'inner' loop)
-  if (!maybeStrideInfo) {
-    auto maybeRanges = op.getConstantRanges();
-    assert(maybeRanges &&
-           "Cannot tile accumulations on dynamic sized paralllel for");
-    if (!skipTrivial) {
-      op = performTiling(op, *maybeRanges);
+    // If we can't fall back to adding a nesting level (to guarentee all
+    // accumulations are in the 'inner' loop)
+    if (!maybeStrideInfo) {
+      auto maybeRanges = op.getConstantRanges();
+      assert(maybeRanges &&
+             "Cannot tile accumulations on dynamic sized paralllel for");
+      if (!skipTrivial) {
+        op = performTiling(op, *maybeRanges);
+      }
+      return op;
     }
-    return op;
+    strides.emplace_back(*maybeStrideInfo);
   }
 
-  auto si = *maybeStrideInfo;
   // Get strides for output
   // Find all the accumulation indexes (stride 0 with respect to output) and
   // tile them into an inner block
@@ -64,14 +65,21 @@ AffineParallelOp tileAccumulations(AffineParallelOp op, bool skipTrivial) {
   bool anyNonAccum = false;
   for (size_t i = 0; i < ranges.size(); i++) {
     auto arg = op.getIVs()[i];
-    if (si.strides.count(arg)) {
-      // Output non-stationary, outer loop
-      anyNonAccum = true;
-      accumTile.push_back(steps[i]);
-    } else {
+    bool accumArg = false;
+    for (auto &si : strides) {
+      if (!si.strides.count(arg)) {
+        accumArg = true;
+        break;
+      }
+    }
+    if (accumArg) {
       // Output stationary, accumulate in inner loop
       anyAccum = true;
       accumTile.push_back(ranges[i]);
+    } else {
+      // Output non-stationary, outer loop
+      anyNonAccum = true;
+      accumTile.push_back(steps[i]);
     }
   }
   // Check if both loops were used
@@ -89,13 +97,14 @@ struct TileAccumulatePass : public TileAccumulateBase<TileAccumulatePass> {
   void runOnFunction() final {
     auto func = getFunction();
     // Tile only the outermost loops
-    for (auto op : func.getBody().getOps<AffineParallelOp>()) {
+    func.walk<WalkOrder::PreOrder>([&](AffineParallelOp op) {
       if (!op.getConstantRanges()) {
         signalPassFailure();
-        break;
+        return WalkResult::interrupt();
       }
       tileAccumulations(op, false);
-    }
+      return WalkResult::skip();
+    });
   }
 };
 

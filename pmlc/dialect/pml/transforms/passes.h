@@ -12,6 +12,12 @@ namespace pmlc::dialect::pml {
 
 std::unique_ptr<mlir::Pass> createApplyRulesPass();
 
+std::unique_ptr<mlir::Pass> createApplyRulesPass(mlir::StringRef module);
+
+std::unique_ptr<mlir::Pass> createLoadModulePass();
+
+std::unique_ptr<mlir::Pass> createLoadModulePass(mlir::StringRef path);
+
 /// Generate the code for registering passes.
 #define GEN_PASS_REGISTRATION
 #include "pmlc/dialect/pml/transforms/passes.h.inc"

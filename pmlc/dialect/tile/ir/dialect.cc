@@ -109,3 +109,5 @@ Type TileDialect::parseType(DialectAsmParser &parser) const {
 }
 
 } // namespace pmlc::dialect::tile
+
+#include "pmlc/dialect/tile/ir/dialect.cc.inc" // NOLINT

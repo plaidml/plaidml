@@ -60,6 +60,29 @@ def XSMM_UnaryKind : I64EnumAttr<
   let cppNamespace = "pmlc::dialect::xsmm";
 }
 
+
+def XSMM_BinaryKind : I64EnumAttr<
+    "BinaryKind",
+    "Operation to aggregate with",
+    [
+      I64EnumAttrCase<"NONE", 0>,
+      I64EnumAttrCase<"ADD", 1>,
+      I64EnumAttrCase<"MUL", 2>,
+      I64EnumAttrCase<"SUB", 3>,
+      I64EnumAttrCase<"DIV", 4>,
+      I64EnumAttrCase<"MULADD", 5>,
+      I64EnumAttrCase<"MATMUL", 6>,
+      I64EnumAttrCase<"MUL_AND_REDUCE_TO_SCALAR_OP_ADD", 7>,
+      I64EnumAttrCase<"PACK", 8>,
+
+    ]> {
+  let cppNamespace = "pmlc::dialect::xsmm";
+}
+
+
+
+
+
 def XSMM_Dialect : Dialect {
   let name = "xsmm";
   let cppNamespace = "pmlc::dialect::xsmm";
@@ -153,6 +176,7 @@ def XSMM_BRGemmOffsInvokeF32Op : XSMM_Op<"brgemm.offs.invoke.f32"> {
   }];
 }
 
+
 def XSMM_UnaryDispatchOp : XSMM_Op<"unary.dispatch", [NoSideEffect]> {
   let summary = "Generate a unary kernel for a specific tile size.";
   let arguments = (ins
@@ -161,14 +185,16 @@ def XSMM_UnaryDispatchOp : XSMM_Op<"unary.dispatch", [NoSideEffect]> {
     I64ArrayAttr:$tile,
     I64Attr:$ldi,
     I64Attr:$ldo,
-    FuncTypeAttr:$func_type
+    FuncTypeAttr:$func_type,
+    I32Attr:$bcastType
   );
   let results = (outs I64:$ptr);
   let assemblyFormat = [{
-    $kind `(` $compute_type `,` $tile `,` $ldi `,` $ldo `)`
+    $kind `(` $compute_type `,` $tile `,` $ldi `,` $ldo `,` $bcastType `)`
     `:` $func_type attr-dict
   }];
 }
+
 
 def XSMM_UnaryInvokeOp : XSMM_Op<"unary.invoke"> {
   let summary = "Invoke a previously generated unary kernel.";
@@ -185,5 +211,35 @@ def XSMM_UnaryInvokeOp : XSMM_Op<"unary.invoke"> {
   }];
 }
 
-
+def XSMM_BinaryDispatchOp : XSMM_Op<"binary.dispatch", [NoSideEffect]> {
+  let summary = "Generate a binary kernel for a specific tile size.";
+  let arguments = (ins
+    XSMM_BinaryKind:$kind,
+    TypeAttr:$compute_type,
+    I64ArrayAttr:$tile,
+    I64Attr:$ldi1,
+    I64Attr:$ldi2,
+    I64Attr:$ldo,
+    FuncTypeAttr:$func_type,
+    I32Attr:$bcastType1,
+    I32Attr:$bcastType2
+  );
+  let results = (outs I64:$ptr);
+  let printer = ?;
+  let parser = ?;
+}
+ 
+def XSMM_BinaryInvokeOp : XSMM_Op<"binary.invoke"> {
+  let summary = "Invoke a previously generated binary kernel.";
+  let arguments = (ins
+    I64:$ptr,
+    Arg<AnyMemRef, "the output memref to store to", [MemWrite]>:$output,
+    Arg<AnyMemRef, "the input memref to load from", [MemRead]>:$input1,
+    Arg<AnyMemRef, "the input memref to load from", [MemRead]>:$input2,
+    Variadic<Index>:$indices
+  );
+  let printer = ?;
+  let parser = ?;
+}
+ 
 #endif // __PML_XSMM_OPS__

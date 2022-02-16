@@ -49,7 +49,7 @@ ExprNode::ExprNode(llvm::StringRef name) : name(name) {}
 ExprNodeCast::ExprNodeCast(DataType dtype, const ExprNodePtr &expr)
     : dtype(dtype), expr(expr) {}
 
-std::string ExprNodeCast::str() const { return "cast"; }
+std::string ExprNodeCast::str() const { return name.size() ? name : "cast"; }
 
 //
 // ExprNodeConstSsigned
@@ -58,7 +58,7 @@ std::string ExprNodeCast::str() const { return "cast"; }
 ExprNodeConstSigned::ExprNodeConstSigned(int64_t value) : value(value) {}
 
 std::string ExprNodeConstSigned::str() const {
-  return llvm::formatv("{0}:six", value);
+  return name.size() ? name : llvm::formatv("{0}:six", value);
 }
 
 //
@@ -68,7 +68,7 @@ std::string ExprNodeConstSigned::str() const {
 ExprNodeConstUnsigned::ExprNodeConstUnsigned(uint64_t value) : value(value) {}
 
 std::string ExprNodeConstUnsigned::str() const {
-  return llvm::formatv("{0}:uix", value);
+  return name.size() ? name : llvm::formatv("{0}:uix", value);
 }
 
 //
@@ -78,7 +78,7 @@ std::string ExprNodeConstUnsigned::str() const {
 ExprNodeConstFloat::ExprNodeConstFloat(double value) : value(value) {}
 
 std::string ExprNodeConstFloat::str() const {
-  return llvm::formatv("{0}:fx", value);
+  return name.size() ? name : llvm::formatv("{0}:fx", value);
 }
 
 //
@@ -90,7 +90,7 @@ ExprNodeConstTensor::ExprNodeConstTensor(const util::BufferPtr &buffer,
     : Base(name), buffer(buffer) {}
 
 std::string ExprNodeConstTensor::str() const {
-  return llvm::formatv("constant_tensor({0})", name);
+  return name.size() ? name : llvm::formatv("constant_tensor({0})", name);
 }
 
 std::string Constraint::str() const {
@@ -104,14 +104,15 @@ std::string Constraint::str() const {
 ExprNodeContraction::ExprNodeContraction(llvm::StringRef name) : Base(name) {}
 
 std::string ExprNodeContraction::str() const {
+  if (name.size())
+    return name;
+
   std::stringstream ss;
-  ss << util::stringifyAggregationKind(aggKind).str() << '(';
-  // for (auto item : llvm::enumerate(srcs)) {
-  //   if (item.index()) {
-  //     ss << ", ";
-  //   }
-  //   ss << item.value().ref->str();
-  // }
+  ss << "contract(" << util::stringifyAggregationKind(aggKind).str() << '/'
+     << util::stringifyCombinationKind(comboKind).str();
+  for (auto item : llvm::enumerate(srcs)) {
+    ss << ", " << item.value().ref->str();
+  }
   ss << ')';
   return ss.str();
 }
@@ -122,7 +123,7 @@ std::string ExprNodeContraction::str() const {
 
 ExprNodeDim::ExprNodeDim(const DimNodePtr &dim) : dim(dim) {}
 
-std::string ExprNodeDim::str() const { return dim->str(); }
+std::string ExprNodeDim::str() const { return name.size() ? name : dim->str(); }
 
 //
 // ExprNodeElement
@@ -132,7 +133,8 @@ ExprNodeElement::ExprNodeElement(const ExprNodePtr &expr, size_t ordinal)
     : expr(expr), ordinal(ordinal) {}
 
 std::string ExprNodeElement::str() const {
-  return llvm::formatv("element({0}, {1})", expr->str(), ordinal);
+  return name.size() ? name
+                     : llvm::formatv("element({0}, {1})", expr->str(), ordinal);
 }
 
 //
@@ -141,16 +143,13 @@ std::string ExprNodeElement::str() const {
 
 ExprNodeInput::ExprNodeInput(const TensorShape &shape, llvm::StringRef name)
     : Base(name), shape(shape) {
-      if (shape.elementType == DataType::invalid) {
-        throw std::runtime_error("DType::INVALID not appropriate here");
-      }
-    }
+  if (shape.elementType == DataType::invalid) {
+    throw std::runtime_error("DType::INVALID not appropriate here");
+  }
+}
 
 std::string ExprNodeInput::str() const {
-  if (name.size()) {
-    return llvm::formatv("input({0}, \"{1}\")", shape.str(), name);
-  }
-  return llvm::formatv("input({0})", shape.str());
+  return name.size() ? name : llvm::formatv("input({0})", shape.str());
 }
 
 //
@@ -158,21 +157,11 @@ std::string ExprNodeInput::str() const {
 //
 
 ExprNodeIntrinsic::ExprNodeIntrinsic(llvm::StringRef op,
-                                     llvm::ArrayRef<ExprNodePtr> operands)
-    : op(op), operands(operands) {}
+                                     llvm::ArrayRef<ExprNodePtr> operands,
+                                     llvm::StringRef name)
+    : Base(name), op(op), operands(operands) {}
 
-std::string ExprNodeIntrinsic::str() const {
-  std::stringstream ss;
-  ss << op << '(';
-  // for (auto item : llvm::enumerate(operands)) {
-  //   if (item.index()) {
-  //     ss << ", ";
-  //   }
-  //   ss << item.value()->str();
-  // }
-  ss << ')';
-  return ss.str();
-}
+std::string ExprNodeIntrinsic::str() const { return name.size() ? name : op; }
 
 //
 // ExprNodeLayer
@@ -184,7 +173,7 @@ ExprNodeLayer::ExprNodeLayer(llvm::StringRef op,
     : op(op), operands(operands), attrs(attrs) {}
 
 std::string ExprNodeLayer::str() const {
-  return llvm::formatv("layer({0})", op);
+  return name.size() ? name : llvm::formatv("layer({0})", op);
 }
 
 //
@@ -195,7 +184,7 @@ ExprNodePragma::ExprNodePragma(const ExprNodePtr &expr, llvm::StringRef op,
                                const llvm::StringMap<VarNodePtr> &attrs)
     : expr(expr), op(op), attrs(attrs) {}
 
-std::string ExprNodePragma::str() const { return op; }
+std::string ExprNodePragma::str() const { return name.size() ? name : op; }
 
 //
 // DimNode tree

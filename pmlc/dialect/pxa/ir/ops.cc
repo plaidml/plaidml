@@ -48,7 +48,7 @@ ParseResult parseKeywordIntoEnumAttr(OpAsmParser &parser,
 /// AffineSymbolExpr@[pos - dims.size()] is replaced.
 /// Mutate `map`,`dims` and `syms` in place as follows:
 ///   1. `dims` and `syms` are only appended to.
-///   2. `map` dim and symbols are gradually shifted to higer positions.
+///   2. `map` dim and symbols are gradually shifted to higher positions.
 ///   3. Old `dim` and `sym` entries are replaced by nullptr
 /// This avoids the need for any bookkeeping.
 static LogicalResult replaceDimOrSym(AffineMap *map,
@@ -319,8 +319,8 @@ void PxaLoadOp::build(OpBuilder &builder, OperationState &result, AffineMap map,
   result.addOperands(operands);
   if (map)
     result.addAttribute(getMapAttrName(), AffineMapAttr::get(map));
-  auto memrefType = operands[0].getType().cast<MemRefType>();
-  result.types.push_back(memrefType.getElementType());
+  auto shapedType = operands[0].getType().cast<ShapedType>();
+  result.types.push_back(shapedType.getElementType());
 }
 
 void PxaLoadOp::build(OpBuilder &builder, OperationState &result, Value memref,
@@ -328,15 +328,15 @@ void PxaLoadOp::build(OpBuilder &builder, OperationState &result, Value memref,
   assert(map.getNumInputs() == mapOperands.size() && "inconsistent index info");
   result.addOperands(memref);
   result.addOperands(mapOperands);
-  auto memrefType = memref.getType().cast<MemRefType>();
   result.addAttribute(getMapAttrName(), AffineMapAttr::get(map));
-  result.types.push_back(memrefType.getElementType());
+  auto shapedType = memref.getType().cast<ShapedType>();
+  result.types.push_back(shapedType.getElementType());
 }
 
 void PxaLoadOp::build(OpBuilder &builder, OperationState &result, Value memref,
                       ValueRange indices) {
-  auto memrefType = memref.getType().cast<MemRefType>();
-  auto rank = memrefType.getRank();
+  auto shapedType = memref.getType().cast<ShapedType>();
+  auto rank = shapedType.getRank();
   // Create identity map for memrefs with at least one dimension or () -> ()
   // for zero-dimensional memrefs.
   auto map =
@@ -345,7 +345,7 @@ void PxaLoadOp::build(OpBuilder &builder, OperationState &result, Value memref,
 }
 
 static void printPxaLoadOp(OpAsmPrinter &p, PxaLoadOp op) {
-  p << op->getName() << ' ';
+  p << ' ';
   p << op.getMemRef() << '[';
   if (AffineMapAttr mapAttr =
           op->getAttrOfType<AffineMapAttr>(op.getMapAttrName()))
@@ -401,7 +401,7 @@ void PxaVectorLoadOp::build(OpBuilder &builder, OperationState &result,
 }
 
 static void printPxaVectorLoadOp(OpAsmPrinter &p, PxaVectorLoadOp op) {
-  p << op->getName() << ' ';
+  p << ' ';
   p << op.getMemRef() << '[';
   if (AffineMapAttr mapAttr =
           op->getAttrOfType<AffineMapAttr>(op.getMapAttrName()))
@@ -450,7 +450,7 @@ OpFoldResult PxaVectorLoadOp::fold(ArrayRef<Attribute> cstOperands) {
 // ---- PxaReduceOp ----
 
 void printPxaReduceOp(OpAsmPrinter &p, PxaReduceOp op) {
-  p << op->getName() << ' ';
+  p << ' ';
   p << stringifyAtomicRMWKind(op.agg()) << ' ';
   p << op.val() << ", ";
   p << op.memref() << '[';
@@ -504,7 +504,7 @@ OpFoldResult PxaReduceOp::fold(ArrayRef<Attribute> cstOperands) {
 // ---- PxaVectorReduceOp ----
 
 void printPxaVectorReduceOp(OpAsmPrinter &p, PxaVectorReduceOp op) {
-  p << op->getName() << ' ';
+  p << ' ';
   p << stringifyAtomicRMWKind(op.agg()) << ' ';
   p << op.val() << ", ";
   p << op.memref() << '[';
@@ -749,7 +749,7 @@ static void printPxaGenericOperands(OpAsmPrinter &p, OperandRange operands,
 static void printPxaGenericOp(OpAsmPrinter &p, PxaGenericOp op) {
   auto funcType = FunctionType::get(op.getContext(), op.inputs().getTypes(),
                                     op.outputs().getTypes());
-  p << op->getName() << ' ';
+  p << ' ';
   p << '(';
   printPxaGenericOperands(p, op.outputs(), op.outputIndices(),
                           op.outputAccessMaps(), op.outputTileMaps());
@@ -896,6 +896,8 @@ static ParseResult parsePxaGenericOp(OpAsmParser &parser,
 }
 
 } // namespace pmlc::dialect::pxa
+
+#include "pmlc/dialect/pxa/ir/dialect.cc.inc" // NOLINT
 
 #define GET_OP_CLASSES
 #include "pmlc/dialect/pxa/ir/ops.cc.inc" // NOLINT

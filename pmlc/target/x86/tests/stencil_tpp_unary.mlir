@@ -1,4 +1,4 @@
-// RUN: pmlc-opt -x86-stencil-tpp-unary %s | FileCheck %s
+// RUN: pmlc-opt -x86-stencil-tpp-unary -pxa-normalize -canonicalize %s | FileCheck %s
 
 // CHECK-LABEL: func @relu
 func @relu(%I: memref<10x20xf32>, %O: memref<10x20xf32>) -> memref<10x20xf32> {
@@ -32,14 +32,13 @@ func @resnet_2d(%I: memref<1x7x1x64xf32>, %O: memref<1x7x7x512xf32>) -> memref<1
   return %257 : memref<1x7x7x512xf32>
 }
 
-// CHECK-LABEL: func @resnet_3d_illegal
-func @resnet_3d_illegal(%I: memref<1x112x16x8xf32>, %O: memref<1x112x16x8xf32>) -> memref<1x112x16x8xf32> {
+// CHECK-LABEL: func @resnet_3d_legal
+func @resnet_3d_legal(%I: memref<1x112x16x8xf32>, %O: memref<1x112x16x8xf32>) -> memref<1x112x16x8xf32> {
     // CHECK: affine.parallel
     %8 = affine.parallel (%arg111, %arg112) = (0, 0) to (7, 8) reduce ("assign") -> (memref<1x112x16x8xf32>) {
-      // CHECK: affine.parallel
+      // CHECK: pxa.generic
       %298 = affine.parallel (%arg113, %arg114, %arg115) = (0, 0, 0) to (112, 16, 8) reduce ("assign") -> (memref<1x112x16x8xf32>) {
         %300 = pxa.load %I[0, %arg113, %arg114, %arg115] : memref<1x112x16x8xf32>
-        // CHECK: stdx.relu
         %301 = stdx.relu(%300) : (f32) -> f32
         %302 = pxa.reduce assign %301, %O[0, %arg113, %arg114, %arg115] : memref<1x112x16x8xf32>
         affine.yield %302 : memref<1x112x16x8xf32>
@@ -103,3 +102,64 @@ func @resnet_conv1_relu(%arg0: memref<1x112x112x64xf32>, %arg1: memref<1x112x112
   }
   return %0 : memref<1x112x112x64xf32>
 }
+
+// CHECK-LABEL: func @stencil_unary_do_nothing
+func @stencil_unary_do_nothing(%arg0: memref<1x64x56x56xf32>) -> memref<1x64x56x56xf32> {
+  %0 = memref.alloc() : memref<1x64x56x56xf32>
+  // CHECK: affine.parallel
+  %1 = affine.parallel (%arg1, %arg2) = (0, 0) to (56, 2) reduce ("assign") -> (memref<1x64x56x56xf32>) {
+    // CHECK: affine.parallel
+    %2 = affine.parallel (%arg3, %arg4) = (0, 0) to (64, 28) reduce ("assign") -> (memref<1x64x56x56xf32>) {
+      %3 = memref.alloc() : memref<1x64x56x56xf32>
+      // CHECK: affine.parallel
+      %4 = affine.parallel (%arg5, %arg6, %arg7) = (0, 0, 0) to (64, 56, 56) reduce ("assign") -> (memref<1x64x56x56xf32>) {
+        %8 = pxa.load %arg0[0, %arg5, %arg6, %arg7] : memref<1x64x56x56xf32>
+        %9 = pxa.reduce assign %8, %3[0, %arg5, %arg6, %arg7] : memref<1x64x56x56xf32>
+        affine.yield %9 : memref<1x64x56x56xf32>
+      }
+      // CHECK: pxa.load
+      %5 = pxa.load %4[0, %arg3, %arg1, %arg4 + %arg2 * 28] : memref<1x64x56x56xf32>
+      // CHECK: stdx.relu
+      %6 = stdx.relu(%5) : (f32) -> f32
+      // CHECK: pxa.reduce
+      %7 = pxa.reduce assign %6, %0[0, %arg3, %arg1, %arg4 + %arg2 * 28] : memref<1x64x56x56xf32>
+      affine.yield %7 : memref<1x64x56x56xf32>
+    }
+    affine.yield %2 : memref<1x64x56x56xf32>
+  }
+  return %1 : memref<1x64x56x56xf32>
+}
+
+// CHECK-LABEL: func @tanh
+func @tanh(%I: memref<10x20xf32>, %O: memref<10x20xf32>) -> memref<10x20xf32> {
+  // CHECK: affine.parallel
+  %0 = affine.parallel (%ox, %oy) = (0, 0) to (5, 10) reduce ("assign") -> (memref<10x20xf32>) {
+    // CHECK: pxa.generic (%{{.*}}[%{{.*}} * 2, %{{.*}} * 2]: #{{.*}}) <assign> @tpp_tanh(%{{.*}}[%{{.*}} * 2, %{{.*}} * 2]: #{{.*}}) tile: [2, 2] : (memref<10x20xf32>) -> memref<10x20xf32>
+    %1 = affine.parallel (%ix, %iy) = (0, 0) to (2, 2) reduce ("assign") -> (memref<10x20xf32>) {
+      %2 = pxa.load %I[%ix + %ox * 2, %iy + %oy * 2] : memref<10x20xf32>
+      %3 = math.tanh %2 : f32
+      %4 = pxa.reduce assign %3, %O[%ix + %ox * 2, %iy + %oy * 2] : memref<10x20xf32>
+      affine.yield %4 : memref<10x20xf32>
+    }
+    affine.yield %1 : memref<10x20xf32>
+  }
+  return %0 : memref<10x20xf32>
+}
+
+// CHECK-LABEL: func @exp
+func @exp(%I: memref<10x20xf32>, %O: memref<10x20xf32>) -> memref<10x20xf32> {
+  // CHECK: affine.parallel
+  %0 = affine.parallel (%ox, %oy) = (0, 0) to (5, 10) reduce ("assign") -> (memref<10x20xf32>) {
+    // CHECK: pxa.generic (%{{.*}}[%{{.*}} * 2, %{{.*}} * 2]: #{{.*}}) <assign> @tpp_exp(%{{.*}}[%{{.*}} * 2, %{{.*}} * 2]: #{{.*}}) tile: [2, 2] : (memref<10x20xf32>) -> memref<10x20xf32>
+    %1 = affine.parallel (%ix, %iy) = (0, 0) to (2, 2) reduce ("assign") -> (memref<10x20xf32>) {
+      %2 = pxa.load %I[%ix + %ox * 2, %iy + %oy * 2] : memref<10x20xf32>
+      %3 = math.exp %2 : f32
+      %4 = pxa.reduce assign %3, %O[%ix + %ox * 2, %iy + %oy * 2] : memref<10x20xf32>
+      affine.yield %4 : memref<10x20xf32>
+    }
+    affine.yield %1 : memref<10x20xf32>
+  }
+  return %0 : memref<10x20xf32>
+}
+
+

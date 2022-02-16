@@ -23,6 +23,9 @@ set(OPENMP_ENABLE_LIBOMPTARGET OFF CACHE BOOL "" FORCE)
 set(OPENMP_ENABLE_OMPT_TOOLS OFF CACHE BOOL "" FORCE)
 set(OPENMP_STANDALONE_BUILD ON CACHE BOOL "" FORCE)
 
+list(APPEND LLVM_EXTERNAL_PROJECTS mlir_hlo)
+set(LLVM_EXTERNAL_MLIR_HLO_SOURCE_DIR ${CMAKE_SOURCE_DIR}/vendor/mlir-hlo)
+
 if(LOCAL_LLVM_DIR)
   message("LOCAL_LLVM_DIR: ${LOCAL_LLVM_DIR}")
   set(LLVM_SOURCE_DIR ${LOCAL_LLVM_DIR})
@@ -33,8 +36,8 @@ else()
   message("Fetching LLVM")
   FetchContent_Declare(
     llvm-project
-    URL      https://github.com/plaidml/llvm-project/archive/f951c621cb80807205e1badc3c0643825bc8bcf0.tar.gz
-    URL_HASH SHA256=b97576639b0bc689f68993e9527747284bba2fbb26fd399857446a398082d4f4
+    URL      https://github.com/plaidml/llvm-project/archive/ca67cd422f5b490444e244418f98c661b73fd978.tar.gz
+    URL_HASH SHA256=5fd6c8e0328704227c7b35af81bee1158160db70b44948fa11cd466f06fa8bdf
   )
   FetchContent_GetProperties(llvm-project)
   if(NOT llvm-project_POPULATED)
@@ -55,6 +58,8 @@ list(APPEND LLVM_INCLUDE_DIRS
 list(APPEND MLIR_INCLUDE_DIRS
   ${MLIR_SOURCE_DIR}/include
   ${LLVM_BINARY_DIR}/tools/mlir/include
+  ${LLVM_EXTERNAL_MLIR_HLO_SOURCE_DIR}/include
+  ${LLVM_BINARY_DIR}/tools/mlir_hlo/include
 )
 
 set(LLVM_INCLUDE_DIRS ${LLVM_INCLUDE_DIRS})

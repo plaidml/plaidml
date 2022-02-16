@@ -117,11 +117,10 @@ void PadConstraintsPass::runOnFunction() {
       continue;
     }
 
-    // Check if it's a block argument or unpack source, and if so add an IdentOp
-    // to copy the value.
+    // Add an IdentOp to copy the value of BlockArguments or specials.
     if (def.isa<BlockArgument>() ||
-        isa_and_nonnull<stdx::UnpackOp, tile::GatherOp, tile::PrngOp,
-                        tile::ScatterOp>(def.getDefiningOp())) {
+        isa_and_nonnull<tile::GatherOp, tile::PrngOp, tile::ScatterOp>(
+            def.getDefiningOp())) {
       OpBuilder inner(&getContext());
       inner.setInsertionPointAfterValue(def);
       // Construct an initial identity operation.

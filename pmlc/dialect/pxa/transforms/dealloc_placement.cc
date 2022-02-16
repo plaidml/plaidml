@@ -23,53 +23,17 @@ struct DeallocPlacementPass
     OpOperand *lastUse;
   };
 
-  using Callback = llvm::function_ref<void(unsigned)>;
-
   void runOnOperation() final {
-    // Get the module
     ModuleOp op = getOperation();
-    // Run all functions.  This could almost be a function pass, but init + fini
-    // interact, which breaks the independence requirements
-    op.walk([&](FuncOp fn) {
-      if (fn.getName() == "init") {
-        // If the function is named init, find fini
-        auto finiFunc = op.lookupSymbol<FuncOp>("fini");
-        if (!finiFunc) {
-          fn.emitError() << "Init with no fini";
-          signalPassFailure();
-          return;
-        }
-        // Find fini's unpack op
-        auto unpackOp = dyn_cast<stdx::UnpackOp>(finiFunc.begin()->begin());
-        if (!unpackOp) {
-          finiFunc.emitError() << "Fini must begin with unpack";
-          signalPassFailure();
-          return;
-        }
-        // Now, place deallocs on the init functions, moving escaping allocs to
-        // be deallocated in fini
-        OpBuilder builder(finiFunc.begin()->getTerminator());
-        runOnFunction(fn, [&](unsigned i) {
-          builder.create<memref::DeallocOp>(fn.getLoc(), unpackOp.getResult(i));
-        });
-      } else {
-        // Place allocs, if any escape, it's an error
-        runOnFunction(
-            fn, [&](unsigned i) {
-              fn.emitError()
-                  << "Allocations escape via a pack for non-init function";
-              signalPassFailure();
-            });
-      }
-    });
+    op.walk([&](FuncOp fn) { runOnFunction(fn); });
   }
 
-  void runOnFunction(FuncOp fn, Callback onPack) {
+  void runOnFunction(FuncOp fn) {
     // Place deallocation for AllocOp
     fn.walk([&](memref::AllocOp alloc) {
       IVLOG(3, "alloc: " << debugString(*alloc));
       Optional<Placement> placement =
-          findPlacement(alloc.getResult(), alloc, alloc->getBlock(), onPack);
+          findPlacement(alloc.getResult(), alloc, alloc->getBlock());
       if (!placement)
         return;
 
@@ -86,8 +50,8 @@ struct DeallocPlacementPass
         Value init;
         std::tie(arg, init) = it.value();
 
-        Optional<Placement> placement = findPlacement(
-            arg, &forOp.getBody()->front(), forOp.getBody(), onPack);
+        Optional<Placement> placement =
+            findPlacement(arg, &forOp.getBody()->front(), forOp.getBody());
         if (!placement)
           continue;
 
@@ -132,7 +96,7 @@ struct DeallocPlacementPass
   }
 
   Optional<Placement> findPlacement(Value ref, Operation *lastOp,
-                                    Block *allocBlock, Callback onPack) {
+                                    Block *allocBlock) {
     OpOperand *lastUse = nullptr;
     for (OpOperand &itUse : getIndirectUses(ref)) {
       Operation *use = itUse.getOwner();
@@ -154,14 +118,6 @@ struct DeallocPlacementPass
     }
 
     IVLOG(3, "  last ancestor: " << debugString(*lastOp));
-
-    if (auto packOp = dyn_cast<stdx::PackOp>(lastOp)) {
-      IVLOG(3, "  pack op");
-      // Alloc 'escapes' via a pack, call our callback to handle
-      onPack(lastUse->getOperandNumber());
-      return None;
-    }
-
     Operation *nextOp = lastOp->getNextNode();
     if (!nextOp) {
       IVLOG(3, "  terminator");

@@ -20,8 +20,6 @@ namespace pml = dialect::pml;
 
 namespace {
 
-static constexpr StringLiteral kStencilAxisType = "stencil";
-
 // A simple wrapper to provide an ordering to object vectors that
 // we're going to be processing with std::next_permutation() --
 // e.g. if we used pointers as comparison values, our order of
@@ -41,7 +39,10 @@ StencilBase::StencilBase(AffineParallelOp op,
     : op(op), blockArgs(op.getIVs().begin(), op.getIVs().end()),
       requirements(requirements.begin(), requirements.end()),
       bestCost(std::numeric_limits<double>::infinity()),
-      schedule(op->getAttrOfType<pml::ScheduleAttr>(pml::kScheduleAttrName)) {}
+      schedule(op->getAttrOfType<pml::ScheduleAttr>(pml::kScheduleAttrName)) {
+  if (schedule)
+    IVLOG(1, "Using schedule: " << schedule);
+}
 
 void StencilBase::reportBestStencil(unsigned logLevel) {
   if (VLOG_IS_ON(logLevel)) {
@@ -181,7 +182,7 @@ void StencilBase::performStenciling() {
   // Initialization
   auto maybeRanges = op.getConstantRanges();
   if (!maybeRanges) {
-    IVLOG(4, "Cannot Stencil: Requires constant ranges");
+    IVLOG(2, "Cannot Stencil: Requires constant ranges");
     return;
   }
   ranges = *maybeRanges;
@@ -189,7 +190,7 @@ void StencilBase::performStenciling() {
 
   Optional<StencilCapture> maybeCapturedValues = capture();
   if (!maybeCapturedValues) {
-    IVLOG(4, "Cannot Stencil: Operations fail to pattern-match.");
+    IVLOG(2, "Cannot Stencil: Operations fail to pattern-match.");
     return;
   }
   capturedValues = *maybeCapturedValues;
@@ -237,7 +238,7 @@ void StencilBase::performStenciling() {
         op->removeAttr(pml::kScheduleAttrName);
     }
   } else {
-    IVLOG(3, "No legal tiling found to stencil");
+    IVLOG(2, "No legal tiling found to stencil");
   }
 }
 

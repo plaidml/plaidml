@@ -1,5 +1,6 @@
 add_subdirectory(affinex)
 add_subdirectory(layer)
+add_subdirectory(linalgx)
 add_subdirectory(pml)
 add_subdirectory(pxa)
 add_subdirectory(stdx)

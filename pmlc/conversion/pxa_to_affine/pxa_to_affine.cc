@@ -252,35 +252,40 @@ struct PxaStoreOpConversion : public OpConversionPattern<pxa::PxaStoreOp> {
   }
 };
 
-struct FuncOpConversion : public OpConversionPattern<FuncOp> {
-  using OpConversionPattern<FuncOp>::OpConversionPattern;
+template <typename Op>
+struct IsExternal {
+  static bool check(Op op) { return false; }
+};
+
+template <>
+struct IsExternal<FuncOp> {
+  static bool check(FuncOp op) { return op.isExternal(); }
+};
+
+template <typename FuncLikeOp>
+struct FuncOpConversion : public OpConversionPattern<FuncLikeOp> {
+  using OpConversionPattern<FuncLikeOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(FuncOp op, ArrayRef<Value> operands,
+  matchAndRewrite(FuncLikeOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
     FunctionType type = op.getType();
-    if (op.isExternal()) {
+    if (IsExternal<FuncLikeOp>::check(op)) {
       return success();
     }
-    IVLOG(2, "FuncOpConversion::rewrite> " << debugString(type));
 
     // Convert the function signature
     TypeConverter::SignatureConversion result(type.getNumInputs());
     for (unsigned i = 0; i < type.getNumInputs(); ++i) {
       result.addInputs(i, {type.getInput(i)});
     }
-    SmallVector<Type, 1> resultTypes;
-    for (unsigned i = 0; i < type.getNumResults(); ++i) {
-      if (type.getResult(i).isa<stdx::ArgpackType>()) {
-        resultTypes.push_back(type.getResult(i));
-      }
-    }
 
     // Create a new function with an updated signature.
-    FuncOp newOp = rewriter.cloneWithoutRegions(op);
-    rewriter.inlineRegionBefore(op.getBody(), newOp.getBody(), newOp.end());
+    FuncLikeOp newOp = rewriter.cloneWithoutRegions(op);
+    rewriter.inlineRegionBefore(op.getBody(), newOp.getBody(),
+                                newOp.getBody().end());
     newOp.setType(FunctionType::get(op.getContext(), result.getConvertedTypes(),
-                                    resultTypes));
+                                    ArrayRef<Type>{}));
 
     // Tell the rewriter to convert the region signature.
     rewriter.applySignatureConversion(&newOp.getBody(), result);
@@ -320,20 +325,15 @@ struct ReluOpConversion : public OpConversionPattern<stdx::ReluOp> {
   }
 };
 
-struct ReturnOpConversion : public OpConversionPattern<ReturnOp> {
-  using OpConversionPattern<ReturnOp>::OpConversionPattern;
+template <typename ReturnLikeOp>
+struct ReturnOpConversion : public OpConversionPattern<ReturnLikeOp> {
+  using OpConversionPattern<ReturnLikeOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(ReturnOp op, ArrayRef<Value> operands,
+  matchAndRewrite(ReturnLikeOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
-    IVLOG(2, "ReturnOpConversion::matchAndRewrite>");
     SmallVector<Value, 1> results;
-    for (Value val : operands) {
-      if (val.getType().isa<stdx::ArgpackType>()) {
-        results.push_back(val);
-      }
-    }
-    rewriter.replaceOpWithNewOp<ReturnOp>(op, results);
+    rewriter.replaceOpWithNewOp<ReturnLikeOp>(op, results);
     return success();
   }
 };
@@ -374,20 +374,26 @@ PXAToAffineConversionTarget::PXAToAffineConversionTarget(MLIRContext &ctx)
   });
   addDynamicallyLegalOp<ReturnOp>(
       [](ReturnOp op) { return op.getNumOperands() == 0; });
+  addDynamicallyLegalOp<stdx::ClosureOp>(
+      [](stdx::ClosureOp op) { return op.getType().getNumResults() == 0; });
+  addDynamicallyLegalOp<stdx::YieldOp>(
+      [](stdx::YieldOp op) { return op.getNumOperands() == 0; });
 }
 
 void populatePXAToAffineConversionPatterns(RewritePatternSet &patterns) {
-  patterns.insert<                 //
-      AffineIfOpConversion,        //
-      AffineParallelOpConversion,  //
-      FuncOpConversion,            //
-      PxaLoadOpConversion,         //
-      PxaReduceOpConversion,       //
-      PxaVectorLoadOpConversion,   //
-      PxaVectorReduceOpConversion, //
-      PxaStoreOpConversion,        //
-      ReluOpConversion,            //
-      ReturnOpConversion>(patterns.getContext());
+  patterns.insert<                       //
+      AffineIfOpConversion,              //
+      AffineParallelOpConversion,        //
+      FuncOpConversion<FuncOp>,          //
+      FuncOpConversion<stdx::ClosureOp>, //
+      PxaLoadOpConversion,               //
+      PxaReduceOpConversion,             //
+      PxaVectorLoadOpConversion,         //
+      PxaVectorReduceOpConversion,       //
+      PxaStoreOpConversion,              //
+      ReluOpConversion,                  //
+      ReturnOpConversion<ReturnOp>,      //
+      ReturnOpConversion<stdx::YieldOp>>(patterns.getContext());
 }
 
 std::unique_ptr<Pass> createLowerPXAToAffinePass() {

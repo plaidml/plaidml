@@ -20,4 +20,5 @@ pml_tblgen_library(
     -gen-op-decls ops.h.inc
     -gen-op-defs ops.cc.inc
     -gen-dialect-decls dialect.h.inc
+    -gen-dialect-defs dialect.cc.inc
 )

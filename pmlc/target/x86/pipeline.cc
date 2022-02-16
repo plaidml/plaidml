@@ -1,31 +1,44 @@
-// Copyright 2020 Intel Corporation
+// Copyright 2021 Intel Corporation
+
 #include "pmlc/target/x86/pipeline.h"
 
 #include <algorithm>
 #include <memory>
+#include <string>
 #include <utility>
+#include <vector>
 
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
+#include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
+#include "mlir/Conversion/LLVMCommon/TypeConverter.h"
+#include "mlir/Conversion/MathToLLVM/MathToLLVM.h"
+#include "mlir/Conversion/MemRefToLLVM/MemRefToLLVM.h"
 #include "mlir/Conversion/OpenMPToLLVM/ConvertOpenMPToLLVM.h"
+#include "mlir/Conversion/SCFToOpenMP/SCFToOpenMP.h"
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
 #include "mlir/Dialect/Affine/Passes.h"
 #include "mlir/Dialect/Math/Transforms/Passes.h"
 #include "mlir/Dialect/OpenMP/OpenMPDialect.h"
+#include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/StandardOps/Transforms/Passes.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Transforms/LoopUtils.h"
 #include "mlir/Transforms/Passes.h"
 #include "mlir/Transforms/RegionUtils.h"
 
 #include "pmlc/compiler/registry.h"
+#include "pmlc/conversion/linalg_to_pxa/passes.h"
 #include "pmlc/conversion/pxa_to_affine/passes.h"
-#include "pmlc/conversion/scf_to_omp/passes.h"
 #include "pmlc/conversion/stdx_to_llvm/passes.h"
+#include "pmlc/conversion/tile_to_linalg/passes.h"
 #include "pmlc/conversion/tile_to_pxa/passes.h"
 #include "pmlc/dialect/layer/transforms/passes.h"
+#include "pmlc/dialect/pml/transforms/passes.h"
 #include "pmlc/dialect/pxa/transforms/passes.h"
 #include "pmlc/dialect/pxa/transforms/stencil.h"
 #include "pmlc/dialect/stdx/transforms/passes.h"
@@ -34,19 +47,17 @@
 #include "pmlc/target/x86/heatmap.h"
 #include "pmlc/target/x86/pass_detail.h"
 #include "pmlc/target/x86/passes.h"
-#include "pmlc/transforms/passes.h"
 #include "pmlc/util/env.h"
 #include "pmlc/util/logging.h"
 
 #include "omp.h" // NOLINT
-
-#include "pmlc/target/x86/utils.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
 
 namespace pmlc::target::x86 {
 
 namespace layer = dialect::layer;
+namespace pml = dialect::pml;
 namespace pxa = dialect::pxa;
 namespace stdx = dialect::stdx;
 namespace tile = dialect::tile;
@@ -76,34 +87,84 @@ struct LowerPXAToAffinePass
 
 struct ConvertStandardToLLVMPass
     : public ConvertStandardToLLVMBase<ConvertStandardToLLVMPass> {
-  void runOnOperation() override {
+  void runOnOperation() final {
     ModuleOp module = getOperation();
     MLIRContext *context = module.getContext();
 
     LowerToLLVMOptions options(context);
     options.emitCWrappers = true;
-    LLVMTypeConverter typeConverter(context, options);
+    LLVMTypeConverter converter(context, options);
 
     RewritePatternSet patterns(context);
     populateExpandTanhPattern(patterns);
-    populateXSMMToLLVMConversionPatterns(typeConverter, patterns);
-    populateStdToLLVMConversionPatterns(typeConverter, patterns);
-    conversion::stdx_to_llvm::populateStdXToLLVMConversionPatterns(
-        typeConverter, patterns);
-    populateOpenMPToLLVMConversionPatterns(typeConverter, patterns);
+    populateXSMMToLLVMConversionPatterns(converter, patterns);
+    populateStdToLLVMConversionPatterns(converter, patterns);
+    populateMemRefToLLVMConversionPatterns(converter, patterns);
+    populateMathToLLVMConversionPatterns(converter, patterns);
+    conversion::stdx_to_llvm::populateStdXToLLVMConversionPatterns(converter,
+                                                                   patterns);
+    populateOpenMPToLLVMConversionPatterns(converter, patterns);
 
     LLVMConversionTarget target(*context);
-    target.addDynamicallyLegalOp<omp::ParallelOp>([&](omp::ParallelOp op) {
-      return typeConverter.isLegal(&op.getRegion());
-    });
-    target.addLegalOp<omp::TerminatorOp, //
-                      omp::TaskyieldOp,  //
-                      omp::FlushOp,      //
-                      omp::BarrierOp,    //
-                      omp::TaskwaitOp>();
+    target.addIllegalOp<UnrealizedConversionCastOp>();
+    target.addDynamicallyLegalOp<omp::ParallelOp, omp::WsLoopOp>(
+        [&](Operation *op) { return converter.isLegal(&op->getRegion(0)); });
+    target.addLegalOp<omp::BarrierOp, omp::FlushOp, omp::TaskyieldOp,
+                      omp::TaskwaitOp, omp::TerminatorOp>();
     if (failed(applyPartialConversion(module, target, std::move(patterns)))) {
       signalPassFailure();
     }
+  }
+};
+
+struct CollapseParallelLoopsPass
+    : public CollapseParallelLoopsBase<CollapseParallelLoopsPass> {
+  void runOnFunction() final {
+    getFunction().walk([&](scf::ParallelOp op) {
+      SmallVector<std::vector<unsigned>, 3> combinedLoops;
+      std::vector<unsigned> dims;
+      for (unsigned i = 0; i < op.getNumLoops(); i++)
+        dims.push_back(i);
+      combinedLoops.push_back(dims);
+      collapseParallelLoops(op, combinedLoops);
+    });
+  }
+};
+
+static APFloat convertFloatUsingType(double value, FloatType type) {
+  bool losesInfo = false;
+  APFloat apValue(value);
+  apValue.convert(type.getFloatSemantics(), APFloat::rmNearestTiesToEven,
+                  &losesInfo);
+  return apValue;
+}
+
+struct FoldConstantCastPass
+    : public FoldConstantCastBase<FoldConstantCastPass> {
+  void runOnFunction() final {
+    getFunction().walk([&](CastOpInterface op) {
+      Attribute attr;
+      if (matchPattern(op->getOperand(0), m_Constant(&attr))) {
+        OpBuilder builder(op);
+        Value result = op->getResult(0);
+        Type type = result.getType();
+        if (auto floatType = type.dyn_cast<FloatType>()) {
+          if (auto intAttr = attr.dyn_cast<IntegerAttr>()) {
+            APFloat value = convertFloatUsingType(intAttr.getInt(), floatType);
+            auto constOp =
+                builder.create<ConstantFloatOp>(op->getLoc(), value, floatType);
+            result.replaceAllUsesWith(constOp);
+          }
+        } else if (auto intType = type.dyn_cast<IntegerType>()) {
+          if (auto floatAttr = attr.dyn_cast<FloatAttr>()) {
+            int64_t value = static_cast<int64_t>(floatAttr.getValueAsDouble());
+            auto constOp =
+                builder.create<ConstantIntOp>(op->getLoc(), value, intType);
+            result.replaceAllUsesWith(constOp);
+          }
+        }
+      }
+    });
   }
 };
 
@@ -151,6 +212,10 @@ struct StencilTppGemmPass : public StencilTppGemmBase<StencilTppGemmPass> {
   }
 };
 
+std::unique_ptr<Pass> createCollapseParallelLoopsPass() {
+  return std::make_unique<CollapseParallelLoopsPass>();
+}
+
 std::unique_ptr<Pass> createStencilTppGemmPass(unsigned numThreads,
                                                bool isBatched) {
   return std::make_unique<StencilTppGemmPass>(numThreads, isBatched);
@@ -168,6 +233,10 @@ std::unique_ptr<Pass> createLowerToLLVMPass() {
   return std::make_unique<ConvertStandardToLLVMPass>();
 }
 
+std::unique_ptr<Pass> createFoldConstantCastPass() {
+  return std::make_unique<FoldConstantCastPass>();
+}
+
 struct Options : public PassPipelineOptions<Options> {
   Option<unsigned> numThreads{*this, "threads",
                               llvm::cl::desc("Number of threads")};
@@ -177,42 +246,66 @@ struct Options : public PassPipelineOptions<Options> {
   }
 };
 
-void pipelineBuilderStage1(OpPassManager &pm, const Options &options) {
-  unsigned maxThreads = options.getNumThreads();
-  IVLOG(1, "Number of threads: " << maxThreads);
-
+void pipelineBuilderStage1(OpPassManager &pm) {
   pm.addNestedPass<FuncOp>(layer::createInlineLayersPass());
   pm.addNestedPass<FuncOp>(tile::createAlgebraicOptPass());
   pm.addNestedPass<FuncOp>(tile::createComputeBoundsPass());
-  pm.addPass(tile::createSplitMainPass());
-  pm.addPass(transforms::createHoistingPass());
   pm.addNestedPass<FuncOp>(tile::createPadConstraintsPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
-  pm.addPass(pmlc::conversion::tile_to_pxa::createLowerTileToPXAPass());
+  std::string schedulePath = util::getEnvVar("PLAIDML_SCHEDULE_PATH");
+  if (!schedulePath.empty()) {
+    pm.addPass(pml::createLoadModulePass(/*path=*/schedulePath));
+    pm.addPass(createCanonicalizerPass());
+    pm.addPass(pml::createApplyRulesPass(/*module=*/"schedule"));
+  }
+
+  pm.addPass(pmlc::conversion::tile_to_linalg::createLowerTileToLinalgPass());
+  if (!util::getEnvVar("PLAIDML_REORDER").empty())
+    pm.addNestedPass<FuncOp>(createReorderLayoutsPass());
+  else
+    pm.addNestedPass<FuncOp>(createReorderWeightLayoutsPass());
+
+  pm.addPass(stdx::createMainClosurePass());
+  pm.addPass(createLoopInvariantCodeMotionPass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+}
+
+void pipelineBuilderStage2(OpPassManager &pm, const Options &options) {
+  unsigned maxThreads = options.getNumThreads();
+  IVLOG(1, "Number of threads: " << maxThreads);
+
+  pm.addPass(pmlc::conversion::linalg_to_pxa::createLowerLinalgToPXAPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
   pm.addNestedPass<FuncOp>(layer::createInlineLayersPass());
 
-  bool blockedDataLayouts = false;
-  if (blockedDataLayouts) {
-    // If the userLayouts flag is set to true, Conv2D recognizer
-    // will introduce blocked data layouts. If it is set to false, a heuristic
-    // will determine the best data layouts
-    pm.addNestedPass<FuncOp>(
-        pxa::createReorderLayoutsPass(/*allowReorder*/ true,
-                                      /*userLayouts*/ true,
-                                      /*datatileSize*/ 64));
-    pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
-    pm.addPass(createCanonicalizerPass());
-    pm.addNestedPass<FuncOp>(
-        pxa::createAffineNormalizePass(/*promote*/ true, /*denest*/ true));
-    pm.addPass(createCanonicalizerPass());
-  }
-
   pm.addNestedPass<FuncOp>(createStencilTppGemmPass(/*numThreads=*/maxThreads,
                                                     /*isBatched=*/true));
+  pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
+  pm.addPass(createCanonicalizerPass());
+
+  pm.addNestedPass<FuncOp>(
+      pxa::createFusionPass(/*memoryActivityThreshold=*/0,
+                            /*minimumThreads=*/maxThreads,
+                            /*exactlyMatch=*/false,
+                            /*tiledFusion=*/true,
+                            /*loopDepth=*/0,
+                            /*singleOutput=*/false,
+                            /*avoidReductionIndexes=*/true));
+  pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
+  pm.addPass(createCanonicalizerPass());
+
+  pm.addNestedPass<FuncOp>(
+      pxa::createFusionPass(/*memoryActivityThreshold=*/0,
+                            /*minimumThreads=*/maxThreads,
+                            /*exactlyMatch=*/false,
+                            /*tiledFusion=*/false,
+                            /*loopDepth=*/1,
+                            /*singleOutput=*/false,
+                            /*avoidReductionIndexes=*/true));
   pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
 
@@ -224,17 +317,11 @@ void pipelineBuilderStage1(OpPassManager &pm, const Options &options) {
   pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
 
-  pm.addNestedPass<FuncOp>(pxa::createFusionPass(/*memoryActivityThreshold=*/0,
-                                                 /*exactlyMatch=*/false,
-                                                 /*tiledFusion=*/true));
-  pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
-  pm.addPass(createCanonicalizerPass());
-
   pm.addNestedPass<FuncOp>(pxa::createMemRefDataFlowOptPass());
   pm.addPass(createCanonicalizerPass());
 
   pm.addNestedPass<FuncOp>(pxa::createLocalizePass());
-  // pm.addNestedPass<FuncOp>(pxa::createResizeTmpsPass());
+  pm.addNestedPass<FuncOp>(pxa::createResizeTmpsPass());
   pm.addPass(pxa::createDeallocPlacementPass());
   pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass(/*promote=*/true,
                                                           /*denest=*/true));
@@ -242,53 +329,74 @@ void pipelineBuilderStage1(OpPassManager &pm, const Options &options) {
   pm.addPass(createCSEPass());
 
   pm.addNestedPass<FuncOp>(createStencilTppUnaryPass());
+  pm.addNestedPass<FuncOp>(createStencilTppBinaryPass());
+  pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
+
+  if (pmlc::util::getEnvVar("PLAIDML_PROFILE") == "1")
+    pm.addPass(createProfileKernelsPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
   pm.addPass(createPRNGLinkingPass());
 }
 
-void pipelineBuilderStage2(OpPassManager &pm) {
+void pipelineBuilderStage3(OpPassManager &pm) {
   pm.addPass(createLowerPXAToAffinePass());
   pm.addPass(createLoopInvariantCodeMotionPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
   pm.addPass(createLowerAffinePass());
+  pm.addPass(createLoopInvariantCodeMotionPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
-  pm.addPass(pmlc::conversion::scf_to_omp::createLowerSCFToOpenMPPass());
+  pm.addNestedPass<FuncOp>(createCollapseParallelLoopsPass());
+  pm.addPass(createConvertSCFToOpenMPPass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+
+  pm.addNestedPass<FuncOp>(createFoldConstantCastPass());
+
+  pm.addPass(stdx::createSplitClosurePass());
+  pm.addPass(createLoopInvariantCodeMotionPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 }
 
-void pipelineBuilderStage3(OpPassManager &pm) {
+void pipelineBuilderStage4(OpPassManager &pm) {
   pm.addPass(createLowerToCFGPass());
   if (pmlc::util::getEnvVar("PLAIDML_BOUNDS_CHECK") == "1")
     pm.addNestedPass<FuncOp>(stdx::createBoundsCheckPass());
 
   pm.addPass(createLowerToLLVMPass());
   pm.addPass(createTraceLinkingPass());
+  if (pmlc::util::getEnvVar("PLAIDML_PROFILE") == "1")
+    pm.addPass(createProfileLinkingPass());
 }
 
 void pipelineBuilder(OpPassManager &pm) {
   Options options;
-  pipelineBuilderStage1(pm, options);
-  pipelineBuilderStage2(pm);
+  pipelineBuilderStage1(pm);
+  pipelineBuilderStage2(pm, options);
   pipelineBuilderStage3(pm);
+  pipelineBuilderStage4(pm);
 }
 
-static PassPipelineRegistration<Options>
-    registerStage1Pipeline("x86-stage1", "x86 Stage1 Pipeline",
-                           pipelineBuilderStage1);
+static PassPipelineRegistration<> registerStage1Pipeline("x86-stage1",
+                                                         "x86 Stage1 Pipeline",
+                                                         pipelineBuilderStage1);
 
-static PassPipelineRegistration<> registerStage2Pipeline("x86-stage2",
-                                                         "x86 Stage2 Pipeline",
-                                                         pipelineBuilderStage2);
+static PassPipelineRegistration<Options>
+    registerStage2Pipeline("x86-stage2", "x86 Stage2 Pipeline",
+                           pipelineBuilderStage2);
 
 static PassPipelineRegistration<> registerStage3Pipeline("x86-stage3",
                                                          "x86 Stage3 Pipeline",
                                                          pipelineBuilderStage3);
+
+static PassPipelineRegistration<> registerStage4Pipeline("x86-stage4",
+                                                         "x86 Stage4 Pipeline",
+                                                         pipelineBuilderStage4);
 
 } // namespace pmlc::target::x86

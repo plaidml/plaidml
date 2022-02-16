@@ -346,14 +346,15 @@ plaidml_expr* plaidml_expr_intrinsic(  //
     plaidml_error* err,                //
     const char* fn,                    //
     size_t nargs,                      //
-    plaidml_expr** args) {
+    plaidml_expr** args,               //
+    const char* name) {
   return ffi_wrap<plaidml_expr*>(err, nullptr, [&] {
     IVLOG(3, "plaidml_expr_intrinsic: " << fn);
     std::vector<ast::ExprNodePtr> operands(nargs);
     for (size_t i = 0; i < nargs; i++) {
       operands[i] = args[i]->node;
     }
-    auto node = std::make_shared<ast::ExprNodeIntrinsic>(fn, operands);
+    auto node = std::make_shared<ast::ExprNodeIntrinsic>(fn, operands, name);
     ast::Evaluator evaluator;
     evaluator.verify(node);
     LayerContext::get()->addNode(node);

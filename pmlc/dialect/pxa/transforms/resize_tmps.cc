@@ -89,11 +89,6 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
         } else if (auto scalarOp = dyn_cast<PxaLoadOp>(use.getOwner())) {
           vectorSize = (vectorSize == 0 || vectorSize == 1) ? 1 : 0;
         }
-        if (!vectorSize) {
-          use.getOwner()->emitRemark(
-              "Users of Alloc ops have different vector/scalar sizes");
-          return;
-        }
       } else if (auto rop = dyn_cast<PxaReduceOpInterface>(use.getOwner())) {
         if (failed(computeMultiDimStrideInfo(rop.getAffineMap(),
                                              rop.getMapOperands(), strides))) {
@@ -115,11 +110,20 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
         } else if (auto scalarOp = dyn_cast<PxaReduceOp>(use.getOwner())) {
           vectorSize = (vectorSize == 0 || vectorSize == 1) ? 1 : 0;
         }
-        if (!vectorSize) {
-          use.getOwner()->emitRemark(
-              "Users of Alloc ops have different vector/scalar sizes");
+      } else if (auto gop = dyn_cast<PxaGenericOp>(use.getOwner())) {
+        auto valueMap = gop.getAffineValueMaps()[use.getOperandNumber()];
+        if (failed(computeMultiDimStrideInfo(
+                valueMap.getAffineMap(), valueMap.getOperands(), strides))) {
+          rop.emitRemark("Unable to compute strides for access");
           return;
         }
+        vectorSize = 1;
+      }
+
+      if (!vectorSize) {
+        use.getOwner()->emitRemark(
+            "Users of Alloc ops have different vector/scalar sizes");
+        return;
       }
 
       SmallVector<StrideInfo, 4> curOuter;
@@ -216,12 +220,15 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
     // Get ops first and then replace since we modify use-def chain during
     // mutation.
     SmallVector<Operation *, 4> ops;
+    SmallVector<unsigned, 4> usePos;
     for (auto &use : getIndirectAccessUses(op.getResult())) {
       ops.push_back(use.getOwner());
+      usePos.push_back(use.getOperandNumber());
     }
     // Now do the actual changes.  Note, we don't bother erasing the original
     // instructions, but they get cleaned up via canonicalization
-    for (Operation *op : ops) {
+    for (unsigned i = 0; i < ops.size(); ++i) {
+      Operation *op = ops[i];
       if (auto rop = dyn_cast<PxaReduceOpInterface>(op)) {
         // TODO: This probably should move into some sort of utility transform,
         // but I need another example or two to generalize from
@@ -240,8 +247,7 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
               vm.getAffineMap(), vm.getOperands());
           ropOp.replaceAllUsesWith(nrop.result());
         }
-      }
-      if (auto lop = dyn_cast<PxaReadOpInterface>(op)) {
+      } else if (auto lop = dyn_cast<PxaReadOpInterface>(op)) {
         auto vm = computeInnerValueMap(lop.getAffineMap(), lop.getMapOperands(),
                                        opBlock);
         OpBuilder replace(lop.getOperation());
@@ -256,6 +262,77 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
               vm.getAffineMap(), vm.getOperands());
           lopOp.replaceAllUsesWith(nlop.result());
         }
+      } else if (auto gop = dyn_cast<PxaGenericOp>(op)) {
+        auto pos = usePos[i];
+        auto valueMap = gop.getAffineValueMaps()[pos];
+        auto vm = computeInnerValueMap(valueMap.getAffineMap(),
+                                       valueMap.getOperands(), opBlock);
+        OpBuilder replace(gop.getOperation());
+
+        SmallVector<Value, 4> inputs = gop.inputs();
+        SmallVector<Value, 4> outputs = gop.outputs();
+        SmallVector<Value, 4> inputIndices;
+        SmallVector<AffineMap, 4> inputAccessMaps;
+        for (auto map : gop.inputAccessMaps()) {
+          inputAccessMaps.push_back(map.cast<AffineMapAttr>().getValue());
+        }
+        SmallVector<Value, 4> outputIndices;
+        SmallVector<AffineMap, 4> outputAccessMaps;
+        for (auto map : gop.outputAccessMaps()) {
+          outputAccessMaps.push_back(map.cast<AffineMapAttr>().getValue());
+        }
+        auto numInputs = inputs.size();
+        if (pos < numInputs) {
+          unsigned idxCount = 0;
+          for (unsigned i = 0; i < pos; ++i) {
+            idxCount += inputAccessMaps[i].getNumDims();
+          }
+          inputIndices.insert(inputIndices.end(), gop.inputIndices().begin(),
+                              gop.inputIndices().begin() + idxCount);
+          inputIndices.insert(inputIndices.end(), vm.getOperands().begin(),
+                              vm.getOperands().end());
+          inputIndices.insert(inputIndices.end(),
+                              gop.inputIndices().begin() + idxCount +
+                                  inputAccessMaps[pos].getNumDims(),
+                              gop.inputIndices().end());
+          inputAccessMaps[pos] = vm.getAffineMap();
+          outputIndices = llvm::to_vector<4>(gop.outputIndices());
+        } else {
+          unsigned idxCount = 0;
+          unsigned outPos = pos - numInputs;
+          for (unsigned i = 0; i < outPos; ++i) {
+            idxCount += outputAccessMaps[i].getNumDims();
+          }
+          outputIndices.insert(outputIndices.end(), gop.outputIndices().begin(),
+                               gop.outputIndices().begin() + idxCount);
+          outputIndices.insert(outputIndices.end(), vm.getOperands().begin(),
+                               vm.getOperands().end());
+          outputIndices.insert(outputIndices.end(),
+                               gop.outputIndices().begin() + idxCount +
+                                   outputAccessMaps[outPos].getNumDims(),
+                               gop.outputIndices().end());
+          outputAccessMaps[outPos] = vm.getAffineMap();
+          inputIndices = llvm::to_vector<4>(gop.inputIndices());
+        }
+        auto ngop = replace.create<pxa::PxaGenericOp>(
+            op->getLoc(), gop.outputs().getTypes(),
+            /*inputs=*/inputs,
+            /*outputs=*/outputs,
+            /*inputIndices=*/inputIndices,
+            /*outputIndices=*/outputIndices,
+            /*inputAccessMaps=*/replace.getAffineMapArrayAttr(inputAccessMaps),
+            /*inputTileMaps=*/gop.inputTileMaps(),
+            /*outputAccessMaps=*/
+            replace.getAffineMapArrayAttr(outputAccessMaps),
+            /*outputTileMaps=*/gop.outputTileMaps(),
+            /*kernel=*/gop.kernel(),
+            /*tile=*/gop.tile(),
+            /*reductions=*/gop.reductions());
+
+        for (unsigned i = 0; i < ngop.getNumResults(); ++i) {
+          gop.getResult(i).replaceAllUsesWith(ngop.getResult(i));
+        }
+        gop.erase();
       }
     }
   }

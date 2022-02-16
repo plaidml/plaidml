@@ -38,6 +38,7 @@
 #include "mlir/Transforms/Passes.h"
 
 #include "pmlc/rt/device_id.h"
+#include "pmlc/rt/instrument.h"
 #include "pmlc/rt/internal.h"
 #include "pmlc/rt/runtime.h"
 #include "pmlc/rt/symbol_registry.h"
@@ -50,6 +51,8 @@ using namespace mlir; // NOLINT[build/namespaces]
 using pmlc::compiler::Program;
 
 namespace pmlc::rt {
+
+namespace {
 
 // Setup LLVM target triple from the current machine.
 static void setupTargetTriple(llvm::Module *llvmModule) {
@@ -94,8 +97,6 @@ static std::string packFunctionArguments(llvm::Module *module,
   return newName;
 }
 
-namespace {
-
 constexpr const char *kInitName = "init";
 constexpr const char *kFiniName = "fini";
 
@@ -109,14 +110,15 @@ private:
   };
 
 public:
-  MemRefDescriptor(void *data, RankedTensorType type)
-      : memory(computeSize(type)) {
+  MemRefDescriptor(void *data, Type type)
+      : rankedType(type.cast<RankedTensorType>()),
+        memory(computeSize(rankedType)) {
     auto base = reinterpret_cast<Base *>(memory.data());
     base->basePtr = data;
     base->data = data;
-    auto rank = type.getRank();
-    auto shape = type.getShape();
-    auto memRefType = MemRefType::get(shape, type.getElementType());
+    auto rank = rankedType.getRank();
+    auto shape = rankedType.getShape();
+    auto memRefType = MemRefType::get(shape, rankedType.getElementType());
     SmallVector<int64_t, 8> strides;
     (void)getStridesAndOffset(memRefType, strides, base->offset);
     for (unsigned i = 0; i < rank; i++) {
@@ -127,6 +129,12 @@ public:
 
   void *ptr() { return memory.data(); }
 
+  void set(void *data) {
+    auto base = reinterpret_cast<Base *>(memory.data());
+    base->basePtr = data;
+    base->data = data;
+  }
+
 private:
   static unsigned computeSize(RankedTensorType type) {
     return sizeof(void *) +                   // allocatedPtr
@@ -136,6 +144,7 @@ private:
            sizeof(int64_t) * type.getRank();  // strides
   }
 
+  RankedTensorType rankedType;
   std::vector<char> memory;
 };
 
@@ -232,6 +241,22 @@ struct OrcJITEngineImpl : EngineImpl {
 
     auto dataLayout = module->getDataLayout();
 
+    auto tmBuilderOrError = JITTargetMachineBuilder::detectHost();
+    if (!tmBuilderOrError) {
+      throw std::runtime_error(
+          "Failed to create a JITTargetMachineBuilder for the host");
+    }
+
+    auto tmOrError = tmBuilderOrError->createTargetMachine();
+    if (!tmOrError) {
+      throw std::runtime_error("Failed to create a TargetMachine for the host");
+    }
+
+    auto transformer = makeOptimizingTransformer(
+        /*optLevel=*/3,
+        /*sizeLevel=*/0,
+        /*targetMachine=*/tmOrError->get());
+
     // Callback to inspect the cache and recompile on demand. This follows
     // Lang's LLJITWithObjectCache example.
     auto compileFunctionCreator = [&](JITTargetMachineBuilder JTMB)
@@ -249,6 +274,14 @@ struct OrcJITEngineImpl : EngineImpl {
 
     // Add a ThreadSafeModule to the engine and return.
     ThreadSafeModule tsm(std::move(module), std::move(ctx));
+    cantFail(tsm.withModuleDo(
+        [&](llvm::Module &module) { return transformer(&module); }));
+
+    if (VLOG_IS_ON(6)) {
+      tsm.withModuleDo(
+          [&](llvm::Module &module) { module.print(llvm::errs(), nullptr); });
+    }
+
     llvm::cantFail(jit->addIRModule(std::move(tsm)));
 
     SymbolMap symbols;
@@ -302,29 +335,12 @@ enum class EngineKind {
   OrcJIT,
 };
 
-struct StopWatch {
-  using fp_milliseconds =
-      std::chrono::duration<double, std::chrono::milliseconds::period>;
-
-  void start() { startTime = std::chrono::steady_clock::now(); }
-
-  void stop() { stopTime = std::chrono::steady_clock::now(); }
-
-  double delta_ms() {
-    return std::chrono::duration_cast<fp_milliseconds>(stopTime - startTime)
-        .count();
-  }
-
-  std::chrono::steady_clock::time_point startTime;
-  std::chrono::steady_clock::time_point stopTime;
-};
-
 class JitExecutable final : public Executable {
 public:
   JitExecutable(const std::shared_ptr<Program> &program,
                 std::shared_ptr<Device> device, ArrayRef<void *> preParams)
-      : program(program), device(std::move(device)), preParams(preParams),
-        jitInit(nullptr), jitFini(nullptr), initPack(nullptr) {
+      : program(program), device(std::move(device)),
+        preParams(preParams.begin(), preParams.end()) {
     static std::once_flag is_initialized;
     std::call_once(is_initialized, []() {
       llvm::InitializeNativeTarget();
@@ -392,20 +408,45 @@ public:
       std::copy(preParams.begin(), preParams.end(),
                 std::back_inserter(initPtrs));
       for (const compiler::ConstantArgument &arg : program->constants) {
-        initDescriptors.emplace_back(arg.buffer->data(),
-                                     arg.type.cast<RankedTensorType>());
+        initDescriptors.emplace_back(arg.buffer->data(), arg.type);
         initPtrs.push_back(initDescriptors.back().ptr());
       }
+      rt::initInstrument();
       initPack = jitInit(initPtrs.data());
       IVLOG(3, "Jit init complete");
+
+      ptrs.push_back(initPack);
+      for (Type type : program->inputs) {
+        descriptors.emplace_back(nullptr, type);
+        ptrs.push_back(descriptors.back().ptr());
+      }
+      for (Type type : program->outputs) {
+        descriptors.emplace_back(nullptr, type);
+        ptrs.push_back(descriptors.back().ptr());
+      }
+    } else {
+      std::copy(preParams.begin(), preParams.end(), std::back_inserter(ptrs));
+      for (Type type : program->inputs) {
+        descriptors.emplace_back(nullptr, type);
+        ptrs.push_back(descriptors.back().ptr());
+      }
+      for (const compiler::ConstantArgument &arg : program->constants) {
+        descriptors.emplace_back(arg.buffer->data(), arg.type);
+        ptrs.push_back(descriptors.back().ptr());
+      }
+      for (Type type : program->outputs) {
+        descriptors.emplace_back(nullptr, type);
+        ptrs.push_back(descriptors.back().ptr());
+      }
     }
   }
 
   ~JitExecutable() {
     if (jitFini) {
       IVLOG(3, "Doing jit fini");
-      std::vector<void *> finiPtrs;
-      finiPtrs.push_back(initPack);
+      rt::initInstrument();
+      SmallVector<void *, 1> finiPtrs{initPack};
+      jitFini(finiPtrs.data());
       IVLOG(3, "Jit fini complete");
       free(initPack);
     }
@@ -429,18 +470,11 @@ public:
     return invoke(inputBuffers, outputBuffers);
   }
 
-  double invoke(mlir::ArrayRef<util::BufferPtr> inputBuffers,
-                mlir::ArrayRef<util::BufferPtr> outputBuffers) final {
-    StopWatch stopWatch;
-    if (VLOG_IS_ON(1)) {
-      stopWatch.start();
-    }
+  double invoke(ArrayRef<util::BufferPtr> inputBuffers,
+                ArrayRef<util::BufferPtr> outputBuffers) final {
+    rt::initInstrument();
     bindArguments(inputBuffers, outputBuffers);
     jitMain(ptrs.data());
-    if (VLOG_IS_ON(1)) {
-      stopWatch.stop();
-      IVLOG(1, "Execution time: " << stopWatch.delta_ms() << "ms");
-    }
     return device->execTimeInMS;
   }
 
@@ -455,43 +489,36 @@ public:
           "Program outputs arguments and buffers mismatch");
     }
 
-    descriptors.clear();
-    ptrs.clear();
-
+    unsigned i = 0;
     if (jitInit) {
-      ptrs.push_back(initPack);
-    } else {
-      std::copy(preParams.begin(), preParams.end(), std::back_inserter(ptrs));
-    }
-
-    for (auto [type, buffer] : llvm::zip(program->inputs, inputBuffers)) {
-      descriptors.emplace_back(buffer->data(), type.cast<RankedTensorType>());
-      ptrs.push_back(descriptors.back().ptr());
-    }
-    if (!jitInit) {
-      for (const compiler::ConstantArgument &arg : program->constants) {
-        descriptors.emplace_back(arg.buffer->data(),
-                                 arg.type.cast<RankedTensorType>());
-        ptrs.push_back(descriptors.back().ptr());
+      for (util::BufferPtr buffer : inputBuffers) {
+        descriptors[i++].set(buffer->data());
       }
-    }
-    for (auto [type, buffer] : llvm::zip(program->outputs, outputBuffers)) {
-      descriptors.emplace_back(buffer->data(), type.cast<RankedTensorType>());
-      ptrs.push_back(descriptors.back().ptr());
+      for (util::BufferPtr buffer : outputBuffers) {
+        descriptors[i++].set(buffer->data());
+      }
+    } else {
+      for (util::BufferPtr buffer : inputBuffers) {
+        descriptors[i++].set(buffer->data());
+      }
+      i += program->constants.size();
+      for (util::BufferPtr buffer : outputBuffers) {
+        descriptors[i++].set(buffer->data());
+      }
     }
   }
 
 private:
   std::shared_ptr<Program> program;
   std::shared_ptr<Device> device;
-  std::vector<void *> preParams;
+  SmallVector<void *> preParams;
   std::unique_ptr<EngineImpl> impl;
-  std::vector<MemRefDescriptor> descriptors;
-  std::vector<void *> ptrs;
-  Function jitInit;
-  Function jitMain;
-  Function jitFini;
-  uint8_t *initPack;
+  SmallVector<MemRefDescriptor> descriptors;
+  SmallVector<void *> ptrs;
+  Function jitInit = nullptr;
+  Function jitMain = nullptr;
+  Function jitFini = nullptr;
+  uint8_t *initPack = nullptr;
 };
 
 } // namespace

@@ -35,8 +35,7 @@ void BoxOp::build(OpBuilder &builder, OperationState &result, StringRef op,
 }
 
 void printBoxOp(OpAsmPrinter &p, BoxOp op) {
-  p << op.getOperationName() << " \"" << op.op() << "\" ("
-    << op.getBody()->getArguments() << ") = (";
+  p << " \"" << op.op() << "\" (" << op.getBody()->getArguments() << ") = (";
   p.printOperands(op.operands());
   p << ") : ";
   p.printFunctionalType(op);
@@ -87,6 +86,8 @@ void LayerDialect::initialize() {
 }
 
 } // namespace pmlc::dialect::layer
+
+#include "pmlc/dialect/layer/ir/dialect.cc.inc" // NOLINT
 
 #define GET_OP_CLASSES
 #include "pmlc/dialect/layer/ir/ops.cc.inc" // NOLINT

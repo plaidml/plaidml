@@ -9,6 +9,7 @@ pml_cc_library(
     enums.h.inc
     enums.cc.inc
     env.h
+    extent.h
     ident.h
     logging.h
     matchers.h
@@ -20,6 +21,7 @@ pml_cc_library(
   SRCS
     enums.cc
     env.cc
+    extent.cc
     ident.cc
     logging.cc
     memuse.cc
@@ -32,6 +34,7 @@ pml_cc_library(
     LLVMCore
     MLIRAffine
     MLIRIR
+    MLIRLoopAnalysis
     MLIRStandard
     ::enums-gen
   PUBLIC

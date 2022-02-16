@@ -1,169 +1,176 @@
 ---
-CONST:
-  efficiency_baseline: tf-cuda-gp100gl
+VARS:
+  version: 1.0.0
 
-  gpu_flops:
-    # nvidia
-    gt650m: 605.77
-    gtx780: 3819.42
-    gtx1050: 1733.15
-    gtx1070: 7282.69
-    gtx1080: 9380.39
-    gtx1080ti: 12571.25
-    gp100gl: 10736.02
-    gv100gl: 14757.70
-    # amd
-    r560: 1815.01
-    rx480: 5950.39
-    r9nano: 8077.04
-    vega: 12697.10
-    gfx900: 11300.84
-    gfx803: 3573.79
-    gfx906: 13379.70
-    vega56: 4342.63
-    # mali
-    t628: 34.05
-    # intel
-    hd4000: 247.14
-    hd505: 213.80
-    hd630: 417.22
-    uhd630: 454.72
-    iris655: 757.84
-    neo: 1084.50
+PARAMS:
+  cfg:
+    debug:
+      vars:
+        build_type: Debug
+        check: core
+        cfg_emoji: ":sleuth_or_spy:"
+    release:
+      vars:
+        build_type: Release
+        check: smoke
+        cfg_emoji: ""
+  platform:
+    linux_x86_64:
+      vars:
+        arch: manylinux1_x86_64
+        build_root: build-x86_64
+        build_emoji: ":linux:"
+        system: Linux
+    pml-llvm-cpu:
+      imports:
+        platform: linux_x86_64
+        cfg: release
+      vars:
+        platform_emoji: ":plaidml::crown:"
+        depends_on: linux_x86_64:release
 
-PLATFORMS:
-  pml-llvm-cpu:
-    variant: linux_x86_64
-  tf-cuda-gp100gl:
-    variant: linux_x86_64
+ACTIONS:
+  build:
+    - "echo --- :building_construction: configure"
+    - mkdir -p logs
+    - python configure --ci --temp=/tmp/{platform}/{cfg} --type={build_type} &> logs/configure.log
+    - "echo --- :hammer_and_wrench: ninja check-{check}"
+    - ninja -C {build_root}/{build_type} check-{check} &> logs/check-{check}.log
+    - "echo --- :hammer_and_wrench: ninja package"
+    - ninja -C {build_root}/{build_type} package
+    - "echo --- Test devkit"
+    - cd {build_root}/{build_type}/_CPack_Packages/{system}/TGZ/PlaidML-{version}-{system}/devkit
+    - cmake -S . -B build -G Ninja
+    - ninja -C build
+    - build/edsl_test
 
-VARIANTS:
-  linux_x86_64:
-    arch: manylinux1_x86_64
-    build_root: build-x86_64
-    build_type: Release
-    check: smoke
-    system: Linux
-    env:
-      PLAIDML_DEVICE: llvm_cpu.0
-      PLAIDML_TARGET: llvm_cpu
-  linux_x86_64_dbg:
-    arch: manylinux1_x86_64
-    build_root: build-x86_64
-    build_type: Debug
-    check: core
-    system: Linux
-    env:
-      PLAIDML_DEVICE: llvm_cpu.0
-      PLAIDML_TARGET: llvm_cpu
+  keras:
+    - "echo --- :buildkite: Downloading artifacts"
+    - buildkite-agent artifact download {build_root}/{build_type}/plaidml-{version}-py3-none-{arch}.whl .
+    - buildkite-agent artifact download {build_root}/{build_type}/plaidml_keras-{version}-py3-none-any.whl .
+    - "echo --- :snake: Creating conda environment"
+    - mamba env update --prune -n keras -f ci/conda/keras.yml
+    - mamba create --clone keras -p .cenv/
+    - "echo --- :snake: Installing packages"
+    - .cenv/bin/pip install {build_root}/{build_type}/plaidml-{version}-py3-none-{arch}.whl
+    - .cenv/bin/pip install {build_root}/{build_type}/plaidml_keras-{version}-py3-none-any.whl
+    - "echo --- Running test: {test}"
+    - export PLAIDML_DEVICE=$$BUILDKITE_AGENT_META_DATA_PLAIDML_DEVICE
+    - export PLAIDML_TARGET=$$BUILDKITE_AGENT_META_DATA_PLAIDML_TARGET
+    - .cenv/bin/python plaidml/bridge/keras/{test}.py
 
-SUITES:
-  smoke:
-    platforms:
-      pml-llvm-cpu:
-        pipelines: [nightly, plaidml]
+  plaidbench:
+    - "echo --- :buildkite: Downloading artifacts"
+    - buildkite-agent artifact download {build_root}/{build_type}/plaidml-{version}-py3-none-{arch}.whl .
+    - buildkite-agent artifact download {build_root}/{build_type}/plaidml_keras-{version}-py3-none-any.whl .
+    - buildkite-agent artifact download {build_root}/{build_type}/plaidbench-{version}-py3-none-any.whl .
+    - "echo --- :snake: Creating conda environment"
+    - mamba env update --prune -n keras -f ci/conda/keras.yml
+    - mamba create --clone keras -p .cenv/
+    - "echo --- :snake: Installing packages"
+    - .cenv/bin/pip install {build_root}/{build_type}/plaidml-{version}-py3-none-{arch}.whl
+    - .cenv/bin/pip install {build_root}/{build_type}/plaidml_keras-{version}-py3-none-any.whl
+    - .cenv/bin/pip install {build_root}/{build_type}/plaidbench-{version}-py3-none-any.whl
+    - "echo --- Running test: {model}"
+    - export PLAIDML_DEVICE=$$BUILDKITE_AGENT_META_DATA_PLAIDML_DEVICE
+    - export PLAIDML_TARGET=$$BUILDKITE_AGENT_META_DATA_PLAIDML_TARGET
+    - .cenv/bin/plaidbench --examples={examples} --batch-size={batch_size} --results=ci/test/{path} keras {model}
+    - .cenv/bin/python ci/analysis.py ci/test {path} --precision={precision}
+
+  openvino:
+    - "echo --- :buildkite: Downloading artifacts"
+    - buildkite-agent artifact download {build_root}/{build_type}/PlaidML-{version}-{system}-testkit.tar.gz .
+    - tar xvf {build_root}/{build_type}/PlaidML-{version}-{system}-testkit.tar.gz
+    - "echo --- Running {test}: {model}"
+    - export PLAIDML_DEVICE=$$BUILDKITE_AGENT_META_DATA_PLAIDML_DEVICE
+    - export PLAIDML_TARGET=$$BUILDKITE_AGENT_META_DATA_PLAIDML_TARGET
+    - python ci/openvino.py {test} {model_path} --pkgdir=testkit --outdir=ci/test/{path}
+
+RULES:
+  - name: "{platform}/{cfg}"
     params:
-      plaidml:
-        batch_sizes: [1]
-      nightly:
-        batch_sizes: [1]
-    wheels:
-      # NOTE: this list must be in least to most dependent order.
-      - plaidml-{version}-py3-none-{arch}.whl
-      - plaidml_keras-{version}-py3-none-any.whl
-      - plaidbench-{version}-py3-none-any.whl
-    timeout: 5
-    conda_env: ci/conda/tensorflow.yml
-    compare: no
-    eventlog: yes
-    runner: plaidbench
-    args:
-      - --results={results}
-      - --no-kernel-timing
-      - --print-stacktraces
-      - --no-warmup
-      - --examples=1
-      - keras
-      - "{workload}"
-    workloads:
-      resnet50:
-        precision: untested
+      pipeline: [plaidml, nightly]
+      platform: linux_x86_64
+      cfg: [release, debug]
+    actions: [build]
+    expand:
+      key: "{platform}:{cfg}"
+      emoji: ":hammer_and_wrench:{build_emoji}{cfg_emoji}"
+      artifacts:
+        - logs/*.log
+        - "{build_root}/{build_type}/*.whl"
+        - "{build_root}/{build_type}/*.tar.gz"
 
-  base:
-    platforms:
-      pml-llvm-cpu:
-        pipelines: [nightly, plaidml]
+  - name: "{platform}/{suite}/{test}.py"
     params:
-      plaidml:
-        batch_sizes: [0]
-      nightly:
-        batch_sizes: [0]
-    wheels:
-      # NOTE: this list must be in least to most dependent order.
-      - plaidml-{version}-py3-none-{arch}.whl
-      - plaidml_keras-{version}-py3-none-any.whl
-    timeout: 30
-    conda_env: ci/conda/tensorflow.yml
-    compare: no
-    runner: python
-    workloads:
-      backend:
-        args: [backend_test.py]
-        cwd: plaidml/bridge/keras
-        conda_env: ci/conda/keras_backend_test.yml
-        precision: untested
-      # mnist_mlp:
-      #   args: [mnist_mlp_test.py]
-      #   precision: untested
-      # regression:
-      #   args: [regression_test.py]
-      #   precision: untested
-      trivial_model:
-        args: [trivial_model_test.py]
-        cwd: plaidml/bridge/keras
-        precision: untested
+      pipeline: [plaidml, nightly]
+      suite: keras
+      platform: pml-llvm-cpu
+      test:
+        - backend_test
+        - trivial_model_test
+    actions: [keras]
+    vars:
+      timeout: 30
+    expand:
+      key: "{platform}:{suite}:{test}"
+      emoji: "{build_emoji}{platform_emoji}"
 
-  infer:
-    platforms:
-      pml-llvm-cpu:
-        pipelines: [nightly, plaidml]
+  - name: "{platform}/{suite}/{model}/bs={batch_size}"
     params:
-      plaidml:
-        batch_sizes: [1]
-      nightly:
-        batch_sizes: [1]
-    wheels:
-      # NOTE: this list must be in least to most dependent order.
-      - plaidml-{version}-py3-none-{arch}.whl
-      - plaidml_keras-{version}-py3-none-any.whl
-      - plaidbench-{version}-py3-none-any.whl
-    timeout: 10
-    conda_env: ci/conda/tensorflow.yml
-    runner: plaidbench
-    args:
-      - --results={results}
-      - --batch-size={batch_size}
-      - --no-kernel-timing
-      - --print-stacktraces
-      - keras
-      - "{workload}"
-    precision: high
-    workloads:
-      inception_v3:
-        platform_overrides:
-          pml-llvm-cpu:
-            prepend_args: [--examples=64]
-      mobilenet: {}
-      mobilenet_v2: {}
-      resnet50:
-        platform_overrides:
-          pml-llvm-cpu:
-            prepend_args: [--examples=128]
-      vgg19:
-        platform_overrides:
-          pml-llvm-cpu:
-            prepend_args: [--examples=64]
-      xception:
-        platform_overrides:
-          pml-llvm-cpu:
-            prepend_args: [--examples=64]
+      pipeline: [plaidml, nightly]
+      suite: infer
+      platform: pml-llvm-cpu
+      batch_size: [1]
+      model:
+        - inception_v3
+        - mobilenet
+        - mobilenet_v2
+        - resnet50
+        - vgg19
+        - xception
+    vars:
+      examples: 1024
+      precision: high
+      timeout: 10
+      expect_result: yes
+      artifacts:
+        - ci/test/**/report.json
+    expand:
+      key: "{platform}:{suite}:{model}:bs{batch_size}"
+      emoji: "{build_emoji}{platform_emoji}"
+    actions: [plaidbench]
+
+  - name: "{platform}/{suite}/{test}/{model}/{dtype}"
+    params:
+      pipeline: [plaidml, nightly]
+      suite: openvino
+      platform: pml-llvm-cpu
+      model:
+        - mobilenet-v2
+        - resnet-50-pytorch
+        - yolo-v2-tiny-ava-0001
+      dtype: FP16
+      test:
+        - benchmark_app
+        # - accuracy_check # FIXME: this seems to fail currently
+    vars:
+      artifacts:
+        - ci/test/**/*.csv
+    expand:
+      key: "{platform}:{suite}:{test}:{model}:{dtype}"
+      emoji: "{build_emoji}{platform_emoji}"
+      model_path: "networks/openvino/{model}/{dtype}/{model}.xml"
+    actions: [openvino]
+
+SETTINGS:
+  - params:
+      pipeline: [nightly, plaidml]
+    select:
+      linux_x86_64/debug:
+        artifacts:
+          - logs/*.log
+      pml-llvm-cpu/infer/inception_v3/bs=1: {examples: 64}
+      pml-llvm-cpu/infer/resnet50/bs=1:     {examples: 128}
+      pml-llvm-cpu/infer/vgg19/bs=1:        {examples: 64}
+      pml-llvm-cpu/infer/xception/bs=1:     {examples: 64}

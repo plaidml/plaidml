@@ -34,3 +34,11 @@ pml_py_wheel(
   VERSION ${PLAIDML_VERSION}
   PY_DEPS ::py
 )
+
+pml_py_library(
+  NAME mnist_mlp
+  SRCS
+    mnist_mlp.py
+  DEPS
+    ::py
+)

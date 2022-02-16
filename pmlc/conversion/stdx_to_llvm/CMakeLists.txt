@@ -8,7 +8,10 @@ pml_cc_library(
     ::passes-gen
     pmlc::dialect::stdx::ir
     pmlc::util
+    MLIRLLVMCommonConversion
     MLIRLLVMIRTransforms
+    MLIRMathToLLVM
+    MLIRMemRef
 )
 
 pml_tblgen_library(

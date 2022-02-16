@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include <functional>
 #include <memory>
 
 #include "mlir/Pass/Pass.h"
@@ -10,6 +9,10 @@
 namespace pmlc::dialect::stdx {
 
 std::unique_ptr<mlir::Pass> createBoundsCheckPass();
+
+std::unique_ptr<mlir::Pass> createMainClosurePass();
+
+std::unique_ptr<mlir::Pass> createSplitClosurePass();
 
 /// Generate the code for registering passes.
 #define GEN_PASS_REGISTRATION

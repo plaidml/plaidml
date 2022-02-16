@@ -437,7 +437,7 @@ std::vector<int64_t>* extend_manual_padding(std::vector<int64_t>* pads, size_t r
 }  // namespace
 
 Value abs(const Value& value) {
-  IVLOG(1, "abs");
+  IVLOG(2, "abs");
   auto args = value.as_tuple();
   if (args.size() != 1) {
     throw std::runtime_error("abs expects 1 argument");
@@ -448,7 +448,7 @@ Value abs(const Value& value) {
 }
 
 Value all(const Value& value) {
-  IVLOG(1, "all");
+  IVLOG(2, "all");
   auto args = value.as_tuple();
   if (args.size() != 3) {
     throw std::runtime_error("all expects 3 arguments");
@@ -470,12 +470,12 @@ Value all(const Value& value) {
   AggregationAxes agg(I.rank(), axes, keepdims);
 
   I.bind_dims(agg.src_dims);
-  Tensor O = Contraction(agg.dst_dims, agg.dst_idxs).product(I_as_bool(agg.src_idxs));
+  Tensor O = Contraction(agg.dst_dims, agg.dst_idxs, "all").product(I_as_bool(agg.src_idxs));
   return Value{cast(O, DType::UINT8)};
 }
 
 Value any(const Value& value) {
-  IVLOG(1, "any");
+  IVLOG(2, "any");
   auto args = value.as_tuple();
   if (args.size() != 3) {
     throw std::runtime_error("any expects 3 arguments");
@@ -497,13 +497,13 @@ Value any(const Value& value) {
   AggregationAxes agg(I.rank(), axes, keepdims);
 
   I.bind_dims(agg.src_dims);
-  Tensor S = Contraction(agg.dst_dims, agg.dst_idxs).sum(I_as_bool(agg.src_idxs));
+  Tensor S = Contraction(agg.dst_dims, agg.dst_idxs, "any").sum(I_as_bool(agg.src_idxs));
   auto O = select(S == 0, zero, one);
   return Value{cast(O, DType::UINT8)};
 }
 
 Value argmax(const Value& value) {
-  IVLOG(1, "argmax");
+  IVLOG(2, "argmax");
   auto args = value.as_tuple();
   if (args.size() != 2) {
     throw std::runtime_error("argmax expects 2 arguments");
@@ -512,15 +512,16 @@ Value argmax(const Value& value) {
   auto axes = args[1];
   AggregationAxes agg(I.rank(), axes, false);
   I.bind_dims(agg.src_dims);
-  Tensor M = Contraction(agg.dst_dims, agg.dst_idxs).max(I(agg.src_idxs));
+  Tensor M = Contraction(agg.dst_dims, agg.dst_idxs, "argmax").max(I(agg.src_idxs));
   auto IX = index(agg.reduce_dims, 0);
-  Tensor AM = Contraction(agg.dst_dims, agg.dst_idxs).max(cond(I(agg.src_idxs), M(agg.dst_idxs), IX(agg.reduce_idxs)));
+  Tensor AM = Contraction(agg.dst_dims, agg.dst_idxs, "argmax")
+                  .max(cond(I(agg.src_idxs), M(agg.dst_idxs), IX(agg.reduce_idxs)));
   auto O = cast(AM, DType::UINT32);
   return Value{O};
 }
 
 Value binary_crossentropy(const Value& value) {
-  IVLOG(1, "binary_crossentropy")
+  IVLOG(2, "binary_crossentropy")
   auto args = value.as_tuple();
 
   // Read arguments
@@ -543,7 +544,7 @@ Value binary_crossentropy(const Value& value) {
 }
 
 Value broadcast(const Value& value) {
-  IVLOG(1, "broadcast");
+  IVLOG(2, "broadcast");
   auto args = value.as_tuple();
   if (args.size() != 3) {
     throw std::runtime_error(llvm::formatv("PlaidML broadcast op expects 3 arguments (received {0})", args.size()));
@@ -576,12 +577,12 @@ Value broadcast(const Value& value) {
     }
   }
 
-  Tensor O = Contraction(O_dims, O_idxs).assign(I(I_idxs));
+  Tensor O = Contraction(O_dims, O_idxs, "broadcast").assign(I(I_idxs));
   return Value{O};
 }
 
 Value clip(const Value& value) {
-  IVLOG(1, "clip");
+  IVLOG(2, "clip");
   auto args = value.as_tuple();
 
   // Read arguments
@@ -606,7 +607,7 @@ Value clip(const Value& value) {
 
 Value concatenate(const Value& value) {
   // TODO: Make errors nicer (e.g. when bind_dims fails)
-  IVLOG(1, "concatenate")
+  IVLOG(2, "concatenate")
 
   // Read Arguments
   auto args = value.as_tuple();
@@ -655,7 +656,7 @@ Value concatenate(const Value& value) {
   // Compute each intermediate output
   for (size_t i = 0; i < tensors.size(); ++i) {
     O_idxs[axis] = axis_idx + axis_dim_subtotals[i];
-    Tensor R = Contraction(dims, O_idxs).assign(tensors[i](I_idxs));
+    Tensor R = Contraction(dims, O_idxs, "concatenate").assign(tensors[i](I_idxs));
     results.emplace_back(R);
   }
   auto final_result = results[0];
@@ -876,7 +877,7 @@ void normalize_grouping_strategy(int64_t* groups, AutoGroupMode* autogroup_mode,
 }  // namespace
 
 Value convolution(const Value& value) {
-  IVLOG(1, "convolution");
+  IVLOG(2, "convolution");
   // Parameters:
   //  0. Input Tensor
   //  1. Filter Tensor
@@ -1466,7 +1467,7 @@ Value convolution(const Value& value) {
 }
 
 Value cumprod(const Value& value) {
-  IVLOG(1, "cumprod");
+  IVLOG(2, "cumprod");
   auto args = value.as_tuple();
   if (args.size() != 2) {
     throw std::runtime_error("cumprod expects 2 arguments");
@@ -1487,7 +1488,7 @@ Value cumprod(const Value& value) {
 }
 
 Value cumsum(const Value& value) {
-  IVLOG(1, "cumsum");
+  IVLOG(2, "cumsum");
   auto args = value.as_tuple();
   if (args.size() != 3) {
     throw std::runtime_error("cumsum expects 2 arguments");
@@ -1509,13 +1510,15 @@ Value cumsum(const Value& value) {
 }
 
 Value dot(const Value& value) {
-  IVLOG(1, "dot");
+  IVLOG(2, "dot");
   auto args = value.as_tuple();
-  if (args.size() != 2) {
-    throw std::runtime_error("dot expects 2 arguments");
+  if (args.size() != 3) {
+    throw std::runtime_error("dot expects 3 arguments");
   }
   auto X = args[0].as_tensor();
   auto Y = args[1].as_tensor();
+  auto name = args[2].as_str();
+  if (name.empty()) name = "dot";
   if (X.dtype() != Y.dtype()) {
     throw std::runtime_error(llvm::formatv("Invalid dtype in dot: X.dtype = '{0}', Y.dtype = '{1}'",
                                            to_string(X.dtype()), to_string(Y.dtype())));
@@ -1525,7 +1528,7 @@ Value dot(const Value& value) {
     TensorIndex i;
     X.bind_dims(I);
     Y.bind_dims(I);
-    Tensor O = Contraction({I}, {i}).sum(X(i) * Y(i));
+    Tensor O = Contraction({I}, {i}, name).sum(X(i) * Y(i));
     return Value{O};
   }
   if (1 <= X.rank() && 2 <= Y.rank()) {
@@ -1550,7 +1553,7 @@ Value dot(const Value& value) {
     }
     O_dims.push_back(Y_dims[Y.rank() - 1]);
     O_idxs.push_back(Y_idxs[Y.rank() - 1]);
-    Tensor O = Contraction(O_dims, O_idxs).sum(X(X_idxs) * Y(Y_idxs));
+    Tensor O = Contraction(O_dims, O_idxs, name).sum(X(X_idxs) * Y(Y_idxs));
     return Value{O};
   }
   throw std::runtime_error(
@@ -1558,7 +1561,7 @@ Value dot(const Value& value) {
 }
 
 Value elu(const Value& value) {
-  IVLOG(1, "elu");
+  IVLOG(2, "elu");
 
   // Read arguments
   auto args = value.as_tuple();
@@ -1581,7 +1584,7 @@ Value elu(const Value& value) {
 }
 
 Value explicit_padding(const Value& value) {
-  IVLOG(1, "explicit_padding");
+  IVLOG(2, "explicit_padding");
   auto args = value.as_tuple();
   if (args.size() < 5) {
     throw std::runtime_error("explicit_padding expects 5 arguments");
@@ -1640,9 +1643,36 @@ Value explicit_padding(const Value& value) {
       IVLOG(2, "Constant padding requested");
 
       auto padval = args[4].as_tensor();
-      O = Contraction(O_dims, O_idxs).assign(I(I_idxs)).init(padval);
+      O = Contraction(O_dims, O_idxs, "explicit_padding").assign(I(I_idxs)).init(padval);
     } break;
-    case PadMode::EDGE:
+    case PadMode::EDGE: {
+      IVLOG(2, "Edge padding requested");
+      O = I;
+
+      std::vector<TensorIndex> dst_lo_idxs(I.rank());
+      std::vector<TensorIndex> dst_hi_idxs(I.rank());
+      std::vector<TensorDim> dst_lo_dims(I.rank());
+      std::vector<TensorDim> dst_hi_dims(I.rank());
+
+      for (size_t i = 0; i < I.rank(); ++i) {
+        std::vector<TensorDim> O_dims(I.rank());
+        O.bind_dims(O_dims);
+
+        std::vector<TensorIndex> src_lo_idxs = dst_lo_idxs;
+        src_lo_idxs[i] = TensorIndex(0);
+        dst_lo_dims = O_dims;
+        dst_lo_dims[i] = TensorDim(lo_pads[i]);
+        Tensor Lo = Contraction(dst_lo_dims, dst_lo_idxs, "explicit_padding").assign(O(src_lo_idxs));
+
+        std::vector<TensorIndex> src_hi_idxs = dst_hi_idxs;
+        src_hi_idxs[i] = O_dims[i] - TensorIndex(1);
+        dst_hi_dims = O_dims;
+        dst_hi_dims[i] = TensorDim(hi_pads[i]);
+        Tensor Hi = Contraction(dst_hi_dims, dst_hi_idxs, "explicit_padding").assign(O(src_hi_idxs));
+
+        O = op::concatenate({Lo, O, Hi}, i);
+      }
+    } break;
     case PadMode::SYMMETRIC:
     case PadMode::REFLECT: {
       throw std::runtime_error(llvm::formatv("Unimplemented padding mode: {0}", to_string(mode)));
@@ -1655,7 +1685,7 @@ Value explicit_padding(const Value& value) {
 }
 
 Value flip(const Value& value) {
-  IVLOG(1, "flip");
+  IVLOG(2, "flip");
   // This is numpy-style `flip`; Keras calls it `repeat`
 
   // Read arguments
@@ -1691,12 +1721,12 @@ Value flip(const Value& value) {
   for (const auto& axis : axes) {
     O_idxs[axis] = dims[axis] - 1 - I_idxs[axis];
   }
-  Tensor O = Contraction(dims, O_idxs).assign(I(I_idxs));
+  Tensor O = Contraction(dims, O_idxs, "flip").assign(I(I_idxs));
   return Value{O};
 }
 
 Value gatherND(const Value& value) {
-  IVLOG(1, "gatherND");
+  IVLOG(2, "gatherND");
   auto args = value.as_tuple();
 
   // Read arguments
@@ -1771,7 +1801,7 @@ Value gatherND(const Value& value) {
 }
 
 Value hard_sigmoid(const Value& value) {
-  IVLOG(1, "hard_sigmoid");
+  IVLOG(2, "hard_sigmoid");
   auto args = value.as_tuple();
   if (args.size() != 2) {
     throw std::runtime_error("hard_sigmoid expects 2 arguments");
@@ -1791,7 +1821,7 @@ Value hard_sigmoid(const Value& value) {
 
 Value image_resize(const Value& value) {
   // Resize a 2D image's spatial dimensions, each by a positive integer factor
-  IVLOG(1, "image_resize");
+  IVLOG(2, "image_resize");
   auto args = value.as_tuple();
   if (args.size() != 4) {
     throw std::runtime_error("image_resize expects 4 arguments");
@@ -1851,13 +1881,15 @@ Value image_resize(const Value& value) {
       TensorDim HFactor{factors[0]};
       TensorDim WFactor{factors[1]};
       TensorIndex j{"j"}, i{"i"}, y{"y"}, x{"x"};
-      Tensor HCoeffVec = Contraction({HFactor}, {y}).assign(HCoeff());
-      Tensor WCoeffVec = Contraction({WFactor}, {x}).assign(WCoeff());
+      Tensor HCoeffVec = Contraction({HFactor}, {y}, "image_resize").assign(HCoeff());
+      Tensor WCoeffVec = Contraction({WFactor}, {x}, "image_resize").assign(WCoeff());
       TensorDim HK_dim = 2 * HFactor - 1;
       TensorDim WK_dim = 2 * WFactor - 1;
-      Tensor HK = Contraction({HK_dim}, {y}).sum(HCoeffVec(j + y - HFactor + 1)).add_constraint(j < HFactor);
-      Tensor WK = Contraction({WK_dim}, {x}).sum(WCoeffVec(i + x - WFactor + 1)).add_constraint(i < WFactor);
-      Tensor K = Contraction({HK_dim, WK_dim}, {y, x}).assign(HK(y) * WK(x));
+      Tensor HK =
+          Contraction({HK_dim}, {y}, "image_resize").sum(HCoeffVec(j + y - HFactor + 1)).add_constraint(j < HFactor);
+      Tensor WK =
+          Contraction({WK_dim}, {x}, "image_resize").sum(WCoeffVec(i + x - WFactor + 1)).add_constraint(i < WFactor);
+      Tensor K = Contraction({HK_dim, WK_dim}, {y, x}, "image_resize").assign(HK(y) * WK(x));
 
       // Resize
       std::vector<TensorDim> I_dims(ndims);
@@ -1877,7 +1909,7 @@ Value image_resize(const Value& value) {
         O_dims.push_back(I_dims[ax]);
         O_idxs.push_back(I_idxs[ax]);
       }
-      O = Contraction(O_dims, O_idxs).sum(I(I_idxs) * K(j, i));
+      O = Contraction(O_dims, O_idxs, "image_resize").sum(I(I_idxs) * K(j, i));
     } break;
     default:
       throw std::runtime_error("Unrecognized InterpolationMode in image_resize");
@@ -1886,7 +1918,7 @@ Value image_resize(const Value& value) {
 }
 
 Value lrn(const Value& value) {
-  IVLOG(1, "lrn");
+  IVLOG(2, "lrn");
   auto args = value.as_tuple();
   if (args.size() != 6) {
     throw std::runtime_error("lrn expects 6 arguments");
@@ -1903,12 +1935,13 @@ Value lrn(const Value& value) {
   I.bind_dims(dims);
 
   auto I_sqr = I * I;
-  Tensor local_sum_sqr = Contraction(dims, agg.dst_idxs).sum(I_sqr(agg.src_idxs)).add_constraints(agg.constraints);
+  Tensor local_sum_sqr =
+      Contraction(dims, agg.dst_idxs, "lrn").sum(I_sqr(agg.src_idxs)).add_constraints(agg.constraints);
   return Value{I / edsl::pow(alpha * local_sum_sqr + epsilon, Tensor(beta))};
 }
 
 Value max(const Value& value) {
-  IVLOG(1, "max");
+  IVLOG(2, "max");
   auto args = value.as_tuple();
   if (args.size() != 3) {
     throw std::runtime_error("max expects 3 arguments");
@@ -1918,12 +1951,12 @@ Value max(const Value& value) {
   auto keepdims = args[2].as_bool();
   AggregationAxes agg(I.rank(), axes, keepdims);
   I.bind_dims(agg.src_dims);
-  Tensor O = Contraction(agg.dst_dims, agg.dst_idxs).max(I(agg.src_idxs));
+  Tensor O = Contraction(agg.dst_dims, agg.dst_idxs, "max").max(I(agg.src_idxs));
   return Value{O};
 }
 
 Value maximum(const Value& value) {
-  IVLOG(1, "maximum");
+  IVLOG(2, "maximum");
   auto args = value.as_tuple();
   if (args.size() != 2) {
     throw std::runtime_error("maximum expects 2 arguments");
@@ -1935,7 +1968,7 @@ Value maximum(const Value& value) {
 }
 
 Value mean(const Value& value) {
-  IVLOG(1, "mean");
+  IVLOG(2, "mean");
   auto args = value.as_tuple();
   if (args.size() != 3) {
     throw std::runtime_error("mean expects 3 arguments");
@@ -1961,7 +1994,7 @@ Value mean(const Value& value) {
   AggregationAxes agg(I.rank(), axes, keepdims);
 
   I.bind_dims(agg.src_dims);
-  Tensor SO = Contraction(agg.dst_dims, agg.dst_idxs).sum(I(agg.src_idxs));
+  Tensor SO = Contraction(agg.dst_dims, agg.dst_idxs, "mean").sum(I(agg.src_idxs));
   auto denom = Tensor{1};
   for (const auto& axis : agg.axes) {
     denom = denom * agg.src_dims.at(axis);
@@ -1970,7 +2003,7 @@ Value mean(const Value& value) {
 }
 
 Value min(const Value& value) {
-  IVLOG(1, "min");
+  IVLOG(2, "min");
   auto args = value.as_tuple();
   if (args.size() != 3) {
     throw std::runtime_error("min expects 3 arguments");
@@ -1980,12 +2013,12 @@ Value min(const Value& value) {
   auto keepdims = args[2].as_bool();
   AggregationAxes agg(I.rank(), axes, keepdims);
   I.bind_dims(agg.src_dims);
-  Tensor O = Contraction(agg.dst_dims, agg.dst_idxs).min(I(agg.src_idxs));
+  Tensor O = Contraction(agg.dst_dims, agg.dst_idxs, "min").min(I(agg.src_idxs));
   return Value{O};
 }
 
 Value minimum(const Value& value) {
-  IVLOG(1, "minimum");
+  IVLOG(2, "minimum");
   auto args = value.as_tuple();
   if (args.size() != 2) {
     throw std::runtime_error("minimum expects 2 arguments");
@@ -2123,7 +2156,7 @@ Tensor compute_iou(std::vector<Tensor> boxes_coordinates, TensorDim num_batches,
 
 // Non-maximum suppression
 Value nms(const Value& value) {
-  IVLOG(1, "nms");
+  IVLOG(2, "nms");
   auto args = value.as_tuple();
   if (args.size() != 21) {
     throw std::runtime_error("nms expects 21 arguments");
@@ -2234,7 +2267,7 @@ Value nms(const Value& value) {
   //         scores and set others to zero.
   std::vector<TensorDim> scatter_dims = {num_batches, num_classes, num_boxes};
   std::vector<TensorIndex> scatter_idxs(3);
-  Tensor zero_scatter = edsl::Contraction(scatter_dims, scatter_idxs).assign(zero(0));
+  Tensor zero_scatter = edsl::Contraction(scatter_dims, scatter_idxs, "nms").assign(zero(0));
   if (nms_style == NmsStyle::CAFFE) {
     // Only keep the top K scores and set all others to zero.
     auto topk_result = op::topk(new_scores, num_boxes_per_class).axis(2).build();
@@ -2265,7 +2298,7 @@ Value nms(const Value& value) {
   }
 
   scatter_dims[2] = one_dim;
-  zero_scatter = edsl::Contraction(scatter_dims, scatter_idxs).assign(zero(0));
+  zero_scatter = edsl::Contraction(scatter_dims, scatter_idxs, "nms").assign(zero(0));
 
   std::function<edsl::Tensor(edsl::Tensor, edsl::Tensor)> iou_compare;
   if (hard_suppression) {
@@ -2385,7 +2418,7 @@ Value nms(const Value& value) {
 }
 
 Value topk(const Value& value) {
-  IVLOG(1, "topk");
+  IVLOG(2, "topk");
   auto args = value.as_tuple();
   if (args.size() != 6) {
     throw std::runtime_error("topk expects 6 arguments");
@@ -2434,7 +2467,7 @@ Value topk(const Value& value) {
 }
 
 Value mvn(const Value& value) {
-  IVLOG(1, "mvn");
+  IVLOG(2, "mvn");
   auto args = value.as_tuple();
   if (args.size() != 6) {
     throw std::runtime_error("mvn expects 6 arguments");
@@ -2470,7 +2503,7 @@ Value mvn(const Value& value) {
 }
 
 Value l2norm(const Value& value) {
-  IVLOG(1, "l2norm");
+  IVLOG(2, "l2norm");
   auto args = value.as_tuple();
   if (args.size() != 4) {
     throw std::runtime_error("norm expects 4 arguments");
@@ -2497,7 +2530,7 @@ Value l2norm(const Value& value) {
 }
 
 Value prod(const Value& value) {
-  IVLOG(1, "prod");
+  IVLOG(2, "prod");
   auto args = value.as_tuple();
   if (args.size() != 3) {
     throw std::runtime_error("prod expects 3 arguments");
@@ -2522,7 +2555,7 @@ Value prod(const Value& value) {
   AggregationAxes agg(I.rank(), raw_axes, keepdims);
 
   I.bind_dims(agg.src_dims);
-  Tensor O = Contraction(agg.dst_dims, agg.dst_idxs).product(I(agg.src_idxs));
+  Tensor O = Contraction(agg.dst_dims, agg.dst_idxs, "prod").product(I(agg.src_idxs));
   return Value{O};
 }
 
@@ -2537,6 +2570,7 @@ Value pool(const Value& value) {
   //    6. Layout (i.e. Channel Order) (minimally NXC v NCX)
   //    7. Include Padding in Avg Computation (bool)
   //    8. Ceil Mode (i.e. as in ONNX)
+  //    9. Name
   //
   // N.B. We determine the number of spatial dimensions from the Pool Size and
   // confirm it is consistent with other parameters that imply a spatial
@@ -2548,8 +2582,8 @@ Value pool(const Value& value) {
 
   // Read arguments
   auto args = value.as_tuple();
-  if (args.size() != 9) {
-    throw std::runtime_error(llvm::formatv("PlaidML pool op expects 9 arguments (received {0})", args.size()));
+  if (args.size() != 10) {
+    throw std::runtime_error(llvm::formatv("PlaidML pool op expects 10 arguments (received {0})", args.size()));
   }
   auto I = args[0].as_tensor();
   auto pool_mode = validate<PoolMode>(args[1].as_int());
@@ -2560,6 +2594,8 @@ Value pool(const Value& value) {
   auto input_layout = validate<TensorLayout>(args[6].as_int());
   auto include_padding_in_avg = args[7].as_bool();
   auto use_ceil_for_output_shape = args[8].as_bool();
+  auto name = args[9].as_str();
+  if (name.empty()) name = "pool";
 
   // Initialize useful values
   auto spatial_rank = pool_size.size();
@@ -2632,7 +2668,7 @@ Value pool(const Value& value) {
     O_dims.push_back(C);
     O_idxs.push_back(c);
   }
-  Contraction O = Contraction(O_dims, O_idxs).add_constraints(constraints);
+  Contraction O = Contraction(O_dims, O_idxs, name).add_constraints(constraints);
   if (pool_mode == PoolMode::MAX) {
     O.max(I(I_idxs));
     return Value{O};
@@ -2656,8 +2692,8 @@ Value pool(const Value& value) {
       // x0, x1, ... However, they do not represent the same index values (and
       // notably do not iterate over the same size of dimensions as I_dims !=
       // O_dims)
-      Tensor Ones = Contraction(I_dims, O_idxs).assign(One());
-      Tensor Count = Contraction(O_dims, O_idxs).sum(Ones(I_idxs)).add_constraints(constraints);
+      Tensor Ones = Contraction(I_dims, O_idxs, name).assign(One());
+      Tensor Count = Contraction(O_dims, O_idxs, name).sum(Ones(I_idxs)).add_constraints(constraints);
       // Ones(O_idxs) = One(std::vector<TensorIndex>());
       return Value{O / Count};
     }
@@ -2667,15 +2703,17 @@ Value pool(const Value& value) {
 }
 
 Value relu(const Value& value) {
-  IVLOG(1, "relu");
+  IVLOG(2, "relu");
   auto args = value.as_tuple();
-  if (args.size() != 4) {
-    throw std::runtime_error("relu expects 4 arguments");
+  if (args.size() != 5) {
+    throw std::runtime_error("relu expects 5 arguments");
   }
   Tensor I = args[0].as_tensor();
   Value alpha = args[1];
   Value max_value = args[2];
   Value threshold = args[3];
+  auto name = args[4].as_str();
+  if (name.empty()) name = "relu";
   double T = threshold.is_none() ? 0.0 : threshold.as_float();
   if ((alpha.is_none() || (alpha.is_float() && alpha.as_float() == 0.0)) && max_value.is_none() && T == 0.0) {
     return Value{edsl::relu(I)};
@@ -2690,7 +2728,7 @@ Value relu(const Value& value) {
 }
 
 Value reorg_yolo(const Value& value) {
-  IVLOG(1, "reorg_yolo");
+  IVLOG(2, "reorg_yolo");
 
   auto args = value.as_tuple();
   if (args.size() != 4) {
@@ -2721,7 +2759,7 @@ Value reorg_yolo(const Value& value) {
   if (decrease) {
     auto C_out = C / (stride * stride);
     auto c = k + ((x + y * stride) * C_out);
-    O = Contraction(lens)
+    O = Contraction(lens, "reorg_yolo")
             .outShape(N, C_out, H * stride, W * stride)
             .outAccess(b, k, h, w)
             .assign(I(b, c, j, i))
@@ -2730,7 +2768,7 @@ Value reorg_yolo(const Value& value) {
   } else {
     auto C_out = C * (stride * stride);
     auto c = k + ((x + y * stride) * C);
-    O = Contraction(lens)
+    O = Contraction(lens, "reorg_yolo")
             .outShape(N, C_out, H / stride, W / stride)
             .outAccess(b, c, j, i)
             .assign(I(b, k, h, w))
@@ -2742,7 +2780,7 @@ Value reorg_yolo(const Value& value) {
 }
 
 Value repeat(const Value& value) {
-  IVLOG(1, "repeat");
+  IVLOG(2, "repeat");
   // This is numpy-style `repeat`; Keras calls it `repeat_elements`
   // This is more limited than in numpy (both repeats & axis required, both must
   // be ints)
@@ -2776,12 +2814,12 @@ Value repeat(const Value& value) {
   std::vector<TensorIndex> O_idxs(I_idxs);
   TensorIndex inner;
   O_idxs[axis] = repeats * I_idxs[axis] + inner;
-  Tensor O = Contraction(O_dims, O_idxs).assign(I(I_idxs)).add_constraint(inner < repeats);
+  Tensor O = Contraction(O_dims, O_idxs, "repeat").assign(I(I_idxs)).add_constraint(inner < repeats);
   return Value{O};
 }
 
 Value reshape(const Value& value) {
-  IVLOG(1, "reshape");
+  IVLOG(2, "reshape");
   auto args = value.as_tuple();
   if (args.size() != 2) {
     throw std::runtime_error(llvm::formatv("PlaidML reshape op expects 2 arguments (received {0})", args.size()));
@@ -2848,7 +2886,7 @@ Value reshape(const Value& value) {
 }
 
 Value scale_gradient(const Value& value) {
-  IVLOG(1, "scale_gradient");
+  IVLOG(2, "scale_gradient");
   auto args = value.as_tuple();
   if (args.size() != 2) {
     throw std::runtime_error("scale_gradient expects 2 arguments");
@@ -2866,7 +2904,7 @@ Value scale_gradient(const Value& value) {
 }
 
 Value sigmoid(const Value& value) {
-  IVLOG(1, "sigmoid");
+  IVLOG(2, "sigmoid");
   auto args = value.as_tuple();
   if (args.size() != 1) {
     throw std::runtime_error("sigmoid expects 1 argument");
@@ -2879,7 +2917,7 @@ Value sigmoid(const Value& value) {
 Value slice(const Value& value) {
   // This code avoids using max/min ops to keep start/stop values in the [-dim - 1, dim] range
   // This means requesting a slice with a start/stop index outside the valid range will give bizarre behavior
-  IVLOG(1, "slice");
+  IVLOG(2, "slice");
   auto args = value.as_tuple();
   if (args.size() != 2) {
     throw std::runtime_error("slice expects 2 arguments");
@@ -3004,18 +3042,20 @@ Value slice(const Value& value) {
   }
 
   // Perform the slice
-  Tensor O = Contraction(O_dims, O_idxs).assign(I(I_idxs));
+  Tensor O = Contraction(O_dims, O_idxs, "slice").assign(I(I_idxs));
   return Value{O};
 }
 
 Value softmax(const Value& value) {
-  IVLOG(1, "softmax");
+  IVLOG(2, "softmax");
   auto args = value.as_tuple();
-  if (args.size() != 2) {
-    throw std::runtime_error("softmax expects 2 arguments");
+  if (args.size() != 3) {
+    throw std::runtime_error("softmax expects 3 arguments");
   }
   auto I = args[0].as_tensor();
   auto raw_axis = args[1].as_int();
+  auto name = args[2].as_str();
+  if (name.empty()) name = "softmax";
 
   int64_t ndims = I.rank();
   int64_t axis = normalize_axis(raw_axis, ndims, "softmax");
@@ -3046,9 +3086,9 @@ Value softmax(const Value& value) {
   std::vector<TensorIndex> R_idxs = I_idxs;
   R_dims[axis] = TensorDim{1};
   R_idxs[axis] = TensorIndex{0};
-  Tensor M = Contraction(R_dims, R_idxs).max(I(I_idxs));
+  Tensor M = Contraction(R_dims, R_idxs, name).max(I(I_idxs));
   auto E = exp(I - M);
-  Tensor N = Contraction(R_dims, R_idxs).sum(E(I_idxs));
+  Tensor N = Contraction(R_dims, R_idxs, name).sum(E(I_idxs));
   auto O = E / N;
   // If we reordered, return to original order
   if (transposed) {
@@ -3058,7 +3098,7 @@ Value softmax(const Value& value) {
 }
 
 Value sort(const Value& value) {
-  IVLOG(1, "sort");
+  IVLOG(2, "sort");
   auto args = value.as_tuple();
   if (args.size() != 3) {
     throw std::runtime_error("sort expects 3 arguments");
@@ -3087,7 +3127,7 @@ Value sort(const Value& value) {
 }
 
 Value spatial_padding(const Value& value) {
-  IVLOG(1, "spatial_padding");
+  IVLOG(2, "spatial_padding");
   auto args = value.as_tuple();
   if (args.size() != 4) {
     throw std::runtime_error("spatial_padding expects 4 arguments");
@@ -3333,18 +3373,18 @@ Value spatial_padding(const Value& value) {
     default:
       throw std::runtime_error("Unrecognized TensorLayout in spatial_padding");
   }
-  Tensor O = Contraction(O_dims, O_idxs).assign(I(I_idxs));
+  Tensor O = Contraction(O_dims, O_idxs, "spatial_padding").assign(I(I_idxs));
   return Value{O};
 }
 
 Value square(const Value& value) {
-  IVLOG(1, "square");
+  IVLOG(2, "square");
   auto x = value.as_tensor();
   return Value(x * x);
 }
 
 Value squeeze(const Value& value) {
-  IVLOG(1, "squeeze");
+  IVLOG(2, "squeeze");
   auto args = value.as_tuple();
   if (args.size() != 2) {
     throw std::runtime_error("Squeeze expects 2 arguments");
@@ -3382,7 +3422,7 @@ Value squeeze(const Value& value) {
 }
 
 Value sum(const Value& value) {
-  IVLOG(1, "sum");
+  IVLOG(2, "sum");
   auto args = value.as_tuple();
   if (args.size() != 3) {
     throw std::runtime_error("sum expects 3 arguments");
@@ -3407,12 +3447,12 @@ Value sum(const Value& value) {
 
   AggregationAxes agg(I.rank(), axes, keepdims);
   I.bind_dims(agg.src_dims);
-  Tensor O = Contraction(agg.dst_dims, agg.dst_idxs).sum(I(agg.src_idxs));
+  Tensor O = Contraction(agg.dst_dims, agg.dst_idxs, "sum").sum(I(agg.src_idxs));
   return Value{O};
 }
 
 Value tile(const Value& value) {
-  IVLOG(1, "tile");
+  IVLOG(2, "tile");
   auto args = value.as_tuple();
   if (args.size() != 2) {
     throw std::runtime_error("Tile expects 2 arguments");
@@ -3444,13 +3484,13 @@ Value tile(const Value& value) {
     O_dims.push_back(I_dims[i] * reps[i]);
     O_idxs.push_back(TensorIndex() * I_dims[i] + I_idxs[i]);
   }
-  Tensor O = Contraction(O_dims, O_idxs).assign(I(I_idxs));
+  Tensor O = Contraction(O_dims, O_idxs, "tile").assign(I(I_idxs));
   return Value{O};
 }
 
 Value transpose(const Value& value) {
   // Reorders dimensions so dim i of the output is dim pattern[i] of the input
-  IVLOG(1, "transpose");
+  IVLOG(2, "transpose");
   auto args = value.as_tuple();
   if (args.size() != 2) {
     throw std::runtime_error("Transpose expects 2 arguments");
@@ -3492,7 +3532,7 @@ Value transpose(const Value& value) {
     O_dims.push_back(I_dims[pattern[i]]);
     O_idxs.push_back(I_idxs[pattern[i]]);
   }
-  Tensor O = Contraction(O_dims, O_idxs).assign(I(I_idxs));
+  Tensor O = Contraction(O_dims, O_idxs, "transpose").assign(I(I_idxs));
   return Value{O};
 }
 
@@ -3539,14 +3579,14 @@ Value unsqueeze(const Value& value) {
   if (src_loc != I.rank()) {
     throw std::runtime_error(llvm::formatv("Unsqueeze did not replicate entirety of input into output"));
   }
-  Tensor O = Contraction(O_dims, O_idxs).assign(I(I_idxs));
+  Tensor O = Contraction(O_dims, O_idxs, "unsqueeze").assign(I(I_idxs));
   return Value{O};
 }
 
 Value variance(const Value& value) {
   // This computes the *uncorrected* sample variance (i.e. denominator = n
   // rather than = n-1) to match tensorflow
-  IVLOG(1, "variance");
+  IVLOG(2, "variance");
   auto args = value.as_tuple();
   if (args.size() != 3) {
     throw std::runtime_error("Variance expects 3 arguments");
@@ -3581,7 +3621,7 @@ Value variance(const Value& value) {
   I.bind_dims(agg.src_dims);
 
   auto SquaredDifference = (I - Mean) * (I - Mean);
-  Tensor SumSqDiff = Contraction(agg.dst_dims, agg.dst_idxs).sum(SquaredDifference(agg.src_idxs));
+  Tensor SumSqDiff = Contraction(agg.dst_dims, agg.dst_idxs, "variance").sum(SquaredDifference(agg.src_idxs));
   auto denom = Tensor{1};
   for (const auto& axis : agg.axes) {
     denom = denom * agg.src_dims.at(axis);

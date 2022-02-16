@@ -1,5 +1,9 @@
 // Copyright 2020, Intel Corporation
 
+#include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
+#include "mlir/Conversion/LLVMCommon/Pattern.h"
+#include "mlir/Conversion/MathToLLVM/MathToLLVM.h"
+#include "mlir/Conversion/MemRefToLLVM/MemRefToLLVM.h"
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
@@ -31,14 +35,15 @@ struct LibMCallLowering : public ConvertOpToLLVMPattern<OpType> {
     SmallVector<Type, 2> argTypes(getArity(), f32Type);
     auto funcType =
         LLVM::LLVMFunctionType::get(f32Type, argTypes, /*isVarArg=*/false);
-    auto sym = getOrInsertFuncOp(getFuncName(), funcType, op, rewriter);
+    auto attr = rewriter.getStringAttr(getFuncName());
+    auto sym = getOrInsertFuncOp(attr, funcType, op, rewriter);
     rewriter.replaceOpWithNewOp<LLVM::CallOp>(
-        op, ArrayRef<Type>{f32Type}, rewriter.getSymbolRefAttr(sym), operands);
+        op, ArrayRef<Type>{f32Type}, SymbolRefAttr::get(attr), operands);
     return success();
   }
 
   LLVM::LLVMFuncOp
-  getOrInsertFuncOp(StringRef funcName, LLVM::LLVMFunctionType funcType,
+  getOrInsertFuncOp(StringAttr funcName, LLVM::LLVMFunctionType funcType,
                     Operation *op, ConversionPatternRewriter &rewriter) const {
     Operation *funcOp = SymbolTable::lookupNearestSymbolFrom(op, funcName);
     if (funcOp)
@@ -47,7 +52,8 @@ struct LibMCallLowering : public ConvertOpToLLVMPattern<OpType> {
     auto module = op->getParentOfType<ModuleOp>();
     OpBuilder::InsertionGuard guard(rewriter);
     rewriter.setInsertionPointToStart(module.getBody());
-    return rewriter.create<LLVM::LLVMFuncOp>(op->getLoc(), funcName, funcType);
+    return rewriter.create<LLVM::LLVMFuncOp>(op->getLoc(), funcName.getValue(),
+                                             funcType);
   }
 
 protected:
@@ -191,7 +197,7 @@ struct ReshapeLowering : public ConvertOpToLLVMPattern<stdx::ReshapeOp> {
   }
 };
 
-static LLVM::LLVMFuncOp importFunc(OpBuilder &builder, StringRef name,
+static LLVM::LLVMFuncOp importFunc(OpBuilder &builder, StringAttr name,
                                    Type funcTy) {
   // Find the enclosing module
   auto moduleOp =
@@ -202,8 +208,8 @@ static LLVM::LLVMFuncOp importFunc(OpBuilder &builder, StringRef name,
     // If not, make a declaration
     OpBuilder::InsertionGuard insertionGuard{builder};
     builder.setInsertionPointToStart(moduleOp.getBody());
-    func =
-        builder.create<LLVM::LLVMFuncOp>(builder.getUnknownLoc(), name, funcTy);
+    func = builder.create<LLVM::LLVMFuncOp>(builder.getUnknownLoc(),
+                                            name.getValue(), funcTy);
   }
   return func;
 }
@@ -225,10 +231,8 @@ struct PackLowering : public ConvertOpToLLVMPattern<stdx::PackOp> {
   matchAndRewrite(stdx::PackOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
     Location loc = op.getLoc();
-    auto i8PtrType =
-        LLVM::LLVMPointerType::get(IntegerType::get(rewriter.getContext(), 8));
     if (op.getNumOperands() == 0) {
-      auto nullPtr = rewriter.create<LLVM::NullOp>(loc, i8PtrType);
+      auto nullPtr = rewriter.create<LLVM::NullOp>(loc, getVoidPtrType());
       rewriter.replaceOp(op, {nullPtr});
       return success();
     }
@@ -236,10 +240,11 @@ struct PackLowering : public ConvertOpToLLVMPattern<stdx::PackOp> {
     auto structType = getStructType(*typeConverter, op.getOperandTypes());
     // Get the size of the struct type and malloc
     auto sizeofStruct = getSizeInBytes(loc, structType, rewriter);
-    auto mallocFunc = importFunc(
-        rewriter, "malloc",
-        LLVM::LLVMFunctionType::get(i8PtrType, ArrayRef<Type>{getIndexType()},
-                                    /*isVarArg=*/false));
+    auto mallocFunc =
+        importFunc(rewriter, rewriter.getStringAttr("malloc"),
+                   LLVM::LLVMFunctionType::get(getVoidPtrType(),
+                                               ArrayRef<Type>{getIndexType()},
+                                               /*isVarArg=*/false));
     auto rawPtr =
         rewriter.create<LLVM::CallOp>(loc, mallocFunc, ValueRange{sizeofStruct})
             .getResult(0);
@@ -302,10 +307,13 @@ struct LowerToLLVMPass : public LowerToLLVMBase<LowerToLLVMPass> {
     RewritePatternSet patterns(context);
     populateLoopToStdConversionPatterns(patterns);
     populateStdToLLVMConversionPatterns(typeConverter, patterns);
+    populateMemRefToLLVMConversionPatterns(typeConverter, patterns);
+    populateMathToLLVMConversionPatterns(typeConverter, patterns);
     populateStdXToLLVMConversionPatterns(typeConverter, patterns);
 
     LLVMConversionTarget target(*context);
     target.addIllegalDialect<stdx::StdXDialect>();
+    target.addIllegalOp<UnrealizedConversionCastOp>();
     if (failed(applyPartialConversion(module, target, std::move(patterns)))) {
       signalPassFailure();
     }
@@ -333,9 +341,7 @@ void populateStdXToLLVMConversionPatterns(LLVMTypeConverter &converter,
                   TanLowering,     //
                   UnpackLowering   //
                   >(converter);
-  converter.addConversion([](stdx::ArgpackType type) -> Optional<Type> {
-    // Argpack types look like i8 pointers.  I'd like this to be void*, but MLIR
-    // disallows void* in it's validation for some bizare reason
+  converter.addConversion([](TupleType type) -> Optional<Type> {
     return LLVM::LLVMPointerType::get(IntegerType::get(type.getContext(), 8));
   });
 }
