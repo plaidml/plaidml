@@ -18,5 +18,4 @@ func @neg_bound(%arg0: tensor<4x8x5x5xf32> {stdx.const}, %arg1: tensor<3x3x2x8xf
 // CHECK-LABEL: func @neg_bound
 //       CHECK:   linalg.generic
 //       CHECK:   linalg.generic
-//       CHECK:   constant -1 : index 
 //       CHECK:   linalg.generic
