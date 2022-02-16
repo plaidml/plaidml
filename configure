@@ -137,7 +137,7 @@ class Configure:
                 '-DENABLE_DATA=OFF',
                 '-DENABLE_FUNCTIONAL_TESTS=ON',
                 '-DENABLE_GNA=OFF',
-                '-DENABLE_MKL_DNN=OFF',
+                '-DENABLE_MKL_DNN=ON',
                 '-DENABLE_OPENCV=OFF',
                 '-DENABLE_MYRIAD=OFF',
                 '-DENABLE_PYTHON=ON',
