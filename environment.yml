@@ -10,7 +10,7 @@ dependencies:
   - matplotlib=3.4.1
   - ninja=1.10.2
   - numpy=1.18.5
-  - opencv=4.5.2
+#  - opencv=4.5.2
   - tbb=2021.5.0
   - pip=21.0.1
   - pre_commit=2.11.1
@@ -28,7 +28,7 @@ dependencies:
       - keras-applications==1.0.8
       - livereload==2.6.3
       - nbstripout==0.3.9
-      - opencv-python-headless==4.5.2.52
+      - opencv-python-headless==4.5.5.62
       - pcpp==1.20.1
       - sphinx-rtd-theme==0.5.1
       - sphinxcontrib-katex==0.7.1

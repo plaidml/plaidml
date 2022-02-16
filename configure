@@ -118,7 +118,14 @@ class Configure:
         build_dir = pathlib.Path(f'build-{args.target}').resolve() / args.type
 
         if not args.no_openvino:
-            opencv_dir = pathlib.Path('.cenv/lib/cmake/opencv4').resolve()
+            #opencv_dir = pathlib.Path('.cenv/lib/cmake/opencv4').resolve()
+            opencv_dir = self.this_dir / 'vendor/opencv/opencv_install/lib64/cmake/opencv4'
+            opencv_build_dir = self.this_dir / 'vendor/opencv/opencv_build'
+            opencv_install_dir = self.this_dir / 'vendor/opencv/opencv_install'
+            cmd = [ './tools/build_opencv.sh', f'{opencv_build_dir}', f'{opencv_install_dir}' ]
+            run(cmd, check=True)
+            env = os.environ.copy()
+
             openvino_dir = build_dir / '_deps/openvino-build'
             if args.temp:
                 temp_dir = args.temp / args.target

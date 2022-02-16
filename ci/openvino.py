@@ -10,7 +10,7 @@ from pathlib import Path
 
 OPEN_ZOO_RELEASE = os.getenv('OPEN_ZOO_RELEASE', '2021.3')
 OPEN_ZOO_URL = f'https://github.com/openvinotoolkit/open_model_zoo/archive/refs/tags/{OPEN_ZOO_RELEASE}.tar.gz'
-OPENCV_PYTHON_VER = '4.5.2.52'
+OPENCV_PYTHON_VER = '4.5.5.62'
 
 AC_DIR = Path(f'open_model_zoo-{OPEN_ZOO_RELEASE}') / 'tools' / 'accuracy_checker'
 DATASET_SRC = os.getenv('DATASET_SRC')
@@ -18,12 +18,13 @@ DATASET_DIR = Path('tmp/ac').resolve()
 
 
 def benchmark_app(args):
-    CONDA_PREFIX = Path(os.getenv('CONDA_PREFIX'))
+    #CONDA_PREFIX = Path(os.getenv('CONDA_PREFIX'))
     env = os.environ.copy()
-    env['LD_LIBRARY_PATH'] = os.pathsep.join([
-        str(CONDA_PREFIX / 'lib'),
-        str(args.pkgdir.resolve()),
-    ])
+    env['LD_LIBRARY_PATH'] = args.pkgdir.resolve()
+    # env['LD_LIBRARY_PATH'] = os.pathsep.join([
+    #     str(CONDA_PREFIX / 'lib'),
+    #     str(args.pkgdir.resolve()),
+    #])
     cmd = [args.pkgdir / 'benchmark_app']
     cmd += ['-d', 'PLAIDML']
     cmd += ['-m', args.model]
