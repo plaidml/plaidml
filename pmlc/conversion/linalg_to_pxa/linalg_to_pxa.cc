@@ -333,26 +333,14 @@ struct GenericOpConversion : public OpConversionPattern<linalg::GenericOp> {
       }
     }
 
-    bool hasDummyTensor = op->hasAttr("dummy_tensor");
-    bool skipBoundCheck = op->hasAttr("skip_bound_check");
     SmallVector<AffineMap, 4> idxMaps = llvm::to_vector<4>(
         adaptor.indexing_maps().getAsValueRange<AffineMapAttr>());
-    if (skipBoundCheck) {
-      // Remove the last dynamic dimension of the indexing maps
-      for (auto &map : idxMaps) {
-        map = AffineMap::get(map.getNumDims() - 1, 0, map.getResults(),
-                             op.getContext());
-      }
-    }
 
     auto staticRanges = op.getStaticLoopRanges();
     if (!staticRanges) {
-      op.emitError("LiangOp does not have static ranges.");
+      op.emitError("LinalgOp does not have static ranges.");
     }
     SmallVector<int64_t, 8> ranges = llvm::to_vector<8>(*staticRanges);
-    if (skipBoundCheck) {
-      ranges.pop_back();
-    }
     auto loc = op.getLoc();
     SmallVector<AtomicRMWKind, 4> reductions(outputs.size(),
                                              AtomicRMWKind::assign);
@@ -379,9 +367,6 @@ struct GenericOpConversion : public OpConversionPattern<linalg::GenericOp> {
     }
 
     for (unsigned i = 0; i < numInputs; ++i) {
-      if (i == 0 && hasDummyTensor) {
-        continue;
-      }
       if (inputs[i].getType().isa<ShapedType>()) {
         // input is a tensor
         auto loadOp =

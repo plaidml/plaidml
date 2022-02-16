@@ -15,10 +15,9 @@ func @main(%arg0: tensor<1x1x3x1xf32> {stdx.const}, %arg1: tensor<1x4x1x1xf32> {
   return %conv : tensor<1x1x9x1xf32>
 }
 
-// CHECK: #[[map0:.*]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4, d5, d6, d7)>
-// CHECK: #[[map1:.*]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d4, d6, d5)>
-// CHECK: #[[map2:.*]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d1 - d4, d2 - d6 * 4 + 1, d3, d5)>
-// CHECK: #[[map3:.*]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3)>
+// CHECK: #[[map0:.*]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d4, d6, d5)>
+// CHECK: #[[map1:.*]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d1 - d4, d2 - d6 * 4 + 1, d3, d5)>
+// CHECK: #[[map2:.*]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
 // CHECK: #[[set:.*]] = affine_set<(d0, d1, d2, d3, d4, d5, d6) : (d2 - d6 * 4 + 1 >= 0, -(d2 + 1) + d6 * 4 + 3 >= 0)>
-// CHECK: linalg.generic {indexing_maps = [#[[map0]], #[[map1]], #[[map2]], #[[map3]]]
+// CHECK: linalg.generic {indexing_maps = [#[[map0]], #[[map1]], #[[map2]]]
 // CHECK-SAME: constraints = #[[set]]
