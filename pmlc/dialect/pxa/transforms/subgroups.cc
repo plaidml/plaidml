@@ -10,6 +10,7 @@
 #include "pmlc/dialect/pxa/analysis/uses.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/dialect/pxa/transforms/cache.h"
+#include "pmlc/dialect/pxa/transforms/gpu_thread.h"
 #include "pmlc/dialect/pxa/transforms/pass_detail.h"
 #include "pmlc/dialect/pxa/transforms/tile.h"
 #include "pmlc/dialect/pxa/transforms/tile_accumulate.h"
@@ -121,15 +122,14 @@ struct SubgroupCostModel {
       IVLOG(3, "Not part of block");
       return false;
     }
-
-    auto maybeDimStrides =
-        computeStrideInfo(ioOp.getAffineMap(), ioOp.getMapOperands());
-    if (!maybeDimStrides) {
+    SmallVector<StrideInfo> strides;
+    if (failed(computeMultiDimStrideInfo(ioOp.getAffineMap(),
+                                         ioOp.getMapOperands(), strides))) {
       IVLOG(3, "Cannot compute dimensionalized strides");
       return false;
     }
-    ioDimStrides.push_back(*maybeDimStrides);
-    IVLOG(3, "  dimensional strides = " << *maybeDimStrides)
+    ioDimStrides.push_back(strides);
+    IVLOG(3, "  dimensional strides = " << strides)
 
     auto memreftype = ioOp.getMemRefType();
 
@@ -191,7 +191,7 @@ struct SubgroupCostModel {
     SmallVector<int64_t, 4> tensorDimensions;
   };
 
-  MemInfo computeMemoryInfo(SmallVector<StrideInfo, 4> dimStrides,
+  MemInfo computeMemoryInfo(SmallVector<StrideInfo> dimStrides,
                             SmallVector<int64_t, 4> tensorStrides,
                             unsigned elementSizeInBytes) {
     MemInfo out = {0, 1, 1, 0.0};
@@ -287,7 +287,7 @@ struct SubgroupCostModel {
   // Cache of the index ranges
   SmallVector<int64_t, 8> ranges;
   // Strides for all io ops
-  SmallVector<SmallVector<StrideInfo, 4>, 4> ioDimStrides;
+  SmallVector<SmallVector<StrideInfo>, 4> ioDimStrides;
   SmallVector<SmallVector<int64_t, 4>, 4> ioTensorStrides;
   SmallVector<unsigned, 4> ioElementSizesInBytes;
 };
@@ -325,7 +325,7 @@ void SubgroupApply(AffineParallelOp op, SubgroupPlan plan) {
     (void)vectorizeBuffer(alloc);
   });
   // Attach subgroup size
-  setIntegerTag(op, subgroupSizeTag(), plan.subgroupSize);
+  setIntegerTag(op, kSubgroupSizeTag, plan.subgroupSize);
 }
 
 struct SubgroupsPass : public SubgroupsBase<SubgroupsPass> {
@@ -347,7 +347,7 @@ struct SubgroupsPass : public SubgroupsBase<SubgroupsPass> {
       // If subgrouping fails, we tile accumulations instead to handle the other
       // cases
       tileAccumulations(op, false);
-      setIntegerTag(op, subgroupSizeTag(), 1);
+      setIntegerTag(op, kSubgroupSizeTag, 1);
       return;
     }
     IVLOG(3, "best plan = " << cm.bestPlan);

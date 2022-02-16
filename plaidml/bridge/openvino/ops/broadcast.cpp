@@ -34,7 +34,7 @@ void registerBroadcast() {
         if (ctx.operands.size() != 3) {
           THROW_IE_EXCEPTION << "An axes_mapping must be passed to broadcast when using explicit mode";
         }
-        axes_mapping = get_axis_vector_from_constant_operand(2, layer);
+        axes_mapping = cast_constant_operand<size_t>(2, layer);
         break;
       case ngraph::op::AutoBroadcastType::NUMPY: {
         auto excess_rank = target_shape.size() - I.rank();

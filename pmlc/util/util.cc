@@ -2,7 +2,6 @@
 
 #include "pmlc/util/util.h"
 
-#include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/Support/Process.h"
@@ -14,7 +13,7 @@ namespace pmlc::util {
 uint64_t getByteSize(MemRefType type) {
   int64_t offset;
   SmallVector<int64_t, 8> strides;
-  if (failed(mlir::getStridesAndOffset(type, strides, offset))) {
+  if (failed(getStridesAndOffset(type, strides, offset))) {
     throw std::runtime_error("Could not retrieve strides");
   }
   auto sizes = type.getShape();
@@ -29,50 +28,6 @@ uint64_t getByteSize(MemRefType type) {
   }
   unsigned elem_bytes = llvm::divideCeil(type.getElementTypeBitWidth(), 8);
   return (total + 1) * elem_bytes;
-}
-
-// Check if all tags exist
-bool hasAllTags(Operation *op, ArrayRef<StringRef> tags) {
-  if (tags.empty()) {
-    return true;
-  }
-  DictionaryAttr opTagsAttr = op->getAttrOfType<DictionaryAttr>(kTagAttribute);
-  if (!opTagsAttr) {
-    return false;
-  }
-  for (StringRef tag : tags) {
-    if (!opTagsAttr.get(tag)) {
-      return false;
-    }
-  }
-  return true;
-}
-
-bool hasTag(Operation *op, StringRef tag) {
-  DictionaryAttr opTagsAttr = op->getAttrOfType<DictionaryAttr>(kTagAttribute);
-  if (!opTagsAttr) {
-    return false;
-  }
-  return opTagsAttr.get(tag) != nullptr;
-}
-
-// Set tags in op
-void setTags(Operation *op, ArrayRef<StringRef> tags) {
-  if (tags.empty()) {
-    return;
-  }
-  OpBuilder builder(op);
-  DictionaryAttr opTagsAttr = op->getAttrOfType<DictionaryAttr>(kTagAttribute);
-  SmallVector<NamedAttribute, 4> newTags;
-  if (opTagsAttr) {
-    newTags.append(opTagsAttr.begin(), opTagsAttr.end());
-  }
-  for (StringRef tag : tags) {
-    if (!opTagsAttr || !opTagsAttr.get(tag)) {
-      newTags.emplace_back(builder.getNamedAttr(tag, builder.getUnitAttr()));
-    }
-  }
-  op->setAttr(kTagAttribute, builder.getDictionaryAttr(newTags));
 }
 
 DiagnosticCounter::DiagnosticCounter() : counter(0), threshold(0) {
@@ -125,8 +80,8 @@ void wrapFunctionAndPackArguments(llvm::Module *module, StringRef funcName,
     llvm::Value *argIndex = llvm::Constant::getIntegerValue(
         builder.getInt64Ty(), APInt(64, indexedArg.index()));
     llvm::Value *argPtrPtr = builder.CreateGEP(argList, argIndex);
-    llvm::Value *argPtr = builder.CreateLoad(argPtrPtr);
-    auto dstType = indexedArg.value().getType();
+    llvm::Value *argPtr = builder.CreateLoad(builder.getInt8PtrTy(), argPtrPtr);
+    llvm::Type *dstType = indexedArg.value().getType();
     llvm::Value *arg = dstType->isIntegerTy()
                            ? builder.CreatePtrToInt(argPtr, dstType)
                            : builder.CreateBitCast(argPtr, dstType);
@@ -139,6 +94,20 @@ void wrapFunctionAndPackArguments(llvm::Module *module, StringRef funcName,
     builder.CreateRetVoid();
   } else {
     builder.CreateRet(val);
+  }
+}
+
+AffineValueMap getRangesValueMap(AffineParallelOp op) {
+  AffineValueMap out;
+  AffineValueMap::difference(op.getUpperBoundsValueMap(),
+                             op.getLowerBoundsValueMap(), &out);
+  return out;
+}
+
+void splitAffineMaps(AffineMap from, SmallVectorImpl<AffineMap> &into) {
+  for (AffineExpr expr : from.getResults()) {
+    into.push_back(
+        AffineMap::get(from.getNumDims(), from.getNumSymbols(), expr));
   }
 }
 

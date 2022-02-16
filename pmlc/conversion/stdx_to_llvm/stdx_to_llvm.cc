@@ -1,10 +1,13 @@
 // Copyright 2020, Intel Corporation
 
+#include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
+#include "mlir/Conversion/LLVMCommon/Pattern.h"
+#include "mlir/Conversion/MathToLLVM/MathToLLVM.h"
+#include "mlir/Conversion/MemRefToLLVM/MemRefToLLVM.h"
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
-#include "mlir/Dialect/StandardOps/EDSC/Intrinsics.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/Pass/Pass.h"
@@ -32,14 +35,15 @@ struct LibMCallLowering : public ConvertOpToLLVMPattern<OpType> {
     SmallVector<Type, 2> argTypes(getArity(), f32Type);
     auto funcType =
         LLVM::LLVMFunctionType::get(f32Type, argTypes, /*isVarArg=*/false);
-    auto sym = getOrInsertFuncOp(getFuncName(), funcType, op, rewriter);
+    auto attr = rewriter.getStringAttr(getFuncName());
+    auto sym = getOrInsertFuncOp(attr, funcType, op, rewriter);
     rewriter.replaceOpWithNewOp<LLVM::CallOp>(
-        op, ArrayRef<Type>{f32Type}, rewriter.getSymbolRefAttr(sym), operands);
+        op, ArrayRef<Type>{f32Type}, SymbolRefAttr::get(attr), operands);
     return success();
   }
 
   LLVM::LLVMFuncOp
-  getOrInsertFuncOp(StringRef funcName, LLVM::LLVMFunctionType funcType,
+  getOrInsertFuncOp(StringAttr funcName, LLVM::LLVMFunctionType funcType,
                     Operation *op, ConversionPatternRewriter &rewriter) const {
     Operation *funcOp = SymbolTable::lookupNearestSymbolFrom(op, funcName);
     if (funcOp)
@@ -48,7 +52,8 @@ struct LibMCallLowering : public ConvertOpToLLVMPattern<OpType> {
     auto module = op->getParentOfType<ModuleOp>();
     OpBuilder::InsertionGuard guard(rewriter);
     rewriter.setInsertionPointToStart(module.getBody());
-    return rewriter.create<LLVM::LLVMFuncOp>(op->getLoc(), funcName, funcType);
+    return rewriter.create<LLVM::LLVMFuncOp>(op->getLoc(), funcName.getValue(),
+                                             funcType);
   }
 
 protected:
@@ -124,37 +129,36 @@ struct TanLowering : public LibMCallLowering<stdx::TanOp> {
 
 class BaseViewConversionHelper {
 public:
-  explicit BaseViewConversionHelper(Type type)
-      : desc(MemRefDescriptor::undef(rewriter(), loc(), type)) {}
+  BaseViewConversionHelper(OpBuilder &rewriter, Location loc, Type type)
+      : rewriter(rewriter), loc(loc),
+        desc(MemRefDescriptor::undef(rewriter, loc, type)) {}
 
-  explicit BaseViewConversionHelper(Value v) : desc(v) {}
+  explicit BaseViewConversionHelper(OpBuilder &rewriter, Location loc, Value v)
+      : rewriter(rewriter), loc(loc), desc(v) {}
 
   /// Wrappers around MemRefDescriptor that use EDSC builder and location.
-  Value allocatedPtr() { return desc.allocatedPtr(rewriter(), loc()); }
-  void setAllocatedPtr(Value v) { desc.setAllocatedPtr(rewriter(), loc(), v); }
-  Value alignedPtr() { return desc.alignedPtr(rewriter(), loc()); }
-  void setAlignedPtr(Value v) { desc.setAlignedPtr(rewriter(), loc(), v); }
-  Value offset() { return desc.offset(rewriter(), loc()); }
-  void setOffset(Value v) { desc.setOffset(rewriter(), loc(), v); }
-  Value size(unsigned i) { return desc.size(rewriter(), loc(), i); }
-  void setSize(unsigned i, Value v) { desc.setSize(rewriter(), loc(), i, v); }
+  Value allocatedPtr() { return desc.allocatedPtr(rewriter, loc); }
+  void setAllocatedPtr(Value v) { desc.setAllocatedPtr(rewriter, loc, v); }
+  Value alignedPtr() { return desc.alignedPtr(rewriter, loc); }
+  void setAlignedPtr(Value v) { desc.setAlignedPtr(rewriter, loc, v); }
+  Value offset() { return desc.offset(rewriter, loc); }
+  void setOffset(Value v) { desc.setOffset(rewriter, loc, v); }
+  Value size(unsigned i) { return desc.size(rewriter, loc, i); }
+  void setSize(unsigned i, Value v) { desc.setSize(rewriter, loc, i, v); }
   void setConstantSize(unsigned i, int64_t v) {
-    desc.setConstantSize(rewriter(), loc(), i, v);
+    desc.setConstantSize(rewriter, loc, i, v);
   }
-  Value stride(unsigned i) { return desc.stride(rewriter(), loc(), i); }
-  void setStride(unsigned i, Value v) {
-    desc.setStride(rewriter(), loc(), i, v);
-  }
+  Value stride(unsigned i) { return desc.stride(rewriter, loc, i); }
+  void setStride(unsigned i, Value v) { desc.setStride(rewriter, loc, i, v); }
   void setConstantStride(unsigned i, int64_t v) {
-    desc.setConstantStride(rewriter(), loc(), i, v);
+    desc.setConstantStride(rewriter, loc, i, v);
   }
 
   operator Value() { return desc; }
 
 private:
-  OpBuilder &rewriter() { return edsc::ScopedContext::getBuilderRef(); }
-  Location loc() { return edsc::ScopedContext::getLocation(); }
-
+  OpBuilder &rewriter;
+  Location loc;
   MemRefDescriptor desc;
 };
 
@@ -177,10 +181,10 @@ struct ReshapeLowering : public ConvertOpToLLVMPattern<stdx::ReshapeOp> {
         }))
       return failure();
 
-    edsc::ScopedContext context(rewriter, op->getLoc());
     stdx::ReshapeOpAdaptor adaptor(operands);
-    BaseViewConversionHelper baseDesc(adaptor.tensor());
-    BaseViewConversionHelper desc(typeConverter->convertType(dstType));
+    BaseViewConversionHelper baseDesc(rewriter, op->getLoc(), adaptor.tensor());
+    BaseViewConversionHelper desc(rewriter, op->getLoc(),
+                                  typeConverter->convertType(dstType));
     desc.setAllocatedPtr(baseDesc.allocatedPtr());
     desc.setAlignedPtr(baseDesc.alignedPtr());
     desc.setOffset(baseDesc.offset());
@@ -193,7 +197,7 @@ struct ReshapeLowering : public ConvertOpToLLVMPattern<stdx::ReshapeOp> {
   }
 };
 
-static LLVM::LLVMFuncOp importFunc(OpBuilder &builder, StringRef name,
+static LLVM::LLVMFuncOp importFunc(OpBuilder &builder, StringAttr name,
                                    Type funcTy) {
   // Find the enclosing module
   auto moduleOp =
@@ -204,8 +208,8 @@ static LLVM::LLVMFuncOp importFunc(OpBuilder &builder, StringRef name,
     // If not, make a declaration
     OpBuilder::InsertionGuard insertionGuard{builder};
     builder.setInsertionPointToStart(moduleOp.getBody());
-    func =
-        builder.create<LLVM::LLVMFuncOp>(builder.getUnknownLoc(), name, funcTy);
+    func = builder.create<LLVM::LLVMFuncOp>(builder.getUnknownLoc(),
+                                            name.getValue(), funcTy);
   }
   return func;
 }
@@ -227,10 +231,8 @@ struct PackLowering : public ConvertOpToLLVMPattern<stdx::PackOp> {
   matchAndRewrite(stdx::PackOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
     Location loc = op.getLoc();
-    auto i8PtrType =
-        LLVM::LLVMPointerType::get(IntegerType::get(rewriter.getContext(), 8));
     if (op.getNumOperands() == 0) {
-      auto nullPtr = rewriter.create<LLVM::NullOp>(loc, i8PtrType);
+      auto nullPtr = rewriter.create<LLVM::NullOp>(loc, getVoidPtrType());
       rewriter.replaceOp(op, {nullPtr});
       return success();
     }
@@ -238,10 +240,11 @@ struct PackLowering : public ConvertOpToLLVMPattern<stdx::PackOp> {
     auto structType = getStructType(*typeConverter, op.getOperandTypes());
     // Get the size of the struct type and malloc
     auto sizeofStruct = getSizeInBytes(loc, structType, rewriter);
-    auto mallocFunc = importFunc(
-        rewriter, "malloc",
-        LLVM::LLVMFunctionType::get(i8PtrType, ArrayRef<Type>{getIndexType()},
-                                    /*isVarArg=*/false));
+    auto mallocFunc =
+        importFunc(rewriter, rewriter.getStringAttr("malloc"),
+                   LLVM::LLVMFunctionType::get(getVoidPtrType(),
+                                               ArrayRef<Type>{getIndexType()},
+                                               /*isVarArg=*/false));
     auto rawPtr =
         rewriter.create<LLVM::CallOp>(loc, mallocFunc, ValueRange{sizeofStruct})
             .getResult(0);
@@ -304,10 +307,13 @@ struct LowerToLLVMPass : public LowerToLLVMBase<LowerToLLVMPass> {
     RewritePatternSet patterns(context);
     populateLoopToStdConversionPatterns(patterns);
     populateStdToLLVMConversionPatterns(typeConverter, patterns);
+    populateMemRefToLLVMConversionPatterns(typeConverter, patterns);
+    populateMathToLLVMConversionPatterns(typeConverter, patterns);
     populateStdXToLLVMConversionPatterns(typeConverter, patterns);
 
     LLVMConversionTarget target(*context);
     target.addIllegalDialect<stdx::StdXDialect>();
+    target.addIllegalOp<UnrealizedConversionCastOp>();
     if (failed(applyPartialConversion(module, target, std::move(patterns)))) {
       signalPassFailure();
     }
@@ -335,9 +341,7 @@ void populateStdXToLLVMConversionPatterns(LLVMTypeConverter &converter,
                   TanLowering,     //
                   UnpackLowering   //
                   >(converter);
-  converter.addConversion([](stdx::ArgpackType type) -> Optional<Type> {
-    // Argpack types look like i8 pointers.  I'd like this to be void*, but MLIR
-    // disallows void* in it's validation for some bizare reason
+  converter.addConversion([](TupleType type) -> Optional<Type> {
     return LLVM::LLVMPointerType::get(IntegerType::get(type.getContext(), 8));
   });
 }

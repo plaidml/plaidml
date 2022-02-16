@@ -2,13 +2,11 @@ pml_cc_library(
   NAME
     analysis
   SRCS
-    affine_constraints.cc
     affine_expr.cc
     memref_access.cc
     strides.cc
     uses.cc
   HDRS
-    affine_constraints.h
     affine_expr.h
     memref_access.cc
     strides.h

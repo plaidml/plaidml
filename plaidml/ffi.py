@@ -3,18 +3,21 @@
 import logging
 import os
 import platform
-import sys
 import threading
 
 import pkg_resources
 
 from plaidml._ffi import ffi
 
+
+class ThreadLocalState(threading.local):
+
+    def __init__(self):
+        self.err = ffi.new('plaidml_error*')
+
+
 logger = logging.getLogger(__name__)
-
-_TLS = threading.local()
-_TLS.err = ffi.new('plaidml_error*')
-
+_TLS = ThreadLocalState()
 _LIBNAME = 'plaidml'
 
 if platform.system() == 'Windows':

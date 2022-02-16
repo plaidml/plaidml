@@ -10,12 +10,17 @@
 #include "mlir/Dialect/StandardOps/Transforms/Passes.h"
 #include "mlir/Transforms/Passes.h"
 
+#include "mlir-hlo/Dialect/mhlo/transforms/register_passes.h"
+#include "mlir-hlo/Transforms/register_passes.h"
+
+#include "pmlc/conversion/linalg_to_pxa/passes.h"
 #include "pmlc/conversion/pxa_to_affine/passes.h"
-#include "pmlc/conversion/scf_to_omp/passes.h"
 #include "pmlc/conversion/stdx_to_llvm/passes.h"
+#include "pmlc/conversion/tile_to_linalg/passes.h"
 #include "pmlc/conversion/tile_to_pxa/passes.h"
 #include "pmlc/dialect/affinex/transforms/passes.h"
 #include "pmlc/dialect/layer/transforms/passes.h"
+#include "pmlc/dialect/pml/transforms/passes.h"
 #include "pmlc/dialect/pxa/transforms/passes.h"
 #include "pmlc/dialect/stdx/transforms/passes.h"
 #include "pmlc/dialect/tile/transforms/passes.h"
@@ -48,19 +53,27 @@ inline void registerAllPasses() {
   mlir::registerSCFPasses();
   mlir::registerStandardPasses();
 
+  // XLA
+  mlir::mhlo::registerAllMhloPasses();
+  mlir::lmhlo::registerAllLmhloPasses();
+  mlir::disc_ral::registerAllDiscRalPasses();
+  mlir::hlo::registerAllHloPasses();
+
   //
   // PMLC
   //
 
   // Conversion passes
+  pmlc::conversion::linalg_to_pxa::registerPasses();
   pmlc::conversion::pxa_to_affine::registerPasses();
-  pmlc::conversion::scf_to_omp::registerPasses();
   pmlc::conversion::stdx_to_llvm::registerPasses();
+  pmlc::conversion::tile_to_linalg::registerPasses();
   pmlc::conversion::tile_to_pxa::registerPasses();
 
   // Dialect passes
   pmlc::dialect::affinex::registerPasses();
   pmlc::dialect::layer::registerPasses();
+  pmlc::dialect::pml::registerPasses();
   pmlc::dialect::pxa::registerPasses();
   pmlc::dialect::stdx::registerPasses();
   pmlc::dialect::tile::registerPasses();
@@ -68,7 +81,7 @@ inline void registerAllPasses() {
   // Target passes
   pmlc::target::x86::registerPasses();
 
-  // Transforms
+  // Generic transforms
   pmlc::transforms::registerPasses();
 
   pmlc::rt::registerRuntimes();

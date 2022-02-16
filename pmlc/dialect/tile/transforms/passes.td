@@ -3,6 +3,11 @@
 
 include "mlir/Pass/PassBase.td"
 
+def AlgebraicOpt : FunctionPass<"tile-algebraic-opt"> {
+  let summary = "Algebraic optimizations";
+  let constructor = "pmlc::dialect::tile::createAlgebraicOptPass()";
+}
+
 def ComputeBounds : FunctionPass<"tile-compute-bounds"> {
   let summary = "Compute bounds for contractions";
   let constructor = "pmlc::dialect::tile::createComputeBoundsPass()";
@@ -34,12 +39,6 @@ def PadRanges : FunctionPass<"tile-pad-ranges"> {
 def PadConstraints : FunctionPass<"tile-pad-constraints"> {
   let summary = "Pad outputs to remove constraints on inputs";
   let constructor = "pmlc::dialect::tile::createPadConstraintsPass()";
-}
-
-def SplitMain :  Pass<"tile-split-main", "mlir::ModuleOp"> {
-  let summary = "Split main into init/main/fini";
-  let constructor = "pmlc::dialect::tile::createSplitMainPass()";
-  let dependentDialects = ["pmlc::dialect::stdx::StdXDialect"];
 }
 
 #endif // __PMLC_DIALECT_TILE_PASSES__

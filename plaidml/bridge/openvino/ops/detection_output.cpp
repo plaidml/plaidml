@@ -49,21 +49,16 @@ void registerDetectionOutput() {
     auto input_width = layer->get_attrs().input_width;
     auto objectness_score = layer->get_attrs().objectness_score;
 
-    // TODO: support decrease_label_id, keep_top_k with multiple batches in NMS.
-    IE_ASSERT(decrease_label_id == false);
-    // TODO: support share_location = false which is not
-    // sharing bounding boxes among different classes.
-    IE_ASSERT(share_location == true);
-
     int prior_size = normalized ? 4 : 5;
     int prior_offset = normalized ? 0 : 1;
+    int num_loc_classes = share_location ? 1 : num_classes;
     int i_h = normalized ? 1 : input_height;
     int i_w = normalized ? 1 : input_width;
     auto batch = Location.compute_shape().sizes()[0];
     auto num_priors = Priors.compute_shape().sizes()[2] / prior_size;
     auto priors_shape_variance = Priors.compute_shape().sizes()[1];
 
-    std::vector<int64_t> location_shape = {batch, num_priors, 4};
+    std::vector<int64_t> location_shape = {batch, num_priors, num_loc_classes, 4};
     std::vector<int64_t> confidence_shape = {batch, num_priors, num_classes};
     std::vector<int64_t> priors_shape = {batch, priors_shape_variance, num_priors, prior_size};
 
@@ -105,12 +100,17 @@ void registerDetectionOutput() {
       confidence = edsl::select(arm_conf < objectness_score, cast(edsl::Tensor{0.0f}, DType::FLOAT32), confidence);
 
       arm_loc = edsl::reshape(ArmLocation, location_shape);
+      arm_loc = op::transpose(arm_loc, edsl::make_tuple<int64_t>({0, 2, 1, 3}));
     }
 
     // Transpose the confidence to match the input shape of `scores` in NMS.
     // confidence -> {batch, num_boxes, num_classes}
     // scores -> {batch, num_classes, num_boxes}
     edsl::Tensor nms_conf = op::transpose(confidence, edsl::make_tuple<int64_t>({0, 2, 1}));
+    // Transpose location to match the indices order of 'selected_indices' in NMS.
+    // location -> {batch, num_boxes, num_classes, 4}
+    // selected_indices {batch, num_classes, num_boxes}
+    location = op::transpose(location, edsl::make_tuple<int64_t>({0, 2, 1, 3}));
     // Set the scores of background class to zeros.
     if (background_label_id > -1) {
       auto zero = cast(edsl::Tensor{0.0f}, nms_conf.dtype());
@@ -142,6 +142,9 @@ void registerDetectionOutput() {
                                            .ssd_location(location)
                                            .ssd_with_arm_loc(with_add_pred)
                                            .ssd_arm_location(arm_loc)
+                                           .nms_style(decrease_label_id ? op::NmsStyle::MXNET : op::NmsStyle::CAFFE)
+                                           .share_location(share_location)
+                                           .hard_suppression(false)
                                            .build();
     edsl::Tensor selected_indices = result[0];
     auto selected_indices_shape = selected_indices.compute_shape().sizes();
@@ -152,7 +155,7 @@ void registerDetectionOutput() {
     if (keep_top_k[0] > -1 && selected_indices_shape[0] > keep_top_k[0]) {
       edsl::Tensor scores_slice = op::slice(selected_scores).add_dim(0, selected_indices_shape[0]).add_dim(2, 3);
       auto sorted_idxs = op::squeeze(edsl::argsort(scores_slice, 0, edsl::SortDirection::DESC), {-1});
-      edsl::Tensor idxs_topk = edsl::gather(sorted_idxs, edsl::index({edsl::TensorDim(keep_top_k[0])}, 0));
+      edsl::Tensor idxs_topk = op::slice(sorted_idxs).add_dim(0, keep_top_k[0]);
       auto idxs_topk_sorted = op::sort(idxs_topk, 0, edsl::SortDirection::ASC);
       topk_results = edsl::gather(selected_scores, idxs_topk_sorted).axis(0);
     } else {

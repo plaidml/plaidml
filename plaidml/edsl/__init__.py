@@ -165,7 +165,7 @@ def _poly_op(op, *args):
 
 class TensorIndex(ForeignObject):
     """Represents an index in a polynomial expression.
-    
+
     Args:
         name (str, optional): The name to give this TensorIndex.
     """
@@ -746,10 +746,12 @@ def _wrap_tensor(x):
         type(x), fn, args, x))
 
 
-def intrinsic(fn, *args):
+def intrinsic(fn, *args, **kwargs):
     args = [_wrap_tensor(x) for x in args]
     raw_args = [x.as_ptr() for x in args]
-    return Tensor(expr=ffi_call(lib.plaidml_expr_intrinsic, fn.encode(), len(args), raw_args))
+    name = kwargs.get('name', '')
+    return Tensor(
+        expr=ffi_call(lib.plaidml_expr_intrinsic, fn.encode(), len(args), raw_args, name.encode()))
 
 
 def abs(x):
@@ -886,6 +888,11 @@ class GatherMode(enum.Enum):
     ND = 1
 
 
+class OutOfBoundsMode(enum.Enum):
+    GATHER_EDGE_PADDED_INPUT = 0
+    RETURN_ZERO = 1
+
+
 def gather(x,
            y,
            axis=0,
@@ -893,7 +900,8 @@ def gather(x,
            nearest_mode=NearestMode.ROUND_PREFER_FLOOR,
            cube_coeff=-0.75,
            gather_mode=GatherMode.NORMAL,
-           batch_dims=0):
+           batch_dims=0,
+           out_of_bounds_mode=OutOfBoundsMode.GATHER_EDGE_PADDED_INPUT):
     """Takes an input tensor (``x``) and a set of indices to gather over
     (``y``), and returns an output tensor that gathers the input tensor from the
     indices specified.
@@ -907,12 +915,13 @@ def gather(x,
         cube_coeff (float): The coefficient that controls the cubic interpolation.
         gather_mode (Enum): The type of gather op.
         batch_dims (int): The number of leading batch dimensions.
+        out_of_bounds_mode (Enum): The mode determines what values to gather for out-of-bounds reads.
 
     Returns:
         Tensor: The result of the ``gather`` operation.
     """
     return intrinsic('gather', x, y, axis, interpolation_mode.value, nearest_mode.value,
-                     cube_coeff, gather_mode.value, batch_dims)
+                     cube_coeff, gather_mode.value, batch_dims, out_of_bounds_mode.value)
 
 
 def ident(x):

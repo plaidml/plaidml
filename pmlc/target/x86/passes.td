@@ -3,6 +3,11 @@
 
 include "mlir/Pass/PassBase.td"
 
+def CollapseParallelLoops : FunctionPass<"x86-collapse-scf-parallel"> {
+  let summary = "Collapse parallel loops to use a single induction variable";
+  let constructor = "pmlc::target::x86::createCollapseParallelLoopsPass()";
+}
+
 def ConvertPXAToAffine : Pass<"x86-convert-pxa-to-affine", "mlir::ModuleOp"> {
   let summary = "Convert PXA dialect to Affine dialect";
   let constructor = "pmlc::target::x86::createLowerPXAToAffinePass()";
@@ -18,13 +23,19 @@ def ConvertStandardToLLVM : Pass<"x86-convert-std-to-llvm", "mlir::ModuleOp"> {
   let dependentDialects = ["mlir::LLVM::LLVMDialect"];
 }
 
-def OpenMPWorkaround : Pass<"x86-openmp-workaround", "mlir::LLVM::LLVMFuncOp"> {
-  let summary = "Packs/unpacks values crossing OpenMP parallel blocks";
-  let constructor = "pmlc::target::x86::createOpenMPWorkaroundPass()";
-  let dependentDialects = [
-    "mlir::LLVM::LLVMDialect",
-    "mlir::omp::OpenMPDialect",
-  ];
+def FoldConstantCast : FunctionPass<"x86-fold-constant-cast"> {
+  let summary = "Materialize casts of constants to target type";
+  let constructor = "pmlc::target::x86::createFoldConstantCastPass()";
+}
+
+def ProfileKernels : Pass<"x86-profile-kernels", "mlir::ModuleOp"> {
+  let summary = "Inject instrumentation points before/after kernel ops";
+  let constructor = "pmlc::target::x86::createProfileKernelsPass()";
+}
+
+def ProfileLinking : Pass<"x86-profile-linking", "mlir::ModuleOp"> {
+  let summary = "Link profile ops to runtime functions";
+  let constructor = "pmlc::target::x86::createProfileLinkingPass()";
 }
 
 def PRNGLinking : Pass<"x86-prng-linking", "mlir::ModuleOp"> {
@@ -32,20 +43,54 @@ def PRNGLinking : Pass<"x86-prng-linking", "mlir::ModuleOp"> {
   let constructor = "pmlc::target::x86::createPRNGLinkingPass()";
 }
 
-def TraceLinking : Pass<"x86-trace-linking", "mlir::ModuleOp"> {
-  let summary = "Link trace ops to runtime functions";
-  let constructor = "pmlc::target::x86::createTraceLinkingPass()";
+def ReorderLayouts : FunctionPass<"x86-reorder-layouts"> {
+  let summary = "Optimize data layouts for efficient reading";
+  let constructor = "pmlc::target::x86::createReorderLayoutsPass()";
+  let options = [
+    Option<"blockSize", "block-size", "int64_t", /*default=*/"32",
+           "Data block size">
+  ];
+  let dependentDialects = [
+    "dialect::linalgx::LinalgXDialect",
+  ];
 }
 
-def XSMMStencil : FunctionPass<"x86-affine-stencil-xsmm"> {
-  let summary = "Find a tiling for extracting 'micro' GEMMs suitable for XSMM";
-  let constructor = "pmlc::target::x86::createXSMMStencilPass()";
+def ReorderWeightLayouts : FunctionPass<"x86-reorder-weight-layouts"> {
+  let summary = "Optimize weight layouts for efficient reading";
+  let constructor = "pmlc::target::x86::createReorderWeightLayoutsPass()";
+  let options = [
+    Option<"blockSize", "block-size", "int64_t", /*default=*/"32",
+           "Data block size">
+  ];
+  let dependentDialects = [
+    "dialect::linalgx::LinalgXDialect",
+  ];
+}
+
+def StencilTppGemm : FunctionPass<"x86-stencil-tpp-gemm"> {
+  let summary = "Find a stencil for TPP GEMM ops";
+  let constructor = "pmlc::target::x86::createStencilTppGemmPass()";
   let options = [
     Option<"numThreads", "threads", "unsigned", /*default=*/"0",
            "Number of threads">,
     Option<"isBatched", "batched", "bool", /*default=*/"false",
            "Enable strided batching over k dimension of GEMM">
   ];
+}
+
+def StencilTppUnary : FunctionPass<"x86-stencil-tpp-unary"> {
+  let summary = "Find a stencil for TPP unary ops";
+  let constructor = "pmlc::target::x86::createStencilTppUnaryPass()";
+}
+
+def StencilTppBinary : FunctionPass<"x86-stencil-tpp-binary"> {
+  let summary = "Find a stencil for TPP binary ops";
+  let constructor = "pmlc::target::x86::createStencilTppBinaryPass()";
+}
+
+def TraceLinking : Pass<"x86-trace-linking", "mlir::ModuleOp"> {
+  let summary = "Link trace ops to runtime functions";
+  let constructor = "pmlc::target::x86::createTraceLinkingPass()";
 }
 
 #endif // __PMLC_TARGET_X86_PASSES__

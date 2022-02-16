@@ -1,4 +1,5 @@
 add_subdirectory(tests)
+add_subdirectory(examples)
 
 set(_SRCS ffi.cc)
 set(_HDRS

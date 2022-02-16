@@ -21,6 +21,7 @@ void registerStridedSlice() {
     IE_ASSERT(ctx.operands.size() <= 4);
     IE_ASSERT(ctx.operands.size() >= 3);
     auto I = ctx.operands.at(0);
+    auto input_sizes = I.compute_shape().sizes();
     auto starts = cast_constant_operand<int64_t>(1, layer);
     auto stops = cast_constant_operand<int64_t>(2, layer);
     std::vector<int64_t> steps;
@@ -69,6 +70,17 @@ void registerStridedSlice() {
         result.add_dim(edsl::None(), edsl::None(), edsl::None());
         continue;
       }
+
+      // The abs bounds in different direction are not equal sine SliceOp uses 0 vs -1 as begin
+      // The slice region is a half-open interval [...), out-of-bounds values are clamped in differnt way
+      // TODO: Check sign of "steps" when zero dimension is allowed in openvino
+      if (std::abs(starts[i]) > input_sizes[i]) {
+        starts[i] = starts[i] < 0 ? -1 * input_sizes[i] : input_sizes[i] - 1;
+      }
+      if (std::abs(stops[i]) > input_sizes[i]) {
+        stops[i] = stops[i] < 0 ? -1 * input_sizes[i] - 1 : input_sizes[i];
+      }
+
       if (!begin_mask[i] && !end_mask[i]) {
         if (starts[i] == stops[i] || (steps[i] == 1 && stops[i] == 0) || shrink_axis_mask[i]) {
           // We hack around nGraph's approach of allowing size 0 dimensions by explicitly looking for the patterns of

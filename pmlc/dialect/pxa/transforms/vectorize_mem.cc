@@ -323,7 +323,7 @@ struct VectorizeMemImpl {
 
     auto newInsertMapOp = builder.create<vector::InsertMapOp>(
         vectorReduce.getLoc(),
-        /*vector=*/vectorReduce.vector(),
+        /*val=*/vectorReduce.val(),
         /*dest=*/vectorReduce.memref(),
         /*ids=*/tileSize != loopVectorSize ? const1Result : blockArg);
 
@@ -418,9 +418,6 @@ void getGlobalMemory(FuncOp f, std::list<Operation *> &globalAllocList) {
   }
   for (auto parallelOp : f.getOps<AffineParallelOp>()) {
     globalAllocList.push_back(parallelOp.getOperation());
-  }
-  for (auto unpackOp : f.getOps<stdx::UnpackOp>()) {
-    globalAllocList.push_back(unpackOp.getOperation());
   }
 }
 

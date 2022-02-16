@@ -1,11 +1,10 @@
-#include "pmlc/target/x86/passes.h"
-
 #include "llvm/Support/FormatVariadic.h"
 
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 
 #include "pmlc/compiler/registry.h"
+#include "pmlc/target/x86/pipeline.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
 

@@ -39,6 +39,26 @@ LogicalResult ContractionOp::materializeOperands(OpBuilder &builder) {
   return tile::materializeOperands(builder, getOperation());
 }
 
+struct SimplifyContractionOp : public OpRewritePattern<ContractionOp> {
+  using OpRewritePattern<ContractionOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(ContractionOp op,
+                                PatternRewriter &rewriter) const override {
+    op.setSink(simplifyAffineMap(op.sink()));
+    SmallVector<AffineMap> srcs;
+    for (AffineMap src : op.srcs().getAsValueRange<AffineMapAttr>()) {
+      srcs.push_back(simplifyAffineMap(src));
+    }
+    op.setSources(srcs);
+    return success();
+  }
+};
+
+void ContractionOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
+                                                MLIRContext *context) {
+  patterns.insert<SimplifyContractionOp>(patterns.getContext());
+}
+
 LogicalResult GatherOp::materializeOperands(OpBuilder &builder) {
   Operation *op = getOperation();
   return tile::materializeOperands(builder, op,
@@ -91,7 +111,7 @@ unsigned ContractionOp::getNumTensors(CombinationKind combo) {
 }
 
 void ContractionOp::build(OpBuilder &builder, OperationState &result,
-                          Type resultType, Value init, ArrayRef<Value> tensors,
+                          Type resultType, Value init, ValueRange tensors,
                           AggregationKind agg, CombinationKind combo,
                           AffineMap sink, ArrayRef<AffineMap> srcs,
                           IntegerSet cons, StringRef name) {
@@ -173,8 +193,7 @@ Value ContractionOp::getSymbol(unsigned i) {
 
 void printContractionOp(OpAsmPrinter *printer, ContractionOp op) {
   SmallVector<StringRef, 3> elidedAttrs = {"agg", "combo", "name"};
-  *printer << op.getOperation()->getName() << ' ';
-  *printer << util::stringifyAggregationKind(op.agg());
+  *printer << ' ' << util::stringifyAggregationKind(op.agg());
   *printer << ", ";
   *printer << util::stringifyCombinationKind(op.combo());
   *printer << ", ";
@@ -338,7 +357,7 @@ void GatherOp::build(OpBuilder &builder, OperationState &result,
                      Type resultType, ValueRange operands, IntegerAttr axis,
                      IntegerAttr interpolationMode, IntegerAttr nearestMode,
                      FloatAttr cubeCoeff, IntegerAttr mode,
-                     IntegerAttr batchDims) {
+                     IntegerAttr batchDims, IntegerAttr OutOfBoundsMode) {
   assert(operands.size() == 2u && "mismatched number of parameters");
   result.addOperands(operands);
   result.addAttribute("axis", axis);
@@ -347,6 +366,7 @@ void GatherOp::build(OpBuilder &builder, OperationState &result,
   result.addAttribute("cubeCoeff", cubeCoeff);
   result.addAttribute("mode", mode);
   result.addAttribute("batchDims", batchDims);
+  result.addAttribute("OutOfBoundsMode", OutOfBoundsMode);
   result.addTypes(resultType);
 }
 

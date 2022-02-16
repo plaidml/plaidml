@@ -21,26 +21,6 @@ using namespace mlir; // NOLINT
 
 namespace pmlc::dialect::pxa {
 
-static AffineMap makeTileMap(MLIRContext *context, AffineMap map,
-                             ValueRange operands,
-                             ArrayRef<BlockArgument> idxs) {
-  SmallVector<AffineExpr, 8> exprs;
-  for (auto value : operands) {
-    bool found = false;
-    for (size_t i = 0; i < idxs.size(); i++) {
-      if (value == idxs[i]) {
-        exprs.push_back(getAffineDimExpr(i, context));
-        found = true;
-      }
-    }
-    if (!found) {
-      exprs.push_back(getAffineConstantExpr(0, context));
-    }
-  }
-  auto toIdxs = AffineMap::get(idxs.size(), 0, exprs, context);
-  return map.compose(toIdxs);
-}
-
 struct GemmOperand {
   Value memref;
   AffineMap accessMap;
@@ -56,13 +36,24 @@ struct GemmOperand {
   }
 };
 
+// Requirements for additional reduction indices that do not appear in output
+// tensor
+static StencilIndexRequirement etcIdxReqs{
+    /*idxName=*/"etc",                         // this is unused
+    /*tilingGenerator=*/EvenTilingGenerator(), // this is unused
+    IndexStridePredicates{
+        [](int64_t stride) { return stride == 0; }, // output
+        [](int64_t stride) { return stride != 0; }, // input0
+        [](int64_t stride) { return stride != 0; }, // input1
+    }};
+
 class StencilGEMM : public StencilBase {
 private:
   unsigned numThreads;
   bool doBatch;
   StencilCostFunction stencilCostFn;
 
-  Optional<LoadStoreOps> capture() {
+  Optional<StencilCapture> capture() {
     using matchers::m_Any;
     // Looking for load..load..mul..reduce..terminator
     Value load1, load2, reduce;
@@ -83,294 +74,255 @@ private:
                              m_Op<MulIOp>(m_Capture(&load1, m_Op<PxaLoadOp>()),
                                           m_Capture(&load2, m_Op<PxaLoadOp>())),
                              m_Any()))))) {
-      return LoadStoreOps{{reduce}, {load1, load2}};
+      return StencilCapture{{reduce}, {load1, load2}};
     }
     return llvm::None;
   }
 
-  // Requirements for additional reduction indices
-  // that do not appear in output tensor
-  IdxStrideReqs additionalReductionIdxReqs = IdxStrideReqs{
-      [](int64_t stride) { return stride == 0; }, // output
-      [](int64_t stride) { return stride != 0; }, // input0
-      [](int64_t stride) { return stride != 0; }, // input1
-  };
-
-  bool isAdditionalReductionIndex(const BlockArgument &index,
-                                  ArrayRef<Value> tensor) {
-    for (size_t i = 0; i < tensor.size(); i++) {
-      auto strideInfo = getStrideInfo(tensor[i]);
-      auto stride = strideInfo->strides[index];
-      if (!additionalReductionIdxReqs[i](stride)) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  double getCost(TensorAndIndexPermutation perm, ArrayRef<int64_t> tileSize) {
-    unsigned tot_inner_loop = tileSize[0] * tileSize[1] * tileSize[2];
-
+  double getCost(const StencilOption &stencil, ArrayRef<int64_t> tileSize) {
     SmallVector<Type, 3> types;
-    for (Value value : perm.values) {
-      types.push_back(value.getType());
+    for (const ValueStrideInfo &vsi : stencil.values) {
+      types.push_back(vsi.value.getType());
     }
     auto cost = stencilCostFn(tileSize, types);
     if (cost.throughput == 0) {
       return std::numeric_limits<double>::infinity();
     }
-    double inner_time = tot_inner_loop / cost.throughput;
-    IVLOG(6,
-          "Inner: loop = " << tot_inner_loop << " inner_time = " << inner_time);
-    for (unsigned i = 0; i < getTiledIdxCount(); ++i) {
-      IVLOG(6, debugString(perm.indexes[i]) << ": " << tileSize[i]);
-    }
 
     // The middle idxs are the accumulation indexes, i.e. those used on loads
     // but not stores
-    DenseMap<BlockArgument, unsigned> middle_idxs;
-    auto in0StrideInfo = getStrideInfo(perm.values[1]);
-    for (const auto &kvp : in0StrideInfo->strides) {
+    DenseMap<BlockArgument, unsigned> middleIdxs, outerIdxs;
+    for (const auto &kvp : stencil.values[1].strideInfo.strides) {
       if (getBlockArgsAsSet().count(kvp.first)) {
         IVLOG(6, "Based on first tensor, inserting middle index "
                      << kvp.first.getArgNumber());
-        middle_idxs.insert(std::make_pair(kvp.first, getIdxRange(kvp.first)));
-      } else {
-        IVLOG(5, "Index found from outside current loop on left input: "
-                     << kvp.first.getArgNumber());
+        middleIdxs.insert(std::make_pair(kvp.first, getIdxRange(kvp.first)));
       }
     }
-    IVLOG(5, "Current size of middle_idxs = " << middle_idxs.size());
+    IVLOG(5, "Current size of middleIdxs = " << middleIdxs.size());
 
-    auto in1StrideInfo = getStrideInfo(perm.values[2]);
-    for (const auto &kvp : in1StrideInfo->strides) {
+    for (const auto &kvp : stencil.values[2].strideInfo.strides) {
       if (getBlockArgsAsSet().count(kvp.first)) {
         IVLOG(6, "Based on second tensor, inserting middle index "
                      << kvp.first.getArgNumber());
-        middle_idxs.insert(std::make_pair(kvp.first, getIdxRange(kvp.first)));
-      } else {
-        IVLOG(5, "Index found from outside current loop on right input: "
-                     << kvp.first.getArgNumber());
+        middleIdxs.insert(std::make_pair(kvp.first, getIdxRange(kvp.first)));
       }
     }
-    IVLOG(5, "Current size of middle_idxs = " << middle_idxs.size());
-    auto outStrideInfo = getStrideInfo(perm.values[0]);
-    for (const auto &kvp : outStrideInfo->strides) {
+    IVLOG(5, "Current size of middleIdxs = " << middleIdxs.size());
+
+    for (const auto &kvp : stencil.values[0].strideInfo.strides) {
       if (getBlockArgsAsSet().count(kvp.first)) {
-        auto it = middle_idxs.find(kvp.first);
-        if (it != middle_idxs.end()) {
+        auto it = middleIdxs.find(kvp.first);
+        if (it != middleIdxs.end()) {
           IVLOG(6, "Based on output tensor, erasing middle index "
                        << it->first.getArgNumber());
-          middle_idxs.erase(it);
+          middleIdxs.erase(it);
         }
-      } else {
-        IVLOG(5, "Index found from outside current loop on output: "
-                     << kvp.first.getArgNumber());
+        outerIdxs.try_emplace(kvp.first, getIdxRange(kvp.first));
       }
     }
 
     for (unsigned i = 0; i < getTiledIdxCount(); ++i) {
-      assert(getBlockArgsAsSet().count(perm.indexes[i]) &&
+      assert(getBlockArgsAsSet().count(stencil.indexes[i]) &&
              "All tiled indexes must be introduced in current loop");
-      auto it = middle_idxs.find(perm.indexes[i]);
-      if (it != middle_idxs.end()) {
-        it->second = llvm::divideCeil(it->second, tileSize[i]);
+
+      auto itMiddle = middleIdxs.find(stencil.indexes[i]);
+      if (itMiddle != middleIdxs.end()) {
+        itMiddle->second = llvm::divideCeil(itMiddle->second, tileSize[i]);
+      }
+
+      auto itOuter = outerIdxs.find(stencil.indexes[i]);
+      if (itOuter != outerIdxs.end()) {
+        itOuter->second = llvm::divideCeil(itOuter->second, tileSize[i]);
       }
     }
-    unsigned tot_middle_loop = 1;
-    for (auto &kvp : middle_idxs) {
-      tot_middle_loop *= kvp.second;
+
+    unsigned totOuterLoop = 1;
+    for (const auto &kvp : outerIdxs) {
+      totOuterLoop *= kvp.second;
     }
 
-    IVLOG(4, "Middle: loop = " << tot_middle_loop);
+    unsigned totMiddleLoop = 1;
+    for (const auto &kvp : middleIdxs) {
+      totMiddleLoop *= kvp.second;
+    }
 
+    unsigned totInnerLoop = tileSize[0] * tileSize[1] * tileSize[2];
+    double innerTime = totInnerLoop / cost.throughput;
+
+    IVLOG(4, "Outer: loop = " << totOuterLoop);
     if (VLOG_IS_ON(4)) {
-      for (auto &kvp : middle_idxs) {
+      for (auto &kvp : outerIdxs) {
         if (kvp.second > 1) {
           IVLOG(4, kvp.first.getArgNumber() << ": " << kvp.second);
         }
       }
     }
 
-    DenseMap<BlockArgument, unsigned> outer_idxs;
-    for (const auto &kvp : outStrideInfo->strides) {
-      if (getBlockArgsAsSet().count(kvp.first)) {
-        IVLOG(4, "First: " << kvp.first.getArgNumber());
-        IVLOG(5, "Second: " << kvp.second);
-        IVLOG(5, "IdxRange: " << getIdxRange(kvp.first));
-        outer_idxs.try_emplace(kvp.first, getIdxRange(kvp.first));
-        IVLOG(4, "And now emplaced");
-      }
-      // If the index is from outside `op` this has already been logged, no need
-      // for `else` branch here
-    }
-    for (unsigned i = 0; i < getTiledIdxCount(); i++) {
-      assert(getBlockArgsAsSet().count(perm.indexes[i]) &&
-             "All tiled indexes must be introduced in current loop");
-      auto it = outer_idxs.find(perm.indexes[i]);
-      if (it != outer_idxs.end()) {
-        it->second = llvm::divideCeil(it->second, tileSize[i]);
-      }
-    }
-    unsigned tot_outer_loop = 1;
-    for (auto &kvp : outer_idxs) {
-      tot_outer_loop *= kvp.second;
-    }
+    unsigned outerBatches = (totOuterLoop - 1) / numThreads + 1;
+    double perf = outerBatches * totMiddleLoop * (cost.startupCost + innerTime);
 
-    IVLOG(4, "Outer: loop = " << tot_outer_loop);
-
-    if (VLOG_IS_ON(4)) {
-      for (auto &kvp : outer_idxs) {
-        if (kvp.second > 1) {
-          IVLOG(4, kvp.first.getArgNumber() << ": " << kvp.second);
-        }
-      }
-    }
-
-    unsigned outer_batches = (tot_outer_loop - 1) / numThreads + 1;
-    double perf =
-        outer_batches * tot_middle_loop * (cost.startupCost + inner_time);
-
-    IVLOG(3, "Performance = " << perf << "(outer count: " << outer_batches
-                              << ", middle count: " << tot_middle_loop
-                              << ", startup cost: " << cost.startupCost
-                              << ", inner time: " << inner_time << ")");
+    IVLOG(3, "Tile Information:");
+    IVLOG(3, " tile:         "
+                 << "[" << tileSize[0] << " " << tileSize[1] << " "
+                 << tileSize[2] << "]");
+    IVLOG(3, " outer count:  " << outerBatches);
+    IVLOG(3, " middle count: " << totMiddleLoop);
+    IVLOG(3, " startup cost: " << cost.startupCost);
+    IVLOG(3, " inner time:   " << innerTime);
     return perf;
   }
 
-  void transform(TensorAndIndexPermutation perm, ArrayRef<int64_t> tileSize) {
-    int64_t numBatches = 1;
-    int64_t kRange = getIdxRange(perm.indexes[2]);
+  void transform(const StencilOption &stencil, ArrayRef<int64_t> tileSize) {
+    int64_t kBatches = 1;
+    int64_t kRange = getIdxRange(stencil.indexes[2]);
     IVLOG(3, "kRange: " << kRange);
-    SmallVector<BlockArgument, 4> Aindices, Bindices;
-    SmallVector<int64_t> numBatchesArr;
-    Aindices.emplace_back(perm.indexes[0]);
-    Aindices.emplace_back(perm.indexes[2]);
-    Bindices.emplace_back(perm.indexes[2]);
-    Bindices.emplace_back(perm.indexes[1]);
+    SmallVector<BlockArgument> tileEtcIdxs(stencil.indexes.begin(),
+                                           stencil.indexes.end());
+    SmallVector<int64_t> batches;
 
     // Generate the GEMM op; select inputs based on permutation order
-    auto opC = cast<PxaReduceOp>(perm.values[0].getDefiningOp());
-    auto opA = cast<PxaLoadOp>(perm.values[1].getDefiningOp());
-    auto opB = cast<PxaLoadOp>(perm.values[2].getDefiningOp());
+    auto opC = cast<PxaReduceOp>(stencil.values[0].value.getDefiningOp());
+    auto opA = cast<PxaLoadOp>(stencil.values[1].value.getDefiningOp());
+    auto opB = cast<PxaLoadOp>(stencil.values[2].value.getDefiningOp());
 
     // First, modify step size of all tiled indexes
-    auto steps = op.getSteps();
-    for (size_t i = 0; i < getBlockArgsAsSet().size(); i++) {
+    SmallVector<int64_t, 8> steps = op.getSteps();
+    for (size_t i = 0; i < steps.size(); i++) {
+      BlockArgument idx = op.getBody()->getArgument(i);
+      int64_t idxRange = getIdxRange(idx);
+
       bool foundBlockArg = false;
       for (size_t j = 0; j < getTiledIdxCount(); j++) {
-        if (perm.indexes[j] == op.getBody()->getArgument(i)) {
+        if (stencil.indexes[j] == idx) {
           steps[i] *= tileSize[j];
           foundBlockArg = true;
 
           // K index (reduction dimension)
           if (doBatch && j == 2) {
-            // We want to transform "regular" pxa.gemm where numBatches is 1:
+            // We want to transform "regular" pxa.generic where kBatches is 1:
             // affine.parallel (i, j, k) = (..., 0) to (..., kRange)
-            //                             step (kStep) {
-            //   pxa.gemm C[i, j] = A[i, k], B[k, j]: [..., kStep], 1
-            // }
+            //                             step (kStep)
+            //   pxa.generic C[i, j] = A[i, k], B[k, j]: [..., kStep], 1
             //
             // to
             //
-            // affine.parallel (i, j, k) = (..., 0) to (..., kRange) step (..,
-            //                             step (kRange) {
-            // pxa.gemm C[i, j] = A[i, k], B[k, j]: [..., kStep], (kRange/64)
-            // }
+            // affine.parallel (i, j, k) = (..., 0) to (..., kRange)
+            //                             step (kRange)
+            //   pxa.generic C[i, j] = A[i, k], B[k, j]: [..., kStep],
+            //    (kRange/64)
             //
-            // where the number of batches of A and B matrices to multiply is
-            // the k loop's range divided by the original step size for the k
-            // loop.
+            // where the number of batches of A and B matrices to multiply
+            // is the k loop's range divided by the original step size for
+            // the k loop.
             //
             // Subsequently, kStep is set to kRange. That is, in one step, a
-            // block of C is completely computed through reduction of batches of
-            // A and B matrix multiplies.
-            numBatches = kRange / steps[i];
+            // block of C is completely computed through reduction of
+            // batches of A and B matrix multiplies.
+            kBatches = kRange / steps[i];
             steps[i] = kRange;
 
             IVLOG(3, "steps[" << i << "] = " << steps[i]);
-            IVLOG(3, "numBatches: " << numBatches);
+            IVLOG(3, "kBatches: " << kBatches);
           }
         }
       }
 
       // Check for additional reduction indices with a range greater than 1
-      if (doBatch && !foundBlockArg && steps[i] == 1 &&
-          getIdxRange(op.getBody()->getArgument(i)) > 1 &&
-          isAdditionalReductionIndex(op.getBody()->getArgument(i),
-                                     ArrayRef<Value>{opC, opA, opB})) {
-        auto index = op.getBody()->getArgument(i);
-        int64_t indexRange = getIdxRange(index);
-
-        Aindices.emplace_back(index);
-        Bindices.emplace_back(index);
-
-        numBatchesArr.emplace_back(indexRange);
+      if (doBatch && !foundBlockArg && steps[i] == 1 && idxRange > 1 &&
+          etcIdxReqs.check(stencil.values, idx)) {
+        tileEtcIdxs.push_back(idx);
+        batches.emplace_back(idxRange);
         foundBlockArg = true;
-        steps[i] = indexRange;
+        steps[i] = idxRange;
       }
     }
     op.setSteps(steps);
 
-    // The numbatches array's first element corresponds to the 'k'
-    // index of GEMM. The other reduction indices follow 'k'.
+    // fullTileSizes always has the form: [m, n, k, kBatches, others...]
+    SmallVector<int64_t> fullTileSizes;
+    fullTileSizes.append(tileSize.begin(), tileSize.end());
+    if (!batches.empty()) {
+      fullTileSizes.push_back(kBatches);
+      fullTileSizes.append(batches.begin(), batches.end());
+    } else if (kBatches != 1) {
+      fullTileSizes.push_back(kBatches);
+    }
 
-    numBatchesArr.insert(numBatchesArr.begin(), numBatches);
+    OpBuilder builder = op.getBodyBuilder();
 
-    auto bodyBuilder = op.getBodyBuilder();
+    SmallVector<Value> inputIndices, outputIndices;
+    GemmOperand c(opC, stencil.indexes, outputIndices);
+    GemmOperand a(opA, tileEtcIdxs, inputIndices);
+    GemmOperand b(opB, tileEtcIdxs, inputIndices);
 
-    auto tileAttr = bodyBuilder.getI64ArrayAttr(tileSize);
-    auto numBatchesAttr =
-        bodyBuilder.getI64ArrayAttr(ArrayRef<int64_t>(numBatchesArr));
+    ArrayAttr outputAccessMaps = builder.getAffineMapArrayAttr({c.accessMap});
+    ArrayAttr outputTileMaps = builder.getAffineMapArrayAttr({c.tileMap});
 
-    SmallVector<Value, 8> mapOperands;
-    GemmOperand c(opC, {perm.indexes[0], perm.indexes[1]}, mapOperands);
-    GemmOperand a(opA, ArrayRef<BlockArgument>(Aindices), mapOperands);
-    GemmOperand b(opB, ArrayRef<BlockArgument>(Bindices), mapOperands);
+    ArrayAttr inputAccessMaps =
+        builder.getAffineMapArrayAttr({a.accessMap, b.accessMap});
+    ArrayAttr inputTileMaps =
+        builder.getAffineMapArrayAttr({a.tileMap, b.tileMap});
 
-    auto brgemm = bodyBuilder.create<pxa::PxaGemmOp>(
-        op.getLoc(), c.memref.getType(), //
-        c.memref, AffineMapAttr::get(c.accessMap),
-        AffineMapAttr::get(c.tileMap), //
-        a.memref, AffineMapAttr::get(a.accessMap),
-        AffineMapAttr::get(a.tileMap), //
-        b.memref, AffineMapAttr::get(b.accessMap),
-        AffineMapAttr::get(b.tileMap), //
-        tileAttr, numBatchesAttr, mapOperands);
+    ArrayAttr reductions =
+        builder.getI64ArrayAttr({static_cast<int64_t>(opC.agg())});
 
-    opC.result().replaceAllUsesWith(brgemm);
+    auto genericOp = builder.create<PxaGenericOp>(
+        op.getLoc(), c.memref.getType(),
+        /*inputs=*/ArrayRef<Value>{a.memref, b.memref},
+        /*outputs=*/ArrayRef<Value>{c.memref},
+        /*inputIndices=*/inputIndices,
+        /*outputIndices=*/outputIndices,
+        /*inputAccessMaps=*/inputAccessMaps,
+        /*inputTileMaps=*/inputTileMaps,
+        /*outputAccessMaps=*/outputAccessMaps,
+        /*outputTileMaps=*/outputTileMaps,
+        /*kernel=*/builder.getStringAttr("tpp_gemm"),
+        /*tile=*/builder.getI64ArrayAttr(fullTileSizes),
+        /*reductions=*/reductions);
+
+    opC.result().replaceAllUsesWith(genericOp.getResult(0));
     opC.erase();
   }
 
 public:
   StencilGEMM(AffineParallelOp op, unsigned numThreads, bool doBatch,
               StencilCostFunction costFn)
-      : StencilBase{op,
-                    3, // Three tileable indexes
-                    {EvenTilingGenerator(), EvenTilingGenerator(),
-                     EvenTilingGenerator()},
-                    {IdxStrideReqs{
-                         [](int64_t stride) { return stride != 0; }, // output
-                         [](int64_t stride) { return stride != 0; }, // input0
-                         [](int64_t stride) { return stride == 0; }, // input1
-                     },
-                     IdxStrideReqs{
-                         [](int64_t stride) { return stride == 1; }, // output
-                         [](int64_t stride) { return stride == 0; }, // input0
-                         [](int64_t stride) { return stride == 1; }, // input1
-                     },
-                     IdxStrideReqs{
-                         [](int64_t stride) { return stride == 0; }, // output
-                         [](int64_t stride) { return stride == 1; }, // input0
-                         [](int64_t stride) { return stride != 0; }, // input1
-                     }}},
+      : StencilBase(
+            op,
+            {
+                StencilIndexRequirement{
+                    /*idxName=*/"gemm_m",
+                    /*tilingGenerator=*/EvenTilingGenerator(),
+                    IndexStridePredicates{
+                        [](int64_t stride) { return stride != 0; }, // output
+                        [](int64_t stride) { return stride != 0; }, // input0
+                        [](int64_t stride) { return stride == 0; }, // input1
+                    }},
+                StencilIndexRequirement{
+                    /*idxName=*/"gemm_n",
+                    /*tilingGenerator=*/EvenTilingGenerator(),
+                    IndexStridePredicates{
+                        [](int64_t stride) { return stride == 1; }, // output
+                        [](int64_t stride) { return stride == 0; }, // input0
+                        [](int64_t stride) { return stride == 1; }, // input1
+                    }},
+                StencilIndexRequirement{
+                    /*idxName=*/"gemm_k",
+                    /*tilingGenerator=*/EvenTilingGenerator(),
+                    IndexStridePredicates{
+                        [](int64_t stride) { return stride == 0; }, // output
+                        [](int64_t stride) { return stride == 1; }, // input0
+                        [](int64_t stride) { return stride != 0; }, // input1
+                    }},
+            }),
         numThreads{numThreads}, doBatch{doBatch}, stencilCostFn(costFn) {}
 };
 
 LogicalResult applyStencilGEMM(AffineParallelOp op, unsigned numThreads,
                                bool doBatch, StencilCostFunction costFn) {
   StencilGEMM stencil(op, numThreads, doBatch, costFn);
-  stencil.DoStenciling();
+  stencil.performStenciling();
   return success();
 }
 

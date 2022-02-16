@@ -9,6 +9,8 @@
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/PatternMatch.h"
 
+#include "pmlc/util/logging.h"
+
 namespace pmlc::dialect::pxa {
 
 using namespace mlir; // NOLINT
@@ -46,7 +48,7 @@ ParseResult parseKeywordIntoEnumAttr(OpAsmParser &parser,
 /// AffineSymbolExpr@[pos - dims.size()] is replaced.
 /// Mutate `map`,`dims` and `syms` in place as follows:
 ///   1. `dims` and `syms` are only appended to.
-///   2. `map` dim and symbols are gradually shifted to higer positions.
+///   2. `map` dim and symbols are gradually shifted to higher positions.
 ///   3. Old `dim` and `sym` entries are replaced by nullptr
 /// This avoids the need for any bookkeeping.
 static LogicalResult replaceDimOrSym(AffineMap *map,
@@ -214,7 +216,7 @@ void SimplifyAffineOp<PxaVectorReduceOp>::replaceAffineOp(
     PatternRewriter &rewriter, PxaVectorReduceOp op, AffineMap map,
     ArrayRef<Value> mapOperands) const {
   rewriter.replaceOpWithNewOp<PxaVectorReduceOp>(op, op.getMemRefType(),
-                                                 op.agg(), op.vector(),
+                                                 op.agg(), op.val(),
                                                  op.memref(), map, mapOperands);
 }
 
@@ -249,42 +251,64 @@ struct SimplifyDeadWrite : public OpRewritePattern<WriteOp> {
   }
 };
 
-struct SimplifyPxaGemmOp : public OpRewritePattern<PxaGemmOp> {
-  using OpRewritePattern<PxaGemmOp>::OpRewritePattern;
+struct SimplifyPxaGenericOp : public OpRewritePattern<PxaGenericOp> {
+  using OpRewritePattern<PxaGenericOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(PxaGemmOp op,
+  LogicalResult matchAndRewrite(PxaGenericOp op,
                                 PatternRewriter &rewriter) const override {
-    auto aAccessMap = op.aAccessMap();
-    auto bAccessMap = op.bAccessMap();
-    auto cAccessMap = op.cAccessMap();
+    bool needsRewrite = false;
 
-    SmallVector<Value, 8> aOperands(op.getOperandsForA());
-    composeAffineMapAndOperands(&aAccessMap, &aOperands);
-    SmallVector<Value, 8> bOperands(op.getOperandsForB());
-    composeAffineMapAndOperands(&bAccessMap, &bOperands);
-    SmallVector<Value, 8> cOperands(op.getOperandsForC());
-    composeAffineMapAndOperands(&cAccessMap, &cOperands);
+    SmallVector<Value> inputIndices;
+    SmallVector<AffineMap> inputAccessMaps;
+    SmallVector<AffineValueMap> inputValueMaps;
+    inputValueMaps.reserve(op.getNumInputs());
+    op.getAffineValueMaps(op.inputAccessMaps(), op.inputIndices(),
+                          inputValueMaps);
 
-    SmallVector<Value, 8> mapOperands;
-    mapOperands.append(cOperands.begin(), cOperands.end());
-    mapOperands.append(aOperands.begin(), aOperands.end());
-    mapOperands.append(bOperands.begin(), bOperands.end());
+    for (AffineValueMap &valueMap : inputValueMaps) {
+      if (succeeded(valueMap.canonicalize()))
+        needsRewrite = true;
+      inputAccessMaps.push_back(valueMap.getAffineMap());
+      inputIndices.append(valueMap.getOperands().begin(),
+                          valueMap.getOperands().end());
+    }
 
-    if (aAccessMap == op.aAccessMap() && bAccessMap == op.bAccessMap() &&
-        cAccessMap == op.cAccessMap() &&
-        std::equal(mapOperands.begin(), mapOperands.end(),
-                   op.mapOperands().begin()))
+    SmallVector<Value> outputIndices;
+    SmallVector<AffineMap> outputAccessMaps;
+    SmallVector<AffineValueMap> outputValueMaps;
+    outputValueMaps.reserve(op.getNumOutputs());
+    op.getAffineValueMaps(op.outputAccessMaps(), op.outputIndices(),
+                          outputValueMaps);
+
+    for (AffineValueMap &valueMap : outputValueMaps) {
+      if (succeeded(valueMap.canonicalize()))
+        needsRewrite = true;
+      outputAccessMaps.push_back(valueMap.getAffineMap());
+      outputIndices.append(valueMap.getOperands().begin(),
+                           valueMap.getOperands().end());
+    }
+
+    if (!needsRewrite)
       return failure();
 
-    rewriter.replaceOpWithNewOp<pxa::PxaGemmOp>(
-        op, op.c().getType(),              //
-        op.c(), cAccessMap, op.cTileMap(), //
-        op.a(), aAccessMap, op.aTileMap(), //
-        op.b(), bAccessMap, op.bTileMap(), //
-        op.tile(), op.numBatches(), mapOperands);
+    rewriter.replaceOpWithNewOp<pxa::PxaGenericOp>(
+        op, op.outputs().getTypes(),
+        /*inputs=*/op.inputs(),
+        /*outputs=*/op.outputs(),
+        /*inputIndices=*/inputIndices,
+        /*outputIndices=*/outputIndices,
+        /*inputAccessMaps=*/rewriter.getAffineMapArrayAttr(inputAccessMaps),
+        /*inputTileMaps=*/op.inputTileMaps(),
+        /*outputAccessMaps=*/rewriter.getAffineMapArrayAttr(outputAccessMaps),
+        /*outputTileMaps=*/op.outputTileMaps(),
+        /*kernel=*/op.kernel(),
+        /*tile=*/op.tile(),
+        /*reductions=*/op.reductions());
+
     return success();
   }
 };
+
 } // namespace
 
 // ---- PxaLoadOp ----
@@ -295,8 +319,8 @@ void PxaLoadOp::build(OpBuilder &builder, OperationState &result, AffineMap map,
   result.addOperands(operands);
   if (map)
     result.addAttribute(getMapAttrName(), AffineMapAttr::get(map));
-  auto memrefType = operands[0].getType().cast<MemRefType>();
-  result.types.push_back(memrefType.getElementType());
+  auto shapedType = operands[0].getType().cast<ShapedType>();
+  result.types.push_back(shapedType.getElementType());
 }
 
 void PxaLoadOp::build(OpBuilder &builder, OperationState &result, Value memref,
@@ -304,15 +328,15 @@ void PxaLoadOp::build(OpBuilder &builder, OperationState &result, Value memref,
   assert(map.getNumInputs() == mapOperands.size() && "inconsistent index info");
   result.addOperands(memref);
   result.addOperands(mapOperands);
-  auto memrefType = memref.getType().cast<MemRefType>();
   result.addAttribute(getMapAttrName(), AffineMapAttr::get(map));
-  result.types.push_back(memrefType.getElementType());
+  auto shapedType = memref.getType().cast<ShapedType>();
+  result.types.push_back(shapedType.getElementType());
 }
 
 void PxaLoadOp::build(OpBuilder &builder, OperationState &result, Value memref,
                       ValueRange indices) {
-  auto memrefType = memref.getType().cast<MemRefType>();
-  auto rank = memrefType.getRank();
+  auto shapedType = memref.getType().cast<ShapedType>();
+  auto rank = shapedType.getRank();
   // Create identity map for memrefs with at least one dimension or () -> ()
   // for zero-dimensional memrefs.
   auto map =
@@ -321,7 +345,8 @@ void PxaLoadOp::build(OpBuilder &builder, OperationState &result, Value memref,
 }
 
 static void printPxaLoadOp(OpAsmPrinter &p, PxaLoadOp op) {
-  p << "pxa.load " << op.getMemRef() << '[';
+  p << ' ';
+  p << op.getMemRef() << '[';
   if (AffineMapAttr mapAttr =
           op->getAttrOfType<AffineMapAttr>(op.getMapAttrName()))
     p.printAffineMapOfSSAIds(mapAttr, op.getMapOperands());
@@ -376,7 +401,8 @@ void PxaVectorLoadOp::build(OpBuilder &builder, OperationState &result,
 }
 
 static void printPxaVectorLoadOp(OpAsmPrinter &p, PxaVectorLoadOp op) {
-  p << "pxa.vector_load " << op.getMemRef() << '[';
+  p << ' ';
+  p << op.getMemRef() << '[';
   if (AffineMapAttr mapAttr =
           op->getAttrOfType<AffineMapAttr>(op.getMapAttrName()))
     p.printAffineMapOfSSAIds(mapAttr, op.getMapOperands());
@@ -424,7 +450,7 @@ OpFoldResult PxaVectorLoadOp::fold(ArrayRef<Attribute> cstOperands) {
 // ---- PxaReduceOp ----
 
 void printPxaReduceOp(OpAsmPrinter &p, PxaReduceOp op) {
-  p << op.getOperation()->getName() << ' ';
+  p << ' ';
   p << stringifyAtomicRMWKind(op.agg()) << ' ';
   p << op.val() << ", ";
   p << op.memref() << '[';
@@ -439,8 +465,8 @@ void printPxaReduceOp(OpAsmPrinter &p, PxaReduceOp op) {
 // <operation> ::= `pxa.reduce` keyword ssa-use `,` ssa-use `[` ssa-use-list `]`
 //                 attribute-dict? `:` type
 ParseResult parsePxaReduceOp(OpAsmParser &parser, OperationState &result) {
-  auto indexTy = parser.getBuilder().getIndexType();
-  auto i64Ty = parser.getBuilder().getIntegerType(64);
+  IndexType indexTy = parser.getBuilder().getIndexType();
+  IntegerType i64Ty = parser.getBuilder().getIntegerType(64);
   MemRefType type;
   AffineMapAttr mapAttr;
   OpAsmParser::OperandType val, out;
@@ -475,105 +501,12 @@ OpFoldResult PxaReduceOp::fold(ArrayRef<Attribute> cstOperands) {
   return {};
 }
 
-//
-// ---- PxaGemmOp ----
-//
-
-PxaGemmOp::operand_range PxaGemmOp::getOperandsForA() {
-  return getOperands().slice(3 + cAccessMap().getNumInputs(),
-                             aAccessMap().getNumInputs());
-}
-
-PxaGemmOp::operand_range PxaGemmOp::getOperandsForB() {
-  return getOperands().slice(3 + cAccessMap().getNumInputs() +
-                                 aAccessMap().getNumInputs(),
-                             bAccessMap().getNumInputs());
-}
-
-PxaGemmOp::operand_range PxaGemmOp::getOperandsForC() {
-  return getOperands().slice(3, cAccessMap().getNumInputs());
-}
-
-void PxaGemmOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
-                                            MLIRContext *context) {
-  patterns.insert<SimplifyPxaGemmOp>(patterns.getContext());
-}
-
-void printPxaGemmOp(OpAsmPrinter &p, PxaGemmOp op) {
-  auto funcType =
-      FunctionType::get(op.getContext(), {op.a().getType(), op.b().getType()},
-                        {op.c().getType()});
-  p << op.getOperation()->getName() << ' ';
-  p << op.c() << '[';
-  p.printAffineMapOfSSAIds(op.cAccessMapAttr(), op.getOperandsForC());
-  p << "]:";
-  p.printAttribute(op.cTileMapAttr());
-  p << " = " << op.a() << '[';
-  p.printAffineMapOfSSAIds(op.aAccessMapAttr(), op.getOperandsForA());
-  p << "]:";
-  p.printAttribute(op.aTileMapAttr());
-  p << ", " << op.b() << '[';
-  p.printAffineMapOfSSAIds(op.bAccessMapAttr(), op.getOperandsForB());
-  p << "]:";
-  p.printAttribute(op.bTileMapAttr());
-  p << ", " << op.tile() << ", " << op.numBatches() << " : " << funcType;
-}
-
-struct GemmOperandParser {
-  OpAsmParser::OperandType operand;
-  SmallVector<OpAsmParser::OperandType, 4> accessOperands;
-  AffineMapAttr accessMapAttr;
-  AffineMapAttr tileMapAttr;
-  std::string accessMapAttrName;
-  std::string tileMapAttrName;
-
-  explicit GemmOperandParser(StringRef name)
-      : accessMapAttrName(name.str() + "AccessMap"),
-        tileMapAttrName(name.str() + "TileMap") {}
-
-  ParseResult parse(OpAsmParser &parser, OperationState &result) {
-    return failure(
-        parser.parseOperand(operand) ||
-        parser.parseAffineMapOfSSAIds(accessOperands, accessMapAttr,
-                                      accessMapAttrName, result.attributes) ||
-        parser.parseColon() ||
-        parser.parseAttribute(tileMapAttr, tileMapAttrName, result.attributes));
-  }
-};
-
-ParseResult parsePxaGemmOp(OpAsmParser &parser, OperationState &result) {
-  auto &builder = parser.getBuilder();
-  auto indexType = builder.getIndexType();
-  auto i64Type = builder.getIntegerType(64);
-  GemmOperandParser a("a"), b("b"), c("c");
-  ArrayAttr tileAttr;
-  ArrayAttr numBatchesAttr;
-  FunctionType funcType;
-  return failure(
-      c.parse(parser, result) || parser.parseEqual() ||
-      a.parse(parser, result) || parser.parseComma() ||
-      b.parse(parser, result) || parser.parseComma() ||
-      parser.parseAttribute(tileAttr, i64Type, "tile", result.attributes) ||
-      parser.parseComma() ||
-      parser.parseAttribute(numBatchesAttr, i64Type, "numBatches",
-                            result.attributes) ||
-      parser.parseColonType(funcType) ||
-      parser.addTypesToList(funcType.getResults(), result.types) ||
-      parser.resolveOperand(c.operand, funcType.getResult(0),
-                            result.operands) ||
-      parser.resolveOperand(a.operand, funcType.getInput(0), result.operands) ||
-      parser.resolveOperand(b.operand, funcType.getInput(1), result.operands) ||
-      parser.resolveOperands(c.accessOperands, indexType, result.operands) ||
-      parser.resolveOperands(a.accessOperands, indexType, result.operands) ||
-      parser.resolveOperands(b.accessOperands, indexType, result.operands));
-}
-
 // ---- PxaVectorReduceOp ----
 
 void printPxaVectorReduceOp(OpAsmPrinter &p, PxaVectorReduceOp op) {
-  p << op.getOperation()->getName() << ' ';
+  p << ' ';
   p << stringifyAtomicRMWKind(op.agg()) << ' ';
-  p << op.vector() << ", ";
+  p << op.val() << ", ";
   p << op.memref() << '[';
   auto mapAttr = op->getAttrOfType<AffineMapAttr>("map");
   p.printAffineMapOfSSAIds(mapAttr, op.idxs());
@@ -582,12 +515,11 @@ void printPxaVectorReduceOp(OpAsmPrinter &p, PxaVectorReduceOp op) {
   p << " : ";
   p.printType(op.memref().getType());
   p << ", ";
-  p.printType(op.vector().getType());
+  p.printType(op.val().getType());
 }
 
 // <operation> ::= `pxa.vector_reduce` keyword ssa-use `,` ssa-use `[`
-// ssa-use-list `]`
-//                 attribute-dict? `:` type
+//                 ssa-use-list `]` attribute-dict? `:` type
 ParseResult parsePxaVectorReduceOp(OpAsmParser &parser,
                                    OperationState &result) {
   auto indexTy = parser.getBuilder().getIndexType();
@@ -649,7 +581,323 @@ void PXADialect::initialize() {
       >();
 }
 
+//
+// ---- PxaGenericOp ----
+//
+
+bool PxaGenericOp::isReadOperand(mlir::OpOperand *opOperand) {
+  assert(opOperand->getOwner() == this->getOperation());
+  return opOperand->getOperandNumber() < getNumInputs();
+}
+
+bool PxaGenericOp::isWriteOperand(mlir::OpOperand *opOperand) {
+  assert(opOperand->getOwner() == this->getOperation());
+  unsigned operandNumber = opOperand->getOperandNumber();
+  return operandNumber >= getNumInputs() &&
+         operandNumber < getNumInputs() + getNumOutputs();
+}
+
+OpOperandVector PxaGenericOp::getInputOperands() {
+  int64_t numInputs = getNumInputs();
+  OpOperandVector result;
+  result.reserve(numInputs);
+  for (OpOperand &opOperand :
+       getOperation()->getOpOperands().take_front(numInputs)) {
+    result.push_back(&opOperand);
+  }
+  return result;
+}
+
+OpOperandVector PxaGenericOp::getOutputOperands() {
+  int64_t numOutputs = getNumOutputs();
+  OpOperandVector result;
+  result.reserve(numOutputs);
+  MutableArrayRef<OpOperand> opOperands = getOperation()->getOpOperands();
+  for (OpOperand &opOperand :
+       opOperands.drop_front(getNumInputs()).take_front(numOutputs)) {
+    result.push_back(&opOperand);
+  }
+  return result;
+}
+
+static Optional<StrideRange> computeRange(AffineExpr expr,
+                                          ArrayRef<int64_t> values) {
+  // If we are a constant affine expression, the range is a fixed value
+  if (auto cexpr = expr.dyn_cast<AffineConstantExpr>())
+    return StrideRange(cexpr.getValue());
+
+  // If we are a dim, the range is [0, value - 1]
+  if (auto dexpr = expr.dyn_cast<AffineDimExpr>())
+    return StrideRange(0, values[dexpr.getPosition()] - 1, 1);
+
+  // Check the various binary ops.
+  if (auto bexpr = expr.dyn_cast<AffineBinaryOpExpr>()) {
+    if (bexpr.getKind() == AffineExprKind::Mul) {
+      // For multiplies, RHS should always be constant of symbolic, and symbols
+      // fail, so we cast to constant and give up if it doesn't work
+      auto rhs = bexpr.getRHS().dyn_cast<AffineConstantExpr>();
+      if (!rhs)
+        return None;
+
+      // Now compute the LHS via recursion
+      Optional<StrideRange> lhs = computeRange(bexpr.getLHS(), values);
+      if (!lhs)
+        return None;
+
+      // Multiply by the multiplier and return
+      *lhs *= rhs.getValue();
+      return lhs;
+    }
+
+    if (bexpr.getKind() == AffineExprKind::Add) {
+      // For add, we compute both sides and add them (presuming they both return
+      // valid outputs).
+      Optional<StrideRange> lhs = computeRange(bexpr.getLHS(), values);
+      if (!lhs)
+        return None;
+
+      Optional<StrideRange> rhs = computeRange(bexpr.getRHS(), values);
+      if (!rhs)
+        return None;
+
+      *lhs += *rhs;
+      return lhs;
+    }
+  }
+
+  return None;
+}
+
+SmallVector<StrideRange>
+PxaGenericOp::getTiedInternalRanges(OpOperand *opOperand) {
+  unsigned operandNumber = opOperand->getOperandNumber();
+  assert(opOperand->getOwner() == this->getOperation());
+  assert(operandNumber < getNumInputs() + getNumOutputs());
+
+  Attribute attr;
+  if (operandNumber < getNumInputs())
+    attr = inputTileMaps()[operandNumber];
+  else
+    attr = outputTileMaps()[operandNumber - getNumInputs()];
+  AffineMap tileMap = attr.cast<AffineMapAttr>().getValue();
+
+  SmallVector<int64_t> tileSizes;
+  for (APInt value : tile().getAsValueRange<IntegerAttr>())
+    tileSizes.push_back(value.getZExtValue());
+
+  SmallVector<StrideRange> results;
+  for (AffineExpr expr : tileMap.getResults()) {
+    Optional<StrideRange> range = computeRange(expr, tileSizes);
+    assert(range.hasValue() && "Invalid StrideRange in tileMap");
+    results.push_back(*range);
+  }
+
+  return results;
+}
+
+void PxaGenericOp::getAffineValueMaps(
+    ArrayAttr accessMaps, OperandRange mapOperands,
+    SmallVectorImpl<AffineValueMap> &results) {
+  size_t prefix = 0;
+  for (Attribute accessMapAttr : accessMaps) {
+    AffineMap accessMap = accessMapAttr.cast<AffineMapAttr>().getValue();
+    size_t count = accessMap.getNumInputs();
+    AffineValueMap valueMap(accessMap, mapOperands.slice(prefix, count));
+    results.emplace_back(valueMap);
+    prefix += count;
+  }
+}
+
+SmallVector<AffineValueMap> PxaGenericOp::getAffineValueMaps() {
+  SmallVector<AffineValueMap> result;
+  result.reserve(getNumInputs() + getNumOutputs());
+  getAffineValueMaps(inputAccessMaps(), inputIndices(), result);
+  getAffineValueMaps(outputAccessMaps(), outputIndices(), result);
+  return result;
+}
+
+AffineValueMap PxaGenericOp::getTiedAffineValueMap(OpOperand *opOperand) {
+  assert(opOperand->getOwner() == this->getOperation());
+  assert(opOperand->getOperandNumber() < getNumInputs() + getNumOutputs());
+  return getAffineValueMaps()[opOperand->getOperandNumber()];
+}
+
+void PxaGenericOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
+                                               MLIRContext *context) {
+  patterns.insert<SimplifyPxaGenericOp>(patterns.getContext());
+}
+
+static void printPxaGenericOperands(OpAsmPrinter &p, OperandRange operands,
+                                    OperandRange indices,
+                                    ArrayAttr accessMapsAttr,
+                                    ArrayAttr tileMapsAttr) {
+  auto items = llvm::zip(operands, accessMapsAttr, tileMapsAttr);
+  size_t prefix = 0;
+  llvm::interleaveComma(items, p, [&](auto it) {
+    Value operand;
+    Attribute accessMap, tileMap;
+    std::tie(operand, accessMap, tileMap) = it;
+    p << operand << '[';
+    AffineMapAttr accessMapAttr = accessMap.cast<AffineMapAttr>();
+    size_t count = accessMapAttr.getValue().getNumInputs();
+    p.printAffineMapOfSSAIds(accessMapAttr, indices.slice(prefix, count));
+    prefix += count;
+    p << "]: " << tileMap;
+  });
+}
+
+static void printPxaGenericOp(OpAsmPrinter &p, PxaGenericOp op) {
+  auto funcType = FunctionType::get(op.getContext(), op.inputs().getTypes(),
+                                    op.outputs().getTypes());
+  p << ' ';
+  p << '(';
+  printPxaGenericOperands(p, op.outputs(), op.outputIndices(),
+                          op.outputAccessMaps(), op.outputTileMaps());
+  p << ") <";
+  llvm::interleaveComma(op.reductions(), p, [&](Attribute attr) {
+    Optional<AtomicRMWKind> kind =
+        symbolizeAtomicRMWKind(attr.cast<IntegerAttr>().getInt());
+    p << stringifyAtomicRMWKind(*kind);
+  });
+  p << "> ";
+  p.printSymbolName(op.kernel());
+  p << '(';
+  printPxaGenericOperands(p, op.inputs(), op.inputIndices(),
+                          op.inputAccessMaps(), op.inputTileMaps());
+  p << ") tile: " << op.tile();
+  p.printOptionalAttrDict(op->getAttrs(),
+                          /*elidedAttrs=*/{
+                              PxaGenericOp::getOperandSegmentSizeAttr(),
+                              PxaGenericOp::getInputAccessMapsAttrName(),
+                              PxaGenericOp::getInputTileMapsAttrName(),
+                              PxaGenericOp::getOutputAccessMapsAttrName(),
+                              PxaGenericOp::getOutputTileMapsAttrName(),
+                              PxaGenericOp::getKernelAttrName(),
+                              PxaGenericOp::getTileAttrName(),
+                              PxaGenericOp::getReductionsAttrName(),
+                          });
+  p << " : " << funcType;
+}
+
+struct GenericOperand {
+  OpAsmParser::OperandType operand;
+  SmallVector<OpAsmParser::OperandType, 4> indices;
+  AffineMapAttr accessMapAttr;
+  AffineMapAttr tileMapAttr;
+
+  ParseResult parse(OpAsmParser &parser) {
+    NamedAttrList attrs;
+    return failure(parser.parseOperand(operand) ||
+                   parser.parseAffineMapOfSSAIds(indices, accessMapAttr,
+                                                 "accessMapAttr", attrs) ||
+                   parser.parseColon() ||
+                   parser.parseAttribute(tileMapAttr, "tileMapAttr", attrs));
+  }
+};
+
+struct GenericOperands {
+  SmallVector<OpAsmParser::OperandType> operands;
+  SmallVector<OpAsmParser::OperandType> indices;
+
+  ParseResult parse(OpAsmParser &parser, StringRef accessMapAttrName,
+                    StringRef tileMapAttrName, OperationState &result) {
+    if (failed(parser.parseLParen()))
+      return failure();
+
+    Builder &builder = parser.getBuilder();
+    SmallVector<Attribute> accessMapAttrs, tileMapAttrs;
+
+    do {
+      GenericOperand operand;
+      if (failed(operand.parse(parser)))
+        return failure();
+      operands.push_back(operand.operand);
+      indices.append(operand.indices);
+      accessMapAttrs.push_back(operand.accessMapAttr);
+      tileMapAttrs.push_back(operand.tileMapAttr);
+    } while (succeeded(parser.parseOptionalComma()));
+
+    if (failed(parser.parseRParen()))
+      return failure();
+
+    result.addAttribute(accessMapAttrName,
+                        builder.getArrayAttr(accessMapAttrs));
+    result.addAttribute(tileMapAttrName, builder.getArrayAttr(tileMapAttrs));
+    return success();
+  }
+};
+
+static ParseResult parseReductions(OpAsmParser &parser,
+                                   OperationState &result) {
+  if (failed(parser.parseLess()))
+    return failure();
+
+  SmallVector<int64_t> reductions;
+  do {
+    llvm::SMLoc loc;
+    StringRef str;
+    if (parser.getCurrentLocation(&loc) || parser.parseKeyword(&str))
+      return failure();
+
+    Optional<AtomicRMWKind> kind = symbolizeAtomicRMWKind(str);
+    if (!kind)
+      return parser.emitError(loc) << "expected valid AtomicRMWKind value";
+
+    reductions.push_back(static_cast<int64_t>(*kind));
+  } while (succeeded(parser.parseOptionalComma()));
+
+  if (failed(parser.parseGreater()))
+    return failure();
+
+  Builder &builder = parser.getBuilder();
+  result.addAttribute(PxaGenericOp::getReductionsAttrName(),
+                      builder.getI64ArrayAttr(reductions));
+  return success();
+}
+
+static ParseResult parsePxaGenericOp(OpAsmParser &parser,
+                                     OperationState &result) {
+  Builder &builder = parser.getBuilder();
+  IndexType indexType = builder.getIndexType();
+  IntegerType i64Type = builder.getIntegerType(64);
+  GenericOperands inputs, outputs;
+  FunctionType funcType;
+  StringAttr kernel;
+  ArrayAttr tileAttr;
+  if (outputs.parse(parser, PxaGenericOp::getOutputAccessMapsAttrName(),
+                    PxaGenericOp::getOutputTileMapsAttrName(), result) ||
+      parseReductions(parser, result) ||
+      parser.parseSymbolName(kernel, PxaGenericOp::getKernelAttrName(),
+                             result.attributes) ||
+      inputs.parse(parser, PxaGenericOp::getInputAccessMapsAttrName(),
+                   PxaGenericOp::getInputTileMapsAttrName(), result) ||
+      parser.parseKeyword("tile") || parser.parseColon() ||
+      parser.parseAttribute(tileAttr, i64Type, PxaGenericOp::getTileAttrName(),
+                            result.attributes) ||
+      parser.parseOptionalAttrDict(result.attributes) ||
+      parser.parseColonType(funcType) ||
+      parser.resolveOperands(inputs.operands, funcType.getInputs(),
+                             parser.getNameLoc(), result.operands) ||
+      parser.resolveOperands(outputs.operands, funcType.getResults(),
+                             parser.getNameLoc(), result.operands) ||
+      parser.resolveOperands(inputs.indices, indexType, result.operands) ||
+      parser.resolveOperands(outputs.indices, indexType, result.operands) ||
+      parser.addTypesToList(funcType.getResults(), result.types))
+    return failure();
+
+  result.addAttribute(PxaGenericOp::getOperandSegmentSizeAttr(),
+                      builder.getI32VectorAttr({
+                          static_cast<int32_t>(inputs.operands.size()),
+                          static_cast<int32_t>(outputs.operands.size()),
+                          static_cast<int32_t>(inputs.indices.size()),
+                          static_cast<int32_t>(outputs.indices.size()),
+                      }));
+  return success();
+}
+
 } // namespace pmlc::dialect::pxa
+
+#include "pmlc/dialect/pxa/ir/dialect.cc.inc" // NOLINT
 
 #define GET_OP_CLASSES
 #include "pmlc/dialect/pxa/ir/ops.cc.inc" // NOLINT

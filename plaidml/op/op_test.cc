@@ -264,6 +264,24 @@ ConvolutionParams convParams[] = {
 
 INSTANTIATE_TEST_CASE_P(Suite, ConvolutionTest, ::testing::ValuesIn(convParams));
 
+TEST_F(OpTest, DISABLED_CastConv) {
+  auto I = Placeholder(DType::UINT8, {1, 3, 256, 256});
+  auto K = Placeholder(DType::UINT8, {64, 3, 3, 3});
+  auto I_f16 = edsl::cast(I, DType::FLOAT16);
+  auto K_f16 = edsl::cast(K, DType::FLOAT16);
+  auto conv = op::convolution(I_f16, K_f16);
+
+  conv.name("conv1")
+      .strides({1, 1})
+      .dilations({1, 1})
+      .autopad_mode(op::AutoPadMode::EXPLICIT)
+      .manual_padding({1, 1, 1, 1})
+      .input_layout(op::TensorLayout::NCX)
+      .filter_layout(op::TensorLayout::KCX);
+  auto program = makeProgram("convolution", {I, K}, {conv});
+  runProgram(program);
+}
+
 TEST_F(OpTest, CumProd) {
   auto I = Placeholder(DType::FLOAT32, {7, 7, 3, 64}, "I");
   auto program = makeProgram("cumprod", {I}, {op::cumprod(I, 2)});
@@ -299,7 +317,7 @@ TEST_F(OpTest, Elu) {
 
 TEST_F(OpTest, ExplicitPadding) {
   auto I = Placeholder(DType::FLOAT32, {2, 3}, "A");
-  auto O = op::explicit_padding(I, {2, 1}, {2, 1}).padval(Constant(-1.0));
+  auto O = op::explicit_padding(I, {2, 1}, {2, 1}).mode(op::PadMode::CONSTANT).padval(Constant(-1.0));
   auto program = makeProgram("explicit_padding", {I}, {O});
 
   std::vector<float> I_input = {1, 2, 3,  //
@@ -360,6 +378,41 @@ TEST_F(OpTest, ExplicitPaddingNoOp) {
                                 4, 5, 6};
   std::vector<float> O_output = {1, 2, 3,  //
                                  4, 5, 6};
+
+  checkExact(program, {I_input}, {O_output});
+}
+
+TEST_F(OpTest, ExplicitPaddingEdge) {
+  auto I = Placeholder(DType::FLOAT32, {1, 2, 3}, "A");
+  auto O = op::explicit_padding(I, {1, 2, 1}, {2, 1, 3}).mode(op::PadMode::EDGE);
+  auto program = makeProgram("explicit_padding", {I}, {O});
+
+  std::vector<float> I_input = {1, 2, 3,  //
+                                4, 5, 6};
+
+  std::vector<float> O_output = {1, 1, 2, 3, 3, 3, 3,  //
+                                 1, 1, 2, 3, 3, 3, 3,  //
+                                 1, 1, 2, 3, 3, 3, 3,  //
+                                 4, 4, 5, 6, 6, 6, 6,  //
+                                 4, 4, 5, 6, 6, 6, 6,  //
+                                 //
+                                 1, 1, 2, 3, 3, 3, 3,  //
+                                 1, 1, 2, 3, 3, 3, 3,  //
+                                 1, 1, 2, 3, 3, 3, 3,  //
+                                 4, 4, 5, 6, 6, 6, 6,  //
+                                 4, 4, 5, 6, 6, 6, 6,  //
+                                 //
+                                 1, 1, 2, 3, 3, 3, 3,  //
+                                 1, 1, 2, 3, 3, 3, 3,  //
+                                 1, 1, 2, 3, 3, 3, 3,  //
+                                 4, 4, 5, 6, 6, 6, 6,  //
+                                 4, 4, 5, 6, 6, 6, 6,  //
+                                 //
+                                 1, 1, 2, 3, 3, 3, 3,  //
+                                 1, 1, 2, 3, 3, 3, 3,  //
+                                 1, 1, 2, 3, 3, 3, 3,  //
+                                 4, 4, 5, 6, 6, 6, 6,  //
+                                 4, 4, 5, 6, 6, 6, 6};
 
   checkExact(program, {I_input}, {O_output});
 }

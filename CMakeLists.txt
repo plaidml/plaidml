@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.13.4)
+cmake_minimum_required(VERSION 3.13.4 FATAL_ERROR)
 
 if(POLICY CMP0068)
   cmake_policy(SET CMP0068 NEW)
@@ -11,6 +11,7 @@ endif()
 
 if(POLICY CMP0077)
   cmake_policy(SET CMP0077 NEW)
+  set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 endif()
 
 include(FetchContent)
@@ -18,6 +19,7 @@ include(FetchContent)
 project(PlaidML LANGUAGES C CXX)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
@@ -49,46 +51,29 @@ list(APPEND CMAKE_MODULE_PATH
   ${CMAKE_CURRENT_LIST_DIR}/cmake/third_party
 )
 
-find_program(CCACHE_PROGRAM ccache)
-if(CCACHE_PROGRAM)
-  set(CMAKE_C_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
-  set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
-endif()
-
 # -------------------------------------------------------------------------------
 # Third party dependencies
 # -------------------------------------------------------------------------------
-include(CPM)
+if(PML_INCLUDE_LLVM)
+  include(llvm-project)
+endif()
 include(boost)
 include(easylogging)
 if(NOT InferenceEngineDeveloperPackage_FOUND)
   include(gflags)
 endif()
 include(googletest)
-include(half)
-
-if(PML_INCLUDE_LLVM)
-  include(llvm-project)
-endif()
+include(pybind11)
+include(mlperf)
 include(xsmm)
+
+add_subdirectory(vendor)
 
 # -------------------------------------------------------------------------------
 # Enable testing
 # -------------------------------------------------------------------------------
 if(PML_BUILD_TESTS)
   enable_testing()
-  add_custom_target(check-core
-    COMMAND ${CMAKE_CTEST_COMMAND} -L core --output-on-failure
-    USES_TERMINAL
-  )
-  add_custom_target(check-smoke
-    COMMAND ${CMAKE_CTEST_COMMAND} -L smoke --output-on-failure
-    USES_TERMINAL
-  )
-  add_custom_target(check-test
-    COMMAND ${CMAKE_CTEST_COMMAND} -L test --output-on-failure
-    USES_TERMINAL
-  )
 endif()
 
 # -------------------------------------------------------------------------------
@@ -105,16 +90,7 @@ include(pml_python)
 include(pml_tblgen_library)
 include(pml_whole_archive_link)
 
-get_directory_property(HAS_PARENT PARENT_DIRECTORY)
-if(HAS_PARENT)
-  set(IS_SUBPROJECT TRUE)
-else()
-  add_custom_target(check
-    DEPENDS
-      check-test
-      check-clang-format
-  )
-endif()
+get_directory_property(IS_SUBPROJECT PARENT_DIRECTORY)
 
 # Set general cpack variables for package description
 set(CPACK_GENERATOR "TGZ")
@@ -136,6 +112,7 @@ add_subdirectory(plaidml)
 add_subdirectory(pmlc)
 add_subdirectory(docs)
 add_subdirectory(networks)
+add_subdirectory(mlperf)
 
 # Note: this must be called after all libraries have been declared.
 pml_complete_binary_link_options()
@@ -149,4 +126,16 @@ configure_lit_site_cfg(
 
 if(PML_ENABLE_DEVKIT)
   include(devkit)
+endif()
+
+if(PML_BUILD_TESTS)
+  get_property(_CHECKS GLOBAL PROPERTY GLOBAL_CHECKS)
+  foreach(_CHECK ${_CHECKS})
+    get_property(_CHECK_DEPS GLOBAL PROPERTY GLOBAL_CHECK_DEPS_${_CHECK})
+    add_custom_target(check-${_CHECK}
+      COMMAND ${CMAKE_CTEST_COMMAND} -L ${_CHECK} --output-on-failure
+      USES_TERMINAL
+      DEPENDS ${_CHECK_DEPS}
+    )
+  endforeach()
 endif()

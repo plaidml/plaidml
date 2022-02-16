@@ -43,19 +43,21 @@ static Type getElementType(Value value) {
   return getElementType(value.getType());
 }
 
-static RankedTensorType getRankedTensorType(Type type) {
-  if (auto rankedTensorType = type.dyn_cast<RankedTensorType>()) {
-    return rankedTensorType;
-  }
-  return RankedTensorType::get({}, type);
-}
-
-static llvm::APFloat convertFloatUsingType(llvm::APFloat value,
-                                           FloatType type) {
-  bool losesInfo = false;
-  value.convert(type.getFloatSemantics(), APFloat::rmNearestTiesToEven,
-                &losesInfo);
-  return value;
+static FlatSymbolRefAttr createStubTraceFunc(ModuleOp module, StringAttr msg) {
+  static unsigned idCounter = 0;
+  auto uniqueId = idCounter++;
+  auto symbol = llvm::formatv("__trace_{0}", uniqueId).str();
+  auto context = module.getContext();
+  OpBuilder builder(context);
+  builder.setInsertionPointToStart(module.getBody());
+  auto funcType = FunctionType::get(context, {}, {});
+  auto funcOp = builder.create<FuncOp>(module.getLoc(), symbol, funcType,
+                                       ArrayRef<NamedAttribute>{});
+  funcOp->setAttr("msg", msg);
+  funcOp->setAttr("trace", builder.getUnitAttr());
+  funcOp->setAttr("id", builder.getI64IntegerAttr(uniqueId));
+  funcOp.setPrivate();
+  return SymbolRefAttr::get(context, symbol);
 }
 
 struct ConstantOpConversion : public OpConversionPattern<tile::ConstantOp> {
@@ -248,11 +250,11 @@ struct StdOp {
     auto attrs = ArrayRef<NamedAttribute>{};
     auto resultTypes = llvm::makeArrayRef(resultType);
     auto op = rewriter.create<OpType>(loc, resultTypes, promoted, attrs);
-    return op.getOperation()->getResult(0);
+    return op->getResult(0);
   }
 };
 
-struct SelectOp {
+struct SelectOpBuilder {
   Value create(ConversionPatternRewriter &rewriter, Location loc,
                Type resultType, ArrayRef<Value> operands,
                ArrayRef<Type> types) {
@@ -335,7 +337,7 @@ struct LogicalOp {
     Type boolType = rewriter.getI1Type();
     auto resultTypes = llvm::makeArrayRef(boolType);
     auto op = rewriter.create<OpType>(loc, resultTypes, promoted, attrs);
-    return op.getOperation()->getResult(0);
+    return op->getResult(0);
   }
 };
 
@@ -360,48 +362,6 @@ struct LogicalNotOp {
   }
 };
 
-static Value createInit(OpBuilder &builder, Location loc, Type type,
-                        AggregationKind agg) {
-  if (auto floatType = type.dyn_cast<FloatType>()) {
-    switch (agg) {
-    case AggregationKind::add: {
-      auto value = convertFloatUsingType(llvm::APFloat(0.0), floatType);
-      return builder.create<mlir::ConstantFloatOp>(loc, value, floatType);
-    }
-    case AggregationKind::mul: {
-      auto value = convertFloatUsingType(llvm::APFloat(1.0), floatType);
-      return builder.create<mlir::ConstantFloatOp>(loc, value, floatType);
-    }
-    case AggregationKind::min: {
-      auto value = llvm::APFloat::getInf(floatType.getFloatSemantics(), false);
-      return builder.create<mlir::ConstantFloatOp>(loc, value, floatType);
-    }
-    case AggregationKind::max: {
-      auto value = llvm::APFloat::getInf(floatType.getFloatSemantics(), true);
-      return builder.create<mlir::ConstantFloatOp>(loc, value, floatType);
-    }
-    default:
-      llvm_unreachable("Unsupported aggregation for createInit");
-    }
-  } else if (auto intType = type.dyn_cast<IntegerType>()) {
-    switch (agg) {
-    case AggregationKind::add:
-      return builder.create<mlir::ConstantIntOp>(loc, 0, intType);
-    case AggregationKind::mul:
-      return builder.create<mlir::ConstantIntOp>(loc, 1, intType);
-    case AggregationKind::min:
-      return builder.create<mlir::ConstantIntOp>(
-          loc, std::numeric_limits<int>::max(), intType);
-    case AggregationKind::max:
-      return builder.create<mlir::ConstantIntOp>(
-          loc, std::numeric_limits<int>::min(), intType);
-    default:
-      llvm_unreachable("Unsupported aggregation for createInit");
-    }
-  }
-  llvm_unreachable("Unknown type for createInit");
-}
-
 template <typename CmpOpBuilder>
 struct CondOp {
   Value create(ConversionPatternRewriter &rewriter, Location loc,
@@ -415,35 +375,6 @@ struct CondOp {
         .getResult();
   }
 };
-
-static Value
-buildBroadcastLoad(OpBuilder &builder, Location loc, Value operand,
-                   unsigned outRank,
-                   Optional<tile::PaddingInfo> maybePadding = llvm::None) {
-  // Handle scalar values
-  if (!operand.getType().isa<MemRefType>()) {
-    return operand;
-  }
-  // handle broadcasts
-  auto body = builder.getBlock();
-  auto operandType = operand.getType().cast<MemRefType>();
-  assert(operandType.getRank() <= outRank && "result rank < operand rank");
-  ArrayRef<int64_t> shape = operandType.getShape();
-  SmallVector<Value, 8> operandIdxs(operandType.getRank());
-  for (unsigned i = 0; i < operandType.getRank(); i++) {
-    unsigned j = outRank - i - 1;
-    unsigned k = operandType.getRank() - i - 1;
-    if (shape[k] == 1) {
-      operandIdxs[k] = builder.create<mlir::ConstantIndexOp>(loc, 0);
-    } else {
-      operandIdxs[k] = body->getArgument(j);
-    }
-  }
-  auto loadOp = builder.create<pxa::PxaLoadOp>(loc, operand, operandIdxs);
-  if (maybePadding)
-    updateAffineMap(loadOp, *maybePadding);
-  return loadOp;
-}
 
 static AtomicRMWKind convertAgg(AggregationKind agg, Type type) {
   switch (agg) {
@@ -481,68 +412,6 @@ static AtomicRMWKind convertAgg(AggregationKind agg, Type type) {
   llvm_unreachable("Invalid agg type in convertAgg");
 }
 
-struct BufferAllocator {
-  Value resultMemRef;
-  RankedTensorType rankedTensorType;
-  MemRefType memRefType;
-  Type elementType;
-
-  BufferAllocator(OpBuilder &builder, Operation *op, Type resultType) {
-    // Gather some basic info
-    TileToPXATypeConverter typeConverter;
-    auto loc = op->getLoc();
-    rankedTensorType = getRankedTensorType(resultType);
-    elementType = typeConverter.convertType(rankedTensorType.getElementType());
-    ArrayRef<int64_t> originalShape = rankedTensorType.getShape();
-    auto shape = llvm::to_vector<8>(originalShape);
-
-    // If padding is detected, expand the shape to accomodate.
-    auto maybePadding = tile::getPaddingInfo(op);
-    if (maybePadding) {
-      for (unsigned i = 0, e = shape.size(); i < e; ++i) {
-        shape[i] += maybePadding->lower[i] + maybePadding->upper[i];
-      }
-    }
-
-    // Make an allocation for the output
-    memRefType = MemRefType::get(shape, elementType);
-    resultMemRef = builder.create<memref::AllocOp>(loc, memRefType);
-    if (maybePadding) {
-      auto initValue = createInit(builder, loc, elementType, maybePadding->agg);
-      auto parallel = builder.create<AffineParallelOp>(
-          loc,
-          /*resultTypes=*/ArrayRef<Type>{memRefType},
-          /*reductions=*/ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign},
-          /*ranges=*/shape);
-      auto parallelBuilder = parallel.getBodyBuilder();
-      auto load =
-          buildBroadcastLoad(parallelBuilder, loc, initValue, shape.size());
-      auto stored = buildSimpleStore(parallelBuilder, loc, load, resultMemRef,
-                                     llvm::None);
-      parallelBuilder.create<AffineYieldOp>(loc, ValueRange{stored});
-      resultMemRef = parallel.getResult(0);
-    }
-  }
-};
-
-struct PrngOpConversion : public OpConversionPattern<tile::PrngOp> {
-  using OpConversionPattern<tile::PrngOp>::OpConversionPattern;
-
-  LogicalResult
-  matchAndRewrite(tile::PrngOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const final {
-    tile::PrngOpAdaptor transformed(operands);
-    BufferAllocator allocResult(rewriter, op.getOperation(),
-                                op.result().getType());
-    BufferAllocator stateResult(rewriter, op.getOperation(),
-                                op.state().getType());
-    rewriter.replaceOpWithNewOp<pxa::PrngOp>(
-        op, allocResult.memRefType, stateResult.memRefType, transformed.state(),
-        allocResult.resultMemRef, stateResult.resultMemRef);
-    return success();
-  }
-};
-
 template <typename FromOpType, typename IntoOpBuilder,
           typename Matcher = AlwaysTrue>
 struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
@@ -564,14 +433,19 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
         /*resultTypes=*/ArrayRef<Type>{alloc.memRefType},
         /*reductions=*/ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign},
         /*ranges=*/alloc.rankedTensorType.getShape());
+    if (Attribute attr = op->getAttr("name"))
+      forOp->setAttr("name", attr);
+    if (Attribute attr = op->getAttr("schedule"))
+      forOp->setAttr("schedule", attr);
+
     auto body = forOp.getBody();
     rewriter.setInsertionPointToStart(body);
 
     // Create the loads
     SmallVector<Value, 4> scalars;
     for (size_t i = 0; i < operands.size(); i++) {
-      auto maybePadding = tile::getPaddingInfo(
-          op.getOperation()->getOperand(i).getDefiningOp());
+      auto maybePadding =
+          tile::getPaddingInfo(op->getOperand(i).getDefiningOp());
       scalars.push_back(buildBroadcastLoad(rewriter, loc, operands[i],
                                            alloc.memRefType.getRank(),
                                            maybePadding));
@@ -579,7 +453,7 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
 
     // Create the standard op
     SmallVector<Type, 4> operandTypes;
-    for (auto type : op.getOperation()->getOperandTypes()) {
+    for (auto type : op->getOperandTypes()) {
       operandTypes.push_back(getElementType(type));
     }
     IntoOpBuilder intoOpBuilder;
@@ -632,8 +506,14 @@ struct ContractionOpConversion
     // Create an adaptor
     tile::ContractionOpAdaptor cionAdaptor(operands);
     auto cionOperands = cionAdaptor.operands();
-
     auto loc = op.getLoc();
+
+    if (auto attr = op->getAttrOfType<StringAttr>("trace")) {
+      auto module = op->getParentOfType<ModuleOp>();
+      auto symbol = createStubTraceFunc(module, attr);
+      rewriter.create<CallOp>(loc, symbol, ArrayRef<Type>{});
+    }
+
     BufferAllocator alloc(rewriter, op.getOperation(), op.result().getType());
 
     // Do initialization
@@ -651,31 +531,40 @@ struct ContractionOpConversion
                                   alloc.resultMemRef, tile::getPaddingInfo(op));
     if (maybePadding)
       updateAffineMap(store.getDefiningOp(), *maybePadding);
-    parallelBuilder.create<AffineYieldOp>(loc, ValueRange{store});
+    parallelBuilder.create<AffineYieldOp>(loc, store);
     auto filled = parallel.getResult(0);
 
     // Determine lower and upper bounds.
-    SmallVector<AffineExpr, 8> ubExprs;
+    SmallVector<AffineMap, 8> lbMaps;
+    SmallVector<AffineMap, 8> ubMaps;
     auto lowerBounds = op.lowerBounds().getValue();
     auto upperBounds = op.upperBounds().getValue();
     assert(lowerBounds.getNumResults() == upperBounds.getNumResults() &&
            "mismatched dims for lower and upper bounds");
     for (unsigned i = 0; i < lowerBounds.getNumResults(); i++) {
-      auto ubExpr = upperBounds.getResult(i) + 1;
-      auto upper = ubExpr.cast<AffineConstantExpr>().getValue();
-      ubExprs.push_back(rewriter.getAffineConstantExpr(upper));
+      AffineExpr ubExpr = upperBounds.getResult(i) + 1;
+      int64_t upper = ubExpr.cast<AffineConstantExpr>().getValue();
+      lbMaps.push_back(AffineMap::get(lowerBounds.getNumDims(),
+                                      lowerBounds.getNumSymbols(),
+                                      lowerBounds.getResult(i)));
+      ubMaps.push_back(AffineMap::getConstantMap(upper, op.getContext()));
     }
 
-    auto ubMap = AffineMap::get(0, 0, {ubExprs}, op.getContext());
     // Make the outer loops
+    SmallVector<int64_t, 8> steps(lbMaps.size(), 1);
     auto forOp = rewriter.create<AffineParallelOp>(
         loc,
         /*resultTypes=*/ArrayRef<Type>{alloc.memRefType},
         /*reductions=*/ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign},
-        /*lbMap=*/op.lowerBounds().getValue(),
+        /*lbMaps=*/lbMaps,
         /*lbArgs=*/ArrayRef<Value>{},
-        /*ubMap=*/ubMap,
-        /*ubArgs=*/ArrayRef<Value>{});
+        /*ubMaps=*/ubMaps,
+        /*ubArgs=*/ArrayRef<Value>{},
+        /*steps=*/steps);
+    if (Attribute attr = op->getAttr("name"))
+      forOp->setAttr("name", attr);
+    if (Attribute attr = op->getAttr("schedule"))
+      forOp->setAttr("schedule", attr);
 
     auto body = forOp.getBody();
     rewriter.setInsertionPointToStart(body);
@@ -686,7 +575,7 @@ struct ContractionOpConversion
       auto cons = op.cons().getValue();
       auto ifOp = rewriter.create<AffineIfOp>(loc, TypeRange{alloc.memRefType},
                                               cons, idxs, true);
-      rewriter.create<AffineYieldOp>(loc, ifOp.getOperation()->getResults());
+      rewriter.create<AffineYieldOp>(loc, ifOp->getResults());
       rewriter.setInsertionPointToStart(&ifOp.elseRegion().front());
       rewriter.create<AffineYieldOp>(loc, filled);
       rewriter.setInsertionPointToStart(&ifOp.thenRegion().front());
@@ -850,41 +739,31 @@ struct CastOpConversion : public OpConversionPattern<tile::CastOp> {
   matchAndRewrite(tile::CastOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
     auto loc = op.getLoc();
-    TileToPXATypeConverter typeConverter;
-    auto oldResultType = op.result().getType();
-    auto resultType =
-        typeConverter.convertType(oldResultType).cast<MemRefType>();
-    auto operand = operands[0];
-    if (resultType == operand.getType()) {
-      rewriter.replaceOp(op, operand);
-      return success();
-    }
 
-    // Make an allocation for the output
-    auto resultMemRef =
-        rewriter.create<memref::AllocOp>(loc, resultType).getResult();
+    BufferAllocator alloc(rewriter, op.getOperation(), op.result().getType());
 
     // Make a parallel for loop to fill the result
     auto forOp = rewriter.create<AffineParallelOp>(
         loc,
-        /*resultTypes=*/ArrayRef<Type>{resultType},
+        /*resultTypes=*/ArrayRef<Type>{alloc.memRefType},
         /*reductions=*/ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign},
-        /*ranges=*/resultType.getShape());
+        /*ranges=*/alloc.rankedTensorType.getShape());
     auto body = forOp.getBody();
     rewriter.setInsertionPointToStart(body);
 
     // Create the load
-    auto scalar =
-        buildBroadcastLoad(rewriter, loc, operand, resultType.getRank());
+    auto scalar = buildBroadcastLoad(rewriter, loc, operands[0],
+                                     alloc.memRefType.getRank());
 
     // Create the standard cast op
     auto dtype = getElementType(op.tensor());
-    bool resultIsSigned = getElementType(oldResultType).isSignedInteger();
+    bool resultIsSigned =
+        getElementType(op.result().getType()).isSignedInteger();
     auto result = createCastOp(rewriter, loc, scalar, dtype.isSignedInteger(),
-                               resultType.getElementType(), resultIsSigned);
+                               alloc.elementType, resultIsSigned);
 
     // Create the store
-    auto stored = buildSimpleStore(rewriter, loc, result, resultMemRef,
+    auto stored = buildSimpleStore(rewriter, loc, result, alloc.resultMemRef,
                                    tile::getPaddingInfo(op));
     rewriter.create<AffineYieldOp>(loc, ValueRange{stored});
 
@@ -895,11 +774,12 @@ struct CastOpConversion : public OpConversionPattern<tile::CastOp> {
   }
 };
 
-struct FuncOpConversion : public OpConversionPattern<FuncOp> {
-  using OpConversionPattern<FuncOp>::OpConversionPattern;
+template <typename FuncLikeOp>
+struct FuncOpConversion : public OpConversionPattern<FuncLikeOp> {
+  using OpConversionPattern<FuncLikeOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(FuncOp op, ArrayRef<Value> operands,
+  matchAndRewrite(FuncLikeOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
     FunctionType type = op.getType();
 
@@ -912,15 +792,14 @@ struct FuncOpConversion : public OpConversionPattern<FuncOp> {
     SmallVector<Type, 8> resultTypes;
     for (Type resultType : type.getResults()) {
       Type newResultType = typeConverter.convertType(resultType);
-      if (!newResultType.isa<stdx::ArgpackType>()) {
-        result.addInputs({newResultType});
-      }
+      result.addInputs({newResultType});
       resultTypes.push_back(newResultType);
     }
 
     // Create a new function with an updated signature.
     auto newOp = rewriter.cloneWithoutRegions(op);
-    rewriter.inlineRegionBefore(op.getBody(), newOp.getBody(), newOp.end());
+    rewriter.inlineRegionBefore(op.getBody(), newOp.getBody(),
+                                newOp.getBody().end());
     newOp.setType(FunctionType::get(op.getContext(), result.getConvertedTypes(),
                                     resultTypes));
 
@@ -930,25 +809,6 @@ struct FuncOpConversion : public OpConversionPattern<FuncOp> {
     // Finally cause the old func op to be erased
     rewriter.eraseOp(op);
 
-    return success();
-  }
-};
-
-struct ReturnOpConversion : public OpConversionPattern<ReturnOp> {
-  using OpConversionPattern<ReturnOp>::OpConversionPattern;
-
-  LogicalResult
-  matchAndRewrite(ReturnOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const final {
-    auto &block = op->getParentRegion()->front();
-    auto funcOp = op->getParentOfType<FuncOp>();
-    auto blockArg = funcOp.getType().getNumInputs() - op.getNumOperands();
-    for (Value operand : operands) {
-      // Find very initial allocation of memref
-      auto def = pxa::getIndirectDef(operand);
-      def.replaceAllUsesWith(block.getArgument(blockArg++));
-    }
-    rewriter.replaceOpWithNewOp<ReturnOp>(op, operands);
     return success();
   }
 };
@@ -983,81 +843,9 @@ struct TraceOpConversion : public OpConversionPattern<tile::PragmaOp> {
     if (!msg) {
       return failure();
     }
-    auto symbol = createStubFunc(module, msg->second.cast<StringAttr>());
+    auto symbol = createStubTraceFunc(module, msg->second.cast<StringAttr>());
     rewriter.create<CallOp>(op.getLoc(), symbol, ArrayRef<Type>{});
     rewriter.replaceOp(op, adaptor.tensor());
-    return success();
-  }
-
-  FlatSymbolRefAttr createStubFunc(ModuleOp module, StringAttr msg) const {
-    static unsigned idCounter = 0;
-    auto uniqueId = idCounter++;
-    auto symbol = llvm::formatv("__trace_{0}", uniqueId).str();
-    auto context = module.getContext();
-    OpBuilder builder(context);
-    builder.setInsertionPointToStart(module.getBody());
-    auto funcType = FunctionType::get(context, {}, {});
-    auto funcOp = builder.create<FuncOp>(module.getLoc(), symbol, funcType,
-                                         ArrayRef<NamedAttribute>{});
-    funcOp->setAttr("msg", msg);
-    funcOp->setAttr("trace", builder.getUnitAttr());
-    funcOp->setAttr("id", builder.getI64IntegerAttr(uniqueId));
-    funcOp.setPrivate();
-    return SymbolRefAttr::get(context, symbol);
-  }
-};
-
-struct PackOpConversion : public OpConversionPattern<stdx::PackOp> {
-  using OpConversionPattern<stdx::PackOp>::OpConversionPattern;
-
-  LogicalResult
-  matchAndRewrite(stdx::PackOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const final {
-    auto argpackType = stdx::ArgpackType::get(op.getContext());
-    // Some 0-dim tensors convert to 0-dim memrefs, and some convert to actual
-    // scalars. To make the type mapping exact, we always convert 0-dim memrefs
-    // to scalars via doing a load before packing.
-    SmallVector<Value, 8> scalarizedOperands;
-    for (auto val : operands) {
-      // Handle cases that require a load.
-      if (auto memrefType = val.getType().dyn_cast<MemRefType>()) {
-        if (memrefType.getRank() == 0) {
-          auto loadOp =
-              rewriter.create<pxa::PxaLoadOp>(op.getLoc(), val, ValueRange{});
-          scalarizedOperands.push_back(loadOp.getResult());
-          continue;
-        }
-      }
-      // Default case is a no-op
-      scalarizedOperands.push_back(val);
-    }
-    rewriter.replaceOpWithNewOp<stdx::PackOp>(op, TypeRange(argpackType),
-                                              scalarizedOperands);
-    return success();
-  }
-};
-
-struct UnpackOpConversion : public OpConversionPattern<stdx::UnpackOp> {
-  using OpConversionPattern<stdx::UnpackOp>::OpConversionPattern;
-
-  LogicalResult
-  matchAndRewrite(stdx::UnpackOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const final {
-    SmallVector<Type, 8> newResultTypes;
-    TileToPXATypeConverter typeConverter;
-    for (auto type : op.getResultTypes()) {
-      if (auto tensorType = type.dyn_cast<TensorType>()) {
-        if (tensorType.getRank() == 0) {
-          auto newType = typeConverter.convertType(tensorType.getElementType());
-          newResultTypes.push_back(newType);
-          continue;
-        }
-      }
-      auto newType = typeConverter.convertType(type);
-      newResultTypes.push_back(newType);
-    }
-    rewriter.replaceOpWithNewOp<stdx::UnpackOp>(op, newResultTypes,
-                                                operands[0]);
     return success();
   }
 };
@@ -1088,36 +876,40 @@ struct ScfForOpConversion : public OpConversionPattern<scf::ForOp> {
 
 struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
   void runOnOperation() final {
+    ModuleOp module = getOperation();
     // Inject tile.ident ops for each return operand that needs it.
     // argument, a constant value, or a reshape op.
-    getOperation().walk([&](ReturnOp op) {
+    auto injectIdent = [](Operation *op) {
       OpBuilder builder(op);
-      for (OpOperand &operand : op.getOperation()->getOpOperands()) {
+      for (OpOperand &operand : op->getOpOperands()) {
         Value value = operand.get();
-        bool needsIdent =                                  //
-            value.isa<BlockArgument>() ||                  // Block arguemnt
-            matchPattern(value, m_Constant()) ||           // Constant op
-            matchPattern(value, m_Op<stdx::UnpackOp>()) || // Direct from unpack
-            matchPattern(value, m_Op<tile::ReshapeOp>());  // Reshape op
+        Value def = pxa::getIndirectDef(value);
+        bool needsIdent =                                   //
+            value.isa<BlockArgument>() ||                   // Block arguemnt
+            matchPattern(value, m_Constant()) ||            // Constant op
+            matchPattern(value, m_Op<tile::ReshapeOp>()) || // Reshape op
+            def.getParentRegion() != op->getParentRegion();
         if (needsIdent) {
-          Value copy = builder.create<tile::IdentOp>(op.getLoc(),
+          Value copy = builder.create<tile::IdentOp>(op->getLoc(),
                                                      value.getType(), value);
           operand.set(copy);
         }
       }
-    });
+    };
+    module.walk([&](ReturnOp op) { injectIdent(op); });
+    module.walk([&](stdx::YieldOp op) { injectIdent(op); });
 
     // Set up target (i.e. what is legal)
     ConversionTarget target(getContext());
     TileToPXATypeConverter converter;
-    target.addLegalDialect<mlir::AffineDialect,          //
-                           mlir::StandardOpsDialect,     //
-                           mlir::math::MathDialect,      //
-                           mlir::memref::MemRefDialect,  //
-                           mlir::scf::SCFDialect,        //
-                           dialect::layer::LayerDialect, //
-                           dialect::pxa::PXADialect,     //
-                           dialect::stdx::StdXDialect>();
+    target.addLegalDialect<mlir::AffineDialect,         //
+                           mlir::StandardOpsDialect,    //
+                           mlir::math::MathDialect,     //
+                           mlir::memref::MemRefDialect, //
+                           mlir::scf::SCFDialect,       //
+                           layer::LayerDialect,         //
+                           pxa::PXADialect,             //
+                           stdx::StdXDialect>();
     target.addLegalOp<scf::ForOp,   //
                       scf::YieldOp, //
                       scf::IfOp>();
@@ -1125,13 +917,8 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
                       ReturnOp>();
     target.addDynamicallyLegalOp<FuncOp>(
         [&](FuncOp op) { return converter.isSignatureLegal(op.getType()); });
-    target.addDynamicallyLegalOp<ReturnOp>(
-        [&](ReturnOp op) { return converter.isLegal(op); });
-    target.addDynamicallyLegalOp<stdx::PackOp>([&](stdx::PackOp op) {
-      return converter.isLegal(op.getOperandTypes());
-    });
-    target.addDynamicallyLegalOp<stdx::UnpackOp>([&](stdx::UnpackOp op) {
-      return converter.isLegal(op.getResultTypes());
+    target.addDynamicallyLegalOp<stdx::ClosureOp>([&](stdx::ClosureOp op) {
+      return converter.isSignatureLegal(op.getType());
     });
     target.addDynamicallyLegalOp<scf::ForOp>(
         [&](scf::ForOp op) { return converter.isLegal(op.getResultTypes()); });
@@ -1147,19 +934,16 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         CmpIntInequalityOp<CmpIPredicate::sge, CmpIPredicate::uge>;
     RewritePatternSet patterns(&getContext());
     patterns.insert<
-        CastOpConversion,     //
-        ConstantOpConversion, //
-        FuncOpConversion,     //
-        IndexOpConversion,    //
-        PragmaOpConversion,   //
-        PrngOpConversion,     //
-        ReshapeOpConversion,  //
-        ReturnOpConversion,   //
-        ShapeOpConversion,    //
-        TraceOpConversion,    //
-        PackOpConversion,     //
-        UnpackOpConversion,   //
-        ScfForOpConversion,   //
+        CastOpConversion,                  //
+        ConstantOpConversion,              //
+        FuncOpConversion<FuncOp>,          //
+        FuncOpConversion<stdx::ClosureOp>, //
+        IndexOpConversion,                 //
+        PragmaOpConversion,                //
+        ReshapeOpConversion,               //
+        ShapeOpConversion,                 //
+        TraceOpConversion,                 //
+        ScfForOpConversion,                //
         ContractionOpConversion<CombinationKind::none, FirstOperand>,
         ContractionOpConversion<CombinationKind::add, StdOp<mlir::AddFOp>,
                                 ResultIs<EltwiseFloat>>,
@@ -1287,7 +1071,8 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         EltwiseOpConversion<tile::LogicalNotOp, LogicalNotOp>,
         EltwiseOpConversion<tile::LogicalOrOp, LogicalOp<mlir::OrOp>>,
         EltwiseOpConversion<tile::LogicalXorOp, LogicalOp<mlir::XOrOp>>,
-        EltwiseOpConversion<tile::SelectOp, SelectOp>,
+        EltwiseOpConversion<tile::ReluOp, StdOp<stdx::ReluOp>>,
+        EltwiseOpConversion<tile::SelectOp, SelectOpBuilder>,
         EltwiseOpConversion<tile::IdentOp, FirstOperand>>(&getContext());
 
     populateTileToPXASpecialPatterns(patterns);
@@ -1297,6 +1082,31 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
             applyFullConversion(getOperation(), target, std::move(patterns)))) {
       signalPassFailure();
       return;
+    }
+
+    for (FuncOp funcOp : module.getOps<FuncOp>()) {
+      for (ReturnOp returnOp : funcOp.getOps<ReturnOp>()) {
+        connectResults(funcOp, returnOp);
+        for (stdx::ClosureOp closureOp : funcOp.getOps<stdx::ClosureOp>()) {
+          for (stdx::YieldOp yieldOp : closureOp.getOps<stdx::YieldOp>()) {
+            connectResults(closureOp, yieldOp);
+          }
+        }
+      }
+    }
+  }
+
+  template <typename FuncLikeOp, typename ReturnLikeOp>
+  void connectResults(FuncLikeOp funcOp, ReturnLikeOp returnOp) {
+    unsigned argNumber =
+        funcOp.getType().getNumInputs() - returnOp.getNumOperands();
+    for (Value operand : returnOp.operands()) {
+      // Find very initial allocation of memref
+      Value def = pxa::getIndirectDef(operand);
+      BlockArgument blockArg = funcOp.getBody().getArgument(argNumber++);
+      if (def != blockArg) {
+        def.replaceAllUsesWith(blockArg);
+      }
     }
   }
 };

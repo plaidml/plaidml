@@ -7,6 +7,7 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/ToolOutputFile.h"
 
 #include "mlir/Parser.h"
@@ -16,6 +17,7 @@
 #include "mlir/Support/FileUtilities.h"
 
 #include "pmlc/compiler/registry.h"
+#include "pmlc/util/env.h"
 #include "pmlc/util/logging.h"
 
 using namespace mlir; // NOLINT[build/namespaces]
@@ -25,13 +27,14 @@ namespace pmlc::compiler {
 namespace {
 
 static bool isHiddenPass(Pass *pass, Operation *op) {
-  if (pass->getName().startswith("mlir::detail::")) {
+  if (pass->getName().startswith("mlir::detail::"))
     return true;
-  }
   if (auto funcOp = dyn_cast<FuncOp>(op)) {
-    if (funcOp.isExternal()) {
+    if (funcOp.isExternal())
       return true;
-    }
+    std::string filter = pmlc::util::getEnvVar("PLAIDML_FUNC_FILTER");
+    if (!filter.empty() && funcOp.getName() != filter)
+      return true;
   }
   return false;
 }
@@ -54,12 +57,16 @@ private:
       topLevelOp = parentOp;
     }
 
+    OpPrintingFlags flags;
+    if (pmlc::util::getEnvVar("PLAIDML_DEBUG") == "1")
+      flags.enableDebugInfo(/*prettyForm=*/true);
+
     // Check to see if the top-level operation is actually a module in the case
     // of invalid-ir.
     if (auto module = dyn_cast<ModuleOp>(topLevelOp)) {
-      module.print(os);
+      module.print(os, flags);
     } else {
-      topLevelOp->print(os);
+      topLevelOp->print(os, flags);
     }
 
     os.flush();
@@ -82,19 +89,13 @@ private:
 Program::Program(ModuleOp module)
     : context(std::make_unique<MLIRContext>()), module(module) {}
 
-Program::Program(llvm::StringRef name)
+Program::Program(StringRef name)
     : context(std::make_unique<MLIRContext>()),
       module(ModuleOp::create(UnknownLoc::get(context.get()), name)) {}
 
-std::unique_ptr<Program>
-Program::fromSource(std::unique_ptr<MLIRContext> context, StringRef source) {
-  return std::make_unique<Program>(std::move(context),
-                                   llvm::MemoryBuffer::getMemBuffer(source));
-}
-
 Program::Program(std::unique_ptr<MLIRContext> context,
-                 std::unique_ptr<llvm::MemoryBuffer> buffer)
-    : context(std::move(context)) {
+                 std::unique_ptr<llvm::MemoryBuffer> buffer, StringRef entry)
+    : context(std::move(context)), entry(entry) {
   llvm::SourceMgr sourceMgr;
   sourceMgr.AddNewSourceBuffer(std::move(buffer), llvm::SMLoc());
   module = parseSourceFile(sourceMgr, this->context.get());
@@ -140,7 +141,10 @@ void Program::compile(StringRef targetNameAndOptions, bool collectPasses,
   if (collectPasses || dumpDir.size()) {
     std::string ir;
     llvm::raw_string_ostream os(ir);
-    module->print(os);
+    OpPrintingFlags flags;
+    if (pmlc::util::getEnvVar("PLAIDML_DEBUG") == "1")
+      flags.enableDebugInfo(/*prettyForm=*/true);
+    module->print(os, flags);
     passes.emplace_back(PassInfo{"tile", os.str()});
     pm.addInstrumentation(std::make_unique<IRCollector>(&passes));
     pm.getContext()->disableMultithreading();
@@ -157,10 +161,15 @@ void Program::compile(StringRef targetNameAndOptions, bool collectPasses,
       return VLOG_IS_ON(3);
     };
     pm.getContext()->disableMultithreading();
+    OpPrintingFlags flags;
+    if (pmlc::util::getEnvVar("PLAIDML_DEBUG") == "1")
+      flags.enableDebugInfo(/*prettyForm=*/true);
     pm.enableIRPrinting(shouldPrintBeforePass, shouldPrintAfterPass,
                         /*printModuleScope=*/true,
                         /*printAfterOnlyOnChange=*/false,
-                        /*out=*/llvm::errs());
+                        /*printAfterOnlyOnFailure=*/false,
+                        /*out=*/llvm::errs(),
+                        /*opPrintingFlags=*/flags);
   }
 
   auto begOpts = targetNameAndOptions.find('{');
@@ -189,9 +198,10 @@ void Program::compile(StringRef targetNameAndOptions, bool collectPasses,
     }
     for (auto pass : llvm::enumerate(passes)) {
       const auto &info = pass.value();
-      SmallString<128> path(dumpDir);
-      llvm::sys::path::append(
-          path, llvm::formatv("{0,0+2}_{1}.mlir", pass.index(), info.name));
+      SmallString<512> path(dumpDir);
+      std::string filename =
+          llvm::formatv("{0,0+2}_{1}.mlir", pass.index(), info.name);
+      llvm::sys::path::append(path, filename);
       auto file = openOutputFile(path, &err);
       if (!err.empty()) {
         throw std::runtime_error("Failed to dump pass: " + err);
@@ -208,6 +218,25 @@ Program::save(const std::unordered_map<std::string, std::string> &config) {
     throw std::runtime_error("Program must be compiled to be saved.");
   }
   return target->save(*this, config);
+}
+
+void Program::parseIOTypes(std::unique_ptr<llvm::MemoryBuffer> buffer) {
+  llvm::SourceMgr sourceMgr;
+  sourceMgr.AddNewSourceBuffer(std::move(buffer), llvm::SMLoc());
+  OwningModuleRef sourceModule = parseSourceFile(sourceMgr, context.get());
+
+  auto op = dyn_cast_or_null<FuncOp>(sourceModule->lookupSymbol(entry));
+  if (!op)
+    throw std::runtime_error("Could not find FuncOp: " + entry);
+
+  FunctionType funcType = op.getType();
+  for (Type type : funcType.getInputs()) {
+    inputs.push_back(type);
+  }
+
+  for (Type type : funcType.getResults()) {
+    outputs.push_back(type);
+  }
 }
 
 } // namespace pmlc::compiler

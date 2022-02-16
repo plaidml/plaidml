@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
+#include <memory>
+
 // NB: IE_SET_METRIC_RETURN requires this header to be included first
 #include "ie_metric_helpers.hpp"
-
-#include <memory>
 
 #include "plaidml_plugin.hpp"
 
@@ -25,8 +25,8 @@ namespace PlaidMLPlugin {
 
 void Engine::GetVersion(const Version*& versionInfo) noexcept {}
 
-ExecutableNetworkInternal::Ptr Engine::LoadExeNetworkImpl(const CNNNetwork& network,
-                                                          const std::map<std::string, std::string>& config) {
+IExecutableNetworkInternal::Ptr Engine::LoadExeNetworkImpl(const CNNNetwork& network,
+                                                           const std::map<std::string, std::string>& config) {
   auto it = config.find("device");
   const auto& device = it != config.end() ? it->second : "";
   return std::make_shared<PlaidMLExecutableNetwork>(network, device);
@@ -51,7 +51,7 @@ InferenceEngine::QueryNetworkResult Engine::QueryNetwork(const CNNNetwork& netwo
   //         res.supportedLayersMap.insert({layer->name, plugin_name});
   //     }
   // }
-  THROW_IE_EXCEPTION << NOT_IMPLEMENTED_str;
+  throw std::logic_error("PlaidMLPlugin::Engine::QueryNetwork not implemented");
 }
 
 Engine::Engine() {

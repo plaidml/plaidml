@@ -14,26 +14,38 @@ class RewritePatternSet;
 
 namespace pmlc::target::x86 {
 
+std::unique_ptr<mlir::Pass> createCollapseParallelLoopsPass();
+
+std::unique_ptr<mlir::Pass> createFoldConstantCastPass();
+
 std::unique_ptr<mlir::Pass> createLowerPXAToAffinePass();
 
 std::unique_ptr<mlir::Pass> createLowerToLLVMPass();
 
-std::unique_ptr<mlir::Pass> createOpenMPWorkaroundPass();
+std::unique_ptr<mlir::Pass> createProfileKernelsPass();
+
+std::unique_ptr<mlir::Pass> createProfileLinkingPass();
 
 std::unique_ptr<mlir::Pass> createPRNGLinkingPass();
+
+std::unique_ptr<mlir::Pass> createReorderLayoutsPass();
+
+std::unique_ptr<mlir::Pass> createReorderWeightLayoutsPass();
+
+std::unique_ptr<mlir::Pass> createStencilTppGemmPass();
+
+std::unique_ptr<mlir::Pass> createStencilTppUnaryPass();
+
+std::unique_ptr<mlir::Pass> createStencilTppBinaryPass();
 
 std::unique_ptr<mlir::Pass> createTraceLinkingPass();
 
 std::unique_ptr<mlir::Pass> createXSMMLoweringPass();
 
-std::unique_ptr<mlir::Pass> createXSMMStencilPass();
-
 void populatePXAGemmToXSMMConversionPatterns(mlir::RewritePatternSet &patterns);
 
 void populateXSMMToLLVMConversionPatterns(mlir::LLVMTypeConverter &converter,
                                           mlir::RewritePatternSet &patterns);
-
-void pipelineBuilder(mlir::OpPassManager &pm);
 
 /// Generate the code for registering passes.
 #define GEN_PASS_REGISTRATION

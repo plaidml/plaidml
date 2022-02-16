@@ -6,6 +6,8 @@
 #include <cassert>
 #include <map>
 
+#include "pmlc/util/logging.h"
+
 namespace pmlc::target::x86 {
 
 using dialect::pxa::StencilCost;
@@ -39,9 +41,12 @@ static Heatmap heatmap;
 StencilCost heatmapCost(llvm::ArrayRef<int64_t> ranges) {
   assert(ranges.size() == 3 && "heatmapCost expects a 3D tile");
 
+  IVLOG(6, "Calculating heatmap cost for tile ["
+               << ranges[0] << " " << ranges[1] << " " << ranges[2] << "]");
   auto tile = Tile{ranges[0], ranges[1], ranges[2]};
   auto it = heatmap.byTile.find(tile);
   if (it != heatmap.byTile.end()) {
+    IVLOG(6, "Found tile in the heatmap with throughput = " << it->second);
     return StencilCost{it->second, kStartupCost};
   }
 
@@ -55,6 +60,10 @@ StencilCost heatmapCost(llvm::ArrayRef<int64_t> ranges) {
       auto throughput = (ranges[1] > 1)
                             ? ((itLower->second + itUpper->second) / 2)
                             : itUpper->second;
+      IVLOG(
+          6,
+          "Found nearby tiles in the heatmap and calculated average throughput "
+          "= " << throughput);
       return StencilCost{throughput, kStartupCost};
     }
   }
@@ -62,10 +71,12 @@ StencilCost heatmapCost(llvm::ArrayRef<int64_t> ranges) {
   // If we cannot find (m, n, k) in the heatmap, try the special cases.
   for (auto stencil : specialStencils) {
     if (stencil == tile) {
+      IVLOG(6, "Found a special tile witih throughput = 0.001");
       return StencilCost{0.001, kStartupCost};
     }
   }
 
+  IVLOG(6, "Unable to calculate heatmap cost for the specified tile");
   return StencilCost{0.0, 0};
 }
 

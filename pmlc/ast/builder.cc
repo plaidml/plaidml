@@ -25,6 +25,7 @@
 #include "pmlc/ast/ast_ops.h"
 #include "pmlc/ast/eval.h"
 #include "pmlc/dialect/layer/ir/ops.h"
+#include "pmlc/dialect/pml/ir/dialect.h"
 #include "pmlc/dialect/tile/ir/ops.h"
 #include "pmlc/dialect/tile/ir/util.h"
 #include "pmlc/dialect/tile/transforms/passes.h"
@@ -347,8 +348,9 @@ struct ContractionBuilder : PolyVisitor<ContractionBuilder, AffineExpr> {
 
   tile::ContractionOp build() {
     AffineMap sinkMap = makeMap(sinkExprs);
+
     return builder.create<tile::ContractionOp>( //
-        builder.getUnknownLoc(),
+        NameLoc::get(builder.getIdentifier(node->str())),
         /*resultType=*/resultType,
         /*init=*/getInit(),
         /*tensors=*/tensors,
@@ -373,23 +375,26 @@ struct ContractionBuilder : PolyVisitor<ContractionBuilder, AffineExpr> {
     if (elementType.isa<FloatType>()) {
       auto init = std::make_shared<ast::ExprNodeConstFloat>(
           tile::getFloatIdentity(node->aggKind));
-      Value value = builder.create<tile::ConstantOp>(builder.getUnknownLoc(),
-                                                     elementType, init->value);
+      Value value = builder.create<tile::ConstantOp>(
+          NameLoc::get(builder.getIdentifier(node->str())), elementType,
+          init->value);
       builder.addNode(init, value);
       return init;
     }
     if (elementType.isSignedInteger()) {
       auto init = std::make_shared<ast::ExprNodeConstSigned>(
           tile::getSignedIntegerIdentity(node->aggKind));
-      Value value = builder.create<tile::ConstantOp>(builder.getUnknownLoc(),
-                                                     elementType, init->value);
+      Value value = builder.create<tile::ConstantOp>(
+          NameLoc::get(builder.getIdentifier(node->str())), elementType,
+          init->value);
       builder.addNode(init, value);
       return init;
     }
     auto init = std::make_shared<ast::ExprNodeConstUnsigned>(
         tile::getUnsignedIntegerIdentity(node->aggKind));
-    Value value = builder.create<tile::ConstantOp>(builder.getUnknownLoc(),
-                                                   elementType, init->value);
+    Value value = builder.create<tile::ConstantOp>(
+        NameLoc::get(builder.getIdentifier(node->str())), elementType,
+        init->value);
     builder.addNode(init, value);
     return init;
   }
@@ -473,8 +478,9 @@ struct ContractionBuilder : PolyVisitor<ContractionBuilder, AffineExpr> {
 struct ProgramBuilder {
   explicit ProgramBuilder(llvm::StringRef name)
       : program(std::make_shared<compiler::Program>(name)),
-        context(program->context.get()), loc(UnknownLoc::get(context)),
-        module(*program->module), builder(module) {
+        context(program->context.get()), module(*program->module),
+        builder(module) {
+    context->getOrLoadDialect<dialect::pml::PMLDialect>();
     context->getOrLoadDialect<dialect::tile::TileDialect>();
     context->getOrLoadDialect<dialect::layer::LayerDialect>();
     context->getOrLoadDialect<math::MathDialect>();
@@ -516,10 +522,11 @@ struct ProgramBuilder {
 
     FunctionType funcType =
         FunctionType::get(context, inputTypes, program->outputs);
-    FuncOp funcOp = FuncOp::create(loc, kEntrypoint, funcType, {});
+    FuncOp funcOp =
+        FuncOp::create(builder.getUnknownLoc(), kEntrypoint, funcType, {});
     size_t numInputs = inputTypes.size() - program->constants.size();
     for (size_t i = 0; i < program->constants.size(); i++) {
-      funcOp.setArgAttr(numInputs + i, "tile.const", builder.getIndexAttr(i));
+      funcOp.setArgAttr(numInputs + i, "stdx.const", builder.getUnitAttr());
     }
     Block *body = funcOp.addEntryBlock();
     builder.setInsertionPointToStart(body);
@@ -574,11 +581,13 @@ struct ProgramBuilder {
       auto defOp = value.getDefiningOp();
       if (!defOp || isa<tile::ReshapeOp>(defOp) ||
           returnOperands.count(value)) {
-        value = builder.create<tile::IdentOp>(loc, value.getType(), value);
+        value = builder.create<tile::IdentOp>(builder.getUnknownLoc(),
+                                              value.getType(), value);
       }
       returnOperands.insert(value);
     }
-    builder.create<ReturnOp>(loc, returnOperands.getArrayRef());
+    builder.create<ReturnOp>(builder.getUnknownLoc(),
+                             returnOperands.getArrayRef());
 
     program->entry = kEntrypoint;
 
@@ -616,25 +625,26 @@ struct ProgramBuilder {
     RankedTensorType resultType =
         RankedTensorType::get(shape.sizes, elementType);
     Value tensor = builder.lookupNode(node->expr);
-    return builder.create<tile::CastOp>(loc, resultType, tensor);
+    return builder.create<tile::CastOp>(
+        NameLoc::get(builder.getIdentifier(node->str())), resultType, tensor);
   }
 
   Value handleConstFloat(ExprNodeConstFloat *node) {
     Type type = builder.getAPFloatType();
-    return builder.create<tile::ConstantOp>(builder.getUnknownLoc(), type,
-                                            node->value);
+    return builder.create<tile::ConstantOp>(
+        NameLoc::get(builder.getIdentifier(node->str())), type, node->value);
   }
 
   Value handleConstSigned(ExprNodeConstSigned *node) {
     Type type = builder.getAPSignedIntegerType();
-    return builder.create<tile::ConstantOp>(builder.getUnknownLoc(), type,
-                                            node->value);
+    return builder.create<tile::ConstantOp>(
+        NameLoc::get(builder.getIdentifier(node->str())), type, node->value);
   }
 
   Value handleConstUnsigned(ExprNodeConstUnsigned *node) {
     Type type = builder.getAPUnsignedIntegerType();
-    return builder.create<tile::ConstantOp>(builder.getUnknownLoc(), type,
-                                            node->value);
+    return builder.create<tile::ConstantOp>(
+        NameLoc::get(builder.getIdentifier(node->str())), type, node->value);
   }
 
   Value handleContraction(ExprNodeContraction *node) {
@@ -644,8 +654,8 @@ struct ProgramBuilder {
   Value handleDim(ExprNodeDim *node) {
     int64_t value = evaluator.evaluate(node->dim);
     Type type = builder.getAPUnsignedIntegerType();
-    return builder.create<tile::ConstantOp>(builder.getUnknownLoc(), type,
-                                            value);
+    return builder.create<tile::ConstantOp>(
+        NameLoc::get(builder.getIdentifier(node->str())), type, value);
   }
 
   Value handleElement(ExprNodeElement *node) {
@@ -674,7 +684,9 @@ struct ProgramBuilder {
             .Case("gather", [&]() { return makeGatherOp(node, operands); })
             .Default([&]() {
               const AbstractOperation *abstractOp = lookupOperation(node->op);
-              OperationState state(loc, abstractOp->name);
+              OperationState state(
+                  NameLoc::get(builder.getIdentifier(node->str())),
+                  abstractOp->name);
               state.addOperands(operands);
               state.addTypes(resultTypes);
               Operation *op = builder.createOperation(state);
@@ -703,7 +715,8 @@ struct ProgramBuilder {
       attrs.push_back(builder.getNamedAttr(kvp.getKey(), value));
     }
     auto layerOp = builder.create<layer::BoxOp>(
-        loc, node->op, operands, resultTypes, builder.getDictionaryAttr(attrs));
+        NameLoc::get(builder.getIdentifier(node->str())), node->op, operands,
+        resultTypes, builder.getDictionaryAttr(attrs));
     BlockAndValueMapping mapper;
     OpBuilder bodyBuilder(layerOp.body());
     for (auto tuple : llvm::zip(operands, layerOp.body().getArguments())) {
@@ -733,7 +746,8 @@ struct ProgramBuilder {
       }
       toRemove.insert(op);
     }
-    bodyBuilder.create<layer::ReturnOp>(loc, innerResults);
+    bodyBuilder.create<layer::ReturnOp>(
+        NameLoc::get(builder.getIdentifier(node->str())), innerResults);
     for (auto it = toRemove.rbegin(); it != toRemove.rend(); ++it) {
       (*it)->erase();
     }
@@ -753,8 +767,9 @@ struct ProgramBuilder {
       attrs.push_back(builder.getNamedAttr(kvp.getKey(), value));
     }
     return builder
-        .create<tile::PragmaOp>(loc, tensor, node->op,
-                                builder.getDictionaryAttr(attrs))
+        .create<tile::PragmaOp>(
+            NameLoc::get(builder.getIdentifier(node->str())), tensor, node->op,
+            builder.getDictionaryAttr(attrs))
         .result();
   }
 
@@ -767,6 +782,7 @@ struct ProgramBuilder {
     FloatAttr cubeCoeff;
     IntegerAttr mode;
     IntegerAttr batchDims;
+    IntegerAttr outOfBoundsMode;
     if (!matchPattern(operands[2], m_Constant(&axis))) {
       throw std::runtime_error("'gather' primitive expects the 'axis' argument "
                                "to be a constant integer");
@@ -795,10 +811,16 @@ struct ProgramBuilder {
           "'gather' primitive expects the 'batchDims' argument "
           "to be a constant integer");
     }
+    if (!matchPattern(operands[8], m_Constant(&outOfBoundsMode))) {
+      throw std::runtime_error(
+          "'gather' primitive expects the 'outOfBoundsMode' argument "
+          "to be a constant integer");
+    }
     auto op = builder.create<tile::GatherOp>(
-        loc, resultType, operands.take_front(2),
-        builder.getIndexAttr(axis.getInt()), interpolationMode, nearestMode,
-        cubeCoeff, mode, builder.getIndexAttr(batchDims.getInt()));
+        NameLoc::get(builder.getIdentifier(node->str())), resultType,
+        operands.take_front(2), builder.getIndexAttr(axis.getInt()),
+        interpolationMode, nearestMode, cubeCoeff, mode,
+        builder.getIndexAttr(batchDims.getInt()), outOfBoundsMode);
     return op.result();
   }
 
@@ -827,15 +849,18 @@ struct ProgramBuilder {
     }
     auto dirAttr = tile::SortDirectionAttr::get(context, *dir);
     IntegerAttr axisIndexAttr = builder.getIndexAttr(axisAttr.getInt());
-    auto op = builder.create<tile::ArgSortOp>(loc, resultType, tensor,
-                                              axisIndexAttr, dirAttr);
+    auto op = builder.create<tile::ArgSortOp>(
+        NameLoc::get(builder.getIdentifier(node->str())), resultType, tensor,
+        axisIndexAttr, dirAttr);
     return op.result();
   }
 
   Value makeReshapeOp(ExprNodeIntrinsic *node, ArrayRef<Value> operands) {
     TensorShape shape = evaluator.getShape(node);
     RankedTensorType resultType = builder.getRankedTensorType(shape);
-    auto op = builder.create<tile::ReshapeOp>(loc, resultType, operands[0]);
+    auto op = builder.create<tile::ReshapeOp>(
+        NameLoc::get(builder.getIdentifier(node->str())), resultType,
+        operands[0]);
     return op.result();
   }
 
@@ -856,8 +881,8 @@ struct ProgramBuilder {
     }
     RankedTensorType resultType = builder.getRankedTensorType(shape);
     auto op = builder.create<tile::ScatterOp>(
-        loc, resultType, operands.take_front(3),
-        builder.getIndexAttr(axis.getInt()), mode);
+        NameLoc::get(builder.getIdentifier(node->str())), resultType,
+        operands.take_front(3), builder.getIndexAttr(axis.getInt()), mode);
     return op.result();
   }
 
@@ -875,7 +900,9 @@ struct ProgramBuilder {
     TensorShape shape = evaluator.getShape(node);
     RankedTensorType resultType = builder.getRankedTensorType(shape);
     IntegerAttr indexAttr = builder.getIndexAttr(axisAttr.getInt());
-    auto op = builder.create<tile::IndexOp>(loc, resultType, indexAttr);
+    auto op = builder.create<tile::IndexOp>(
+        NameLoc::get(builder.getIdentifier(node->str())), resultType,
+        indexAttr);
     return op.result();
   }
 
@@ -888,7 +915,8 @@ struct ProgramBuilder {
     for (const TensorShape &shape : evaluator.getShapes(node)) {
       resultTypes.push_back(builder.getRankedTensorType(shape));
     }
-    auto op = builder.create<tile::PrngOp>(loc, resultTypes, state);
+    auto op = builder.create<tile::PrngOp>(
+        NameLoc::get(builder.getIdentifier(node->str())), resultTypes, state);
     SmallVector<Value, 4> tuple;
     for (OpResult result : op.getResults()) {
       tuple.push_back(result);
@@ -909,7 +937,6 @@ struct ProgramBuilder {
   std::string name;
   std::shared_ptr<Program> program;
   MLIRContext *context;
-  Location loc;
   ModuleOp module;
   OpBuilder builder;
   Evaluator evaluator;

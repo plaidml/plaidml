@@ -748,9 +748,10 @@ inline Tensor Placeholder(             //
 
 inline Tensor Zero(edsl_source_location loc = edsl_source_location::current()) { return Tensor(0, loc); }
 
-Tensor intrinsicCall(const std::string& fn, const TensorVec& args);
+Tensor intrinsicCall(const std::string& fn, const TensorVec& args, const std::string& name = "");
 
-Tensor intrinsicCall(edsl_source_location loc, const std::string& fn, const TensorVec& args);
+Tensor intrinsicCall(edsl_source_location loc, const std::string& fn, const TensorVec& args,
+                     const std::string& name = "");
 
 template <typename... Ts>
 Tensor intrinsic(const std::string& fn, Ts... args) {
@@ -918,103 +919,6 @@ inline Tensor floor(const Tensor& x, edsl_source_location loc = edsl_source_loca
   return intrinsic(loc, "floor", x);
 }
 
-enum class InterpolationMode : uint64_t {
-  NEAREST,
-  LINEAR,
-  CUBIC,
-};
-
-enum class NearestMode : uint64_t {
-  ROUND_PREFER_FLOOR,
-  ROUND_PREFER_CEIL,
-  FLOOR,
-  CEIL,
-  SIMPLE,
-};
-
-enum class GatherMode : uint64_t { NORMAL, ND };
-
-///
-/// Gather takes an input tensor (`x`) and a set of indices to gather over (`y`), and computes an output tensor that
-/// gathers the input tensor from the indices specified.
-///
-class gather {
- public:
-  explicit gather(const Tensor& x, const Tensor& y) : x_(x), y_(y) {}
-
-  ///
-  /// Set the axis for gather.
-  ///
-  gather& axis(int64_t axis) {
-    if (axis < 0) {
-      axis += x_.rank();
-    }
-    axis_ = Tensor(axis);
-    return *this;
-  }
-
-  gather& mode(GatherMode mode) {
-    mode_ = Tensor(static_cast<uint64_t>(mode));
-    return *this;
-  }
-
-  ///
-  /// Set the interpolation mode for gather.
-  ///
-  gather& interpolationMode(InterpolationMode mode) {
-    interpolation_mode_ = Tensor(static_cast<uint64_t>(mode));
-    return *this;
-  }
-
-  ///
-  /// Set the nearest mode for gather.
-  ///
-  gather& nearestMode(NearestMode mode) {
-    nearest_mode_ = Tensor(static_cast<uint64_t>(mode));
-    return *this;
-  }
-
-  ///
-  /// Set the coefficient that controls cubic interpolation for gather.
-  ///
-  gather& cubeCoeff(float cube_coeff) {
-    cube_coeff_ = Tensor(cube_coeff);
-    return *this;
-  }
-
-  gather& batchDims(int batch_dims) {
-    batch_dims_ = Tensor(batch_dims);
-    return *this;
-  }
-
-  ///
-  /// Construct gather.
-  ///
-  Tensor build(edsl_source_location loc = edsl_source_location::current()) const {
-    std::vector<Tensor> args = {x_, y_, axis_, interpolation_mode_, nearest_mode_, cube_coeff_, mode_, batch_dims_};
-    return intrinsicCall(loc, "gather", args);
-  }
-
-  operator Tensor() { return build(); }
-
- private:
-  Tensor x_;
-  Tensor y_;
-
-  ///
-  /// axis_ is a dimension index to gather data from
-  /// interpolation_mode_ specifies type of interpolation
-  /// nearest_mode_ specifies type of  nearest interpolation
-  /// cube_coeff_ controls the cubic interpolation
-  ///
-  Tensor axis_ = Tensor(0);
-  Tensor mode_ = Tensor(static_cast<uint64_t>(GatherMode::NORMAL));
-  Tensor interpolation_mode_ = Tensor(static_cast<uint64_t>(InterpolationMode::LINEAR));
-  Tensor nearest_mode_ = Tensor(static_cast<uint64_t>(NearestMode::ROUND_PREFER_FLOOR));
-  Tensor cube_coeff_ = Tensor(-0.75);
-  Tensor batch_dims_ = Tensor(0);
-};
-
 ///
 /// Returns the identity of `x`.
 /// \param x Tensor
@@ -1102,6 +1006,11 @@ inline Tensor reshape(const Tensor& x, const std::vector<TensorDim>& dims,
     args.emplace_back(dim);
   }
   return intrinsicCall(loc, "reshape", args);
+}
+
+inline Tensor relu(const Tensor& x, const std::string& name = "",
+                   edsl_source_location loc = edsl_source_location::current()) {
+  return intrinsicCall(loc, "relu", {x}, name);
 }
 
 ///
@@ -1358,20 +1267,22 @@ PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(^, "bit_xor");
 PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(&&, "logical_and");
 PLAIDML_EDSL_DEFINE_TENSOR_BINARY_OPS(||, "logical_or");
 
-inline Tensor intrinsicCall(const std::string& fn, const TensorVec& args) {
+inline Tensor intrinsicCall(const std::string& fn, const TensorVec& args, const std::string& name) {
   std::vector<plaidml_expr*> ptrs(args.size());
   for (size_t i = 0; i < args.size(); i++) {
     ptrs[i] = args[i].as_ptr();
   }
-  return Tensor{ffi::call<plaidml_expr*>(plaidml_expr_intrinsic, fn.c_str(), ptrs.size(), ptrs.data())};
+  return Tensor{ffi::call<plaidml_expr*>(plaidml_expr_intrinsic, fn.c_str(), ptrs.size(), ptrs.data(), name.c_str())};
 }
 
-inline Tensor intrinsicCall(edsl_source_location loc, const std::string& fn, const TensorVec& args) {
+inline Tensor intrinsicCall(edsl_source_location loc, const std::string& fn, const TensorVec& args,
+                            const std::string& name) {
   std::vector<plaidml_expr*> ptrs(args.size());
   for (size_t i = 0; i < args.size(); i++) {
     ptrs[i] = args[i].as_ptr();
   }
-  return Tensor{ffi::call<plaidml_expr*>(loc, plaidml_expr_intrinsic, fn.c_str(), ptrs.size(), ptrs.data())};
+  return Tensor{
+      ffi::call<plaidml_expr*>(loc, plaidml_expr_intrinsic, fn.c_str(), ptrs.size(), ptrs.data(), name.c_str())};
 }
 
 class Value {
@@ -1702,13 +1613,156 @@ inline TensorVec layer(const std::string& op, const TensorVec& operands, const D
 
 inline Tensor layer(const std::string& op, const TensorVec& operands, const Dictionary& attrs,
                     const LayerBodySingleFn& fn, edsl_source_location loc = edsl_source_location::current()) {
-  return layer(op, operands, attrs, [&]() { return TensorVec{fn()}; }, loc)[0];
+  return layer(
+      op, operands, attrs, [&]() { return TensorVec{fn()}; }, loc)[0];
 }
 
 inline Tensor layer(const std::string& op, const TensorVec& operands, const LayerBodySingleFn& fn,
                     edsl_source_location loc = edsl_source_location::current()) {
   return layer(op, operands, {}, fn, loc);
 }
+
+enum class InterpolationMode : uint64_t {
+  NEAREST,
+  LINEAR,
+  CUBIC,
+  NONE,
+};
+
+enum class NearestMode : uint64_t {
+  ROUND_PREFER_FLOOR,
+  ROUND_PREFER_CEIL,
+  FLOOR,
+  CEIL,
+  SIMPLE,
+  NONE,
+};
+
+enum class GatherMode : uint64_t { NORMAL, ND };
+enum class OutOfBoundsMode : uint64_t { GATHER_EDGE_PADDED_INPUT, RETURN_ZERO };
+
+// TODO: Split gather intrinsic to gather and gatherND intrinsics
+class gatherBuilder {
+ public:
+  explicit gatherBuilder(Tensor x, Tensor y, uint64_t axis, InterpolationMode interpolation_mode,
+                         NearestMode nearest_mode, OutOfBoundsMode out_of_bounds_mode, float cube_coeff)
+      : x_(x),
+        y_(y),
+        axis_(axis),
+        interpolation_mode_(interpolation_mode),
+        nearest_mode_(nearest_mode),
+        out_of_bounds_mode_(out_of_bounds_mode),
+        cube_coeff_(cube_coeff) {
+    mode_ = GatherMode::NORMAL;
+  }
+
+  explicit gatherBuilder(Tensor x, Tensor y, uint64_t batch_dims, InterpolationMode interpolation_mode)
+      : x_(x), y_(y), batch_dims_(batch_dims), interpolation_mode_(interpolation_mode) {
+    mode_ = GatherMode::ND;
+  }
+
+  Tensor build(edsl_source_location loc = edsl_source_location::current()) const {
+    std::vector<Tensor> args = {
+        x_,                                                  //
+        y_,                                                  //
+        Tensor(static_cast<uint64_t>(axis_)),                //
+        Tensor(static_cast<uint64_t>(interpolation_mode_)),  //
+        Tensor(static_cast<uint64_t>(nearest_mode_)),        //
+        Tensor(cube_coeff_),                                 //
+        Tensor(static_cast<uint64_t>(mode_)),                //
+        Tensor(static_cast<uint64_t>(batch_dims_)),          //
+        Tensor(static_cast<uint64_t>(out_of_bounds_mode_)),  //
+    };
+    return intrinsicCall(loc, "gather", args);
+  }
+
+ private:
+  Tensor x_;
+  Tensor y_;
+  uint64_t axis_ = 0;
+  uint64_t batch_dims_ = 0;
+  float cube_coeff_ = -0.75;
+  GatherMode mode_ = GatherMode::NORMAL;
+  OutOfBoundsMode out_of_bounds_mode_ = OutOfBoundsMode::GATHER_EDGE_PADDED_INPUT;
+  NearestMode nearest_mode_ = NearestMode::ROUND_PREFER_FLOOR;
+  InterpolationMode interpolation_mode_ = InterpolationMode::NONE;
+};
+
+///
+/// Gather takes an input tensor (`x`) and a set of indices to gather over (`y`), and computes an output tensor that
+/// gathers the input tensor from the indices specified.
+///
+class gather {
+ public:
+  explicit gather(const Tensor& x, const Tensor& y) : x_(x), y_(y) {}
+
+  gather(const Tensor& x, int i) {
+    x_ = x;
+    y_ = cast(index({edsl::TensorDim(1)}, 0), DType::INT32) + i;
+  }
+
+  gather(const Tensor& x, int64_t i) {
+    x_ = x;
+    y_ = cast(index({edsl::TensorDim(1)}, 0), DType::INT64) + i;
+  }
+
+  gather(const Tensor& x, uint64_t i) {
+    x_ = x;
+    y_ = cast(index({edsl::TensorDim(1)}, 0), DType::UINT64) + i;
+  }
+
+  gather(const Tensor& x, float f) {
+    x_ = x;
+    y_ = cast(index({edsl::TensorDim(1)}, 0), DType::FLOAT32) + f;
+  }
+
+  gather(const Tensor& x, double f) {
+    x_ = x;
+    y_ = cast(index({edsl::TensorDim(1)}, 0), DType::FLOAT64) + f;
+  }
+
+  gather& axis(int64_t axis) {
+    if (axis < 0) {
+      axis += x_.rank();
+    }
+    axis_ = axis;
+    return *this;
+  }
+
+  gather& interpolationMode(InterpolationMode mode) {
+    interpolation_mode_ = mode;
+    return *this;
+  }
+
+  gather& nearestMode(NearestMode mode) {
+    nearest_mode_ = mode;
+    return *this;
+  }
+
+  gather& cubeCoeff(float cube_coeff) {
+    cube_coeff_ = cube_coeff;
+    return *this;
+  }
+
+  gather& outOfBoundsMode(OutOfBoundsMode mode) {
+    out_of_bounds_mode_ = mode;
+    return *this;
+  }
+
+  operator Tensor() {
+    auto builder = gatherBuilder(x_, y_, axis_, interpolation_mode_, nearest_mode_, out_of_bounds_mode_, cube_coeff_);
+    return builder.build();
+  }
+
+ private:
+  Tensor x_;
+  Tensor y_;
+  uint64_t axis_ = 0;
+  InterpolationMode interpolation_mode_ = InterpolationMode::NONE;
+  NearestMode nearest_mode_ = NearestMode::ROUND_PREFER_FLOOR;
+  OutOfBoundsMode out_of_bounds_mode_ = OutOfBoundsMode::GATHER_EDGE_PADDED_INPUT;
+  float cube_coeff_ = -0.75;
+};
 
 }  // namespace edsl
 }  // namespace plaidml

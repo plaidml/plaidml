@@ -90,8 +90,8 @@ void replaceAssignLoadAdd(PxaReduceOpInterface &reduceOp) {
 
   // Make sure that reduce assign result is used only by the reduce add
   // Also check if the memref is not modified by any other operation
-  if (!reduceAssignOp.getReduceResult().getUseList()->hasOneUse() ||
-      !reduceAssignOp.getMemRef().getUseList()->hasOneUse())
+  if (!reduceAssignOp.getReduceResult().hasOneUse() ||
+      !reduceAssignOp.getMemRef().hasOneUse())
     return;
 
   // Check if parent op is the same for both

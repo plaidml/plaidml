@@ -40,7 +40,7 @@ def ContractionOp : TileOp<"contract", [
     OpBuilder<(ins
       "mlir::Type":$resultType,
       "mlir::Value":$init,
-      "mlir::ArrayRef<mlir::Value>":$tensors,
+      "mlir::ValueRange":$tensors,
       "util::AggregationKind":$agg,
       "util::CombinationKind":$combo,
       "mlir::AffineMap":$sink,
@@ -78,6 +78,7 @@ def ContractionOp : TileOp<"contract", [
   let printer = [{ print$cppClass(&p, *this); }];
   let parser = [{ return parse$cppClass(&parser, result); }];
   let verifier = [{ return verify$cppClass(*this); }];
+  let hasCanonicalizer = 1;
 }
 
 class SpecialOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
@@ -95,10 +96,10 @@ class MaterializeOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
 def ArgSortOp : MaterializeOp<"argsort"> {
   let summary = "tensor sort index operation";
   let arguments = (ins
-    RankedTensorOf<[AnyScalar]>:$tensor,
+    RankedTensorOf<[AnyInteger, AnyScalar]>:$tensor,
     IndexAttr:$axis,
     SortDirection:$direction);
-  let results = (outs RankedTensorOf<[SI32]>:$result);
+  let results = (outs RankedTensorOf<[I32, SI32]>:$result);
   let assemblyFormat = [{
     $direction $tensor `[` $axis `]` attr-dict `:` functional-type(operands, $result)
   }];
@@ -107,16 +108,17 @@ def ArgSortOp : MaterializeOp<"argsort"> {
 def GatherOp : MaterializeOp<"gather"> {
   let summary = "special gather operation";
   let arguments = (ins
-    RankedTensorOf<[AnyScalar]>:$tensor,
-    RankedTensorOf<[AnyScalar]>:$indices,
+    RankedTensorOf<[AnyInteger, AnyScalar]>:$tensor,
+    RankedTensorOf<[AnyInteger, AnyScalar]>:$indices,
     DefaultValuedAttr<IndexAttr, "0">:$axis,
     DefaultValuedAttr<InterpolationMode, "InterpolationMode::linear">:$interpolationMode,
     DefaultValuedAttr<NearestMode, "NearestMode::round_prefer_floor">:$nearestMode,
     DefaultValuedAttr<F64Attr, "-0.75">:$cubeCoeff,
     DefaultValuedAttr<GatherMode, "GatherMode::normal">:$mode,
-    DefaultValuedAttr<IndexAttr, "0">:$batchDims
+    DefaultValuedAttr<IndexAttr, "0">:$batchDims,
+    DefaultValuedAttr<OutOfBoundsMode, "OutOfBoundsMode::gather_edge_padded_input">:$OutOfBoundsMode
   );
-  let results = (outs RankedTensorOf<[AnyScalar]>:$result);
+  let results = (outs RankedTensorOf<[AnyInteger, AnyScalar]>:$result);
   let assemblyFormat = [{
     $tensor $indices attr-dict `:` functional-type(operands, $result)
   }];
@@ -130,7 +132,8 @@ def GatherOp : MaterializeOp<"gather"> {
       "mlir::IntegerAttr":$nearestMode,
       "mlir::FloatAttr":$cubeCoeff,
       "mlir::IntegerAttr":$mode,
-      "mlir::IntegerAttr":$batchDims
+      "mlir::IntegerAttr":$batchDims,
+      "mlir::IntegerAttr":$OutOfBoundsMode
     )>
   ];
 }
@@ -142,12 +145,12 @@ def IndexOp : SpecialOp<"index"> {
   let assemblyFormat = "$axis attr-dict `:` type($result)";
 }
 
-def PrngOp : SpecialOp<"prng"> {
+def PrngOp : SpecialOp<"prng", []> {
   let summary = "pseudorandom number generator";
-  let arguments = (ins RankedTensorOf<[UI32]>:$state);
+  let arguments = (ins RankedTensorOf<[I32, UI32]>:$state);
   let results = (outs
     RankedTensorOf<[AnyFloat]>:$result,
-    RankedTensorOf<[UI32]>:$new_state);
+    RankedTensorOf<[I32, UI32]>:$new_state);
   let assemblyFormat = "$state attr-dict `:` functional-type($state, results)";
 }
 
@@ -165,13 +168,13 @@ def ReshapeOp : MaterializeOp<"reshape">,
 def ScatterOp : MaterializeOp<"scatter"> {
   let summary = "special scatter operation";
   let arguments = (ins
-    RankedTensorOf<[AnyScalar]>:$data,
-    RankedTensorOf<[AnyScalar]>:$indices,
-    RankedTensorOf<[AnyScalar]>:$updates,
+    RankedTensorOf<[AnyInteger, AnyScalar]>:$data,
+    RankedTensorOf<[AnyInteger, AnyScalar]>:$indices,
+    RankedTensorOf<[AnyInteger, AnyScalar]>:$updates,
     DefaultValuedAttr<IndexAttr, "0">:$axis,
     DefaultValuedAttr<ScatterMode, "ScatterMode::normal">:$mode
   );
-  let results = (outs RankedTensorOf<[AnyScalar]>:$result);
+  let results = (outs RankedTensorOf<[AnyInteger, AnyScalar]>:$result);
   let builders = [
     OpBuilder<(ins
       "mlir::Type":$resultType,

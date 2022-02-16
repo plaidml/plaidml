@@ -1,0 +1,39 @@
+models:
+  - name: resnet-50-pytorch
+
+    launchers:
+      - framework: dlsdk
+        tags:
+          - resnet-50-pytorch
+
+        adapter: classification
+    datasets:
+      - name: ImageNet2012
+        data_source: imagenet/ILSVRC/Data/CLS-LOC/val
+        dataset_meta: imagenet/imagenet.json
+        subsample_size: 25
+        reader: pillow_imread
+        annotation_conversion:
+            converter: imagenet
+            labels_file: imagenet/synset_words.txt
+            annotation_file: imagenet/val.txt
+            has_background: False
+        metrics:
+          - name: accuracy @ top1
+            type: accuracy
+            top_k: 1
+          - name: accuracy @ top5
+            type: accuracy
+            top_k: 5
+        preprocessing:
+          - type: resize
+            size: 256
+            aspect_ratio_scale: greater
+            use_pillow: true
+            interpolation: BILINEAR
+          - type: crop
+            size: 224
+            use_pillow: true
+          - type: rgb_to_bgr
+
+

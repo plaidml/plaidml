@@ -18,7 +18,7 @@ CONDA_ENV_FILE=environment.yml
 
 # Handle env update
 echo "Auto-Update environment $CONDA_ENV."
-conda env update --prune -n "${CONDA_ENV}" -f "${CONDA_ENV_FILE}"
+mamba env update --prune -n "${CONDA_ENV}" -f "${CONDA_ENV_FILE}"
 
 if conda activate "$CONDA_ENV"; then
   :

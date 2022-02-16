@@ -36,4 +36,24 @@ buildSimpleStore(mlir::OpBuilder &builder, mlir::Location loc,
 void updateAffineMap(mlir::Operation *in,
                      const pmlc::dialect::tile::PaddingInfo &padding);
 
+llvm::APFloat convertFloatUsingType(llvm::APFloat value, mlir::FloatType type);
+
+mlir::Value createInit(mlir::OpBuilder &builder, mlir::Location loc,
+                       mlir::Type type, pmlc::util::AggregationKind agg);
+
+mlir::Value buildBroadcastLoad(
+    mlir::OpBuilder &builder, mlir::Location loc, mlir::Value operand,
+    unsigned outRank,
+    mlir::Optional<pmlc::dialect::tile::PaddingInfo> maybePadding = llvm::None);
+
+struct BufferAllocator {
+  mlir::Value resultMemRef;
+  mlir::RankedTensorType rankedTensorType;
+  mlir::MemRefType memRefType;
+  mlir::Type elementType;
+
+  BufferAllocator(mlir::OpBuilder &builder, mlir::Operation *op,
+                  mlir::Type resultType);
+};
+
 } // namespace pmlc::conversion::tile_to_pxa

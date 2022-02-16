@@ -5,13 +5,13 @@ pml_cc_library(
     expand_reshape.h
     passes.h
   SRCS
+    algebraic_opt.cc
     contraction.cc
     expand_reshape.cc
     materialize.cc
     pad_constraints.cc
     pad_ranges.cc
     padding.cc
-    split_main.cc
   DEPS
     LLVMSupport
     MLIRIR

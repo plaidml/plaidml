@@ -64,3 +64,12 @@ install(
       PATTERN "libopencv_core.so*"
       PATTERN "libopencv_img*.so*"
 )
+
+add_custom_target(benchmark_app ALL)
+
+add_custom_command(
+  TARGET benchmark_app
+  COMMAND ${CMAKE_COMMAND} -E copy
+    ${OpenVINO_MAIN_SOURCE_DIR}/${BIN_FOLDER}/benchmark_app
+    ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/benchmark_app
+)

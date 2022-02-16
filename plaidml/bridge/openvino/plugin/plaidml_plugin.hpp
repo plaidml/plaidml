@@ -8,18 +8,19 @@
 #include <string>
 #include <vector>
 
-#include "cpp_interfaces/impl/ie_plugin_internal.hpp"
+#include "cpp_interfaces/interface/ie_iexecutable_network_internal.hpp"
+#include "cpp_interfaces/interface/ie_iplugin_internal.hpp"
 
 namespace PlaidMLPlugin {
 
-class Engine : public InferenceEngine::InferencePluginInternal {
+class Engine : public InferenceEngine::IInferencePlugin {
  public:
   Engine();
   virtual ~Engine() = default;
 
   void GetVersion(const InferenceEngine::Version*& versionInfo) noexcept;
 
-  InferenceEngine::ExecutableNetworkInternal::Ptr LoadExeNetworkImpl(
+  InferenceEngine::IExecutableNetworkInternal::Ptr LoadExeNetworkImpl(
       const InferenceEngine::CNNNetwork& network, const std::map<std::string, std::string>& config) override;
 
   InferenceEngine::QueryNetworkResult QueryNetwork(const InferenceEngine::CNNNetwork& network,

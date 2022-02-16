@@ -60,6 +60,7 @@ INSTANTIATE_TEST_CASE_P(smoke_MaxPool_ExplicitPad_FloorRpunding, PoolingLayerTes
                             ::testing::Values(std::vector<size_t>({1, 3, 30, 30})),      //
                             ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),         //
                         PoolingLayerTest::getTestCaseName);
+
 /* ========== Explicit Pad Ceil Rounding ========== */
 const auto maxPool_ExplicitPad_CeilRounding_Params = ::testing::Combine(  //
     ::testing::Values(ngraph::helpers::PoolingTypes::MAX),                //
@@ -82,6 +83,29 @@ INSTANTIATE_TEST_CASE_P(smoke_MaxPool_ExplicitPad_CeilRpunding, PoolingLayerTest
                             ::testing::Values(std::vector<size_t>({1, 3, 30, 30})),      //
                             ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),         //
                         PoolingLayerTest::getTestCaseName);
+/* ========== Same Upper Pad Ceil Rounding ========== */
+const auto maxPool_SameUpperPad_CeilRounding_Params = ::testing::Combine(  //
+    ::testing::Values(ngraph::helpers::PoolingTypes::MAX),                 //
+    ::testing::Values(std::vector<size_t>{2, 2}),                          //
+    ::testing::Values(std::vector<size_t>{2, 2}),                          //
+    ::testing::Values(std::vector<size_t>{0, 0}),                          //
+    ::testing::Values(std::vector<size_t>{0, 0}),                          //
+    ::testing::Values(ngraph::op::RoundingType::CEIL),                     //
+    ::testing::Values(ngraph::op::PadType::SAME_UPPER),                    //
+    ::testing::Values(false)  // placeholder value - exclude pad not applicable for max pooling
+);
+INSTANTIATE_TEST_CASE_P(smoke_MaxPool_SameUpperPad_CeilRpunding, PoolingLayerTest,
+                        ::testing::Combine(                                              //
+                            maxPool_SameUpperPad_CeilRounding_Params,                    //
+                            ::testing::ValuesIn(netPrecisions),                          //
+                            ::testing::Values(InferenceEngine::Precision::UNSPECIFIED),  //
+                            ::testing::Values(InferenceEngine::Precision::UNSPECIFIED),  //
+                            ::testing::Values(InferenceEngine::Layout::ANY),             //
+                            ::testing::Values(InferenceEngine::Layout::ANY),             //
+                            ::testing::Values(std::vector<size_t>({1, 16, 416, 416})),   //
+                            ::testing::Values(CommonTestUtils::DEVICE_PLAIDML)),         //
+                        PoolingLayerTest::getTestCaseName);
+
 ////* ========== Avg Pooling ========== */
 /* +========== Explicit Pad Ceil Rounding ========== */
 const auto avgPoolExplicitPadCeilRoundingParams = ::testing::Combine(  //

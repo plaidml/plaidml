@@ -10,10 +10,13 @@
 #include "pmlc/dialect/pxa/analysis/strides.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/util/logging.h"
+#include "pmlc/util/util.h"
 
 using namespace mlir; // NOLINT
 
 namespace pmlc::dialect::pxa {
+
+namespace pml = dialect::pml;
 
 namespace {
 
@@ -21,73 +24,42 @@ namespace {
 // we're going to be processing with std::next_permutation() --
 // e.g. if we used pointers as comparison values, our order of
 // iteration could vary run-to-run, creating non-determinism.
-template <typename V>
-class Orderer {
-public:
-  Orderer(unsigned ord, V value) : ord_{ord}, value_{std::forward<V>(value)} {}
+using OrderedValue = std::pair<unsigned, ValueStrideInfo>;
 
-  void setOrd(unsigned ord) { ord_ = ord; }
-  unsigned ord() const { return ord_; }
-
-  V &operator*() { return value_; }
-  const V &operator*() const { return value_; }
-
-  V &operator->() { return value_; }
-  const V &operator->() const { return value_; }
-
-  bool operator<(const Orderer<V> &other) const { return ord() < other.ord(); }
-
-private:
-  unsigned ord_;
-  V value_;
+struct OrderedValueCmp {
+  bool operator()(OrderedValue lhs, OrderedValue rhs) {
+    return lhs.first < rhs.first;
+  }
 };
-
-template <typename V>
-std::ostream &operator<<(std::ostream &os, const Orderer<V> &v) {
-  os << *v << ":" << v.ord();
-  return os;
-}
-
-template <typename V>
-void swap(Orderer<V> &v1, Orderer<V> &v2) {
-  unsigned v1o = v1.ord();
-  v1.setOrd(v2.ord());
-  v2.setOrd(v1o);
-  std::swap(*v1, *v2);
-}
 
 } // namespace
 
+StencilBase::StencilBase(AffineParallelOp op,
+                         ArrayRef<StencilIndexRequirement> requirements)
+    : op(op), blockArgs(op.getIVs().begin(), op.getIVs().end()),
+      requirements(requirements.begin(), requirements.end()),
+      bestCost(std::numeric_limits<double>::infinity()),
+      schedule(op->getAttrOfType<pml::ScheduleAttr>(pml::kScheduleAttrName)) {
+  if (schedule)
+    IVLOG(1, "Using schedule: " << schedule);
+}
+
 void StencilBase::reportBestStencil(unsigned logLevel) {
   if (VLOG_IS_ON(logLevel)) {
-    std::stringstream bestReport;
-    bestReport << "Stencil Selection Report:\n";
-    bestReport << "    Best Perf: " << bestCost << "\n";
-    std::stringstream tensorPermStr;
-    tensorPermStr << "[\n";
-    for (auto value : bestPermutation.values) {
-      tensorPermStr << "        " << debugString(value) << "\n";
+    SmallVector<unsigned, 3> idxs = llvm::to_vector<3>(
+        llvm::map_range(bestStencil.indexes,
+                        [](BlockArgument idx) { return idx.getArgNumber(); }));
+    std::stringstream ss;
+    ss << "Stencil Selection Report:\n";
+    ss << "    Best Perf: " << bestCost << "\n";
+    ss << "    Best Tensor Permutation:\n";
+    for (const ValueStrideInfo &vsi : bestStencil.values) {
+      Value value = vsi.value;
+      ss << "        " << debugString(value) << "\n";
     }
-    tensorPermStr << "    ]";
-    bestReport << "    Best Tensor Permutation: " << tensorPermStr.str()
-               << "\n";
-    std::stringstream indexPermStr;
-    indexPermStr << "[ ";
-    for (auto ind : bestPermutation.indexes) {
-      assert(getBlockArgsAsSet().count(ind) &&
-             "All tiled indexes must be introduced in current loop");
-      indexPermStr << ind.getArgNumber() << " ";
-    }
-    indexPermStr << "]";
-    bestReport << "    Best Index Permutation: " << indexPermStr.str() << "\n";
-    std::stringstream bestTilingStr;
-    bestTilingStr << "[ ";
-    for (const auto &sz : bestTiling) {
-      bestTilingStr << sz << " ";
-    }
-    bestTilingStr << "]";
-    bestReport << "    Best Tiling: " << bestTilingStr.str();
-    IVLOG(logLevel, bestReport.str());
+    ss << "    Best Index Permutation: " << idxs << '\n';
+    ss << "    Best Tiling: " << bestTiling;
+    IVLOG(logLevel, ss.str());
   }
 }
 
@@ -97,7 +69,7 @@ std::vector<int64_t> StencilBase::generateTilings(int64_t idx, int64_t range) {
   if (cached != tilingsCache.end()) {
     return cached->second;
   }
-  auto result = tilingGenerators[idx](range);
+  std::vector<int64_t> result = requirements[idx].tilingGenerator(range);
   tilingsCache.insert(std::make_pair(idxRangePair, result));
   return result;
 }
@@ -109,153 +81,184 @@ int64_t StencilBase::getIdxRange(BlockArgument idx) {
   return ranges[idx.getArgNumber()];
 }
 
-Optional<StrideInfo> StencilBase::getStrideInfo(Value value) {
-  auto cached = strideInfoCache.find(value);
-  if (cached != strideInfoCache.end()) {
-    return cached->second;
-  }
-  auto maybeInfo =
-      llvm::TypeSwitch<Operation *, Optional<StrideInfo>>(value.getDefiningOp())
+StrideInfo StencilBase::getStrideInfo(Value value) {
+  Optional<StrideInfo> maybeInfo =
+      TypeSwitch<Operation *, Optional<StrideInfo>>(value.getDefiningOp())
           .Case<PxaLoadOp>([&](PxaLoadOp op) { return computeStrideInfo(op); })
           .Case<PxaReduceOp>(
               [&](PxaReduceOp op) { return computeStrideInfo(op); })
-          .Default([](Operation *) { return llvm::None; });
-  strideInfoCache[value] = maybeInfo;
-  return maybeInfo;
+          .Default([](Operation *) { return None; });
+  assert(maybeInfo.hasValue() && "StrideInfo must be computable");
+  return *maybeInfo;
 }
 
-void StencilBase::BindIndexes(llvm::ArrayRef<Value> values) {
-  llvm::SmallVector<BlockArgument, 8> emptyBoundIdxsVector;
-  RecursiveBindIndex(emptyBoundIdxsVector, values);
+bool StencilIndexRequirement::check(ArrayRef<ValueStrideInfo> values,
+                                    BlockArgument idx) const {
+  assert(predicates.size() == values.size() &&
+         "Each predicate entry must have one function per I/O op");
+  for (unsigned i = 0; i < values.size(); i++) {
+    const StrideInfo &info = values[i].strideInfo;
+    int64_t stride = info.strides.lookup(idx);
+    if (!predicates[i](stride))
+      return false;
+  }
+  return true;
 }
 
-void StencilBase::RecursiveBindIndex(
-    llvm::SmallVector<BlockArgument, 8> &boundIdxs,
-    llvm::ArrayRef<Value> values) {
-  auto currIdx = boundIdxs.size();
-  if (currIdx == tiledIdxCount) {
+void StencilBase::bindIndexes(ArrayRef<ValueStrideInfo> values) {
+  SetVector<BlockArgument> empty;
+  recursiveBindIndex(empty, values);
+}
+
+void StencilBase::recursiveBindIndex(SetVector<BlockArgument> &boundIdxs,
+                                     ArrayRef<ValueStrideInfo> values) {
+  size_t currIdx = boundIdxs.size();
+  if (currIdx == requirements.size()) {
     // This is a legal binding, go find a tiling for it
-    llvm::SmallVector<int64_t, 8> currTileSize(tiledIdxCount);
-    RecursiveTileIndex(TensorAndIndexPermutation(values, boundIdxs),
+    SmallVector<int64_t, 8> currTileSize(requirements.size());
+    recursiveTileIndex(StencilOption(values, boundIdxs.getArrayRef()),
                        currTileSize, 0);
   } else {
-    for (const auto blockArg : getBlockArgsAsSet()) {
+    Optional<pml::AxisDim> axisDim;
+    if (schedule)
+      axisDim = schedule.getAxisResultDim(requirements[currIdx].idxName);
+
+    for (BlockArgument blockArg : getBlockArgsAsSet()) {
       // Don't bind same index twice
-      // Note: While it's awkward to be repeatedly searching a vector, I think
-      // boundIdxs is small enough that it would not be efficient to maintain a
-      // parallel map
-      if (std::find(boundIdxs.begin(), boundIdxs.end(), blockArg) !=
-          boundIdxs.end()) {
+      if (boundIdxs.contains(blockArg))
         continue;
-      }
+
+      if (axisDim && blockArg.getArgNumber() != axisDim->dim)
+        continue;
 
       // Verify the requirements for this index with each tensor are all met
-      bool reqsMet = true;
-      assert(requirements[currIdx].size() == values.size() &&
-             "Each requirements entry must have one function per I/O op");
-      for (unsigned i = 0; i < values.size(); i++) {
-        auto strideInfo = getStrideInfo(values[i]);
-        auto stride = strideInfo->strides[blockArg];
-        if (!requirements[currIdx][i](stride)) {
-          reqsMet = false;
-          break;
-        }
-      }
-      if (!reqsMet) {
+      if (!requirements[currIdx].check(values, blockArg))
         continue;
-      }
 
       // If we made it to here, this index has appropriate semantics; bind it
       // and recurse
-      boundIdxs.push_back(blockArg);
-      RecursiveBindIndex(boundIdxs, values);
+      boundIdxs.insert(blockArg);
+      recursiveBindIndex(boundIdxs, values);
       boundIdxs.pop_back();
     }
   }
 }
 
-void StencilBase::RecursiveTileIndex(        //
-    const TensorAndIndexPermutation &perm,   //
-    llvm::MutableArrayRef<int64_t> tileSize, //
-    int64_t currIdx) {
-  assert(tileSize.size() == tiledIdxCount);
-  if (currIdx == tiledIdxCount) {
-    auto cost = getCost(perm, tileSize);
-    if (VLOG_IS_ON(3)) {
-      std::stringstream currTilingStr;
-      currTilingStr << "[ ";
-      for (const auto &sz : tileSize) {
-        currTilingStr << sz << " ";
-      }
-      currTilingStr << "]";
-      IVLOG(3, "Considering Tiling " << currTilingStr.str()
-                                     << ", which would have cost " << cost);
-    }
+void StencilBase::recursiveTileIndex(const StencilOption &stencil,
+                                     MutableArrayRef<int64_t> tileSizes,
+                                     int64_t currIdx) {
+  assert(tileSizes.size() == requirements.size());
+  if (currIdx == requirements.size()) {
+    IVLOG(3, "Considering Tile " << tileSizes);
+    auto cost = getCost(stencil, tileSizes);
+    IVLOG(3, "Tile cost = " << cost);
     if (cost < bestCost) {
       bestCost = cost;
-      bestPermutation = perm;
-      bestTiling.assign(tileSize.begin(), tileSize.end());
+      bestStencil = stencil;
+      bestTiling.assign(tileSizes.begin(), tileSizes.end());
     }
   } else {
-    assert(getBlockArgsAsSet().count(perm.indexes[currIdx]) &&
+    assert(getBlockArgsAsSet().count(stencil.indexes[currIdx]) &&
            "BlockArg for current index must be valid");
+
+    if (schedule) {
+      if (Optional<pml::AxisDim> axisDim =
+              schedule.getAxisResultDim(requirements[currIdx].idxName)) {
+        tileSizes[currIdx] = axisDim->axis.getRange();
+        recursiveTileIndex(stencil, tileSizes, currIdx + 1);
+        return;
+      }
+    }
+
     for (int64_t currIdxTileSize : generateTilings(
-             currIdx, ranges[perm.indexes[currIdx].getArgNumber()])) {
-      tileSize[currIdx] = currIdxTileSize;
-      RecursiveTileIndex(perm, tileSize, currIdx + 1);
+             currIdx, ranges[stencil.indexes[currIdx].getArgNumber()])) {
+      tileSizes[currIdx] = currIdxTileSize;
+      recursiveTileIndex(stencil, tileSizes, currIdx + 1);
     }
   }
 }
 
-void StencilBase::DoStenciling() {
+void StencilBase::performStenciling() {
   // Initialization
   auto maybeRanges = op.getConstantRanges();
   if (!maybeRanges) {
-    IVLOG(4, "Cannot Stencil: Requires constant ranges");
+    IVLOG(2, "Cannot Stencil: Requires constant ranges");
     return;
   }
   ranges = *maybeRanges;
   assert(ranges.size() == getBlockArgsAsSet().size());
 
-  auto maybeLoadsAndStores = capture();
-  if (!maybeLoadsAndStores) {
-    IVLOG(4, "Cannot Stencil: Operations fail to pattern-match.");
+  Optional<StencilCapture> maybeCapturedValues = capture();
+  if (!maybeCapturedValues) {
+    IVLOG(2, "Cannot Stencil: Operations fail to pattern-match.");
     return;
   }
-  loadsAndStores = *maybeLoadsAndStores;
+  capturedValues = *maybeCapturedValues;
 
-  // We wrap loads & stores with `Orderer` to make the order the permutations
-  // are iterated through deterministic (the "sorted" order of the IO ops is the
-  // order they were returned by `capture`) -- without this, the sorted order
-  // would be however the pointers were ordered in memory.
-  llvm::SmallVector<Orderer<Value>, 3> ordered;
-  unsigned ord = 0;
-  for (auto &storeOp : loadsAndStores.stores) {
-    ordered.push_back(Orderer<Value>(ord++, storeOp));
+  // We wrap loads & stores with `OrderedValue` to make the order the
+  // permutations are iterated through deterministic (the "sorted" order of the
+  // IO ops is the order they were returned by `capture`) -- without this, the
+  // sorted order would be however the pointers were ordered in memory.
+  SmallVector<OrderedValue, 3> ordered;
+  OrderedValueCmp cmp;
+  for (Value value : capturedValues.stores) {
+    ordered.push_back(std::make_pair(
+        ordered.size(), ValueStrideInfo{value, getStrideInfo(value)}));
   }
   size_t firstLoadIdx = ordered.size();
-  for (auto &loadOp : loadsAndStores.loads) {
-    ordered.push_back(Orderer<Value>(ord++, loadOp));
+  for (Value value : capturedValues.loads) {
+    ordered.push_back(std::make_pair(
+        ordered.size(), ValueStrideInfo{value, getStrideInfo(value)}));
   }
   auto itLastStoreFirstLoad = ordered.begin() + firstLoadIdx;
-  std::sort(ordered.begin(), itLastStoreFirstLoad);
+  std::sort(ordered.begin(), itLastStoreFirstLoad, cmp);
   do { // Each store tensor permutation
-    std::sort(itLastStoreFirstLoad, ordered.end());
+    std::sort(itLastStoreFirstLoad, ordered.end(), cmp);
     do { // Each load tensor permutation
-      llvm::SmallVector<Value, 3> values;
-      for (const auto &ioOp : ordered) {
-        values.push_back(*ioOp);
-      }
-      BindIndexes(values);
-    } while (std::next_permutation(itLastStoreFirstLoad, ordered.end()));
-  } while (std::next_permutation(ordered.begin(), itLastStoreFirstLoad));
+      SmallVector<ValueStrideInfo, 3> values =
+          llvm::to_vector<3>(llvm::map_range(
+              ordered, [](OrderedValue value) { return value.second; }));
+      bindIndexes(values);
+    } while (std::next_permutation(itLastStoreFirstLoad, ordered.end(), cmp));
+  } while (std::next_permutation(ordered.begin(), itLastStoreFirstLoad, cmp));
 
   if (bestCost < std::numeric_limits<double>::infinity()) {
     reportBestStencil(2);
-    transform(bestPermutation, bestTiling);
+    transform(bestStencil, bestTiling);
+    if (schedule) {
+      DenseSet<StringRef> usedIdxs;
+      for (const StencilIndexRequirement &req : requirements) {
+        usedIdxs.insert(req.idxName);
+      }
+
+      pml::ScheduleAttr newSchedule = schedule.removeAxes(usedIdxs);
+      if (newSchedule)
+        op->setAttr(pml::kScheduleAttrName, newSchedule);
+      else
+        op->removeAttr(pml::kScheduleAttrName);
+    }
   } else {
-    IVLOG(3, "No legal tiling found to stencil");
+    IVLOG(2, "No legal tiling found to stencil");
   }
+}
+
+AffineMap makeTileMap(MLIRContext *context, AffineMap map, ValueRange operands,
+                      ArrayRef<BlockArgument> idxs) {
+  SmallVector<AffineExpr, 8> exprs;
+  for (Value value : operands) {
+    bool found = false;
+    for (size_t i = 0; i < idxs.size(); i++) {
+      if (value == idxs[i]) {
+        exprs.push_back(getAffineDimExpr(i, context));
+        found = true;
+      }
+    }
+    if (!found) {
+      exprs.push_back(getAffineConstantExpr(0, context));
+    }
+  }
+  auto toIdxs = AffineMap::get(idxs.size(), 0, exprs, context);
+  return map.compose(toIdxs);
 }
 
 } // namespace pmlc::dialect::pxa
