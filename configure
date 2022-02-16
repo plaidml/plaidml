@@ -176,6 +176,8 @@ class Configure:
             cmd += [
                 '-DPML_OPENVINO_BRIDGE=ON',
                 f'-DInferenceEngineDeveloperPackage_DIR={openvino_dir}',
+                f'-DOpenCV_DIR={opencv_dir}',
+                f'-DOpenCV_INSTALL_PATH={opencv_install_dir}',
             ]
         if args.temp:
             cmd.append(f'-DFETCHCONTENT_BASE_DIR={fc_dir}')
