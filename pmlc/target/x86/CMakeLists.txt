@@ -11,6 +11,7 @@ pml_cc_library(
     register.cc
     reorder_layouts.cc
     stencil_tpp_unary.cc
+    stencil_tpp_binary.cc
     trace_linking.cc
     xsmm_lowering.cc
   DEPS

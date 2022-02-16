@@ -68,6 +68,10 @@ def Fusion : FunctionPass<"pxa-fusion"> {
            /*default=*/"0",
            "Prevent over-fusion by specifying the maximum memory activity "
            "(alloc, read, write) allowed">,
+    Option<"minimumThreads", "minimum-threads", "int64_t",
+           /*default=*/"0",
+           "The minimum number of threads, i.e., the ranges' product of outermost loop."
+           "0 for unlimited.">,
     Option<"exactlyMatch", "exactly-match", "bool",
            /*default=*/"false",
            "Whether fuse the loops with exactly matched indices">,
@@ -80,6 +84,9 @@ def Fusion : FunctionPass<"pxa-fusion"> {
     Option<"singleOutput", "single-output", "bool",
            /*default=*/"false",
            "Allow single output only">,
+    Option<"avoidReductionIndexes", "avoid-reduction-indexes", "bool",
+           /*default*/"true",
+           "Avoid fusion on reduction indexes">
   ];
 }
 

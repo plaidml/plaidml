@@ -604,7 +604,8 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
         /*inputs=*/operands,
         /*outputs=*/ValueRange{init.resultTensor},
         /*indexingMaps=*/idxMaps,
-        /*iteratorTypes=*/SmallVector<StringRef, 4>(numDims, "parallel"),
+        /*iteratorTypes=*/
+        SmallVector<StringRef, 4>(numDims, getParallelIteratorTypeName()),
         /*doc=*/"",
         /*libraryCall=*/"",
         [&](OpBuilder &builder, Location loc, ValueRange args) {
@@ -679,7 +680,8 @@ struct ContractionOpConversion
     tile::ContractionOpAdaptor adaptor(operands);
     ValueRange cionOperands = adaptor.operands();
 
-    TensorInitializer init(rewriter, op, op.result().getType());
+    TensorInitializer init(rewriter, op, op.result().getType(),
+                           /*padding=*/false);
     RankedTensorType resultType = init.getType();
     unsigned numDims = resultType.getRank();
 
@@ -699,7 +701,8 @@ struct ContractionOpConversion
             /*inputs=*/ValueRange{initValue},
             /*outputs=*/ValueRange{init.resultTensor},
             /*indexingMaps=*/ArrayRef<AffineMap>{inputMap, outputMap},
-            /*iteratorTypes=*/SmallVector<StringRef, 4>(numDims, "parallel"),
+            /*iteratorTypes=*/
+            SmallVector<StringRef, 4>(numDims, getParallelIteratorTypeName()),
             /*doc=*/"",
             /*libraryCall=*/"",
             [&](OpBuilder &builder, Location loc, ValueRange args) {
@@ -714,6 +717,26 @@ struct ContractionOpConversion
                                           /*value=*/initValue,
                                           /*output=*/init.resultTensor);
       initValue = fillOp.result();
+    }
+
+    Optional<tile::PaddingInfo> maybeOpPadding = tile::getPaddingInfo(op);
+    if (maybeOpPadding) {
+      Value exteriorValue = createInit(
+          rewriter, loc, resultType.getElementType(), maybeOpPadding->agg);
+      auto pad = rewriter.create<linalg::PadTensorOp>(
+          loc,
+          /*source=*/initValue,
+          /*staticLow=*/maybeOpPadding->lower,
+          /*staticHigh=*/maybeOpPadding->upper,
+          /*low=*/ValueRange{},
+          /*high=*/ValueRange{});
+      SmallVector<Type, 4> padArgs(numDims, rewriter.getIndexType());
+      OpBuilder::InsertionGuard guard(rewriter);
+      Block *padBody =
+          rewriter.createBlock(&pad.region(), pad.region().begin(), padArgs);
+      rewriter.create<linalg::YieldOp>(loc, ValueRange{exteriorValue});
+      initValue = pad.getResult();
+      resultType = initValue.getType().cast<RankedTensorType>();
     }
 
     auto lowMap = op.lowerBounds().getValue();
@@ -734,9 +757,9 @@ struct ContractionOpConversion
     ArrayRef<Attribute> srcs = op.srcs().getValue();
     for (size_t i = 0; i < srcs.size(); i++) {
       AffineMap map = srcs[i].cast<AffineMapAttr>().getValue();
-      if (Optional<tile::PaddingInfo> maybePadding =
+      if (Optional<tile::PaddingInfo> maybeOperandPadding =
               tile::getPaddingInfo(op.operands()[i].getDefiningOp())) {
-        map = updatePaddingMap(map, *maybePadding, context);
+        map = updatePaddingMap(map, *maybeOperandPadding, context);
       }
       if (!zeroLowBounds) {
         map = adjustMapByBounds(map, lowBounds, context);
@@ -744,39 +767,45 @@ struct ContractionOpConversion
       idxMaps.emplace_back(map);
     }
     AffineMap sink = op.sink();
-    if (Optional<tile::PaddingInfo> maybePadding = tile::getPaddingInfo(op)) {
-      sink = updatePaddingMap(sink, *maybePadding, context);
+    if (maybeOpPadding) {
+      sink = updatePaddingMap(sink, *maybeOpPadding, context);
     }
     if (!zeroLowBounds) {
       sink = adjustMapByBounds(sink, lowBounds, context);
     }
     idxMaps.emplace_back(sink);
 
-    SmallVector<StringRef, 4> iterTypes(sink.getNumDims(), "reduction");
+    SmallVector<StringRef, 4> iterTypes(sink.getNumDims(),
+                                        getReductionIteratorTypeName());
     for (AffineExpr expr : sink.getResults()) {
       if (auto dimExpr = expr.dyn_cast<AffineDimExpr>()) {
-        iterTypes[dimExpr.getPosition()] = "parallel";
+        iterTypes[dimExpr.getPosition()] = getParallelIteratorTypeName();
       } else {
         for (int64_t dim : getUsedDims(expr)) {
-          iterTypes[dim] = "window";
+          iterTypes[dim] = getWindowIteratorTypeName();
         }
       }
     }
 
-    OpMapsAndShapes info(op, cionOperands, ValueRange{initValue}, idxMaps);
-    auto genericOp = createValidGenericOp(
-        /*builder=*/rewriter,
-        /*loc=*/loc,
-        /*info=*/info,
-        /*resultTypes=*/TypeRange{resultType},
-        /*rawInputs=*/cionOperands,
-        /*rawOutputs=*/ValueRange{initValue},
-        /*rawIdxMaps=*/idxMaps,
-        /*rawIterTypes=*/iterTypes,
-        /*body=*/[&](OpBuilder &builder, Location loc, ValueRange args) {
-          int offset = (info.needDummyMap() || info.needDynamicDim()) ? 1 : 0;
+    SmallVector<int64_t, 8> iterRanges;
+    SmallVector<int64_t> lowerBounds =
+        op.lowerBounds().getValue().getConstantResults();
+    SmallVector<int64_t> upperBounds =
+        op.upperBounds().getValue().getConstantResults();
+    for (unsigned i = 0; i < lowerBounds.size(); i++) {
+      iterRanges.emplace_back(upperBounds[i] - lowerBounds[i] + 1);
+    }
+
+    auto genericOp = rewriter.create<linalg::GenericOp>(
+        loc,
+        /*resultTensorTypes=*/resultType,
+        /*inputs=*/cionOperands,
+        /*outputs=*/initValue,
+        /*indexingMaps=*/idxMaps,
+        /*iteratorTypes=*/iterTypes,
+        [&](OpBuilder &builder, Location loc, ValueRange args) {
           ComboBuilder comboBuilder;
-          ValueRange comboArgs = args.slice(offset, args.size() - offset - 1);
+          ValueRange comboArgs = args.drop_back();
           Value combined =
               comboBuilder.create(builder, loc, args.back().getType(),
                                   comboArgs, comboArgs.getTypes());
@@ -784,7 +813,8 @@ struct ContractionOpConversion
               getAggResult(builder, loc, op.agg(), args.back(), combined);
           builder.create<linalg::YieldOp>(loc, ValueRange{aggregate});
         });
-
+    genericOp->setAttr(getIteratorRangesAttrName(),
+                       rewriter.getI64ArrayAttr(iterRanges));
     if (Attribute attr = op->getAttr("name"))
       genericOp->setAttr("name", attr);
     if (Attribute attr = op->getAttr("schedule"))
@@ -828,7 +858,8 @@ struct IndexOpConversion : public OpConversionPattern<tile::IndexOp> {
         /*inputs=*/ValueRange{},
         /*outputs=*/ValueRange{init.getResult()},
         /*indexingMaps=*/ArrayRef<AffineMap>{identMap},
-        /*iteratorTypes=*/SmallVector<StringRef, 4>(numDims, "parallel"),
+        /*iteratorTypes=*/
+        SmallVector<StringRef, 4>(numDims, getParallelIteratorTypeName()),
         /*doc=*/"",
         /*libraryCall=*/"",
         [&](OpBuilder &builder, Location loc, ValueRange args) {
@@ -984,7 +1015,8 @@ struct CastOpConversion : public OpConversionPattern<tile::CastOp> {
         /*inputs=*/operands,
         /*outputs=*/ValueRange{init.resultTensor},
         /*indexingMaps=*/ArrayRef<AffineMap>{inputMap, outputMap},
-        /*iteratorTypes=*/SmallVector<StringRef, 4>(numDims, "parallel"),
+        /*iteratorTypes=*/
+        SmallVector<StringRef, 4>(numDims, getParallelIteratorTypeName()),
         /*doc=*/"",
         /*libraryCall=*/"",
         [&](OpBuilder &builder, Location loc, ValueRange args) {

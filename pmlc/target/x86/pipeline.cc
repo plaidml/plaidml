@@ -261,30 +261,23 @@ void pipelineBuilderStage1(OpPassManager &pm) {
     pm.addPass(pml::createApplyRulesPass(/*module=*/"schedule"));
   }
 
-  if (util::getEnvVar("PLAIDML_USE_LINALG") == "1") {
-    pm.addPass(pmlc::conversion::tile_to_linalg::createLowerTileToLinalgPass());
+  pm.addPass(pmlc::conversion::tile_to_linalg::createLowerTileToLinalgPass());
+  if (!util::getEnvVar("PLAIDML_REORDER").empty())
     pm.addNestedPass<FuncOp>(createReorderLayoutsPass());
-  }
+  else
+    pm.addNestedPass<FuncOp>(createReorderWeightLayoutsPass());
 
   pm.addPass(stdx::createMainClosurePass());
   pm.addPass(createLoopInvariantCodeMotionPass());
-  if (util::getEnvVar("PLAIDML_USE_LINALG") != "1") {
-    pm.addPass(createCanonicalizerPass());
-    // CSE reuses the output for multiple linalg.generic. This may break the
-    // assumption of value-like program, and cause bugs later.
-    pm.addPass(createCSEPass());
-  }
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
 }
 
 void pipelineBuilderStage2(OpPassManager &pm, const Options &options) {
   unsigned maxThreads = options.getNumThreads();
   IVLOG(1, "Number of threads: " << maxThreads);
 
-  if (util::getEnvVar("PLAIDML_USE_LINALG") == "1") {
-    pm.addPass(pmlc::conversion::linalg_to_pxa::createLowerLinalgToPXAPass());
-  } else {
-    pm.addPass(pmlc::conversion::tile_to_pxa::createLowerTileToPXAPass());
-  }
+  pm.addPass(pmlc::conversion::linalg_to_pxa::createLowerLinalgToPXAPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
   pm.addNestedPass<FuncOp>(layer::createInlineLayersPass());
@@ -294,11 +287,25 @@ void pipelineBuilderStage2(OpPassManager &pm, const Options &options) {
   pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
 
-  pm.addNestedPass<FuncOp>(pxa::createFusionPass(/*memoryActivityThreshold=*/0,
-                                                 /*exactlyMatch=*/false,
-                                                 /*tiledFusion=*/true,
-                                                 /*loopDepth=*/0,
-                                                 /*singleOutput=*/true));
+  pm.addNestedPass<FuncOp>(
+      pxa::createFusionPass(/*memoryActivityThreshold=*/0,
+                            /*minimumThreads=*/maxThreads,
+                            /*exactlyMatch=*/false,
+                            /*tiledFusion=*/true,
+                            /*loopDepth=*/0,
+                            /*singleOutput=*/false,
+                            /*avoidReductionIndexes=*/true));
+  pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
+  pm.addPass(createCanonicalizerPass());
+
+  pm.addNestedPass<FuncOp>(
+      pxa::createFusionPass(/*memoryActivityThreshold=*/0,
+                            /*minimumThreads=*/maxThreads,
+                            /*exactlyMatch=*/false,
+                            /*tiledFusion=*/false,
+                            /*loopDepth=*/1,
+                            /*singleOutput=*/false,
+                            /*avoidReductionIndexes=*/true));
   pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
 
@@ -314,7 +321,7 @@ void pipelineBuilderStage2(OpPassManager &pm, const Options &options) {
   pm.addPass(createCanonicalizerPass());
 
   pm.addNestedPass<FuncOp>(pxa::createLocalizePass());
-  // pm.addNestedPass<FuncOp>(pxa::createResizeTmpsPass());
+  pm.addNestedPass<FuncOp>(pxa::createResizeTmpsPass());
   pm.addPass(pxa::createDeallocPlacementPass());
   pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass(/*promote=*/true,
                                                           /*denest=*/true));
@@ -322,6 +329,9 @@ void pipelineBuilderStage2(OpPassManager &pm, const Options &options) {
   pm.addPass(createCSEPass());
 
   pm.addNestedPass<FuncOp>(createStencilTppUnaryPass());
+  pm.addNestedPass<FuncOp>(createStencilTppBinaryPass());
+  pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
+
   if (pmlc::util::getEnvVar("PLAIDML_PROFILE") == "1")
     pm.addPass(createProfileKernelsPass());
   pm.addPass(createCanonicalizerPass());
@@ -361,6 +371,8 @@ void pipelineBuilderStage4(OpPassManager &pm) {
 
   pm.addPass(createLowerToLLVMPass());
   pm.addPass(createTraceLinkingPass());
+  if (pmlc::util::getEnvVar("PLAIDML_PROFILE") == "1")
+    pm.addPass(createProfileLinkingPass());
 }
 
 void pipelineBuilder(OpPassManager &pm) {
