@@ -124,7 +124,6 @@ class Configure:
             opencv_install_dir = self.this_dir / 'vendor/opencv/opencv_install'
             cmd = [ './tools/build_opencv.sh', f'{opencv_build_dir}', f'{opencv_install_dir}' ]
             run(cmd, check=True)
-            env = os.environ.copy()
 
             openvino_dir = build_dir / '_deps/openvino-build'
             if args.temp:
