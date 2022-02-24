@@ -10,7 +10,7 @@ from pathlib import Path
 
 OPEN_ZOO_RELEASE = os.getenv('OPEN_ZOO_RELEASE', '2021.3')
 OPEN_ZOO_URL = f'https://github.com/openvinotoolkit/open_model_zoo/archive/refs/tags/{OPEN_ZOO_RELEASE}.tar.gz'
-OPENCV_PYTHON_VER = '4.5.5.62'
+OPENCV_PYTHON_VER = '4.4.0.46'
 
 AC_DIR = Path(f'open_model_zoo-{OPEN_ZOO_RELEASE}') / 'tools' / 'accuracy_checker'
 DATASET_SRC = os.getenv('DATASET_SRC')
