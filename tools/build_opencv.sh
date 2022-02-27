@@ -22,5 +22,12 @@ if [ -d "./lib64" ]
 then
     echo "Directory ./lib64 exists."
 else
-    ln -s ./lib lib64
+    echo "Directory ./lib64 does not exist"
+    mkdir lib64
+    cd lib64
+    echo "./lib64 has been created"
+    cp -P ./../lib/libopencv_* .
+    echo "libopencv* files have been copied to ./lib64"
+    cp -R ./../lib/cmake .
+    echo "cmake files have been copied to ./lib64"
 fi
