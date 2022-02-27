@@ -17,3 +17,10 @@ cmake -DCMAKE_INSTALL_PREFIX=${INSTALL_DIR} -DWITH_PNG=OFF -DWITH_JPEG=OFF -DWIT
 #cmake -DCMAKE_INSTALL_PREFIX=${INSTALL_DIR} -DOPENCV_EXTRA_MODULES_PATH=../opencv_contrib-4.x/modules ../opencv-4.x
 cmake --build . -j 16
 make install
+cd ${INSTALL_DIR}
+if [ -d "./lib64" ]
+then
+    echo "Directory ./lib64 exists."
+else
+    ln -s ./lib lib64
+fi
