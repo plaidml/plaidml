@@ -119,6 +119,7 @@ class Configure:
 
         if not args.no_openvino:
             #opencv_dir = pathlib.Path('.cenv/lib/cmake/opencv4').resolve()
+            system_dir = self.cenv_dir
             opencv_dir = self.this_dir / 'vendor/opencv/opencv_install/lib64/cmake/opencv4'
             opencv_build_dir = self.this_dir / 'vendor/opencv/opencv_build'
             opencv_install_dir = self.this_dir / 'vendor/opencv/opencv_install'
@@ -176,6 +177,7 @@ class Configure:
             cmd += [
                 '-DPML_OPENVINO_BRIDGE=ON',
                 f'-DInferenceEngineDeveloperPackage_DIR={openvino_dir}',
+                f'-DSystem_DIR={system_dir}',
                 f'-DOpenCV_DIR={opencv_dir}',
                 f'-DOpenCV_INSTALL_PATH={opencv_install_dir}',
             ]

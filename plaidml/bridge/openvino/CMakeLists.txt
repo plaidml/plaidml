@@ -56,13 +56,23 @@ install(
 )
 
 install(
-    DIRECTORY ${OpenCV_INSTALL_PATH}/lib64/
-    DESTINATION "testkit"
-    COMPONENT testkit
-    USE_SOURCE_PERMISSIONS
-    FILES_MATCHING
-      PATTERN "libopencv_core.so*"
-      PATTERN "libopencv_img*.so*"
+  DIRECTORY ${OpenCV_INSTALL_PATH}/lib64/
+  DESTINATION "testkit"
+  COMPONENT testkit
+  USE_SOURCE_PERMISSIONS
+  FILES_MATCHING
+    PATTERN "libopencv_core.so*"
+    PATTERN "libopencv_img*.so*"
+)
+
+install(
+  DIRECTORY ${System_DIR}/lib/
+  DESTINATION "testkit"
+  COMPONENT testkit
+  USE_SOURCE_PERMISSIONS
+  FILES_MATCHING
+    PATTERN "libwebp.so*"
+    PATTERN "libopenjp2.so*"
 )
 
 add_custom_target(benchmark_app ALL)
