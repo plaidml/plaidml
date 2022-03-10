@@ -23,13 +23,14 @@ pml_cc_library(
   DEPS
     IE::inference_engine
     IE::ngraph
+    IE::runtime
     half
 )
 
 add_subdirectory(plugin)
-if(PML_BUILD_TESTS)
-  add_subdirectory(tests/functional)
-endif()
+#if(PML_BUILD_TESTS)
+#  add_subdirectory(tests/functional)
+#endif()
 
 install(
   PROGRAMS
@@ -50,7 +51,7 @@ install(
   PROGRAMS
     ${OUTPUT_ROOT}/bin/libplaidml.so.1
     ${OpenVINO_MAIN_SOURCE_DIR}/${BIN_FOLDER}/lib/libformat_reader.so
-    ${IE_MAIN_SOURCE_DIR}/temp/tbb/lib/libtbb.so.2
+#    ${IE_MAIN_SOURCE_DIR}/temp/tbb/lib/libtbb.so.2
   DESTINATION "testkit"
   COMPONENT testkit
 )

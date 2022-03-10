@@ -1,3 +1,4 @@
+set(BUILD_SHARED_LIBS ON)
 set(TARGET_NAME "plaidmlPlugin")
 
 ie_cpack_set_library_dir()
