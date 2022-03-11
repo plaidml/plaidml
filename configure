@@ -119,6 +119,7 @@ class Configure:
 
         if not args.no_openvino:
             openvino_dir = build_dir / '_deps/openvino-build'
+            openvino_install_dir = build_dir / f'bin/intel64/{args.type}'
             if args.temp:
                 temp_dir = args.temp / args.target
                 fc_dir = temp_dir / 'fc'
@@ -167,6 +168,7 @@ class Configure:
             cmd += [
                 '-DPML_OPENVINO_BRIDGE=ON',
                 f'-DInferenceEngineDeveloperPackage_DIR={openvino_dir}',
+                f'-DOpenvinoInstall_DIR={openvino_install_dir}',
             ]
         if args.temp:
             cmd.append(f'-DFETCHCONTENT_BASE_DIR={fc_dir}')

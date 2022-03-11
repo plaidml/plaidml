@@ -1,4 +1,5 @@
 set(OUTPUT_ROOT ${CMAKE_BINARY_DIR})
+set(BUILD_SHARED_LIBS ON)
 
 if(NOT InferenceEngineDeveloperPackage_FOUND)
   find_package(InferenceEngineDeveloperPackage REQUIRED)
