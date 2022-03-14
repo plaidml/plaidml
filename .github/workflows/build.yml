@@ -9,6 +9,7 @@ on:
       check:
         required: true
         type: string
+  workflow_dispatch:
 
 defaults:
   run:
