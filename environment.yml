@@ -15,6 +15,7 @@ dependencies:
   - python=3.7
   - pystache=0.5.4
   - pyyaml=5.4.1
+  - tbb=2021.5.0
   - yapf=0.27
   - pip:
       - asq==1.3

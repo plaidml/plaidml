@@ -9,6 +9,7 @@ on:
       check:
         required: true
         type: string
+  workflow_dispatch:
 
 defaults:
   run:
@@ -26,7 +27,7 @@ jobs:
   build:
     runs-on: [self-hosted, build=linux_x86_64]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           submodules: recursive
 
