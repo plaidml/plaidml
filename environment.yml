@@ -7,6 +7,7 @@ dependencies:
   - cython=0.29.22
   - doxygen=1.9.1
   - git=2.32.0
+  - libusb=1.0.25
   - matplotlib=3.4.1
   - ninja=1.10.2
   - numpy=1.18.5
@@ -15,7 +16,6 @@ dependencies:
   - python=3.7
   - pystache=0.5.4
   - pyyaml=5.4.1
-  - tbb=2021.5.0
   - yapf=0.27
   - pip:
       - asq==1.3
