@@ -40,6 +40,14 @@ install(
   USE_SOURCE_PERMISSIONS
   FILES_MATCHING
     PATTERN "benchmark_app"
+)
+
+install(
+  DIRECTORY ${OpenVINO_MAIN_SOURCE_DIR}/${BIN_FOLDER}/lib/
+  DESTINATION "testkit"
+  COMPONENT testkit
+  USE_SOURCE_PERMISSIONS
+  FILES_MATCHING
     PATTERN "libformat_reader.so"
 )
 

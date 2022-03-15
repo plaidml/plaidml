@@ -48,9 +48,7 @@ jobs:
       build_type: Release
 
     steps:
-      - uses: actions/checkout@v3
-        with:
-          submodules: recursive
+      - uses: actions/checkout@v2
 
       - uses: conda-incubator/setup-miniconda@v2
         with:
@@ -115,9 +113,7 @@ jobs:
       precision: high
 
     steps:
-      - uses: actions/checkout@v3
-        with:
-          submodules: recursive
+      - uses: actions/checkout@v2
 
       - uses: conda-incubator/setup-miniconda@v2
         with:
@@ -168,9 +164,7 @@ jobs:
       test: ${{matrix.test}}
 
     steps:
-      - uses: actions/checkout@v3
-        with:
-          submodules: recursive
+      - uses: actions/checkout@v2
 
       - uses: conda-incubator/setup-miniconda@v2
         with:
