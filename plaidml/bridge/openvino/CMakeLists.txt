@@ -34,10 +34,13 @@ add_subdirectory(plugin)
 #endif()
 
 install(
-  PROGRAMS
-    ${OpenVINO_MAIN_SOURCE_DIR}/${BIN_FOLDER}/benchmark_app
+  DIRECTORY ${OpenVINO_MAIN_SOURCE_DIR}/${BIN_FOLDER}/
   DESTINATION "testkit"
   COMPONENT testkit
+  USE_SOURCE_PERMISSIONS
+  FILES_MATCHING
+    PATTERN "benchmark_app"
+    PATTERN "libformat_reader.so"
 )
 
 install(
@@ -45,16 +48,18 @@ install(
   DESTINATION "testkit"
   COMPONENT testkit
   USE_SOURCE_PERMISSIONS
-  PATTERN "*.a" EXCLUDE
+  FILES_MATCHING
+    PATTERN "libplaidml*"
 )
 
 install(
-  PROGRAMS
-    ${OUTPUT_ROOT}/bin/libplaidml.so.1
-    ${OpenVINO_MAIN_SOURCE_DIR}/${BIN_FOLDER}/lib/libformat_reader.so
-#    ${IE_MAIN_SOURCE_DIR}/temp/tbb/lib/libtbb.so.2
+  DIRECTORY ${CMAKE_BINARY_DIR}/${BIN_FOLDER}/lib/
   DESTINATION "testkit"
   COMPONENT testkit
+  USE_SOURCE_PERMISSIONS
+  FILES_MATCHING
+    PATTERN "*.so"
+    PATTERN "plugins.xml"
 )
 
 install(
