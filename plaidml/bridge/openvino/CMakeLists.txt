@@ -72,6 +72,15 @@ install(
       PATTERN "libopencv_img*.so*"
 )
 
+install(
+    DIRECTORY ${_tbb_root}/lib/
+    DESTINATION "testkit"
+    COMPONENT testkit
+    USE_SOURCE_PERMISSIONS
+    FILES_MATCHING
+      PATTERN "libtbb.so*"
+)
+
 add_custom_target(benchmark_app ALL)
 
 add_custom_command(
