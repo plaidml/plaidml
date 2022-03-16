@@ -62,11 +62,9 @@ InferenceEngine::Parameter PlaidMLExecutableNetwork::GetMetric(const std::string
   } else if (name == METRIC_KEY(OPTIMAL_NUMBER_OF_INFER_REQUESTS)) {
     return IE_SET_METRIC(OPTIMAL_NUMBER_OF_INFER_REQUESTS, 1);
   } else if (name == METRIC_KEY(SUPPORTED_CONFIG_KEYS)) {
-    std::vector<std::string> configKeys = {};
-    return IE_SET_METRIC(SUPPORTED_CONFIG_KEYS, configKeys);
-  } else {
-    IE_THROW() << "Unsupported ExecutableNetwork metric: " << name;
+    return IE_SET_METRIC(SUPPORTED_CONFIG_KEYS, {});
   }
+  IE_THROW() << "Unsupported ExecutableNetwork metric: " << name;
 }
 
 void PlaidMLExecutableNetwork::ExportImpl(std::ostream& model) {  //

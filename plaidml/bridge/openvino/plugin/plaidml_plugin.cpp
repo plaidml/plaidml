@@ -80,9 +80,8 @@ Parameter Engine::GetMetric(const std::string& name, const std::map<std::string,
   } else if (name == METRIC_KEY(AVAILABLE_DEVICES)) {
     std::vector<std::string> devices = {"llvm_cpu"};
     IE_SET_METRIC_RETURN(AVAILABLE_DEVICES, devices);
-  } else {
-    IE_THROW() << "Unsupported metric key: " << name;
   }
+  IE_THROW() << "Unsupported metric key: " << name;
 }
 
 }  // namespace PlaidMLPlugin

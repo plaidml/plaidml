@@ -28,11 +28,3 @@ ie_register_plugins_dynamic(
   MAIN_TARGET ${TARGET_NAME}
   POSSIBLE_PLUGINS ${TARGET_NAME}
 )
-
-set(src_plugins_file "$<TARGET_FILE_DIR:${TARGET_NAME}>/plugins.xml")
-set(dest_plugins_dir "${OpenvinoInstall_DIR}/lib")
-add_custom_command(
-    TARGET ${TARGET_NAME} POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy "${src_plugins_file}" "${dest_plugins_dir}"
-    COMMENT "Copying ${src_plugins_file} to build directory"
-)

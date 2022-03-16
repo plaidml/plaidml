@@ -58,6 +58,7 @@ install(
   USE_SOURCE_PERMISSIONS
   FILES_MATCHING
     PATTERN "libplaidml*"
+    PATTERN "plugins.xml"
 )
 
 install(
@@ -67,7 +68,6 @@ install(
   USE_SOURCE_PERMISSIONS
   FILES_MATCHING
     PATTERN "*.so"
-    PATTERN "plugins.xml"
 )
 
 install(
