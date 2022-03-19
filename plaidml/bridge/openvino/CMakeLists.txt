@@ -1,4 +1,5 @@
 set(OUTPUT_ROOT ${CMAKE_BINARY_DIR})
+set(BUILD_SHARED_LIBS ON)
 
 if(NOT InferenceEngineDeveloperPackage_FOUND)
   find_package(InferenceEngineDeveloperPackage REQUIRED)
@@ -23,19 +24,31 @@ pml_cc_library(
   DEPS
     IE::inference_engine
     IE::ngraph
+    IE::runtime
     half
 )
 
 add_subdirectory(plugin)
-if(PML_BUILD_TESTS)
-  add_subdirectory(tests/functional)
-endif()
+#if(PML_BUILD_TESTS)
+#  add_subdirectory(tests/functional)
+#endif()
 
 install(
-  PROGRAMS
-    ${OpenVINO_MAIN_SOURCE_DIR}/${BIN_FOLDER}/benchmark_app
+  DIRECTORY ${OpenVINO_MAIN_SOURCE_DIR}/${BIN_FOLDER}/
   DESTINATION "testkit"
   COMPONENT testkit
+  USE_SOURCE_PERMISSIONS
+  FILES_MATCHING
+    PATTERN "benchmark_app"
+)
+
+install(
+  DIRECTORY ${OpenVINO_MAIN_SOURCE_DIR}/${BIN_FOLDER}/lib/
+  DESTINATION "testkit"
+  COMPONENT testkit
+  USE_SOURCE_PERMISSIONS
+  FILES_MATCHING
+    PATTERN "libformat_reader.so"
 )
 
 install(
@@ -43,16 +56,18 @@ install(
   DESTINATION "testkit"
   COMPONENT testkit
   USE_SOURCE_PERMISSIONS
-  PATTERN "*.a" EXCLUDE
+  FILES_MATCHING
+    PATTERN "libplaidml*"
+    PATTERN "plugins.xml"
 )
 
 install(
-  PROGRAMS
-    ${OUTPUT_ROOT}/bin/libplaidml.so.1
-    ${OpenVINO_MAIN_SOURCE_DIR}/${BIN_FOLDER}/lib/libformat_reader.so
-    ${IE_MAIN_SOURCE_DIR}/temp/tbb/lib/libtbb.so.2
+  DIRECTORY ${CMAKE_BINARY_DIR}/${BIN_FOLDER}/lib/
   DESTINATION "testkit"
   COMPONENT testkit
+  USE_SOURCE_PERMISSIONS
+  FILES_MATCHING
+    PATTERN "*.so"
 )
 
 install(
@@ -73,6 +88,15 @@ install(
   FILES_MATCHING
     PATTERN "libwebp.so*"
     PATTERN "libopenjp2.so*"
+)
+
+install(
+    DIRECTORY ${_tbb_root}/lib/
+    DESTINATION "testkit"
+    COMPONENT testkit
+    USE_SOURCE_PERMISSIONS
+    FILES_MATCHING
+      PATTERN "libtbb.so*"
 )
 
 add_custom_target(benchmark_app ALL)

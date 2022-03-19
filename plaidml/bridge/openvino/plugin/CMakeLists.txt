@@ -24,7 +24,7 @@ target_link_libraries(${TARGET_NAME}
     plaidml::plaidml
 )
 
-ie_register_plugins(
+ie_register_plugins_dynamic(
   MAIN_TARGET ${TARGET_NAME}
   POSSIBLE_PLUGINS ${TARGET_NAME}
 )

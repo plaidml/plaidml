@@ -81,8 +81,7 @@ Parameter Engine::GetMetric(const std::string& name, const std::map<std::string,
     std::vector<std::string> devices = {"llvm_cpu"};
     IE_SET_METRIC_RETURN(AVAILABLE_DEVICES, devices);
   }
-
-  throw std::logic_error("Unsupported metric: " + name);
+  IE_THROW() << "Unsupported metric key: " << name;
 }
 
 }  // namespace PlaidMLPlugin

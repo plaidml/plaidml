@@ -28,7 +28,7 @@ class PlaidMLExecutableNetwork : public InferenceEngine::ExecutableNetworkThread
   void Export(const std::string& modelFileName) final;
   void Export(std::ostream& networkModel) final { ExportImpl(networkModel); }
 
-  void ExportImpl(std::ostream& model) final;
+  void ExportImpl(std::ostream& model);
 
  private:
   plaidml::Program program_;

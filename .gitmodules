@@ -1,7 +1,7 @@
 [submodule "vendor/openvino"]
 	path = vendor/openvino
-	url = https://github.com/plaidml/openvino.git
-	branch = plaidml
+	url = git@github.com:openvinotoolkit/openvino.git
+	branch = master
 [submodule "vendor/mlir-hlo"]
 	path = vendor/mlir-hlo
 	url = https://github.com/plaidml/mlir-hlo
