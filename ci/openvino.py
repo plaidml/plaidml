@@ -18,8 +18,12 @@ DATASET_DIR = Path('tmp/ac').resolve()
 
 
 def benchmark_app(args):
+    CONDA_PREFIX = Path(os.getenv('CONDA_PREFIX'))
     env = os.environ.copy()
-    env['LD_LIBRARY_PATH'] = args.pkgdir.resolve()
+    env['LD_LIBRARY_PATH'] = os.pathsep.join([
+        str(args.pkgdir.resolve()),
+        str(CONDA_PREFIX / 'lib'),
+    ])
     cmd = [args.pkgdir / 'benchmark_app']
     cmd += ['-d', 'PLAIDML']
     cmd += ['-m', args.model]

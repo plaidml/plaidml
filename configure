@@ -135,18 +135,15 @@ class Configure:
                 '-DENABLE_CLDNN=OFF',
                 '-DENABLE_DATA=OFF',
                 '-DENABLE_FUNCTIONAL_TESTS=ON',
-                '-DENABLE_GNA=OFF',
-                '-DENABLE_MKL_DNN=OFF',
-                '-DENABLE_MYRIAD=OFF',
+                '-DENABLE_INTEL_GNA=OFF',
+                '-DENABLE_INTEL_MYRIAD=OFF',
+                '-DENABLE_INTEL_MYRIAD_COMMON=OFF',
+                '-DENABLE_NCC_STYLE=OFF',
+                '-DENABLE_OPENCV=OFF',
                 '-DENABLE_PYTHON=ON',
-                '-DENABLE_SPEECH_DEMO=OFF',
                 '-DENABLE_TESTS=ON',
-                '-DENABLE_VPU=OFF',
-                '-DFETCHCONTENT_QUIET=OFF',
                 f'-DOUTPUT_ROOT={build_dir}',
             ]
-            if args.temp:
-                cmd.append(f'-DFETCHCONTENT_BASE_DIR={fc_dir}')
             run(cmd, check=True)
 
             run(['ninja', '-C', openvino_dir], check=True)
