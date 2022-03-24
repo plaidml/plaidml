@@ -1,6 +1,8 @@
 channels:
   - conda-forge
 dependencies:
+  - blas=2.113
+  - boost=1.76.0
   - ccache=4.1
   - cffi=1.14.4
   - cmake=3.13.4
@@ -11,6 +13,7 @@ dependencies:
   - matplotlib=3.4.1
   - ninja=1.10.2
   - numpy=1.18.5
+  - opencv=4.5.2
   - pip=21.0.1
   - pre_commit=2.11.1
   - python=3.7

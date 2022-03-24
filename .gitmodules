@@ -1,6 +1,6 @@
 [submodule "vendor/openvino"]
 	path = vendor/openvino
-	url = git@github.com:openvinotoolkit/openvino.git
+	url = https://github.com/openvinotoolkit/openvino.git
 	branch = master
 [submodule "vendor/mlir-hlo"]
 	path = vendor/mlir-hlo

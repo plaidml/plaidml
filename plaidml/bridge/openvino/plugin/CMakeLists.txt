@@ -28,3 +28,10 @@ ie_register_plugins_dynamic(
   MAIN_TARGET ${TARGET_NAME}
   POSSIBLE_PLUGINS ${TARGET_NAME}
 )
+
+add_custom_command(
+  TARGET ${TARGET_NAME}
+  COMMAND ${CMAKE_COMMAND} -E copy
+    ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/plugins.xml
+    ${CMAKE_BINARY_DIR}/${BIN_FOLDER}/lib/plugins.xml
+)

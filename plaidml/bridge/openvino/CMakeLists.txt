@@ -71,16 +71,6 @@ install(
 )
 
 install(
-    DIRECTORY ${OpenCV_INSTALL_PATH}/lib/
-    DESTINATION "testkit"
-    COMPONENT testkit
-    USE_SOURCE_PERMISSIONS
-    FILES_MATCHING
-      PATTERN "libopencv_core.so*"
-      PATTERN "libopencv_img*.so*"
-)
-
-install(
     DIRECTORY ${_tbb_root}/lib/
     DESTINATION "testkit"
     COMPONENT testkit
