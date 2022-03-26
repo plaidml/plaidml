@@ -87,3 +87,10 @@ add_custom_command(
     ${OpenVINO_MAIN_SOURCE_DIR}/${BIN_FOLDER}/benchmark_app
     ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/benchmark_app
 )
+
+add_custom_command(
+  TARGET benchmark_app
+  COMMAND ${CMAKE_COMMAND} -E copy
+    ${CMAKE_BINARY_DIR}/${BIN_FOLDER}/lib/plugins.xml
+    ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/plugins.xml
+)
