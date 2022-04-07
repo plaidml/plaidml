@@ -1,0 +1,60 @@
+--- ${LLVM_SOURCE_DIR}/mlir/lib/Conversion/AffineToStandard/AffineToStandard.cpp	2022-02-22 00:29:41.279576775 -0800
++++ ${LLVM_SOURCE_DIR}/mlir/lib/Conversion/AffineToStandard/AffineToStandard.cpp	2022-02-22 00:30:03.862557283 -0800
+@@ -410,6 +410,12 @@
+       parOp = rewriter.create<scf::ParallelOp>(loc, lowerBoundTuple,
+                                                upperBoundTuple, steps,
+                                                /*bodyBuilderFn=*/nullptr);
++      static constexpr StringLiteral kTagAttribute = "tags";
++      NamedAttrList srcDict = op->getAttrOfType<DictionaryAttr>(kTagAttribute);
++      NamedAttrList dstDict = parOp->getAttrOfType<DictionaryAttr>(kTagAttribute);
++      dstDict.append(srcDict.begin(), srcDict.end());
++      parOp->setAttr(kTagAttribute, dstDict.getDictionary(parOp->getContext()));
++      
+       rewriter.eraseBlock(parOp.getBody());
+       rewriter.inlineRegionBefore(op.region(), parOp.region(),
+                                   parOp.region().end());
+--- ${LLVM_SOURCE_DIR}/mlir/lib/Conversion/SCFToOpenMP/SCFToOpenMP.cpp	2021-09-16 13:03:09.000000000 -0700
++++ ${LLVM_SOURCE_DIR}/mlir/lib/Conversion/SCFToOpenMP/SCFToOpenMP.cpp	2022-02-23 03:44:21.080923343 -0800
+@@ -387,11 +387,41 @@
+         rewriter.replaceOpWithNewOp<omp::YieldOp>(
+             parallelOp.getBody()->getTerminator(), ValueRange());
+       }
+-
++      auto chunk = rewriter.create<LLVM::ConstantOp>(
++            parallelOp.getLoopBody().getParentOp()->getParentOp()->getLoc(), rewriter.getIntegerType(64), rewriter.getI64IntegerAttr(2));
++	
+       // Replace the loop.
+       auto loop = rewriter.create<omp::WsLoopOp>(
+           parallelOp.getLoc(), parallelOp.lowerBound(), parallelOp.upperBound(),
+           parallelOp.step());
++      if(static_cast<bool>(parallelOp->getAttrOfType<DictionaryAttr>("tags"))){
++	  //Iniitialize to default
++	  ::mlir::StringAttr schedAttr = ::mlir::StringAttr::get(parallelOp.getContext(), "Static");
++          auto dict = parallelOp->getAttrOfType<DictionaryAttr>("tags");
++          if( dict.get("static").dyn_cast_or_null<UnitAttr>()!=nullptr || dict.get("Static").dyn_cast_or_null<UnitAttr>()!=nullptr){
++         	schedAttr = ::mlir::StringAttr::get(parallelOp.getContext(),"Static");
++	  }
++          else if( dict.get("dynamic").dyn_cast_or_null<UnitAttr>()!=nullptr || dict.get("Dynamic").dyn_cast_or_null<UnitAttr>()!=nullptr){
++       		schedAttr = ::mlir::StringAttr::get(parallelOp.getContext(),"Dynamic");
++	  }
++	  else if( dict.get("auto").dyn_cast_or_null<UnitAttr>()!=nullptr || dict.get("Auto").dyn_cast_or_null<UnitAttr>()!=nullptr){
++          	schedAttr = ::mlir::StringAttr::get(parallelOp.getContext(),"Auto");
++	  }
++ 	  else if( dict.get("guided").dyn_cast_or_null<UnitAttr>()!=nullptr || dict.get("Guided").dyn_cast_or_null<UnitAttr>()!=nullptr){
++          	schedAttr = ::mlir::StringAttr::get(parallelOp.getContext(),"Guided");
++	  }
++	  else if( dict.get("runtime").dyn_cast_or_null<UnitAttr>()!=nullptr || dict.get("Runtime").dyn_cast_or_null<UnitAttr>()!=nullptr){
++          	schedAttr = ::mlir::StringAttr::get(parallelOp.getContext(),"Runtime");
++	  }
++	  loop.schedule_valAttr(schedAttr);
++
++	  if(dict.get("chunk_size").dyn_cast_or_null<IntegerAttr>()!=nullptr){
++	       loop.schedule_chunk_varMutable().assign(chunk);
++	  }
++	  if(dict.get("collapse").dyn_cast_or_null<IntegerAttr>()!=nullptr){
++	    loop.collapse_valAttr(dict.get("collapse").dyn_cast_or_null<IntegerAttr>());
++	  }
++      }
+       rewriter.create<omp::TerminatorOp>(loc);
+ 
+       rewriter.inlineRegionBefore(parallelOp.region(), loop.region(),

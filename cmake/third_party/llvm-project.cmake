@@ -38,6 +38,7 @@ else()
     llvm-project
     URL      https://github.com/plaidml/llvm-project/archive/ca67cd422f5b490444e244418f98c661b73fd978.tar.gz
     URL_HASH SHA256=5fd6c8e0328704227c7b35af81bee1158160db70b44948fa11cd466f06fa8bdf
+    PATCH_COMMAND patch -p1 ${LLVM_SOURCE_DIR} < ${CMAKE_CURRENT_SOURCE_DIR}/patches/cpu_thread.patch
   )
   FetchContent_GetProperties(llvm-project)
   if(NOT llvm-project_POPULATED)
