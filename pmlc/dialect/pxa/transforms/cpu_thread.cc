@@ -16,6 +16,9 @@
 
 using namespace mlir; // NOLINT
 
+#include "pmlc/util/env.h"
+#include "pmlc/util/logging.h"
+#include "llvm/Support/JSON.h"
 namespace pmlc::dialect::pxa {
 
 namespace {
@@ -45,20 +48,96 @@ struct CostModel {
   }
 };
 
+typedef struct ThreadSchedParams {
+  std::string schedVal;
+  int chunkSize;
+  std::string schedModifier;
+  int collapseVal;
+} ThreadSchedParams;
+
 struct CPUThreadPass : public CPUThreadBase<CPUThreadPass> {
   CPUThreadPass() = default;
   explicit CPUThreadPass(unsigned threads) { this->threads = threads; }
 
-  void runOnOperation() final {
-    auto func = getOperation();
-    // Nest outermost loops into 'blocks' and 'threads'
+  void runOnFunction() final {
+    auto func = getFunction();
+    std::list<Operation *> opStack;
+    std::vector<int> opId;
+    std::map<Operation *, std::string> opIdMap;
+    std::map<std::string, ThreadSchedParams *> schedParamsMap;
+
     func.walk<WalkOrder::PreOrder>([&](AffineParallelOp op) {
-      processOp(op);
-      return WalkResult::skip();
+      // Assign a unique id to each affineparallel op
+      int lastUsedIdAtLevel = 0;
+      while (!opStack.empty() &&
+             opStack.back() != op.getBody()->getParentOp()->getParentOp()) {
+        opStack.pop_back();
+        lastUsedIdAtLevel = opId.back() + 1;
+        opId.pop_back();
+      }
+      opStack.push_back(op.getOperation());
+      opId.push_back(lastUsedIdAtLevel);
+
+      std::stringstream idString("");
+      for (int i = 0; i < opId.size(); i++) {
+        idString << opId[i];
+        if (i < opId.size() - 1) {
+          idString << ",";
+        }
+      }
+      opIdMap.insert(std::make_pair(op.getOperation(), idString.str()));
     });
+
+    // Read the file specified by the  environment variable for loop
+    // configuration
+    if (!util::getEnvVar("PLAIDML_THREAD_DIST_CONFIG_FILE").empty()) {
+      auto configFileName = util::getEnvVar("PLAIDML_THREAD_DIST_CONFIG_FILE");
+      IVLOG(1, "Configuration file name:" << configFileName);
+      std::ifstream configFile(configFileName, std::ifstream::binary);
+      std::stringstream jsonStringStream;
+      jsonStringStream << configFile.rdbuf();
+      std::string jsonString = jsonStringStream.str();
+      llvm::Expected<llvm::json::Value> threadMapping =
+          llvm::json::parse(llvm::StringRef(jsonString));
+      if (threadMapping.takeError()) {
+        IVLOG(1, "Error");
+      } else if (llvm::json::Array *loopSchedObj =
+                     threadMapping->getAsObject()->getArray("loopschedule")) {
+        llvm::json::Array loopSched = *loopSchedObj;
+        for (int i = 0; i < loopSched.size(); i++) {
+          ThreadSchedParams *params = new ThreadSchedParams();
+          auto id =
+              loopSched[i].getAsObject()->getString("id").getValue().str();
+          params->schedVal = loopSched[i]
+                                 .getAsObject()
+                                 ->getString("sched_val")
+                                 .getValue()
+                                 .str();
+          params->chunkSize = std::stoi(loopSched[i]
+                                            .getAsObject()
+                                            ->getString("sched_chunk")
+                                            .getValue()
+                                            .str());
+          params->collapseVal = std::stoi(loopSched[i]
+                                              .getAsObject()
+                                              ->getString("collapse_val")
+                                              .getValue()
+                                              .str());
+          schedParamsMap[id] = params;
+        }
+      }
+    }
   }
 
-  void processOp(AffineParallelOp op) {
+  void processOp(AffineParallelOp op, ThreadSchedParams *schedParams) {
+    if (schedParams) {
+      setIntegerTag(op, "collapse", schedParams->collapseVal);
+      setIntegerTag(op, "chunk_size", schedParams->chunkSize);
+      setUnitTag(op, schedParams->schedVal);
+      setUnitTag(op, kCpuThreadTag);
+      return;
+    }
+
     auto maybeRanges = op.getConstantRanges();
     if (!maybeRanges) {
       // Fail if we can't compute the ranges at compile time

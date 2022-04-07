@@ -1,0 +1,15 @@
+{"loopschedule":[	
+	{
+		"id":"1",
+		"sched_val":"static",
+		"sched_chunk":"2",
+		"collapse_val":"2"
+	},
+	{
+		"id":"1,0",
+		"sched_val":"static",
+		"sched_chunk":"2",
+		"collapse_val":"4"
+	}
+	]	
+}
