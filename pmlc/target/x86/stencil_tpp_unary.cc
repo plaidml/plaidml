@@ -128,12 +128,49 @@ private:
     this->opName = inName;
   }
 
+  void maybeCaptureReduceOp(Optional<pxa::StencilCapture> &capture,
+                            StringRef inName, AtomicRMWKind agg) {
+    if (capture)
+      return;
+
+    using matchers::m_Any;
+
+    Value load, reduce;
+    auto pattern = m_Op<AffineYieldOp>(m_Capture(
+        &reduce,
+        pxa::m_PxaReduceOp(agg, m_Capture(&load, m_Op<pxa::PxaLoadOp>()), m_Any())));
+
+    Operation *yield = op.getBody()->getTerminator();
+    if (!matchPattern(yield, pattern))
+      return;
+    if (!load.getType().isF32() ||
+        !reduce.getType().cast<MemRefType>().getElementType().isF32())
+      return;
+    auto source = cast<pxa::PxaLoadOp>(load.getDefiningOp()).memref();
+    if (!source.isa<BlockArgument>()) {
+      // If the definition of load's source is in "op", it is too complex to
+      // stencil
+      auto defOp = source.getDefiningOp();
+      while (!isa<FuncOp>(defOp)) {
+        if (defOp == op.getOperation())
+          return;
+        defOp = defOp->getParentOp();
+      }
+    }
+
+    capture = pxa::StencilCapture{{reduce}, {load}};
+    this->opName = inName;
+  }
+
   Optional<pxa::StencilCapture> capture() {
     Optional<pxa::StencilCapture> ret;
     maybeCaptureGeneric<stdx::ReluOp>(ret, "tpp_relu");
     maybeCaptureGeneric<math::TanhOp>(ret, "tpp_tanh");
     maybeCaptureGeneric<math::ExpOp>(ret, "tpp_exp");
     maybeCaptureIdentityOp(ret, "tpp_identity");
+    maybeCaptureReduceOp(ret, "tpp_add_reduce", AtomicRMWKind::addf);
+    maybeCaptureReduceOp(ret, "tpp_mul_reduce", AtomicRMWKind::mulf);
+    maybeCaptureReduceOp(ret, "tpp_max_reduce", AtomicRMWKind::maxf);
     return ret;
   }
 
@@ -215,7 +252,9 @@ public:
                     /*idxName=*/"eltwise_i",
                     /*tilingGenerator=*/pxa::ExactRangeGenerator(),
                     pxa::IndexStridePredicates{
-                        [](int64_t stride) { return stride > 1; }, // output
+                        [](int64_t stride) {
+                          return (stride == 0 || stride > 1);
+                        }, // output
                         [](int64_t stride) {
                           return (stride == 0 || stride > 1);
                         }, // input
@@ -224,7 +263,9 @@ public:
                     /*idxName=*/"eltwise_j",
                     /*tilingGenerator=*/pxa::ExactRangeGenerator(),
                     pxa::IndexStridePredicates{
-                        [](int64_t stride) { return stride == 1; }, // output
+                        [](int64_t stride) {
+                          return (stride == 1 || stride == 0);
+                        }, // output
                         [](int64_t stride) {
                           return (stride == 1 || stride == 0);
                         }, // input
@@ -234,8 +275,54 @@ public:
 
 } // namespace
 
+// For 1D tensor, we still map to 2D TPPs. We can make 2D TPPs do 1D 
+// by having the outer dim being 1. 
+void addSingleIteration(AffineParallelOp op) {
+  if (op.getIVs().size() == 1) {
+    Block *body = op.getBody();
+    auto builder = OpBuilder::atBlockBegin(body);
+    auto zeroExpr = builder.getAffineConstantExpr(0);
+    auto oneExpr = builder.getAffineConstantExpr(1);
+    SmallVector<AffineExpr, 6> newLowerBounds;
+    SmallVector<AffineExpr, 6> newUpperBounds;
+    SmallVector<int64_t, 6> newSteps;
+    SmallVector<int32_t> groups;
+    auto steps = op.getSteps();
+    // Add a single iteration
+    newLowerBounds.push_back(zeroExpr);
+    newUpperBounds.push_back(oneExpr);
+    newSteps.push_back(1);
+    groups.push_back(1);
+    // Keep the original args
+    body->addArguments(body->getArguments()[0].getType());
+    for (unsigned i = 0, e = steps.size(); i < e; ++i) {
+      int64_t step = steps[i];
+      newLowerBounds.push_back(op.lowerBoundsMap().getResult(i));
+      newUpperBounds.push_back(op.upperBoundsMap().getResult(i));
+      newSteps.push_back(step);
+      groups.push_back(1);
+    }
+    auto newArgs = body->getArguments();
+    newArgs[0].replaceAllUsesWith(newArgs[1]);
+
+    // Update attributes
+    auto newLower = AffineMap::get(op.lowerBoundsMap().getNumDims(),
+                                   op.lowerBoundsMap().getNumSymbols(),
+                                   newLowerBounds, op.getContext());
+    auto newUpper = AffineMap::get(op.upperBoundsMap().getNumDims(),
+                                   op.upperBoundsMap().getNumSymbols(),
+                                   newUpperBounds, op.getContext());
+    op.lowerBoundsMapAttr(AffineMapAttr::get(newLower));
+    op.lowerBoundsGroupsAttr(builder.getI32TensorAttr(groups));
+    op.upperBoundsMapAttr(AffineMapAttr::get(newUpper));
+    op.upperBoundsGroupsAttr(builder.getI32TensorAttr(groups));
+    op.setSteps(newSteps);
+  }
+}
+
 struct StencilTppUnaryPass : public StencilTppUnaryBase<StencilTppUnaryPass> {
   void runOnFunction() final {
+    getFunction().walk(addSingleIteration);
     getFunction().walk([](AffineParallelOp op) {
       if (op.getIVs().size() >= 2) {
         StencilImpl stencil(op);

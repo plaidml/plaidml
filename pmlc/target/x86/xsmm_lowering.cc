@@ -1260,6 +1260,12 @@ void populatePXAGemmToXSMMConversionPatterns(RewritePatternSet &patterns) {
                                                xsmm::UnaryKind::TANH);
   patterns.insert<UnaryPxaGenericOpConversion>(context, "tpp_identity",
                                                xsmm::UnaryKind::IDENTITY);
+  patterns.insert<UnaryPxaGenericOpConversion>(context, "tpp_add_reduce",
+                                               xsmm::UnaryKind::REDUCE_X_OP_ADD);
+  patterns.insert<UnaryPxaGenericOpConversion>(context, "tpp_max_reduce",
+                                               xsmm::UnaryKind::REDUCE_X_OP_MAX);
+  patterns.insert<UnaryPxaGenericOpConversion>(context, "tpp_mul_reduce",
+                                               xsmm::UnaryKind::REDUCE_X_OP_MUL);
   patterns.insert<BinaryPxaGenericOpConversion>(context, "tpp_add",
                                                 xsmm::BinaryKind::ADD);
   patterns.insert<BinaryPxaGenericOpConversion>(context, "tpp_mul",
