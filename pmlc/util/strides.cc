@@ -53,6 +53,39 @@ llvm::Optional<StrideArray> computeStrideArray(mlir::AffineMap map) {
   return ret;
 }
 
+llvm::Optional<StrideArray> computeStrideArray(mlir::AffineMap map,
+                                               mlir::MemRefType memRefType) {
+  assert(map.getNumResults() == 1);
+  std::vector<llvm::SmallVector<int64_t, 8>> flat;
+  if (failed(getFlattenedAffineExprs(map, &flat, nullptr)))
+    return llvm::None;
+
+  StrideArray ret(map.getNumDims(), flat.front().back());
+  auto shape = memRefType.getShape();
+  llvm::SmallVector<int64_t, 4> strides;
+  int64_t offset;
+  if (failed(getStridesAndOffset(memRefType, strides, offset))) {
+    return llvm::None;
+  }
+
+  // For 1D tensor, if the computed stride is lost (e.g. 0), 
+  // then take the original memRefType for reference.
+  bool use_memref = (map.getNumDims() == 2 && shape.size() == 2);
+  for (unsigned i = 0, e = map.getNumDims(); i < e; i++) {
+    int64_t stride = flat.front()[i];
+    if (stride == 0 && use_memref) {
+      if (shape[i] > 1) {
+        return llvm::None;
+      }
+      ret.strides[i] = strides[i];
+    } else {
+      ret.strides[i] = stride;
+    }
+  }
+
+  return ret;
+}
+
 mlir::Optional<StrideArray> computeStrideArray(mlir::MemRefType memRefType,
                                                mlir::AffineMap map) {
   assert(map.getNumResults() == memRefType.getRank());

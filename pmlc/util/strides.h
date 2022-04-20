@@ -30,6 +30,13 @@ std::ostream &operator<<(std::ostream &os, const StrideArray &val);
 // AffineExpr result and this result must be purely affine.
 mlir::Optional<StrideArray> computeStrideArray(mlir::AffineMap map);
 
+// Compute the StrideArray for a given AffineMap. The map must have a single
+// AffineExpr result and this result must be purely affine.
+// The computation references the shape of memRefType if map is lack of
+// information.
+llvm::Optional<StrideArray> computeStrideArray(mlir::AffineMap map,
+                                               mlir::MemRefType memRefType);
+
 // Compute the StrideArray for a given AffineMap accessing a given memref.
 mlir::Optional<StrideArray> computeStrideArray(mlir::MemRefType memRefType,
                                                mlir::AffineMap map);

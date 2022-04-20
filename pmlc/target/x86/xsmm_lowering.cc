@@ -41,7 +41,7 @@ util::StrideArray getStrideArray(Value operand, AffineMap tileMap) {
   AffineMap layoutMap =
       makeStridedLinearLayoutMap(strides, offset, operand.getContext());
   Optional<util::StrideArray> info =
-      util::computeStrideArray(layoutMap.compose(tileMap));
+      util::computeStrideArray(layoutMap.compose(tileMap), type);
   assert(info.hasValue() && "computeStrideArray must succeed");
   return *info;
 }
