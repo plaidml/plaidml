@@ -79,6 +79,14 @@ llvm::Optional<StrideArray> computeStrideArray(mlir::AffineMap map,
       ret.strides[i] = stride;
     }
   }
+  if (map.getNumDims() == 2 && shape.size() == 1) {
+    if (ret.strides[0] == 0) {
+      ret.strides[0] = shape[0];
+    }
+    if (ret.strides[1] == 0) {
+      ret.strides[1] = strides[0];
+    }
+  }
 
   return ret;
 }
