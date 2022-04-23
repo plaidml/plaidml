@@ -68,15 +68,12 @@ llvm::Optional<StrideArray> computeStrideArray(mlir::AffineMap map,
     return llvm::None;
   }
 
-  // For 1D tensor, if the computed stride is lost (e.g. 0), 
+  // For 1D tensor, if the computed stride is lost (i.e. 0),
   // then take the original memRefType for reference.
   bool use_memref = (map.getNumDims() == 2 && shape.size() == 2);
   for (unsigned i = 0, e = map.getNumDims(); i < e; i++) {
     int64_t stride = flat.front()[i];
     if (stride == 0 && use_memref) {
-      if (shape[i] > 1) {
-        return llvm::None;
-      }
       ret.strides[i] = strides[i];
     } else {
       ret.strides[i] = stride;

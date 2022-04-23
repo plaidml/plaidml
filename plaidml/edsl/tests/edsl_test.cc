@@ -519,11 +519,11 @@ TEST_F(CppEdsl, Max) {
   Tensor R = Contraction().outShape(I).outAccess(i).max(A(i, j));
   auto program = makeProgram("max", {A}, {R});
   std::vector<float> input = {
-      -5.0f, -6.0f, -7.0f,  //
-      4.0f,  5.0f,  6.0f,   //
-      7.0f,  8.0f,  9.0f,   //
+      5.0f, 6.0f, 7.0f,  //
+      4.0f, 5.0f, 6.0f,  //
+      7.0f, 8.0f, 9.0f,  //
   };
-  std::vector<float> expected = {-5.0, 6.0, 9.0};
+  std::vector<float> expected = {7.0, 6.0, 9.0};
   checkExact(program, {input}, {expected});
 }
 

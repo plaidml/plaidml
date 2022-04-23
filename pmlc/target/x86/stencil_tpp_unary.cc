@@ -60,6 +60,13 @@ private:
                            StringRef inName) {
     if (capture)
       return;
+    AffineValueMap ranges = util::getRangesValueMap(op);
+    if (op.getIVs().size() == 2) {
+      auto constExpr = ranges.getResult(0).dyn_cast<AffineConstantExpr>();
+      if (constExpr && constExpr.getValue() == 1) {
+        return;
+      }
+    }
 
     using matchers::m_Any;
 
@@ -97,6 +104,13 @@ private:
                               StringRef inName) {
     if (capture)
       return;
+    AffineValueMap ranges = util::getRangesValueMap(op);
+    if (op.getIVs().size() == 2) {
+      auto constExpr = ranges.getResult(0).dyn_cast<AffineConstantExpr>();
+      if (constExpr && constExpr.getValue() == 1) {
+        return;
+      }
+    }
 
     using matchers::m_Any;
 
@@ -132,13 +146,19 @@ private:
                             StringRef inName, AtomicRMWKind agg) {
     if (capture)
       return;
+    AffineValueMap ranges = util::getRangesValueMap(op);
+    auto constExpr =
+        ranges.getResult(op.getIVs().size() - 2).dyn_cast<AffineConstantExpr>();
+    if (constExpr && constExpr.getValue() > 1) {
+      return;
+    }
 
     using matchers::m_Any;
 
     Value load, reduce;
     auto pattern = m_Op<AffineYieldOp>(m_Capture(
-        &reduce,
-        pxa::m_PxaReduceOp(agg, m_Capture(&load, m_Op<pxa::PxaLoadOp>()), m_Any())));
+        &reduce, pxa::m_PxaReduceOp(
+                     agg, m_Capture(&load, m_Op<pxa::PxaLoadOp>()), m_Any())));
 
     Operation *yield = op.getBody()->getTerminator();
     if (!matchPattern(yield, pattern))
@@ -245,38 +265,36 @@ private:
 
 public:
   explicit StencilImpl(AffineParallelOp op)
-      : StencilBase(
-            op,
-            {
-                pxa::StencilIndexRequirement{
-                    /*idxName=*/"eltwise_i",
-                    /*tilingGenerator=*/pxa::ExactRangeGenerator(),
-                    pxa::IndexStridePredicates{
-                        [](int64_t stride) {
-                          return (stride == 0 || stride > 1);
-                        }, // output
-                        [](int64_t stride) {
-                          return (stride == 0 || stride > 1);
-                        }, // input
-                    }},
-                pxa::StencilIndexRequirement{
-                    /*idxName=*/"eltwise_j",
-                    /*tilingGenerator=*/pxa::ExactRangeGenerator(),
-                    pxa::IndexStridePredicates{
-                        [](int64_t stride) {
-                          return (stride == 1 || stride == 0);
-                        }, // output
-                        [](int64_t stride) {
-                          return (stride == 1 || stride == 0);
-                        }, // input
-                    }},
-            }) {}
+      : StencilBase(op, {
+                            pxa::StencilIndexRequirement{
+                                /*idxName=*/"eltwise_i",
+                                /*tilingGenerator=*/pxa::ExactRangeGenerator(),
+                                pxa::IndexStridePredicates{
+                                    [](int64_t stride) {
+                                      return (stride == 0 || stride > 1);
+                                    }, // output
+                                    [](int64_t stride) {
+                                      return (stride == 0 || stride > 1);
+                                    }, // input
+                                }},
+                            pxa::StencilIndexRequirement{
+                                /*idxName=*/"eltwise_j",
+                                /*tilingGenerator=*/pxa::ExactRangeGenerator(),
+                                pxa::IndexStridePredicates{
+                                    [](int64_t stride) {
+                                      return (stride == 1 || stride == 0);
+                                    }, // output
+                                    [](int64_t stride) {
+                                      return (stride == 1 || stride == 0);
+                                    }, // input
+                                }},
+                        }) {}
 };
 
 } // namespace
 
-// For 1D tensor, we still map to 2D TPPs. We can make 2D TPPs do 1D 
-// by having the outer dim being 1. 
+// For 1D stenciling, we still map to 2D TPPs. We can make 2D TPPs do 1D
+// by having the outer dim being 1.
 void addSingleIteration(AffineParallelOp op) {
   if (op.getIVs().size() == 1) {
     Block *body = op.getBody();
