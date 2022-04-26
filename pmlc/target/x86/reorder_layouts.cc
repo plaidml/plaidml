@@ -621,12 +621,6 @@ struct ReorderWeightLayoutsPass
   }
 
   void reorderConvolution(linalg::GenericOp op) {
-    int64_t blockSize = 32;
-    std::string blockSizeStr = util::getEnvVar("PLAIDML_BLOCK_SIZE");
-    if (!blockSizeStr.empty()) {
-      blockSize = std::stoi(blockSizeStr);
-    }
-
     Optional<ConvCapture> conv = detectConv(op);
     if (!conv)
       return;
@@ -654,10 +648,28 @@ struct ReorderWeightLayoutsPass
       return;
     }
 
-    if (ranges->size() != 7 ||           //
-        (*ranges)[3] % blockSize != 0 || // C
-        (*ranges)[6] % blockSize != 0)   // K
+    if (ranges->size() != 7) {
+      IVLOG(1, "Cannot reorder: number of indexes is not 7.");
       return;
+    }
+
+    SmallVector<int64_t, 4> feasibleSizes = {32, 24, 16};
+    int64_t blockSize = 0;
+    std::string blockSizeStr = util::getEnvVar("PLAIDML_BLOCK_SIZE");
+    if (!blockSizeStr.empty()) {
+      blockSize = std::stoi(blockSizeStr);
+    }
+    for (int64_t size : feasibleSizes) {
+      if ((*ranges)[3] % size == 0 && (*ranges)[6] % size == 0) {
+        blockSize = size;
+        break;
+      }
+    }
+
+    if (blockSize == 0) {
+      IVLOG(1, "Cannot reorder: incompatible layout. op: " << debugString(op));
+      return;
+    }
 
     MLIRContext *context = &getContext();
     ImplicitLocOpBuilder builder(op->getLoc(), op);
