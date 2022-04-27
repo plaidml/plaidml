@@ -24,6 +24,7 @@ pml_cc_library(
     pmlc::conversion::tile_to_linalg
     pmlc::conversion::tile_to_pxa
     pmlc::dialect::layer::transforms
+    pmlc::dialect::linalgx::analysis
     pmlc::dialect::linalgx::ir
     pmlc::dialect::pml::transforms
     pmlc::dialect::pxa::analysis

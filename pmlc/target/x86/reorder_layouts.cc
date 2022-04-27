@@ -7,6 +7,7 @@
 #include "mlir/Support/DebugStringHelper.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
+#include "pmlc/dialect/linalgx/analysis/convolution.h"
 #include "pmlc/target/x86/pass_detail.h"
 #include "pmlc/target/x86/passes.h"
 #include "pmlc/util/env.h"
@@ -22,84 +23,6 @@ namespace pmlc::target::x86 {
 namespace linalgx = dialect::linalgx;
 
 namespace {
-
-struct ConvOperand {
-  Value value;
-  RankedTensorType type;
-  AffineMap idxMap;
-
-  ConvOperand(ValueRange values, ArrayRef<AffineMap> idxMaps, int64_t i)
-      : value(values[i]), type(value.getType().cast<RankedTensorType>()),
-        idxMap(idxMaps[i]) {}
-};
-
-struct ConvCapture {
-  ConvOperand input;
-  ConvOperand filter;
-  ConvOperand output;
-
-  ConvCapture(ValueRange values, ArrayRef<AffineMap> idxMaps,
-              ArrayRef<int64_t> order)
-      : input(values, idxMaps, order[0]), filter(values, idxMaps, order[1]),
-        output(values, idxMaps, order[2]) {}
-
-  RankedTensorType getBlockedInputType(int64_t blockSize) {
-    ArrayRef<int64_t> shape = input.type.getShape();
-    return RankedTensorType::get({shape[0],             //
-                                  shape[3] / blockSize, //
-                                  shape[1],             //
-                                  shape[2],             //
-                                  blockSize},
-                                 input.type.getElementType());
-  }
-
-  RankedTensorType getBlockedFilterType(int64_t blockSize) {
-    ArrayRef<int64_t> shape = filter.type.getShape();
-    return RankedTensorType::get({shape[2] / blockSize, //
-                                  shape[3] / blockSize, //
-                                  shape[0],             //
-                                  shape[1],             //
-                                  blockSize,            //
-                                  blockSize},
-                                 filter.type.getElementType());
-  }
-
-  RankedTensorType getBlockedOutputType(int64_t blockSize) {
-    ArrayRef<int64_t> shape = output.type.getShape();
-    return RankedTensorType::get({shape[0],             //
-                                  shape[3] / blockSize, //
-                                  shape[1],             //
-                                  shape[2],             //
-                                  blockSize},
-                                 input.type.getElementType());
-  }
-};
-
-static Optional<ConvCapture> detectConv(linalg::GenericOp op) {
-  if (op.getNumInputs() != 2 || op.getNumOutputs() != 1)
-    return None;
-
-  Block *block = op.getBody();
-  Block::BlockArgListType args = block->getArguments();
-  if (args.size() != 3)
-    return None;
-
-  ValueRange values = op.getOperands();
-  SmallVector<AffineMap> idxMaps = op.getIndexingMaps();
-
-  Operation *yieldOp = block->getTerminator();
-  if (matchPattern(
-          yieldOp,
-          m_Op<linalg::YieldOp>(m_Op<AddFOp>(
-              m_Val(args[2]), m_Op<MulFOp>(m_Val(args[0]), m_Val(args[1]))))) ||
-      matchPattern(yieldOp,
-                   m_Op<linalg::YieldOp>(m_Op<AddFOp>(m_Op<MulFOp>(
-                                             m_Val(args[0]), m_Val(args[1]))),
-                                         m_Val(args[2]))))
-    return ConvCapture{values, idxMaps, {0, 1, 2}};
-
-  return None;
-}
 
 static AffineExpr getBlockedExpr(MLIRContext *context, int64_t highDim,
                                  int64_t lowDim, int64_t blockSize) {
@@ -426,7 +349,7 @@ struct ReorderLayoutsPass : public ReorderLayoutsBase<ReorderLayoutsPass> {
   }
 
   void reorderConvolution(linalg::GenericOp op) {
-    Optional<ConvCapture> conv = detectConv(op);
+    Optional<linalgx::ConvCapture> conv = linalgx::detectConv(op);
     if (!conv) {
       IVLOG(3, "Cannot reorder: not a convolution. " << debugString(op));
       return;
@@ -461,7 +384,7 @@ struct ReorderLayoutsPass : public ReorderLayoutsBase<ReorderLayoutsPass> {
       return;
     }
 
-    SmallVector<int64_t, 4> feasibleSizes = {32, 24, 16};
+    SmallVector<int64_t, 4> feasibleSizes = {32, 16};
     int64_t blockSize = 0;
     std::string blockSizeStr = util::getEnvVar("PLAIDML_BLOCK_SIZE");
     if (!blockSizeStr.empty()) {
@@ -621,7 +544,7 @@ struct ReorderWeightLayoutsPass
   }
 
   void reorderConvolution(linalg::GenericOp op) {
-    Optional<ConvCapture> conv = detectConv(op);
+    Optional<linalgx::ConvCapture> conv = linalgx::detectConv(op);
     if (!conv)
       return;
 
@@ -653,7 +576,7 @@ struct ReorderWeightLayoutsPass
       return;
     }
 
-    SmallVector<int64_t, 4> feasibleSizes = {32, 24, 16};
+    SmallVector<int64_t, 4> feasibleSizes = {32, 16};
     int64_t blockSize = 0;
     std::string blockSizeStr = util::getEnvVar("PLAIDML_BLOCK_SIZE");
     if (!blockSizeStr.empty()) {
