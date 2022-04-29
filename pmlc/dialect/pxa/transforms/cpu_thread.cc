@@ -61,7 +61,7 @@ struct CPUThreadPass : public CPUThreadBase<CPUThreadPass> {
 
   void runOnFunction() final {
     auto func = getFunction();
-    std::list<Operation *> opStack;
+    std::list<AffineParallelOp> opStack;
     std::vector<int> opId;
     std::map<Operation *, std::string> opIdMap;
     std::map<std::string, ThreadSchedParams *> schedParamsMap;
@@ -70,14 +70,23 @@ struct CPUThreadPass : public CPUThreadBase<CPUThreadPass> {
       // Assign a unique id to each affineparallel op
       int lastUsedIdAtLevel = 0;
       while (!opStack.empty() &&
-             opStack.back() != op.getBody()->getParentOp()->getParentOp()) {
+             opStack.back().getOperation() !=
+                 op.getBody()->getParentOp()->getParentOp()) {
         opStack.pop_back();
-        lastUsedIdAtLevel = opId.back() + 1;
+        if (opStack.empty()) {
+          // TODO Hack
+          // At the topmost level, maintain the same starting id (0)
+          lastUsedIdAtLevel = opId.back();
+        } else {
+          lastUsedIdAtLevel = opId.back() + 1;
+        }
         opId.pop_back();
       }
-      opStack.push_back(op.getOperation());
+      opStack.push_back(op);
       opId.push_back(lastUsedIdAtLevel);
-
+      if (opStack.front().getNumDims() != 7) {
+        return WalkResult::skip();
+      }
       std::stringstream idString("");
       for (int i = 0; i < opId.size(); i++) {
         idString << opId[i];
