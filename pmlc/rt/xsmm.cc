@@ -114,13 +114,15 @@ extern "C" int64_t plaidml_rt_xsmm_unary_dispatch(
     unary_flags = LIBXSMM_MELTW_FLAG_UNARY_BCAST_SCALAR;
   }
 
-  libxsmm_meltw_unary_type unary_type = static_cast<libxsmm_meltw_unary_type>(type);
+  libxsmm_meltw_unary_type unary_type =
+      static_cast<libxsmm_meltw_unary_type>(type);
   if (unary_type == LIBXSMM_MELTW_TYPE_UNARY_REDUCE_X_OP_ADD ||
       unary_type == LIBXSMM_MELTW_TYPE_UNARY_REDUCE_X_OP_MUL ||
       unary_type == LIBXSMM_MELTW_TYPE_UNARY_REDUCE_X_OP_MAX) {
     unary_flags = static_cast<libxsmm_meltw_unary_flags>(
-      static_cast<int>(unary_flags) | 
-      static_cast<int>(LIBXSMM_MELTW_FLAG_UNARY_REDUCE_ROWS));
+        static_cast<int>(unary_flags) |
+        static_cast<int>(LIBXSMM_MELTW_FLAG_UNARY_REDUCE_ROWS));
+    ldo_int = ldi_int;
   }
   libxsmm_meltwfunction_unary kernel = libxsmm_dispatch_meltw_unary(
       static_cast<libxsmm_blasint>(n), static_cast<libxsmm_blasint>(m),
@@ -129,8 +131,7 @@ extern "C" int64_t plaidml_rt_xsmm_unary_dispatch(
       static_cast<libxsmm_datatype>(compute_type),
       static_cast<libxsmm_datatype>(out_type),
       unary_flags, // TODO: add flags to op definition
-      unary_type
-      );
+      unary_type);
   return reinterpret_cast<int64_t>(kernel);
 }
 

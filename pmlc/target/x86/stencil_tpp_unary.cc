@@ -180,7 +180,7 @@ private:
 
     // TODO: remove the constraint of memRefType
     auto type = cast<pxa::PxaLoadOp>(load.getDefiningOp()).getMemRefType();
-    if (type.getShape().size() > 2)
+    if (type.getShape().size() != 2)
       return;
 
     capture = pxa::StencilCapture{{reduce}, {load}};
