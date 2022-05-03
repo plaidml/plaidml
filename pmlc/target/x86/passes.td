@@ -88,6 +88,11 @@ def StencilTppBinary : FunctionPass<"x86-stencil-tpp-binary"> {
   let constructor = "pmlc::target::x86::createStencilTppBinaryPass()";
 }
 
+def StencilSplit : FunctionPass<"x86-stencil-tpp-split"> {
+  let summary = "Split back to back unary/binary stencils";
+  let constructor = "pmlc::target::x86::createStencilSplitPass()";
+}
+
 def TraceLinking : Pass<"x86-trace-linking", "mlir::ModuleOp"> {
   let summary = "Link trace ops to runtime functions";
   let constructor = "pmlc::target::x86::createTraceLinkingPass()";
