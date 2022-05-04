@@ -7,7 +7,6 @@ include "mlir/IR/OpBase.td"
 include "mlir/Interfaces/LoopLikeInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/ViewLikeInterface.td"
-include "mlir/Dialect/StandardOps/IR/StandardOpsBase.td"
 
 def StdX_Dialect : Dialect {
   let name = "stdx";

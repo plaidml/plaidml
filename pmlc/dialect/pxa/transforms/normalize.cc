@@ -129,9 +129,9 @@ void denestLoops(mlir::AffineParallelOp op) {
   newRanges.insert(newRanges.end(), outerRanges.begin(), outerRanges.end());
   newRanges.insert(newRanges.end(), innerRanges.begin(), innerRanges.end());
   // Extract reductions
-  SmallVector<AtomicRMWKind, 8> reductions;
+  SmallVector<arith::AtomicRMWKind, 8> reductions;
   for (APInt value : op.reductions().getAsValueRange<IntegerAttr>()) {
-    reductions.push_back(*symbolizeAtomicRMWKind(value.getZExtValue()));
+    reductions.push_back(*arith::symbolizeAtomicRMWKind(value.getZExtValue()));
   }
   // Make a new AffineParallel right before the current op
   OpBuilder builder(op);

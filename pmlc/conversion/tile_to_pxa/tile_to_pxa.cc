@@ -7,6 +7,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/DebugStringHelper.h"
+#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 
 #include "pmlc/conversion/tile_to_pxa/pass_detail.h"
 #include "pmlc/dialect/pxa/analysis/strides.h"
@@ -376,37 +377,37 @@ struct CondOp {
   }
 };
 
-static AtomicRMWKind convertAgg(AggregationKind agg, Type type) {
+static arith::AtomicRMWKind convertAgg(AggregationKind agg, Type type) {
   switch (agg) {
   case AggregationKind::assign:
-    return AtomicRMWKind::assign;
+    return arith::AtomicRMWKind::assign;
   case AggregationKind::add:
     if (type.isa<FloatType>()) {
-      return AtomicRMWKind::addf;
+      return arith::AtomicRMWKind::addf;
     } else {
-      return AtomicRMWKind::addi;
+      return arith::AtomicRMWKind::addi;
     }
   case AggregationKind::mul:
     if (type.isa<FloatType>()) {
-      return AtomicRMWKind::mulf;
+      return arith::AtomicRMWKind::mulf;
     } else {
-      return AtomicRMWKind::muli;
+      return arith::AtomicRMWKind::muli;
     }
   case AggregationKind::min:
     if (type.isa<FloatType>()) {
-      return AtomicRMWKind::minf;
+      return arith::AtomicRMWKind::minf;
     } else if (type.isSignedInteger()) {
-      return AtomicRMWKind::mins;
+      return arith::AtomicRMWKind::mins;
     } else {
-      return AtomicRMWKind::minu;
+      return arith::AtomicRMWKind::minu;
     }
   case AggregationKind::max:
     if (type.isa<FloatType>()) {
-      return AtomicRMWKind::maxf;
+      return arith::AtomicRMWKind::maxf;
     } else if (type.isSignedInteger()) {
-      return AtomicRMWKind::maxs;
+      return arith::AtomicRMWKind::maxs;
     } else {
-      return AtomicRMWKind::maxu;
+      return arith::AtomicRMWKind::maxu;
     }
   }
   llvm_unreachable("Invalid agg type in convertAgg");
@@ -431,7 +432,7 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
     auto forOp = rewriter.create<AffineParallelOp>(
         loc,
         /*resultTypes=*/ArrayRef<Type>{alloc.memRefType},
-        /*reductions=*/ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign},
+        /*reductions=*/ArrayRef<arith::AtomicRMWKind>{arith::AtomicRMWKind::assign},
         /*ranges=*/alloc.rankedTensorType.getShape());
     if (Attribute attr = op->getAttr("name"))
       forOp->setAttr("name", attr);
@@ -521,7 +522,7 @@ struct ContractionOpConversion
     auto parallel = rewriter.create<AffineParallelOp>(
         loc,
         /*resultTypes=*/ArrayRef<Type>{alloc.memRefType},
-        /*reductions=*/ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign},
+        /*reductions=*/ArrayRef<arith::AtomicRMWKind>{arith::AtomicRMWKind::assign},
         /*ranges=*/shape);
     auto parallelBuilder = parallel.getBodyBuilder();
     auto maybePadding = tile::getPaddingInfo(op.init().getDefiningOp());
@@ -555,7 +556,7 @@ struct ContractionOpConversion
     auto forOp = rewriter.create<AffineParallelOp>(
         loc,
         /*resultTypes=*/ArrayRef<Type>{alloc.memRefType},
-        /*reductions=*/ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign},
+        /*reductions=*/ArrayRef<arith::AtomicRMWKind>{arith::AtomicRMWKind::assign},
         /*lbMaps=*/lbMaps,
         /*lbArgs=*/ArrayRef<Value>{},
         /*ubMaps=*/ubMaps,
@@ -650,7 +651,7 @@ struct IndexOpConversion : public OpConversionPattern<tile::IndexOp> {
     auto forOp = rewriter.create<AffineParallelOp>(
         loc,
         /*resultTypes=*/ArrayRef<Type>{resultType},
-        /*reductions=*/ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign},
+        /*reductions=*/ArrayRef<arith::AtomicRMWKind>{arith::AtomicRMWKind::assign},
         /*ranges=*/resultType.getShape());
     auto body = forOp.getBody();
     rewriter.setInsertionPointToStart(body);
@@ -715,7 +716,7 @@ struct ShapeOpConversion : public OpConversionPattern<tile::ShapeOp> {
 
     // Populate the buffer with the shape dims
     auto operandType = adaptor.tensor().getType().cast<MemRefType>();
-    auto aggOp = AtomicRMWKind::assign;
+    auto aggOp = arith::AtomicRMWKind::assign;
     for (unsigned i = 0; i < operandType.getRank(); i++) {
       auto dim = rewriter.create<mlir::memref::DimOp>(loc, adaptor.tensor(), i);
       auto cast = rewriter.create<mlir::arith::IndexCastOp>(
@@ -746,7 +747,7 @@ struct CastOpConversion : public OpConversionPattern<tile::CastOp> {
     auto forOp = rewriter.create<AffineParallelOp>(
         loc,
         /*resultTypes=*/ArrayRef<Type>{alloc.memRefType},
-        /*reductions=*/ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign},
+        /*reductions=*/ArrayRef<arith::AtomicRMWKind>{arith::AtomicRMWKind::assign},
         /*ranges=*/alloc.rankedTensorType.getShape());
     auto body = forOp.getBody();
     rewriter.setInsertionPointToStart(body);

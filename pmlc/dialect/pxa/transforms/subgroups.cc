@@ -86,7 +86,7 @@ struct SubgroupCostModel {
     // Preflight all loads/stores + cache
     bool safe = true;
     op.walk([&](PxaReduceOp red) {
-      if (red.agg() != AtomicRMWKind::addf) {
+      if (red.agg() != arith::AtomicRMWKind::addf) {
         // This isn't really unsafe, but basically this test removes
         // non-contraction like ops from consideration.  Eltwise ops are not
         // good to subgroup due to low computational density (we should

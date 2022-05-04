@@ -9,6 +9,7 @@
 #include "mlir/Dialect/Affine/IR/AffineValueMap.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 
 #include "pmlc/dialect/pxa/analysis/strides.h"
 #include "pmlc/dialect/pxa/analysis/uses.h"
@@ -29,12 +30,12 @@ static Value createInitLoop(OpBuilder &builder, Location loc, Value memref,
   ArrayRef<int64_t> size = memrefType.getShape();
   assert(memrefType.getElementType() == initVal.getType());
   auto loop = builder.create<AffineParallelOp>(loc, memrefType,
-                                               AtomicRMWKind::assign, size);
+                                               arith::AtomicRMWKind::assign, size);
   auto initBuilder = loop.getBodyBuilder();
   auto idMap =
       AffineMap::getMultiDimIdentityMap(size.size(), builder.getContext());
   auto stored = initBuilder.create<PxaReduceOp>(
-      loc, AtomicRMWKind::assign, initVal, memref, idMap, loop.getIVs());
+      loc, arith::AtomicRMWKind::assign, initVal, memref, idMap, loop.getIVs());
   initBuilder.create<AffineYieldOp>(loc, ArrayRef<Value>{stored});
   return loop.getResult(0);
 }
@@ -45,13 +46,13 @@ static AffineParallelOp createCopyLoop(OpBuilder &builder,               //
                                        Value srcMemRef, Value dstMemRef, //
                                        ArrayRef<StrideInfo> srcOffset,   //
                                        ArrayRef<StrideInfo> dstOffset,   //
-                                       AtomicRMWKind agg) {
+                                       arith::AtomicRMWKind agg) {
   assert(size.size() == srcOffset.size());
   assert(size.size() == dstOffset.size());
   size_t dims = size.size();
   auto ctx = builder.getContext();
   auto loop = builder.create<AffineParallelOp>(loc, dstMemRef.getType(),
-                                               AtomicRMWKind::assign, size);
+                                               arith::AtomicRMWKind::assign, size);
   SmallVector<StrideInfo, 4> srcAccess;
   SmallVector<StrideInfo, 4> dstAccess;
   for (size_t i = 0; i < dims; i++) {
@@ -110,7 +111,7 @@ LogicalResult cacheLoad(AffineParallelOp par, PxaLoadOp load) {
   SmallVector<StrideInfo, 4> zeroOffset(rap.innerCount.size());
   auto copyLoop =
       createCopyLoop(builder, loc, rap.innerCount, load.getMemRef(), localBuf,
-                     rap.outer, zeroOffset, AtomicRMWKind::assign);
+                     rap.outer, zeroOffset, arith::AtomicRMWKind::assign);
 
   // Make a new load and remove the old one
   auto innerMap = convertToValueMap(par.getContext(), rap.inner);
@@ -247,7 +248,7 @@ LogicalResult cacheReduce(AffineParallelOp par, PxaReduceOp reduce) {
 
   // If it's not an assign, clear it to the reduction identity
   Value initBuf = localBuf;
-  if (reduce.agg() != AtomicRMWKind::assign) {
+  if (reduce.agg() != arith::AtomicRMWKind::assign) {
     auto ident = createIdentity(builder, loc, reduce.agg(), eltType);
     initBuf = createInitLoop(builder, loc, localBuf, ident);
   }
@@ -412,7 +413,7 @@ void CachePlan::execute() {
       auto copyLoop = createCopyLoop(
           builder, loc,
           wholeBlock ? entry.rap.wholeInnerCount : entry.rap.innerCount, memref,
-          entry.cache, entry.rap.outer, zeroOffset, AtomicRMWKind::assign);
+          entry.cache, entry.rap.outer, zeroOffset, arith::AtomicRMWKind::assign);
       copyLoop.getOperation()->setAttr("cache_in", builder.getUnitAttr());
       entry.cache = copyLoop.getResult(0);
     }
@@ -436,7 +437,7 @@ void CachePlan::execute() {
       auto &finalUse = *finalValue.use_begin();
       auto copyLoop =
           createCopyLoop(builder, loc, entry.rap.innerCount, finalValue, memref,
-                         zeroOffset, entry.rap.outer, AtomicRMWKind::assign);
+                         zeroOffset, entry.rap.outer, arith::AtomicRMWKind::assign);
       copyLoop.getOperation()->setAttr("cache_out", builder.getUnitAttr());
       finalUse.set(copyLoop.getResult(0));
     }

@@ -92,7 +92,7 @@ Value buildSimpleStore(OpBuilder &builder, Location loc, Value scalar,
   if (elementType != scalar.getType()) {
     scalar = createCastOp(builder, loc, scalar, false, elementType, false);
   }
-  AtomicRMWKind aggOp = AtomicRMWKind::assign;
+  arith::AtomicRMWKind aggOp = arith::AtomicRMWKind::assign;
   AffineMap idMap = builder.getMultiDimIdentityMap(memRefType.getRank());
   auto storeOp = builder.create<pxa::PxaReduceOp>(loc, aggOp, scalar, memRef,
                                                   idMap, body->getArguments());
@@ -222,7 +222,7 @@ BufferAllocator::BufferAllocator(OpBuilder &builder, Operation *op,
     auto parallel = builder.create<AffineParallelOp>(
         loc,
         /*resultTypes=*/ArrayRef<Type>{memRefType},
-        /*reductions=*/ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign},
+        /*reductions=*/ArrayRef<arith::AtomicRMWKind>{arith::AtomicRMWKind::assign},
         /*ranges=*/shape);
     auto parallelBuilder = parallel.getBodyBuilder();
     auto load =

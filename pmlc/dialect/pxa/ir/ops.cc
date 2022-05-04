@@ -3,7 +3,7 @@
 #include "pmlc/dialect/pxa/ir/ops.h"
 
 #include <string>
-
+#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/OpImplementation.h"
@@ -472,7 +472,7 @@ ParseResult parsePxaReduceOp(OpAsmParser &parser, OperationState &result) {
   OpAsmParser::OperandType val, out;
   SmallVector<OpAsmParser::OperandType, 4> idxs;
   auto symbolizeAtomicRMWKindWrap = [](StringRef str) {
-    return symbolizeAtomicRMWKind(str);
+    return arith::symbolizeAtomicRMWKind(str);
   };
   return failure(
       parseKeywordIntoEnumAttr(parser, result, "agg", i64Ty,
@@ -530,7 +530,7 @@ ParseResult parsePxaVectorReduceOp(OpAsmParser &parser,
   OpAsmParser::OperandType val, out;
   SmallVector<OpAsmParser::OperandType, 4> idxs;
   auto symbolizeAtomicRMWKindWrap = [](StringRef str) {
-    return symbolizeAtomicRMWKind(str);
+    return arith::symbolizeAtomicRMWKind(str);
   };
   return failure(
       parseKeywordIntoEnumAttr(parser, result, "agg", i64Ty,
@@ -755,8 +755,8 @@ static void printPxaGenericOp(OpAsmPrinter &p, PxaGenericOp op) {
                           op.outputAccessMaps(), op.outputTileMaps());
   p << ") <";
   llvm::interleaveComma(op.reductions(), p, [&](Attribute attr) {
-    Optional<AtomicRMWKind> kind =
-        symbolizeAtomicRMWKind(attr.cast<IntegerAttr>().getInt());
+    Optional<arith::AtomicRMWKind> kind =
+        arith::symbolizeAtomicRMWKind(attr.cast<IntegerAttr>().getInt());
     p << stringifyAtomicRMWKind(*kind);
   });
   p << "> ";
@@ -839,7 +839,7 @@ static ParseResult parseReductions(OpAsmParser &parser,
     if (parser.getCurrentLocation(&loc) || parser.parseKeyword(&str))
       return failure();
 
-    Optional<AtomicRMWKind> kind = symbolizeAtomicRMWKind(str);
+    Optional<arith::AtomicRMWKind> kind = arith::symbolizeAtomicRMWKind(str);
     if (!kind)
       return parser.emitError(loc) << "expected valid AtomicRMWKind value";
 

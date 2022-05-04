@@ -83,7 +83,7 @@ struct FusionInfo {
   }
 
   void collectReductionIdxs(PxaReduceOp reduce) {
-    if (reduce.agg() == AtomicRMWKind::assign) {
+    if (reduce.agg() == arith::AtomicRMWKind::assign) {
       return;
     }
     DenseSet<BlockArgument> idxs;
@@ -588,8 +588,8 @@ struct FusionInfo {
     }
 
     // Construct the new outer parallel op
-    SmallVector<AtomicRMWKind, 8> reductions(typesC.size(),
-                                             AtomicRMWKind::assign);
+    SmallVector<arith::AtomicRMWKind, 8> reductions(typesC.size(),
+                                             arith::AtomicRMWKind::assign);
     MLIRContext *context = aInfo.op.getContext();
     auto apC = builder.create<AffineParallelOp>(
         FusedLoc::get(context, {aInfo.op.getLoc(), bInfo.op.getLoc()}),

@@ -42,10 +42,10 @@ unsigned getNestedIVCount(AffineParallelOp op) {
 void buildNestLoop(AffineParallelOp op) {
   OpBuilder builder(op.getBody(), op.getBody()->begin());
   Block *outerBody = op.getBody();
-  llvm::SmallVector<mlir::AtomicRMWKind, 8> reductions;
+  llvm::SmallVector<arith::AtomicRMWKind, 8> reductions;
   for (Attribute attr : op.reductions()) {
     auto intAttr = attr.dyn_cast<IntegerAttr>();
-    reductions.push_back(*mlir::symbolizeAtomicRMWKind(intAttr.getInt()));
+    reductions.push_back(*arith::symbolizeAtomicRMWKind(intAttr.getInt()));
   }
   auto inner = builder.create<AffineParallelOp>(
       op.getLoc(), op.getResultTypes(), reductions, ArrayRef<int64_t>{1});

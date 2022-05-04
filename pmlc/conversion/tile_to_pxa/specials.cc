@@ -324,7 +324,7 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
 
     auto loop = rewriter.create<AffineParallelOp>(
         loc, ArrayRef<Type>{memrefType},
-        ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign}, size);
+        ArrayRef<arith::AtomicRMWKind>{arith::AtomicRMWKind::assign}, size);
     rewriter.setInsertionPointToStart(loop.getBody());
 
     // Create an affine map for loading the index, using the leading counters
@@ -429,7 +429,7 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
     auto dstStoreMap = AffineMap::getMultiDimIdentityMap(dstDims, ctx);
 
     // Create a destination map from the whole loop
-    auto stored = rewriter.create<pxa::PxaReduceOp>(loc, AtomicRMWKind::assign,
+    auto stored = rewriter.create<pxa::PxaReduceOp>(loc, arith::AtomicRMWKind::assign,
                                                     interpVal, resultMemRef,
                                                     dstStoreMap, loop.getIVs());
     rewriter.create<AffineYieldOp>(loc, ArrayRef<Value>{stored.getResult()});
@@ -771,7 +771,7 @@ struct ScatterOpConversion : public OpConversionPattern<tile::ScatterOp> {
     ArrayRef<int64_t> dataShape = data.getType().cast<MemRefType>().getShape();
     auto copyLoop = rewriter.create<AffineParallelOp>(
         loc, ArrayRef<Type>{data.getType()},
-        ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign}, dataShape);
+        ArrayRef<arith::AtomicRMWKind>{arith::AtomicRMWKind::assign}, dataShape);
     rewriter.setInsertionPointToStart(copyLoop.getBody());
     size_t dataDims = dataShape.size();
     AffineMap dataLoadMap = AffineMap::getMultiDimIdentityMap(dataDims, ctx);
@@ -792,7 +792,7 @@ struct ScatterOpConversion : public OpConversionPattern<tile::ScatterOp> {
 
     auto loop = rewriter.create<AffineParallelOp>(
         loc, ArrayRef<Type>{resultMemRefType},
-        ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign}, updatesShape);
+        ArrayRef<arith::AtomicRMWKind>{arith::AtomicRMWKind::assign}, updatesShape);
     rewriter.setInsertionPointToStart(loop.getBody());
 
     // Load the source value from the updates tensor.
@@ -854,16 +854,16 @@ struct ScatterOpConversion : public OpConversionPattern<tile::ScatterOp> {
     if (op.mode() == ScatterMode::normal) {
       if (srcVal.getType().isa<FloatType>()) {
         storeResult = rewriter.create<pxa::PxaStoreOp>(
-            loc, AtomicRMWKind::addf, srcVal, copyLoop.getResult(0), dstOps);
+            loc, arith::AtomicRMWKind::addf, srcVal, copyLoop.getResult(0), dstOps);
       } else if (srcVal.getType().isa<IntegerType>()) {
         storeResult = rewriter.create<pxa::PxaStoreOp>(
-            loc, AtomicRMWKind::addi, srcVal, copyLoop.getResult(0), dstOps);
+            loc, arith::AtomicRMWKind::addi, srcVal, copyLoop.getResult(0), dstOps);
       } else {
         llvm_unreachable("Unsupported datatype in scatter.");
       }
     } else {
       storeResult = rewriter.create<pxa::PxaStoreOp>(
-          loc, AtomicRMWKind::assign, srcVal, copyLoop.getResult(0), dstOps);
+          loc, arith::AtomicRMWKind::assign, srcVal, copyLoop.getResult(0), dstOps);
     }
 
     rewriter.create<AffineYieldOp>(loc, ArrayRef<Value>{storeResult});

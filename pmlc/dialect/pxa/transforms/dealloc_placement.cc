@@ -71,7 +71,7 @@ struct DeallocPlacementPass
         auto copyLoopOp = builder.create<AffineParallelOp>(
             forOp.getLoc(),
             /*resultTypes=*/resType,
-            /*reductions=*/AtomicRMWKind::assign,
+            /*reductions=*/arith::AtomicRMWKind::assign,
             /*ranges=*/resType.getShape());
 
         Block *body = copyLoopOp.getBody();
@@ -82,7 +82,7 @@ struct DeallocPlacementPass
 
         AffineMap idMap = builder.getMultiDimIdentityMap(resType.getRank());
         auto reduce = builder.create<pxa::PxaReduceOp>(
-            forOp.getLoc(), AtomicRMWKind::assign, load, newBuf, idMap,
+            forOp.getLoc(), arith::AtomicRMWKind::assign, load, newBuf, idMap,
             builder.getBlock()->getArguments());
 
         builder.create<AffineYieldOp>(forOp.getLoc(),

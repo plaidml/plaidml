@@ -45,29 +45,29 @@ private:
   DenseSet<Operation *> vectorizedOps;
   DenseSet<Operation *> zeroStrideReductions;
 
-  const char *stringifyAtomicRMWKindForVectorReductionOp(AtomicRMWKind val) {
+  const char *stringifyAtomicRMWKindForVectorReductionOp(arith::AtomicRMWKind val) {
     switch (val) {
-    case AtomicRMWKind::addf:
+    case arith::AtomicRMWKind::addf:
       return "add";
-    case AtomicRMWKind::addi:
+    case arith::AtomicRMWKind::addi:
       return "add";
-    case AtomicRMWKind::assign:
+    case arith::AtomicRMWKind::assign:
       return "invalid";
-    case AtomicRMWKind::maxf:
+    case arith::AtomicRMWKind::maxf:
       return "max";
-    case AtomicRMWKind::maxs:
+    case arith::AtomicRMWKind::maxs:
       return "max";
-    case AtomicRMWKind::maxu:
+    case arith::AtomicRMWKind::maxu:
       return "max";
-    case AtomicRMWKind::minf:
+    case arith::AtomicRMWKind::minf:
       return "min";
-    case AtomicRMWKind::mins:
+    case arith::AtomicRMWKind::mins:
       return "min";
-    case AtomicRMWKind::minu:
+    case arith::AtomicRMWKind::minu:
       return "min";
-    case AtomicRMWKind::mulf:
+    case arith::AtomicRMWKind::mulf:
       return "mul";
-    case AtomicRMWKind::muli:
+    case arith::AtomicRMWKind::muli:
       return "mul";
     }
     llvm_unreachable("Invalid aggregation type");
@@ -107,7 +107,7 @@ private:
       // see the vector::ReductionOp verification code
       // (https://github.com/llvm/llvm-project/blob/master/mlir/lib/Dialect/Vector/VectorOps.cpp#L134).
       Type elementType = op.getMemRefType().getElementType();
-      if (op.agg() == AtomicRMWKind::assign ||
+      if (op.agg() == arith::AtomicRMWKind::assign ||
           (!elementType.isF32() && !elementType.isF64() &&
            !elementType.isSignlessInteger(32) &&
            !elementType.isSignlessInteger(64))) {

@@ -175,7 +175,7 @@ struct VectorizeMemImpl {
     auto vectorReduceOp =
         dyn_cast_or_null<PxaVectorReduceOp>(memOp.getOperation());
     if (vectorReduceOp &&
-        (vectorReduceOp.getAgg() != AtomicRMWKind::assign ||
+        (vectorReduceOp.getAgg() != arith::AtomicRMWKind::assign ||
          loopOp.results().size() != 1 ||
          (tileSize == loopVectorSize &&
           loopOp->getParentOfType<AffineParallelOp>() &&
@@ -337,7 +337,7 @@ struct VectorizeMemImpl {
       }
     }
     auto newReduceOp = builder.create<PxaVectorReduceOp>(
-        vectorReduce.getLoc(), AtomicRMWKind::assign,
+        vectorReduce.getLoc(), arith::AtomicRMWKind::assign,
         newInsertMapOp.getResult(), newAllocOp, identityMap,
         ValueRange{const0.getResult()});
     builder.setInsertionPointAfter(loopOp);
@@ -345,7 +345,7 @@ struct VectorizeMemImpl {
         vectorReduce.getLoc(), vectorType, newAllocOp, identityMap,
         ValueRange{const0.getResult()});
     auto newReduceOuterOp = builder.create<PxaVectorReduceOp>(
-        vectorReduce.getLoc(), AtomicRMWKind::assign, newLoadOp.getResult(),
+        vectorReduce.getLoc(), arith::AtomicRMWKind::assign, newLoadOp.getResult(),
         vectorReduce.memref(), vectorReduce.getAffineMap(),
         vectorReduce.idxs());
     for (auto res : results) {

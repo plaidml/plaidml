@@ -44,7 +44,7 @@ struct MemOpPattern final : public OpRewritePattern<MemOp> {
     if (auto store = dyn_cast<memref::StoreOp>(op.getOperation())) {
       // Convert to PxaReduceOp
       auto result = rewriter.create<PxaReduceOp>(
-          op.getLoc(), AtomicRMWKind::assign, store.getValueToStore(), memRef,
+          op.getLoc(), arith::AtomicRMWKind::assign, store.getValueToStore(), memRef,
           affineMap, idxs);
       if (auto loop =
               dyn_cast<AffineParallelOp>(op.getOperation()->getParentOp())) {

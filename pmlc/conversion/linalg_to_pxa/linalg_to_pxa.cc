@@ -3,6 +3,7 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Support/DebugStringHelper.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 
 #include "pmlc/conversion/linalg_to_pxa/pass_detail.h"
 #include "pmlc/conversion/tile_to_pxa/pass_detail.h"
@@ -64,16 +65,16 @@ struct ReductionInfo {
     Value lhs, rhs;
     Value cond, trueValue, falseValue;
     if (matchPattern(op, m_Op<arith::AddIOp>(m_Capture(&lhs), m_Capture(&rhs)))) {
-      agg = AtomicRMWKind::addi;
+      agg = arith::AtomicRMWKind::addi;
     } else if (matchPattern(op,
                             m_Op<arith::AddFOp>(m_Capture(&lhs), m_Capture(&rhs)))) {
-      agg = AtomicRMWKind::addf;
+      agg = arith::AtomicRMWKind::addf;
     } else if (matchPattern(op,
                             m_Op<arith::MulIOp>(m_Capture(&lhs), m_Capture(&rhs)))) {
-      agg = AtomicRMWKind::muli;
+      agg = arith::AtomicRMWKind::muli;
     } else if (matchPattern(op,
                             m_Op<arith::MulFOp>(m_Capture(&lhs), m_Capture(&rhs)))) {
-      agg = AtomicRMWKind::mulf;
+      agg = arith::AtomicRMWKind::mulf;
     } else if (matchPattern(
                    op, m_Op<SelectOp>(
                            m_Capture(&cond, m_Op<arith::CmpIOp>(m_Capture(&lhs),
@@ -85,19 +86,19 @@ struct ReductionInfo {
         switch (intPred) {
         case arith::CmpIPredicate::sgt:
         case arith::CmpIPredicate::sge:
-          agg = AtomicRMWKind::maxs;
+          agg = arith::AtomicRMWKind::maxs;
           break;
         case arith::CmpIPredicate::ugt:
         case arith::CmpIPredicate::uge:
-          agg = AtomicRMWKind::maxu;
+          agg = arith::AtomicRMWKind::maxu;
           break;
         case arith::CmpIPredicate::slt:
         case arith::CmpIPredicate::sle:
-          agg = AtomicRMWKind::mins;
+          agg = arith::AtomicRMWKind::mins;
           break;
         case arith::CmpIPredicate::ult:
         case arith::CmpIPredicate::ule:
-          agg = AtomicRMWKind::minu;
+          agg = arith::AtomicRMWKind::minu;
           break;
         default:
           op->emitError("Invalid integer cmp predicate for aggregation.");
@@ -116,13 +117,13 @@ struct ReductionInfo {
         case arith::CmpFPredicate::OGE:
         case arith::CmpFPredicate::UGT:
         case arith::CmpFPredicate::UGE:
-          agg = AtomicRMWKind::maxf;
+          agg = arith::AtomicRMWKind::maxf;
           break;
         case arith::CmpFPredicate::OLT:
         case arith::CmpFPredicate::OLE:
         case arith::CmpFPredicate::ULT:
         case arith::CmpFPredicate::ULE:
-          agg = AtomicRMWKind::minf;
+          agg = arith::AtomicRMWKind::minf;
           break;
         default:
           op->emitError("Invalid float cmp predicate for aggregation.");
@@ -134,12 +135,12 @@ struct ReductionInfo {
     scalar = (lhs == bufElem) ? rhs : lhs;
   }
 
-  AtomicRMWKind getAgg() { return agg; }
+  arith::AtomicRMWKind getAgg() { return agg; }
   Value getScalar() { return scalar; }
   Operation *getRelatedOp() { return relatedOp; }
 
 private:
-  AtomicRMWKind agg;
+  arith::AtomicRMWKind agg;
   Value scalar;
   Operation *relatedOp;
 };
@@ -152,7 +153,7 @@ static AffineParallelOp copyBuffer(OpBuilder &builder, Location loc,
   auto forOp = builder.create<AffineParallelOp>(
       loc,
       /*resultTypes=*/TypeRange{type},
-      /*reductions=*/ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign},
+      /*reductions=*/ArrayRef<arith::AtomicRMWKind>{arith::AtomicRMWKind::assign},
       /*ranges=*/type.getShape());
   Block::BlockArgListType idxs = forOp.getBody()->getArguments();
   OpBuilder bodyBuilder = forOp.getBodyBuilder();
@@ -161,7 +162,7 @@ static AffineParallelOp copyBuffer(OpBuilder &builder, Location loc,
   auto loadOp =
       bodyBuilder.create<pxa::PxaLoadOp>(loc, input, identityMap, idxs);
   auto reduceOp = bodyBuilder.create<pxa::PxaReduceOp>(
-      loc, AtomicRMWKind::assign, loadOp, output, identityMap, idxs);
+      loc, arith::AtomicRMWKind::assign, loadOp, output, identityMap, idxs);
   bodyBuilder.create<AffineYieldOp>(loc, reduceOp.result());
   return forOp;
 }
@@ -309,7 +310,7 @@ struct GenericOpConversion : public OpConversionPattern<linalg::GenericOp> {
     auto numInputs = inputs.size();
     auto numOutputs = outputs.size();
     // Make a parallel for loop to fill the result
-    SmallVector<AtomicRMWKind, 4> aggs(outputs.size(), AtomicRMWKind::assign);
+    SmallVector<arith::AtomicRMWKind, 4> aggs(outputs.size(), arith::AtomicRMWKind::assign);
     auto outputArgs = op.getBody()->getArguments();
     for (unsigned i = 0; i < outputs.size(); ++i) {
       for (auto &use : outputArgs[numInputs + i].getUses()) {
@@ -346,8 +347,8 @@ struct GenericOpConversion : public OpConversionPattern<linalg::GenericOp> {
     }
     SmallVector<int64_t, 8> ranges = llvm::to_vector<8>(*staticRanges);
     auto loc = op.getLoc();
-    SmallVector<AtomicRMWKind, 4> reductions(outputs.size(),
-                                             AtomicRMWKind::assign);
+    SmallVector<arith::AtomicRMWKind, 4> reductions(outputs.size(),
+                                             arith::AtomicRMWKind::assign);
     auto forOp = rewriter.create<AffineParallelOp>(loc,
                                                    /*resultTypes=*/outputTypes,
                                                    /*reductions=*/reductions,

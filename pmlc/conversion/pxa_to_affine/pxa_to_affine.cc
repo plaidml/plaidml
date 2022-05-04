@@ -44,7 +44,7 @@ struct AffineParallelOpConversion
         // don't like 0 index affine.parallel
         newOp = rewriter.create<AffineParallelOp>(
             op.getLoc(),                                                 //
-            ArrayRef<Type>{}, ArrayRef<AtomicRMWKind>{},                 //
+            ArrayRef<Type>{}, ArrayRef<arith::AtomicRMWKind>{},                 //
             AffineMap::getConstantMap(0, op.getContext()), ValueRange(), //
             AffineMap::getConstantMap(1, op.getContext()), ValueRange(), //
             ArrayRef<int64_t>{1});
@@ -55,7 +55,7 @@ struct AffineParallelOpConversion
         util::splitAffineMaps(op.upperBoundsMap(), ubMaps);
         newOp = rewriter.create<AffineParallelOp>(
             op.getLoc(),                                 //
-            ArrayRef<Type>{}, ArrayRef<AtomicRMWKind>{}, //
+            ArrayRef<Type>{}, ArrayRef<arith::AtomicRMWKind>{}, //
             lbMaps, op.getLowerBoundsOperands(),         //
             ubMaps, op.getUpperBoundsOperands(),         //
             steps);
@@ -153,41 +153,41 @@ struct PxaVectorLoadOpConversion
 };
 
 static Value createReduction(ConversionPatternRewriter &rewriter, Location loc,
-                             AtomicRMWKind agg, Value source, Value val) {
+                             arith::AtomicRMWKind agg, Value source, Value val) {
   switch (agg) {
-  case AtomicRMWKind::assign:
+  case arith::AtomicRMWKind::assign:
     return val;
-  case AtomicRMWKind::addf:
+  case arith::AtomicRMWKind::addf:
     return rewriter.create<arith::AddFOp>(loc, source, val);
-  case AtomicRMWKind::addi:
+  case arith::AtomicRMWKind::addi:
     return rewriter.create<arith::AddIOp>(loc, source, val);
-  case AtomicRMWKind::maxf: {
+  case arith::AtomicRMWKind::maxf: {
     auto cmp = rewriter.create<arith::CmpFOp>(loc, arith::CmpFPredicate::OGT, val, source);
     return rewriter.create<SelectOp>(loc, cmp, val, source);
   }
-  case AtomicRMWKind::maxu: {
+  case arith::AtomicRMWKind::maxu: {
     auto cmp = rewriter.create<arith::CmpIOp>(loc, arith::CmpIPredicate::ugt, val, source);
     return rewriter.create<SelectOp>(loc, cmp, val, source);
   }
-  case AtomicRMWKind::maxs: {
+  case arith::AtomicRMWKind::maxs: {
     auto cmp = rewriter.create<arith::CmpIOp>(loc, arith::CmpIPredicate::sgt, val, source);
     return rewriter.create<SelectOp>(loc, cmp, val, source);
   }
-  case AtomicRMWKind::minf: {
+  case arith::AtomicRMWKind::minf: {
     auto cmp = rewriter.create<arith::CmpFOp>(loc, arith::CmpFPredicate::OLT, val, source);
     return rewriter.create<SelectOp>(loc, cmp, val, source);
   }
-  case AtomicRMWKind::minu: {
+  case arith::AtomicRMWKind::minu: {
     auto cmp = rewriter.create<arith::CmpIOp>(loc, arith::CmpIPredicate::ult, val, source);
     return rewriter.create<SelectOp>(loc, cmp, val, source);
   }
-  case AtomicRMWKind::mins: {
+  case arith::AtomicRMWKind::mins: {
     auto cmp = rewriter.create<arith::CmpIOp>(loc, arith::CmpIPredicate::slt, val, source);
     return rewriter.create<SelectOp>(loc, cmp, val, source);
   }
-  case AtomicRMWKind::mulf:
+  case arith::AtomicRMWKind::mulf:
     return rewriter.create<arith::MulFOp>(loc, source, val);
-  case AtomicRMWKind::muli:
+  case arith::AtomicRMWKind::muli:
     return rewriter.create<arith::MulIOp>(loc, source, val);
   default:
     llvm_unreachable("Unsupported aggregation for "
@@ -238,8 +238,8 @@ struct PxaStoreOpConversion : public OpConversionPattern<pxa::PxaStoreOp> {
   matchAndRewrite(pxa::PxaStoreOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const final {
     Value memref = op.memref();
-    AtomicRMWKind agg = op.agg();
-    if (agg == AtomicRMWKind::assign) {
+    arith::AtomicRMWKind agg = op.agg();
+    if (agg == arith::AtomicRMWKind::assign) {
       rewriter.create<memref::StoreOp>(op.getLoc(), op.value(), memref,
                                        op.indices());
     } else {

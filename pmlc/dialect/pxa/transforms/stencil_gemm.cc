@@ -62,7 +62,7 @@ private:
             yield,
             m_Op<AffineYieldOp>(m_Capture(
                 &reduce, m_PxaReduceOp(
-                             AtomicRMWKind::addf,
+                             arith::AtomicRMWKind::addf,
                              m_Op<arith::MulFOp>(m_Capture(&load1, m_Op<PxaLoadOp>()),
                                           m_Capture(&load2, m_Op<PxaLoadOp>())),
                              m_Any())))) ||
@@ -70,7 +70,7 @@ private:
             yield,
             m_Op<AffineYieldOp>(m_Capture(
                 &reduce, m_PxaReduceOp(
-                             AtomicRMWKind::addi,
+                             arith::AtomicRMWKind::addi,
                              m_Op<arith::MulIOp>(m_Capture(&load1, m_Op<PxaLoadOp>()),
                                           m_Capture(&load2, m_Op<PxaLoadOp>())),
                              m_Any()))))) {

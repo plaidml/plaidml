@@ -51,8 +51,8 @@ bool checkIfZero(ConstantOp constantVal) {
 
 void replaceAssignLoadAdd(PxaReduceOpInterface &reduceOp) {
   // Consider only addf and addi kinds
-  if (reduceOp.getAgg() != AtomicRMWKind::addf &&
-      reduceOp.getAgg() != AtomicRMWKind::addi)
+  if (reduceOp.getAgg() != arith::AtomicRMWKind::addf &&
+      reduceOp.getAgg() != arith::AtomicRMWKind::addi)
     return;
 
   auto memRefOp = reduceOp.getMemRef().getDefiningOp();
@@ -61,7 +61,7 @@ void replaceAssignLoadAdd(PxaReduceOpInterface &reduceOp) {
 
   // The memref operand needs to come from reduce op assign
   auto reduceAssignOp = dyn_cast<PxaReduceOpInterface>(memRefOp);
-  if (!reduceAssignOp || reduceAssignOp.getAgg() != AtomicRMWKind::assign)
+  if (!reduceAssignOp || reduceAssignOp.getAgg() != arith::AtomicRMWKind::assign)
     return;
 
   // Check if both reduce add and assign are of the same type, vector or scalar
@@ -102,13 +102,13 @@ void replaceAssignLoadAdd(PxaReduceOpInterface &reduceOp) {
   OpBuilder builder(reduceOp);
   if (isa<PxaVectorReduceOp>(reduceOp.getOperation())) {
     auto newReduceOp = builder.create<PxaVectorReduceOp>(
-        reduceOp.getLoc(), AtomicRMWKind::assign, reduceOp.getValueToStore(),
+        reduceOp.getLoc(), arith::AtomicRMWKind::assign, reduceOp.getValueToStore(),
         reduceAssignOp.getMemRef(), reduceOp.getAffineMap(),
         reduceOp.getIdxs());
     reduceOp.getReduceResult().replaceAllUsesWith(newReduceOp.getResult());
   } else {
     auto newReduceOp = builder.create<PxaReduceOp>(
-        reduceOp.getLoc(), AtomicRMWKind::assign, reduceOp.getValueToStore(),
+        reduceOp.getLoc(), arith::AtomicRMWKind::assign, reduceOp.getValueToStore(),
         reduceAssignOp.getMemRef(), reduceOp.getAffineMap(),
         reduceOp.getIdxs());
     reduceOp.getReduceResult().replaceAllUsesWith(newReduceOp.getResult());
