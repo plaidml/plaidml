@@ -130,8 +130,8 @@ private:
       return op->emitRemark("Vectorize op: Failed, interior loops");
     }
     // TODO: consider more generic way to add ops supported here
-    if (!isa<FPExtOp, FPTruncOp, IndexCastOp, VectorUnrollOpInterface, SelectOp,
-             CmpFOp>(op)) {
+    if (!isa<arith::ExtFOp, arith::TruncFOp, arith::IndexCastOp, VectorUnrollOpInterface, SelectOp,
+             arith::CmpFOp>(op)) {
       // Probably not a vectorizable op. Verify it doesn't use an
       // vectorized results.
       for (auto operand : op->getOperands()) {

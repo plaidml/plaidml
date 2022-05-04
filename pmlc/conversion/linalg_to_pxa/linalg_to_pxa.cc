@@ -63,40 +63,40 @@ struct ReductionInfo {
   ReductionInfo(Operation *op, Value bufElem) : relatedOp(nullptr) {
     Value lhs, rhs;
     Value cond, trueValue, falseValue;
-    if (matchPattern(op, m_Op<AddIOp>(m_Capture(&lhs), m_Capture(&rhs)))) {
+    if (matchPattern(op, m_Op<arith::AddIOp>(m_Capture(&lhs), m_Capture(&rhs)))) {
       agg = AtomicRMWKind::addi;
     } else if (matchPattern(op,
-                            m_Op<AddFOp>(m_Capture(&lhs), m_Capture(&rhs)))) {
+                            m_Op<arith::AddFOp>(m_Capture(&lhs), m_Capture(&rhs)))) {
       agg = AtomicRMWKind::addf;
     } else if (matchPattern(op,
-                            m_Op<MulIOp>(m_Capture(&lhs), m_Capture(&rhs)))) {
+                            m_Op<arith::MulIOp>(m_Capture(&lhs), m_Capture(&rhs)))) {
       agg = AtomicRMWKind::muli;
     } else if (matchPattern(op,
-                            m_Op<MulFOp>(m_Capture(&lhs), m_Capture(&rhs)))) {
+                            m_Op<arith::MulFOp>(m_Capture(&lhs), m_Capture(&rhs)))) {
       agg = AtomicRMWKind::mulf;
     } else if (matchPattern(
                    op, m_Op<SelectOp>(
-                           m_Capture(&cond, m_Op<CmpIOp>(m_Capture(&lhs),
+                           m_Capture(&cond, m_Op<arith::CmpIOp>(m_Capture(&lhs),
                                                          m_Capture(&rhs))),
                            m_Capture(&trueValue), m_Capture(&falseValue)))) {
       if (lhs == trueValue && rhs == falseValue) {
         relatedOp = cond.getDefiningOp();
-        CmpIPredicate intPred = cast<CmpIOp>(relatedOp).predicate();
+        arith::CmpIPredicate intPred = cast<arith::CmpIOp>(relatedOp).predicate();
         switch (intPred) {
-        case CmpIPredicate::sgt:
-        case CmpIPredicate::sge:
+        case arith::CmpIPredicate::sgt:
+        case arith::CmpIPredicate::sge:
           agg = AtomicRMWKind::maxs;
           break;
-        case CmpIPredicate::ugt:
-        case CmpIPredicate::uge:
+        case arith::CmpIPredicate::ugt:
+        case arith::CmpIPredicate::uge:
           agg = AtomicRMWKind::maxu;
           break;
-        case CmpIPredicate::slt:
-        case CmpIPredicate::sle:
+        case arith::CmpIPredicate::slt:
+        case arith::CmpIPredicate::sle:
           agg = AtomicRMWKind::mins;
           break;
-        case CmpIPredicate::ult:
-        case CmpIPredicate::ule:
+        case arith::CmpIPredicate::ult:
+        case arith::CmpIPredicate::ule:
           agg = AtomicRMWKind::minu;
           break;
         default:
@@ -105,23 +105,23 @@ struct ReductionInfo {
       }
     } else if (matchPattern(
                    op, m_Op<SelectOp>(
-                           m_Capture(&cond, m_Op<CmpFOp>(m_Capture(&lhs),
+                           m_Capture(&cond, m_Op<arith::CmpFOp>(m_Capture(&lhs),
                                                          m_Capture(&rhs))),
                            m_Capture(&trueValue), m_Capture(&falseValue)))) {
       if (lhs == trueValue && rhs == falseValue) {
         relatedOp = cond.getDefiningOp();
-        CmpFPredicate floatPred = cast<CmpFOp>(relatedOp).predicate();
+        arith::CmpFPredicate floatPred = cast<arith::CmpFOp>(relatedOp).predicate();
         switch (floatPred) {
-        case CmpFPredicate::OGT:
-        case CmpFPredicate::OGE:
-        case CmpFPredicate::UGT:
-        case CmpFPredicate::UGE:
+        case arith::CmpFPredicate::OGT:
+        case arith::CmpFPredicate::OGE:
+        case arith::CmpFPredicate::UGT:
+        case arith::CmpFPredicate::UGE:
           agg = AtomicRMWKind::maxf;
           break;
-        case CmpFPredicate::OLT:
-        case CmpFPredicate::OLE:
-        case CmpFPredicate::ULT:
-        case CmpFPredicate::ULE:
+        case arith::CmpFPredicate::OLT:
+        case arith::CmpFPredicate::OLE:
+        case arith::CmpFPredicate::ULT:
+        case arith::CmpFPredicate::ULE:
           agg = AtomicRMWKind::minf;
           break;
         default:
@@ -166,6 +166,8 @@ static AffineParallelOp copyBuffer(OpBuilder &builder, Location loc,
   return forOp;
 }
 
+// TODO: lorenzo: this should match an arith::ConstantOp
+// See linal_to_pxa/test/shape.mlir
 struct ConstantOpConversion : public OpConversionPattern<ConstantOp> {
   using OpConversionPattern<ConstantOp>::OpConversionPattern;
 
@@ -188,7 +190,8 @@ struct ConstantOpConversion : public OpConversionPattern<ConstantOp> {
           /*sym_visibility=*/rewriter.getStringAttr("private"),
           /*type=*/newType,
           /*initial_value=*/origValue,
-          /*constant=*/true);
+          /*constant=*/true,
+          /*alignment=*/IntegerAttr());
       rewriter.setInsertionPoint(op);
       rewriter.replaceOpWithNewOp<memref::GetGlobalOp>(op, newType,
                                                        globalOp.sym_name());
@@ -210,7 +213,8 @@ struct ConstantOpConversion : public OpConversionPattern<ConstantOp> {
           /*type=*/memRefType,
           /*initial_value=*/
           DenseElementsAttr::get(shapeType, {origValue}),
-          /*constant=*/true);
+          /*constant=*/true,
+          /*alignment=*/IntegerAttr());
 
       rewriter.setInsertionPoint(op);
 
@@ -463,11 +467,11 @@ struct LowerLinalgToPXAPass
 
   void performLinalgTransforms(ModuleOp op) {
     RewritePatternSet patterns(op.getContext());
-    linalg::populateLinalgConvGeneralizationPatterns(patterns);
+    //populateLinalgConvGeneralizationPatterns(patterns);
     linalg::populateLinalgNamedOpsGeneralizationPatterns(patterns);
     populateLinalgTensorCollapseOpGeneralizationPatterns(patterns);
     populateLinalgTensorExpandOpGeneralizationPatterns(patterns);
-    populateLinalgPoolingOpGeneralizationPatterns(patterns);
+    // populateLinalgPoolingOpGeneralizationPatterns(patterns);
     patterns.add<linalg::PadTensorOpTransformationPattern>(op.getContext());
     (void)applyPatternsAndFoldGreedily(op, std::move(patterns));
   }
@@ -487,6 +491,7 @@ struct LowerLinalgToPXAPass
                            scf::SCFDialect,       //
                            layer::LayerDialect,   //
                            pxa::PXADialect,       //
+                           arith::ArithmeticDialect,
                            stdx::StdXDialect>();
     target.addLegalOp<ModuleOp>();
     target.addDynamicallyLegalOp<FuncOp>(

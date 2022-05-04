@@ -31,13 +31,13 @@ func @global_sum(%arg0: tensor<5x10xf32>) -> tensor<f32> {
 // CHECK-LABEL: func @global_sum
 // CHECK-SAME: %[[IN:.*]]: memref<5x10xf32>
 // CHECK-SAME: %[[OUT:.*]]: memref<f32>
-// CHECK: %[[CST:.*]] = constant
+// CHECK: %[[CST:.*]] = arith.constant
 // CHECK: affine.store %[[CST]], %[[OUT]]
 // CHECK: affine.for
 // CHECK: affine.for
 // CHECK-DAG: %[[OLD:.*]] = affine.load %[[OUT]][] : memref<f32>
 // CHECK-DAG: %[[UPDATE:.*]] = affine.load %[[IN]][%{{.*}}, %{{.*}}] : memref<5x10xf32>
-// CHECK: %[[NEW:.*]] = addf
+// CHECK: %[[NEW:.*]] = arith.addf
 // CHECK-DAG: %[[OLD]]
 // CHECK-DAG: %[[UPDATE]]
 // CHECK: affine.store %[[NEW]], %[[OUT]][] : memref<f32>

@@ -540,8 +540,8 @@ struct ReorderLayoutsPass : public ReorderLayoutsBase<ReorderLayoutsPass> {
         /*doc=*/"",
         /*libraryCall=*/"",
         [](OpBuilder &builder, Location loc, ValueRange args) {
-          auto mul = builder.create<MulFOp>(loc, args[0], args[1]);
-          auto add = builder.create<AddFOp>(loc, args[2], mul);
+          auto mul = builder.create<arith::MulFOp>(loc, args[0], args[1]);
+          auto add = builder.create<arith::AddFOp>(loc, args[2], mul);
           builder.create<linalg::YieldOp>(loc, ValueRange{add});
         });
 
@@ -719,8 +719,8 @@ struct ReorderWeightLayoutsPass
         /*doc=*/"",
         /*libraryCall=*/"",
         [](OpBuilder &builder, Location loc, ValueRange args) {
-          auto mul = builder.create<MulFOp>(loc, args[0], args[1]);
-          auto add = builder.create<AddFOp>(loc, args[2], mul);
+          auto mul = builder.create<arith::MulFOp>(loc, args[0], args[1]);
+          auto add = builder.create<arith::AddFOp>(loc, args[2], mul);
           builder.create<linalg::YieldOp>(loc, ValueRange{add});
         });
 

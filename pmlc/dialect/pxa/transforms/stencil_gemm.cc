@@ -63,7 +63,7 @@ private:
             m_Op<AffineYieldOp>(m_Capture(
                 &reduce, m_PxaReduceOp(
                              AtomicRMWKind::addf,
-                             m_Op<MulFOp>(m_Capture(&load1, m_Op<PxaLoadOp>()),
+                             m_Op<arith::MulFOp>(m_Capture(&load1, m_Op<PxaLoadOp>()),
                                           m_Capture(&load2, m_Op<PxaLoadOp>())),
                              m_Any())))) ||
         matchPattern(
@@ -71,7 +71,7 @@ private:
             m_Op<AffineYieldOp>(m_Capture(
                 &reduce, m_PxaReduceOp(
                              AtomicRMWKind::addi,
-                             m_Op<MulIOp>(m_Capture(&load1, m_Op<PxaLoadOp>()),
+                             m_Op<arith::MulIOp>(m_Capture(&load1, m_Op<PxaLoadOp>()),
                                           m_Capture(&load2, m_Op<PxaLoadOp>())),
                              m_Any()))))) {
       return StencilCapture{{reduce}, {load1, load2}};

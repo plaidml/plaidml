@@ -18,13 +18,13 @@ func @vectorize_gemm(%arg0: memref<64x64xf32>, %arg1: memref<64x64xf32>) -> (mem
     // This load *does* vectorize (stride 1 on j)
     // CHECK: pxa.vector_load %{{.*}} : memref<64x64xf32>, vector<8xf32>
 
-    %2 = mulf %0, %1 : f32
+    %2 = arith.mulf %0, %1 : f32
     // Since this mulf uses one vector (%1) and one scalar (%0) we need to add
     // a broadcast + vectorize
     // CHECK: vector.broadcast %{{.*}} : f32 to vector<8xf32>
     // CHECK: mulf %{{.*}}, %{{.*}} : vector<8xf32>
 
-    %3 = mulf %0, %0 : f32
+    %3 = arith.mulf %0, %0 : f32
     // This mulf is pure scalar
     // CHECK: mulf %{{.*}}, %{{.*}} : f32
 
@@ -67,7 +67,7 @@ func @vectorize_reduce_stride_0(%a: memref<1x4x128x24xf32>, %b: memref<1x4x128x2
     // expected-remark@+1 {{Vectorize op: Failed, stride != 1}}
     %2 = pxa.load %b[0, %arg0, %arg2, %i] : memref<1x4x128x24xf32>
     // CHECK: pxa.vector_load %{{.*}}[0, %{{.*}}, %{{.*}}, %{{.*}}] : memref<1x4x128x24xf32>, vector<8xf32>
-    %3 = mulf %1, %2 : f32
+    %3 = arith.mulf %1, %2 : f32
     // CHECK: mulf %{{.*}}, %{{.*}} : vector<8xf32>
     %4 = pxa.reduce addf %3, %c[0, 0, 0, 0] : memref<1x1x1x1xf32>
     // CHECK:      vector.reduction "add", %{{.*}} : vector<8xf32> into f32

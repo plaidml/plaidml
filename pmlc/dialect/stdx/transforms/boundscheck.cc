@@ -61,7 +61,7 @@ public:
     for (size_t i = 0; i < dimSizes.size(); i++) {
       auto idxVal = op.getIndices()[i];
       auto rangeVal =
-          opBuilder.create<ConstantIntOp>(loc, dimSizes[i], i64Type);
+          opBuilder.create<arith::ConstantIntOp>(loc, dimSizes[i], i64Type);
       SmallVector<Value, 2> args;
       idxVal.getType().template dyn_cast<mlir::IntegerType>();
       args.push_back(idxVal);

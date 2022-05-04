@@ -5,7 +5,7 @@
 #map3 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>
 
 func @inception_v3(%arg0: tensor<1x2x35x35x32xf32>) -> tensor<1x35x35x256xf32> {
-  %cst = constant 0.000000e+00 : f32
+  %cst = arith.constant 0.000000e+00 : f32
   %0 = linalg.init_tensor [1, 35, 35, 64] : tensor<1x35x35x64xf32>
   %1 = linalgx.copy(%arg0, %0) {inputMap = #map3, outputMap = #map2}
     : tensor<1x2x35x35x32xf32>, tensor<1x35x35x64xf32> -> tensor<1x35x35x64xf32>
@@ -53,8 +53,8 @@ func @broadcast(%arg0: tensor<64xf32>, %arg1: tensor<1x56x56x64xf32>, %arg2: ten
     outs(%1 : tensor<1x56x56x64xf32>)
     attrs = {iterator_ranges = [1, 56, 56, 64, 1, 1, 64]} {
   ^bb0(%arg3: f32, %arg4: f32, %arg5: f32):  // no predecessors
-    %334 = mulf %arg3, %arg4 : f32
-    %335 = addf %arg5, %334 : f32
+    %334 = arith.mulf %arg3, %arg4 : f32
+    %335 = arith.addf %arg5, %334 : f32
     linalg.yield %335 : f32
   } -> tensor<1x56x56x64xf32>
   return %2 : tensor<1x56x56x64xf32>

@@ -48,6 +48,8 @@ pml_cc_library(
     MLIRSCFToStandard
     MLIRStandardOpsTransforms
     MLIRStandardToLLVM
+    MLIRReconcileUnrealizedCasts
+    MLIRArithmeticToLLVM
     omp
     xsmm
 )

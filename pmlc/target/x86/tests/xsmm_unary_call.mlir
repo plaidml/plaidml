@@ -11,9 +11,9 @@
 func private @print_memref_f32(memref<*xf32>)
 
 func @fill_2d(%buf : memref<?x?xf32>, %alt : i1) {
-  %c0 = constant 0 : index
-  %c1 = constant 1 : index
-  %c5 = constant 5 : index
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c5 = arith.constant 5 : index
   %X = memref.dim %buf, %c0 : memref<?x?xf32>
   %Y = memref.dim %buf, %c1 : memref<?x?xf32>
   affine.parallel (%x, %y) = (0, 0) to (%X, %Y) {
@@ -22,19 +22,19 @@ func @fill_2d(%buf : memref<?x?xf32>, %alt : i1) {
     // t = alt ? i : 0
     %t = select %alt, %i, %c0 : index
     // v = x + y + t - 5
-    %1 = addi %x, %y : index
-    %2 = addi %1, %t : index
-    %v = subi %2, %c5 : index
-    %v_i64 = index_cast %v : index to i64
-    %v_f32 = sitofp %v_i64 : i64 to f32
+    %1 = arith.addi %x, %y : index
+    %2 = arith.addi %1, %t : index
+    %v = arith.subi %2, %c5 : index
+    %v_i64 = arith.index_cast %v : index to i64
+    %v_f32 = arith.sitofp %v_i64 : i64 to f32
     memref.store %v_f32, %buf[%x, %y] : memref<?x?xf32>
   }
   return
 }
 
 func @main() {
-  %false = constant 0 : i1
-  %true = constant 1 : i1
+  %false = arith.constant 0 : i1
+  %true = arith.constant 1 : i1
   %A = memref.alloc() : !eltwise
   %A_2d = memref.cast %A : !eltwise to memref<?x?xf32>
   %A_ud = memref.cast %A : !eltwise to memref<*xf32>
@@ -87,16 +87,16 @@ func @main() {
 }
 
 func @exp_xsmm(%I: !eltwise, %O: !eltwise) {
-  %c0 = constant 0 : index
-  %c1 = constant 1 : index
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
   %exp = xsmm.unary.dispatch EXP(f32, [8, 2], 3, 3, 0) : (f32) -> f32
   xsmm.unary.invoke %O[%c0, %c1] = %exp(%I[%c0, %c1]) : (!eltwise) -> !eltwise
   return
 }
 
 func @relu_xsmm(%I: !eltwise, %O: !eltwise) {
-  %c0 = constant 0 : index
-  %c1 = constant 1 : index
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
   %relu = xsmm.unary.dispatch RELU(f32, [7, 3], 3, 3, 0) : (f32) -> f32
   xsmm.unary.invoke %O[%c1, %c0] = %relu(%I[%c1, %c0]) : (!eltwise) -> !eltwise
   return

@@ -158,37 +158,37 @@ static Value createReduction(ConversionPatternRewriter &rewriter, Location loc,
   case AtomicRMWKind::assign:
     return val;
   case AtomicRMWKind::addf:
-    return rewriter.create<AddFOp>(loc, source, val);
+    return rewriter.create<arith::AddFOp>(loc, source, val);
   case AtomicRMWKind::addi:
-    return rewriter.create<AddIOp>(loc, source, val);
+    return rewriter.create<arith::AddIOp>(loc, source, val);
   case AtomicRMWKind::maxf: {
-    auto cmp = rewriter.create<CmpFOp>(loc, CmpFPredicate::OGT, val, source);
+    auto cmp = rewriter.create<arith::CmpFOp>(loc, arith::CmpFPredicate::OGT, val, source);
     return rewriter.create<SelectOp>(loc, cmp, val, source);
   }
   case AtomicRMWKind::maxu: {
-    auto cmp = rewriter.create<CmpIOp>(loc, CmpIPredicate::ugt, val, source);
+    auto cmp = rewriter.create<arith::CmpIOp>(loc, arith::CmpIPredicate::ugt, val, source);
     return rewriter.create<SelectOp>(loc, cmp, val, source);
   }
   case AtomicRMWKind::maxs: {
-    auto cmp = rewriter.create<CmpIOp>(loc, CmpIPredicate::sgt, val, source);
+    auto cmp = rewriter.create<arith::CmpIOp>(loc, arith::CmpIPredicate::sgt, val, source);
     return rewriter.create<SelectOp>(loc, cmp, val, source);
   }
   case AtomicRMWKind::minf: {
-    auto cmp = rewriter.create<CmpFOp>(loc, CmpFPredicate::OLT, val, source);
+    auto cmp = rewriter.create<arith::CmpFOp>(loc, arith::CmpFPredicate::OLT, val, source);
     return rewriter.create<SelectOp>(loc, cmp, val, source);
   }
   case AtomicRMWKind::minu: {
-    auto cmp = rewriter.create<CmpIOp>(loc, CmpIPredicate::ult, val, source);
+    auto cmp = rewriter.create<arith::CmpIOp>(loc, arith::CmpIPredicate::ult, val, source);
     return rewriter.create<SelectOp>(loc, cmp, val, source);
   }
   case AtomicRMWKind::mins: {
-    auto cmp = rewriter.create<CmpIOp>(loc, CmpIPredicate::slt, val, source);
+    auto cmp = rewriter.create<arith::CmpIOp>(loc, arith::CmpIPredicate::slt, val, source);
     return rewriter.create<SelectOp>(loc, cmp, val, source);
   }
   case AtomicRMWKind::mulf:
-    return rewriter.create<MulFOp>(loc, source, val);
+    return rewriter.create<arith::MulFOp>(loc, source, val);
   case AtomicRMWKind::muli:
-    return rewriter.create<MulIOp>(loc, source, val);
+    return rewriter.create<arith::MulIOp>(loc, source, val);
   default:
     llvm_unreachable("Unsupported aggregation for "
                      "PxaReduceOpConversion::createReduction");
@@ -315,9 +315,9 @@ struct ReluOpConversion : public OpConversionPattern<stdx::ReluOp> {
 
     auto floatType = adaptor.value().getType().cast<FloatType>();
     llvm::APFloat value = convertFloatUsingType(llvm::APFloat(0.0), floatType);
-    auto zero = rewriter.create<ConstantFloatOp>(loc, value, floatType);
+    auto zero = rewriter.create<arith::ConstantFloatOp>(loc, value, floatType);
     auto cmpOp =
-        rewriter.create<CmpFOp>(loc, CmpFPredicate::OLT, adaptor.value(), zero)
+        rewriter.create<arith::CmpFOp>(loc, arith::CmpFPredicate::OLT, adaptor.value(), zero)
             .getResult();
     rewriter.replaceOpWithNewOp<SelectOp>(op, cmpOp, zero, adaptor.value());
 

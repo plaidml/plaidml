@@ -5,7 +5,7 @@
 
 func @main(%arg0: tensor<1x1x64x64xf32> {stdx.const}) {
   stdx.closure() -> tensor<4x4x1x1x16x16xf32> {
-    %zero = constant 0.000000e+00 : f32
+    %zero = arith.constant 0.000000e+00 : f32
 
     %0 = linalg.init_tensor [4, 4, 1, 1, 16, 16] : tensor<4x4x1x1x16x16xf32>
     %1 = linalg.generic {

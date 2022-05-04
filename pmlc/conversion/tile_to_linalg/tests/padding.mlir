@@ -100,8 +100,8 @@ func @max_pool(%arg0: tensor<1x112x112x128xf32>, %arg1: tensor<3x3x128x256xf32> 
 //      CHECK: #[[map3:.*]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d3)>
 //      CHECK: #[[map4:.*]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
 //      CHECK: func @max_pool
-//      CHECK:   %[[ZERO:.*]] = constant 0.000000e+00 : f32
-//      CHECK:   %[[NINF:.*]] = constant 0xFF800000 : f32
+//      CHECK:   %[[ZERO:.*]] = arith.constant 0.000000e+00 : f32
+//      CHECK:   %[[NINF:.*]] = arith.constant 0xFF800000 : f32
 //      CHECK:   linalg.init_tensor [1, 56, 56, 128] : tensor<1x56x56x128xf32>
 //      CHECK:   linalg.fill(%[[NINF]], %{{.*}}) : f32, tensor<1x56x56x128xf32> -> tensor<1x56x56x128xf32>
 //      CHECK:   linalg.pad_tensor %{{.*}} low[0, 1, 1, 0] high[0, 1, 1, 0]

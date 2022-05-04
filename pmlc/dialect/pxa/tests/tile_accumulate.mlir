@@ -10,7 +10,7 @@
 #set0 = affine_set<(d0, d1) : (d0 - d1 >= 0)>
 
 func @cumsum(%arg0: memref<10xf32> {tile.name = "I"}) -> memref<10xf32> {
-%cst = constant 0.000000e+00 : f32
+%cst = arith.constant 0.000000e+00 : f32
 %0 = memref.alloc() : memref<10xf32>
 // CHECK: affine.parallel
 %1 = affine.parallel (%arg1) = (0) to (10) reduce ("assign") -> (memref<10xf32>) {
@@ -38,7 +38,7 @@ func @mixed() {
   // CHECK: memref.alloc()
   // CHECK-NEXT: constant
   %ret_s = memref.alloc() : memref<3xf32>
-  %cst_s = constant 0xFF800000 : f32
+  %cst_s = arith.constant 0xFF800000 : f32
   // CHECK-NEXT: affine.parallel
   %serial = affine.parallel (%arg0, %arg1) = (0, 0) to (3, 3) reduce ("assign") -> (memref<3xf32>) {
     // CHECK-NEXT: affine.parallel
@@ -50,7 +50,7 @@ func @mixed() {
   // CHECK: memref.alloc()
   %ret_p = memref.alloc() : memref<3x3xf32>
   // CHECK-NEXT: constant
-  %cst_p = constant 0xFF800000 : f32
+  %cst_p = arith.constant 0xFF800000 : f32
   // CHECK-NEXT: affine.parallel
   // CHECK-NEXT: affine.parallel
   %parallel = affine.parallel (%arg2, %arg3) = (0, 0) to (3, 3) reduce ("assign") -> (memref<3x3xf32>) {

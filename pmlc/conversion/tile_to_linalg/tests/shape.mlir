@@ -6,6 +6,5 @@ func @shape(%arg0: tensor<10x20xf32>) -> tensor<2xsi32> {
 }
 
 // CHECK-LABEL: func @shape
-// CHECK: %[[cst:.*]] = constant dense<[10, 20]> : tensor<2xi32>
+// CHECK: %[[cst:.*]] = arith.constant dense<[10, 20]> : tensor<2xi32>
 // CHECK: return %[[cst]] : tensor<2xi32>
-

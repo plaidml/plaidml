@@ -92,10 +92,10 @@ private:
   Optional<pxa::StencilCapture> capture() {
     Optional<pxa::StencilCapture> ret;
 
-    maybeCaptureGeneric<AddFOp>(ret, "tpp_add");
-    maybeCaptureGeneric<MulFOp>(ret, "tpp_mul");
-    maybeCaptureGeneric<SubFOp>(ret, "tpp_sub");
-    maybeCaptureGeneric<DivFOp>(ret, "tpp_div");
+    maybeCaptureGeneric<arith::AddFOp>(ret, "tpp_add");
+    maybeCaptureGeneric<arith::MulFOp>(ret, "tpp_mul");
+    maybeCaptureGeneric<arith::SubFOp>(ret, "tpp_sub");
+    maybeCaptureGeneric<arith::DivFOp>(ret, "tpp_div");
 
     return ret;
   }

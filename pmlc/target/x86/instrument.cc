@@ -64,12 +64,12 @@ struct ProfileKernelsPass : public ProfileKernelsBase<ProfileKernelsPass> {
     module.walk<WalkOrder::PreOrder>([&](AffineParallelOp op) {
       Location loc = op->getLoc();
       OpBuilder builder(op);
-      Value idValue = builder.create<ConstantIntOp>(loc, id++, 64);
-      Value tagZero = builder.create<ConstantIntOp>(loc, 0, 64);
+      Value idValue = builder.create<arith::ConstantIntOp>(loc, id++, 64);
+      Value tagZero = builder.create<arith::ConstantIntOp>(loc, 0, 64);
       auto call = builder.create<CallOp>(loc, TypeRange{}, func,
                                          ValueRange{idValue, tagZero});
       builder.setInsertionPointAfter(op);
-      Value tagOne = builder.create<ConstantIntOp>(loc, 1, 64);
+      Value tagOne = builder.create<arith::ConstantIntOp>(loc, 1, 64);
       builder.create<CallOp>(loc, TypeRange{}, func,
                              ValueRange{idValue, tagOne});
 
