@@ -28,8 +28,8 @@ func @matrixPower(%m : tensor<16x16xf32>) -> tensor<16x16xf32> {
 // CHECK-SAME: iterator_types = ["parallel", "parallel", "reduction"]}
 // CHECK-SAME: ins(%[[arg2]], %[[arg0]] : tensor<16x16xf32>, tensor<16x16xf32>) outs(%[[t2]] : tensor<16x16xf32>)
 // CHECK:      ^bb0(%[[arg3:.*]]: f32, %[[arg4:.*]]: f32, %[[arg5:.*]]: f32):
-// CHECK:        %[[t4:.*]] = mulf %[[arg3]], %[[arg4]] : f32
-// CHECK:        %[[t5:.*]] = addf %[[arg5]], %[[t4]] : f32
+// CHECK:        %[[t4:.*]] = arith.mulf %[[arg3]], %[[arg4]] : f32
+// CHECK:        %[[t5:.*]] = arith.addf %[[arg5]], %[[t4]] : f32
 // CHECK:        linalg.yield %[[t5]] : f32
 // CHECK:   scf.yield %[[t3]]
 // CHECK: return

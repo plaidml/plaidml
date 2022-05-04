@@ -22,6 +22,6 @@ func @dot(%arg0: tensor<1x784xf32>, %arg1: tensor<784x512xf32>) -> tensor<1x512x
 // CHECK: %[[FINAL:.*]] = affine.parallel (%[[I2:.*]], %[[J2:.*]], %[[K2:.*]]) = (0, 0, 0) to (784, 1, 512)
 // CHECK-DAG: %[[A:.*]] = pxa.load %[[ARG0]][%[[J2]], %[[I2]]] : memref<1x784xf32>
 // CHECK-DAG: %[[B:.*]] = pxa.load %[[ARG1]][%[[I2]], %[[K2]]] : memref<784x512xf32>
-// CHECK:     %[[C:.*]] = mulf %[[A]], %[[B]] : f32
+// CHECK:     %[[C:.*]] = arith.mulf %[[A]], %[[B]] : f32
 // CHECK:     pxa.reduce addf %[[C]], %[[ZEROED]][%[[J2]], %[[K2]]] : memref<1x512xf32>
 // CHECK: return %[[FINAL]]

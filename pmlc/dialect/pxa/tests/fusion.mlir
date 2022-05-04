@@ -5,14 +5,14 @@ func @simple_fusion(%A: memref<2x3xf32>, %B: memref<2x3xf32>, %C: memref<2x3xf32
   %4 = affine.parallel (%i, %j) = (0, 0) to (2, 3) reduce ("assign") -> (memref<2x3xf32>) {
     %0 = pxa.load %A[%i, %j] : memref<2x3xf32>
     %1 = pxa.load %B[%i, %j] : memref<2x3xf32>
-    %2 = addf %0, %1 : f32
+    %2 = arith.addf %0, %1 : f32
     %3 = pxa.reduce assign %2, %T[%i, %j] : memref<2x3xf32>
     affine.yield %3 : memref<2x3xf32>
   }
   %5 = affine.parallel (%i, %j) = (0, 0) to (2, 3) reduce ("assign") -> (memref<2x3xf32>) {
     %0 = pxa.load %4[%i, %j] : memref<2x3xf32>
     %1 = pxa.load %C[%i, %j] : memref<2x3xf32>
-    %2 = mulf %0, %1 : f32
+    %2 = arith.mulf %0, %1 : f32
     %3 = pxa.reduce assign %2, %D[%i, %j] : memref<2x3xf32>
     affine.yield %3 : memref<2x3xf32>
   }
@@ -39,14 +39,14 @@ func @fusion_different_idxs(%A: memref<2x3xf32>, %B: memref<2x3xf32>, %C: memref
   %4 = affine.parallel (%i, %j) = (0, 0) to (2, 3) reduce ("assign") -> (memref<2x3xf32>) {
     %0 = pxa.load %A[%i, %j] : memref<2x3xf32>
     %1 = pxa.load %B[%i, %j] : memref<2x3xf32>
-    %2 = addf %0, %1 : f32
+    %2 = arith.addf %0, %1 : f32
     %3 = pxa.reduce assign %2, %T[%i, %j] : memref<2x3xf32>
     affine.yield %3 : memref<2x3xf32>
   }
   %5 = affine.parallel (%i, %j, %k) = (0, 0, 0) to (2, 3, 4) reduce ("assign") -> (memref<2x3x4xf32>) {
     %0 = pxa.load %4[%i, %j] : memref<2x3xf32>
     %1 = pxa.load %C[%i, %j, %k] : memref<2x3x4xf32>
-    %2 = mulf %0, %1 : f32
+    %2 = arith.mulf %0, %1 : f32
     %3 = pxa.reduce assign %2, %D[%i, %j, %k] : memref<2x3x4xf32>
     affine.yield %3 : memref<2x3x4xf32>
   }
@@ -76,7 +76,7 @@ func @resnet50_tail(%arg0: memref<1000xf32>, %arg1: memref<1x1000xf32>, %out: me
   %2 = affine.parallel (%i) = (0) to (1000) reduce ("assign") -> (memref<1x1000xf32>) {
     %9 = pxa.load %arg1[0, %i] : memref<1x1000xf32>
     %10 = pxa.load %arg0[%i] : memref<1000xf32>
-    %11 = addf %9, %10 : f32
+    %11 = arith.addf %9, %10 : f32
     %12 = pxa.reduce assign %11, %1[0, %i] : memref<1x1000xf32>
     affine.yield %12 : memref<1x1000xf32>
   }
@@ -96,7 +96,7 @@ func @resnet50_tail(%arg0: memref<1000xf32>, %arg1: memref<1x1000xf32>, %out: me
   %8 = affine.parallel (%i) = (0) to (1000) reduce ("assign") -> (memref<1x1000xf32>) {
     %9 = pxa.load %4[0, %i] : memref<1x1000xf32>
     %10 = pxa.load %7[0, 0] : memref<1x1xf32>
-    %11 = subf %9, %10 : f32
+    %11 = arith.subf %9, %10 : f32
     %12 = pxa.reduce assign %11, %out[0, %i] : memref<1x1000xf32>
     affine.yield %12 : memref<1x1000xf32>
   }

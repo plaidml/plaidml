@@ -6,7 +6,7 @@ func @main(%arg0: memref<16x16xf32> {stdx.const}, %arg1: memref<16x16xf32> {stdx
     affine.for %arg3 = 0 to 16 {
       %1 = affine.load %arg0[%arg2, %arg3] : memref<16x16xf32>
       %2 = affine.load %arg1[%arg2, %arg3] : memref<16x16xf32>
-      %3 = addf %1, %2 : f32
+      %3 = arith.addf %1, %2 : f32
       affine.store %3, %0[%arg2, %arg3] : memref<16x16xf32>
     }
   }
@@ -16,7 +16,7 @@ func @main(%arg0: memref<16x16xf32> {stdx.const}, %arg1: memref<16x16xf32> {stdx
       affine.for %arg5 = 0 to 16 {
         %1 = affine.load %arg2[%arg4, %arg5] : memref<16x16xf32>
         %2 = affine.load %0[%arg4, %arg5] : memref<16x16xf32>
-        %3 = addf %1, %2 : f32
+        %3 = arith.addf %1, %2 : f32
         affine.store %3, %arg3[%arg4, %arg5] : memref<16x16xf32>
       }
     }
@@ -64,7 +64,7 @@ func @main(%arg0: memref<16x16xf32> {stdx.const}, %arg1: memref<16x16xf32> {stdx
       affine.for %arg5 = 0 to 16 {
         %1 = affine.load %arg0[%arg4, %arg5] : memref<16x16xf32>
         %2 = affine.load %arg1[%arg4, %arg5] : memref<16x16xf32>
-        %3 = addf %1, %2 : f32
+        %3 = arith.addf %1, %2 : f32
         affine.store %3, %arg2[%arg4, %arg5] : memref<16x16xf32>
       }
     }

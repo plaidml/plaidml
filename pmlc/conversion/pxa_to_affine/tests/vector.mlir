@@ -5,7 +5,7 @@ func @eltwise_sum(%arg0: memref<1x256x256x16xf16>, %arg1: memref<1x256x256x16xf1
   %1 = affine.parallel (%arg2, %arg3, %arg4) = (0, 0, 0) to (256, 256, 2) reduce ("assign") -> (memref<1x256x256x16xf16>) {
     %2 = pxa.vector_load %arg1[0, %arg2, %arg3, %arg4 * 8] : memref<1x256x256x16xf16>, vector<8xf16>
     %3 = pxa.vector_load %arg0[0, %arg2, %arg3, %arg4 * 8] : memref<1x256x256x16xf16>, vector<8xf16>
-    %4 = addf %2, %3 : vector<8xf16>
+    %4 = arith.addf %2, %3 : vector<8xf16>
     %5 = pxa.vector_reduce assign %4, %0[0, %arg2, %arg3, %arg4 * 8] : memref<1x256x256x16xf16>, vector<8xf16>
     affine.yield %5 : memref<1x256x256x16xf16>
   }

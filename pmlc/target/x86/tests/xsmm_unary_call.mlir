@@ -22,11 +22,11 @@ func @fill_2d(%buf : memref<?x?xf32>, %alt : i1) {
     // t = alt ? i : 0
     %t = select %alt, %i, %c0 : index
     // v = x + y + t - 5
-    %1 = addi %x, %y : index
-    %2 = addi %1, %t : index
-    %v = subi %2, %c5 : index
-    %v_i64 = index_cast %v : index to i64
-    %v_f32 = sitofp %v_i64 : i64 to f32
+    %1 = arith.addi %x, %y : index
+    %2 = arith.addi %1, %t : index
+    %v = arith.subi %2, %c5 : index
+    %v_i64 = arith.index_cast %v : index to i64
+    %v_f32 = arith.sitofp %v_i64 : i64 to f32
     memref.store %v_f32, %buf[%x, %y] : memref<?x?xf32>
   }
   return

@@ -16,11 +16,11 @@ func @argsort0(%arg0: tensor<20xf32>) -> tensor<20xsi32> {
 // CHECK:       scf.for %[[IDX1:.*]] = %[[C0]] to %[[C19]]
 // CHECK:         %[[CHECKIDX:.*]] = memref.load %[[OUT]][%[[IDX1]]] : memref<20xi32>
 // CHECK:         %[[CHECKVAL:.*]] = memref.load %[[IN]][%{{.*}}] : memref<20xf32>
-// CHECK:         %[[SUBIDX:.*]] = addi %[[IDX1]], %[[C1]] : index
+// CHECK:         %[[SUBIDX:.*]] = arith.addi %[[IDX1]], %[[C1]] : index
 // CHECK:         scf.for %[[IDX2:.*]] = %[[SUBIDX]] to %[[C20]]
 // CHECK:           memref.load %[[OUT]][%[[IDX2]]] : memref<20xi32>
 // CHECK:           %[[SUBVAL:.*]] = memref.load %[[IN]][%{{.*}}] : memref<20xf32>
-// CHECK:           %[[COND:.*]] = cmpf olt
+// CHECK:           %[[COND:.*]] = arith.cmpf olt
 // CHECK:           scf.if %[[COND]]
 // CHECK:             memref.store %[[IDX2]]
 // CHECK:             memref.store %[[SUBVAL]]
@@ -44,11 +44,11 @@ func @argsort1(%arg0: tensor<5x4xf32>) -> tensor<5x4xsi32> {
 // CHECK:       scf.for %{{.*}} = %[[C0]] to %[[C4]] step %[[C1]]
 // CHECK:         %[[CHECKIDX:.*]] = memref.load %[[OUT]][%{{.*}}, %{{.*}}] : memref<5x4xi32>
 // CHECK:         %[[CHECKVAL:.*]] = memref.load %[[IN]][%{{.*}}, %{{.*}}] : memref<5x4xf32>
-// CHECK:         %[[SUBIDX:.*]] = addi %{{.*}}, %[[C1]] : index
+// CHECK:         %[[SUBIDX:.*]] = arith.addi %{{.*}}, %[[C1]] : index
 // CHECK:           scf.for %[[IDX3:.*]] = %[[SUBIDX]] to %[[C5]] step %[[C1]]
 // CHECK:           memref.load %[[OUT]][%{{.*}}, %{{.*}}] : memref<5x4xi32>
 // CHECK:           %[[SUBVAL:.*]] = memref.load %[[IN]][%{{.*}}, %{{.*}}] : memref<5x4xf32>
-// CHECK:           %[[COND:.*]] = cmpf ogt
+// CHECK:           %[[COND:.*]] = arith.cmpf ogt
 // CHECK:           scf.if %[[COND]]
 // CHECK:             memref.store %[[IDX3]]
 // CHECK:             memref.store %[[SUBVAL]]

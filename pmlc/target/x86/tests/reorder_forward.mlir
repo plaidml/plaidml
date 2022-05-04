@@ -53,8 +53,8 @@ func @broadcast(%arg0: tensor<64xf32>, %arg1: tensor<1x56x56x64xf32>, %arg2: ten
     outs(%1 : tensor<1x56x56x64xf32>)
     attrs = {iterator_ranges = [1, 56, 56, 64, 1, 1, 64]} {
   ^bb0(%arg3: f32, %arg4: f32, %arg5: f32):  // no predecessors
-    %334 = mulf %arg3, %arg4 : f32
-    %335 = addf %arg5, %334 : f32
+    %334 = arith.mulf %arg3, %arg4 : f32
+    %335 = arith.addf %arg5, %334 : f32
     linalg.yield %335 : f32
   } -> tensor<1x56x56x64xf32>
   return %2 : tensor<1x56x56x64xf32>

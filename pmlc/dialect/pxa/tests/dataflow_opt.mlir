@@ -46,7 +46,7 @@ func @grn(%arg0: memref<1x4x4x3xf16>) -> memref<1x4x4x3xf16> {
       // CHECK-NEXT: pxa.load
       %25 = pxa.load %arg0[0, %arg1, %arg2, %arg3] : memref<1x4x4x3xf16>
       // CHECK-NEXT: mulf
-      %26 = mulf %24, %25 : f16
+      %26 = arith.mulf %24, %25 : f16
       %27 = pxa.reduce assign %26, %0[0, %arg1, %arg2, %arg3] : memref<1x4x4x3xf16>
       %28 = pxa.load %27[0, %arg1, %arg2, %arg3] : memref<1x4x4x3xf16>
       // CHECK-NEXT: pxa.reduce addf
@@ -56,7 +56,7 @@ func @grn(%arg0: memref<1x4x4x3xf16>) -> memref<1x4x4x3xf16> {
     // CHECK: pxa.load
     %10 = pxa.load %9[0, %arg1, %arg2, 0] : memref<1x4x4x1xf16>
     // CHECK-NEXT: addf
-    %11 = addf %10, %cst_1 : f16
+    %11 = arith.addf %10, %cst_1 : f16
     %12 = pxa.reduce assign %11, %2[0, %arg1, %arg2, 0] : memref<1x4x4x1xf16>
     %13 = pxa.load %12[0, %arg1, %arg2, 0] : memref<1x4x4x1xf16>
     // CHECK-NEXT: math.sqrt
@@ -64,7 +64,7 @@ func @grn(%arg0: memref<1x4x4x3xf16>) -> memref<1x4x4x3xf16> {
     %15 = pxa.reduce assign %14, %3[0, %arg1, %arg2, 0] : memref<1x4x4x1xf16>
     %16 = pxa.load %15[0, %arg1, %arg2, 0] : memref<1x4x4x1xf16>
     // CHECK-NEXT: cmpf olt
-    %17 = cmpf olt, %16, %cst : f16
+    %17 = arith.cmpf olt, %16, %cst : f16
     %18 = pxa.reduce assign %17, %4[0, %arg1, %arg2, 0] : memref<1x4x4x1xi1>
     %19 = pxa.load %18[0, %arg1, %arg2, 0] : memref<1x4x4x1xi1>
     %20 = pxa.load %15[0, %arg1, %arg2, 0] : memref<1x4x4x1xf16>
@@ -77,7 +77,7 @@ func @grn(%arg0: memref<1x4x4x3xf16>) -> memref<1x4x4x3xf16> {
       %24 = pxa.load %arg0[0, %arg1, %arg2, %arg3] : memref<1x4x4x3xf16>
       %25 = pxa.load %22[0, %arg1, %arg2, 0] : memref<1x4x4x1xf16>
       // CHECK-NEXT: divf
-      %26 = divf %24, %25 : f16
+      %26 = arith.divf %24, %25 : f16
       // CHECK-NEXT: pxa.reduce assign
       %27 = pxa.reduce assign %26, %6[0, %arg1, %arg2, %arg3] : memref<1x4x4x3xf16>
       affine.yield %27 : memref<1x4x4x3xf16>

@@ -52,11 +52,11 @@ func @argmax_1(%arg0: memref<1x256x256x16xf16>, %arg1: memref<1x256x16xf16>, %ar
     %1 = affine.parallel (%arg3) = (0) to (64) reduce ("assign") -> (memref<1x256x16xi32>) {
       %2 = affine.parallel (%arg4) = (0) to (4) reduce ("assign") -> (memref<1x256x16xi32>) {
         %3 = affine.apply #map0(%arg3, %arg4)
-        %4 = index_cast %3 : index to i32
+        %4 = arith.index_cast %3 : index to i32
         %5 = affine.parallel (%arg5, %arg6) = (0, 0) to (256, 16) reduce ("assign") -> (memref<1x256x16xi32>) {
           %6 = pxa.load %arg0[0, %arg3 * 4 + %arg4, %arg5, %arg6] : memref<1x256x256x16xf16>
           %7 = pxa.load %arg1[0, %arg5, %arg6] : memref<1x256x16xf16>
-          %8 = cmpf "oeq", %6, %7 : f16
+          %8 = arith.cmpf "oeq", %6, %7 : f16
           %9 = select %8, %4, %c0_i32 : i32
           %10 = pxa.reduce maxu %9, %arg2[0, %arg5, %arg6] : memref<1x256x16xi32>
           affine.yield %10 : memref<1x256x16xi32>

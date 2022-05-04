@@ -89,11 +89,11 @@ func @fill_2d(%buf : memref<?x?xf32>, %alt : i1) {
     // t = alt ? i : 0
     %t = select %alt, %i, %c0 : index
     // v = x + y + t - 5
-    %1 = addi %x, %y : index
-    %2 = addi %1, %t : index
-    %v = subi %2, %c5 : index
-    %v_i64 = index_cast %v : index to i64
-    %v_f32 = sitofp %v_i64 : i64 to f32
+    %1 = arith.addi %x, %y : index
+    %2 = arith.addi %1, %t : index
+    %v = arith.subi %2, %c5 : index
+    %v_i64 = arith.index_cast %v : index to i64
+    %v_f32 = arith.sitofp %v_i64 : i64 to f32
     memref.store %v_f32, %buf[%x, %y] : memref<?x?xf32>
   }
   return
@@ -116,10 +116,10 @@ func @fill_4d(%buf : memref<?x?x?x?xf32>, %alt : i1) {
     %t = select %alt, %i, %c0 : index
     %j = affine.apply affine_map<(x, y, z, w) -> (x + y + z + w)>(%x, %y, %z, %w)
     // v = j + t - 5
-    %2 = addi %j, %t : index
-    %v = subi %2, %c5 : index
-    %v_i64 = index_cast %v : index to i64
-    %v_f32 = sitofp %v_i64 : i64 to f32
+    %2 = arith.addi %j, %t : index
+    %v = arith.subi %2, %c5 : index
+    %v_i64 = arith.index_cast %v : index to i64
+    %v_f32 = arith.sitofp %v_i64 : i64 to f32
     memref.store %v_f32, %buf[%x, %y, %z, %w] : memref<?x?x?x?xf32>
   }
   return
@@ -168,7 +168,7 @@ func @dot(%A: memref<?x?xf32>, %B: memref<?x?xf32>, %C: memref<?x?xf32>) {
   affine.parallel (%i, %j, %k) = (0, 0, 0) to (%M, %N, %K) {
     %0 = affine.load %A[%i, %k] : memref<?x?xf32>
     %1 = affine.load %B[%k, %j] : memref<?x?xf32>
-    %2 = mulf %0, %1 : f32
+    %2 = arith.mulf %0, %1 : f32
     pxa.reduce addf %2, %C[%i, %j] : memref<?x?xf32>
   }
   return
@@ -184,7 +184,7 @@ func @dot_tiled(%A: memref<?x?xf32>, %B: memref<?x?xf32>, %C: memref<?x?xf32>) {
     affine.parallel (%i1, %j1, %k1) = (%i0, %j0, %k0) to (%i0 + 2, %j0 + 2, %k0 + 2) {
       %0 = affine.load %A[%i1, %k1] : memref<?x?xf32>
       %1 = affine.load %B[%k1, %j1] : memref<?x?xf32>
-      %2 = mulf %0, %1 : f32
+      %2 = arith.mulf %0, %1 : f32
       pxa.reduce addf %2, %C[%i1, %j1] : memref<?x?xf32>
     }
   }
@@ -258,7 +258,7 @@ func @conv2(%I: !I_memref, %K: !K_memref, %O: !O_memref) {
   affine.parallel (%x, %y, %ci, %co) = (0, 0, 0, 0) to (%X, %Y, %CI, %CO) {
     %0 = affine.load %I[0, %x, %y, %ci] : !I_memref
     %1 = affine.load %K[0, 0, %ci, %co] : !K_memref
-    %2 = mulf %0, %1 : f32
+    %2 = arith.mulf %0, %1 : f32
     pxa.reduce addf %2, %O[0, %x, %y, %co] : !O_memref
   }
   return
@@ -276,7 +276,7 @@ func @conv2_tiled(%I: !I_memref, %K: !K_memref, %O: !O_memref) {
     affine.parallel (%x1, %ci, %co) = (%x0, 0, 0) to (%x0 + 2, %CI, %CO) {
       %0 = affine.load %I[0, %x1, %y, %ci] : !I_memref
       %1 = affine.load %K[0, 0, %ci, %co] : !K_memref
-      %2 = mulf %0, %1 : f32
+      %2 = arith.mulf %0, %1 : f32
       pxa.reduce addf %2, %O[0, %x1, %y, %co] : !O_memref
     }
   }

@@ -8,7 +8,7 @@ func @binary_add(%A: memref<256x256xf32>, %B: memref<256x256xf32>,%C: memref<256
     %1 = affine.parallel (%ix, %iy) = (0, 0) to (2, 2) reduce ("assign") -> (memref<256x256xf32>) {
       %2 = pxa.load %A[%ix + %ox * 2, %iy + %oy * 2] : memref<256x256xf32>
       %3 = pxa.load %B[%ix + %ox * 2, %iy + %oy * 2] : memref<256x256xf32>
-      %4 = addf %2, %3 : f32
+      %4 = arith.addf %2, %3 : f32
       %5 = pxa.reduce assign %4, %C[%ix + %ox * 2, %iy + %oy * 2] : memref<256x256xf32>
       affine.yield %5 : memref<256x256xf32>
     }

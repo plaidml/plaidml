@@ -17,8 +17,8 @@ func @main(%arg0: tensor<1x56x56x64xf32>, %arg1: tensor<1x1x64x64xf32> {stdx.con
     iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]
   } ins(%arg0, %arg1 : tensor<1x56x56x64xf32>, tensor<1x1x64x64xf32>) outs(%1 : tensor<1x56x56x64xf32>) {
   ^bb0(%arg3: f32, %arg4: f32, %arg5: f32):  // no predecessors
-    %5 = mulf %arg3, %arg4 : f32
-    %6 = addf %arg5, %5 : f32
+    %5 = arith.mulf %arg3, %arg4 : f32
+    %6 = arith.addf %arg5, %5 : f32
     linalg.yield %6 : f32
   } -> tensor<1x56x56x64xf32>
 
@@ -28,7 +28,7 @@ func @main(%arg0: tensor<1x56x56x64xf32>, %arg1: tensor<1x1x64x64xf32> {stdx.con
     iterator_types = ["parallel", "parallel", "parallel", "parallel"]
   } ins(%2, %arg2 : tensor<1x56x56x64xf32>, tensor<64xf32>) outs(%T1 : tensor<1x56x56x64xf32>) {
   ^bb0(%arg3: f32, %arg4: f32, %arg5: f32):  // no predecessors
-    %5 = addf %arg3, %arg4 : f32
+    %5 = arith.addf %arg3, %arg4 : f32
     linalg.yield %5 : f32
   } -> tensor<1x56x56x64xf32>
 

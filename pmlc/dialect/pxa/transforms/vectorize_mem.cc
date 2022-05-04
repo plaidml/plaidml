@@ -41,7 +41,7 @@ using namespace mlir; // NOLINT[build/namespaces]
 //  %1 = affine.parallel (%arg1) = (0) to (16) step (8) {
 //    %2 = pxa.vector_load %arg0[%arg1, 0] : memref<16x16xf32>, vector<128xf32>
 //    %3 = affine.parallel (%arg2) = (%arg1) to (%arg1 + 8) {
-//      %4 = subi %arg2, %arg1 : index
+//      %4 = arith.subi %arg2, %arg1 : index
 //      %5 = vector.extract_map %2[%4 : 8] : vector<128xf32> to vector<16xf32>
 //      %6 = pxa.reduce assign
 //      affine.yield %6
@@ -61,7 +61,7 @@ using namespace mlir; // NOLINT[build/namespaces]
 //    %2 = memref.alloc() : memref<128xf32>
 //    %3 = affine.parallel (%arg2) = (%arg1) to (%arg1 + 8) {
 //      %4 = pxa.load
-//      %5 = subi %arg2, %arg1 : index
+//      %5 = arith.subi %arg2, %arg1 : index
 //      %6 = vector.insert_map %4, %5, 8 : vector<16xf32> to vector<128xf32>
 //      %7 = pxa.vector_reduce assign %6, %2[%c0_1] : memref<128xf32>,
 //      vector<128xf32> affine.yield %7

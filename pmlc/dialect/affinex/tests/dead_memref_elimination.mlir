@@ -31,7 +31,7 @@ func @alloc_used () {
   // CHECK: affine.load
   %1 = affine.load %0[0] : memref<1xf32>
   // CHECK: addf
-  %2 = addf %1, %1 : f32
+  %2 = arith.addf %1, %1 : f32
   // CHECK: return
   return
 }

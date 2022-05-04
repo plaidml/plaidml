@@ -7,7 +7,7 @@ func @simple() {
   // CHECK: addf
   // CHECK: addf
   affine.for %arg0 = 0 to 2 {
-    %0 = addf %cst, %cst : f32
+    %0 = arith.addf %cst, %cst : f32
   }
   // CHECK: return
   return
@@ -33,7 +33,7 @@ func @nested() {
     // CHECK: addf
     affine.for %arg1 = 0 to 3 {
       affine.for %arg2 = 0 to 4 {
-        %0 = addf %cst, %cst : f32
+        %0 = arith.addf %cst, %cst : f32
       }
     }
   }
@@ -55,7 +55,7 @@ func @nested_over_limit_1() {
       // CHECK: addf
       // CHECK: addf
       affine.for %arg2 = 0 to 5 {
-        %0 = addf %cst, %cst : f32
+        %0 = arith.addf %cst, %cst : f32
       }
     }
   }
@@ -72,13 +72,13 @@ func @nested_over_limit_2() {
     // CHECK: affine.for
     affine.for %arg1 = 0 to 3 {
       // CHECK: addf
-      %0 = addf %cst, %cst : f32
+      %0 = arith.addf %cst, %cst : f32
       // CHECK: addf
       // CHECK: addf
       // CHECK: addf
       // CHECK: addf
       affine.for %arg2 = 0 to 4 {
-        %1 = addf %cst, %cst : f32
+        %1 = arith.addf %cst, %cst : f32
       }
     }
   }
@@ -108,7 +108,7 @@ func @conditional_if() {
     affine.for %arg1 = 0 to 2 {
       affine.for %arg2 = 0 to 3 {
         affine.if #set(%arg1, %arg2) {
-          %0 = addf %cst, %cst : f32
+          %0 = arith.addf %cst, %cst : f32
         }
       }
     }
@@ -135,7 +135,7 @@ func @conditional_if_over_limit() {
       // CHECK: addf
       affine.for %arg2 = 0 to 4 {
         affine.if #set(%arg1, %arg2) {
-          %0 = addf %cst, %cst : f32
+          %0 = arith.addf %cst, %cst : f32
         }
       }
     }
@@ -169,9 +169,9 @@ func @conditional_if_else() {
     affine.for %arg1 = 0 to 2 {
       affine.for %arg2 = 0 to 2 {
         affine.if #set(%arg1, %arg2) {
-          %0 = addf %cst, %cst : f32
+          %0 = arith.addf %cst, %cst : f32
         } else {
-          %1 = addf %cst, %cst : f32
+          %1 = arith.addf %cst, %cst : f32
         }
       }
     }
@@ -202,9 +202,9 @@ func @conditional_if_else_over_limit() {
       // CHECK: addf
       affine.for %arg2 = 0 to 3 {
         affine.if #set(%arg1, %arg2) {
-          %0 = addf %cst, %cst : f32
+          %0 = arith.addf %cst, %cst : f32
         } else {
-          %1 = addf %cst, %cst : f32
+          %1 = arith.addf %cst, %cst : f32
         }
       }
     }
@@ -233,7 +233,7 @@ func @double_nested() {
     // CHECK: addf
     affine.for %arg1 = 0 to 3 {
       affine.for %arg2 = 0 to 4 {
-        %0 = addf %cst, %cst : f32
+        %0 = arith.addf %cst, %cst : f32
       }
     }
   }
@@ -253,7 +253,7 @@ func @double_nested() {
     // CHECK: addf
     affine.for %arg4 = 0 to 3 {
       affine.for %arg5 = 0 to 4 {
-        %1 = addf %cst, %cst : f32
+        %1 = arith.addf %cst, %cst : f32
       }
     }
   }
@@ -270,7 +270,7 @@ func @parallel_no_unroll() {
     // CHECK: affine.parallel
     affine.parallel (%i, %j) = (0, 0) to (2, 2) {
       // CHECK: addf
-      %0 = addf %cst, %cst : f32
+      %0 = arith.addf %cst, %cst : f32
     }
   }
   // CHECK: return
@@ -286,7 +286,7 @@ func @variable_index(%arg: memref<1xindex>) {
   // CHECK: affine.for
   affine.for %arg0 = 0 to %0 {
     // CHECK: addf
-    %1 = addf %cst, %cst : f32
+    %1 = arith.addf %cst, %cst : f32
   }
   // CHECK: return
   return

@@ -15,7 +15,7 @@ func @double_for(%arg0: memref<16x16xf32>, %arg1: memref<16x16xf32>) -> memref<1
       %4 = affine.parallel (%arg6, %arg7, %arg8) = (0, 0, 0) to (16, 16, 16) reduce ("assign") -> (memref<16x16xf32>) {
         %5 = pxa.load %arg5[%arg6, %arg8] : memref<16x16xf32>
         %6 = pxa.load %arg0[%arg8, %arg7] : memref<16x16xf32>
-        %7 = mulf %5, %6 : f32
+        %7 = arith.mulf %5, %6 : f32
         %8 = pxa.reduce addf %7, %3[%arg6, %arg7] : memref<16x16xf32>
         affine.yield %8 : memref<16x16xf32>
       }
@@ -61,7 +61,7 @@ func @matrix_power(%arg0: memref<16x16xf32>, %arg1: memref<16x16xf32>) -> memref
     %3 = affine.parallel (%arg4, %arg5, %arg6) = (0, 0, 0) to (16, 16, 16) reduce ("assign") -> (memref<16x16xf32>) {
       %7 = pxa.load %arg3[%arg4, %arg6] : memref<16x16xf32>
       %8 = pxa.load %arg0[%arg6, %arg5] : memref<16x16xf32>
-      %9 = mulf %7, %8 : f32
+      %9 = arith.mulf %7, %8 : f32
       %10 = pxa.reduce addf %9, %2[%arg4, %arg5] : memref<16x16xf32>
       affine.yield %10 : memref<16x16xf32>
     }
@@ -73,7 +73,7 @@ func @matrix_power(%arg0: memref<16x16xf32>, %arg1: memref<16x16xf32>) -> memref
     %6 = affine.parallel (%arg4, %arg5, %arg6) = (0, 0, 0) to (16, 16, 16) reduce ("assign") -> (memref<16x16xf32>) {
       %7 = pxa.load %3[%arg4, %arg6] : memref<16x16xf32>
       %8 = pxa.load %arg0[%arg6, %arg5] : memref<16x16xf32>
-      %9 = mulf %7, %8 : f32
+      %9 = arith.mulf %7, %8 : f32
       %10 = pxa.reduce addf %9, %5[%arg4, %arg5] : memref<16x16xf32>
       affine.yield %10 : memref<16x16xf32>
     }

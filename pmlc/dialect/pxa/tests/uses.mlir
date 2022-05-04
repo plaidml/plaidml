@@ -94,7 +94,7 @@ func @pxa_generic_op(%A: memref<8x16xf32>, %B: memref<16x32xf32>, %C: memref<8x3
   %3 = affine.parallel (%arg4) = (0) to (32) reduce ("assign") -> (memref<8x32xf16>) {
     %4 = affine.parallel (%arg5) = (0) to (8) reduce ("assign") -> (memref<8x32xf16>) {
       %5 = pxa.load %2[%arg5, %arg4] {tag="%5"} : memref<8x32xf32>
-      %6 = fptrunc %5 : f32 to f16
+      %6 = arith.truncf %5 : f32 to f16
       %7 = pxa.reduce assign %6, %C[%arg5, %arg4] : memref<8x32xf16>
       affine.yield %7 : memref<8x32xf16>
     }

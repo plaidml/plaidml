@@ -13,7 +13,7 @@ func @main(%arg0: memref<1x56x56x64xf32>, %arg1: memref<1x1x64x64xf32>, %arg2: m
     %8 = affine.parallel (%i, %j, %k) = (0, 0, 0) to (56, 32, 64) reduce ("assign") -> memref<1x56x56x64xf32> {
       %a = pxa.load %arg0[0, %i, %arg3, %k] : memref<1x56x56x64xf32>
       %b = pxa.load %arg1[0, 0, %k, %j + %arg4 * 32] : memref<1x1x64x64xf32>
-      %c = mulf %a, %b : f32
+      %c = arith.mulf %a, %b : f32
       %d = pxa.reduce addf %c, %1[0, %i, %arg3, %j + %arg4 * 32] : memref<1x56x56x64xf32>
       affine.yield %d : memref<1x56x56x64xf32>
     }
@@ -23,7 +23,7 @@ func @main(%arg0: memref<1x56x56x64xf32>, %arg1: memref<1x1x64x64xf32>, %arg2: m
   %4 = affine.parallel (%arg3, %arg4, %arg5) = (0, 0, 0) to (56, 56, 64) reduce ("assign") -> (memref<1x56x56x64xf32>) {
     %8 = pxa.load %2[0, %arg3, %arg4, %arg5] : memref<1x56x56x64xf32>
     %9 = pxa.load %arg2[%arg5] : memref<64xf32>
-    %10 = addf %8, %9 : f32
+    %10 = arith.addf %8, %9 : f32
     %11 = pxa.reduce assign %10, %3[0, %arg3, %arg4, %arg5] : memref<1x56x56x64xf32>
     affine.yield %11 : memref<1x56x56x64xf32>
   }
