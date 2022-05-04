@@ -4,6 +4,7 @@
 #include "mlir/Dialect/Affine/IR/AffineValueMap.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Support/DebugStringHelper.h"
+#include "mlir/IR/BuiltinAttributes.h"
 
 #include "pmlc/dialect/pxa/analysis/memref_access.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
@@ -21,9 +22,9 @@ namespace {
 /// which is basically side effect of the fusion pass.
 
 // Helper function to detect if constant op is 0
-bool checkIfZero(ConstantOp constantVal) {
+bool checkIfZero(arith::ConstantOp constantVal) {
   auto valueType = constantVal.getType();
-  auto value = constantVal.value();
+  auto value = constantVal.getValue();
 
   // Special handling for vector type
   if (auto vectorType = valueType.dyn_cast<VectorType>()) {
@@ -77,7 +78,7 @@ void replaceAssignLoadAdd(PxaReduceOpInterface &reduceOp) {
   if (!assignValOp)
     return;
 
-  auto constantVal = dyn_cast<ConstantOp>(assignValOp);
+  auto constantVal = dyn_cast<arith::ConstantOp>(assignValOp);
   if (!constantVal || !checkIfZero(constantVal))
     return;
 
