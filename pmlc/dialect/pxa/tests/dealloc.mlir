@@ -1,10 +1,10 @@
 // RUN: pmlc-opt -split-input-file -pxa-dealloc-placement %s | FileCheck %s
 
 func @double_for(%arg0: memref<16x16xf32>, %arg1: memref<16x16xf32>) -> memref<16x16xf32> {
-  %cst = constant 0.0 : f32
-  %c0 = constant 0 : index
-  %c1 = constant 1 : index
-  %c4 = constant 4 : index
+  %cst = arith.constant 0.0 : f32
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c4 = arith.constant 4 : index
   %0 = scf.for %arg2 = %c0 to %c4 step %c1 iter_args(%arg3 = %arg0) -> (memref<16x16xf32>) {
     %1 = scf.for %arg4 = %c0 to %c4 step %c1 iter_args(%arg5 = %arg3) -> (memref<16x16xf32>) {
       %2 = memref.alloc() : memref<16x16xf32>
@@ -48,10 +48,10 @@ func @double_for(%arg0: memref<16x16xf32>, %arg1: memref<16x16xf32>) -> memref<1
 // -----
 
 func @matrix_power(%arg0: memref<16x16xf32>, %arg1: memref<16x16xf32>) -> memref<16x16xf32> {
-  %cst = constant 0.0 : f32
-  %c0 = constant 0 : index
-  %c1 = constant 1 : index
-  %c4 = constant 4 : index
+  %cst = arith.constant 0.0 : f32
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c4 = arith.constant 4 : index
   %0 = scf.for %arg2 = %c0 to %c4 step %c1 iter_args(%arg3 = %arg0) -> (memref<16x16xf32>) {
     %1 = memref.alloc() : memref<16x16xf32>
     %2 = affine.parallel (%arg4, %arg5) = (0, 0) to (16, 16) reduce ("assign") -> (memref<16x16xf32>) {

@@ -909,6 +909,7 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
                            mlir::scf::SCFDialect,       //
                            layer::LayerDialect,         //
                            pxa::PXADialect,             //
+                           arith::ArithmeticDialect,    //
                            stdx::StdXDialect>();
     target.addLegalOp<scf::ForOp,   //
                       scf::YieldOp, //

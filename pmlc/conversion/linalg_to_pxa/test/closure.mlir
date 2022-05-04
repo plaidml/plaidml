@@ -5,7 +5,7 @@
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 
 func @closure() {
-  %cst = constant 0.0 : f32
+  %cst = arith.constant 0.0 : f32
   %0 = linalg.init_tensor [8, 32] : tensor<8x32xf32>
   %1 = linalg.fill(%cst, %0) : f32, tensor<8x32xf32> -> tensor<8x32xf32>
   stdx.closure(%arg0: tensor<8x16xf32>, %arg1: tensor<16x32xf32>)

@@ -70,8 +70,8 @@ func @fusion_different_idxs(%A: memref<2x3xf32>, %B: memref<2x3xf32>, %C: memref
 // -----
 
 func @resnet50_tail(%arg0: memref<1000xf32>, %arg1: memref<1x1000xf32>, %out: memref<1x1000xf32>) -> memref<1x1000xf32> {
-  %cst = constant 0xFF800000 : f32
-  %cst_1 = constant 0.000000e+00 : f32
+  %cst = arith.constant 0xFF800000 : f32
+  %cst_1 = arith.constant 0.000000e+00 : f32
   %1 = memref.alloc() : memref<1x1000xf32>
   %2 = affine.parallel (%i) = (0) to (1000) reduce ("assign") -> (memref<1x1000xf32>) {
     %9 = pxa.load %arg1[0, %i] : memref<1x1000xf32>

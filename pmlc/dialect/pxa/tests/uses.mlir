@@ -2,7 +2,7 @@
 // RUN: pmlc-opt -pxa-test-indirect-values-iterator -split-input-file %s | FileCheck %s --check-prefix=VALUES
 
 func @simple(%arg0: memref<3xf32>) -> memref<3xf32> {
-  %zero = constant 0.0 : f32
+  %zero = arith.constant 0.0 : f32
   // USES: alloc: %0
   // VALUES: alloc: %0
   %0 = memref.alloc() {tag="%0"} : memref<3xf32>
@@ -25,7 +25,7 @@ func @simple(%arg0: memref<3xf32>) -> memref<3xf32> {
 #set0 = affine_set<(d0, d1, d2, d3, d4, d5) : (d3 - d4 * 64 - d5 * 128 >= 0, -d3 + d4 * 64 + d5 * 128 + 63 >= 0)>
 
 func @complex(%arg0: memref<1x26x26x64xi8>) -> memref<1x13x13x256xi8> {
-  %c0_i8 = constant 0 : i8
+  %c0_i8 = arith.constant 0 : i8
   // USES: alloc: %0
   // VALUES: alloc: %0
   %0 = memref.alloc() {tag="%0"} : memref<1x13x13x256xi8>
@@ -81,7 +81,7 @@ func @complex(%arg0: memref<1x26x26x64xi8>) -> memref<1x13x13x256xi8> {
 #map = affine_map<(d0, d1) -> (d0, d1)>
 
 func @pxa_generic_op(%A: memref<8x16xf32>, %B: memref<16x32xf32>, %C: memref<8x32xf16>) -> memref<8x32xf16> {
-  %cst = constant 0.0 : f32
+  %cst = arith.constant 0.0 : f32
   %0 = memref.alloc() {tag="%0"} : memref<8x32xf32>
   %1 = affine.parallel (%arg4) = (0) to (32) reduce ("assign") -> (memref<8x32xf32>) {
     %4 = affine.parallel (%arg5) = (0) to (8) reduce ("assign") -> (memref<8x32xf32>) {

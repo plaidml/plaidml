@@ -1,10 +1,10 @@
 // RUN: pmlc-opt -pxa-vectorize="strategy=recursive" -verify-diagnostics %s | FileCheck %s
 
 func @grn(%arg0: index, %arg1: memref<1x4x128x24xf16>, %arg2: memref<1x4x128x24xf16>) -> memref<1x4x128x24xf16> {
-  %cst = constant 0.000000e+00 : f16
-  %cst_0 = constant 1.000000e+00 : f16
-  %cst_1 = constant 1.001360e-05 : f16
-  %cst_2 = constant 1.600000e+01 : f16
+  %cst = arith.constant 0.000000e+00 : f16
+  %cst_0 = arith.constant 1.000000e+00 : f16
+  %cst_1 = arith.constant 1.001360e-05 : f16
+  %cst_2 = arith.constant 1.600000e+01 : f16
   // expected-remark@+2 {{Vectorize: Failed, !vectorizable}}
   // expected-remark@+1 {{Vectorize: Failed, dimension is not a multiple of the vector width}}
   %0 = affine.parallel (%arg3, %arg4) = (0, 0) to (4, 128) reduce ("assign") -> (memref<1x4x128x24xf16>) {
@@ -15,7 +15,7 @@ func @grn(%arg0: index, %arg1: memref<1x4x128x24xf16>, %arg2: memref<1x4x128x24x
     %4 = affine.parallel (%arg5) = (0) to (24) reduce ("assign") -> (memref<1x1x1x1xf32>) {
       // CHECK: pxa.vector_load
       %15 = pxa.load %arg1[0, %arg3, %arg4, %arg5] : memref<1x4x128x24xf16>
-      // CHECK: fpext %{{.*}} : vector<8xf16> to vector<8xf32>
+      // CHECK: arith.extf %{{.*}} : vector<8xf16> to vector<8xf32>
       %16 = arith.extf %15 : f16 to f32
       // CHECK: mulf %{{.*}}, %{{.*}} : vector<8xf32>
       %17 = arith.mulf %16, %16 : f32

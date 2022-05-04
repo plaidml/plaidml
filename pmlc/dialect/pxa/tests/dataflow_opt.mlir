@@ -3,7 +3,7 @@
 // CHECK-LABEL: func @simple
 func @simple(%out : memref<2xf32>) -> memref<2xf32> {
   // CHECK: constant 0.0
-  %zero = constant 0.0 : f32
+  %zero = arith.constant 0.0 : f32
   %buf = memref.alloc() : memref<2xf32>
   // CHECK-NEXT: affine.parallel
   %0 = affine.parallel (%i) = (0) to (2) reduce ("assign") -> (memref<2xf32>) {
@@ -18,9 +18,9 @@ func @simple(%out : memref<2xf32>) -> memref<2xf32> {
 
 // CHECK-LABEL: func @grn
 func @grn(%arg0: memref<1x4x4x3xf16>) -> memref<1x4x4x3xf16> {
-  %cst = constant 1.001360e-05 : f16
-  %cst_0 = constant 0.000000e+00 : f16
-  %cst_1 = constant 1.000000e+00 : f16
+  %cst = arith.constant 1.001360e-05 : f16
+  %cst_0 = arith.constant 0.000000e+00 : f16
+  %cst_1 = arith.constant 1.000000e+00 : f16
 
   // CHECK-DAG: constant 1.001360e-05
   // CHECK-DAG: constant 0.0

@@ -988,7 +988,7 @@ struct ShapeOpConversion : public OpConversionPattern<tile::ShapeOp> {
     } else {
       op.emitError("Invalid return type of ShapeOp.");
     }
-    rewriter.replaceOpWithNewOp<ConstantOp>(op, shapeAttr, resultType);
+    rewriter.replaceOpWithNewOp<arith::ConstantOp>(op, shapeAttr, resultType);
     return success();
   }
 };

@@ -78,9 +78,9 @@ func @xsmm_brgemm_offs() {
 }
 
 func @fill_2d(%buf : memref<?x?xf32>, %alt : i1) {
-  %c0 = constant 0 : index
-  %c1 = constant 1 : index
-  %c5 = constant 5 : index
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c5 = arith.constant 5 : index
   %X = memref.dim %buf, %c0 : memref<?x?xf32>
   %Y = memref.dim %buf, %c1 : memref<?x?xf32>
   affine.parallel (%x, %y) = (0, 0) to (%X, %Y) {
@@ -100,11 +100,11 @@ func @fill_2d(%buf : memref<?x?xf32>, %alt : i1) {
 }
 
 func @fill_4d(%buf : memref<?x?x?x?xf32>, %alt : i1) {
-  %c0 = constant 0 : index
-  %c1 = constant 1 : index
-  %c2 = constant 2 : index
-  %c3 = constant 3 : index
-  %c5 = constant 5 : index
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c2 = arith.constant 2 : index
+  %c3 = arith.constant 3 : index
+  %c5 = arith.constant 5 : index
   %X = memref.dim %buf, %c0 : memref<?x?x?x?xf32>
   %Y = memref.dim %buf, %c1 : memref<?x?x?x?xf32>
   %Z = memref.dim %buf, %c2 : memref<?x?x?x?xf32>
@@ -126,9 +126,9 @@ func @fill_4d(%buf : memref<?x?x?x?xf32>, %alt : i1) {
 }
 
 func @test_dot(%impl : (memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()) {
-  %false = constant 0 : i1
-  %true = constant 1 : i1
-  %f0 = constant 0.0 : f32
+  %false = arith.constant 0 : i1
+  %true = arith.constant 1 : i1
+  %f0 = arith.constant 0.0 : f32
   %A = memref.alloc() : memref<8x8xf32>
   %A_2d = memref.cast %A : memref<8x8xf32> to memref<?x?xf32>
   %A_ud = memref.cast %A : memref<8x8xf32> to memref<*xf32>
@@ -160,8 +160,8 @@ func @test_dot(%impl : (memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()
 }
 
 func @dot(%A: memref<?x?xf32>, %B: memref<?x?xf32>, %C: memref<?x?xf32>) {
-  %c0 = constant 0 : index
-  %c1 = constant 1 : index
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
   %M = memref.dim %C, %c0 : memref<?x?xf32>
   %N = memref.dim %C, %c1 : memref<?x?xf32>
   %K = memref.dim %A, %c1 : memref<?x?xf32>
@@ -175,8 +175,8 @@ func @dot(%A: memref<?x?xf32>, %B: memref<?x?xf32>, %C: memref<?x?xf32>) {
 }
 
 func @dot_tiled(%A: memref<?x?xf32>, %B: memref<?x?xf32>, %C: memref<?x?xf32>) {
-  %c0 = constant 1 : index
-  %c1 = constant 1 : index
+  %c0 = arith.constant 1 : index
+  %c1 = arith.constant 1 : index
   %M = memref.dim %C, %c0 : memref<?x?xf32>
   %N = memref.dim %C, %c1 : memref<?x?xf32>
   %K = memref.dim %A, %c1 : memref<?x?xf32>
@@ -192,9 +192,9 @@ func @dot_tiled(%A: memref<?x?xf32>, %B: memref<?x?xf32>, %C: memref<?x?xf32>) {
 }
 
 func @test_conv2(%impl : (!I_memref, !K_memref, !O_memref) -> ()) {
-  %false = constant 0 : i1
-  %true = constant 1 : i1
-  %f0 = constant 0.0 : f32
+  %false = arith.constant 0 : i1
+  %true = arith.constant 1 : i1
+  %f0 = arith.constant 0.0 : f32
   %I = memref.alloc() : !I_memref
   %I_2d = memref.cast %I : !I_memref to memref<?x?x?x?xf32>
   %I_ud = memref.cast %I : !I_memref to memref<*xf32>
@@ -248,9 +248,9 @@ func @test_conv2(%impl : (!I_memref, !K_memref, !O_memref) -> ()) {
 }
 
 func @conv2(%I: !I_memref, %K: !K_memref, %O: !O_memref) {
-  %c1 = constant 1 : index
-  %c2 = constant 2 : index
-  %c3 = constant 3 : index
+  %c1 = arith.constant 1 : index
+  %c2 = arith.constant 2 : index
+  %c3 = arith.constant 3 : index
   %X = memref.dim %I, %c1 : !I_memref
   %Y = memref.dim %I, %c2 : !I_memref
   %CI = memref.dim %I, %c3 : !I_memref
@@ -265,9 +265,9 @@ func @conv2(%I: !I_memref, %K: !K_memref, %O: !O_memref) {
 }
 
 func @conv2_tiled(%I: !I_memref, %K: !K_memref, %O: !O_memref) {
-  %c1 = constant 1 : index
-  %c2 = constant 2 : index
-  %c3 = constant 3 : index
+  %c1 = arith.constant 1 : index
+  %c2 = arith.constant 2 : index
+  %c3 = arith.constant 3 : index
   %X = memref.dim %I, %c1 : !I_memref
   %Y = memref.dim %I, %c2 : !I_memref
   %CI = memref.dim %I, %c3 : !I_memref
@@ -284,10 +284,10 @@ func @conv2_tiled(%I: !I_memref, %K: !K_memref, %O: !O_memref) {
 }
 
 func @conv2_xsmm(%I: !I_memref, %K: !K_memref, %O: !O_memref) {
-  %c0 = constant 0 : index
-  %c1 = constant 1 : index
-  %c2 = constant 2 : index
-  %c3 = constant 3 : index
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c2 = arith.constant 2 : index
+  %c3 = arith.constant 3 : index
   %X = memref.dim %I, %c1 : !I_memref
   %Y = memref.dim %I, %c2 : !I_memref
   %CI = memref.dim %I, %c3 : !I_memref
@@ -301,10 +301,10 @@ func @conv2_xsmm(%I: !I_memref, %K: !K_memref, %O: !O_memref) {
 }
 
 func @conv2_xsmm_brgemm_offs(%I: !I_memref, %K: !K_memref, %O: !O_memref) {
-  %c0 = constant 0 : index
-  %c1 = constant 1 : index
-  %c2 = constant 2 : index
-  %c3 = constant 3 : index
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c2 = arith.constant 2 : index
+  %c3 = arith.constant 3 : index
   %X = memref.dim %I, %c1 : !I_memref
   %Y = memref.dim %I, %c2 : !I_memref
   %CI = memref.dim %I, %c3 : !I_memref

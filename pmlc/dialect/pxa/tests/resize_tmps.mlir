@@ -47,7 +47,7 @@ func @inner_indexes(%I: memref<100x100xf32>) -> (memref<100x100xf32>) {
 
 func @no_resize_return() -> memref<10x10xf32> {
 // CHECK-LABEL: func @no_resize_return
-  %cst = constant 0.000000e+00 : f32
+  %cst = arith.constant 0.000000e+00 : f32
   %0 = memref.alloc() : memref<10x10xf32>
   // CHECK: memref.alloc() : memref<10x10xf32>
   %1 = affine.parallel (%arg0, %arg1) = (0, 0) to (5, 5) reduce ("assign") -> (memref<10x10xf32>) {

@@ -166,6 +166,8 @@ static AffineParallelOp copyBuffer(OpBuilder &builder, Location loc,
   return forOp;
 }
 
+// TODO: lorenzo: this should match an arith::ConstantOp
+// See linal_to_pxa/test/shape.mlir
 struct ConstantOpConversion : public OpConversionPattern<ConstantOp> {
   using OpConversionPattern<ConstantOp>::OpConversionPattern;
 

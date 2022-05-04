@@ -18,7 +18,7 @@ func @simple(%arg0: memref<100x100xf32>, %arg1: memref<100x100xf32>, %arg2: memr
 }
 
 func @symbolic_fail(%arg0: memref<100x?xf32>) {
-  %c0 = constant 0 : index
+  %c0 = arith.constant 0 : index
   %d1 = memref.dim %arg0, %c0 : memref<100x?xf32>
   affine.parallel (%i, %j) = (0, 0) to (100, symbol(%d1)) {
     %0 = pxa.load %arg0[%i, %j] : memref<100x?xf32>

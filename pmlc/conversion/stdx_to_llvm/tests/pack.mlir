@@ -29,14 +29,14 @@ func private @print_memref_f32(memref<*xf32>)
 
 func @jitEntry() -> () {
   %in = memref.alloc() : memref<3xf32>
-  %a = constant 1.0 : f32
-  %b = constant 2.0 : f32
-  %c = constant 3.0 : f32
+  %a = arith.constant 1.0 : f32
+  %b = arith.constant 2.0 : f32
+  %c = arith.constant 3.0 : f32
   %p = stdx.pack(%in, %a, %b, %c) : (memref<3xf32>, f32, f32, f32) -> tuple<memref<3xf32>, f32, f32, f32>
   %out, %a2, %b2, %c2 = stdx.unpack(%p) : (tuple<memref<3xf32>, f32, f32, f32>) -> (memref<3xf32>, f32, f32, f32)
-  %i0 = constant 0 : index
-  %i1 = constant 1 : index
-  %i2 = constant 2 : index
+  %i0 = arith.constant 0 : index
+  %i1 = arith.constant 1 : index
+  %i2 = arith.constant 2 : index
   memref.store %a2, %out[%i0] : memref<3xf32>
   memref.store %b2, %out[%i1] : memref<3xf32>
   memref.store %c2, %out[%i2] : memref<3xf32>

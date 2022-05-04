@@ -7,7 +7,7 @@
 #act    = affine_map<(n, h, w, c) -> (n, h, w, c)>
 
 func @main(%arg0: tensor<1x56x56x64xf32>, %arg1: tensor<1x1x64x64xf32> {stdx.const}, %arg2: tensor<64xf32> {stdx.const}) -> tensor<1x56x56x64xf32> {
-  %cst = constant 0.000000e+00 : f32
+  %cst = arith.constant 0.000000e+00 : f32
   %T0 = linalg.init_tensor [1, 56, 56, 64] : tensor<1x56x56x64xf32>
   %1 = linalg.fill(%cst, %T0) : f32, tensor<1x56x56x64xf32> -> tensor<1x56x56x64xf32>
 

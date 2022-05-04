@@ -3,7 +3,7 @@
 #map0 = affine_map<(d0, d1) -> (d0 * 4 + d1)>
 
 func @argmax_0(%arg0: memref<1x256x256x16xf16>, %arg1: memref<1x256x16xf16>) {
-  %cst = constant 0xFC00 : f16
+  %cst = arith.constant 0xFC00 : f16
   %0 = affine.parallel (%arg2) = (0) to (64) reduce ("assign") -> (memref<1x256x16xf16>) {
     %1 = affine.parallel () = () to () reduce ("assign") -> (memref<1x256x16xf16>) {
       %2 = affine.parallel (%arg3, %arg4) = (0, 0) to (4, 16) reduce ("assign") -> (memref<1x256x16xf16>) {
@@ -47,7 +47,7 @@ func @argmax_0(%arg0: memref<1x256x256x16xf16>, %arg1: memref<1x256x16xf16>) {
 // CHECK:       {outer, outermost}
 
 func @argmax_1(%arg0: memref<1x256x256x16xf16>, %arg1: memref<1x256x16xf16>, %arg2: memref<1x256x16xi32>) {
-  %c0_i32 = constant 0 : i32
+  %c0_i32 = arith.constant 0 : i32
   %0 = affine.parallel () = () to () reduce ("assign") -> (memref<1x256x16xi32>) {
     %1 = affine.parallel (%arg3) = (0) to (64) reduce ("assign") -> (memref<1x256x16xi32>) {
       %2 = affine.parallel (%arg4) = (0) to (4) reduce ("assign") -> (memref<1x256x16xi32>) {

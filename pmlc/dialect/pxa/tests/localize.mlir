@@ -2,7 +2,7 @@
 
 // CHECK-LABEL: func @simple
 func @simple(%arg0: memref<3x4xf16>) -> memref<3x4xf16> {
-  %cst = constant 0.0 : f16
+  %cst = arith.constant 0.0 : f16
   // CHECK: memref.alloc()
   %0 = memref.alloc() : memref<3x4xf16>
   %1 = memref.alloc() : memref<3x4xf16>
