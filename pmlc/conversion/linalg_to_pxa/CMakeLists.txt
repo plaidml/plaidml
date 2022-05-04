@@ -4,7 +4,7 @@ pml_cc_library(
     passes.h
   SRCS
     linalg_to_pxa.cc
-    pooling.cc
+    #pooling.cc
     reshape.cc
     utils.cc
   DEPS

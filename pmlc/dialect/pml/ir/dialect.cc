@@ -30,7 +30,7 @@ Attribute PMLDialect::parseAttribute(DialectAsmParser &parser,
     return Attribute();
   Attribute attr;
   auto parseResult =
-      generatedAttributeParser(getContext(), parser, attrTag, type, attr);
+      generatedAttributeParser(parser, attrTag, type, attr);
   if (parseResult.hasValue())
     return attr;
   parser.emitError(parser.getNameLoc(), "unknown schedule attribute");
@@ -64,11 +64,11 @@ static void printAxisAttr(DialectAsmPrinter &printer, AxisAttr axis) {
   printer << axis.getName().getValue() << ':' << axis.getRange();
 }
 
-Attribute AxisAttr::parse(MLIRContext *context, DialectAsmParser &parser,
+Attribute AxisAttr::parse(DialectAsmParser &parser,
                           Type type) {
   AxisAttr attr;
   if (parser.parseLess() ||                   //
-      parseAxisAttr(context, parser, attr) || //
+      parseAxisAttr(parser.getContext(), parser, attr) || //
       parser.parseGreater())
     return {};
   return attr;
@@ -78,7 +78,7 @@ void AxisAttr::print(DialectAsmPrinter &printer) const {
   printer << "axis<" << getName().getValue() << ':' << getRange() << '>';
 }
 
-Attribute ScheduleAttr::parse(MLIRContext *context, DialectAsmParser &parser,
+Attribute ScheduleAttr::parse(DialectAsmParser &parser,
                               Type type) {
   AffineMap map;
   if (parser.parseLess() ||         //
@@ -92,7 +92,7 @@ Attribute ScheduleAttr::parse(MLIRContext *context, DialectAsmParser &parser,
   SmallVector<AxisAttr> axes;
   do {
     AxisAttr axis;
-    if (parseAxisAttr(context, parser, axis))
+    if (parseAxisAttr(parser.getContext(), parser, axis))
       return {};
     axes.push_back(axis);
   } while (succeeded(parser.parseOptionalComma()));
@@ -101,7 +101,7 @@ Attribute ScheduleAttr::parse(MLIRContext *context, DialectAsmParser &parser,
       parser.parseGreater())
     return {};
 
-  return parser.getChecked<ScheduleAttr>(context, map, axes);
+  return parser.getChecked<ScheduleAttr>(parser.getContext(), map, axes);
 }
 
 void ScheduleAttr::print(DialectAsmPrinter &printer) const {
@@ -164,7 +164,7 @@ ScheduleAttr ScheduleAttr::removeAxes(DenseSet<StringRef> names) {
   return ScheduleAttr::get(getContext(), map, axes);
 }
 
-Attribute PatternAttr::parse(MLIRContext *context, DialectAsmParser &parser,
+Attribute PatternAttr::parse(DialectAsmParser &parser,
                              Type type) {
   StringAttr op;
   DictionaryAttr dict;
@@ -176,14 +176,14 @@ Attribute PatternAttr::parse(MLIRContext *context, DialectAsmParser &parser,
     parser.emitError(parser.getNameLoc(), "expected '$op, $dict'");
     return {};
   }
-  return parser.getChecked<PatternAttr>(context, op, dict);
+  return parser.getChecked<PatternAttr>(parser.getContext(), op, dict);
 }
 
 void PatternAttr::print(DialectAsmPrinter &printer) const {
   printer << "pattern<" << getOp() << ", " << getDict() << '>';
 }
 
-Attribute ApplyAttr::parse(MLIRContext *context, DialectAsmParser &parser,
+Attribute ApplyAttr::parse(DialectAsmParser &parser,
                            Type type) {
   PatternAttr pattern;
   DictionaryAttr dict;
@@ -195,7 +195,7 @@ Attribute ApplyAttr::parse(MLIRContext *context, DialectAsmParser &parser,
     parser.emitError(parser.getNameLoc(), "expected '$pattern, $dict'");
     return {};
   }
-  return parser.getChecked<ApplyAttr>(context, pattern, dict);
+  return parser.getChecked<ApplyAttr>(parser.getContext(), pattern, dict);
 }
 
 void ApplyAttr::print(DialectAsmPrinter &printer) const {

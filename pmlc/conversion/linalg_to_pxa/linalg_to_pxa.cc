@@ -467,7 +467,7 @@ struct LowerLinalgToPXAPass
     linalg::populateLinalgNamedOpsGeneralizationPatterns(patterns);
     populateLinalgTensorCollapseOpGeneralizationPatterns(patterns);
     populateLinalgTensorExpandOpGeneralizationPatterns(patterns);
-    populateLinalgPoolingOpGeneralizationPatterns(patterns);
+    // populateLinalgPoolingOpGeneralizationPatterns(patterns);
     patterns.add<linalg::PadTensorOpTransformationPattern>(op.getContext());
     (void)applyPatternsAndFoldGreedily(op, std::move(patterns));
   }
