@@ -182,7 +182,7 @@ LogicalResult cacheLoadAsVector(AffineParallelOp par, PxaLoadOp load,
       loc, innerMap.getAffineMap().getSubMap({last}), innerMap.getOperands());
 
   if (idx.getType().isa<IndexType>()) {
-    auto indexCast = newLoadBuilder.create<IndexCastOp>(load.getLoc(), idx,
+    auto indexCast = newLoadBuilder.create<arith::IndexCastOp>(load.getLoc(), idx,
                                                         builder.getI32Type());
     idx = indexCast.getResult();
   }

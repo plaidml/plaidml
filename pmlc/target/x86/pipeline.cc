@@ -152,14 +152,14 @@ struct FoldConstantCastPass
           if (auto intAttr = attr.dyn_cast<IntegerAttr>()) {
             APFloat value = convertFloatUsingType(intAttr.getInt(), floatType);
             auto constOp =
-                builder.create<ConstantFloatOp>(op->getLoc(), value, floatType);
+                builder.create<arith::ConstantFloatOp>(op->getLoc(), value, floatType);
             result.replaceAllUsesWith(constOp);
           }
         } else if (auto intType = type.dyn_cast<IntegerType>()) {
           if (auto floatAttr = attr.dyn_cast<FloatAttr>()) {
             int64_t value = static_cast<int64_t>(floatAttr.getValueAsDouble());
             auto constOp =
-                builder.create<ConstantIntOp>(op->getLoc(), value, intType);
+                builder.create<arith::ConstantIntOp>(op->getLoc(), value, intType);
             result.replaceAllUsesWith(constOp);
           }
         }

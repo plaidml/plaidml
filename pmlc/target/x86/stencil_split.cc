@@ -454,15 +454,15 @@ private:
   }
 
   SmallVector<Value *, 3> captureTopLevel(AffineParallelOp op) {
-    auto retVal = maybeCaptureTopLevel<AddFOp>(true, op);
+    auto retVal = maybeCaptureTopLevel<arith::AddFOp>(true, op);
     if (retVal[0] == NULL) {
-      retVal = maybeCaptureTopLevel<MulFOp>(true, op);
+      retVal = maybeCaptureTopLevel<arith::MulFOp>(true, op);
     }
     if (retVal[0] == NULL) {
-      retVal = maybeCaptureTopLevel<SubFOp>(true, op);
+      retVal = maybeCaptureTopLevel<arith::SubFOp>(true, op);
     }
     if (retVal[0] == NULL) {
-      retVal = maybeCaptureTopLevel<DivFOp>(true, op);
+      retVal = maybeCaptureTopLevel<arith::DivFOp>(true, op);
     }
     if (retVal[0] == NULL) {
       retVal = maybeCaptureTopLevel<stdx::ReluOp>(false, op);

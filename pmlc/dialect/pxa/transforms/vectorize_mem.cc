@@ -231,7 +231,7 @@ struct VectorizeMemImpl {
     // loop we are extracting from, in case the loop was not tiled.
     // If it was tiled then it will be removed later on.
     OpBuilder builder(loopOp);
-    auto const0 = builder.create<ConstantIndexOp>(loopOp.getLoc(), 0);
+    auto const0 = builder.create<arith::ConstantIndexOp>(loopOp.getLoc(), 0);
 
     // Replace the IV except for the orginal operation that would become
     // vector.extractelement later. In case of no tiling it would be 0,
@@ -277,7 +277,7 @@ struct VectorizeMemImpl {
     Value const1Result;
     if (tileSize != loopVectorSize) {
       auto const1 =
-          builder.create<SubIOp>(vectorLoad.getLoc(), blockArg, tiledBlockArg);
+          builder.create<arith::SubIOp>(vectorLoad.getLoc(), blockArg, tiledBlockArg);
       const1Result = const1.getResult();
     }
     AffineMap identityMap = AffineMap::getMultiDimIdentityMap(
@@ -309,14 +309,14 @@ struct VectorizeMemImpl {
         MemRefType::get(vectorType.getShape(), vectorType.getElementType());
     auto newAllocOp =
         builder.create<memref::AllocOp>(loopOp.getLoc(), newMemrefType);
-    auto const0 = builder.create<ConstantIndexOp>(loopOp.getLoc(), 0);
+    auto const0 = builder.create<arith::ConstantIndexOp>(loopOp.getLoc(), 0);
     AffineMap identityMap = AffineMap::getMultiDimIdentityMap(
         /*numDims=*/1, vectorReduce.getContext());
 
     builder.setInsertionPoint(vectorReduce);
     Value const1Result;
     if (tileSize != loopVectorSize) {
-      auto const1 = builder.create<SubIOp>(vectorReduce.getLoc(), blockArg,
+      auto const1 = builder.create<arith::SubIOp>(vectorReduce.getLoc(), blockArg,
                                            tiledBlockArg);
       const1Result = const1.getResult();
     }

@@ -223,8 +223,8 @@ struct NegIOp {
   Value create(ConversionPatternRewriter &rewriter, Location loc,
                Type resultType, ArrayRef<Value> operands,
                ArrayRef<Type> types) {
-    auto zero = rewriter.create<mlir::ConstantIntOp>(loc, 0, resultType);
-    auto neg = rewriter.create<mlir::SubIOp>(loc, zero, operands[0]);
+    auto zero = rewriter.create<mlir::arith::ConstantIntOp>(loc, 0, resultType);
+    auto neg = rewriter.create<mlir::arith::SubIOp>(loc, zero, operands[0]);
     return neg.getResult();
   }
 };
@@ -234,8 +234,8 @@ struct NotOp {
                Type resultType, ArrayRef<Value> operands,
                ArrayRef<Type> types) {
     // -(x + 1) = -1 - x
-    auto negOne = rewriter.create<mlir::ConstantIntOp>(loc, -1, resultType);
-    auto sub = rewriter.create<mlir::SubIOp>(loc, negOne, operands[0]);
+    auto negOne = rewriter.create<mlir::arith::ConstantIntOp>(loc, -1, resultType);
+    auto sub = rewriter.create<mlir::arith::SubIOp>(loc, negOne, operands[0]);
     return sub.getResult();
   }
 };
@@ -267,7 +267,7 @@ struct SelectOpBuilder {
   }
 };
 
-template <CmpFPredicate predicate>
+template <arith::CmpFPredicate predicate>
 struct CmpFloatOp {
   Value create(ConversionPatternRewriter &rewriter, Location loc,
                Type resultType, ArrayRef<Value> operands,
@@ -275,12 +275,12 @@ struct CmpFloatOp {
     SmallVector<Value, 2> promoted;
     promoteTypes(rewriter, loc, operands, types, &promoted);
     return rewriter
-        .create<mlir::CmpFOp>(loc, predicate, promoted[0], promoted[1])
+        .create<mlir::arith::CmpFOp>(loc, predicate, promoted[0], promoted[1])
         .getResult();
   }
 };
 
-template <CmpIPredicate predicate>
+template <arith::CmpIPredicate predicate>
 struct CmpIntOp {
   Value create(ConversionPatternRewriter &rewriter, Location loc,
                Type resultType, ArrayRef<Value> operands,
@@ -288,12 +288,12 @@ struct CmpIntOp {
     SmallVector<Value, 2> promoted;
     promoteTypes(rewriter, loc, operands, types, &promoted);
     return rewriter
-        .create<mlir::CmpIOp>(loc, predicate, promoted[0], promoted[1])
+        .create<mlir::arith::CmpIOp>(loc, predicate, promoted[0], promoted[1])
         .getResult();
   }
 };
 
-template <CmpIPredicate signedPred, CmpIPredicate unsignedPred>
+template <arith::CmpIPredicate signedPred, arith::CmpIPredicate unsignedPred>
 struct CmpIntInequalityOp {
   Value create(ConversionPatternRewriter &rewriter, Location loc,
                Type resultType, ArrayRef<Value> operands,
@@ -302,7 +302,7 @@ struct CmpIntInequalityOp {
     auto bestType = promoteTypes(rewriter, loc, operands, types, &promoted);
     auto predicate = bestType.isSignedInteger() ? signedPred : unsignedPred;
     return rewriter
-        .create<mlir::CmpIOp>(loc, predicate, promoted[0], promoted[1])
+        .create<mlir::arith::CmpIOp>(loc, predicate, promoted[0], promoted[1])
         .getResult();
   }
 };
@@ -319,15 +319,15 @@ struct LogicalOp {
       if (auto floatType = fromType.dyn_cast<FloatType>()) {
         auto value = convertFloatUsingType(llvm::APFloat(0.0), floatType);
         auto zero =
-            rewriter.create<mlir::ConstantFloatOp>(loc, value, floatType);
+            rewriter.create<mlir::arith::ConstantFloatOp>(loc, value, floatType);
         promoted.push_back(
             rewriter
-                .create<mlir::CmpFOp>(loc, CmpFPredicate::ONE, operand, zero)
+                .create<mlir::arith::CmpFOp>(loc, arith::CmpFPredicate::ONE, operand, zero)
                 .getResult());
       } else if (auto intType = fromType.dyn_cast<IntegerType>()) {
-        auto zero = rewriter.create<mlir::ConstantIntOp>(loc, 0, intType);
+        auto zero = rewriter.create<mlir::arith::ConstantIntOp>(loc, 0, intType);
         promoted.push_back(
-            rewriter.create<mlir::CmpIOp>(loc, CmpIPredicate::ne, operand, zero)
+            rewriter.create<mlir::arith::CmpIOp>(loc, arith::CmpIPredicate::ne, operand, zero)
                 .getResult());
       } else {
         llvm_unreachable("Unknown type for LogicalOp");
@@ -349,12 +349,12 @@ struct LogicalNotOp {
     auto fromType = input.getType();
     if (auto floatType = fromType.dyn_cast<FloatType>()) {
       auto value = convertFloatUsingType(llvm::APFloat(0.0), floatType);
-      auto zero = rewriter.create<mlir::ConstantFloatOp>(loc, value, floatType);
-      return rewriter.create<mlir::CmpFOp>(loc, CmpFPredicate::OEQ, input, zero)
+      auto zero = rewriter.create<mlir::arith::ConstantFloatOp>(loc, value, floatType);
+      return rewriter.create<mlir::arith::CmpFOp>(loc, arith::CmpFPredicate::OEQ, input, zero)
           .getResult();
     } else if (auto intType = fromType.dyn_cast<IntegerType>()) {
-      auto zero = rewriter.create<mlir::ConstantIntOp>(loc, 0, intType);
-      return rewriter.create<mlir::CmpIOp>(loc, CmpIPredicate::eq, input, zero)
+      auto zero = rewriter.create<mlir::arith::ConstantIntOp>(loc, 0, intType);
+      return rewriter.create<mlir::arith::CmpIOp>(loc, arith::CmpIPredicate::eq, input, zero)
           .getResult();
     } else {
       llvm_unreachable("Unknown type for LogicalNotOp");
@@ -663,7 +663,7 @@ struct IndexOpConversion : public OpConversionPattern<tile::IndexOp> {
     auto apply = rewriter.create<mlir::AffineApplyOp>(loc, map, idxs[axis]);
 
     // Create the store
-    auto cast = rewriter.create<mlir::IndexCastOp>(loc, apply,
+    auto cast = rewriter.create<mlir::arith::IndexCastOp>(loc, apply,
                                                    rewriter.getIntegerType(32));
     auto stored = buildSimpleStore(rewriter, loc, cast, resultMemRef,
                                    tile::getPaddingInfo(op));
@@ -718,7 +718,7 @@ struct ShapeOpConversion : public OpConversionPattern<tile::ShapeOp> {
     auto aggOp = AtomicRMWKind::assign;
     for (unsigned i = 0; i < operandType.getRank(); i++) {
       auto dim = rewriter.create<mlir::memref::DimOp>(loc, adaptor.tensor(), i);
-      auto cast = rewriter.create<mlir::IndexCastOp>(
+      auto cast = rewriter.create<mlir::arith::IndexCastOp>(
           loc, dim, rewriter.getIntegerType(32));
       auto map = rewriter.getConstantAffineMap(i);
       memRef = rewriter.create<pxa::PxaReduceOp>(loc, aggOp, cast, memRef, map,
@@ -925,13 +925,13 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
 
     // Setup rewrite patterns
     using CmpIntLtOp =
-        CmpIntInequalityOp<CmpIPredicate::slt, CmpIPredicate::ult>;
+        CmpIntInequalityOp<arith::CmpIPredicate::slt, arith::CmpIPredicate::ult>;
     using CmpIntLeOp =
-        CmpIntInequalityOp<CmpIPredicate::sle, CmpIPredicate::ule>;
+        CmpIntInequalityOp<arith::CmpIPredicate::sle, arith::CmpIPredicate::ule>;
     using CmpIntGtOp =
-        CmpIntInequalityOp<CmpIPredicate::sgt, CmpIPredicate::ugt>;
+        CmpIntInequalityOp<arith::CmpIPredicate::sgt, arith::CmpIPredicate::ugt>;
     using CmpIntGeOp =
-        CmpIntInequalityOp<CmpIPredicate::sge, CmpIPredicate::uge>;
+        CmpIntInequalityOp<arith::CmpIPredicate::sge, arith::CmpIPredicate::uge>;
     RewritePatternSet patterns(&getContext());
     patterns.insert<
         CastOpConversion,                  //
@@ -945,25 +945,25 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         TraceOpConversion,                 //
         ScfForOpConversion,                //
         ContractionOpConversion<CombinationKind::none, FirstOperand>,
-        ContractionOpConversion<CombinationKind::add, StdOp<mlir::AddFOp>,
+        ContractionOpConversion<CombinationKind::add, StdOp<mlir::arith::AddFOp>,
                                 ResultIs<EltwiseFloat>>,
-        ContractionOpConversion<CombinationKind::add, StdOp<mlir::AddIOp>,
+        ContractionOpConversion<CombinationKind::add, StdOp<mlir::arith::AddIOp>,
                                 ResultIs<EltwiseInteger>>,
-        ContractionOpConversion<CombinationKind::mul, StdOp<mlir::MulFOp>,
+        ContractionOpConversion<CombinationKind::mul, StdOp<mlir::arith::MulFOp>,
                                 ResultIs<EltwiseFloat>>,
-        ContractionOpConversion<CombinationKind::mul, StdOp<mlir::MulIOp>,
+        ContractionOpConversion<CombinationKind::mul, StdOp<mlir::arith::MulIOp>,
                                 ResultIs<EltwiseInteger>>,
         ContractionOpConversion<CombinationKind::eq,
-                                CmpFloatOp<CmpFPredicate::OEQ>,
+                                CmpFloatOp<arith::CmpFPredicate::OEQ>,
                                 AnyComparandIs<EltwiseFloat>>,
         ContractionOpConversion<CombinationKind::eq,
-                                CmpIntOp<CmpIPredicate::eq>,
+                                CmpIntOp<arith::CmpIPredicate::eq>,
                                 ComparandsAre<EltwiseInteger>>,
         ContractionOpConversion<CombinationKind::cond,
-                                CondOp<CmpFloatOp<CmpFPredicate::OEQ>>,
+                                CondOp<CmpFloatOp<arith::CmpFPredicate::OEQ>>,
                                 AnyComparandIs<EltwiseFloat>>,
         ContractionOpConversion<CombinationKind::cond,
-                                CondOp<CmpIntOp<CmpIPredicate::eq>>,
+                                CondOp<CmpIntOp<arith::CmpIPredicate::eq>>,
                                 AnyComparandIs<EltwiseInteger>>,
         EltwiseOpConversion<tile::ExpOp, StdOp<math::ExpOp>>,
         EltwiseOpConversion<tile::LogOp, StdOp<math::LogOp>,
@@ -996,81 +996,81 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
                             OperandsAre<EltwiseFloat>>,
         EltwiseOpConversion<tile::ATanHOp, StdOp<stdx::ATanHOp>,
                             OperandsAre<EltwiseFloat>>,
-        EltwiseOpConversion<tile::CeilOp, StdOp<mlir::CeilFOp>,
+        EltwiseOpConversion<tile::CeilOp, StdOp<mlir::math::CeilOp>,
                             ResultIs<EltwiseFloat>>,
         EltwiseOpConversion<tile::FloorOp, StdOp<stdx::FloorOp>,
                             OperandsAre<EltwiseFloat>>,
         EltwiseOpConversion<tile::RoundOp, StdOp<stdx::RoundOp>,
                             OperandsAre<EltwiseFloat>>,
-        EltwiseOpConversion<tile::NegOp, StdOp<mlir::NegFOp>,
+        EltwiseOpConversion<tile::NegOp, StdOp<mlir::arith::NegFOp>,
                             ResultIs<EltwiseFloat>>,
         EltwiseOpConversion<tile::NegOp, NegIOp, ResultIs<EltwiseInteger>>,
-        EltwiseOpConversion<tile::AddOp, StdOp<mlir::AddFOp>,
+        EltwiseOpConversion<tile::AddOp, StdOp<mlir::arith::AddFOp>,
                             ResultIs<EltwiseFloat>>,
-        EltwiseOpConversion<tile::AddOp, StdOp<mlir::AddIOp>,
+        EltwiseOpConversion<tile::AddOp, StdOp<mlir::arith::AddIOp>,
                             ResultIs<EltwiseInteger>>,
-        EltwiseOpConversion<tile::SubOp, StdOp<mlir::SubFOp>,
+        EltwiseOpConversion<tile::SubOp, StdOp<mlir::arith::SubFOp>,
                             ResultIs<EltwiseFloat>>,
-        EltwiseOpConversion<tile::SubOp, StdOp<mlir::SubIOp>,
+        EltwiseOpConversion<tile::SubOp, StdOp<mlir::arith::SubIOp>,
                             ResultIs<EltwiseInteger>>,
-        EltwiseOpConversion<tile::MulOp, StdOp<mlir::MulFOp>,
+        EltwiseOpConversion<tile::MulOp, StdOp<mlir::arith::MulFOp>,
                             ResultIs<EltwiseFloat>>,
-        EltwiseOpConversion<tile::MulOp, StdOp<mlir::MulIOp>,
+        EltwiseOpConversion<tile::MulOp, StdOp<mlir::arith::MulIOp>,
                             ResultIs<EltwiseInteger>>,
-        EltwiseOpConversion<tile::DivOp, StdOp<mlir::DivFOp>,
+        EltwiseOpConversion<tile::DivOp, StdOp<mlir::arith::DivFOp>,
                             ResultIs<EltwiseFloat>>,
-        EltwiseOpConversion<tile::DivOp, StdOp<mlir::SignedDivIOp>,
+        EltwiseOpConversion<tile::DivOp, StdOp<mlir::arith::DivSIOp>,
                             ResultIs<EltwiseSigned>>,
-        EltwiseOpConversion<tile::DivOp, StdOp<mlir::UnsignedDivIOp>,
+        EltwiseOpConversion<tile::DivOp, StdOp<mlir::arith::DivUIOp>,
                             ResultIs<EltwiseUnsigned>>,
         EltwiseOpConversion<tile::SqrtOp, StdOp<math::SqrtOp>>,
-        EltwiseOpConversion<tile::ModOp, StdOp<mlir::RemFOp>,
+        EltwiseOpConversion<tile::ModOp, StdOp<mlir::arith::RemFOp>,
                             ResultIs<EltwiseFloat>>,
-        EltwiseOpConversion<tile::ModOp, StdOp<mlir::SignedRemIOp>,
+        EltwiseOpConversion<tile::ModOp, StdOp<mlir::arith::RemSIOp>,
                             ResultIs<EltwiseSigned>>,
-        EltwiseOpConversion<tile::ModOp, StdOp<mlir::UnsignedRemIOp>,
+        EltwiseOpConversion<tile::ModOp, StdOp<mlir::arith::RemUIOp>,
                             ResultIs<EltwiseUnsigned>>,
-        EltwiseOpConversion<tile::CmpEqOp, CmpFloatOp<CmpFPredicate::OEQ>,
+        EltwiseOpConversion<tile::CmpEqOp, CmpFloatOp<arith::CmpFPredicate::OEQ>,
                             AnyOperandIs<EltwiseFloat>>,
-        EltwiseOpConversion<tile::CmpEqOp, CmpIntOp<CmpIPredicate::eq>,
+        EltwiseOpConversion<tile::CmpEqOp, CmpIntOp<arith::CmpIPredicate::eq>,
                             OperandsAre<Not<EltwiseFloat>>>,
-        EltwiseOpConversion<tile::CmpNeOp, CmpFloatOp<CmpFPredicate::ONE>,
+        EltwiseOpConversion<tile::CmpNeOp, CmpFloatOp<arith::CmpFPredicate::ONE>,
                             AnyOperandIs<EltwiseFloat>>,
-        EltwiseOpConversion<tile::CmpNeOp, CmpIntOp<CmpIPredicate::ne>,
+        EltwiseOpConversion<tile::CmpNeOp, CmpIntOp<arith::CmpIPredicate::ne>,
                             OperandsAre<Not<EltwiseFloat>>>,
-        EltwiseOpConversion<tile::CmpLtOp, CmpFloatOp<CmpFPredicate::OLT>,
+        EltwiseOpConversion<tile::CmpLtOp, CmpFloatOp<arith::CmpFPredicate::OLT>,
                             AnyOperandIs<EltwiseFloat>>,
         EltwiseOpConversion<tile::CmpLtOp, CmpIntLtOp,
                             OperandsAre<Not<EltwiseFloat>>>,
-        EltwiseOpConversion<tile::CmpLeOp, CmpFloatOp<CmpFPredicate::OLE>,
+        EltwiseOpConversion<tile::CmpLeOp, CmpFloatOp<arith::CmpFPredicate::OLE>,
                             AnyOperandIs<EltwiseFloat>>,
         EltwiseOpConversion<tile::CmpLeOp, CmpIntLeOp,
                             OperandsAre<Not<EltwiseFloat>>>,
-        EltwiseOpConversion<tile::CmpGtOp, CmpFloatOp<CmpFPredicate::OGT>,
+        EltwiseOpConversion<tile::CmpGtOp, CmpFloatOp<arith::CmpFPredicate::OGT>,
                             AnyOperandIs<EltwiseFloat>>,
         EltwiseOpConversion<tile::CmpGtOp, CmpIntGtOp,
                             OperandsAre<Not<EltwiseFloat>>>,
-        EltwiseOpConversion<tile::CmpGeOp, CmpFloatOp<CmpFPredicate::OGE>,
+        EltwiseOpConversion<tile::CmpGeOp, CmpFloatOp<arith::CmpFPredicate::OGE>,
                             AnyOperandIs<EltwiseFloat>>,
         EltwiseOpConversion<tile::CmpGeOp, CmpIntGeOp,
                             OperandsAre<Not<EltwiseFloat>>>,
-        EltwiseOpConversion<tile::BitAndOp, StdOp<mlir::AndOp>,
+        EltwiseOpConversion<tile::BitAndOp, StdOp<mlir::arith::AndIOp>,
                             OperandsAre<EltwiseInteger>>,
-        EltwiseOpConversion<tile::BitOrOp, StdOp<mlir::OrOp>,
+        EltwiseOpConversion<tile::BitOrOp, StdOp<mlir::arith::OrIOp>,
                             OperandsAre<EltwiseInteger>>,
         EltwiseOpConversion<tile::BitNotOp, NotOp>,
-        EltwiseOpConversion<tile::BitXorOp, StdOp<mlir::XOrOp>,
+        EltwiseOpConversion<tile::BitXorOp, StdOp<mlir::arith::XOrIOp>,
                             OperandsAre<EltwiseInteger>>,
-        EltwiseOpConversion<tile::BitShlOp, StdOp<mlir::ShiftLeftOp>,
+        EltwiseOpConversion<tile::BitShlOp, StdOp<mlir::arith::ShLIOp>,
                             OperandsAre<EltwiseInteger>>,
-        EltwiseOpConversion<tile::BitShrOp, StdOp<mlir::SignedShiftRightOp>,
+        EltwiseOpConversion<tile::BitShrOp, StdOp<mlir::arith::ShRSIOp>,
                             FirstOperandIs<EltwiseSigned>>,
-        EltwiseOpConversion<tile::BitShrOp, StdOp<mlir::UnsignedShiftRightOp>,
+        EltwiseOpConversion<tile::BitShrOp, StdOp<mlir::arith::ShRUIOp>,
                             FirstOperandIs<EltwiseUnsigned>>,
-        EltwiseOpConversion<tile::LogicalAndOp, LogicalOp<mlir::AndOp>>,
+        EltwiseOpConversion<tile::LogicalAndOp, LogicalOp<mlir::arith::AndIOp>>,
         EltwiseOpConversion<tile::LogicalNotOp, LogicalNotOp>,
-        EltwiseOpConversion<tile::LogicalOrOp, LogicalOp<mlir::OrOp>>,
-        EltwiseOpConversion<tile::LogicalXorOp, LogicalOp<mlir::XOrOp>>,
+        EltwiseOpConversion<tile::LogicalOrOp, LogicalOp<mlir::arith::OrIOp>>,
+        EltwiseOpConversion<tile::LogicalXorOp, LogicalOp<mlir::arith::XOrIOp>>,
         EltwiseOpConversion<tile::ReluOp, StdOp<stdx::ReluOp>>,
         EltwiseOpConversion<tile::SelectOp, SelectOpBuilder>,
         EltwiseOpConversion<tile::IdentOp, FirstOperand>>(&getContext());

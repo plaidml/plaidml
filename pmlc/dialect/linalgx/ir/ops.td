@@ -22,6 +22,7 @@ class LinalgX_Op<string mnemonic, list<OpTrait> traits = []> :
 
 def CopyOp : LinalgX_Op<"copy", [
   CopyOpInterface,
+  SingleBlockImplicitTerminator<"mlir::linalg::YieldOp">,
   LinalgStructuredInterface,
   NoSideEffect
 ]> {

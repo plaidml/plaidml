@@ -90,10 +90,10 @@ static Optional<ConvCapture> detectConv(linalg::GenericOp op) {
   Operation *yieldOp = block->getTerminator();
   if (matchPattern(
           yieldOp,
-          m_Op<linalg::YieldOp>(m_Op<AddFOp>(
-              m_Val(args[2]), m_Op<MulFOp>(m_Val(args[0]), m_Val(args[1]))))) ||
+          m_Op<linalg::YieldOp>(m_Op<arith::AddFOp>(
+              m_Val(args[2]), m_Op<arith::MulFOp>(m_Val(args[0]), m_Val(args[1]))))) ||
       matchPattern(yieldOp,
-                   m_Op<linalg::YieldOp>(m_Op<AddFOp>(m_Op<MulFOp>(
+                   m_Op<linalg::YieldOp>(m_Op<arith::AddFOp>(m_Op<arith::MulFOp>(
                                              m_Val(args[0]), m_Val(args[1]))),
                                          m_Val(args[2]))))
     return ConvCapture{values, idxMaps, {0, 1, 2}};
@@ -580,8 +580,8 @@ struct ReorderLayoutsPass : public ReorderLayoutsBase<ReorderLayoutsPass> {
         /*doc=*/"",
         /*libraryCall=*/"",
         [](OpBuilder &builder, Location loc, ValueRange args) {
-          auto mul = builder.create<MulFOp>(loc, args[0], args[1]);
-          auto add = builder.create<AddFOp>(loc, args[2], mul);
+          auto mul = builder.create<arith::MulFOp>(loc, args[0], args[1]);
+          auto add = builder.create<arith::AddFOp>(loc, args[2], mul);
           builder.create<linalg::YieldOp>(loc, ValueRange{add});
         });
 
@@ -738,8 +738,8 @@ struct ReorderWeightLayoutsPass
         /*doc=*/"",
         /*libraryCall=*/"",
         [](OpBuilder &builder, Location loc, ValueRange args) {
-          auto mul = builder.create<MulFOp>(loc, args[0], args[1]);
-          auto add = builder.create<AddFOp>(loc, args[2], mul);
+          auto mul = builder.create<arith::MulFOp>(loc, args[0], args[1]);
+          auto add = builder.create<arith::AddFOp>(loc, args[2], mul);
           builder.create<linalg::YieldOp>(loc, ValueRange{add});
         });
 
