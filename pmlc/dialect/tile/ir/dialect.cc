@@ -17,7 +17,7 @@ using namespace mlir; // NOLINT
 namespace pmlc::dialect::tile {
 
 namespace {
-
+/*
 struct OpAsmDialectInterfaceImpl : public OpAsmDialectInterface {
   using OpAsmDialectInterface::OpAsmDialectInterface;
 
@@ -40,7 +40,7 @@ struct OpAsmDialectInterfaceImpl : public OpAsmDialectInterface {
     setNameFn(op->getResult(0), os.str());
   }
 };
-
+*/
 } // namespace
 
 void TileDialect::initialize() {
@@ -49,7 +49,7 @@ void TileDialect::initialize() {
 #define GET_OP_LIST
 #include "pmlc/dialect/tile/ir/ops.cc.inc"
       >();
-  addInterfaces<OpAsmDialectInterfaceImpl>();
+  // addInterfaces<OpAsmDialectInterfaceImpl>();
 }
 
 std::string TileDialect::getDialectAttrName(StringRef name) {

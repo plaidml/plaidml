@@ -91,7 +91,7 @@ struct SplitClosurePass : public SplitClosureBase<SplitClosurePass> {
     builder.create<ReturnOp>();
     yield->erase();
 
-    main.insertArgument(0, tupleType, /*argAttrs=*/nullptr);
+    main.insertArgument(0, tupleType, /*argAttrs=*/nullptr, main.getLoc());
     builder.setInsertionPointToStart(&main.body().front());
     auto mainUnpackOp =
         builder.create<UnpackOp>(packedTypes, main.getArgument(0));

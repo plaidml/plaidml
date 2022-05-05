@@ -59,15 +59,17 @@ linalg::GenericOp createGenericOp(OpBuilder &builder, Operation *locationOp,
 
   // Arguments for the loop body
   SmallVector<Type, 4> argTypes;
+  SmallVector<Location, 4> argLocations;
   for (auto input : inputs) {
     argTypes.emplace_back(input.getType().cast<ShapedType>().getElementType());
+    argLocations.emplace_back(input.getLoc());
   }
   for (auto outputType : outputTypes) {
     argTypes.emplace_back(outputType.cast<ShapedType>().getElementType());
   }
 
   Block &block = genericOp.region().emplaceBlock();
-  block.addArguments(argTypes);
+  block.addArguments(argTypes, argLocations);
   builder.setInsertionPointToStart(&block);
   // Call bodyBuilder to create the customized generic op body.
   bodyBuilder(builder, genericOp.getLoc(), inputs.size(), block.getArguments());

@@ -62,7 +62,7 @@ void MainClosurePass::runOnOperation() {
   returnOp->setOperands({});
 
   for (BlockArgument arg : args) {
-    BlockArgument newArg = body->addArgument(arg.getType());
+    BlockArgument newArg = body->addArgument(arg.getType(), arg.getLoc());
     arg.replaceAllUsesWith(newArg);
   }
 

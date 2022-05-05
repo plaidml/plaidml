@@ -29,7 +29,7 @@ void BoxOp::build(OpBuilder &builder, OperationState &result, StringRef op,
   auto *body = new Block();
   // Add all the block arguments.
   for (Value operand : operands) {
-    body->addArgument(operand.getType());
+    body->addArgument(operand.getType(), operand.getLoc());
   }
   bodyRegion->push_back(body);
 }

@@ -93,14 +93,14 @@ AffineExpr isSizeOne(AffineExpr expr, SmallVector<int64_t, 4> &ranges) {
 
 // Forward a reorder thru linalg.pad_tensor operations.
 struct PropagateReorderThruPadTensorOpPattern
-    : public OpRewritePattern<linalg::PadTensorOp> {
-  using OpRewritePattern<linalg::PadTensorOp>::OpRewritePattern;
+    : public OpRewritePattern<tensor::PadOp> {
+  using OpRewritePattern<tensor::PadOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(linalg::PadTensorOp op,
+  LogicalResult matchAndRewrite(tensor::PadOp op,
                                 PatternRewriter &rewriter) const final {
     Optional<ReorderInfo> info = getReorderInfo(&op->getOpOperand(0));
     if (!info) {
-      IVLOG(1, "Unrecognized PadTensorOp: " << debugString(op));
+      IVLOG(1, "Unrecognized PadOp: " << debugString(op));
       return failure();
     }
 
@@ -115,7 +115,7 @@ struct PropagateReorderThruPadTensorOpPattern
     upper.insert(upper.begin() + 1, 0);
 
     auto newOp =
-        rewriter.create<linalg::PadTensorOp>(op->getLoc(),
+        rewriter.create<tensor::PadOp>(op->getLoc(),
                                              /*source=*/info->sourceValue,
                                              /*staticLow=*/lower,
                                              /*staticHigh=*/upper,

@@ -55,16 +55,17 @@ static ParseResult parseClosureOp(OpAsmParser &parser, OperationState &result) {
   MLIRContext *ctx = result.getContext();
   Builder &builder = parser.getBuilder();
 
-  SmallVector<OpAsmParser::OperandType, 4> args;
-  SmallVector<NamedAttrList, 4> argAttrs;
-  SmallVector<NamedAttrList, 4> resultAttrs;
-  SmallVector<Type, 4> argTypes;
-  SmallVector<Type, 4> resultTypes;
+  SmallVector<OpAsmParser::OperandType> entryArgs;
+  SmallVector<NamedAttrList> argAttrs;
+  SmallVector<NamedAttrList> resultAttrs;
+  SmallVector<Type> argTypes;
+  SmallVector<Type> resultTypes;
+  SmallVector<Location> argLocations;
+  bool isVariadic;
 
-  bool isVariadic = false;
-  if (function_like_impl::parseFunctionSignature(
-          parser, /*allowVariadic=*/false, args, argTypes, argAttrs, isVariadic,
-          resultTypes, resultAttrs))
+  if (failed(function_interface_impl::parseFunctionSignature(
+          parser, /*allowVariadic=*/false, entryArgs, argTypes, argAttrs, argLocations,
+          isVariadic, resultTypes, resultAttrs)))
     return failure();
 
   // Parse operation attributes.
@@ -77,8 +78,9 @@ static ParseResult parseClosureOp(OpAsmParser &parser, OperationState &result) {
       "type", TypeAttr::get(builder.getFunctionType(argTypes, resultTypes)));
 
   Region *body = result.addRegion();
-  if (parser.parseRegion(*body, /*arguments=*/{args},
+  if (parser.parseRegion(*body, /*arguments=*/{entryArgs},
                          /*argTypes=*/{argTypes},
+                         /*locations=*/{argLocations},
                          /*enableNameShadowing=*/false))
     return failure();
   return success();
@@ -86,7 +88,7 @@ static ParseResult parseClosureOp(OpAsmParser &parser, OperationState &result) {
 
 static void printClosureOp(OpAsmPrinter &p, ClosureOp op) {
   FunctionType type = op.getType();
-  function_like_impl::printFunctionSignature(p, op, type.getInputs(),
+  function_interface_impl::printFunctionSignature(p, op, type.getInputs(),
                                              /*isVariadic=*/false,
                                              type.getResults());
   p.printOptionalAttrDictWithKeyword(op->getAttrs(), {"type"});

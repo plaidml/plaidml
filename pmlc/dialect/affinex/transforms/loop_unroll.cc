@@ -1,8 +1,8 @@
 // Copyright 2020 Intel Corporation
 
-#include "mlir/Analysis/LoopAnalysis.h"
+#include "mlir/Dialect/Affine/Analysis/LoopAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
-#include "mlir/Transforms/LoopUtils.h"
+#include "mlir/Dialect/Affine/LoopUtils.h"
 #include "pmlc/dialect/affinex/transforms/pass_detail.h"
 
 using namespace mlir; // NOLINT

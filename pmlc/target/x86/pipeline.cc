@@ -27,9 +27,10 @@
 #include "mlir/IR/Matchers.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
-#include "mlir/Transforms/LoopUtils.h"
+#include "mlir/Dialect/Affine/LoopUtils.h"
 #include "mlir/Transforms/Passes.h"
 #include "mlir/Transforms/RegionUtils.h"
+#include "mlir/Dialect/SCF/Utils.h"
 
 #include "pmlc/compiler/registry.h"
 #include "pmlc/conversion/linalg_to_pxa/passes.h"

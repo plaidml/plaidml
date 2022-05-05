@@ -3,7 +3,6 @@
 #include "pmlc/dialect/pml/ir/dialect.h"
 
 #include "mlir/IR/DialectImplementation.h"
-#include "mlir/IR/Identifier.h"
 #include "mlir/IR/OpDefinition.h"
 #include "llvm/ADT/TypeSwitch.h"
 
@@ -22,7 +21,7 @@ void PMLDialect::initialize() {
 #include "pmlc/dialect/pml/ir/attrdef.cc.inc" // NOLINT
       >();
 }
-
+/*
 Attribute PMLDialect::parseAttribute(DialectAsmParser &parser,
                                      Type type) const {
   StringRef attrTag;
@@ -42,7 +41,7 @@ void PMLDialect::printAttribute(Attribute attr,
   if (succeeded(generatedAttributePrinter(attr, printer)))
     return;
 }
-
+*/
 static ParseResult parseAxisAttr(MLIRContext *context, AsmParser &parser,
                                  AxisAttr &attr) {
   StringRef typeStr;
