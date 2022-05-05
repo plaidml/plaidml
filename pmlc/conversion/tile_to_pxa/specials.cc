@@ -448,13 +448,13 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
       Value cmp = isHalfWayFloat(loc, rewriter, idx);
       Value floor = floorFPToSI(loc, rewriter, idx, i32Type);
       Value round = roundFPToSI(loc, rewriter, idx, i32Type);
-      idx = rewriter.create<mlir::SelectOp>(loc, cmp, floor, round).result();
+      idx = rewriter.create<mlir::SelectOp>(loc, cmp, floor, round);
     } break;
     case NearestMode::round_prefer_ceil: {
       Value cmp = isHalfWayFloat(loc, rewriter, idx);
       Value ceil = ceilFPToSI(loc, rewriter, idx, i32Type);
       Value round = roundFPToSI(loc, rewriter, idx, i32Type);
-      idx = rewriter.create<mlir::SelectOp>(loc, cmp, ceil, round).result();
+      idx = rewriter.create<mlir::SelectOp>(loc, cmp, ceil, round);
     } break;
     case NearestMode::floor:
       idx = floorFPToSI(loc, rewriter, idx, i32Type);
@@ -652,10 +652,8 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
                                                   value, bounds.lower);
     auto cmpUpper = rewriter.create<mlir::arith::CmpIOp>(loc, arith::CmpIPredicate::slt,
                                                   value, bounds.upper);
-    value = rewriter.create<mlir::SelectOp>(loc, cmpLower, bounds.lower, value)
-                .result();
-    value = rewriter.create<mlir::SelectOp>(loc, cmpUpper, value, bounds.upper)
-                .result();
+    value = rewriter.create<mlir::SelectOp>(loc, cmpLower, bounds.lower, value);
+    value = rewriter.create<mlir::SelectOp>(loc, cmpUpper, value, bounds.upper);
     return value;
   }
 
@@ -723,10 +721,8 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
                                                      idx, bound_upper);
       auto cmp_lower = rewriter.create<mlir::arith::CmpFOp>(loc, arith::CmpFPredicate::OLT,
                                                      idx, bound_lower);
-      result = rewriter.create<mlir::SelectOp>(loc, cmp_upper, zero, result)
-                   .result();
-      result = rewriter.create<mlir::SelectOp>(loc, cmp_lower, zero, result)
-                   .result();
+      result = rewriter.create<mlir::SelectOp>(loc, cmp_upper, zero, result);
+      result = rewriter.create<mlir::SelectOp>(loc, cmp_lower, zero, result);
     } break;
     default:
       llvm_unreachable("Unsupported OutOfBoundsMode");

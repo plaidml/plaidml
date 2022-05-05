@@ -244,7 +244,7 @@ struct PxaStoreOpConversion : public OpConversionPattern<pxa::PxaStoreOp> {
                                        op.indices());
     } else {
       Type resultType = memref.getType().cast<MemRefType>().getElementType();
-      rewriter.create<AtomicRMWOp>(op.getLoc(), resultType, agg, op.value(),
+      rewriter.create<memref::AtomicRMWOp>(op.getLoc(), resultType, agg, op.value(),
                                    memref, op.indices());
     }
     rewriter.replaceOp(op, memref);

@@ -82,7 +82,7 @@ struct ReductionInfo {
                            m_Capture(&trueValue), m_Capture(&falseValue)))) {
       if (lhs == trueValue && rhs == falseValue) {
         relatedOp = cond.getDefiningOp();
-        arith::CmpIPredicate intPred = cast<arith::CmpIOp>(relatedOp).predicate();
+        arith::CmpIPredicate intPred = cast<arith::CmpIOp>(relatedOp).getPredicate();
         switch (intPred) {
         case arith::CmpIPredicate::sgt:
         case arith::CmpIPredicate::sge:
@@ -111,7 +111,7 @@ struct ReductionInfo {
                            m_Capture(&trueValue), m_Capture(&falseValue)))) {
       if (lhs == trueValue && rhs == falseValue) {
         relatedOp = cond.getDefiningOp();
-        arith::CmpFPredicate floatPred = cast<arith::CmpFOp>(relatedOp).predicate();
+        arith::CmpFPredicate floatPred = cast<arith::CmpFOp>(relatedOp).getPredicate();
         switch (floatPred) {
         case arith::CmpFPredicate::OGT:
         case arith::CmpFPredicate::OGE:
@@ -173,7 +173,7 @@ struct ConstantOpConversion : public OpConversionPattern<ConstantOp> {
   using OpConversionPattern<ConstantOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(ConstantOp op, ArrayRef<Value> operands,
+  matchAndRewrite(ConstantOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
     static int constCount = 0;
     Attribute origValue = op.getValue();
@@ -239,7 +239,7 @@ struct FuncOpConversion : public OpConversionPattern<FuncLikeOp> {
   using OpConversionPattern<FuncLikeOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(FuncLikeOp op, ArrayRef<Value> operands,
+  matchAndRewrite(FuncLikeOp op, typename FuncLikeOp::Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
     FunctionType type = op.getType();
 
@@ -278,9 +278,8 @@ struct GenericOpConversion : public OpConversionPattern<linalg::GenericOp> {
   using OpConversionPattern<linalg::GenericOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(linalg::GenericOp op, ArrayRef<Value> operands,
+  matchAndRewrite(linalg::GenericOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
-    linalg::GenericOpAdaptor adaptor(operands, op->getAttrDictionary());
     ValueRange inputs = adaptor.inputs();
     SmallVector<Value, 4> outputs;
     SmallVector<Type, 4> outputTypes;
@@ -426,7 +425,7 @@ struct IndexOpConversion : public OpConversionPattern<linalg::IndexOp> {
   using OpConversionPattern<linalg::IndexOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(linalg::IndexOp op, ArrayRef<Value> operands,
+  matchAndRewrite(linalg::IndexOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
     auto idxs = op->getBlock()->getArguments();
     op.replaceAllUsesWith(idxs[op.dim()]);
@@ -440,7 +439,7 @@ struct InitTensorOpConversion
   using OpConversionPattern<linalg::InitTensorOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(linalg::InitTensorOp op, ArrayRef<Value> operands,
+  matchAndRewrite(linalg::InitTensorOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
     auto type = op.result().getType().cast<RankedTensorType>();
     if (llvm::none_of(type.getShape(), ShapedType::isDynamic)) {
@@ -456,9 +455,9 @@ struct YieldOpConversion : public OpConversionPattern<linalg::YieldOp> {
   using OpConversionPattern<linalg::YieldOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(linalg::YieldOp op, ArrayRef<Value> operands,
+  matchAndRewrite(linalg::YieldOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
-    rewriter.replaceOpWithNewOp<AffineYieldOp>(op, operands);
+    rewriter.replaceOpWithNewOp<AffineYieldOp>(op, adaptor.getOperands());
     return success();
   }
 };

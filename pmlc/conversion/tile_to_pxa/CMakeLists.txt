@@ -4,7 +4,7 @@ pml_cc_library(
     passes.h
   SRCS
     specials.cc
-    tile_to_pxa.cc
+    #tile_to_pxa.cc
     utils.cc
   DEPS
     ::passes-gen

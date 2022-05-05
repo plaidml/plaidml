@@ -423,7 +423,7 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
     return pred(op);
   }
 
-  void rewrite(FromOpType op, ArrayRef<Value> operands,
+  void rewrite(FromOpType op, typename FromOpType::Adaptor adaptor,
                ConversionPatternRewriter &rewriter) const final {
     auto loc = op.getLoc();
     BufferAllocator alloc(rewriter, op.getOperation(), op.result().getType());
@@ -444,10 +444,10 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
 
     // Create the loads
     SmallVector<Value, 4> scalars;
-    for (size_t i = 0; i < operands.size(); i++) {
+    for (size_t i = 0; i < adaptor.getOperands().size(); i++) {
       auto maybePadding =
           tile::getPaddingInfo(op->getOperand(i).getDefiningOp());
-      scalars.push_back(buildBroadcastLoad(rewriter, loc, operands[i],
+      scalars.push_back(buildBroadcastLoad(rewriter, loc, adaptor.getOperands()[i],
                                            alloc.memRefType.getRank(),
                                            maybePadding));
     }
@@ -493,10 +493,10 @@ struct ContractionOpConversion
     return failure();
   }
 
-  void rewrite(tile::ContractionOp op, ArrayRef<Value> operands,
+  void rewrite(tile::ContractionOp op, OpAdaptor adaptor,
                ConversionPatternRewriter &rewriter) const final {
     try {
-      tryRewrite(op, operands, rewriter);
+      tryRewrite(op, adaptor.getOperands(), rewriter);
     } catch (const std::exception &ex) {
       op.emitError(ex.what());
     }
@@ -836,7 +836,7 @@ struct TraceOpConversion : public OpConversionPattern<tile::PragmaOp> {
     if (!msg) {
       return failure();
     }
-    auto symbol = createStubTraceFunc(module, msg->getValue().cast<StringAttr>());
+    auto symbol = createStubTraceFunc(module, msg.getValue().cast<StringAttr>());
     rewriter.create<CallOp>(op.getLoc(), symbol, ArrayRef<Type>{});
     rewriter.replaceOp(op, adaptor.tensor());
     return success();
@@ -861,7 +861,7 @@ struct ScfForOpConversion : public OpConversionPattern<scf::ForOp> {
     for (unsigned i = 0; i < oldArgs.size(); ++i) {
       oldArgs[i].replaceAllUsesWith(newArgs[i]);
     }
-    rewriter.replaceOp(op, newOp.results());
+    rewriter.replaceOp(op, newOp.getResults());
     return success();
   }
 };

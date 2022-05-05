@@ -573,7 +573,7 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
     return pred(op);
   }
 
-  void rewrite(FromOpType op, ArrayRef<Value> operands,
+  void rewrite(FromOpType op, typename FromOpType::Adaptor adaptor,
                ConversionPatternRewriter &rewriter) const final {
     Location loc = op.getLoc();
     MLIRContext *context = op.getContext();
@@ -673,12 +673,11 @@ struct ContractionOpConversion
     return failure();
   }
 
-  void rewrite(tile::ContractionOp op, ArrayRef<Value> operands,
+  void rewrite(tile::ContractionOp op, OpAdaptor adaptor,
                ConversionPatternRewriter &rewriter) const final {
     MLIRContext *context = op.getContext();
     Location loc = op.getLoc();
-    tile::ContractionOpAdaptor adaptor(operands);
-    ValueRange cionOperands = adaptor.operands();
+    ValueRange cionOperands = adaptor.getOperands();
 
     TensorInitializer init(rewriter, op, op.result().getType(),
                            /*padding=*/false);
@@ -838,8 +837,8 @@ struct IndexOpConversion : public OpConversionPattern<tile::IndexOp> {
   using OpConversionPattern<tile::IndexOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(tile::IndexOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
+  matchAndRewrite(tile::IndexOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
     // Gather some basic info
     Location loc = op.getLoc();
     MLIRContext *context = op.getContext();
@@ -917,11 +916,8 @@ struct ReshapeOpConversion : public OpConversionPattern<tile::ReshapeOp> {
   using OpConversionPattern<tile::ReshapeOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(tile::ReshapeOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
-    // Create an adaptor, to interpret the operands
-    tile::ReshapeOpAdaptor adaptor(operands);
-
+  matchAndRewrite(tile::ReshapeOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
     auto tensor = adaptor.tensor();
 
     TileToLinalgTypeConverter typeConverter;
@@ -964,11 +960,8 @@ struct ShapeOpConversion : public OpConversionPattern<tile::ShapeOp> {
   using OpConversionPattern<tile::ShapeOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(tile::ShapeOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
-    // Create an adaptor
-    tile::ShapeOpAdaptor adaptor(operands);
-
+  matchAndRewrite(tile::ShapeOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
     // Gather some basic info
     auto loc = op.getLoc();
     TileToLinalgTypeConverter typeConverter;
@@ -997,8 +990,8 @@ struct CastOpConversion : public OpConversionPattern<tile::CastOp> {
   using OpConversionPattern<tile::CastOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(tile::CastOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
+  matchAndRewrite(tile::CastOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
     Location loc = op.getLoc();
     MLIRContext *context = op.getContext();
 
@@ -1006,13 +999,13 @@ struct CastOpConversion : public OpConversionPattern<tile::CastOp> {
     RankedTensorType initType = init.getType();
     unsigned numDims = initType.getRank();
     AffineMap inputMap =
-        buildBroadcastMap(rewriter, loc, operands[0], initType);
+        buildBroadcastMap(rewriter, loc, adaptor.getOperands()[0], initType);
     AffineMap outputMap = AffineMap::getMultiDimIdentityMap(numDims, context);
 
     auto genericOp = rewriter.create<linalg::GenericOp>(
         loc,
         /*resultTensorTypes=*/TypeRange{initType},
-        /*inputs=*/operands,
+        /*inputs=*/adaptor.getOperands(),
         /*outputs=*/ValueRange{init.resultTensor},
         /*indexingMaps=*/ArrayRef<AffineMap>{inputMap, outputMap},
         /*iteratorTypes=*/
@@ -1021,7 +1014,7 @@ struct CastOpConversion : public OpConversionPattern<tile::CastOp> {
         /*libraryCall=*/"",
         [&](OpBuilder &builder, Location loc, ValueRange args) {
           Type originalSrcType = getElementType(op.tensor());
-          Type convertedSrcType = getElementType(operands[0]);
+          Type convertedSrcType = getElementType(adaptor.getOperands()[0]);
           // Create the standard cast op
           bool resultIsSigned =
               getElementType(op.result().getType()).isSignedInteger();
@@ -1042,7 +1035,7 @@ struct FuncOpConversion : public OpConversionPattern<FuncLikeOp> {
   using OpConversionPattern<FuncLikeOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(FuncLikeOp op, ArrayRef<Value> operands,
+  matchAndRewrite(FuncLikeOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
     FunctionType type = op.getType();
 
@@ -1079,9 +1072,9 @@ struct ReturnOpConversion : public OpConversionPattern<ReturnOp> {
   using OpConversionPattern<ReturnOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(ReturnOp op, ArrayRef<Value> operands,
+  matchAndRewrite(ReturnOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
-    rewriter.replaceOpWithNewOp<ReturnOp>(op, operands);
+    rewriter.replaceOpWithNewOp<ReturnOp>(op, adaptor.getOperands());
     return success();
   }
 };
@@ -1090,12 +1083,11 @@ struct PragmaOpConversion : public OpConversionPattern<tile::PragmaOp> {
   using OpConversionPattern<tile::PragmaOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(tile::PragmaOp op, ArrayRef<Value> operands,
+  matchAndRewrite(tile::PragmaOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
     if (op.op() == "trace") {
       return failure();
     }
-    tile::PragmaOpAdaptor adaptor(operands);
     rewriter.replaceOp(op, adaptor.tensor());
     return success();
   }
@@ -1106,12 +1098,12 @@ struct SpecialOpConversion : public OpConversionPattern<SpecialOp> {
   using OpConversionPattern<SpecialOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(SpecialOp op, ArrayRef<Value> operands,
+  matchAndRewrite(SpecialOp op, typename SpecialOp::Adaptor adaptor
                   ConversionPatternRewriter &rewriter) const final {
     TileToLinalgTypeConverter typeConverter;
     SmallVector<Type> resultTypes;
     (void)typeConverter.convertTypes(op->getResultTypes(), resultTypes);
-    rewriter.replaceOpWithNewOp<SpecialOp>(op, resultTypes, operands,
+    rewriter.replaceOpWithNewOp<SpecialOp>(op, resultTypes, adaptor.getOperands(),
                                            op->getAttrs());
     return success();
   }
@@ -1121,12 +1113,11 @@ struct TraceOpConversion : public OpConversionPattern<tile::PragmaOp> {
   using OpConversionPattern<tile::PragmaOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(tile::PragmaOp op, ArrayRef<Value> operands,
+  matchAndRewrite(tile::PragmaOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
     if (op.op() != "trace") {
       return failure();
     }
-    tile::PragmaOpAdaptor adaptor(operands);
     auto module = op->getParentOfType<ModuleOp>();
     auto msg = op.attrs().getNamed("msg");
     if (!msg) {
@@ -1143,13 +1134,12 @@ struct ScfForOpConversion : public OpConversionPattern<scf::ForOp> {
   using OpConversionPattern<scf::ForOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(scf::ForOp op, ArrayRef<Value> operands,
+  matchAndRewrite(scf::ForOp op, OpAdaptor oldFor,
                   ConversionPatternRewriter &rewriter) const final {
-    scf::ForOpAdaptor oldFor(operands);
     auto &oldBodyOps = op.getBody()->getOperations();
-    auto newOp = rewriter.create<scf::ForOp>(op.getLoc(), oldFor.lowerBound(),
-                                             oldFor.upperBound(), oldFor.step(),
-                                             oldFor.initArgs());
+    auto newOp = rewriter.create<scf::ForOp>(op.getLoc(), oldFor.getLowerBound(),
+                                             oldFor.getUpperBound(), oldFor.getStep(),
+                                             oldFor.getInitArgs());
     auto &newBodyOps = newOp.getBody()->getOperations();
     newBodyOps.splice(std::prev(newBodyOps.end()), oldBodyOps,
                       oldBodyOps.begin(), oldBodyOps.end());
