@@ -66,7 +66,7 @@ private:
     Value load, reduce;
     auto pattern = m_Op<AffineYieldOp>(m_Capture(
         &reduce,
-        pxa::m_PxaReduceOp(AtomicRMWKind::assign,
+        pxa::m_PxaReduceOp(arith::AtomicRMWKind::assign,
                            m_Op<OpTy>(m_Capture(&load, m_Op<pxa::PxaLoadOp>())),
                            m_Any())));
 
@@ -103,7 +103,7 @@ private:
     Value load, reduce;
     auto pattern = m_Op<AffineYieldOp>(m_Capture(
         &reduce,
-        pxa::m_PxaReduceOp(AtomicRMWKind::assign,
+        pxa::m_PxaReduceOp(arith::AtomicRMWKind::assign,
                            m_Capture(&load, m_Op<pxa::PxaLoadOp>()), m_Any())));
 
     Operation *yield = op.getBody()->getTerminator();

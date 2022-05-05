@@ -96,7 +96,7 @@ struct ProfileLinkingPass : public ProfileLinkingBase<ProfileLinkingPass> {
     int64_t id = 0;
     MLIRContext *context = module.getContext();
     module.walk([&](LLVM::CallOp op) {
-      if (op.callee().getValue() != kInstrument)
+      if (op.getCallee().getValue() != kInstrument)
         return;
 
       Location loc = op.getLoc();
@@ -107,7 +107,7 @@ struct ProfileLinkingPass : public ProfileLinkingBase<ProfileLinkingPass> {
       Value globalStr =
           getOrCreateGlobalString(loc, builder, locSymbol, locStrRef, module);
       builder.create<LLVM::CallOp>(
-          loc, ArrayRef<Type>{}, *op.callee(),
+          loc, ArrayRef<Type>{}, *op.getCallee(),
           ArrayRef<Value>{op.getOperand(0), op.getOperand(1), globalStr});
       op.erase();
     });

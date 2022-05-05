@@ -200,7 +200,7 @@ private:
          !isa<pxa::PxaLoadOp>(rootedInstructions.front()))) {
       newMemFirst = builder.create<mlir::memref::AllocOp>(loc, memRefType);
       firstAffineParallelOp = builder.create<AffineParallelOp>(
-          loc, reductionTypes, AtomicRMWKind::assign, lbMap, lbOps, ubMap,
+          loc, reductionTypes, arith::AtomicRMWKind::assign, lbMap, lbOps, ubMap,
           ubOps, steps);
       auto bodyBuilder =
           OpBuilder::atBlockBegin(firstAffineParallelOp.getBody());
@@ -238,7 +238,7 @@ private:
       }
 
       auto reduceOp = bodyBuilder.create<pxa::PxaReduceOp>(
-          firstAffineParallelOp.getLoc(), AtomicRMWKind::assign,
+          firstAffineParallelOp.getLoc(), arith::AtomicRMWKind::assign,
           lastInstr->getResult(0), newMemFirst, idMap, range);
       clonedInstr.push_back(reduceOp);
 
@@ -269,7 +269,7 @@ private:
          !isa<pxa::PxaLoadOp>(secondRootedInstructions.front()))) {
       newMemSecond = builder.create<mlir::memref::AllocOp>(loc, memRefType);
       secondAffineParallelOp = builder.create<AffineParallelOp>(
-          loc, reductionTypes, AtomicRMWKind::assign, lbMap, lbOps, ubMap,
+          loc, reductionTypes, arith::AtomicRMWKind::assign, lbMap, lbOps, ubMap,
           ubOps, steps);
 
       auto bodyBuilder =
@@ -307,7 +307,7 @@ private:
         }
       }
       auto reduceOp = bodyBuilder.create<pxa::PxaReduceOp>(
-          secondAffineParallelOp.getLoc(), AtomicRMWKind::assign,
+          secondAffineParallelOp.getLoc(), arith::AtomicRMWKind::assign,
           lastInstr->getResult(0), newMemSecond, idMap, range);
 
       clonedInstr.push_back(reduceOp);
@@ -333,7 +333,7 @@ private:
     {
       AffineParallelOp reduceAffineParallelOp =
           builder.create<AffineParallelOp>(loc, reductionTypes,
-                                           AtomicRMWKind::assign, lbMap, lbOps,
+                                           arith::AtomicRMWKind::assign, lbMap, lbOps,
                                            ubMap, ubOps, steps);
 
       auto bodyBuilder =
@@ -431,7 +431,7 @@ private:
 
     auto binaryPattern = m_Op<AffineYieldOp>(m_Capture(
         reduce,
-        pxa::m_PxaReduceOp(AtomicRMWKind::assign,
+        pxa::m_PxaReduceOp(arith::AtomicRMWKind::assign,
                            m_Op<OpTy0>(m_Capture(firstOp), m_Capture(secondOp)),
                            m_Any())));
 
@@ -444,7 +444,7 @@ private:
     }
 
     auto unaryPattern = m_Op<AffineYieldOp>(m_Capture(
-        reduce, pxa::m_PxaReduceOp(AtomicRMWKind::assign,
+        reduce, pxa::m_PxaReduceOp(arith::AtomicRMWKind::assign,
                                    m_Op<OpTy0>(m_Capture(firstOp)), m_Any())));
 
     if (!matchPattern(affineYield, unaryPattern)) {

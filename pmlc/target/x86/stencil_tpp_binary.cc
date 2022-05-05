@@ -67,7 +67,7 @@ private:
 
     auto pattern = m_Op<AffineYieldOp>(m_Capture(
         &reduce, pxa::m_PxaReduceOp(
-                     AtomicRMWKind::assign,
+                     arith::AtomicRMWKind::assign,
                      m_Op<OpTy>(m_Capture(&load1, m_Op<pxa::PxaLoadOp>()),
                                 m_Capture(&load2, m_Op<pxa::PxaLoadOp>())),
                      m_Any())));
