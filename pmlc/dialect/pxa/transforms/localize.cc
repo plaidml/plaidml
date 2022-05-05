@@ -36,8 +36,8 @@ private:
 };
 
 struct LocalizePass : public LocalizeBase<LocalizePass> {
-  void runOnFunction() final {
-    FuncOp f = getFunction();
+  void runOnOperation() final {
+    FuncOp f = getOperation();
     DenseMap<Operation *, Block *> toMove;
     auto &analysis = getAnalysis<LocalizeAnalysis>();
 

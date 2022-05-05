@@ -28,12 +28,12 @@ void MainClosurePass::runOnOperation() {
   }
 
   SmallVector<BlockArgument> args;
-  SmallVector<unsigned> argIndices;
+  llvm::BitVector argIndices(main.getNumArguments());
   SmallVector<Type> argTypes;
   for (BlockArgument arg : main.getArguments()) {
     if (!main.getArgAttr(arg.getArgNumber(), "stdx.const")) {
       args.push_back(arg);
-      argIndices.push_back(arg.getArgNumber());
+      argIndices.set(arg.getArgNumber());
       argTypes.push_back(arg.getType());
     }
   }

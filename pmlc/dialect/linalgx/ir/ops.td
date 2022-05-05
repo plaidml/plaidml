@@ -60,8 +60,10 @@ def CopyOp : LinalgX_Op<"copy", [
     mlir::ArrayAttr indexing_maps();
     mlir::ArrayAttr iterator_types();
 
-    static void regionBuilder(mlir::ImplicitLocOpBuilder &b, mlir::Block &block);
-    static std::function<void(mlir::ImplicitLocOpBuilder &b, mlir::Block &block)>
+    static void regionBuilder(mlir::ImplicitLocOpBuilder &b, mlir::Block &block, 
+                              llvm::ArrayRef<mlir::NamedAttribute> attrs);
+    static std::function<void(mlir::ImplicitLocOpBuilder &b, mlir::Block &block, 
+                              llvm::ArrayRef<mlir::NamedAttribute> attrs)>
     getRegionBuilder() { return &regionBuilder; }
     static unsigned getNumRegionArgs() { return 2; }
 

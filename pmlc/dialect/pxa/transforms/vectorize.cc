@@ -130,7 +130,7 @@ private:
       return op->emitRemark("Vectorize op: Failed, interior loops");
     }
     // TODO: consider more generic way to add ops supported here
-    if (!isa<arith::ExtFOp, arith::TruncFOp, arith::IndexCastOp, VectorUnrollOpInterface, SelectOp,
+    if (!isa<arith::ExtFOp, arith::TruncFOp, arith::IndexCastOp, VectorUnrollOpInterface, arith::SelectOp,
              arith::CmpFOp>(op)) {
       // Probably not a vectorizable op. Verify it doesn't use an
       // vectorized results.
@@ -215,11 +215,21 @@ public:
     }
     if (zeroStrideReductions.count(op.getOperation())) {
       // Add vector_reduction only if the stride is 0
+      /*
       auto reductionOp = builder.create<vector::ReductionOp>(
           op.getLoc(), op.getMemRefType().getElementType(),
           builder.getStringAttr(
               stringifyAtomicRMWKindForVectorReductionOp(op.agg())),
           val, ValueRange{});
+      */
+      // Create a dummy reductionOp. Here we need to re-write
+      // a reduction op expect a vector::CombiningKind while
+      // here we use AtomicRMWKindAttr. Clearly they are not the
+      // same. Assert for now when this path is taken. Will fix
+      // later (lorenzo).
+      auto reductionOp = builder.create<vector::ReductionOp>(
+        op.getLoc(), vector::CombiningKind::XOR, val);
+      assert(0 && "read comment above");
       auto reduceOp = builder.create<PxaReduceOp>(
           op.getLoc(), ArrayRef<Type>{op.getMemRefType()}, op.agg(),
           reductionOp.getResult(), op.memref(), op.map(), op.idxs());

@@ -213,8 +213,8 @@ public:
 
 struct StencilTppBinaryPass
     : public StencilTppBinaryBase<StencilTppBinaryPass> {
-  void runOnFunction() final {
-    getFunction().walk([](AffineParallelOp op) {
+  void runOnOperation() final {
+    getOperation().walk([](AffineParallelOp op) {
       if (op.getIVs().size() >= 2) {
         StencilImpl stencil(op);
         stencil.performStenciling();

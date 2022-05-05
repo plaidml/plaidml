@@ -15,7 +15,6 @@
 #include "mlir/Conversion/MemRefToLLVM/MemRefToLLVM.h"
 #include "mlir/Conversion/OpenMPToLLVM/ConvertOpenMPToLLVM.h"
 #include "mlir/Conversion/SCFToOpenMP/SCFToOpenMP.h"
-#include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
 #include "mlir/Dialect/Affine/Passes.h"
@@ -30,7 +29,7 @@
 #include "mlir/Dialect/Affine/LoopUtils.h"
 #include "mlir/Transforms/Passes.h"
 #include "mlir/Transforms/RegionUtils.h"
-#include "mlir/Dialect/SCF/Utils.h"
+#include "mlir/Dialect/SCF/Utils/Utils.h"
 
 #include "pmlc/compiler/registry.h"
 #include "pmlc/conversion/linalg_to_pxa/passes.h"
@@ -370,7 +369,7 @@ void pipelineBuilderStage3(OpPassManager &pm) {
 }
 
 void pipelineBuilderStage4(OpPassManager &pm) {
-  pm.addPass(createLowerToCFGPass());
+  // pm.addPass(createLowerToCFGPass());
   if (pmlc::util::getEnvVar("PLAIDML_BOUNDS_CHECK") == "1")
     pm.addNestedPass<FuncOp>(stdx::createBoundsCheckPass());
 

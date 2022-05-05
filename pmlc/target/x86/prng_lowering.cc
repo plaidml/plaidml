@@ -14,6 +14,7 @@ namespace pxa = dialect::pxa;
 
 namespace {
 
+// TODO: Lorenzo fix style use camelCase.
 struct PRNGLinkingPass : public PRNGLinkingBase<PRNGLinkingPass> {
   void runOnOperation() override {
     getOperation().walk([](pxa::PrngOp op) {
@@ -30,11 +31,11 @@ struct PRNGLinkingPass : public PRNGLinkingBase<PRNGLinkingPass> {
                                     resultType, stateType);
 
       auto resultCast =
-          builder.create<memref::CastOp>(loc, op.tensor(), resultType);
+          builder.create<memref::CastOp>(loc, resultType, op.tensor());
       auto stateCast =
-          builder.create<memref::CastOp>(loc, op.state(), stateType);
+          builder.create<memref::CastOp>(loc, stateType, op.state());
       auto newStateCast =
-          builder.create<memref::CastOp>(loc, op.new_state(), stateType);
+          builder.create<memref::CastOp>(loc, stateType, op.new_state());
 
       builder.create<CallOp>(
           loc, symbol, ArrayRef<Type>{},

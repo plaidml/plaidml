@@ -36,23 +36,23 @@ Value createCastOp(OpBuilder &builder, Location loc, Value from,
     if (auto fromFloatType = fromType.dyn_cast<FloatType>()) {
       if (fromFloatType.getWidth() < intoFloatType.getWidth()) {
         // arith::ExtFOp: FloatType -> wider FloatType
-        return builder.create<arith::ExtFOp>(loc, from, intoType).getResult();
+        return builder.create<arith::ExtFOp>(loc, intoType, from).getResult();
       }
       // arith::TruncFOp: FloatType -> narrower FloatType
-      return builder.create<arith::TruncFOp>(loc, from, intoType).getResult();
+      return builder.create<arith::TruncFOp>(loc, intoType, from).getResult();
     }
     if (auto fromIntType = fromType.dyn_cast<IntegerType>()) {
       if (fromSigned) {
         // arith::SIToFPOp: IntegerType -> FloatType
-        return builder.create<arith::SIToFPOp>(loc, from, intoType).getResult();
+        return builder.create<arith::SIToFPOp>(loc, intoType, from).getResult();
       }
       // arith::UIToFPOp: IntegerType -> FloatType
       return builder.create<arith::UIToFPOp>(loc, intoType, from).getResult();
     }
     if (auto fromIndexType = fromType.dyn_cast<IndexType>()) {
       IntegerType i64Type = builder.getIntegerType(64);
-      auto intCastOp = builder.create<arith::IndexCastOp>(loc, from, i64Type);
-      return builder.create<arith::SIToFPOp>(loc, intCastOp, intoType).getResult();
+      auto intCastOp = builder.create<arith::IndexCastOp>(loc, i64Type, from);
+      return builder.create<arith::SIToFPOp>(loc, intoType, intCastOp).getResult();
     }
   }
   if (auto intoIntType = intoType.dyn_cast<IntegerType>()) {
@@ -60,25 +60,25 @@ Value createCastOp(OpBuilder &builder, Location loc, Value from,
       if (fromIntType.getWidth() < intoIntType.getWidth()) {
         if (fromSigned) {
           // arith::ExtSIOp: IntegerType -> wider signed int
-          return builder.create<arith::ExtSIOp>(loc, from, intoType).getResult();
+          return builder.create<arith::ExtSIOp>(loc, intoType, from).getResult();
         }
         // arith::ExtUIOp: IntegerType -> wider unsigned int
-        return builder.create<arith::ExtUIOp>(loc, from, intoType).getResult();
+        return builder.create<arith::ExtUIOp>(loc,intoType, from).getResult();
       }
       // arith::TruncIOp: IntegerType -> narrower IntegerType
-      return builder.create<arith::TruncIOp>(loc, from, intoType).getResult();
+      return builder.create<arith::TruncIOp>(loc, intoType, from).getResult();
     }
     if (auto fromFloatType = fromType.dyn_cast<FloatType>()) {
       if (intoSigned) {
         // arith::FPToSIOp: FloatType -> signed IntegerType
-        return builder.create<arith::FPToSIOp>(loc, from, intoType).getResult();
+        return builder.create<arith::FPToSIOp>(loc, intoType, from).getResult();
       }
       // arith::FPToUIOp: FloatType -> unsigned IntegerType
-      return builder.create<arith::FPToUIOp>(loc, from, intoType).getResult();
+      return builder.create<arith::FPToUIOp>(loc, intoType, from).getResult();
     }
     if (auto fromIndexType = fromType.dyn_cast<IndexType>()) {
       IntegerType intType = builder.getIntegerType(intoIntType.getWidth());
-      return builder.create<arith::IndexCastOp>(loc, from, intType);
+      return builder.create<arith::IndexCastOp>(loc, intType, from);
     }
   }
   llvm_unreachable("Unsupported cast op");

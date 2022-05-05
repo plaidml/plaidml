@@ -59,7 +59,7 @@ static Attribute getAggAttr(arith::AtomicRMWKind agg, Type type) {
 Value createIdentity(OpBuilder &builder, Location loc, arith::AtomicRMWKind agg,
                      Type type) {
   Attribute attr = getAggAttr(agg, type);
-  return builder.create<mlir::ConstantOp>(loc, type, attr);
+  return builder.create<arith::ConstantOp>(loc, type, attr);
 }
 
 } // namespace mlir

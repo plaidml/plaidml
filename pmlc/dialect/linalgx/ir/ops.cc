@@ -90,7 +90,7 @@ ArrayAttr CopyOp::iterator_types() {
           SmallVector<StringRef, 8>(numLoops, getParallelIteratorTypeName()));
 }
 
-void CopyOp::regionBuilder(ImplicitLocOpBuilder &b, Block &block) {
+void CopyOp::regionBuilder(ImplicitLocOpBuilder &b, Block &block, llvm::ArrayRef<NamedAttribute> attrs = {}) {
   assert(block.getNumArguments() == 2 && "CopyOp regionBuilder expects 2 args");
   b.create<linalg::YieldOp>(block.getArgument(0));
 }

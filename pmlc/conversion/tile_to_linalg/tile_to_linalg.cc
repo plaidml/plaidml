@@ -261,7 +261,7 @@ struct SelectOp {
     SmallVector<Value, 2> promoted;
     promoteTypes(builder, loc, operands.drop_front(), types.drop_front(),
                  &promoted);
-    auto op = builder.create<mlir::SelectOp>(loc, operands[0], promoted[0],
+    auto op = builder.create<arith::SelectOp>(loc, operands[0], promoted[0],
                                              promoted[1]);
     return op.getResult();
   }
@@ -866,8 +866,8 @@ struct IndexOpConversion : public OpConversionPattern<tile::IndexOp> {
         [&](OpBuilder &builder, Location loc, ValueRange args) {
           auto index =
               builder.create<linalg::IndexOp>(loc, op.axis().getZExtValue());
-          auto cast = builder.create<arith::IndexCastOp>(loc, index.getResult(),
-                                                  resultType.getElementType());
+          auto cast = builder.create<arith::IndexCastOp>(loc, 
+                                                  resultType.getElementType(), index.getResult());
           builder.create<linalg::YieldOp>(loc, ValueRange{cast.getResult()});
         });
 

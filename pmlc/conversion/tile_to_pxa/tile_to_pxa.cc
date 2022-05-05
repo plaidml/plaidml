@@ -79,7 +79,7 @@ struct ConstantOpConversion : public OpConversionPattern<tile::ConstantOp> {
     } else {
       llvm_unreachable("Invalid scalar constant op");
     }
-    rewriter.replaceOpWithNewOp<mlir::ConstantOp>(op, stdType, value);
+    rewriter.replaceOpWithNewOp<arith::ConstantOp>(op, stdType, value);
     return success();
   }
 };
@@ -665,8 +665,7 @@ struct IndexOpConversion : public OpConversionPattern<tile::IndexOp> {
     auto apply = rewriter.create<mlir::AffineApplyOp>(loc, map, idxs[axis]);
 
     // Create the store
-    auto cast = rewriter.create<mlir::arith::IndexCastOp>(loc, apply,
-                                                   rewriter.getIntegerType(32));
+    auto cast = rewriter.create<mlir::arith::IndexCastOp>(loc, rewriter.getIntegerType(32), apply);
     auto stored = buildSimpleStore(rewriter, loc, cast, resultMemRef,
                                    tile::getPaddingInfo(op));
     rewriter.create<AffineYieldOp>(loc, ValueRange{stored});
@@ -715,7 +714,7 @@ struct ShapeOpConversion : public OpConversionPattern<tile::ShapeOp> {
     for (unsigned i = 0; i < operandType.getRank(); i++) {
       auto dim = rewriter.create<mlir::memref::DimOp>(loc, adaptor.tensor(), i);
       auto cast = rewriter.create<mlir::arith::IndexCastOp>(
-          loc, dim, rewriter.getIntegerType(32));
+          loc, rewriter.getIntegerType(32), dim);
       auto map = rewriter.getConstantAffineMap(i);
       memRef = rewriter.create<pxa::PxaReduceOp>(loc, aggOp, cast, memRef, map,
                                                  ArrayRef<Value>{});

@@ -68,9 +68,9 @@ struct ArgSortOpConversion : public OpConversionPattern<tile::ArgSortOp> {
     tensor = layerOp.body().getArguments()[1];
 
     Value icon0 =
-        rewriter.create<ConstantOp>(loc, rewriter.getIndexAttr(0)).getResult();
+        rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(0)).getResult();
     Value icon1 =
-        rewriter.create<ConstantOp>(loc, rewriter.getIndexAttr(1)).getResult();
+        rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(1)).getResult();
 
     // Create a loop nest over all the dimensions, including the one we are
     // sorting on. We will use a single iteration for the sort axis, since the
@@ -83,7 +83,7 @@ struct ArgSortOpConversion : public OpConversionPattern<tile::ArgSortOp> {
         continue;
       }
       Value limit =
-          rewriter.create<ConstantOp>(loc, rewriter.getIndexAttr(shape[i]))
+          rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(shape[i]))
               .getResult();
       auto loop = rewriter.create<scf::ForOp>(loc, icon0, limit, icon1);
       ops.push_back(loop.getInductionVar());
@@ -91,7 +91,7 @@ struct ArgSortOpConversion : public OpConversionPattern<tile::ArgSortOp> {
     }
 
     Value iconN =
-        rewriter.create<ConstantOp>(loc, rewriter.getIndexAttr(shape[axis]))
+        rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(shape[axis]))
             .getResult();
 
     // For loads and stores from the minIdxVar and minValVar, we'll need a
@@ -110,7 +110,7 @@ struct ArgSortOpConversion : public OpConversionPattern<tile::ArgSortOp> {
       // Combine the index value with the loop dimension indexes to create the
       // destination affine map.
       Value indexVal =
-          rewriter.create<arith::IndexCastOp>(loc, initIV, i32Type).getResult();
+          rewriter.create<arith::IndexCastOp>(loc,  i32Type, initIV).getResult();
       ops[axis] = initIV;
       rewriter.create<memref::StoreOp>(loc, indexVal, result, ops);
       rewriter.setInsertionPointAfter(initLoop);
@@ -134,7 +134,7 @@ struct ArgSortOpConversion : public OpConversionPattern<tile::ArgSortOp> {
 
     // Build inner sorting loop
     if (shape[axis] > 1) {
-      auto sortUB = rewriter.create<ConstantOp>(
+      auto sortUB = rewriter.create<arith::ConstantOp>(
           loc, rewriter.getIndexAttr(shape[axis] - 1));
       auto sortLoop = rewriter.create<scf::ForOp>(loc, icon0, sortUB, icon1);
       Value sortIV = sortLoop.getInductionVar();
@@ -150,7 +150,7 @@ struct ArgSortOpConversion : public OpConversionPattern<tile::ArgSortOp> {
       Value minValIdxInt =
           rewriter.create<memref::LoadOp>(loc, result, ops).getResult();
       Value minValIdx =
-          rewriter.create<arith::IndexCastOp>(loc, minValIdxInt, indexType)
+          rewriter.create<arith::IndexCastOp>(loc, indexType, minValIdxInt)
               .getResult();
       ops[axis] = minValIdx;
       Value minVal =
@@ -170,7 +170,7 @@ struct ArgSortOpConversion : public OpConversionPattern<tile::ArgSortOp> {
       Value compValIdxInt =
           rewriter.create<memref::LoadOp>(loc, result, ops).getResult();
       Value compValIdx =
-          rewriter.create<arith::IndexCastOp>(loc, compValIdxInt, indexType)
+          rewriter.create<arith::IndexCastOp>(loc, indexType, compValIdxInt)
               .getResult();
       ops[axis] = compValIdx;
       Value compVal =
@@ -352,11 +352,11 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
       // Create std ops for 1D interpolation
       if (idx.getType().isa<FloatType>()) {
         if (elementType.isa<IntegerType>()) {
-          idx = rewriter.create<mlir::arith::FPToSIOp>(loc, idx, rewriter.getI32Type())
+          idx = rewriter.create<mlir::arith::FPToSIOp>(loc, rewriter.getI32Type(), idx)
                     .getResult();
           IndexType indexType = rewriter.getIndexType();
           // Cast from whatever integer type it has to index type
-          idx = rewriter.create<mlir::arith::IndexCastOp>(loc, idx, indexType)
+          idx = rewriter.create<mlir::arith::IndexCastOp>(loc, indexType, idx)
                     .getResult();
           srcOps.at(axis) = idx;
           interpVal = rewriter.create<memref::LoadOp>(loc, tensor, srcOps);
@@ -384,7 +384,7 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
         if (!idx.getType().isa<IndexType>()) {
           IndexType indexType = rewriter.getIndexType();
           // Cast from whatever integer type it has to index type
-          idx = rewriter.create<mlir::arith::IndexCastOp>(loc, idx, indexType)
+          idx = rewriter.create<mlir::arith::IndexCastOp>(loc, indexType, idx)
                     .getResult();
         }
         srcOps.at(axis) = idx;
@@ -403,7 +403,7 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
                 .getResult();
         if (!idx.getType().isa<IndexType>()) {
           IndexType indexType = rewriter.getIndexType();
-          idx = rewriter.create<mlir::arith::IndexCastOp>(loc, idx, indexType)
+          idx = rewriter.create<mlir::arith::IndexCastOp>(loc, indexType, idx)
                     .getResult();
         }
         idxs.push_back(idx);
@@ -463,13 +463,13 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
       idx = ceilFPToSI(loc, rewriter, idx, i32Type);
       break;
     case NearestMode::simple:
-      idx = rewriter.create<mlir::arith::FPToSIOp>(loc, idx, i32Type).getResult();
+      idx = rewriter.create<mlir::arith::FPToSIOp>(loc, i32Type, idx).getResult();
       break;
     default:
       llvm_unreachable("Unsupported NearestMode");
     }
     idx = checkIntOutOfBounds(loc, rewriter, idx, bounds);
-    idx = rewriter.create<mlir::arith::IndexCastOp>(loc, idx, idxType).getResult();
+    idx = rewriter.create<mlir::arith::IndexCastOp>(loc, idxType, idx).getResult();
     srcOps.at(axis) = idx;
     Value result = rewriter.create<memref::LoadOp>(loc, tensor, srcOps);
     result = processOutOfBoundsMode(loc, rewriter, result, idx, bounds,
@@ -488,7 +488,7 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
     IndexBounds bounds = getIndexBounds(loc, rewriter, tensor, axis, i32Type);
     Value cst1F =
         rewriter
-            .create<mlir::ConstantOp>(loc, elementType,
+            .create<arith::ConstantOp>(loc, elementType,
                                       rewriter.getFloatAttr(elementType, 1.0))
             .getResult();
 
@@ -497,8 +497,8 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
     Value ceil = ceilFPToSI(loc, rewriter, idx, i32Type);
     floor = checkIntOutOfBounds(loc, rewriter, floor, bounds);
     ceil = checkIntOutOfBounds(loc, rewriter, ceil, bounds);
-    floor = rewriter.create<mlir::arith::IndexCastOp>(loc, floor, idxType).getResult();
-    ceil = rewriter.create<mlir::arith::IndexCastOp>(loc, ceil, idxType).getResult();
+    floor = rewriter.create<mlir::arith::IndexCastOp>(loc, idxType, floor).getResult();
+    ceil = rewriter.create<mlir::arith::IndexCastOp>(loc, idxType, ceil).getResult();
 
     // Load sample data g0 and g1 at interpolation nodes
     srcOps.at(axis) = ceil;
@@ -537,7 +537,7 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
 
     // Create constant a (cubeCoeff)
     Value a = rewriter
-                  .create<mlir::ConstantOp>(
+                  .create<arith::ConstantOp>(
                       loc, rewriter.getF64Type(),
                       FloatAttr::get(rewriter.getF64Type(), cubicCoeff))
                   .getResult();
@@ -548,7 +548,7 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
     // Create integer constants
     SmallVector<Value, 4> cstI;
     for (size_t i = 0; i <= 2; i++) {
-      auto cstOp = rewriter.create<mlir::ConstantOp>(
+      auto cstOp = rewriter.create<arith::ConstantOp>(
           loc, i32Type, rewriter.getIntegerAttr(i32Type, i));
       cstI.push_back(cstOp.getResult());
     }
@@ -556,7 +556,7 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
     // Create float constants
     SmallVector<Value, 4> cstF;
     for (size_t i = 0; i <= 3; i++) {
-      auto cstOp = rewriter.create<mlir::ConstantOp>(
+      auto cstOp = rewriter.create<arith::ConstantOp>(
           loc, elementType, rewriter.getFloatAttr(elementType, i));
       cstF.push_back(cstOp.getResult());
     }
@@ -566,16 +566,16 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
     Value ceilI = ceilFPToSI(loc, rewriter, idx, i32Type);
     SmallVector<Value, 4> x;
     x.push_back(
-        rewriter.create<mlir::arith::SubIOp>(loc, floorI, cstI[1]).getResult());
+        rewriter.create<arith::SubIOp>(loc, floorI, cstI[1]).getResult());
     x.push_back(floorI);
     x.push_back(ceilI);
-    x.push_back(rewriter.create<mlir::arith::AddIOp>(loc, ceilI, cstI[1]).getResult());
+    x.push_back(rewriter.create<arith::AddIOp>(loc, ceilI, cstI[1]).getResult());
 
     // Load sample data g at interpolation nodes
     SmallVector<Value, 4> g;
     for (size_t i = 0; i < x.size(); i++) {
       x[i] = checkIntOutOfBounds(loc, rewriter, x[i], bounds);
-      x[i] = rewriter.create<mlir::arith::IndexCastOp>(loc, x[i], idxType).getResult();
+      x[i] = rewriter.create<mlir::arith::IndexCastOp>(loc, idxType, x[i]).getResult();
       srcOps.at(axis) = x[i];
       auto loadOp = rewriter.create<memref::LoadOp>(loc, tensor, srcOps);
       g.push_back(loadOp.getResult());
@@ -637,9 +637,9 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
     // Return lower and upper bounds of a tensor at an axis
     SmallVector<Value, 2> bounds;
     int64_t axisLen = tensor.getType().cast<MemRefType>().getShape()[axis];
-    auto lower = rewriter.create<mlir::ConstantOp>(
+    auto lower = rewriter.create<arith::ConstantOp>(
         loc, integerType, rewriter.getIntegerAttr(integerType, 0));
-    auto upper = rewriter.create<mlir::ConstantOp>(
+    auto upper = rewriter.create<arith::ConstantOp>(
         loc, integerType, rewriter.getIntegerAttr(integerType, axisLen - 1));
     return IndexBounds{lower, upper};
   }
@@ -661,7 +661,7 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
                        Value value) const {
     // Check if the fractional part of a float value is 0.5
     Type floatType = value.getType();
-    auto half = rewriter.create<mlir::ConstantOp>(
+    auto half = rewriter.create<arith::ConstantOp>(
         loc, floatType, rewriter.getFloatAttr(floatType, 0.5));
     Value floor =
         rewriter.create<mlir::math::FloorOp>(loc, floatType, value).getResult();
@@ -691,7 +691,7 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
   Value roundFPToSI(Location loc, ConversionPatternRewriter &rewriter,
                     Value value, IntegerType integerType) const {
     Type floatType = value.getType();
-    auto half = rewriter.create<mlir::ConstantOp>(
+    auto half = rewriter.create<arith::ConstantOp>(
         loc, floatType, rewriter.getFloatAttr(floatType, 0.5));
     auto valuePlusHalf = rewriter.create<mlir::arith::AddFOp>(loc, value, half);
     return floorFPToSI(loc, rewriter, valuePlusHalf, integerType);
@@ -708,14 +708,14 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
     case OutOfBoundsMode::return_zero: {
       auto zero =
           rewriter
-              .create<mlir::ConstantOp>(loc, elementType,
+              .create<arith::ConstantOp>(loc, elementType,
                                         rewriter.getFloatAttr(elementType, 0.0))
               .getResult();
       auto bound_upper =
-          rewriter.create<mlir::arith::SIToFPOp>(loc, bounds.upper, elementType)
+          rewriter.create<arith::SIToFPOp>(loc, elementType, bounds.upper)
               .getResult();
       auto bound_lower =
-          rewriter.create<mlir::arith::SIToFPOp>(loc, bounds.lower, elementType)
+          rewriter.create<arith::SIToFPOp>(loc, elementType, bounds.lower)
               .getResult();
       auto cmp_upper = rewriter.create<mlir::arith::CmpFOp>(loc, arith::CmpFPredicate::OGT,
                                                      idx, bound_upper);
@@ -868,7 +868,7 @@ struct ScatterOpConversion : public OpConversionPattern<tile::ScatterOp> {
     if (!indexVal.getType().isa<IndexType>()) {
       // cast from whatever integer type it has to index type
       IndexType indexType = rewriter.getIndexType();
-      indexVal = rewriter.create<mlir::arith::IndexCastOp>(loc, indexVal, indexType)
+      indexVal = rewriter.create<mlir::arith::IndexCastOp>(loc, indexType, indexVal)
                      .getResult();
     }
     return indexVal;

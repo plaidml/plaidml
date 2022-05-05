@@ -303,7 +303,7 @@ struct LowerToLLVMPass : public LowerToLLVMBase<LowerToLLVMPass> {
     LLVMTypeConverter typeConverter(context);
 
     RewritePatternSet patterns(context);
-    populateLoopToStdConversionPatterns(patterns);
+    //populateLoopToStdConversionPatterns(patterns);
     populateStdToLLVMConversionPatterns(typeConverter, patterns);
     populateMemRefToLLVMConversionPatterns(typeConverter, patterns);
     populateMathToLLVMConversionPatterns(typeConverter, patterns);
