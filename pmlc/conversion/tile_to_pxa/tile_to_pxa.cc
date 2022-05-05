@@ -65,7 +65,7 @@ struct ConstantOpConversion : public OpConversionPattern<tile::ConstantOp> {
   using OpConversionPattern<tile::ConstantOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(tile::ConstantOp op, ArrayRef<Value> operands,
+  matchAndRewrite(tile::ConstantOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
     auto stdType = tile::toSignlessType(getElementType(op));
     auto value = op.getValue();
@@ -635,8 +635,8 @@ struct IndexOpConversion : public OpConversionPattern<tile::IndexOp> {
   using OpConversionPattern<tile::IndexOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(tile::IndexOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
+  matchAndRewrite(tile::IndexOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
     // Gather some basic info
     auto loc = op.getLoc();
     TileToPXATypeConverter typeConverter;
@@ -681,11 +681,8 @@ struct ReshapeOpConversion : public OpConversionPattern<tile::ReshapeOp> {
   using OpConversionPattern<tile::ReshapeOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(tile::ReshapeOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
-    // Create an adaptor, to interpret the operands
-    tile::ReshapeOpAdaptor adaptor(operands);
-
+  matchAndRewrite(tile::ReshapeOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
     auto tensor = adaptor.tensor();
 
     TileToPXATypeConverter typeConverter;
@@ -700,11 +697,8 @@ struct ShapeOpConversion : public OpConversionPattern<tile::ShapeOp> {
   using OpConversionPattern<tile::ShapeOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(tile::ShapeOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
-    // Create an adaptor
-    tile::ShapeOpAdaptor adaptor(operands);
-
+  matchAndRewrite(tile::ShapeOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
     // Gather some basic info
     auto loc = op.getLoc();
     TileToPXATypeConverter typeConverter;
@@ -737,8 +731,8 @@ struct CastOpConversion : public OpConversionPattern<tile::CastOp> {
   using OpConversionPattern<tile::CastOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(tile::CastOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
+  matchAndRewrite(tile::CastOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
     auto loc = op.getLoc();
 
     BufferAllocator alloc(rewriter, op.getOperation(), op.result().getType());
@@ -753,7 +747,7 @@ struct CastOpConversion : public OpConversionPattern<tile::CastOp> {
     rewriter.setInsertionPointToStart(body);
 
     // Create the load
-    auto scalar = buildBroadcastLoad(rewriter, loc, operands[0],
+    auto scalar = buildBroadcastLoad(rewriter, loc, getOperands()[0],
                                      alloc.memRefType.getRank());
 
     // Create the standard cast op
@@ -780,7 +774,7 @@ struct FuncOpConversion : public OpConversionPattern<FuncLikeOp> {
   using OpConversionPattern<FuncLikeOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(FuncLikeOp op, ArrayRef<Value> operands,
+  matchAndRewrite(FuncLikeOp op, typename FuncLikeOp::Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
     FunctionType type = op.getType();
 
@@ -818,12 +812,11 @@ struct PragmaOpConversion : public OpConversionPattern<tile::PragmaOp> {
   using OpConversionPattern<tile::PragmaOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(tile::PragmaOp op, ArrayRef<Value> operands,
+  matchAndRewrite(tile::PragmaOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
     if (op.op() == "trace") {
       return failure();
     }
-    tile::PragmaOpAdaptor adaptor(operands);
     rewriter.replaceOp(op, adaptor.tensor());
     return success();
   }
@@ -833,12 +826,11 @@ struct TraceOpConversion : public OpConversionPattern<tile::PragmaOp> {
   using OpConversionPattern<tile::PragmaOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(tile::PragmaOp op, ArrayRef<Value> operands,
+  matchAndRewrite(tile::PragmaOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
     if (op.op() != "trace") {
       return failure();
     }
-    tile::PragmaOpAdaptor adaptor(operands);
     auto module = op->getParentOfType<ModuleOp>();
     NamedAttribute msg = op.attrs().getNamed("msg");
     if (!msg) {
@@ -855,9 +847,8 @@ struct ScfForOpConversion : public OpConversionPattern<scf::ForOp> {
   using OpConversionPattern<scf::ForOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(scf::ForOp op, ArrayRef<Value> operands,
+  matchAndRewrite(scf::ForOp op, OpAdaptor oldFor,
                   ConversionPatternRewriter &rewriter) const final {
-    scf::ForOpAdaptor oldFor(operands);
     auto &oldBodyOps = op.getBody()->getOperations();
     auto newOp = rewriter.create<scf::ForOp>(op.getLoc(), oldFor.getLowerBound(),
                                              oldFor.getUpperBound(), oldFor.getStep(),
