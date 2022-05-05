@@ -14,11 +14,11 @@ struct AffinexLoopUnroll : public AffinexLoopUnrollBase<AffinexLoopUnroll> {
     this->operationLimit = operationLimit;
   }
 
-  void runOnFunction() override {
+  void runOnOperation() override {
     DenseMap<Operation *, uint64_t> opCount;
     SmallVector<AffineForOp, 4> loopsToUnroll;
 
-    getFunction().walk([&](Operation *op) {
+    getOperation().walk([&](Operation *op) {
       auto count = opCount[op];
       if (AffineForOp forOp = dyn_cast<AffineForOp>(op)) {
         Optional<uint64_t> tripCount = getConstantTripCount(forOp);

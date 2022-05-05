@@ -3,7 +3,7 @@
 
 include "mlir/Pass/PassBase.td"
 
-def AffineNormalize : FunctionPass<"pxa-normalize"> {
+def AffineNormalize : Pass<"pxa-normalize", "mlir::FuncOp"> {
   let summary = "Normalize affine ops";
   let constructor = "pmlc::dialect::pxa::createAffineNormalizePass()";
   let options = [
@@ -16,7 +16,7 @@ def AffineNormalize : FunctionPass<"pxa-normalize"> {
   ];
 }
 
-def AutoTileExample : FunctionPass<"pxa-autotile-example"> {
+def AutoTileExample : Pass<"pxa-autotile-example", "mlir::FuncOp"> {
   let summary = "Tile all dimensions by 10";
   let constructor = "pmlc::dialect::pxa::createAutoTileExamplePass()";
 }
@@ -26,7 +26,7 @@ def DeallocPlacement : Pass<"pxa-dealloc-placement", "mlir::ModuleOp"> {
   let constructor = "pmlc::dialect::pxa::createDeallocPlacementPass()";
 }
 
-def Cache : FunctionPass<"pxa-cache"> {
+def Cache : Pass<"pxa-cache", "mlir::FuncOp"> {
   let summary = "Cache global memory into local memory";
   let constructor = "pmlc::dialect::pxa::createCachePass()";
   let options = [
@@ -55,12 +55,12 @@ def Cache : FunctionPass<"pxa-cache"> {
   let dependentDialects = ["mlir::memref::MemRefDialect"];
 }
 
-def ConvertMemOp : FunctionPass<"pxa-convert-mem-op"> {
+def ConvertMemOp : Pass<"pxa-convert-mem-op", "mlir::FuncOp"> {
   let summary = "Convert standard memory operations to pxa if possible";
   let constructor = "pmlc::dialect::pxa::createConvertMemOpPass()";
 }
 
-def Fusion : FunctionPass<"pxa-fusion"> {
+def Fusion : Pass<"pxa-fusion", "mlir::FuncOp"> {
   let summary = "Fuse blocks that are compatible";
   let constructor = "pmlc::dialect::pxa::createFusionPass()";
   let options = [
@@ -90,7 +90,7 @@ def Fusion : FunctionPass<"pxa-fusion"> {
   ];
 }
 
-def GPUThread : FunctionPass<"pxa-gpu-thread"> {
+def GPUThread : Pass<"pxa-gpu-thread", "mlir::FuncOp"> {
   let summary = "Tile outmost loops for GPU threading";
   let constructor = "pmlc::dialect::pxa::createGPUThreadPass()";
   let options = [
@@ -99,7 +99,7 @@ def GPUThread : FunctionPass<"pxa-gpu-thread"> {
   ];
 }
 
-def CPUThread : FunctionPass<"pxa-cpu-thread"> {
+def CPUThread : Pass<"pxa-cpu-thread", "mlir::FuncOp"> {
   let summary = "Tile outmost loops for CPU threading";
   let constructor = "pmlc::dialect::pxa::createCPUThreadPass()";
   let options = [
@@ -109,12 +109,12 @@ def CPUThread : FunctionPass<"pxa-cpu-thread"> {
   ];
 }
 
-def Localize : FunctionPass<"pxa-localize"> {
+def Localize : Pass<"pxa-localize", "mlir::FuncOp"> {
   let summary = "Push memref allocs to innermost scope";
   let constructor = "pmlc::dialect::pxa::createLocalizePass()";
 }
 
-def MemRefDataFlowOpt : FunctionPass<"pxa-dataflow-opt"> {
+def MemRefDataFlowOpt : Pass<"pxa-dataflow-opt", "mlir::FuncOp"> {
   let summary = "Perform reduce/load forwarding for memrefs";
   let constructor = "pmlc::dialect::pxa::createMemRefDataFlowOptPass()";
     let options = [
@@ -124,7 +124,7 @@ def MemRefDataFlowOpt : FunctionPass<"pxa-dataflow-opt"> {
   ];
 }
 
-def NestLoops : FunctionPass<"pxa-nest-loops"> {
+def NestLoops : Pass<"pxa-nest-loops", "mlir::FuncOp"> {
   let summary = "Nests outermost loops to a minimum IV count";
   let constructor = "pmlc::dialect::pxa::createNestLoopsPass()";
   let options = [
@@ -133,7 +133,7 @@ def NestLoops : FunctionPass<"pxa-nest-loops"> {
   ];
 }
 
-def ResizeTmps : FunctionPass<"pxa-resize-tmps"> {
+def ResizeTmps : Pass<"pxa-resize-tmps", "mlir::FuncOp"> {
   let summary = "Resize temporary buffers to minimal sizes";
   let constructor = "pmlc::dialect::pxa::createResizeTmpsPass()";
   let options = [
@@ -143,7 +143,7 @@ def ResizeTmps : FunctionPass<"pxa-resize-tmps"> {
   ];
 }
 
-def Subgroups : FunctionPass<"pxa-subgroups"> {
+def Subgroups : Pass<"pxa-subgroups", "mlir::FuncOp"> {
   let summary = "Regorganize top level block to maximum use of subgroups on gen9";
   let constructor = "pmlc::dialect::pxa::createSubgroupsPass()";
   let dependentDialects = ["mlir::vector::VectorDialect"];
@@ -164,13 +164,13 @@ def TestStrideInfo : Pass<"pxa-stride-info"> {
   let constructor = "pmlc::dialect::pxa::createTestStrideInfoPass()";
 }
 
-def TileAccumulate : FunctionPass<"pxa-tile-accumulate"> {
+def TileAccumulate : Pass<"pxa-tile-accumulate", "mlir::FuncOp"> {
   let summary = "Tile accumulation indexes into an inner block to avoid "
     "possible race conditions";
   let constructor = "pmlc::dialect::pxa::createTileAccumulatePass()";
 }
 
-def Vectorize : FunctionPass<"pxa-vectorize"> {
+def Vectorize : Pass<"pxa-vectorize", "mlir::FuncOp"> {
   let summary = "Perform vectorization based on specified strategy";
   let constructor = "pmlc::dialect::pxa::createVectorizePass()";
   let dependentDialects = ["mlir::vector::VectorDialect"];
@@ -182,12 +182,12 @@ def Vectorize : FunctionPass<"pxa-vectorize"> {
   ];
 }
 
-def SimplifyArithmetic : FunctionPass<"pxa-simplify-arithmetic"> {
+def SimplifyArithmetic : Pass<"pxa-simplify-arithmetic", "mlir::FuncOp"> {
   let summary = "Simplifies arithmetic";
   let constructor = "pmlc::dialect::pxa::createSimplifyArithmeticPass()";
 }
 
-def VectorizeMem : FunctionPass<"pxa-vectorize-mem"> {
+def VectorizeMem : Pass<"pxa-vectorize-mem", "mlir::FuncOp"> {
   let summary = "Vectorize load and reduce assign ops";
   let constructor = "pmlc::dialect::pxa::createVectorizeMemPass()";
   let dependentDialects = ["mlir::vector::VectorDialect"];

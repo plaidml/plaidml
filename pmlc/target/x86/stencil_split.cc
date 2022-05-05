@@ -494,8 +494,8 @@ public:
 } // namespace
 
 struct StencilSplitPass : public StencilSplitBase<StencilSplitPass> {
-  void runOnFunction() final {
-    getFunction().walk([](AffineParallelOp op) {
+  void runOnOperation() final {
+    getOperation().walk([](AffineParallelOp op) {
       StencilSplitImpl splitImpl;
       splitImpl.performSplit(op);
     });

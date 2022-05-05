@@ -74,8 +74,8 @@ struct AddInitPattern final : public OpRewritePattern<AddOp> {
 };
 
 struct AlgebraicOptPass : public AlgebraicOptBase<AlgebraicOptPass> {
-  void runOnFunction() final {
-    FuncOp op = getFunction();
+  void runOnOperation() final {
+    FuncOp op = getOperation();
     MLIRContext *context = &getContext();
 
     RewritePatternSet patterns(context);

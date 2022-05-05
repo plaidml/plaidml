@@ -235,8 +235,8 @@ public:
 } // namespace
 
 struct StencilTppUnaryPass : public StencilTppUnaryBase<StencilTppUnaryPass> {
-  void runOnFunction() final {
-    getFunction().walk([](AffineParallelOp op) {
+  void runOnOperation() final {
+    getOperation().walk([](AffineParallelOp op) {
       if (op.getIVs().size() >= 2) {
         StencilImpl stencil(op);
         stencil.performStenciling();

@@ -122,8 +122,8 @@ struct ConvertStandardToLLVMPass
 
 struct CollapseParallelLoopsPass
     : public CollapseParallelLoopsBase<CollapseParallelLoopsPass> {
-  void runOnFunction() final {
-    getFunction().walk([&](scf::ParallelOp op) {
+  void runOnOperation() final {
+    getOperation().walk([&](scf::ParallelOp op) {
       SmallVector<std::vector<unsigned>, 3> combinedLoops;
       std::vector<unsigned> dims;
       for (unsigned i = 0; i < op.getNumLoops(); i++)
@@ -144,8 +144,8 @@ static APFloat convertFloatUsingType(double value, FloatType type) {
 
 struct FoldConstantCastPass
     : public FoldConstantCastBase<FoldConstantCastPass> {
-  void runOnFunction() final {
-    getFunction().walk([&](CastOpInterface op) {
+  void runOnOperation() final {
+    getOperation().walk([&](CastOpInterface op) {
       Attribute attr;
       if (matchPattern(op->getOperand(0), m_Constant(&attr))) {
         OpBuilder builder(op);
@@ -201,13 +201,13 @@ struct StencilTppGemmPass : public StencilTppGemmBase<StencilTppGemmPass> {
     this->isBatched = isBatched;
   }
 
-  void runOnFunction() final {
+  void runOnOperation() final {
     if (!numThreads.getValue()) {
       numThreads = std::thread::hardware_concurrency();
     }
     IVLOG(3, "StencilTppGemmPass> numThreads: " << numThreads.getValue());
     IVLOG(3, "StencilTppGemmPass> isBatched: " << isBatched.getValue());
-    getFunction().walk([this](AffineParallelOp op) {
+    getOperation().walk([this](AffineParallelOp op) {
       // TODO: check LogicalResult
       (void)pxa::applyStencilGEMM(op, numThreads.getValue(),
                                   isBatched.getValue(), heatmapCostTransposed);

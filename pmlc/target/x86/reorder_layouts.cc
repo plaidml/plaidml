@@ -360,8 +360,8 @@ struct FoldBroadcastReordersPattern : public OpRewritePattern<linalgx::CopyOp> {
 };
 
 struct ReorderLayoutsPass : public ReorderLayoutsBase<ReorderLayoutsPass> {
-  void runOnFunction() final {
-    FuncOp func = getFunction();
+  void runOnOperation() final {
+    FuncOp func = getOperation();
     MLIRContext *context = func.getContext();
 
     func.walk([&](linalg::GenericOp op) { reorderConvolution(op); });
@@ -564,8 +564,8 @@ struct ReorderLayoutsPass : public ReorderLayoutsBase<ReorderLayoutsPass> {
 
 struct ReorderWeightLayoutsPass
     : public ReorderWeightLayoutsBase<ReorderWeightLayoutsPass> {
-  void runOnFunction() final {
-    FuncOp func = getFunction();
+  void runOnOperation() final {
+    FuncOp func = getOperation();
     MLIRContext *context = func.getContext();
 
     func.walk([&](linalg::GenericOp op) { reorderConvolution(op); });

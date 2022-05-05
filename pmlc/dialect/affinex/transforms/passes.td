@@ -3,7 +3,7 @@
 
 include "mlir/Pass/PassBase.td"
 
-def AffinexLoopUnroll : FunctionPass<"affinex-loop-unroll"> {
+def AffinexLoopUnroll : Pass<"affinex-loop-unroll", "mlir::FuncOp"> {
   let summary = "Fully unrolls AffineFor loops which meet the operation limit.";
   let constructor = "pmlc::dialect::affinex::createAffinexLoopUnroll()";
   let options = [
@@ -13,12 +13,12 @@ def AffinexLoopUnroll : FunctionPass<"affinex-loop-unroll"> {
   ];
 }
 
-def AffinexMemRefDataFlowOpt : FunctionPass<"affinex-memref-dataflow-opt"> {
+def AffinexMemRefDataFlowOpt : Pass<"affinex-memref-dataflow-opt", "mlir::FuncOp"> {
   let summary = "Performs store to load forwarding.";
   let constructor = "pmlc::dialect::affinex::createAffinexMemRefDataFlowOpt()";
 }
 
-def AffinexDeadMemRefElimination : FunctionPass<"affinex-dead-memref-elimination"> {
+def AffinexDeadMemRefElimination : Pass<"affinex-dead-memref-elimination", "mlir::FuncOp"> {
   let summary = "Eliminate unused MemRefs.";
   let constructor = "pmlc::dialect::affinex::createAffinexDeadMemRefElimination()";
 }

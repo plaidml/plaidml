@@ -3,7 +3,7 @@
 
 include "mlir/Pass/PassBase.td"
 
-def InlineLayers : FunctionPass<"layer-inline-layers"> {
+def InlineLayers : Pass<"layer-inline-layers", "mlir::FuncOp"> {
   let summary = "Inline layers";
   let constructor = "pmlc::dialect::layer::createInlineLayersPass()";
 }

@@ -15,8 +15,8 @@ namespace pmlc::dialect::tile {
 namespace {
 
 struct MaterializePass : public MaterializeBase<MaterializePass> {
-  void runOnFunction() final {
-    auto func = getFunction();
+  void runOnOperation() final {
+    auto func = getOperation();
     func.walk([&](MaterializeOperandsOpInterface op) {
       OpBuilder builder(op);
       if (failed(op.materializeOperands(builder))) {

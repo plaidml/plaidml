@@ -27,16 +27,16 @@ using namespace mlir; // NOLINT
 namespace {
 
 struct PadRangesPass : public PadRangesBase<PadRangesPass> {
-  void runOnFunction() final;
+  void runOnOperation() final;
 };
 
-void PadRangesPass::runOnFunction() {
+void PadRangesPass::runOnOperation() {
   assert(maxPowerOfTwo >= minPowerOfTwo);
   assert(util::math::IsPo2(maxPowerOfTwo));
   assert(util::math::IsPo2(minPowerOfTwo));
   assert(maxIncrease >= 0.0);
   assert(maxIncrease < 1.0);
-  auto func = getFunction();
+  auto func = getOperation();
   func.walk([&](ContractionOp op) {
     // Skip some cases where the padding pass can't operate.
     if (op.getNumSymbols()) {

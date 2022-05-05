@@ -57,12 +57,12 @@ namespace pmlc::dialect::affinex {
 struct AffinexMemRefDataFlowOpt
     : public AffinexMemRefDataFlowOptBase<AffinexMemRefDataFlowOpt> {
 
-  void runOnFunction() override {
+  void runOnOperation() override {
     Block *cur = nullptr;
     llvm::SmallVector<Operation *, 8> opsToErase;
     llvm::DenseMap<MemAccess, AffineWriteOpInterface> lastStoreOps;
 
-    getFunction().walk([&](Operation *op) {
+    getOperation().walk([&](Operation *op) {
       if (op->getBlock() != cur) {
         lastStoreOps.clear();
         cur = op->getBlock();
