@@ -747,7 +747,7 @@ struct CastOpConversion : public OpConversionPattern<tile::CastOp> {
     rewriter.setInsertionPointToStart(body);
 
     // Create the load
-    auto scalar = buildBroadcastLoad(rewriter, loc, getOperands()[0],
+    auto scalar = buildBroadcastLoad(rewriter, loc, adaptor.getOperands()[0],
                                      alloc.memRefType.getRank());
 
     // Create the standard cast op

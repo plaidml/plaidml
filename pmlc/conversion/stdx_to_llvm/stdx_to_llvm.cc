@@ -29,8 +29,8 @@ struct LibMCallLowering : public ConvertOpToLLVMPattern<OpType> {
   using ConvertOpToLLVMPattern<OpType>::ConvertOpToLLVMPattern;
 
   LogicalResult
-  matchAndRewrite(OpType op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
+  matchAndRewrite(OpType op, typename OpType::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
     auto f32Type = rewriter.getF32Type();
     SmallVector<Type, 2> argTypes(getArity(), f32Type);
     auto funcType =
@@ -38,7 +38,7 @@ struct LibMCallLowering : public ConvertOpToLLVMPattern<OpType> {
     auto attr = rewriter.getStringAttr(getFuncName());
     auto sym = getOrInsertFuncOp(attr, funcType, op, rewriter);
     rewriter.replaceOpWithNewOp<LLVM::CallOp>(
-        op, ArrayRef<Type>{f32Type}, SymbolRefAttr::get(attr), operands);
+        op, ArrayRef<Type>{f32Type}, SymbolRefAttr::get(attr), adaptor.getOperands());
     return success();
   }
 
@@ -166,8 +166,8 @@ struct ReshapeLowering : public ConvertOpToLLVMPattern<stdx::ReshapeOp> {
   using ConvertOpToLLVMPattern<stdx::ReshapeOp>::ConvertOpToLLVMPattern;
 
   LogicalResult
-  matchAndRewrite(stdx::ReshapeOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
+  matchAndRewrite(stdx::ReshapeOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
     MemRefType dstType = op.getResult().getType().cast<MemRefType>();
 
     if (!dstType.hasStaticShape())
@@ -181,7 +181,6 @@ struct ReshapeLowering : public ConvertOpToLLVMPattern<stdx::ReshapeOp> {
         }))
       return failure();
 
-    stdx::ReshapeOpAdaptor adaptor(operands);
     BaseViewConversionHelper baseDesc(rewriter, op->getLoc(), adaptor.tensor());
     BaseViewConversionHelper desc(rewriter, op->getLoc(),
                                   typeConverter->convertType(dstType));
@@ -228,8 +227,8 @@ struct PackLowering : public ConvertOpToLLVMPattern<stdx::PackOp> {
   using ConvertOpToLLVMPattern<stdx::PackOp>::ConvertOpToLLVMPattern;
 
   LogicalResult
-  matchAndRewrite(stdx::PackOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
+  matchAndRewrite(stdx::PackOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
     Location loc = op.getLoc();
     if (op.getNumOperands() == 0) {
       auto nullPtr = rewriter.create<LLVM::NullOp>(loc, getVoidPtrType());
@@ -252,7 +251,7 @@ struct PackLowering : public ConvertOpToLLVMPattern<stdx::PackOp> {
         loc, LLVM::LLVMPointerType::get(structType), rawPtr);
     // Make a value like struct holding all the fields
     Value structVal = rewriter.create<LLVM::UndefOp>(op.getLoc(), structType);
-    for (auto valIdx : llvm::enumerate(operands)) {
+    for (auto valIdx : llvm::enumerate(adaptor.getOperands())) {
       structVal = rewriter.create<LLVM::InsertValueOp>(
           loc, structType, structVal, valIdx.value(),
           rewriter.getI64ArrayAttr(valIdx.index()));
@@ -269,8 +268,8 @@ struct UnpackLowering : public ConvertOpToLLVMPattern<stdx::UnpackOp> {
   using ConvertOpToLLVMPattern<stdx::UnpackOp>::ConvertOpToLLVMPattern;
 
   LogicalResult
-  matchAndRewrite(stdx::UnpackOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
+  matchAndRewrite(stdx::UnpackOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
     if (op.getNumResults() == 0) {
       rewriter.replaceOp(op, {});
       return success();
@@ -280,7 +279,7 @@ struct UnpackLowering : public ConvertOpToLLVMPattern<stdx::UnpackOp> {
     auto structType = getStructType(*typeConverter, op.getResultTypes());
     // Bitcast the input operand
     auto structPtr = rewriter.create<LLVM::BitcastOp>(
-        loc, LLVM::LLVMPointerType::get(structType), operands[0]);
+        loc, LLVM::LLVMPointerType::get(structType), adaptor.getOperands()[0]);
     // Load it
     auto structVal = rewriter.create<LLVM::LoadOp>(loc, structPtr);
     // Extract all the values
