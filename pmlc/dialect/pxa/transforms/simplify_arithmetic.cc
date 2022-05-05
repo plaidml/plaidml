@@ -1,10 +1,12 @@
 // Copyright 2020 Intel Corporation
 
+#include "mlir/Support/LLVM.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/IR/AffineValueMap.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Support/DebugStringHelper.h"
 #include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinTypes.h"
 
 #include "pmlc/dialect/pxa/analysis/memref_access.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
@@ -32,22 +34,24 @@ bool checkIfZero(arith::ConstantOp constantVal) {
     auto denseAttr = value.cast<DenseElementsAttr>();
     if (!denseAttr.isSplat())
       return false;
-    value = denseAttr.getSplatValue();
+    if ((denseAttr.getType().getElementType().isa<IntegerType>()) && (denseAttr.getSplatValue<APInt>().isZero()))
+      return true;
+    if ((denseAttr.getType().getElementType().isa<FloatType>()) && (denseAttr.getSplatValue<APFloat>().isZero()))
+      return true;
   }
 
   // Float and integer types are supported
   if (auto floatType = valueType.dyn_cast<FloatType>()) {
     auto floatAttr = value.cast<FloatAttr>();
-    if (floatAttr.getValueAsDouble() != 0.0)
-      return false;
-  } else if (auto intType = valueType.dyn_cast<IntegerType>()) {
+    if (floatAttr.getValueAsDouble() == 0.0)
+      return true;
+  } 
+  if (auto intType = valueType.dyn_cast<IntegerType>()) {
     auto intAttr = value.cast<IntegerAttr>();
-    if (intAttr.getInt() != 0)
-      return false;
-  } else {
-    return false;
+    if (intAttr.getInt() == 0)
+      return true;
   }
-  return true;
+  return false;
 }
 
 void replaceAssignLoadAdd(PxaReduceOpInterface &reduceOp) {
