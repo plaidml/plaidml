@@ -683,10 +683,9 @@ struct ProgramBuilder {
             .Case("scatter", [&]() { return makeScatterOp(node, operands); })
             .Case("gather", [&]() { return makeGatherOp(node, operands); })
             .Default([&]() {
-              const AbstractOperation *abstractOp = lookupOperation(node->op);
               OperationState state(
                   NameLoc::get(builder.getIdentifier(node->str())),
-                  abstractOp->name);
+                  lookupOperation(node->op));
               state.addOperands(operands);
               state.addTypes(resultTypes);
               Operation *op = builder.createOperation(state);
@@ -925,13 +924,13 @@ struct ProgramBuilder {
     return nullptr;
   }
 
-  const AbstractOperation *lookupOperation(StringRef op) {
+  std::string lookupOperation(StringRef op) {
     auto opName = tile::TileDialect::getCanonicalOpName(op);
-    auto abstractOp = AbstractOperation::lookup(opName, context);
-    if (!abstractOp) {
+    Optional<RegisteredOperationName> opInfo =
+      RegisteredOperationName::lookup(opName, context); 
+    if (!opInfo) 
       throw std::runtime_error("Unknown EDSL primitive: " + op.str());
-    }
-    return abstractOp;
+    return opInfo->getStringRef().str();
   }
 
   std::string name;
