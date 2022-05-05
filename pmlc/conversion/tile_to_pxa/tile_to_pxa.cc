@@ -840,11 +840,11 @@ struct TraceOpConversion : public OpConversionPattern<tile::PragmaOp> {
     }
     tile::PragmaOpAdaptor adaptor(operands);
     auto module = op->getParentOfType<ModuleOp>();
-    auto msg = op.attrs().getNamed("msg");
+    NamedAttribute msg = op.attrs().getNamed("msg");
     if (!msg) {
       return failure();
     }
-    auto symbol = createStubTraceFunc(module, msg->second.cast<StringAttr>());
+    auto symbol = createStubTraceFunc(module, msg->getValue().cast<StringAttr>());
     rewriter.create<CallOp>(op.getLoc(), symbol, ArrayRef<Type>{});
     rewriter.replaceOp(op, adaptor.tensor());
     return success();
