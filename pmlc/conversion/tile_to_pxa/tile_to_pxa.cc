@@ -412,7 +412,7 @@ static arith::AtomicRMWKind convertAgg(AggregationKind agg, Type type) {
   }
   llvm_unreachable("Invalid agg type in convertAgg");
 }
-
+#if 0
 template <typename FromOpType, typename IntoOpBuilder,
           typename Matcher = AlwaysTrue>
 struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
@@ -630,6 +630,7 @@ struct ContractionOpConversion
     rewriter.replaceOp(op, forOp.getResult(0));
   }
 };
+#endif
 
 struct IndexOpConversion : public OpConversionPattern<tile::IndexOp> {
   using OpConversionPattern<tile::IndexOp>::OpConversionPattern;
@@ -832,11 +833,11 @@ struct TraceOpConversion : public OpConversionPattern<tile::PragmaOp> {
       return failure();
     }
     auto module = op->getParentOfType<ModuleOp>();
-    NamedAttribute msg = op.attrs().getNamed("msg");
+    llvm::Optional<NamedAttribute> msg = op.attrs().getNamed("msg");
     if (!msg) {
       return failure();
     }
-    auto symbol = createStubTraceFunc(module, msg.getValue().cast<StringAttr>());
+    auto symbol = createStubTraceFunc(module, msg->getValue().cast<StringAttr>());
     rewriter.create<CallOp>(op.getLoc(), symbol, ArrayRef<Type>{});
     rewriter.replaceOp(op, adaptor.tensor());
     return success();
@@ -936,7 +937,7 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         ReshapeOpConversion,               //
         ShapeOpConversion,                 //
         TraceOpConversion,                 //
-        ScfForOpConversion,                //
+        ScfForOpConversion/*,                //
         ContractionOpConversion<CombinationKind::none, FirstOperand>,
         ContractionOpConversion<CombinationKind::add, StdOp<mlir::arith::AddFOp>,
                                 ResultIs<EltwiseFloat>>,
@@ -1066,7 +1067,7 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         EltwiseOpConversion<tile::LogicalXorOp, LogicalOp<mlir::arith::XOrIOp>>,
         EltwiseOpConversion<tile::ReluOp, StdOp<stdx::ReluOp>>,
         EltwiseOpConversion<tile::SelectOp, SelectOpBuilder>,
-        EltwiseOpConversion<tile::IdentOp, FirstOperand>>(&getContext());
+        EltwiseOpConversion<tile::IdentOp, FirstOperand>*/>(&getContext());
 
     populateTileToPXASpecialPatterns(patterns);
 

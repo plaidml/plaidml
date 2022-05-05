@@ -15,10 +15,10 @@
 #include "mlir/IR/Dialect.h"
 
 #include "mlir-hlo/Dialect/mhlo/IR/chlo_ops.h"
-#include "mlir-hlo/Dialect/mhlo/IR/disc_ral_ops.h"
+//#include "mlir-hlo/Dialect/mhlo/IR/disc_ral_ops.h"
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
-#include "mlir-hlo/Dialect/mhlo/IR/lhlo_gpu_ops.h"
-#include "mlir-hlo/Dialect/mhlo/IR/lhlo_ops.h"
+//#include "mlir-hlo/Dialect/mhlo/IR/lhlo_gpu_ops.h"
+//#include "mlir-hlo/Dialect/mhlo/IR/lhlo_ops.h"
 
 #include "pmlc/dialect/layer/ir/ops.h"
 #include "pmlc/dialect/linalgx/ir/ops.h"
@@ -44,9 +44,9 @@ void registerAllDialects(DialectRegistry &registry) {
                   vector::VectorDialect,                  //
                   mlir::mhlo::MhloDialect,                //
                   mlir::chlo::HloClientDialect,           //
-                  mlir::lmhlo::LmhloDialect,              //
-                  mlir::lmhlo_gpu::LmhloGpuDialect,       //
-                  mlir::disc_ral::RalDialect,             //
+                  //mlir::lmhlo::LmhloDialect,              //
+                  //mlir::lmhlo_gpu::LmhloGpuDialect,       //
+                  //mlir::disc_ral::RalDialect,             //
                   pmlc::dialect::layer::LayerDialect,     //
                   pmlc::dialect::linalgx::LinalgXDialect, //
                   pmlc::dialect::pml::PMLDialect,         //

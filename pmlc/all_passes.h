@@ -56,8 +56,8 @@ inline void registerAllPasses() {
 
   // XLA
   mlir::mhlo::registerAllMhloPasses();
-  mlir::lmhlo::registerAllLmhloPasses();
-  mlir::disc_ral::registerAllDiscRalPasses();
+  // mlir::lmhlo::registerAllLmhloPasses();
+  // mlir::disc_ral::registerAllDiscRalPasses();
   mlir::hlo::registerAllHloPasses();
 
   //

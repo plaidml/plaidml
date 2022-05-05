@@ -3,7 +3,7 @@ pml_cc_library(
   HDRS
     passes.h
   SRCS
-    #tile_to_linalg.cc
+    tile_to_linalg.cc
     utils.cc
   DEPS
     ::passes-gen

@@ -68,7 +68,7 @@ struct ConstantOpConversion : public OpConversionPattern<tile::ConstantOp> {
   using OpConversionPattern<tile::ConstantOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(tile::ConstantOp op, ArrayRef<Value> operands,
+  matchAndRewrite(tile::ConstantOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
     TileToLinalgTypeConverter typeConverter;
     Type newType = typeConverter.convertType(op.getType());
@@ -563,6 +563,7 @@ struct TensorInitializer {
   }
 };
 
+#if 0
 template <typename FromOpType, typename IntoOpBuilder,
           typename Matcher = AlwaysTrue>
 struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
@@ -832,6 +833,7 @@ struct ContractionOpConversion
     rewriter.replaceOp(op, genericOp.getResult(0));
   }
 };
+#endif
 
 struct IndexOpConversion : public OpConversionPattern<tile::IndexOp> {
   using OpConversionPattern<tile::IndexOp>::OpConversionPattern;
@@ -911,7 +913,7 @@ matchShape(ArrayRef<int64_t> srcShape, ArrayRef<int64_t> dstShape) {
   }
   return result;
 }
-
+#if 0
 struct ReshapeOpConversion : public OpConversionPattern<tile::ReshapeOp> {
   using OpConversionPattern<tile::ReshapeOp>::OpConversionPattern;
 
@@ -955,7 +957,7 @@ struct ReshapeOpConversion : public OpConversionPattern<tile::ReshapeOp> {
     return success();
   }
 };
-
+#endif
 struct ShapeOpConversion : public OpConversionPattern<tile::ShapeOp> {
   using OpConversionPattern<tile::ShapeOp>::OpConversionPattern;
 
@@ -1035,7 +1037,7 @@ struct FuncOpConversion : public OpConversionPattern<FuncLikeOp> {
   using OpConversionPattern<FuncLikeOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(FuncLikeOp op, OpAdaptor adaptor,
+  matchAndRewrite(FuncLikeOp op, typename FuncLikeOp::Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
     FunctionType type = op.getType();
 
@@ -1098,7 +1100,7 @@ struct SpecialOpConversion : public OpConversionPattern<SpecialOp> {
   using OpConversionPattern<SpecialOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(SpecialOp op, typename SpecialOp::Adaptor adaptor
+  matchAndRewrite(SpecialOp op, typename SpecialOp::Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
     TileToLinalgTypeConverter typeConverter;
     SmallVector<Type> resultTypes;
@@ -1119,11 +1121,11 @@ struct TraceOpConversion : public OpConversionPattern<tile::PragmaOp> {
       return failure();
     }
     auto module = op->getParentOfType<ModuleOp>();
-    auto msg = op.attrs().getNamed("msg");
+    llvm::Optional<NamedAttribute> msg = op.attrs().getNamed("msg");
     if (!msg) {
       return failure();
     }
-    auto symbol = createStubTraceFunc(module, msg->second.cast<StringAttr>());
+    auto symbol = createStubTraceFunc(module, msg->getValue().cast<StringAttr>());
     rewriter.create<CallOp>(op.getLoc(), symbol, TypeRange{});
     rewriter.replaceOp(op, adaptor.tensor());
     return success();
@@ -1148,7 +1150,7 @@ struct ScfForOpConversion : public OpConversionPattern<scf::ForOp> {
     for (unsigned i = 0; i < oldArgs.size(); ++i) {
       oldArgs[i].replaceAllUsesWith(newArgs[i]);
     }
-    rewriter.replaceOp(op, newOp.results());
+    rewriter.replaceOp(op, newOp.getResults());
     return success();
   }
 };
@@ -1232,7 +1234,7 @@ struct LowerTileToLinalgPass
         FuncOpConversion<stdx::ClosureOp>,    //
         IndexOpConversion,                    //
         PragmaOpConversion,                   //
-        ReshapeOpConversion,                  //
+        //ReshapeOpConversion,                  //
         ReturnOpConversion,                   //
         SpecialOpConversion<tile::ArgSortOp>, //
         SpecialOpConversion<tile::GatherOp>,  //
@@ -1240,7 +1242,7 @@ struct LowerTileToLinalgPass
         SpecialOpConversion<tile::ScatterOp>, //
         ShapeOpConversion,                    //
         TraceOpConversion,                    //
-        ScfForOpConversion,                   //
+        ScfForOpConversion/*,                   
         ContractionOpConversion<CombinationKind::none, FirstOperand>,
         ContractionOpConversion<CombinationKind::add, StdOp<mlir::arith::AddFOp>,
                                 ResultIs<EltwiseFloat>>,
@@ -1371,7 +1373,7 @@ struct LowerTileToLinalgPass
         EltwiseOpConversion<tile::LogicalXorOp, LogicalOp<mlir::arith::XOrIOp>>,
         EltwiseOpConversion<tile::ReluOp, StdOp<stdx::ReluOp>>,
         EltwiseOpConversion<tile::SelectOp, SelectOp>,
-        EltwiseOpConversion<tile::IdentOp, FirstOperand>>(&getContext());
+        EltwiseOpConversion<tile::IdentOp, FirstOperand>*/>(&getContext());
 
     // Run the conversion
     if (failed(applyFullConversion(module, target, std::move(patterns)))) {
