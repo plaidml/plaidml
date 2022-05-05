@@ -4,7 +4,7 @@
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
-#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/OpenMP/OpenMPDialect.h"
@@ -53,5 +53,6 @@ void registerAllDialects(DialectRegistry &registry) {
                   pmlc::dialect::pxa::PXADialect,         //
                   pmlc::dialect::stdx::StdXDialect,       //
                   pmlc::dialect::tile::TileDialect,       //
+                  arith::ArithmeticDialect,               //
                   pmlc::dialect::xsmm::XSMMDialect>();
 }
