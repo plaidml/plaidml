@@ -24,10 +24,9 @@ struct ArgSortOpConversion : public OpConversionPattern<tile::ArgSortOp> {
   using OpConversionPattern<tile::ArgSortOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(tile::ArgSortOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
+  matchAndRewrite(tile::ArgSortOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
     IVLOG(3, "ArgSortOpConversion::matchAndRewrite");
-    tile::ArgSortOpAdaptor adaptor(operands);
     Location loc = op.getLoc();
     IntegerType i32Type = rewriter.getI32Type();
     IndexType indexType = rewriter.getIndexType();
@@ -296,11 +295,8 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
   using OpConversionPattern<tile::GatherOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(tile::GatherOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
-    // Create an adaptor, to interpret the operands
-    tile::GatherOpAdaptor adaptor(operands);
-
+  matchAndRewrite(tile::GatherOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
     Location loc = op.getLoc();
     MLIRContext *ctx = rewriter.getContext();
 
@@ -743,21 +739,15 @@ struct ScatterOpConversion : public OpConversionPattern<tile::ScatterOp> {
   using OpConversionPattern<tile::ScatterOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(tile::ScatterOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
+  matchAndRewrite(tile::ScatterOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
     // Helpful explanation of scatter from tensorflow docs:
     // https://www.tensorflow.org/api_docs/python/tf/scatter_nd
 
     Location loc = op.getLoc();
     MLIRContext *ctx = rewriter.getContext();
     TileToPXATypeConverter typeConverter;
-
-    // Create an adaptor, to interpret the operands
-    tile::ScatterOpAdaptor adaptor(operands);
-    // 'tensor' provides update values
-    // 'dims' contains the destination indices
-    // 'other' is the shape of the output
-    // this is redundant because the result type also specifies output shape
+ 
     Value data = adaptor.data();
     Value indices = adaptor.indices();
     Value updates = adaptor.updates();
@@ -907,9 +897,9 @@ struct PrngOpConversion : public OpConversionPattern<tile::PrngOp> {
   using OpConversionPattern<tile::PrngOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(tile::PrngOp op, ArrayRef<Value> operands,
+  matchAndRewrite(tile::PrngOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
-    tile::PrngOpAdaptor transformed(operands);
+    tile::PrngOpAdaptor transformed(adaptor.getOperands());
     BufferAllocator allocResult(rewriter, op.getOperation(),
                                 op.result().getType());
     BufferAllocator stateResult(rewriter, op.getOperation(),

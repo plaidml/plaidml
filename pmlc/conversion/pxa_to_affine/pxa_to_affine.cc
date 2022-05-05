@@ -30,7 +30,7 @@ struct AffineParallelOpConversion
   using OpConversionPattern<AffineParallelOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(AffineParallelOp op, ArrayRef<Value> operands,
+  matchAndRewrite(AffineParallelOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
     // Make a map for induction variable
     llvm::SmallVector<Value, 8> ivs;
@@ -101,7 +101,7 @@ struct AffineIfOpConversion : public OpConversionPattern<AffineIfOp> {
   using OpConversionPattern<AffineIfOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(AffineIfOp op, ArrayRef<Value> operands,
+  matchAndRewrite(AffineIfOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
     // Make a new if value
     auto newIf = rewriter.create<AffineIfOp>(op.getLoc(), op.getIntegerSet(),
@@ -131,7 +131,7 @@ struct PxaLoadOpConversion : public OpConversionPattern<pxa::PxaLoadOp> {
   using OpConversionPattern<pxa::PxaLoadOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(pxa::PxaLoadOp op, ArrayRef<Value> operands,
+  matchAndRewrite(pxa::PxaLoadOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
     rewriter.replaceOpWithNewOp<AffineLoadOp>(op, op.memref(),
                                               op.getAffineMap(), op.idxs());
@@ -144,7 +144,7 @@ struct PxaVectorLoadOpConversion
   using OpConversionPattern<pxa::PxaVectorLoadOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(pxa::PxaVectorLoadOp op, ArrayRef<Value> operands,
+  matchAndRewrite(pxa::PxaVectorLoadOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
     rewriter.replaceOpWithNewOp<AffineVectorLoadOp>(
         op, op.getVectorType(), op.memref(), op.getAffineMap(), op.idxs());
@@ -199,7 +199,7 @@ struct PxaReduceOpConversion : public OpConversionPattern<pxa::PxaReduceOp> {
   using OpConversionPattern<pxa::PxaReduceOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(pxa::PxaReduceOp op, ArrayRef<Value> operands,
+  matchAndRewrite(pxa::PxaReduceOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
     auto source = rewriter.create<AffineLoadOp>(op.getLoc(), op.memref(),
                                                 op.map(), op.idxs());
@@ -217,7 +217,7 @@ struct PxaVectorReduceOpConversion
   using OpConversionPattern<pxa::PxaVectorReduceOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(pxa::PxaVectorReduceOp op, ArrayRef<Value> operands,
+  matchAndRewrite(pxa::PxaVectorReduceOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
     auto source = rewriter.create<AffineVectorLoadOp>(
         op.getLoc(), op.getVectorType(), op.memref(), op.getAffineMap(),
@@ -235,7 +235,7 @@ struct PxaStoreOpConversion : public OpConversionPattern<pxa::PxaStoreOp> {
   using OpConversionPattern<pxa::PxaStoreOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(pxa::PxaStoreOp op, ArrayRef<Value> operands,
+  matchAndRewrite(pxa::PxaStoreOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
     Value memref = op.memref();
     arith::AtomicRMWKind agg = op.agg();
@@ -267,7 +267,7 @@ struct FuncOpConversion : public OpConversionPattern<FuncLikeOp> {
   using OpConversionPattern<FuncLikeOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(FuncLikeOp op, ArrayRef<Value> operands,
+  matchAndRewrite(FuncLikeOp op, typename FuncLikeOp::Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
     FunctionType type = op.getType();
     if (IsExternal<FuncLikeOp>::check(op)) {
@@ -308,9 +308,8 @@ struct ReluOpConversion : public OpConversionPattern<stdx::ReluOp> {
   using OpConversionPattern<stdx::ReluOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(stdx::ReluOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
-    stdx::ReluOp::Adaptor adaptor(operands);
+  matchAndRewrite(stdx::ReluOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
     Location loc = op->getLoc();
 
     auto floatType = adaptor.value().getType().cast<FloatType>();
@@ -330,7 +329,7 @@ struct ReturnOpConversion : public OpConversionPattern<ReturnLikeOp> {
   using OpConversionPattern<ReturnLikeOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(ReturnLikeOp op, ArrayRef<Value> operands,
+  matchAndRewrite(ReturnLikeOp op, typename ReturnLikeOp::Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
     SmallVector<Value, 1> results;
     rewriter.replaceOpWithNewOp<ReturnLikeOp>(op, results);
