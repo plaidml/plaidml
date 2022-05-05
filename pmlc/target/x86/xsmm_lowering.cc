@@ -830,19 +830,19 @@ struct XSMMBRGemmOffsInvokeF32Lowering
     auto bOffsetsBase =
         rewriter.create<LLVM::AddressOfOp>(op->getLoc(), bOffsets);
 
-    SmallVector<Value, 4> aOffsetOperands = {aOffsetsBase};
+    SmallVector<Value> aOffsetOperands;
     aOffsetOperands.insert(aOffsetOperands.end(), aOffsetType.getRank() + 1,
                            createIndexConstant(rewriter, op->getLoc(), 0));
 
-    SmallVector<Value, 4> bOffsetOperands = {bOffsetsBase};
+    SmallVector<Value> bOffsetOperands;
     bOffsetOperands.insert(bOffsetOperands.end(), bOffsetType.getRank() + 1,
                            createIndexConstant(rewriter, op->getLoc(), 0));
 
     auto aOffsetsPtr = rewriter.create<LLVM::GEPOp>(op->getLoc(), longPtrType,
-                                                    aOffsetOperands);
+                                                    aOffsetsBase, aOffsetOperands);
 
     auto bOffsetsPtr = rewriter.create<LLVM::GEPOp>(op->getLoc(), longPtrType,
-                                                    bOffsetOperands);
+                                                    bOffsetsBase, bOffsetOperands);
 
     auto func = getOrInsertFunc(op, rewriter);
     rewriter.create<LLVM::CallOp>(
