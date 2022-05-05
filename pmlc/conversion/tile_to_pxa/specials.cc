@@ -185,7 +185,7 @@ struct ArgSortOpConversion : public OpConversionPattern<tile::ArgSortOp> {
                                op.direction());
 
       auto ifReorder = rewriter.create<scf::IfOp>(loc, orderPred, false);
-      rewriter.setInsertionPointToStart(&ifReorder.thenRegion().front());
+      rewriter.setInsertionPointToStart(&ifReorder.getThenRegion().front());
       // store minIV -> minIdxVar
       rewriter.create<memref::StoreOp>(loc, minIV, minIdxVar, zeroIndex);
       // store compVal -> minValVar
