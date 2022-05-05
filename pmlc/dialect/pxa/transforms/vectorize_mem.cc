@@ -4,7 +4,7 @@
 #include "mlir/Dialect/Affine/IR/AffineValueMap.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
-#include "mlir/Dialect/Vector/VectorOps.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/Support/DebugStringHelper.h"
 #include "pmlc/dialect/pxa/analysis/strides.h"
@@ -422,8 +422,8 @@ void getGlobalMemory(FuncOp f, std::list<Operation *> &globalAllocList) {
 }
 
 struct VectorizeMemPass : public VectorizeMemBase<VectorizeMemPass> {
-  void runOnFunction() final {
-    FuncOp f = getFunction();
+  void runOnOperation() final {
+    FuncOp f = getOperation();
 
     // Get global memory
     std::list<Operation *> globalAllocList;

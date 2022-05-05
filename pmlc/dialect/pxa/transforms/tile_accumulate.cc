@@ -94,8 +94,8 @@ AffineParallelOp tileAccumulations(AffineParallelOp op, bool skipTrivial) {
 namespace {
 
 struct TileAccumulatePass : public TileAccumulateBase<TileAccumulatePass> {
-  void runOnFunction() final {
-    auto func = getFunction();
+  void runOnOperation() final {
+    auto func = getOperation();
     // Tile only the outermost loops
     func.walk<WalkOrder::PreOrder>([&](AffineParallelOp op) {
       if (!op.getConstantRanges()) {

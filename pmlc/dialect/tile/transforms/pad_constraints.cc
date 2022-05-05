@@ -42,11 +42,11 @@ IntegerSet makeConstraintSet(size_t numDims, ArrayRef<AffineExpr> cons) {
 }
 
 struct PadConstraintsPass : public PadConstraintsBase<PadConstraintsPass> {
-  void runOnFunction() final;
+  void runOnOperation() final;
 };
 
-void PadConstraintsPass::runOnFunction() {
-  auto func = getFunction();
+void PadConstraintsPass::runOnOperation() {
+  auto func = getOperation();
   llvm::DenseMap<Value, llvm::DenseMap<AggregationKind, PaddingInfo>> toPad;
 
   func.walk([&](ContractionOp op) {

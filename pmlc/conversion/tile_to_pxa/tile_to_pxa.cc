@@ -262,7 +262,7 @@ struct SelectOpBuilder {
     SmallVector<Value, 2> promoted;
     promoteTypes(rewriter, loc, operands.drop_front(), types.drop_front(),
                  &promoted);
-    auto op = rewriter.create<mlir::SelectOp>(loc, operands[0], promoted[0],
+    auto op = rewriter.create<arith::SelectOp>(loc, operands[0], promoted[0],
                                               promoted[1]);
     return op.getResult();
   }
@@ -372,7 +372,7 @@ struct CondOp {
     auto cmp = cmpOpBuilder.create(rewriter, loc, resultType,
                                    operands.take_front(2), types.take_front(2));
     auto zero = createInit(rewriter, loc, resultType, AggregationKind::add);
-    return rewriter.create<mlir::SelectOp>(loc, cmp, operands[2], zero)
+    return rewriter.create<arith::SelectOp>(loc, cmp, operands[2], zero)
         .getResult();
   }
 };

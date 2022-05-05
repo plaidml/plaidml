@@ -24,8 +24,8 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
     this->onlyParallelNested = onlyParallelNested;
   }
 
-  void runOnFunction() final {
-    auto func = getFunction();
+  void runOnOperation() final {
+    auto func = getOperation();
     func.walk([&](memref::AllocOp op) { runOnAlloc(op); });
   }
 

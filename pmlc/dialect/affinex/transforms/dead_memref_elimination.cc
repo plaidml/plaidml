@@ -11,9 +11,9 @@ namespace pmlc::dialect::affinex {
 struct AffinexDeadMemRefElimination
     : public AffinexDeadMemRefEliminationBase<AffinexDeadMemRefElimination> {
 
-  void runOnFunction() override {
+  void runOnOperation() override {
     llvm::SmallVector<Operation *, 8> opsToErase;
-    getFunction().walk([&](memref::AllocOp alloc) {
+    getOperation().walk([&](memref::AllocOp alloc) {
       auto memref = alloc.getResult();
       for (Operation *user : memref.getUsers()) {
         if (isa<AffineWriteOpInterface, memref::DeallocOp>(user)) {

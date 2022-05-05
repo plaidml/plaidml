@@ -223,7 +223,7 @@ Program::save(const std::unordered_map<std::string, std::string> &config) {
 void Program::parseIOTypes(std::unique_ptr<llvm::MemoryBuffer> buffer) {
   llvm::SourceMgr sourceMgr;
   sourceMgr.AddNewSourceBuffer(std::move(buffer), llvm::SMLoc());
-  OwningModuleRef sourceModule = parseSourceFile(sourceMgr, context.get());
+  OwningOpRef<ModuleOp> sourceModule = parseSourceFile(sourceMgr, context.get());
 
   auto op = dyn_cast_or_null<FuncOp>(sourceModule->lookupSymbol(entry));
   if (!op)

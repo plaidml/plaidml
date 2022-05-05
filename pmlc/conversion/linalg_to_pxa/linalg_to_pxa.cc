@@ -76,7 +76,7 @@ struct ReductionInfo {
                             m_Op<arith::MulFOp>(m_Capture(&lhs), m_Capture(&rhs)))) {
       agg = arith::AtomicRMWKind::mulf;
     } else if (matchPattern(
-                   op, m_Op<SelectOp>(
+                   op, m_Op<arith::SelectOp>(
                            m_Capture(&cond, m_Op<arith::CmpIOp>(m_Capture(&lhs),
                                                          m_Capture(&rhs))),
                            m_Capture(&trueValue), m_Capture(&falseValue)))) {
@@ -105,7 +105,7 @@ struct ReductionInfo {
         }
       }
     } else if (matchPattern(
-                   op, m_Op<SelectOp>(
+                   op, m_Op<arith::SelectOp>(
                            m_Capture(&cond, m_Op<arith::CmpFOp>(m_Capture(&lhs),
                                                          m_Capture(&rhs))),
                            m_Capture(&trueValue), m_Capture(&falseValue)))) {
@@ -167,13 +167,13 @@ static AffineParallelOp copyBuffer(OpBuilder &builder, Location loc,
   return forOp;
 }
 
-// TODO: lorenzo: this should match an arith::ConstantOp
+// TODO: lorenzo: 
 // See linal_to_pxa/test/shape.mlir
-struct ConstantOpConversion : public OpConversionPattern<ConstantOp> {
-  using OpConversionPattern<ConstantOp>::OpConversionPattern;
+struct ConstantOpConversion : public OpConversionPattern<arith::ConstantOp> {
+  using OpConversionPattern<arith::ConstantOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(ConstantOp op, OpAdaptor adaptor,
+  matchAndRewrite(arith::ConstantOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
     static int constCount = 0;
     Attribute origValue = op.getValue();
@@ -500,7 +500,7 @@ struct LowerLinalgToPXAPass
       return converter.isSignatureLegal(op.getType());
     });
 
-    target.addDynamicallyLegalOp<ConstantOp>([&](ConstantOp op) {
+    target.addDynamicallyLegalOp<arith::ConstantOp>([&](arith::ConstantOp op) {
       return (!op.getType().isa<TensorType>() && !op.getType().isF32());
     });
 

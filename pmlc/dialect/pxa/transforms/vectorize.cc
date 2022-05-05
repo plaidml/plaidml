@@ -11,7 +11,7 @@
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/TypeSwitch.h"
 
-#include "mlir/Dialect/Vector/VectorOps.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/Interfaces/VectorInterfaces.h"
 
@@ -364,8 +364,8 @@ struct VectorizePass : public VectorizeBase<VectorizePass> {
     this->vectorWidth = vectorWidth;
   }
 
-  void runOnFunction() final {
-    auto func = getFunction();
+  void runOnOperation() final {
+    auto func = getOperation();
     auto it = strategies.find(strategy);
     if (it == strategies.end()) {
       emitError(func.getLoc(), "Invalid strategy specified: ") << strategy;

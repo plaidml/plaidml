@@ -126,8 +126,8 @@ void replaceAssignLoadAdd(PxaReduceOpInterface &reduceOp) {
 
 struct SimplifyArithmeticPass
     : public SimplifyArithmeticBase<SimplifyArithmeticPass> {
-  void runOnFunction() final {
-    FuncOp f = getFunction();
+  void runOnOperation() final {
+    FuncOp f = getOperation();
     f.walk(
         [&](PxaReduceOpInterface reduceOp) { replaceAssignLoadAdd(reduceOp); });
   }

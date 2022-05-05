@@ -793,8 +793,8 @@ struct ComputeBoundsImpl {
 };
 
 struct ComputeBoundsPass : public ComputeBoundsBase<ComputeBoundsPass> {
-  void runOnFunction() final {
-    auto func = getFunction();
+  void runOnOperation() final {
+    auto func = getOperation();
     func.walk([this](ContractionOp op) {
       try {
         ComputeBoundsImpl impl(op);

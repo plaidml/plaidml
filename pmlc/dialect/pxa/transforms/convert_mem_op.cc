@@ -86,7 +86,7 @@ struct MemOpPattern final : public OpRewritePattern<MemOp> {
 
 struct ConvertMemOpPass : public ConvertMemOpBase<ConvertMemOpPass> {
 public:
-  void runOnFunction() override {
+  void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
     patterns.insert<MemOpPattern<memref::LoadOp>, //

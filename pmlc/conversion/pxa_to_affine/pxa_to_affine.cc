@@ -163,27 +163,27 @@ static Value createReduction(ConversionPatternRewriter &rewriter, Location loc,
     return rewriter.create<arith::AddIOp>(loc, source, val);
   case arith::AtomicRMWKind::maxf: {
     auto cmp = rewriter.create<arith::CmpFOp>(loc, arith::CmpFPredicate::OGT, val, source);
-    return rewriter.create<SelectOp>(loc, cmp, val, source);
+    return rewriter.create<arith::SelectOp>(loc, cmp, val, source);
   }
   case arith::AtomicRMWKind::maxu: {
     auto cmp = rewriter.create<arith::CmpIOp>(loc, arith::CmpIPredicate::ugt, val, source);
-    return rewriter.create<SelectOp>(loc, cmp, val, source);
+    return rewriter.create<arith::SelectOp>(loc, cmp, val, source);
   }
   case arith::AtomicRMWKind::maxs: {
     auto cmp = rewriter.create<arith::CmpIOp>(loc, arith::CmpIPredicate::sgt, val, source);
-    return rewriter.create<SelectOp>(loc, cmp, val, source);
+    return rewriter.create<arith::SelectOp>(loc, cmp, val, source);
   }
   case arith::AtomicRMWKind::minf: {
     auto cmp = rewriter.create<arith::CmpFOp>(loc, arith::CmpFPredicate::OLT, val, source);
-    return rewriter.create<SelectOp>(loc, cmp, val, source);
+    return rewriter.create<arith::SelectOp>(loc, cmp, val, source);
   }
   case arith::AtomicRMWKind::minu: {
     auto cmp = rewriter.create<arith::CmpIOp>(loc, arith::CmpIPredicate::ult, val, source);
-    return rewriter.create<SelectOp>(loc, cmp, val, source);
+    return rewriter.create<arith::SelectOp>(loc, cmp, val, source);
   }
   case arith::AtomicRMWKind::mins: {
     auto cmp = rewriter.create<arith::CmpIOp>(loc, arith::CmpIPredicate::slt, val, source);
-    return rewriter.create<SelectOp>(loc, cmp, val, source);
+    return rewriter.create<arith::SelectOp>(loc, cmp, val, source);
   }
   case arith::AtomicRMWKind::mulf:
     return rewriter.create<arith::MulFOp>(loc, source, val);
@@ -318,7 +318,7 @@ struct ReluOpConversion : public OpConversionPattern<stdx::ReluOp> {
     auto cmpOp =
         rewriter.create<arith::CmpFOp>(loc, arith::CmpFPredicate::OLT, adaptor.value(), zero)
             .getResult();
-    rewriter.replaceOpWithNewOp<SelectOp>(op, cmpOp, zero, adaptor.value());
+    rewriter.replaceOpWithNewOp<arith::SelectOp>(op, cmpOp, zero, adaptor.value());
 
     return success();
   }

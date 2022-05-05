@@ -47,8 +47,8 @@ struct InlinerImpl : InlinerInterface {
 };
 
 struct InlineLayersPass : public InlineLayersBase<InlineLayersPass> {
-  void runOnFunction() final {
-    auto func = getFunction();
+  void runOnOperation() final {
+    auto func = getOperation();
     InlinerImpl inliner(&getContext());
     func.walk([&](BoxOp op) {
       if (failed(inlineRegion(/*interface=*/inliner,

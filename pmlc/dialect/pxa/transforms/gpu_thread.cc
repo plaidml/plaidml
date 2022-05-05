@@ -62,8 +62,8 @@ struct GPUThreadPass : public GPUThreadBase<GPUThreadPass> {
   GPUThreadPass() = default;
   explicit GPUThreadPass(unsigned maxThreads) { this->maxThreads = maxThreads; }
   void threadOp(AffineParallelOp op) {}
-  void runOnFunction() final {
-    auto func = getFunction();
+  void runOnOperation() final {
+    auto func = getOperation();
     // Nest outermost loops into 'blocks' and 'threads'
     for (auto op : func.getOps<AffineParallelOp>()) {
       gpuThreadParallelOp(maxThreads, op);

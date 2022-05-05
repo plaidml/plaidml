@@ -785,8 +785,8 @@ struct FusionPass : public FusionBase<FusionPass> {
     return opLoopNest;
   }
 
-  void runOnFunction() final {
-    FuncOp func = getFunction();
+  void runOnOperation() final {
+    FuncOp func = getOperation();
 
     // Collect the blocks contain the top-level AffineParallelOps
     SmallPtrSet<Block *, 4> outermost;

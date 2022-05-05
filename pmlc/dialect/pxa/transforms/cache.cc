@@ -447,8 +447,8 @@ void CachePlan::execute() {
 struct CachePass : public CacheBase<CachePass> {
   explicit CachePass(bool wholeBlock) { this->wholeBlock = wholeBlock; }
 
-  void runOnFunction() final {
-    auto func = getFunction();
+  void runOnOperation() final {
+    auto func = getOperation();
 
     func.walk([&](AffineParallelOp inner) {
       if (!hasTag(inner, innerTag)) {

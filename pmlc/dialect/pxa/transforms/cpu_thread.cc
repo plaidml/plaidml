@@ -48,8 +48,8 @@ struct CPUThreadPass : public CPUThreadBase<CPUThreadPass> {
   CPUThreadPass() = default;
   explicit CPUThreadPass(unsigned threads) { this->threads = threads; }
 
-  void runOnFunction() final {
-    auto func = getFunction();
+  void runOnOperation() final {
+    auto func = getOperation();
     // Nest outermost loops into 'blocks' and 'threads'
     func.walk<WalkOrder::PreOrder>([&](AffineParallelOp op) {
       processOp(op);

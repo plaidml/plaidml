@@ -159,14 +159,14 @@ struct AffineNormalizePass : public AffineNormalizeBase<AffineNormalizePass> {
     this->promote = promote;
     this->denest = denest;
   }
-  void runOnFunction() override {
-    getFunction().walk(normalizeAffineParallel);
-    getFunction().walk(elideSingleIterationIndexes);
+  void runOnOperation() override {
+    getOperation().walk(normalizeAffineParallel);
+    getOperation().walk(elideSingleIterationIndexes);
     if (promote.getValue()) {
-      getFunction().walk(promoteIfEmptyIVs);
+      getOperation().walk(promoteIfEmptyIVs);
     }
     if (denest.getValue()) {
-      getFunction().walk(denestLoops);
+      getOperation().walk(denestLoops);
     }
   }
 };

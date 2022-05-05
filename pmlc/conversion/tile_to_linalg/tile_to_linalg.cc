@@ -405,7 +405,7 @@ struct CondOp {
     CmpOpBuilder cmpOpBuilder;
     auto cmp = cmpOpBuilder.create(builder, loc, resultType,
                                    operands.take_front(2), types.take_front(2));
-    return builder.create<mlir::SelectOp>(loc, cmp, operands[0], operands[1])
+    return builder.create<arith::SelectOp>(loc, cmp, operands[0], operands[1])
         .getResult();
   }
 };
@@ -418,7 +418,7 @@ struct ContractionCondOp {
     auto cmp = cmpOpBuilder.create(builder, loc, resultType,
                                    operands.take_front(2), types.take_front(2));
     auto zero = createInit(builder, loc, resultType, AggregationKind::add);
-    return builder.create<mlir::SelectOp>(loc, cmp, operands[2], zero)
+    return builder.create<arith::SelectOp>(loc, cmp, operands[2], zero)
         .getResult();
   }
 };

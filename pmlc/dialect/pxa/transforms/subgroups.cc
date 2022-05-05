@@ -329,8 +329,8 @@ void SubgroupApply(AffineParallelOp op, SubgroupPlan plan) {
 }
 
 struct SubgroupsPass : public SubgroupsBase<SubgroupsPass> {
-  void runOnFunction() final {
-    auto func = getFunction();
+  void runOnOperation() final {
+    auto func = getOperation();
     func.walk([&](AffineParallelOp op) { doSubgroups(op); });
   }
 

@@ -75,8 +75,8 @@ public:
 } // namespace
 
 struct BoundsCheckPass : public BoundsCheckBase<BoundsCheckPass> {
-  void runOnFunction() final {
-    auto func = getFunction();
+  void runOnOperation() final {
+    auto func = getOperation();
     func.walk([&](Operation *op) {
       TypeSwitch<Operation *>(op)
           .Case<memref::LoadOp>([](auto op) {

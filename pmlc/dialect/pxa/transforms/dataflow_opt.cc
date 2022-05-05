@@ -23,9 +23,9 @@ struct MemRefDataFlowOptPass
     this->onlyParallelNested = onlyParallelNested;
   }
 
-  void runOnFunction() final {
+  void runOnOperation() final {
     // Walk all load's and perform reduce to load forwarding.
-    FuncOp f = getFunction();
+    FuncOp f = getOperation();
     f.walk([&](PxaReadOpInterface loadOp) {
       auto defOp = loadOp.getMemRef().getDefiningOp();
       if (!defOp) {

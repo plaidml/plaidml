@@ -62,8 +62,8 @@ void buildNestLoop(AffineParallelOp op) {
 struct NestLoopsPass : public NestLoopsBase<NestLoopsPass> {
   NestLoopsPass() = default;
   explicit NestLoopsPass(unsigned minLoopIVs) { this->minLoopIVs = minLoopIVs; }
-  void runOnFunction() final {
-    auto func = getFunction();
+  void runOnOperation() final {
+    auto func = getOperation();
     // Nest output loops
     for (auto op : func.getBody().getOps<AffineParallelOp>()) {
       while (getNestedIVCount(op) < minLoopIVs) {
