@@ -81,10 +81,10 @@ def ContractionOp : TileOp<"contract", [
   let hasCanonicalizer = 1;
 }
 
-class SpecialOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
+class SpecialOp<string mnemonic, list<Trait> traits = [NoSideEffect]> :
     Op<TileDialect, mnemonic, traits>;
 
-class MaterializeOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
+class MaterializeOp<string mnemonic, list<Trait> traits = [NoSideEffect]> :
   Op<TileDialect, mnemonic, !listconcat(traits, [
     MaterializeOperandsOpInterface
   ])> {

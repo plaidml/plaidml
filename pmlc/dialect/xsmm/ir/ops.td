@@ -88,7 +88,7 @@ def XSMM_Dialect : Dialect {
   let cppNamespace = "pmlc::dialect::xsmm";
 }
 
-class XSMM_Op<string mnemonic, list<OpTrait> traits = []>
+class XSMM_Op<string mnemonic, list<Trait> traits = []>
     : Op<XSMM_Dialect, mnemonic, traits> {
   let printer = [{ print$cppClass(p, *this); }];
   let parser = [{ return parse$cppClass(parser, result); }];

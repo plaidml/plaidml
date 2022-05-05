@@ -13,7 +13,7 @@ def StdX_Dialect : Dialect {
   let cppNamespace = "pmlc::dialect::stdx";
 }
 
-class StdX_Op<string mnemonic, list<OpTrait> traits = []> :
+class StdX_Op<string mnemonic, list<Trait> traits = []> :
     Op<StdX_Dialect, mnemonic, traits> {
   let printer = [{ print$cppClass(p, *this); }];
   let parser = [{ return parse$cppClass(parser, result); }];
@@ -31,7 +31,7 @@ def ReshapeOp : StdX_Op<"reshape",
   let verifier = ?;
 }
 
-class StdX_UnaryFuncOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
+class StdX_UnaryFuncOp<string mnemonic, list<Trait> traits = [NoSideEffect]> :
     Op<StdX_Dialect, mnemonic, traits> {
   let arguments = (ins AnyType:$value);
   let results = (outs AnyType);

@@ -13,7 +13,7 @@ def LinalgX_Dialect : Dialect {
   let cppNamespace = "pmlc::dialect::linalgx";
 }
 
-class LinalgX_Op<string mnemonic, list<OpTrait> traits = []> :
+class LinalgX_Op<string mnemonic, list<Trait> traits = []> :
     Op<LinalgX_Dialect, mnemonic, traits> {
   let printer = [{ print$cppClass(p, *this); }];
   let parser = [{ return parse$cppClass(parser, result); }];

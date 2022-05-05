@@ -12,7 +12,7 @@ def LayerDialect : Dialect {
   let cppNamespace = "pmlc::dialect::layer";
 }
 
-class LayerOp<string mnemonic, list<OpTrait> traits = []>
+class LayerOp<string mnemonic, list<Trait> traits = []>
     : Op<LayerDialect, mnemonic, traits> {
 }
 

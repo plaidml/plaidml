@@ -16,7 +16,7 @@ def TileDialect : Dialect {
   }];
 }
 
-class TileOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
+class TileOp<string mnemonic, list<Trait> traits = [NoSideEffect]> :
     Op<TileDialect, mnemonic, traits> {}
 
 class HasFolder {

@@ -15,16 +15,16 @@ def PXA_Dialect : Dialect {
   let cppNamespace = "pmlc::dialect::pxa";
 }
 
-class PXA_Op<string mnemonic, list<OpTrait> traits = []> :
+class PXA_Op<string mnemonic, list<Trait> traits = []> :
     Op<PXA_Dialect, mnemonic, traits>;
 
-class PXA_OpWithPP<string mnemonic, list<OpTrait> traits = []> :
+class PXA_OpWithPP<string mnemonic, list<Trait> traits = []> :
     PXA_Op<mnemonic, traits> {
   let printer = [{ print$cppClass(p, *this); }];
   let parser = [{ return parse$cppClass(parser, result); }];
 }
 
-class PxaReduceOpBase<string mnemonic, list<OpTrait> traits = []> :
+class PxaReduceOpBase<string mnemonic, list<Trait> traits = []> :
     PXA_OpWithPP<mnemonic, !listconcat(traits, [
         PxaGenericOpInterface,
         DeclareOpInterfaceMethods<PxaReduceOpInterface>,
@@ -154,7 +154,7 @@ def PxaVectorReduceOp : PxaReduceOpBase<"vector_reduce"> {
   }];
 }
 
-class PxaLoadOpBase<string mnemonic, list<OpTrait> traits = []> :
+class PxaLoadOpBase<string mnemonic, list<Trait> traits = []> :
     PXA_OpWithPP<mnemonic, !listconcat(traits, [
         PxaGenericOpInterface,
         DeclareOpInterfaceMethods<PxaReadOpInterface>,
