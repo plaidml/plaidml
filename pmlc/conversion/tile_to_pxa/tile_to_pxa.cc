@@ -859,9 +859,9 @@ struct ScfForOpConversion : public OpConversionPattern<scf::ForOp> {
                   ConversionPatternRewriter &rewriter) const final {
     scf::ForOpAdaptor oldFor(operands);
     auto &oldBodyOps = op.getBody()->getOperations();
-    auto newOp = rewriter.create<scf::ForOp>(op.getLoc(), oldFor.lowerBound(),
-                                             oldFor.upperBound(), oldFor.step(),
-                                             oldFor.initArgs());
+    auto newOp = rewriter.create<scf::ForOp>(op.getLoc(), oldFor.getLowerBound(),
+                                             oldFor.getUpperBound(), oldFor.getStep(),
+                                             oldFor.getInitArgs());
     auto &newBodyOps = newOp.getBody()->getOperations();
     newBodyOps.splice(std::prev(newBodyOps.end()), oldBodyOps,
                       oldBodyOps.begin(), oldBodyOps.end());
