@@ -190,7 +190,7 @@ LogicalResult cacheLoadAsVector(AffineParallelOp par, PxaLoadOp load,
   }
   auto newLoad = newLoadBuilder.create<vector::ExtractElementOp>(
       loc, eltType, loadVec.getResult(), idx);
-  load.replaceAllUsesWith(newLoad.result());
+  load.replaceAllUsesWith(newLoad.getResult());
   load.erase();
   return success();
 }

@@ -100,16 +100,6 @@ void ClosureOp::print(OpAsmPrinter &p) {
 
 Region &ClosureOp::getLoopBody() { return body(); }
 
-bool ClosureOp::isDefinedOutsideOfLoop(Value value) {
-  return !body().isAncestor(value.getParentRegion());
-}
-
-LogicalResult ClosureOp::moveOutOfLoop(ArrayRef<Operation *> ops) {
-  for (Operation *op : ops)
-    op->moveBefore(*this);
-  return success();
-}
-
 LogicalResult ClosureOp::verify() {
   // TODO
   return success();

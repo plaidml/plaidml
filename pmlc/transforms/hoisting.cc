@@ -103,7 +103,9 @@ HoistingPass::moveLoopInvariantCode(LoopLikeOpInterface looplike) {
 
   // For all instructions that we found to be invariant, move outside of the
   // loop.
-  return looplike.moveOutOfLoop(opsToMove);
+  for (Operation *op : opsToMove)
+    looplike.moveOutOfLoop(op);
+  return success();
 }
 
 } // namespace
