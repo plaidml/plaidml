@@ -345,7 +345,7 @@ public:
     std::call_once(is_initialized, []() {
       llvm::InitializeNativeTarget();
       llvm::InitializeNativeTargetAsmPrinter();
-      initializeLLVMPasses();
+      // initializeLLVMPasses();
       llvm::sys::DynamicLibrary::LoadLibraryPermanently(nullptr);
     });
     registerLLVMDialectTranslation(*program->context);
