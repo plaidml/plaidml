@@ -37,13 +37,14 @@ struct ConvCapture {
 
   mlir::RankedTensorType getBlockedFilterType(int64_t blockSize) {
     llvm::ArrayRef<int64_t> shape = filter.type.getShape();
-    return mlir::RankedTensorType::get({shape[2] / blockSize, //
-                                        shape[3] / blockSize, //
-                                        shape[0],             //
-                                        shape[1],             //
-                                        blockSize,            //
-                                        blockSize},
-                                       filter.type.getElementType());
+    return mlir::RankedTensorType::get(
+        {shape[2] / blockSize,                     //
+         shape[3] == 1 ? 1 : shape[3] / blockSize, //
+         shape[0],                                 //
+         shape[1],                                 //
+         blockSize,                                //
+         blockSize},
+        filter.type.getElementType());
   }
 
   mlir::RankedTensorType getBlockedOutputType(int64_t blockSize) {
