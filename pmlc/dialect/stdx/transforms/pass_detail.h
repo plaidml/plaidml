@@ -11,6 +11,10 @@ class FuncOp;
 } // end namespace func
 } // end namesapce mlir
 
+namespace mlir {
+class ModuleOp;
+} // end namespace mlir
+
 namespace pmlc::dialect::stdx {
 
 #define GEN_PASS_CLASSES

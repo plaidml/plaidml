@@ -3,7 +3,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/DebugStringHelper.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-
+#include "mlir/Dialect/Math/IR/Math.h"
 #include "pmlc/dialect/pxa/ir/matchers.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/dialect/pxa/transforms/autotile.h"

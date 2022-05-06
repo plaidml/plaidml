@@ -10,7 +10,7 @@
 #include "mlir/IR/AffineMap.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-
+#include "mlir/Analysis/Presburger/Utils.h"
 #include "pmlc/dialect/stdx/ir/ops.h"
 #include "pmlc/dialect/tile/ir/ops.h"
 #include "pmlc/dialect/tile/transforms/padding.h"
@@ -203,7 +203,7 @@ void PadConstraintsPass::runOnOperation() {
         // It seems wasteful to intern a temporary integer set, but any other
         // way of doing this is also annoying given the current class structures
         auto set = makeConstraintSet(numDims, cons);
-        FlatAffineConstraints fac(set);
+        FlatAffineValueConstraints fac(set);
         // Can't prove it's empty, keep constraint
         if (fac.isEmpty())
           keep = false;

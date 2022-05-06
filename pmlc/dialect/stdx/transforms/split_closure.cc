@@ -72,9 +72,9 @@ struct SplitClosurePass : public SplitClosureBase<SplitClosurePass> {
     auto finiFuncType = FunctionType::get(context, {tupleType}, {});
 
     ImplicitLocOpBuilder builder(op.getLoc(), func);
-    auto init = builder.create<FuncOp>("init", initFuncType);
-    auto main = builder.create<FuncOp>("main", mainFuncType);
-    auto fini = builder.create<FuncOp>("fini", finiFuncType);
+    auto init = builder.create<func::FuncOp>("init", initFuncType);
+    auto main = builder.create<func::FuncOp>("main", mainFuncType);
+    auto fini = builder.create<func::FuncOp>("fini", finiFuncType);
 
     // Construct the `init` function.
     builder.setInsertionPointToStart(init.addEntryBlock());
@@ -116,7 +116,7 @@ struct SplitClosurePass : public SplitClosureBase<SplitClosurePass> {
   }
 
   void replaceWithUnpacked(ArrayRef<ValuesWithCast> values, UnpackOp unpackOp,
-                           FuncOp func, OpBuilder &builder) {
+                           func::FuncOp func, OpBuilder &builder) {
     for (auto it : llvm::enumerate(values)) {
       Value value = it.value().value;
       memref::CastOp castOp = it.value().castOp;
@@ -126,7 +126,7 @@ struct SplitClosurePass : public SplitClosureBase<SplitClosurePass> {
             castOp.getLoc(), castOp.dest().getType(), newValue);
       }
       value.replaceUsesWithIf(newValue, [&](OpOperand &operand) {
-        return operand.getOwner()->getParentOfType<FuncOp>() == func;
+        return operand.getOwner()->getParentOfType<func::FuncOp>() == func;
       });
     }
   }

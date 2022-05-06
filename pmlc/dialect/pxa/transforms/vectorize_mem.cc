@@ -111,7 +111,7 @@ struct VectorizeMemImpl {
     if (!maybeSI) {
       return failure();
     }
-    IVLOG(3, "StrideInfo: " << debugString(*maybeSI));
+    //IVLOG(3, "StrideInfo: " << debugString(*maybeSI));
 
     // Check if read op uses parallel op IV for a single dimension
     for (auto ba : loopOp.getIVs()) {

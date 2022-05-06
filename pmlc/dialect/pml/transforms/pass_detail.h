@@ -1,8 +1,11 @@
 #pragma once
 
 #include "mlir/Pass/Pass.h"
-
 #include "pmlc/dialect/pml/ir/dialect.h"
+
+namespace mlir {
+class ModuleOp;
+} // end namesapce mlir
 
 namespace pmlc::dialect::pml {
 

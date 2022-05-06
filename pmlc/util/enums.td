@@ -4,6 +4,7 @@
 #ifndef OP_BASE
 include "mlir/IR/OpBase.td"
 #endif
+include "mlir/IR/EnumAttr.td"
 
 def AggregationKind : I64EnumAttr<
     "AggregationKind",

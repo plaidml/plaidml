@@ -42,7 +42,7 @@ void registerAllDialects(DialectRegistry &registry) {
                   tensor::TensorDialect,                  //
                   vector::VectorDialect,                  //
                   mlir::mhlo::MhloDialect,                //
-                  mlir::chlo::HloClientDialect,           //
+                  //mlir::chlo::HloClientDialect,           //
                   //mlir::lmhlo::LmhloDialect,              //
                   //mlir::lmhlo_gpu::LmhloGpuDialect,       //
                   //mlir::disc_ral::RalDialect,             //

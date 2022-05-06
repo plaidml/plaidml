@@ -204,9 +204,10 @@ struct FusionInfo {
       const auto &sb = stridesB[i];
       // If the offsets don't match, bail
       if (sa.offset != sb.offset) {
-        opB.getOperation()->emitRemark(
-            "Failed to fuse with def offsets mismatch: i = ")
-            << i << ", A: " << debugString(sa) << ", B: " << debugString(sb);
+        //opB.getOperation()->emitRemark(
+        //    "Failed to fuse with def offsets mismatch: i = ")
+        //    << i << ", A: " << debugString(sa) << ", B: " << debugString(sb);
+        opB.getOperation()->emitRemark("Failed to fuse");
         return false;
       }
       // If either are empty, nothing to do
@@ -214,8 +215,8 @@ struct FusionInfo {
         continue;
 
       // If there are multiple indexes, give up
-      IVLOG(3, "sa: " << debugString(sa));
-      IVLOG(3, "sb: " << debugString(sb));
+      //IVLOG(3, "sa: " << debugString(sa));
+      //IVLOG(3, "sb: " << debugString(sb));
 
       // Pick the largest unique stride from each side
       auto pickUniqueTop = [&](const auto &options) {

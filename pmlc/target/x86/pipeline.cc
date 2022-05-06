@@ -250,10 +250,10 @@ struct Options : public PassPipelineOptions<Options> {
 };
 
 void pipelineBuilderStage1(OpPassManager &pm) {
-  pm.addNestedPass<FuncOp>(layer::createInlineLayersPass());
-  pm.addNestedPass<FuncOp>(tile::createAlgebraicOptPass());
-  pm.addNestedPass<FuncOp>(tile::createComputeBoundsPass());
-  pm.addNestedPass<FuncOp>(tile::createPadConstraintsPass());
+  pm.addNestedPass<func::FuncOp>(layer::createInlineLayersPass());
+  pm.addNestedPass<func::FuncOp>(tile::createAlgebraicOptPass());
+  pm.addNestedPass<func::FuncOp>(tile::createComputeBoundsPass());
+  pm.addNestedPass<func::FuncOp>(tile::createPadConstraintsPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
@@ -267,9 +267,9 @@ void pipelineBuilderStage1(OpPassManager &pm) {
   pm.addPass(pmlc::conversion::tile_to_linalg::createLowerTileToLinalgPass());
   pm.addNestedPass<FuncOp>(linalgx::createRegulateDepthwisePass());
   if (!util::getEnvVar("PLAIDML_REORDER").empty())
-    pm.addNestedPass<FuncOp>(createReorderLayoutsPass());
+    pm.addNestedPass<func::FuncOp>(createReorderLayoutsPass());
   else
-    pm.addNestedPass<FuncOp>(createReorderWeightLayoutsPass());
+    pm.addNestedPass<func::FuncOp>(createReorderWeightLayoutsPass());
 
   pm.addPass(stdx::createMainClosurePass());
   pm.addPass(createLoopInvariantCodeMotionPass());
@@ -284,14 +284,14 @@ void pipelineBuilderStage2(OpPassManager &pm, const Options &options) {
   pm.addPass(pmlc::conversion::linalg_to_pxa::createLowerLinalgToPXAPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
-  pm.addNestedPass<FuncOp>(layer::createInlineLayersPass());
+  pm.addNestedPass<func::FuncOp>(layer::createInlineLayersPass());
 
-  pm.addNestedPass<FuncOp>(createStencilTppGemmPass(/*numThreads=*/maxThreads,
+  pm.addNestedPass<func::FuncOp>(createStencilTppGemmPass(/*numThreads=*/maxThreads,
                                                     /*isBatched=*/true));
-  pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
+  pm.addNestedPass<func::FuncOp>(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
 
-  pm.addNestedPass<FuncOp>(
+  pm.addNestedPass<func::FuncOp>(
       pxa::createFusionPass(/*memoryActivityThreshold=*/0,
                             /*minimumThreads=*/maxThreads,
                             /*exactlyMatch=*/false,
@@ -299,10 +299,10 @@ void pipelineBuilderStage2(OpPassManager &pm, const Options &options) {
                             /*loopDepth=*/0,
                             /*singleOutput=*/false,
                             /*avoidReductionIndexes=*/true));
-  pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
+  pm.addNestedPass<func::FuncOp>(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
 
-  pm.addNestedPass<FuncOp>(
+  pm.addNestedPass<func::FuncOp>(
       pxa::createFusionPass(/*memoryActivityThreshold=*/0,
                             /*minimumThreads=*/maxThreads,
                             /*exactlyMatch=*/false,
@@ -310,32 +310,32 @@ void pipelineBuilderStage2(OpPassManager &pm, const Options &options) {
                             /*loopDepth=*/1,
                             /*singleOutput=*/false,
                             /*avoidReductionIndexes=*/true));
-  pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
+  pm.addNestedPass<func::FuncOp>(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
 
-  pm.addNestedPass<FuncOp>(pxa::createTileAccumulatePass());
-  pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass(/*promote=*/false));
+  pm.addNestedPass<func::FuncOp>(pxa::createTileAccumulatePass());
+  pm.addNestedPass<func::FuncOp>(pxa::createAffineNormalizePass(/*promote=*/false));
   pm.addPass(createCanonicalizerPass());
 
-  pm.addNestedPass<FuncOp>(pxa::createCPUThreadPass(maxThreads));
-  pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
+  pm.addNestedPass<func::FuncOp>(pxa::createCPUThreadPass(maxThreads));
+  pm.addNestedPass<func::FuncOp>(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
 
-  pm.addNestedPass<FuncOp>(pxa::createMemRefDataFlowOptPass());
+  pm.addNestedPass<func::FuncOp>(pxa::createMemRefDataFlowOptPass());
   pm.addPass(createCanonicalizerPass());
 
-  pm.addNestedPass<FuncOp>(pxa::createLocalizePass());
-  pm.addNestedPass<FuncOp>(pxa::createResizeTmpsPass());
+  pm.addNestedPass<func::FuncOp>(pxa::createLocalizePass());
+  pm.addNestedPass<func::FuncOp>(pxa::createResizeTmpsPass());
   pm.addPass(pxa::createDeallocPlacementPass());
-  pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass(/*promote=*/true,
+  pm.addNestedPass<func::FuncOp>(pxa::createAffineNormalizePass(/*promote=*/true,
                                                           /*denest=*/true));
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
-  pm.addNestedPass<FuncOp>(createStencilSplitPass());
-  pm.addNestedPass<FuncOp>(createStencilTppUnaryPass());
-  pm.addNestedPass<FuncOp>(createStencilTppBinaryPass());
-  pm.addNestedPass<FuncOp>(pxa::createAffineNormalizePass());
+  pm.addNestedPass<func::FuncOp>(createStencilSplitPass());
+  pm.addNestedPass<func::FuncOp>(createStencilTppUnaryPass());
+  pm.addNestedPass<func::FuncOp>(createStencilTppBinaryPass());
+  pm.addNestedPass<func::FuncOp>(pxa::createAffineNormalizePass());
 
   if (pmlc::util::getEnvVar("PLAIDML_PROFILE") == "1")
     pm.addPass(createProfileKernelsPass());
@@ -356,12 +356,12 @@ void pipelineBuilderStage3(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
-  pm.addNestedPass<FuncOp>(createCollapseParallelLoopsPass());
+  pm.addNestedPass<func::FuncOp>(createCollapseParallelLoopsPass());
   pm.addPass(createConvertSCFToOpenMPPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
-  pm.addNestedPass<FuncOp>(createFoldConstantCastPass());
+  pm.addNestedPass<func::FuncOp>(createFoldConstantCastPass());
 
   pm.addPass(stdx::createSplitClosurePass());
   pm.addPass(createLoopInvariantCodeMotionPass());
@@ -372,7 +372,7 @@ void pipelineBuilderStage3(OpPassManager &pm) {
 void pipelineBuilderStage4(OpPassManager &pm) {
   // pm.addPass(createLowerToCFGPass());
   if (pmlc::util::getEnvVar("PLAIDML_BOUNDS_CHECK") == "1")
-    pm.addNestedPass<FuncOp>(stdx::createBoundsCheckPass());
+    pm.addNestedPass<func::FuncOp>(stdx::createBoundsCheckPass());
 
   pm.addPass(createLowerToLLVMPass());
   pm.addPass(createTraceLinkingPass());

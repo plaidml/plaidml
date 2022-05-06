@@ -25,7 +25,7 @@ struct DeallocPlacementPass
 
   void runOnOperation() final {
     ModuleOp op = getOperation();
-    op.walk([&](FuncOp fn) { runOnFunction(fn); });
+    op.walk([&](func::FuncOp fn) { runOnFunction(fn); });
   }
 
   void runOnFunction(func::FuncOp fn) {

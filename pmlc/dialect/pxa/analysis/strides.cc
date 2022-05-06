@@ -226,7 +226,9 @@ void StrideInfo::print(raw_ostream &os, Block *relative) const {
 }
 
 std::ostream &operator<<(std::ostream &os, const StrideInfo &x) {
-  os << debugString(x);
+  //os << debugString(x);
+  // TODO: lorenzo fix this.
+  os << debugString(x.offset);
   return os;
 }
 

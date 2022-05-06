@@ -1,5 +1,6 @@
 // Copyright 2021, Intel Corporation
 
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/DebugStringHelper.h"

@@ -57,17 +57,13 @@ ParseResult ClosureOp::parse(OpAsmParser &parser, OperationState &result) {
   MLIRContext *ctx = result.getContext();
   Builder &builder = parser.getBuilder();
 
-  SmallVector<OpAsmParser::UnresolvedOperand> entryArgs;
-  SmallVector<NamedAttrList> argAttrs;
-  SmallVector<NamedAttrList> resultAttrs;
-  SmallVector<Type> argTypes;
+  SmallVector<OpAsmParser::Argument> entryArgs;
+  SmallVector<DictionaryAttr> resultAttrs;
   SmallVector<Type> resultTypes;
-  SmallVector<Location> argLocations;
   bool isVariadic;
 
   if (failed(function_interface_impl::parseFunctionSignature(
-          parser, /*allowVariadic=*/false, entryArgs, argTypes, argAttrs, argLocations,
-          isVariadic, resultTypes, resultAttrs)))
+          parser, /*allowVariadic=*/false, entryArgs, isVariadic, resultTypes, resultAttrs)))
     return failure();
 
   // Parse operation attributes.
@@ -75,14 +71,16 @@ ParseResult ClosureOp::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDictWithKeyword(attrs))
     return failure();
 
+  SmallVector<Type> argTypes;
+  for (auto &arg : entryArgs)
+    argTypes.push_back(arg.type);
+  
   result.addAttributes(attrs);
   result.addAttribute(
       "type", TypeAttr::get(builder.getFunctionType(argTypes, resultTypes)));
 
   Region *body = result.addRegion();
-  if (parser.parseRegion(*body, /*arguments=*/{entryArgs},
-                         /*argTypes=*/{argTypes},
-                         /*locations=*/{argLocations},
+  if (parser.parseRegion(*body, /*arguments=*/entryArgs, 
                          /*enableNameShadowing=*/false))
     return failure();
   return success();

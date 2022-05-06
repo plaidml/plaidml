@@ -6,6 +6,7 @@
 #include "mlir/Support/DebugStringHelper.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 
 #include "pmlc/dialect/linalgx/analysis/convolution.h"
 #include "pmlc/target/x86/pass_detail.h"

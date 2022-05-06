@@ -4,6 +4,7 @@
 #define __PML_XSMM_OPS__
 
 include "mlir/Interfaces/SideEffectInterfaces.td"
+include "mlir/IR/EnumAttr.td"
 
 #ifndef OP_BASE
 include "mlir/IR/OpBase.td"

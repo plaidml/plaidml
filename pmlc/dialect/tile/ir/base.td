@@ -5,6 +5,7 @@
 
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "pmlc/dialect/tile/ir/interfaces.td"
+include "mlir/IR/EnumAttr.td"
 
 def TileDialect : Dialect {
   let name = "tile";

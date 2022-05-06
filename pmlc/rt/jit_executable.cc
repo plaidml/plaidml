@@ -323,8 +323,8 @@ struct OrcJITEngineImpl : EngineImpl {
       throw std::runtime_error(os.str());
     }
 
-    auto addr = expectedSymbol->getAddress();
-    return reinterpret_cast<Function>(addr);
+    //auto addr = expectedSymbol->getAddress();
+    return reinterpret_cast<Function>(expectedSymbol->getValue());
   }
 
   std::unique_ptr<llvm::orc::LLJIT> jit;

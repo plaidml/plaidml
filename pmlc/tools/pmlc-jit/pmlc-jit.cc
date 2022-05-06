@@ -128,7 +128,7 @@ int main(int argc, char **argv) {
   llvm::InitLLVM y(argc, argv);
   llvm::InitializeNativeTarget();
   llvm::InitializeNativeTargetAsmPrinter();
-  mlir::initializeLLVMPasses();
+  //mlir::initializeLLVMPasses();
   pmlc::rt::registerRuntimes();
   pmlc::rt::initRuntimes();
 

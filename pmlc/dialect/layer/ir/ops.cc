@@ -53,11 +53,11 @@ void BoxOp::print(OpAsmPrinter &p) {
 ParseResult BoxOp::parse(OpAsmParser &parser, OperationState &result) {
   StringAttr opName;
   FunctionType funcType;
-  SmallVector<OpAsmParser::UnresolvedOperand, 4> inner;
+  SmallVector<OpAsmParser::Argument, 4> inner;
   SmallVector<OpAsmParser::UnresolvedOperand, 4> outer;
   auto loc = parser.getCurrentLocation();
   if (parser.parseAttribute(opName, "op", result.attributes) ||
-      parser.parseRegionArgumentList(inner, OpAsmParser::Delimiter::Paren) ||
+      parser.parseArgumentList(inner, OpAsmParser::Delimiter::Paren) ||
       parser.parseEqual() ||
       parser.parseOperandList(outer, OpAsmParser::Delimiter::Paren) ||
       parser.parseColonType(funcType) ||
@@ -67,7 +67,8 @@ ParseResult BoxOp::parse(OpAsmParser &parser, OperationState &result) {
   }
   result.addTypes(funcType.getResults());
   Region *body = result.addRegion();
-  if (parser.parseRegion(*body, inner, funcType.getInputs()) ||
+  SmallVector<Type> argTypes;
+  if (parser.parseRegion(*body, inner) ||
       parser.parseOptionalAttrDict(result.attributes)) {
     return failure();
   }

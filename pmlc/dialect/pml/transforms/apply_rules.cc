@@ -1,7 +1,7 @@
 // Copyright 2021 Intel Corporation
 
 #include "pmlc/dialect/pml/transforms/pass_detail.h"
-
+#include "mlir/IR/BuiltinOps.h"
 #include "pmlc/dialect/pml/ir/dialect.h"
 
 using namespace mlir; // NOLINT

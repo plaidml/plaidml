@@ -325,7 +325,7 @@ LogicalResult vectorizeOverOutputs(AffineParallelOp op, unsigned vectorWidth) {
     return op.emitRemark(
         "vectorizeOverOutputs: Failed, could not compute StrideInfo");
   }
-  IVLOG(3, "StrideInfo: " << debugString(*maybeSI));
+  // IVLOG(3, "StrideInfo: " << debugString(*maybeSI));
   SmallVector<BlockArgument, 4> options;
   for (auto ba : op.getIVs()) {
     if (maybeSI->strides.count(ba) && maybeSI->strides[ba] == 1) {
