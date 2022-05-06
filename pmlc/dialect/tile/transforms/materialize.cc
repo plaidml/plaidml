@@ -3,6 +3,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/DebugStringHelper.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 #include "pmlc/dialect/tile/ir/ops.h"
 #include "pmlc/dialect/tile/transforms/pass_detail.h"

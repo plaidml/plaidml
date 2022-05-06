@@ -10,7 +10,7 @@
 
 #include "mlir/IR/Matchers.h"
 #include "mlir/Support/DebugStringHelper.h"
-
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "pmlc/dialect/tile/transforms/pass_detail.h"
 #include "pmlc/util/bilp/ilp_solver.h"
 #include "pmlc/util/logging.h"

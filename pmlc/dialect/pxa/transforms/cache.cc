@@ -10,6 +10,7 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 #include "pmlc/dialect/pxa/analysis/strides.h"
 #include "pmlc/dialect/pxa/analysis/uses.h"
@@ -292,7 +293,7 @@ static bool isInitialized(Value memref) {
   }
   auto arg = memref.cast<BlockArgument>();
   auto *parentOp = arg.getOwner()->getParentOp();
-  if (auto funcOp = dyn_cast<FuncOp>(parentOp)) {
+  if (auto funcOp = dyn_cast<func::FuncOp>(parentOp)) {
     auto numInputs = funcOp.getNumArguments() - funcOp.getNumResults();
     return arg.getArgNumber() < numInputs;
   }

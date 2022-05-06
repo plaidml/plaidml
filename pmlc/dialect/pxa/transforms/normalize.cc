@@ -10,6 +10,7 @@
 #include "mlir/Dialect/Affine/IR/AffineValueMap.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 #include "pmlc/dialect/pxa/transforms/pass_detail.h"
 #include "pmlc/dialect/pxa/transforms/passes.h"

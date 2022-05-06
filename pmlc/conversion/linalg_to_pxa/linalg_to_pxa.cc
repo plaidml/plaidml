@@ -4,6 +4,7 @@
 #include "mlir/Support/DebugStringHelper.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 #include "pmlc/conversion/linalg_to_pxa/pass_detail.h"
 #include "pmlc/conversion/tile_to_pxa/pass_detail.h"
@@ -183,7 +184,7 @@ struct ConstantOpConversion : public OpConversionPattern<arith::ConstantOp> {
           typeConverter.convertType(origType).cast<MemRefType>();
       std::string funcName =
           llvm::formatv("cst_memref_{0}", constCount++).str();
-      auto funcOp = op->getParentOfType<FuncOp>();
+      auto funcOp = op->getParentOfType<func::FuncOp>();
       rewriter.setInsertionPoint(funcOp);
       auto globalOp = rewriter.create<memref::GlobalOp>(
           funcOp.getLoc(),
@@ -204,7 +205,7 @@ struct ConstantOpConversion : public OpConversionPattern<arith::ConstantOp> {
       std::string funcName =
           llvm::formatv("cst_scalar_memref_{0}", constCount++).str();
 
-      auto funcOp = op->getParentOfType<FuncOp>();
+      auto funcOp = op->getParentOfType<func::FuncOp>();
       rewriter.setInsertionPoint(funcOp);
 
       auto globalOp = rewriter.create<memref::GlobalOp>(
@@ -241,7 +242,7 @@ struct FuncOpConversion : public OpConversionPattern<FuncLikeOp> {
   LogicalResult
   matchAndRewrite(FuncLikeOp op, typename FuncLikeOp::Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
-    FunctionType type = op.getType();
+    FunctionType type = op.getFunctionType();
 
     // Convert the function signature
     LinalgToPXATypeConverter typeConverter;
@@ -485,7 +486,7 @@ struct LowerLinalgToPXAPass
     ConversionTarget target(getContext());
     LinalgToPXATypeConverter converter;
     target.addLegalDialect<AffineDialect,         //
-                           StandardOpsDialect,    //
+                           //StandardOpsDialect,    //
                            math::MathDialect,     //
                            memref::MemRefDialect, //
                            scf::SCFDialect,       //
@@ -494,10 +495,10 @@ struct LowerLinalgToPXAPass
                            arith::ArithmeticDialect,
                            stdx::StdXDialect>();
     target.addLegalOp<ModuleOp>();
-    target.addDynamicallyLegalOp<FuncOp>(
-        [&](FuncOp op) { return converter.isSignatureLegal(op.getType()); });
+    target.addDynamicallyLegalOp<func::FuncOp>(
+        [&](func::FuncOp op) { return converter.isSignatureLegal(op.getFunctionType()); });
     target.addDynamicallyLegalOp<stdx::ClosureOp>([&](stdx::ClosureOp op) {
-      return converter.isSignatureLegal(op.getType());
+      return converter.isSignatureLegal(op.getFunctionType());
     });
 
     target.addDynamicallyLegalOp<arith::ConstantOp>([&](arith::ConstantOp op) {
@@ -509,7 +510,7 @@ struct LowerLinalgToPXAPass
 
     RewritePatternSet patterns(&getContext());
     patterns.insert<ConstantOpConversion,              //
-                    FuncOpConversion<FuncOp>,          //
+                    FuncOpConversion<func::FuncOp>,          //
                     FuncOpConversion<stdx::ClosureOp>, //
                     GenericOpConversion,               //
                     IndexOpConversion,                 //
@@ -523,8 +524,8 @@ struct LowerLinalgToPXAPass
       return;
     }
 
-    for (FuncOp funcOp : module.getOps<FuncOp>()) {
-      for (ReturnOp returnOp : funcOp.getOps<ReturnOp>()) {
+    for (func::FuncOp funcOp : module.getOps<func::FuncOp>()) {
+      for (func::ReturnOp returnOp : funcOp.getOps<func::ReturnOp>()) {
         connectResults(funcOp, returnOp);
         for (stdx::ClosureOp closureOp : funcOp.getOps<stdx::ClosureOp>()) {
           for (stdx::YieldOp yieldOp : closureOp.getOps<stdx::YieldOp>()) {
@@ -538,7 +539,7 @@ struct LowerLinalgToPXAPass
   template <typename FuncLikeOp, typename ReturnLikeOp>
   void connectResults(FuncLikeOp funcOp, ReturnLikeOp returnOp) {
     unsigned argNumber =
-        funcOp.getType().getNumInputs() - returnOp.getNumOperands();
+        funcOp.getFunctionType().getNumInputs() - returnOp.getNumOperands();
     MLIRContext *context = &getContext();
     Location loc = returnOp->getLoc();
     for (OpOperand &operand : returnOp->getOpOperands()) {

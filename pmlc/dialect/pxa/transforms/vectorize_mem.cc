@@ -3,13 +3,12 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/IR/AffineValueMap.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/Support/DebugStringHelper.h"
 #include "pmlc/dialect/pxa/analysis/strides.h"
 #include "pmlc/dialect/pxa/transforms/tile.h"
-
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/dialect/pxa/transforms/pass_detail.h"
 #include "pmlc/dialect/stdx/ir/ops.h"
@@ -412,7 +411,7 @@ struct VectorizeMemImpl {
   VectorizeMemOpsPlan memOpsPlan;
 };
 
-void getGlobalMemory(FuncOp f, std::list<Operation *> &globalAllocList) {
+void getGlobalMemory(func::FuncOp f, std::list<Operation *> &globalAllocList) {
   for (auto allocOp : f.getOps<memref::AllocOp>()) {
     globalAllocList.push_back(allocOp.getOperation());
   }
@@ -423,7 +422,7 @@ void getGlobalMemory(FuncOp f, std::list<Operation *> &globalAllocList) {
 
 struct VectorizeMemPass : public VectorizeMemBase<VectorizeMemPass> {
   void runOnOperation() final {
-    FuncOp f = getOperation();
+    func::FuncOp f = getOperation();
 
     // Get global memory
     std::list<Operation *> globalAllocList;

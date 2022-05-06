@@ -5,7 +5,7 @@
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Support/DebugStringHelper.h"
-
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "pmlc/dialect/pxa/analysis/strides.h"
 #include "pmlc/dialect/pxa/analysis/uses.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
@@ -96,7 +96,7 @@ struct FusionInfo {
         }
       }
       currOp = currOp->getParentOp();
-    } while (!isa<FuncOp>(currOp));
+    } while (!isa<func::FuncOp>(currOp));
 
     auto maybeStrideInfo = computeStrideInfo(reduce);
     if (maybeStrideInfo) {
@@ -164,7 +164,7 @@ struct FusionInfo {
 
   static bool isOutermostLoop(AffineParallelOp ap) {
     auto currOp = ap->getParentOp();
-    while (!isa<AffineParallelOp>(currOp) && !isa<FuncOp>(currOp)) {
+    while (!isa<AffineParallelOp>(currOp) && !isa<func::FuncOp>(currOp)) {
       currOp = currOp->getParentOp();
     }
     return !isa<AffineParallelOp>(currOp);
@@ -786,7 +786,7 @@ struct FusionPass : public FusionBase<FusionPass> {
   }
 
   void runOnOperation() final {
-    FuncOp func = getOperation();
+    func::FuncOp func = getOperation();
 
     // Collect the blocks contain the top-level AffineParallelOps
     SmallPtrSet<Block *, 4> outermost;

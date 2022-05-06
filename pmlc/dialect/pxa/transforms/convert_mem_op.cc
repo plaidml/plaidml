@@ -1,10 +1,10 @@
 // Copyright 2021 Intel Corporation
 
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 #include "pmlc/dialect/pxa/analysis/uses.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
@@ -22,7 +22,7 @@ bool isLoopArgumentOrConstant(Value value) {
     return isa<AffineParallelOp>(arg.getOwner()->getParentOp());
   }
   if (auto defOp = value.getDefiningOp()) {
-    return isa<ConstantOp>(defOp);
+    return isa<arith::ConstantOp>(defOp);
   }
   return false;
 }

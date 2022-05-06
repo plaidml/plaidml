@@ -2,7 +2,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/DebugStringHelper.h"
-
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "pmlc/dialect/pxa/ir/matchers.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/dialect/pxa/transforms/autotile.h"
@@ -82,7 +82,7 @@ private:
       // If the definition of load's source is in "op", it is too complex to
       // stencil
       auto defOp = source.getDefiningOp();
-      while (!isa<FuncOp>(defOp)) {
+      while (!isa<func::FuncOp>(defOp)) {
         if (defOp == op.getOperation())
           return;
         defOp = defOp->getParentOp();
@@ -117,7 +117,7 @@ private:
       // If the definition of load's source is in "op", it is too complex to
       // stencil
       auto defOp = source.getDefiningOp();
-      while (!isa<FuncOp>(defOp)) {
+      while (!isa<func::FuncOp>(defOp)) {
         if (defOp == op.getOperation())
           return;
         defOp = defOp->getParentOp();

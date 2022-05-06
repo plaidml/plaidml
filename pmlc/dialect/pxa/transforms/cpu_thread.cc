@@ -5,6 +5,7 @@
 #include <utility>
 #include <vector>
 
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "pmlc/dialect/pxa/analysis/strides.h"
 #include "pmlc/dialect/pxa/analysis/uses.h"
 #include "pmlc/dialect/pxa/transforms/autotile.h"

@@ -7,6 +7,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/DebugStringHelper.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 #include "pmlc/conversion/tile_to_linalg/pass_detail.h"
 #include "pmlc/dialect/pxa/analysis/uses.h"
@@ -55,7 +56,7 @@ static FlatSymbolRefAttr createStubTraceFunc(ModuleOp module, StringAttr msg) {
   OpBuilder builder(context);
   builder.setInsertionPointToStart(module.getBody());
   auto funcType = FunctionType::get(context, {}, {});
-  auto funcOp = builder.create<FuncOp>(module.getLoc(), symbol, funcType,
+  auto funcOp = builder.create<func::FuncOp>(module.getLoc(), symbol, funcType,
                                        ArrayRef<NamedAttribute>{});
   funcOp->setAttr("msg", msg);
   funcOp->setAttr("trace", builder.getUnitAttr());
@@ -1039,7 +1040,7 @@ struct FuncOpConversion : public OpConversionPattern<FuncLikeOp> {
   LogicalResult
   matchAndRewrite(FuncLikeOp op, typename FuncLikeOp::Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
-    FunctionType type = op.getType();
+    FunctionType type = op.getFunctionType();
 
     // Convert the function signature
     TileToLinalgTypeConverter typeConverter;
@@ -1070,13 +1071,13 @@ struct FuncOpConversion : public OpConversionPattern<FuncLikeOp> {
   }
 };
 
-struct ReturnOpConversion : public OpConversionPattern<ReturnOp> {
-  using OpConversionPattern<ReturnOp>::OpConversionPattern;
+struct ReturnOpConversion : public OpConversionPattern<func::ReturnOp> {
+  using OpConversionPattern<func::ReturnOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(ReturnOp op, OpAdaptor adaptor,
+  matchAndRewrite(func::ReturnOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
-    rewriter.replaceOpWithNewOp<ReturnOp>(op, adaptor.getOperands());
+    rewriter.replaceOpWithNewOp<func::ReturnOp>(op, adaptor.getOperands());
     return success();
   }
 };
@@ -1126,7 +1127,7 @@ struct TraceOpConversion : public OpConversionPattern<tile::PragmaOp> {
       return failure();
     }
     auto symbol = createStubTraceFunc(module, msg->getValue().cast<StringAttr>());
-    rewriter.create<CallOp>(op.getLoc(), symbol, TypeRange{});
+    rewriter.create<func::CallOp>(op.getLoc(), symbol, TypeRange{});
     rewriter.replaceOp(op, adaptor.tensor());
     return success();
   }
@@ -1178,7 +1179,7 @@ struct LowerTileToLinalgPass
         }
       }
     };
-    module.walk([&](ReturnOp op) { injectIdent(op); });
+    module.walk([&](func::ReturnOp op) { injectIdent(op); });
     module.walk([&](stdx::YieldOp op) { injectIdent(op); });
 
     // Set up target (i.e. what is legal)
@@ -1186,7 +1187,7 @@ struct LowerTileToLinalgPass
     TileToLinalgTypeConverter converter;
     target.addLegalDialect<mlir::AffineDialect,         //
                            mlir::linalg::LinalgDialect, //
-                           mlir::StandardOpsDialect,    //
+                           //mlir::StandardOpsDialect,    //
                            mlir::math::MathDialect,     //
                            mlir::memref::MemRefDialect, //
                            mlir::scf::SCFDialect,       //
@@ -1197,14 +1198,14 @@ struct LowerTileToLinalgPass
                       scf::YieldOp, //
                       scf::IfOp>();
     target.addLegalOp<mlir::ModuleOp, //
-                      ReturnOp>();
-    target.addDynamicallyLegalOp<FuncOp>(
-        [&](FuncOp op) { return converter.isSignatureLegal(op.getType()); });
+                      func::ReturnOp>();
+    target.addDynamicallyLegalOp<func::FuncOp>(
+        [&](func::FuncOp op) { return converter.isSignatureLegal(op.getFunctionType()); });
     target.addDynamicallyLegalOp<stdx::ClosureOp>([&](stdx::ClosureOp op) {
-      return converter.isSignatureLegal(op.getType());
+      return converter.isSignatureLegal(op.getFunctionType());
     });
-    target.addDynamicallyLegalOp<ReturnOp>(
-        [&](ReturnOp op) { return converter.isLegal(op); });
+    target.addDynamicallyLegalOp<func::ReturnOp>(
+        [&](func::ReturnOp op) { return converter.isLegal(op); });
     target.addDynamicallyLegalOp<scf::ForOp>(
         [&](scf::ForOp op) { return converter.isLegal(op.getResultTypes()); });
 
@@ -1230,7 +1231,7 @@ struct LowerTileToLinalgPass
     patterns.insert<
         CastOpConversion,                     //
         ConstantOpConversion,                 //
-        FuncOpConversion<FuncOp>,             //
+        FuncOpConversion<func::FuncOp>,             //
         FuncOpConversion<stdx::ClosureOp>,    //
         IndexOpConversion,                    //
         PragmaOpConversion,                   //

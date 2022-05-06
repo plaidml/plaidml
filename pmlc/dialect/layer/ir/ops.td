@@ -39,9 +39,7 @@ def BoxOp : LayerOp<"box", [IsolatedFromAbove]> {
   let extraClassDeclaration = [{
     mlir::Block *getBody();
   }];
-
-  let printer = [{ print$cppClass(p, *this); }];
-  let parser = [{ return parse$cppClass(parser, result); }];
+  let hasCustomAssemblyFormat = 1;
 }
 
 def ReturnOp : LayerOp<"return", [

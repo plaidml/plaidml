@@ -34,27 +34,27 @@ void BoxOp::build(OpBuilder &builder, OperationState &result, StringRef op,
   bodyRegion->push_back(body);
 }
 
-void printBoxOp(OpAsmPrinter &p, BoxOp op) {
-  p << " \"" << op.op() << "\" (" << op.getBody()->getArguments() << ") = (";
-  p.printOperands(op.operands());
+void BoxOp::print(OpAsmPrinter &p) {
+  p << " \"" << op() << "\" (" << getBody()->getArguments() << ") = (";
+  p.printOperands(operands());
   p << ") : ";
-  p.printFunctionalType(op);
-  p.printRegion(op.body(),
+  p.printFunctionalType(*this);
+  p.printRegion(body(),
                 /*printEntryBlockArgs=*/false,
                 /*printBlockTerminators=*/true);
   SmallVector<StringRef, 2> elidedAttrs{"op"};
-  auto attrs = op.attrs().cast<DictionaryAttr>();
-  if (attrs.empty()) {
+  auto att = attrs().cast<DictionaryAttr>();
+  if (att.empty()) {
     elidedAttrs.push_back("attrs");
   }
-  p.printOptionalAttrDict(op->getAttrs(), elidedAttrs);
+  p.printOptionalAttrDict((*this)->getAttrs(), elidedAttrs);
 }
 
-ParseResult parseBoxOp(OpAsmParser &parser, OperationState &result) {
+ParseResult BoxOp::parse(OpAsmParser &parser, OperationState &result) {
   StringAttr opName;
   FunctionType funcType;
-  SmallVector<OpAsmParser::OperandType, 4> inner;
-  SmallVector<OpAsmParser::OperandType, 4> outer;
+  SmallVector<OpAsmParser::UnresolvedOperand, 4> inner;
+  SmallVector<OpAsmParser::UnresolvedOperand, 4> outer;
   auto loc = parser.getCurrentLocation();
   if (parser.parseAttribute(opName, "op", result.attributes) ||
       parser.parseRegionArgumentList(inner, OpAsmParser::Delimiter::Paren) ||

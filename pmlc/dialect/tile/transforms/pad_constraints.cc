@@ -6,10 +6,10 @@
 #include <vector>
 
 #include "mlir/Dialect/Affine/Analysis/AffineStructures.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/AffineExprVisitor.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 #include "pmlc/dialect/stdx/ir/ops.h"
 #include "pmlc/dialect/tile/ir/ops.h"

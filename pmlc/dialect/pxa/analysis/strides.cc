@@ -14,6 +14,7 @@
 #include "mlir/Support/DebugStringHelper.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/FormatVariadic.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 #include "pmlc/dialect/pxa/analysis/affine_expr.h"
 #include "pmlc/util/bilp/ilp_solver.h"
@@ -167,7 +168,7 @@ AffineValueExpr StrideInfo::toValueExpr(MLIRContext *ctx) const {
   for (auto kvp : strides) {
     unsigned loopDepth = 0;
     auto parent = kvp.first.getOwner()->getParentOp();
-    while (!dyn_cast<FuncOp>(parent)) {
+    while (!dyn_cast<func::FuncOp>(parent)) {
       loopDepth++;
       parent = parent->getParentOp();
     }

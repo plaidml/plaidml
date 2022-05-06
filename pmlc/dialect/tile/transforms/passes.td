@@ -3,27 +3,27 @@
 
 include "mlir/Pass/PassBase.td"
 
-def AlgebraicOpt : Pass<"tile-algebraic-opt", "mlir::FuncOp"> {
+def AlgebraicOpt : Pass<"tile-algebraic-opt", "mlir::func::FuncOp"> {
   let summary = "Algebraic optimizations";
   let constructor = "pmlc::dialect::tile::createAlgebraicOptPass()";
 }
 
-def ComputeBounds : Pass<"tile-compute-bounds", "mlir::FuncOp"> {
+def ComputeBounds : Pass<"tile-compute-bounds", "mlir::func::FuncOp"> {
   let summary = "Compute bounds for contractions";
   let constructor = "pmlc::dialect::tile::createComputeBoundsPass()";
 }
 
-def ExpandReshape : Pass<"tile-expand-reshape", "mlir::FuncOp"> {
+def ExpandReshape : Pass<"tile-expand-reshape", "mlir::func::FuncOp"> {
   let summary = "Expand reshape and generate contraction";
   let constructor = "pmlc::dialect::tile::createExpandReshapePass()";
 }
 
-def Materialize : Pass<"tile-materialize", "mlir::FuncOp"> {
+def Materialize : Pass<"tile-materialize", "mlir::func::FuncOp"> {
   let summary = "Materialize arbitrary-precision values based on type promotion rules";
   let constructor = "pmlc::dialect::tile::createMaterializePass()";
 }
 
-def PadRanges : Pass<"tile-pad-ranges", "mlir::FuncOp"> {
+def PadRanges : Pass<"tile-pad-ranges", "mlir::func::FuncOp"> {
   let summary = "Pad ranges to make things more even (possibly adding constraints)";
   let constructor = "pmlc::dialect::tile::createPadRangesPass()";
   let options = [
@@ -36,7 +36,7 @@ def PadRanges : Pass<"tile-pad-ranges", "mlir::FuncOp"> {
   ];
 }
 
-def PadConstraints : Pass<"tile-pad-constraints", "mlir::FuncOp"> {
+def PadConstraints : Pass<"tile-pad-constraints", "mlir::func::FuncOp"> {
   let summary = "Pad outputs to remove constraints on inputs";
   let constructor = "pmlc::dialect::tile::createPadConstraintsPass()";
 }

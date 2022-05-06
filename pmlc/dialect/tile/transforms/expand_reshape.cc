@@ -5,8 +5,7 @@
 #include <numeric>
 
 #include "mlir/Pass/Pass.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
-
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "pmlc/dialect/stdx/ir/ops.h"
 #include "pmlc/dialect/tile/ir/ops.h"
 #include "pmlc/dialect/tile/transforms/pass_detail.h"

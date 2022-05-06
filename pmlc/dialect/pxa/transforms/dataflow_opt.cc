@@ -2,8 +2,8 @@
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/IR/AffineValueMap.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Support/DebugStringHelper.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 #include "pmlc/dialect/pxa/analysis/memref_access.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
@@ -25,7 +25,7 @@ struct MemRefDataFlowOptPass
 
   void runOnOperation() final {
     // Walk all load's and perform reduce to load forwarding.
-    FuncOp f = getOperation();
+    func::FuncOp f = getOperation();
     f.walk([&](PxaReadOpInterface loadOp) {
       auto defOp = loadOp.getMemRef().getDefiningOp();
       if (!defOp) {

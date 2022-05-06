@@ -1,11 +1,11 @@
 // Copyright 2021, Intel Corporation
 
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/Support/DebugStringHelper.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 #include "pmlc/dialect/linalgx/analysis/convolution.h"
 #include "pmlc/target/x86/pass_detail.h"
@@ -361,7 +361,7 @@ struct FoldBroadcastReordersPattern : public OpRewritePattern<linalgx::CopyOp> {
 
 struct ReorderLayoutsPass : public ReorderLayoutsBase<ReorderLayoutsPass> {
   void runOnOperation() final {
-    FuncOp func = getOperation();
+    func::FuncOp func = getOperation();
     MLIRContext *context = func.getContext();
 
     func.walk([&](linalg::GenericOp op) { reorderConvolution(op); });
@@ -565,7 +565,7 @@ struct ReorderLayoutsPass : public ReorderLayoutsBase<ReorderLayoutsPass> {
 struct ReorderWeightLayoutsPass
     : public ReorderWeightLayoutsBase<ReorderWeightLayoutsPass> {
   void runOnOperation() final {
-    FuncOp func = getOperation();
+    func::FuncOp func = getOperation();
     MLIRContext *context = func.getContext();
 
     func.walk([&](linalg::GenericOp op) { reorderConvolution(op); });

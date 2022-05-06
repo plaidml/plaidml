@@ -20,8 +20,7 @@ class PXA_Op<string mnemonic, list<Trait> traits = []> :
 
 class PXA_OpWithPP<string mnemonic, list<Trait> traits = []> :
     PXA_Op<mnemonic, traits> {
-  let printer = [{ print$cppClass(p, *this); }];
-  let parser = [{ return parse$cppClass(parser, result); }];
+  let hasCustomAssemblyFormat = 1;
 }
 
 class PxaReduceOpBase<string mnemonic, list<Trait> traits = []> :

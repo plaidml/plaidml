@@ -15,13 +15,13 @@
 #include "mlir/Conversion/MemRefToLLVM/MemRefToLLVM.h"
 #include "mlir/Conversion/OpenMPToLLVM/ConvertOpenMPToLLVM.h"
 #include "mlir/Conversion/SCFToOpenMP/SCFToOpenMP.h"
-#include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
-#include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
+//#include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
+//#include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
 #include "mlir/Dialect/Affine/Passes.h"
 #include "mlir/Dialect/Math/Transforms/Passes.h"
 #include "mlir/Dialect/OpenMP/OpenMPDialect.h"
 #include "mlir/Dialect/SCF/SCF.h"
-#include "mlir/Dialect/StandardOps/Transforms/Passes.h"
+//#include "mlir/Dialect/StandardOps/Transforms/Passes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/Pass/Pass.h"
@@ -30,6 +30,7 @@
 #include "mlir/Transforms/Passes.h"
 #include "mlir/Transforms/RegionUtils.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 #include "pmlc/compiler/registry.h"
 #include "pmlc/conversion/linalg_to_pxa/passes.h"
@@ -100,7 +101,7 @@ struct ConvertStandardToLLVMPass
     RewritePatternSet patterns(context);
     populateExpandTanhPattern(patterns);
     populateXSMMToLLVMConversionPatterns(converter, patterns);
-    populateStdToLLVMConversionPatterns(converter, patterns);
+    //populateStdToLLVMConversionPatterns(converter, patterns);
     populateMemRefToLLVMConversionPatterns(converter, patterns);
     populateMathToLLVMConversionPatterns(converter, patterns);
     conversion::stdx_to_llvm::populateStdXToLLVMConversionPatterns(converter,

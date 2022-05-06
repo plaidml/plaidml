@@ -14,6 +14,7 @@
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/Interfaces/VectorInterfaces.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 #include "pmlc/dialect/pxa/analysis/strides.h"
 #include "pmlc/dialect/pxa/analysis/uses.h"
@@ -29,7 +30,7 @@ namespace pmlc::dialect::pxa {
 using pmlc::dialect::pxa::PxaReduceOp;
 
 static std::string getValueName(Operation *op, Value value) {
-  AsmState state(op->getParentOfType<FuncOp>());
+  AsmState state(op->getParentOfType<func::FuncOp>());
   std::string str;
   llvm::raw_string_ostream os(str);
   value.printAsOperand(os, state);

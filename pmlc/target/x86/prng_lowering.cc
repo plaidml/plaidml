@@ -2,6 +2,7 @@
 
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/target/x86/pass_detail.h"
@@ -37,7 +38,7 @@ struct PRNGLinkingPass : public PRNGLinkingBase<PRNGLinkingPass> {
       auto newStateCast =
           builder.create<memref::CastOp>(loc, stateType, op.new_state());
 
-      builder.create<CallOp>(
+      builder.create<func::CallOp>(
           loc, symbol, ArrayRef<Type>{},
           ArrayRef<Value>{stateCast, resultCast, newStateCast});
 
@@ -62,7 +63,7 @@ private:
     auto funcType = builder.getFunctionType(
         ArrayRef<Type>{stateType, resultType, stateType}, ArrayRef<Type>{});
     builder
-        .create<FuncOp>(builder.getUnknownLoc(), symbol, funcType,
+        .create<func::FuncOp>(builder.getUnknownLoc(), symbol, funcType,
                         ArrayRef<NamedAttribute>{})
         .setPrivate();
     return SymbolRefAttr::get(context, symbol);

@@ -2,7 +2,7 @@
 
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/FormatVariadic.h"
-
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/Builders.h"
@@ -43,11 +43,11 @@ static FlatSymbolRefAttr lookupOrCreateFn(ModuleOp module, StringRef name,
                                           TypeRange argTypes,
                                           TypeRange resultTypes) {
   OpBuilder builder(module.getBodyRegion());
-  if (auto fn = module.lookupSymbol<FuncOp>(name))
+  if (auto fn = module.lookupSymbol<func::FuncOp>(name))
     return FlatSymbolRefAttr::get(fn);
 
   FunctionType funcType = builder.getFunctionType(argTypes, resultTypes);
-  auto fn = builder.create<FuncOp>(module.getLoc(), name, funcType,
+  auto fn = builder.create<func::FuncOp>(module.getLoc(), name, funcType,
                                    builder.getStringAttr("private"));
   return FlatSymbolRefAttr::get(fn);
 }

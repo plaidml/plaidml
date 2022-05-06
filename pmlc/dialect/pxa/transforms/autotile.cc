@@ -1,8 +1,9 @@
 // Copyright 2020 Intel Corporation
 
 #include "pmlc/dialect/pxa/transforms/autotile.h"
-
 #include "pmlc/dialect/pxa/transforms/pass_detail.h"
+
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 namespace pmlc::dialect::pxa {
 

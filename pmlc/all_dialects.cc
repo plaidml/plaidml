@@ -9,7 +9,6 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/OpenMP/OpenMPDialect.h"
 #include "mlir/Dialect/SCF/SCF.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/Dialect.h"
@@ -39,7 +38,7 @@ void registerAllDialects(DialectRegistry &registry) {
                   memref::MemRefDialect,                  //
                   omp::OpenMPDialect,                     //
                   scf::SCFDialect,                        //
-                  StandardOpsDialect,                     //
+                  // StandardOpsDialect,                     //
                   tensor::TensorDialect,                  //
                   vector::VectorDialect,                  //
                   mlir::mhlo::MhloDialect,                //

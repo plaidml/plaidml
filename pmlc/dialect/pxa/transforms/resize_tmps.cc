@@ -3,8 +3,8 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/IR/AffineValueMap.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Support/DebugStringHelper.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 #include "pmlc/dialect/pxa/analysis/strides.h"
 #include "pmlc/dialect/pxa/analysis/uses.h"
@@ -48,7 +48,7 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
     IVLOG(2, "Considering: " << debugString(*op.getOperation()));
 
     for (auto &use : getIndirectUses(op)) {
-      if (isa<ReturnOp>(use.getOwner())) {
+      if (isa<func::ReturnOp>(use.getOwner())) {
         IVLOG(2, "Found ReturnOp user, cannot resize allocation");
         return;
       } else if (isa<pmlc::dialect::stdx::ReshapeOp>(use.getOwner())) {

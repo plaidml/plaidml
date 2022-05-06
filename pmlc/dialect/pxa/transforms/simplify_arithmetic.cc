@@ -3,10 +3,10 @@
 #include "mlir/Support/LLVM.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/IR/AffineValueMap.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Support/DebugStringHelper.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 #include "pmlc/dialect/pxa/analysis/memref_access.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
@@ -127,7 +127,7 @@ void replaceAssignLoadAdd(PxaReduceOpInterface &reduceOp) {
 struct SimplifyArithmeticPass
     : public SimplifyArithmeticBase<SimplifyArithmeticPass> {
   void runOnOperation() final {
-    FuncOp f = getOperation();
+    func::FuncOp f = getOperation();
     f.walk(
         [&](PxaReduceOpInterface reduceOp) { replaceAssignLoadAdd(reduceOp); });
   }

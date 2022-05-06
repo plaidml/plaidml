@@ -34,7 +34,6 @@ pml_cc_library(
     LLVMCore
     MLIRAffine
     MLIRIR
-    MLIRStandard
     ::enums-gen
   PUBLIC
 )

@@ -10,7 +10,6 @@
 #include <vector>
 
 #include "mlir/Dialect/Math/IR/Math.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/Pass/PassManager.h"

@@ -3,7 +3,7 @@
 
 include "mlir/Pass/PassBase.td"
 
-def BoundsCheck : Pass<"stdx-check-bounds", "mlir::FuncOp"> {
+def BoundsCheck : Pass<"stdx-check-bounds", "mlir::func::FuncOp"> {
   let summary = "Check bounds for Load and Store Ops";
   let constructor = "pmlc::dialect::stdx::createBoundsCheckPass()";
 }

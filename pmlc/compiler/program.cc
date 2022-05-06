@@ -10,11 +10,12 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/ToolOutputFile.h"
 
-#include "mlir/Parser.h"
+#include "mlir/Parser/Parser.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/DebugStringHelper.h"
 #include "mlir/Support/FileUtilities.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 #include "pmlc/compiler/registry.h"
 #include "pmlc/util/env.h"
@@ -29,7 +30,7 @@ namespace {
 static bool isHiddenPass(Pass *pass, Operation *op) {
   if (pass->getName().startswith("mlir::detail::"))
     return true;
-  if (auto funcOp = dyn_cast<FuncOp>(op)) {
+  if (auto funcOp = dyn_cast<func::FuncOp>(op)) {
     if (funcOp.isExternal())
       return true;
     std::string filter = pmlc::util::getEnvVar("PLAIDML_FUNC_FILTER");
@@ -98,7 +99,7 @@ Program::Program(std::unique_ptr<MLIRContext> context,
     : context(std::move(context)), entry(entry) {
   llvm::SourceMgr sourceMgr;
   sourceMgr.AddNewSourceBuffer(std::move(buffer), llvm::SMLoc());
-  module = parseSourceFile(sourceMgr, this->context.get());
+  module = parseSourceFile<ModuleOp>(sourceMgr, this->context.get());
 }
 
 static StringRef getDiagKindStr(DiagnosticSeverity kind) {
@@ -225,11 +226,11 @@ void Program::parseIOTypes(std::unique_ptr<llvm::MemoryBuffer> buffer) {
   sourceMgr.AddNewSourceBuffer(std::move(buffer), llvm::SMLoc());
   OwningOpRef<ModuleOp> sourceModule = parseSourceFile(sourceMgr, context.get());
 
-  auto op = dyn_cast_or_null<FuncOp>(sourceModule->lookupSymbol(entry));
+  auto op = dyn_cast_or_null<func::FuncOp>(sourceModule->lookupSymbol(entry));
   if (!op)
     throw std::runtime_error("Could not find FuncOp: " + entry);
 
-  FunctionType funcType = op.getType();
+  FunctionType funcType = op.getFunctionType();
   for (Type type : funcType.getInputs()) {
     inputs.push_back(type);
   }

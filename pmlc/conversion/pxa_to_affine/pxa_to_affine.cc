@@ -1,12 +1,12 @@
 // Copyright 2020 Intel Corporation
 
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/IntegerSet.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/DebugStringHelper.h"
 #include "mlir/Transforms/DialectConversion.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 #include "pmlc/conversion/pxa_to_affine/pass_detail.h"
 #include "pmlc/conversion/pxa_to_affine/passes.h"
@@ -258,8 +258,8 @@ struct IsExternal {
 };
 
 template <>
-struct IsExternal<FuncOp> {
-  static bool check(FuncOp op) { return op.isExternal(); }
+struct IsExternal<func::FuncOp> {
+  static bool check(func::FuncOp op) { return op.isExternal(); }
 };
 
 template <typename FuncLikeOp>
@@ -269,7 +269,7 @@ struct FuncOpConversion : public OpConversionPattern<FuncLikeOp> {
   LogicalResult
   matchAndRewrite(FuncLikeOp op, typename FuncLikeOp::Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
-    FunctionType type = op.getType();
+    FunctionType type = op.getFunctionType();
     if (IsExternal<FuncLikeOp>::check(op)) {
       return success();
     }
@@ -360,7 +360,7 @@ struct LowerPXAToAffinePass
 PXAToAffineConversionTarget::PXAToAffineConversionTarget(MLIRContext &ctx)
     : ConversionTarget(ctx) {
   addLegalDialect<AffineDialect,      //
-                  StandardOpsDialect, //
+                  //StandardOpsDialect, //
                   memref::MemRefDialect>();
   addIllegalDialect<pxa::PXADialect>();
   addDynamicallyLegalOp<AffineParallelOp>([](AffineParallelOp op) {
@@ -368,13 +368,13 @@ PXAToAffineConversionTarget::PXAToAffineConversionTarget(MLIRContext &ctx)
   });
   addDynamicallyLegalOp<AffineIfOp>(
       [](AffineIfOp op) { return op.getNumResults() == 0; });
-  addDynamicallyLegalOp<FuncOp>([](FuncOp op) {
-    return op.isExternal() || op.getType().getNumResults() == 0;
+  addDynamicallyLegalOp<func::FuncOp>([](func::FuncOp op) {
+    return op.isExternal() || op.getFunctionType().getNumResults() == 0;
   });
-  addDynamicallyLegalOp<ReturnOp>(
-      [](ReturnOp op) { return op.getNumOperands() == 0; });
+  addDynamicallyLegalOp<func::ReturnOp>(
+      [](func::ReturnOp op) { return op.getNumOperands() == 0; });
   addDynamicallyLegalOp<stdx::ClosureOp>(
-      [](stdx::ClosureOp op) { return op.getType().getNumResults() == 0; });
+      [](stdx::ClosureOp op) { return op.getFunctionType().getNumResults() == 0; });
   addDynamicallyLegalOp<stdx::YieldOp>(
       [](stdx::YieldOp op) { return op.getNumOperands() == 0; });
 }
@@ -383,7 +383,7 @@ void populatePXAToAffineConversionPatterns(RewritePatternSet &patterns) {
   patterns.insert<                       //
       AffineIfOpConversion,              //
       AffineParallelOpConversion,        //
-      FuncOpConversion<FuncOp>,          //
+      FuncOpConversion<func::FuncOp>,          //
       FuncOpConversion<stdx::ClosureOp>, //
       PxaLoadOpConversion,               //
       PxaReduceOpConversion,             //
@@ -391,7 +391,7 @@ void populatePXAToAffineConversionPatterns(RewritePatternSet &patterns) {
       PxaVectorReduceOpConversion,       //
       PxaStoreOpConversion,              //
       ReluOpConversion,                  //
-      ReturnOpConversion<ReturnOp>,      //
+      ReturnOpConversion<func::ReturnOp>,      //
       ReturnOpConversion<stdx::YieldOp>>(patterns.getContext());
 }
 

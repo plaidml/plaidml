@@ -9,7 +9,6 @@ pml_cc_library(
     dialect.cc
   DEPS
     MLIRAffine
-    MLIRStandard
     pmlc::util
     ::dialect-gen
   PUBLIC

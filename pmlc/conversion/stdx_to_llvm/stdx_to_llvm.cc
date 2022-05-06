@@ -4,10 +4,9 @@
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
 #include "mlir/Conversion/MathToLLVM/MathToLLVM.h"
 #include "mlir/Conversion/MemRefToLLVM/MemRefToLLVM.h"
-#include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
-#include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
+//#include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
+//#include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/Pass/Pass.h"
 
@@ -304,7 +303,7 @@ struct LowerToLLVMPass : public LowerToLLVMBase<LowerToLLVMPass> {
 
     RewritePatternSet patterns(context);
     //populateLoopToStdConversionPatterns(patterns);
-    populateStdToLLVMConversionPatterns(typeConverter, patterns);
+    //populateStdToLLVMConversionPatterns(typeConverter, patterns);
     populateMemRefToLLVMConversionPatterns(typeConverter, patterns);
     populateMathToLLVMConversionPatterns(typeConverter, patterns);
     populateStdXToLLVMConversionPatterns(typeConverter, patterns);

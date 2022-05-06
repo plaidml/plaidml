@@ -2,6 +2,7 @@
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "pmlc/dialect/affinex/transforms/pass_detail.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 using namespace mlir; // NOLINT
 

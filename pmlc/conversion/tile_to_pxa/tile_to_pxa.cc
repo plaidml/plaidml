@@ -8,6 +8,7 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/DebugStringHelper.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 #include "pmlc/conversion/tile_to_pxa/pass_detail.h"
 #include "pmlc/dialect/pxa/analysis/strides.h"
@@ -52,7 +53,7 @@ static FlatSymbolRefAttr createStubTraceFunc(ModuleOp module, StringAttr msg) {
   OpBuilder builder(context);
   builder.setInsertionPointToStart(module.getBody());
   auto funcType = FunctionType::get(context, {}, {});
-  auto funcOp = builder.create<FuncOp>(module.getLoc(), symbol, funcType,
+  auto funcOp = builder.create<func::FuncOp>(module.getLoc(), symbol, funcType,
                                        ArrayRef<NamedAttribute>{});
   funcOp->setAttr("msg", msg);
   funcOp->setAttr("trace", builder.getUnitAttr());
@@ -776,7 +777,7 @@ struct FuncOpConversion : public OpConversionPattern<FuncLikeOp> {
   LogicalResult
   matchAndRewrite(FuncLikeOp op, typename FuncLikeOp::Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
-    FunctionType type = op.getType();
+    FunctionType type = op.getFunctionType();
 
     // Convert the function signature
     TileToPXATypeConverter typeConverter;
@@ -837,7 +838,7 @@ struct TraceOpConversion : public OpConversionPattern<tile::PragmaOp> {
       return failure();
     }
     auto symbol = createStubTraceFunc(module, msg->getValue().cast<StringAttr>());
-    rewriter.create<CallOp>(op.getLoc(), symbol, ArrayRef<Type>{});
+    rewriter.create<func::CallOp>(op.getLoc(), symbol, ArrayRef<Type>{});
     rewriter.replaceOp(op, adaptor.tensor());
     return success();
   }
@@ -888,14 +889,14 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         }
       }
     };
-    module.walk([&](ReturnOp op) { injectIdent(op); });
+    module.walk([&](func::ReturnOp op) { injectIdent(op); });
     module.walk([&](stdx::YieldOp op) { injectIdent(op); });
 
     // Set up target (i.e. what is legal)
     ConversionTarget target(getContext());
     TileToPXATypeConverter converter;
     target.addLegalDialect<mlir::AffineDialect,         //
-                           mlir::StandardOpsDialect,    //
+                           //mlir::StandardOpsDialect,    //
                            mlir::math::MathDialect,     //
                            mlir::memref::MemRefDialect, //
                            mlir::scf::SCFDialect,       //
@@ -907,11 +908,11 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
                       scf::YieldOp, //
                       scf::IfOp>();
     target.addLegalOp<mlir::ModuleOp, //
-                      ReturnOp>();
-    target.addDynamicallyLegalOp<FuncOp>(
-        [&](FuncOp op) { return converter.isSignatureLegal(op.getType()); });
+                      func::ReturnOp>();
+    target.addDynamicallyLegalOp<func::FuncOp>(
+        [&](func::FuncOp op) { return converter.isSignatureLegal(op.getFunctionType()); });
     target.addDynamicallyLegalOp<stdx::ClosureOp>([&](stdx::ClosureOp op) {
-      return converter.isSignatureLegal(op.getType());
+      return converter.isSignatureLegal(op.getFunctionType());
     });
     target.addDynamicallyLegalOp<scf::ForOp>(
         [&](scf::ForOp op) { return converter.isLegal(op.getResultTypes()); });
@@ -929,7 +930,7 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
     patterns.insert<
         CastOpConversion,                  //
         ConstantOpConversion,              //
-        FuncOpConversion<FuncOp>,          //
+        FuncOpConversion<func::FuncOp>,          //
         FuncOpConversion<stdx::ClosureOp>, //
         IndexOpConversion,                 //
         PragmaOpConversion,                //
@@ -1077,8 +1078,8 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
       return;
     }
 
-    for (FuncOp funcOp : module.getOps<FuncOp>()) {
-      for (ReturnOp returnOp : funcOp.getOps<ReturnOp>()) {
+    for (func::FuncOp funcOp : module.getOps<func::FuncOp>()) {
+      for (func::ReturnOp returnOp : funcOp.getOps<func::ReturnOp>()) {
         connectResults(funcOp, returnOp);
         for (stdx::ClosureOp closureOp : funcOp.getOps<stdx::ClosureOp>()) {
           for (stdx::YieldOp yieldOp : closureOp.getOps<stdx::YieldOp>()) {
@@ -1092,7 +1093,7 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
   template <typename FuncLikeOp, typename ReturnLikeOp>
   void connectResults(FuncLikeOp funcOp, ReturnLikeOp returnOp) {
     unsigned argNumber =
-        funcOp.getType().getNumInputs() - returnOp.getNumOperands();
+        funcOp.getFunctionType().getNumInputs() - returnOp.getNumOperands();
     for (Value operand : returnOp.operands()) {
       // Find very initial allocation of memref
       Value def = pxa::getIndirectDef(operand);

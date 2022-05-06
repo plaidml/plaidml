@@ -12,6 +12,7 @@
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 #include "pmlc/dialect/tile/ir/ops.h"
 #include "pmlc/dialect/tile/transforms/padding.h"

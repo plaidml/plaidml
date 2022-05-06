@@ -2,9 +2,9 @@
 
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/SCF.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Support/DebugStringHelper.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 #include "pmlc/dialect/pxa/analysis/uses.h"
 #include "pmlc/dialect/pxa/transforms/pass_detail.h"
@@ -28,7 +28,7 @@ struct DeallocPlacementPass
     op.walk([&](FuncOp fn) { runOnFunction(fn); });
   }
 
-  void runOnFunction(FuncOp fn) {
+  void runOnFunction(func::FuncOp fn) {
     // Place deallocation for AllocOp
     fn.walk([&](memref::AllocOp alloc) {
       IVLOG(3, "alloc: " << debugString(*alloc));
@@ -106,7 +106,7 @@ struct DeallocPlacementPass
       assert(ancestor && "use and alloc do not have a common ancestor");
       IVLOG(3, "  ancestor: " << debugString(*use));
 
-      if (isa<ReturnOp>(ancestor)) {
+      if (isa<func::ReturnOp>(ancestor)) {
         IVLOG(3, "  return");
         return None;
       }

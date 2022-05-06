@@ -3,7 +3,7 @@
 
 include "mlir/Pass/PassBase.td"
 
-def HoistingPass : Pass<"pmlc-hoisting", "mlir::FuncOp"> {
+def HoistingPass : Pass<"pmlc-hoisting", "mlir::func::FuncOp"> {
   let summary = "Hoists operations out of loops";
   let description = [{
     Similar to the standard MLIR loop-invariant code motion, this pass hoists

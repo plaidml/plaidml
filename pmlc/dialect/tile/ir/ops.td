@@ -75,9 +75,8 @@ def ContractionOp : TileOp<"contract", [
     mlir::LogicalResult materializeOperands(mlir::OpBuilder& builder);
   }];
 
-  let printer = [{ print$cppClass(&p, *this); }];
-  let parser = [{ return parse$cppClass(&parser, result); }];
-  let verifier = [{ return verify$cppClass(*this); }];
+  let hasCustomAssemblyFormat = 1;
+  let hasVerifier = 1;
   let hasCanonicalizer = 1;
 }
 
@@ -162,7 +161,7 @@ def ReshapeOp : MaterializeOp<"reshape">,
   let assemblyFormat = [{
     $tensor attr-dict `:` functional-type($tensor, $result)
   }];
-  let verifier = [{ return verify$cppClass(*this); }];
+  let hasVerifier = 1;
 }
 
 def ScatterOp : MaterializeOp<"scatter"> {
