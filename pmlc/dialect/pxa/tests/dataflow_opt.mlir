@@ -68,8 +68,8 @@ func @grn(%arg0: memref<1x4x4x3xf16>) -> memref<1x4x4x3xf16> {
     %18 = pxa.reduce assign %17, %4[0, %arg1, %arg2, 0] : memref<1x4x4x1xi1>
     %19 = pxa.load %18[0, %arg1, %arg2, 0] : memref<1x4x4x1xi1>
     %20 = pxa.load %15[0, %arg1, %arg2, 0] : memref<1x4x4x1xf16>
-    // CHECK-NEXT: select
-    %21 = select %19, %cst, %20 : f16
+    // CHECK-NEXT: arith.select
+    %21 = arith.select %19, %cst, %20 : f16
     %22 = pxa.reduce assign %21, %5[0, %arg1, %arg2, 0] : memref<1x4x4x1xf16>
     // CHECK-NEXT: affine.parallel
     %23 = affine.parallel (%arg3) = (0) to (3) reduce ("assign") -> (memref<1x4x4x3xf16>) {

@@ -28,14 +28,18 @@ static void fillStructuredOpRegion(
 
   // TODO: atm all operands go through getElementTypeOrSelf,
   // reconsider when we have evidence we need to.
+  // TODO: find a way to pass proper location.
   SmallVector<Type, 8> argTypes;
+  SmallVector<Location> locations;
   for (auto containers : {inputTypes, outputTypes})
-    for (auto t : containers)
+    for (auto t : containers) {
       argTypes.push_back(getElementTypeOrSelf(t));
+      locations.push_back(opBuilder.getUnknownLoc());
+    }
 
   // RAII.
   OpBuilder::InsertionGuard guard(opBuilder);
-  Block *body = opBuilder.createBlock(&region, /*insertPt=*/{}, argTypes);
+  Block *body = opBuilder.createBlock(&region, /*insertPt=*/{}, argTypes, locations);
   unsigned actual = body->getNumArguments();
   unsigned expected = NamedStructuredOpType::getNumRegionArgs();
   if (expected != actual) {
