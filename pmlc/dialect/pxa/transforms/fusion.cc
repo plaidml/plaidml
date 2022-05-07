@@ -3,9 +3,9 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/IR/AffineValueMap.h"
 #include "mlir/Dialect/Affine/Utils.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Support/DebugStringHelper.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "pmlc/dialect/pxa/analysis/strides.h"
 #include "pmlc/dialect/pxa/analysis/uses.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
@@ -204,9 +204,9 @@ struct FusionInfo {
       const auto &sb = stridesB[i];
       // If the offsets don't match, bail
       if (sa.offset != sb.offset) {
-        //opB.getOperation()->emitRemark(
-        //    "Failed to fuse with def offsets mismatch: i = ")
-        //    << i << ", A: " << debugString(sa) << ", B: " << debugString(sb);
+        // opB.getOperation()->emitRemark(
+        //     "Failed to fuse with def offsets mismatch: i = ")
+        //     << i << ", A: " << debugString(sa) << ", B: " << debugString(sb);
         opB.getOperation()->emitRemark("Failed to fuse");
         return false;
       }
@@ -215,8 +215,8 @@ struct FusionInfo {
         continue;
 
       // If there are multiple indexes, give up
-      //IVLOG(3, "sa: " << debugString(sa));
-      //IVLOG(3, "sb: " << debugString(sb));
+      // IVLOG(3, "sa: " << debugString(sa));
+      // IVLOG(3, "sb: " << debugString(sb));
 
       // Pick the largest unique stride from each side
       auto pickUniqueTop = [&](const auto &options) {
@@ -589,8 +589,8 @@ struct FusionInfo {
     }
 
     // Construct the new outer parallel op
-    SmallVector<arith::AtomicRMWKind, 8> reductions(typesC.size(),
-                                             arith::AtomicRMWKind::assign);
+    SmallVector<arith::AtomicRMWKind, 8> reductions(
+        typesC.size(), arith::AtomicRMWKind::assign);
     MLIRContext *context = aInfo.op.getContext();
     auto apC = builder.create<AffineParallelOp>(
         FusedLoc::get(context, {aInfo.op.getLoc(), bInfo.op.getLoc()}),

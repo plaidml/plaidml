@@ -10,12 +10,12 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/ToolOutputFile.h"
 
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Parser/Parser.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/DebugStringHelper.h"
 #include "mlir/Support/FileUtilities.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 #include "pmlc/compiler/registry.h"
 #include "pmlc/util/env.h"
@@ -224,7 +224,8 @@ Program::save(const std::unordered_map<std::string, std::string> &config) {
 void Program::parseIOTypes(std::unique_ptr<llvm::MemoryBuffer> buffer) {
   llvm::SourceMgr sourceMgr;
   sourceMgr.AddNewSourceBuffer(std::move(buffer), llvm::SMLoc());
-  OwningOpRef<ModuleOp> sourceModule = parseSourceFile<ModuleOp>(sourceMgr, context.get());
+  OwningOpRef<ModuleOp> sourceModule =
+      parseSourceFile<ModuleOp>(sourceMgr, context.get());
 
   auto op = dyn_cast_or_null<func::FuncOp>(sourceModule->lookupSymbol(entry));
   if (!op)

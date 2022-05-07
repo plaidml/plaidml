@@ -1,10 +1,10 @@
 // Copyright 2021 Intel Corporation
 
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 #include "pmlc/dialect/pxa/analysis/uses.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
@@ -44,8 +44,8 @@ struct MemOpPattern final : public OpRewritePattern<MemOp> {
     if (auto store = dyn_cast<memref::StoreOp>(op.getOperation())) {
       // Convert to PxaReduceOp
       auto result = rewriter.create<PxaReduceOp>(
-          op.getLoc(), arith::AtomicRMWKind::assign, store.getValueToStore(), memRef,
-          affineMap, idxs);
+          op.getLoc(), arith::AtomicRMWKind::assign, store.getValueToStore(),
+          memRef, affineMap, idxs);
       if (auto loop =
               dyn_cast<AffineParallelOp>(op.getOperation()->getParentOp())) {
         // Fix affine.yield

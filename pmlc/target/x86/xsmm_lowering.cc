@@ -3,11 +3,11 @@
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
-//#include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
-//#include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
+// #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
+// #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
+#include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/BuiltinOps.h"
-#include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Support/DebugStringHelper.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -839,11 +839,11 @@ struct XSMMBRGemmOffsInvokeF32Lowering
     bOffsetOperands.insert(bOffsetOperands.end(), bOffsetType.getRank() + 1,
                            createIndexConstant(rewriter, op->getLoc(), 0));
 
-    auto aOffsetsPtr = rewriter.create<LLVM::GEPOp>(op->getLoc(), longPtrType,
-                                                    aOffsetsBase, aOffsetOperands);
+    auto aOffsetsPtr = rewriter.create<LLVM::GEPOp>(
+        op->getLoc(), longPtrType, aOffsetsBase, aOffsetOperands);
 
-    auto bOffsetsPtr = rewriter.create<LLVM::GEPOp>(op->getLoc(), longPtrType,
-                                                    bOffsetsBase, bOffsetOperands);
+    auto bOffsetsPtr = rewriter.create<LLVM::GEPOp>(
+        op->getLoc(), longPtrType, bOffsetsBase, bOffsetOperands);
 
     auto func = getOrInsertFunc(op, rewriter);
     rewriter.create<LLVM::CallOp>(

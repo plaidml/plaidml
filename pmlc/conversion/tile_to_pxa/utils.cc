@@ -52,7 +52,8 @@ Value createCastOp(OpBuilder &builder, Location loc, Value from,
     if (auto fromIndexType = fromType.dyn_cast<IndexType>()) {
       IntegerType i64Type = builder.getIntegerType(64);
       auto intCastOp = builder.create<arith::IndexCastOp>(loc, i64Type, from);
-      return builder.create<arith::SIToFPOp>(loc, intoType, intCastOp).getResult();
+      return builder.create<arith::SIToFPOp>(loc, intoType, intCastOp)
+          .getResult();
     }
   }
   if (auto intoIntType = intoType.dyn_cast<IntegerType>()) {
@@ -60,10 +61,11 @@ Value createCastOp(OpBuilder &builder, Location loc, Value from,
       if (fromIntType.getWidth() < intoIntType.getWidth()) {
         if (fromSigned) {
           // arith::ExtSIOp: IntegerType -> wider signed int
-          return builder.create<arith::ExtSIOp>(loc, intoType, from).getResult();
+          return builder.create<arith::ExtSIOp>(loc, intoType, from)
+              .getResult();
         }
         // arith::ExtUIOp: IntegerType -> wider unsigned int
-        return builder.create<arith::ExtUIOp>(loc,intoType, from).getResult();
+        return builder.create<arith::ExtUIOp>(loc, intoType, from).getResult();
       }
       // arith::TruncIOp: IntegerType -> narrower IntegerType
       return builder.create<arith::TruncIOp>(loc, intoType, from).getResult();
@@ -132,19 +134,23 @@ Value createInit(OpBuilder &builder, Location loc, Type type,
     switch (agg) {
     case AggregationKind::add: {
       auto value = convertFloatUsingType(llvm::APFloat(0.0), floatType);
-      return builder.create<mlir::arith::ConstantFloatOp>(loc, value, floatType);
+      return builder.create<mlir::arith::ConstantFloatOp>(loc, value,
+                                                          floatType);
     }
     case AggregationKind::mul: {
       auto value = convertFloatUsingType(llvm::APFloat(1.0), floatType);
-      return builder.create<mlir::arith::ConstantFloatOp>(loc, value, floatType);
+      return builder.create<mlir::arith::ConstantFloatOp>(loc, value,
+                                                          floatType);
     }
     case AggregationKind::min: {
       auto value = llvm::APFloat::getInf(floatType.getFloatSemantics(), false);
-      return builder.create<mlir::arith::ConstantFloatOp>(loc, value, floatType);
+      return builder.create<mlir::arith::ConstantFloatOp>(loc, value,
+                                                          floatType);
     }
     case AggregationKind::max: {
       auto value = llvm::APFloat::getInf(floatType.getFloatSemantics(), true);
-      return builder.create<mlir::arith::ConstantFloatOp>(loc, value, floatType);
+      return builder.create<mlir::arith::ConstantFloatOp>(loc, value,
+                                                          floatType);
     }
     default:
       llvm_unreachable("Unsupported aggregation for createInit");
@@ -222,7 +228,8 @@ BufferAllocator::BufferAllocator(OpBuilder &builder, Operation *op,
     auto parallel = builder.create<AffineParallelOp>(
         loc,
         /*resultTypes=*/ArrayRef<Type>{memRefType},
-        /*reductions=*/ArrayRef<arith::AtomicRMWKind>{arith::AtomicRMWKind::assign},
+        /*reductions=*/
+        ArrayRef<arith::AtomicRMWKind>{arith::AtomicRMWKind::assign},
         /*ranges=*/shape);
     auto parallelBuilder = parallel.getBodyBuilder();
     auto load =

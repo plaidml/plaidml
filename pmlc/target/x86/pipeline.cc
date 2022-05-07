@@ -15,22 +15,22 @@
 #include "mlir/Conversion/MemRefToLLVM/MemRefToLLVM.h"
 #include "mlir/Conversion/OpenMPToLLVM/ConvertOpenMPToLLVM.h"
 #include "mlir/Conversion/SCFToOpenMP/SCFToOpenMP.h"
-//#include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
-//#include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
+// #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
+// #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
 #include "mlir/Dialect/Affine/Passes.h"
 #include "mlir/Dialect/Math/Transforms/Passes.h"
 #include "mlir/Dialect/OpenMP/OpenMPDialect.h"
 #include "mlir/Dialect/SCF/SCF.h"
-//#include "mlir/Dialect/StandardOps/Transforms/Passes.h"
+// #include "mlir/Dialect/StandardOps/Transforms/Passes.h"
+#include "mlir/Dialect/Affine/LoopUtils.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
-#include "mlir/Dialect/Affine/LoopUtils.h"
 #include "mlir/Transforms/Passes.h"
 #include "mlir/Transforms/RegionUtils.h"
-#include "mlir/Dialect/SCF/Utils/Utils.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 #include "pmlc/compiler/registry.h"
 #include "pmlc/conversion/linalg_to_pxa/passes.h"
@@ -101,7 +101,7 @@ struct ConvertStandardToLLVMPass
     RewritePatternSet patterns(context);
     populateExpandTanhPattern(patterns);
     populateXSMMToLLVMConversionPatterns(converter, patterns);
-    //populateStdToLLVMConversionPatterns(converter, patterns);
+    // populateStdToLLVMConversionPatterns(converter, patterns);
     populateMemRefToLLVMConversionPatterns(converter, patterns);
     populateMathToLLVMConversionPatterns(converter, patterns);
     conversion::stdx_to_llvm::populateStdXToLLVMConversionPatterns(converter,
@@ -154,15 +154,15 @@ struct FoldConstantCastPass
         if (auto floatType = type.dyn_cast<FloatType>()) {
           if (auto intAttr = attr.dyn_cast<IntegerAttr>()) {
             APFloat value = convertFloatUsingType(intAttr.getInt(), floatType);
-            auto constOp =
-                builder.create<arith::ConstantFloatOp>(op->getLoc(), value, floatType);
+            auto constOp = builder.create<arith::ConstantFloatOp>(
+                op->getLoc(), value, floatType);
             result.replaceAllUsesWith(constOp);
           }
         } else if (auto intType = type.dyn_cast<IntegerType>()) {
           if (auto floatAttr = attr.dyn_cast<FloatAttr>()) {
             int64_t value = static_cast<int64_t>(floatAttr.getValueAsDouble());
-            auto constOp =
-                builder.create<arith::ConstantIntOp>(op->getLoc(), value, intType);
+            auto constOp = builder.create<arith::ConstantIntOp>(op->getLoc(),
+                                                                value, intType);
             result.replaceAllUsesWith(constOp);
           }
         }
@@ -286,8 +286,9 @@ void pipelineBuilderStage2(OpPassManager &pm, const Options &options) {
   pm.addPass(createCSEPass());
   pm.addNestedPass<func::FuncOp>(layer::createInlineLayersPass());
 
-  pm.addNestedPass<func::FuncOp>(createStencilTppGemmPass(/*numThreads=*/maxThreads,
-                                                    /*isBatched=*/true));
+  pm.addNestedPass<func::FuncOp>(
+      createStencilTppGemmPass(/*numThreads=*/maxThreads,
+                               /*isBatched=*/true));
   pm.addNestedPass<func::FuncOp>(pxa::createAffineNormalizePass());
   pm.addPass(createCanonicalizerPass());
 
@@ -314,7 +315,8 @@ void pipelineBuilderStage2(OpPassManager &pm, const Options &options) {
   pm.addPass(createCanonicalizerPass());
 
   pm.addNestedPass<func::FuncOp>(pxa::createTileAccumulatePass());
-  pm.addNestedPass<func::FuncOp>(pxa::createAffineNormalizePass(/*promote=*/false));
+  pm.addNestedPass<func::FuncOp>(
+      pxa::createAffineNormalizePass(/*promote=*/false));
   pm.addPass(createCanonicalizerPass());
 
   pm.addNestedPass<func::FuncOp>(pxa::createCPUThreadPass(maxThreads));
@@ -327,8 +329,9 @@ void pipelineBuilderStage2(OpPassManager &pm, const Options &options) {
   pm.addNestedPass<func::FuncOp>(pxa::createLocalizePass());
   pm.addNestedPass<func::FuncOp>(pxa::createResizeTmpsPass());
   pm.addPass(pxa::createDeallocPlacementPass());
-  pm.addNestedPass<func::FuncOp>(pxa::createAffineNormalizePass(/*promote=*/true,
-                                                          /*denest=*/true));
+  pm.addNestedPass<func::FuncOp>(
+      pxa::createAffineNormalizePass(/*promote=*/true,
+                                     /*denest=*/true));
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 

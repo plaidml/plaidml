@@ -3,12 +3,12 @@
 #include <limits>
 #include <utility>
 
+#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/DebugStringHelper.h"
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 #include "pmlc/conversion/tile_to_pxa/pass_detail.h"
 #include "pmlc/dialect/pxa/analysis/strides.h"
@@ -54,7 +54,7 @@ static FlatSymbolRefAttr createStubTraceFunc(ModuleOp module, StringAttr msg) {
   builder.setInsertionPointToStart(module.getBody());
   auto funcType = FunctionType::get(context, {}, {});
   auto funcOp = builder.create<func::FuncOp>(module.getLoc(), symbol, funcType,
-                                       ArrayRef<NamedAttribute>{});
+                                             ArrayRef<NamedAttribute>{});
   funcOp->setAttr("msg", msg);
   funcOp->setAttr("trace", builder.getUnitAttr());
   funcOp->setAttr("id", builder.getI64IntegerAttr(uniqueId));
@@ -94,16 +94,14 @@ struct AlwaysTrue : Matcher {
   bool match(Operation *op) const final { return true; }
 };
 
-template <typename InnerPredicate>
-struct ResultIs : Matcher {
+template <typename InnerPredicate> struct ResultIs : Matcher {
   bool match(Operation *op) const final {
     InnerPredicate pred;
     return pred.match(op->getResult(0).getType());
   }
 };
 
-template <typename InnerPredicate>
-struct AnyOperandIs : Matcher {
+template <typename InnerPredicate> struct AnyOperandIs : Matcher {
   bool match(Operation *op) const final {
     for (auto operand : op->getOperands()) {
       InnerPredicate pred;
@@ -115,8 +113,7 @@ struct AnyOperandIs : Matcher {
   }
 };
 
-template <typename InnerPredicate>
-struct OperandsAre : Matcher {
+template <typename InnerPredicate> struct OperandsAre : Matcher {
   bool match(Operation *op) const final {
     for (auto operand : op->getOperands()) {
       InnerPredicate pred;
@@ -128,8 +125,7 @@ struct OperandsAre : Matcher {
   }
 };
 
-template <typename InnerPredicate>
-struct FirstOperandIs : Matcher {
+template <typename InnerPredicate> struct FirstOperandIs : Matcher {
   bool match(Operation *op) const final {
     InnerPredicate pred;
     if (op->getNumOperands() == 0) {
@@ -139,8 +135,7 @@ struct FirstOperandIs : Matcher {
   }
 };
 
-template <typename InnerPredicate>
-struct AnyComparandIs : Matcher {
+template <typename InnerPredicate> struct AnyComparandIs : Matcher {
   bool match(Operation *op) const final {
     SmallVector<Value, 4> allOperands(op->getOperands());
     tile::ContractionOpAdaptor adaptor(allOperands);
@@ -151,8 +146,7 @@ struct AnyComparandIs : Matcher {
   }
 };
 
-template <typename InnerPredicate>
-struct ComparandsAre : Matcher {
+template <typename InnerPredicate> struct ComparandsAre : Matcher {
   bool match(Operation *op) const final {
     SmallVector<Value, 4> allOperands(op->getOperands());
     tile::ContractionOpAdaptor adaptor(allOperands);
@@ -163,8 +157,7 @@ struct ComparandsAre : Matcher {
   }
 };
 
-template <typename InnerPredicate>
-struct Not {
+template <typename InnerPredicate> struct Not {
   bool match(Type type) const {
     InnerPredicate pred;
     return !pred.match(type);
@@ -236,14 +229,14 @@ struct NotOp {
                Type resultType, ArrayRef<Value> operands,
                ArrayRef<Type> types) {
     // -(x + 1) = -1 - x
-    auto negOne = rewriter.create<mlir::arith::ConstantIntOp>(loc, -1, resultType);
+    auto negOne =
+        rewriter.create<mlir::arith::ConstantIntOp>(loc, -1, resultType);
     auto sub = rewriter.create<mlir::arith::SubIOp>(loc, negOne, operands[0]);
     return sub.getResult();
   }
 };
 
-template <typename OpType>
-struct StdOp {
+template <typename OpType> struct StdOp {
   Value create(ConversionPatternRewriter &rewriter, Location loc,
                Type resultType, ArrayRef<Value> operands,
                ArrayRef<Type> types) {
@@ -264,13 +257,12 @@ struct SelectOpBuilder {
     promoteTypes(rewriter, loc, operands.drop_front(), types.drop_front(),
                  &promoted);
     auto op = rewriter.create<arith::SelectOp>(loc, operands[0], promoted[0],
-                                              promoted[1]);
+                                               promoted[1]);
     return op.getResult();
   }
 };
 
-template <arith::CmpFPredicate predicate>
-struct CmpFloatOp {
+template <arith::CmpFPredicate predicate> struct CmpFloatOp {
   Value create(ConversionPatternRewriter &rewriter, Location loc,
                Type resultType, ArrayRef<Value> operands,
                ArrayRef<Type> types) {
@@ -282,8 +274,7 @@ struct CmpFloatOp {
   }
 };
 
-template <arith::CmpIPredicate predicate>
-struct CmpIntOp {
+template <arith::CmpIPredicate predicate> struct CmpIntOp {
   Value create(ConversionPatternRewriter &rewriter, Location loc,
                Type resultType, ArrayRef<Value> operands,
                ArrayRef<Type> types) {
@@ -309,8 +300,7 @@ struct CmpIntInequalityOp {
   }
 };
 
-template <typename OpType>
-struct LogicalOp {
+template <typename OpType> struct LogicalOp {
   Value create(ConversionPatternRewriter &rewriter, Location loc,
                Type resultType, ArrayRef<Value> operands,
                ArrayRef<Type> types) {
@@ -320,17 +310,20 @@ struct LogicalOp {
       auto fromType = operand.getType();
       if (auto floatType = fromType.dyn_cast<FloatType>()) {
         auto value = convertFloatUsingType(llvm::APFloat(0.0), floatType);
-        auto zero =
-            rewriter.create<mlir::arith::ConstantFloatOp>(loc, value, floatType);
+        auto zero = rewriter.create<mlir::arith::ConstantFloatOp>(loc, value,
+                                                                  floatType);
         promoted.push_back(
             rewriter
-                .create<mlir::arith::CmpFOp>(loc, arith::CmpFPredicate::ONE, operand, zero)
+                .create<mlir::arith::CmpFOp>(loc, arith::CmpFPredicate::ONE,
+                                             operand, zero)
                 .getResult());
       } else if (auto intType = fromType.dyn_cast<IntegerType>()) {
-        auto zero = rewriter.create<mlir::arith::ConstantIntOp>(loc, 0, intType);
-        promoted.push_back(
-            rewriter.create<mlir::arith::CmpIOp>(loc, arith::CmpIPredicate::ne, operand, zero)
-                .getResult());
+        auto zero =
+            rewriter.create<mlir::arith::ConstantIntOp>(loc, 0, intType);
+        promoted.push_back(rewriter
+                               .create<mlir::arith::CmpIOp>(
+                                   loc, arith::CmpIPredicate::ne, operand, zero)
+                               .getResult());
       } else {
         llvm_unreachable("Unknown type for LogicalOp");
       }
@@ -351,12 +344,17 @@ struct LogicalNotOp {
     auto fromType = input.getType();
     if (auto floatType = fromType.dyn_cast<FloatType>()) {
       auto value = convertFloatUsingType(llvm::APFloat(0.0), floatType);
-      auto zero = rewriter.create<mlir::arith::ConstantFloatOp>(loc, value, floatType);
-      return rewriter.create<mlir::arith::CmpFOp>(loc, arith::CmpFPredicate::OEQ, input, zero)
+      auto zero =
+          rewriter.create<mlir::arith::ConstantFloatOp>(loc, value, floatType);
+      return rewriter
+          .create<mlir::arith::CmpFOp>(loc, arith::CmpFPredicate::OEQ, input,
+                                       zero)
           .getResult();
     } else if (auto intType = fromType.dyn_cast<IntegerType>()) {
       auto zero = rewriter.create<mlir::arith::ConstantIntOp>(loc, 0, intType);
-      return rewriter.create<mlir::arith::CmpIOp>(loc, arith::CmpIPredicate::eq, input, zero)
+      return rewriter
+          .create<mlir::arith::CmpIOp>(loc, arith::CmpIPredicate::eq, input,
+                                       zero)
           .getResult();
     } else {
       llvm_unreachable("Unknown type for LogicalNotOp");
@@ -364,8 +362,7 @@ struct LogicalNotOp {
   }
 };
 
-template <typename CmpOpBuilder>
-struct CondOp {
+template <typename CmpOpBuilder> struct CondOp {
   Value create(ConversionPatternRewriter &rewriter, Location loc,
                Type resultType, ArrayRef<Value> operands,
                ArrayRef<Type> types) {
@@ -653,7 +650,8 @@ struct IndexOpConversion : public OpConversionPattern<tile::IndexOp> {
     auto forOp = rewriter.create<AffineParallelOp>(
         loc,
         /*resultTypes=*/ArrayRef<Type>{resultType},
-        /*reductions=*/ArrayRef<arith::AtomicRMWKind>{arith::AtomicRMWKind::assign},
+        /*reductions=*/
+        ArrayRef<arith::AtomicRMWKind>{arith::AtomicRMWKind::assign},
         /*ranges=*/resultType.getShape());
     auto body = forOp.getBody();
     rewriter.setInsertionPointToStart(body);
@@ -666,7 +664,8 @@ struct IndexOpConversion : public OpConversionPattern<tile::IndexOp> {
     auto apply = rewriter.create<mlir::AffineApplyOp>(loc, map, idxs[axis]);
 
     // Create the store
-    auto cast = rewriter.create<mlir::arith::IndexCastOp>(loc, rewriter.getIntegerType(32), apply);
+    auto cast = rewriter.create<mlir::arith::IndexCastOp>(
+        loc, rewriter.getIntegerType(32), apply);
     auto stored = buildSimpleStore(rewriter, loc, cast, resultMemRef,
                                    tile::getPaddingInfo(op));
     rewriter.create<AffineYieldOp>(loc, ValueRange{stored});
@@ -742,7 +741,8 @@ struct CastOpConversion : public OpConversionPattern<tile::CastOp> {
     auto forOp = rewriter.create<AffineParallelOp>(
         loc,
         /*resultTypes=*/ArrayRef<Type>{alloc.memRefType},
-        /*reductions=*/ArrayRef<arith::AtomicRMWKind>{arith::AtomicRMWKind::assign},
+        /*reductions=*/
+        ArrayRef<arith::AtomicRMWKind>{arith::AtomicRMWKind::assign},
         /*ranges=*/alloc.rankedTensorType.getShape());
     auto body = forOp.getBody();
     rewriter.setInsertionPointToStart(body);
@@ -837,7 +837,8 @@ struct TraceOpConversion : public OpConversionPattern<tile::PragmaOp> {
     if (!msg) {
       return failure();
     }
-    auto symbol = createStubTraceFunc(module, msg->getValue().cast<StringAttr>());
+    auto symbol =
+        createStubTraceFunc(module, msg->getValue().cast<StringAttr>());
     rewriter.create<func::CallOp>(op.getLoc(), symbol, ArrayRef<Type>{});
     rewriter.replaceOp(op, adaptor.tensor());
     return success();
@@ -851,9 +852,9 @@ struct ScfForOpConversion : public OpConversionPattern<scf::ForOp> {
   matchAndRewrite(scf::ForOp op, OpAdaptor oldFor,
                   ConversionPatternRewriter &rewriter) const final {
     auto &oldBodyOps = op.getBody()->getOperations();
-    auto newOp = rewriter.create<scf::ForOp>(op.getLoc(), oldFor.getLowerBound(),
-                                             oldFor.getUpperBound(), oldFor.getStep(),
-                                             oldFor.getInitArgs());
+    auto newOp = rewriter.create<scf::ForOp>(
+        op.getLoc(), oldFor.getLowerBound(), oldFor.getUpperBound(),
+        oldFor.getStep(), oldFor.getInitArgs());
     auto &newBodyOps = newOp.getBody()->getOperations();
     newBodyOps.splice(std::prev(newBodyOps.end()), oldBodyOps,
                       oldBodyOps.begin(), oldBodyOps.end());
@@ -895,8 +896,8 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
     // Set up target (i.e. what is legal)
     ConversionTarget target(getContext());
     TileToPXATypeConverter converter;
-    target.addLegalDialect<mlir::AffineDialect,         //
-                           //mlir::StandardOpsDialect,    //
+    target.addLegalDialect<mlir::AffineDialect, //
+                                                // mlir::StandardOpsDialect, //
                            mlir::math::MathDialect,     //
                            mlir::memref::MemRefDialect, //
                            mlir::scf::SCFDialect,       //
@@ -909,8 +910,9 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
                       scf::IfOp>();
     target.addLegalOp<mlir::ModuleOp, //
                       func::ReturnOp>();
-    target.addDynamicallyLegalOp<func::FuncOp>(
-        [&](func::FuncOp op) { return converter.isSignatureLegal(op.getFunctionType()); });
+    target.addDynamicallyLegalOp<func::FuncOp>([&](func::FuncOp op) {
+      return converter.isSignatureLegal(op.getFunctionType());
+    });
     target.addDynamicallyLegalOp<stdx::ClosureOp>([&](stdx::ClosureOp op) {
       return converter.isSignatureLegal(op.getFunctionType());
     });
@@ -918,14 +920,14 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         [&](scf::ForOp op) { return converter.isLegal(op.getResultTypes()); });
 
     // Setup rewrite patterns
-    using CmpIntLtOp =
-        CmpIntInequalityOp<arith::CmpIPredicate::slt, arith::CmpIPredicate::ult>;
-    using CmpIntLeOp =
-        CmpIntInequalityOp<arith::CmpIPredicate::sle, arith::CmpIPredicate::ule>;
-    using CmpIntGtOp =
-        CmpIntInequalityOp<arith::CmpIPredicate::sgt, arith::CmpIPredicate::ugt>;
-    using CmpIntGeOp =
-        CmpIntInequalityOp<arith::CmpIPredicate::sge, arith::CmpIPredicate::uge>;
+    using CmpIntLtOp = CmpIntInequalityOp<arith::CmpIPredicate::slt,
+                                          arith::CmpIPredicate::ult>;
+    using CmpIntLeOp = CmpIntInequalityOp<arith::CmpIPredicate::sle,
+                                          arith::CmpIPredicate::ule>;
+    using CmpIntGtOp = CmpIntInequalityOp<arith::CmpIPredicate::sgt,
+                                          arith::CmpIPredicate::ugt>;
+    using CmpIntGeOp = CmpIntInequalityOp<arith::CmpIPredicate::sge,
+                                          arith::CmpIPredicate::uge>;
     RewritePatternSet patterns(&getContext());
     patterns.insert<
         CastOpConversion,                  //

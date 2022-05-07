@@ -11,7 +11,7 @@
 namespace mlir {
 namespace func {
 class FuncOp;
-} // end namesapce func
+} // namespace func
 } // end namespace mlir
 
 namespace pmlc::target::x86 {

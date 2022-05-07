@@ -1,10 +1,10 @@
 // Copyright 2021, Intel Corporation
 
+#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Support/DebugStringHelper.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 #include "pmlc/conversion/linalg_to_pxa/pass_detail.h"
 #include "pmlc/conversion/tile_to_pxa/pass_detail.h"
@@ -65,25 +65,28 @@ struct ReductionInfo {
   ReductionInfo(Operation *op, Value bufElem) : relatedOp(nullptr) {
     Value lhs, rhs;
     Value cond, trueValue, falseValue;
-    if (matchPattern(op, m_Op<arith::AddIOp>(m_Capture(&lhs), m_Capture(&rhs)))) {
+    if (matchPattern(op,
+                     m_Op<arith::AddIOp>(m_Capture(&lhs), m_Capture(&rhs)))) {
       agg = arith::AtomicRMWKind::addi;
-    } else if (matchPattern(op,
-                            m_Op<arith::AddFOp>(m_Capture(&lhs), m_Capture(&rhs)))) {
+    } else if (matchPattern(
+                   op, m_Op<arith::AddFOp>(m_Capture(&lhs), m_Capture(&rhs)))) {
       agg = arith::AtomicRMWKind::addf;
-    } else if (matchPattern(op,
-                            m_Op<arith::MulIOp>(m_Capture(&lhs), m_Capture(&rhs)))) {
+    } else if (matchPattern(
+                   op, m_Op<arith::MulIOp>(m_Capture(&lhs), m_Capture(&rhs)))) {
       agg = arith::AtomicRMWKind::muli;
-    } else if (matchPattern(op,
-                            m_Op<arith::MulFOp>(m_Capture(&lhs), m_Capture(&rhs)))) {
+    } else if (matchPattern(
+                   op, m_Op<arith::MulFOp>(m_Capture(&lhs), m_Capture(&rhs)))) {
       agg = arith::AtomicRMWKind::mulf;
     } else if (matchPattern(
-                   op, m_Op<arith::SelectOp>(
-                           m_Capture(&cond, m_Op<arith::CmpIOp>(m_Capture(&lhs),
-                                                         m_Capture(&rhs))),
-                           m_Capture(&trueValue), m_Capture(&falseValue)))) {
+                   op,
+                   m_Op<arith::SelectOp>(
+                       m_Capture(&cond, m_Op<arith::CmpIOp>(m_Capture(&lhs),
+                                                            m_Capture(&rhs))),
+                       m_Capture(&trueValue), m_Capture(&falseValue)))) {
       if (lhs == trueValue && rhs == falseValue) {
         relatedOp = cond.getDefiningOp();
-        arith::CmpIPredicate intPred = cast<arith::CmpIOp>(relatedOp).getPredicate();
+        arith::CmpIPredicate intPred =
+            cast<arith::CmpIOp>(relatedOp).getPredicate();
         switch (intPred) {
         case arith::CmpIPredicate::sgt:
         case arith::CmpIPredicate::sge:
@@ -106,13 +109,15 @@ struct ReductionInfo {
         }
       }
     } else if (matchPattern(
-                   op, m_Op<arith::SelectOp>(
-                           m_Capture(&cond, m_Op<arith::CmpFOp>(m_Capture(&lhs),
-                                                         m_Capture(&rhs))),
-                           m_Capture(&trueValue), m_Capture(&falseValue)))) {
+                   op,
+                   m_Op<arith::SelectOp>(
+                       m_Capture(&cond, m_Op<arith::CmpFOp>(m_Capture(&lhs),
+                                                            m_Capture(&rhs))),
+                       m_Capture(&trueValue), m_Capture(&falseValue)))) {
       if (lhs == trueValue && rhs == falseValue) {
         relatedOp = cond.getDefiningOp();
-        arith::CmpFPredicate floatPred = cast<arith::CmpFOp>(relatedOp).getPredicate();
+        arith::CmpFPredicate floatPred =
+            cast<arith::CmpFOp>(relatedOp).getPredicate();
         switch (floatPred) {
         case arith::CmpFPredicate::OGT:
         case arith::CmpFPredicate::OGE:
@@ -154,7 +159,8 @@ static AffineParallelOp copyBuffer(OpBuilder &builder, Location loc,
   auto forOp = builder.create<AffineParallelOp>(
       loc,
       /*resultTypes=*/TypeRange{type},
-      /*reductions=*/ArrayRef<arith::AtomicRMWKind>{arith::AtomicRMWKind::assign},
+      /*reductions=*/
+      ArrayRef<arith::AtomicRMWKind>{arith::AtomicRMWKind::assign},
       /*ranges=*/type.getShape());
   Block::BlockArgListType idxs = forOp.getBody()->getArguments();
   OpBuilder bodyBuilder = forOp.getBodyBuilder();
@@ -168,7 +174,7 @@ static AffineParallelOp copyBuffer(OpBuilder &builder, Location loc,
   return forOp;
 }
 
-// TODO: lorenzo: 
+// TODO: lorenzo:
 // See linal_to_pxa/test/shape.mlir
 struct ConstantOpConversion : public OpConversionPattern<arith::ConstantOp> {
   using OpConversionPattern<arith::ConstantOp>::OpConversionPattern;
@@ -310,7 +316,8 @@ struct GenericOpConversion : public OpConversionPattern<linalg::GenericOp> {
     auto numInputs = inputs.size();
     auto numOutputs = outputs.size();
     // Make a parallel for loop to fill the result
-    SmallVector<arith::AtomicRMWKind, 4> aggs(outputs.size(), arith::AtomicRMWKind::assign);
+    SmallVector<arith::AtomicRMWKind, 4> aggs(outputs.size(),
+                                              arith::AtomicRMWKind::assign);
     auto outputArgs = op.getBody()->getArguments();
     for (unsigned i = 0; i < outputs.size(); ++i) {
       for (auto &use : outputArgs[numInputs + i].getUses()) {
@@ -346,8 +353,8 @@ struct GenericOpConversion : public OpConversionPattern<linalg::GenericOp> {
       op.emitError("LinalgOp does not have static ranges.");
     }
     auto loc = op.getLoc();
-    SmallVector<arith::AtomicRMWKind, 4> reductions(outputs.size(),
-                                             arith::AtomicRMWKind::assign);
+    SmallVector<arith::AtomicRMWKind, 4> reductions(
+        outputs.size(), arith::AtomicRMWKind::assign);
     auto forOp = rewriter.create<AffineParallelOp>(loc,
                                                    /*resultTypes=*/outputTypes,
                                                    /*reductions=*/reductions,
@@ -467,11 +474,11 @@ struct LowerLinalgToPXAPass
 
   void performLinalgTransforms(ModuleOp op) {
     RewritePatternSet patterns(op.getContext());
-    //populateLinalgConvGeneralizationPatterns(patterns);
+    // populateLinalgConvGeneralizationPatterns(patterns);
     linalg::populateLinalgNamedOpsGeneralizationPatterns(patterns);
-    //populateLinalgTensorCollapseOpGeneralizationPatterns(patterns);
-    //populateLinalgTensorExpandOpGeneralizationPatterns(patterns);
-    // populateLinalgPoolingOpGeneralizationPatterns(patterns);
+    // populateLinalgTensorCollapseOpGeneralizationPatterns(patterns);
+    // populateLinalgTensorExpandOpGeneralizationPatterns(patterns);
+    //  populateLinalgPoolingOpGeneralizationPatterns(patterns);
     patterns.add<linalg::PadOpTransformationPattern>(op.getContext());
     (void)applyPatternsAndFoldGreedily(op, std::move(patterns));
   }
@@ -484,18 +491,18 @@ struct LowerLinalgToPXAPass
 
     ConversionTarget target(getContext());
     LinalgToPXATypeConverter converter;
-    target.addLegalDialect<AffineDialect,         //
-                           //StandardOpsDialect,    //
+    target.addLegalDialect<AffineDialect, //
+                                          // StandardOpsDialect,    //
                            math::MathDialect,     //
                            memref::MemRefDialect, //
                            scf::SCFDialect,       //
                            layer::LayerDialect,   //
                            pxa::PXADialect,       //
-                           arith::ArithmeticDialect,
-                           stdx::StdXDialect>();
+                           arith::ArithmeticDialect, stdx::StdXDialect>();
     target.addLegalOp<ModuleOp>();
-    target.addDynamicallyLegalOp<func::FuncOp>(
-        [&](func::FuncOp op) { return converter.isSignatureLegal(op.getFunctionType()); });
+    target.addDynamicallyLegalOp<func::FuncOp>([&](func::FuncOp op) {
+      return converter.isSignatureLegal(op.getFunctionType());
+    });
     target.addDynamicallyLegalOp<stdx::ClosureOp>([&](stdx::ClosureOp op) {
       return converter.isSignatureLegal(op.getFunctionType());
     });
@@ -509,7 +516,7 @@ struct LowerLinalgToPXAPass
 
     RewritePatternSet patterns(&getContext());
     patterns.insert<ConstantOpConversion,              //
-                    FuncOpConversion<func::FuncOp>,          //
+                    FuncOpConversion<func::FuncOp>,    //
                     FuncOpConversion<stdx::ClosureOp>, //
                     GenericOpConversion,               //
                     IndexOpConversion,                 //

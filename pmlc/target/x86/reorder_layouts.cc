@@ -1,12 +1,12 @@
 // Copyright 2021, Intel Corporation
 
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/Support/DebugStringHelper.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
 
 #include "pmlc/dialect/linalgx/analysis/convolution.h"
 #include "pmlc/target/x86/pass_detail.h"
@@ -115,13 +115,12 @@ struct PropagateReorderThruPadTensorOpPattern
     lower.insert(lower.begin() + 1, 0);
     upper.insert(upper.begin() + 1, 0);
 
-    auto newOp =
-        rewriter.create<tensor::PadOp>(op->getLoc(),
-                                             /*source=*/info->sourceValue,
-                                             /*staticLow=*/lower,
-                                             /*staticHigh=*/upper,
-                                             /*low=*/ValueRange{},
-                                             /*high=*/ValueRange{});
+    auto newOp = rewriter.create<tensor::PadOp>(op->getLoc(),
+                                                /*source=*/info->sourceValue,
+                                                /*staticLow=*/lower,
+                                                /*staticHigh=*/upper,
+                                                /*low=*/ValueRange{},
+                                                /*high=*/ValueRange{});
     SmallVector<Type, 4> padArgs(lower.size(), rewriter.getIndexType());
     {
       OpBuilder::InsertionGuard guard(rewriter);

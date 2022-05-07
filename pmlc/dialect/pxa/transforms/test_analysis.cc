@@ -18,8 +18,7 @@ namespace pmlc::dialect::pxa {
 
 namespace {
 
-template <typename T>
-static void printStrideInfo(T op) {
+template <typename T> static void printStrideInfo(T op) {
   auto info = computeStrideInfo(op);
   llvm::outs() << "strides: ";
   if (!info) {

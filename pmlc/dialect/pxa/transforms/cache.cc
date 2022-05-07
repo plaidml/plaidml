@@ -7,10 +7,10 @@
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/IR/AffineValueMap.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 
 #include "pmlc/dialect/pxa/analysis/strides.h"
 #include "pmlc/dialect/pxa/analysis/uses.h"
@@ -30,8 +30,8 @@ static Value createInitLoop(OpBuilder &builder, Location loc, Value memref,
   auto memrefType = memref.getType().cast<MemRefType>();
   ArrayRef<int64_t> size = memrefType.getShape();
   assert(memrefType.getElementType() == initVal.getType());
-  auto loop = builder.create<AffineParallelOp>(loc, memrefType,
-                                               arith::AtomicRMWKind::assign, size);
+  auto loop = builder.create<AffineParallelOp>(
+      loc, memrefType, arith::AtomicRMWKind::assign, size);
   auto initBuilder = loop.getBodyBuilder();
   auto idMap =
       AffineMap::getMultiDimIdentityMap(size.size(), builder.getContext());
@@ -52,8 +52,8 @@ static AffineParallelOp createCopyLoop(OpBuilder &builder,               //
   assert(size.size() == dstOffset.size());
   size_t dims = size.size();
   auto ctx = builder.getContext();
-  auto loop = builder.create<AffineParallelOp>(loc, dstMemRef.getType(),
-                                               arith::AtomicRMWKind::assign, size);
+  auto loop = builder.create<AffineParallelOp>(
+      loc, dstMemRef.getType(), arith::AtomicRMWKind::assign, size);
   SmallVector<StrideInfo, 4> srcAccess;
   SmallVector<StrideInfo, 4> dstAccess;
   for (size_t i = 0; i < dims; i++) {
@@ -184,8 +184,8 @@ LogicalResult cacheLoadAsVector(AffineParallelOp par, PxaLoadOp load,
       loc, innerMap.getAffineMap().getSubMap({last}), innerMap.getOperands());
 
   if (idx.getType().isa<IndexType>()) {
-    auto indexCast = newLoadBuilder.create<arith::IndexCastOp>(load.getLoc(),
-                                                        builder.getI32Type(), idx);
+    auto indexCast = newLoadBuilder.create<arith::IndexCastOp>(
+        load.getLoc(), builder.getI32Type(), idx);
     idx = indexCast.getResult();
   }
   auto newLoad = newLoadBuilder.create<vector::ExtractElementOp>(
@@ -411,10 +411,11 @@ void CachePlan::execute() {
     if (isInitialized(memref)) {
       // copy global -> local
       entry.copyInto = true;
-      auto copyLoop = createCopyLoop(
-          builder, loc,
-          wholeBlock ? entry.rap.wholeInnerCount : entry.rap.innerCount, memref,
-          entry.cache, entry.rap.outer, zeroOffset, arith::AtomicRMWKind::assign);
+      auto copyLoop = createCopyLoop(builder, loc,
+                                     wholeBlock ? entry.rap.wholeInnerCount
+                                                : entry.rap.innerCount,
+                                     memref, entry.cache, entry.rap.outer,
+                                     zeroOffset, arith::AtomicRMWKind::assign);
       copyLoop.getOperation()->setAttr("cache_in", builder.getUnitAttr());
       entry.cache = copyLoop.getResult(0);
     }
@@ -436,9 +437,9 @@ void CachePlan::execute() {
       auto yield = entry.band.getBody()->getTerminator();
       builder.setInsertionPoint(yield);
       auto &finalUse = *finalValue.use_begin();
-      auto copyLoop =
-          createCopyLoop(builder, loc, entry.rap.innerCount, finalValue, memref,
-                         zeroOffset, entry.rap.outer, arith::AtomicRMWKind::assign);
+      auto copyLoop = createCopyLoop(
+          builder, loc, entry.rap.innerCount, finalValue, memref, zeroOffset,
+          entry.rap.outer, arith::AtomicRMWKind::assign);
       copyLoop.getOperation()->setAttr("cache_out", builder.getUnitAttr());
       finalUse.set(copyLoop.getResult(0));
     }

@@ -25,7 +25,8 @@ mlir::Value createReorder(mlir::Location loc, mlir::OpBuilder &builder,
   // Create `affine.parallel` that will perform copy with reordering.
   auto parallel = builder.create<mlir::AffineParallelOp>(
       loc, mlir::ArrayRef<mlir::Type>{newMem.getType()},
-      mlir::ArrayRef<mlir::arith::AtomicRMWKind>{mlir::arith::AtomicRMWKind::assign},
+      mlir::ArrayRef<mlir::arith::AtomicRMWKind>{
+          mlir::arith::AtomicRMWKind::assign},
       srcMemType.getShape());
   mlir::OpBuilder bodyBuilder = parallel.getBodyBuilder();
   mlir::MutableArrayRef<mlir::BlockArgument> loopIVs = parallel.getIVs();
@@ -36,8 +37,9 @@ mlir::Value createReorder(mlir::Location loc, mlir::OpBuilder &builder,
       bodyBuilder.create<PxaLoadOp>(loc, srcMem, identityMap, loopIVs);
   // Assign with transformed map.
   mlir::AffineMap assignMap = desc.reorderMap.compose(identityMap);
-  mlir::Value assign = bodyBuilder.create<PxaReduceOp>(
-      loc, mlir::arith::AtomicRMWKind::assign, load, newMem, assignMap, loopIVs);
+  mlir::Value assign =
+      bodyBuilder.create<PxaReduceOp>(loc, mlir::arith::AtomicRMWKind::assign,
+                                      load, newMem, assignMap, loopIVs);
   // Yield product of assignment.
   bodyBuilder.create<mlir::AffineYieldOp>(loc,
                                           mlir::ArrayRef<mlir::Value>{assign});

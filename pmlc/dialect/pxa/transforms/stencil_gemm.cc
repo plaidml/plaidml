@@ -58,21 +58,21 @@ private:
     Value load1, load2, reduce;
     Operation *yield = op.getBody()->getTerminator();
     if (matchPattern(
-            yield,
-            m_Op<AffineYieldOp>(m_Capture(
-                &reduce, m_PxaReduceOp(
-                             arith::AtomicRMWKind::addf,
-                             m_Op<arith::MulFOp>(m_Capture(&load1, m_Op<PxaLoadOp>()),
-                                          m_Capture(&load2, m_Op<PxaLoadOp>())),
-                             m_Any())))) ||
+            yield, m_Op<AffineYieldOp>(m_Capture(
+                       &reduce,
+                       m_PxaReduceOp(arith::AtomicRMWKind::addf,
+                                     m_Op<arith::MulFOp>(
+                                         m_Capture(&load1, m_Op<PxaLoadOp>()),
+                                         m_Capture(&load2, m_Op<PxaLoadOp>())),
+                                     m_Any())))) ||
         matchPattern(
-            yield,
-            m_Op<AffineYieldOp>(m_Capture(
-                &reduce, m_PxaReduceOp(
-                             arith::AtomicRMWKind::addi,
-                             m_Op<arith::MulIOp>(m_Capture(&load1, m_Op<PxaLoadOp>()),
-                                          m_Capture(&load2, m_Op<PxaLoadOp>())),
-                             m_Any()))))) {
+            yield, m_Op<AffineYieldOp>(m_Capture(
+                       &reduce,
+                       m_PxaReduceOp(arith::AtomicRMWKind::addi,
+                                     m_Op<arith::MulIOp>(
+                                         m_Capture(&load1, m_Op<PxaLoadOp>()),
+                                         m_Capture(&load2, m_Op<PxaLoadOp>())),
+                                     m_Any()))))) {
       return StencilCapture{{reduce}, {load1, load2}};
     }
     return llvm::None;

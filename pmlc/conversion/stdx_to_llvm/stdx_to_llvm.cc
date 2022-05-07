@@ -4,8 +4,8 @@
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
 #include "mlir/Conversion/MathToLLVM/MathToLLVM.h"
 #include "mlir/Conversion/MemRefToLLVM/MemRefToLLVM.h"
-//#include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
-//#include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
+// #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
+// #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/Pass/Pass.h"
@@ -35,8 +35,9 @@ struct LibMCallLowering : public ConvertOpToLLVMPattern<OpType> {
         LLVM::LLVMFunctionType::get(f32Type, argTypes, /*isVarArg=*/false);
     auto attr = rewriter.getStringAttr(getFuncName());
     auto sym = getOrInsertFuncOp(attr, funcType, op, rewriter);
-    rewriter.replaceOpWithNewOp<LLVM::CallOp>(
-        op, ArrayRef<Type>{f32Type}, SymbolRefAttr::get(attr), adaptor.getOperands());
+    rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, ArrayRef<Type>{f32Type},
+                                              SymbolRefAttr::get(attr),
+                                              adaptor.getOperands());
     return success();
   }
 
@@ -302,8 +303,8 @@ struct LowerToLLVMPass : public LowerToLLVMBase<LowerToLLVMPass> {
     LLVMTypeConverter typeConverter(context);
 
     RewritePatternSet patterns(context);
-    //populateLoopToStdConversionPatterns(patterns);
-    //populateStdToLLVMConversionPatterns(typeConverter, patterns);
+    // populateLoopToStdConversionPatterns(patterns);
+    // populateStdToLLVMConversionPatterns(typeConverter, patterns);
     populateMemRefToLLVMConversionPatterns(typeConverter, patterns);
     populateMathToLLVMConversionPatterns(typeConverter, patterns);
     populateStdXToLLVMConversionPatterns(typeConverter, patterns);

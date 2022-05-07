@@ -1,9 +1,9 @@
 // Copyright 2021 Intel Corporation
 
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Interfaces/LoopLikeInterface.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 #include "pmlc/transforms/pass_detail.h"
 

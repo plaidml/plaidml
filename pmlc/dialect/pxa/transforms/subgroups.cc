@@ -2,9 +2,9 @@
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/IR/AffineValueMap.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Support/DebugStringHelper.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 #include "pmlc/dialect/pxa/analysis/strides.h"
 #include "pmlc/dialect/pxa/analysis/uses.h"
@@ -115,8 +115,7 @@ struct SubgroupCostModel {
     }
   }
 
-  template <typename OpType>
-  bool preflightIO(OpType ioOp) {
+  template <typename OpType> bool preflightIO(OpType ioOp) {
     IVLOG(3, "Preflight: " << debugString(*ioOp.getOperation()));
     if (ioOp.getOperation()->getBlock() != op.getBody()) {
       IVLOG(3, "Not part of block");

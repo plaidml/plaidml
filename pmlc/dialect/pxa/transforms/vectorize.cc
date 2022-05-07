@@ -11,10 +11,10 @@
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/TypeSwitch.h"
 
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/Interfaces/VectorInterfaces.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 #include "pmlc/dialect/pxa/analysis/strides.h"
 #include "pmlc/dialect/pxa/analysis/uses.h"
@@ -46,7 +46,8 @@ private:
   DenseSet<Operation *> vectorizedOps;
   DenseSet<Operation *> zeroStrideReductions;
 
-  const char *stringifyAtomicRMWKindForVectorReductionOp(arith::AtomicRMWKind val) {
+  const char *
+  stringifyAtomicRMWKindForVectorReductionOp(arith::AtomicRMWKind val) {
     switch (val) {
     case arith::AtomicRMWKind::addf:
       return "add";
@@ -131,8 +132,8 @@ private:
       return op->emitRemark("Vectorize op: Failed, interior loops");
     }
     // TODO: consider more generic way to add ops supported here
-    if (!isa<arith::ExtFOp, arith::TruncFOp, arith::IndexCastOp, VectorUnrollOpInterface, arith::SelectOp,
-             arith::CmpFOp>(op)) {
+    if (!isa<arith::ExtFOp, arith::TruncFOp, arith::IndexCastOp,
+             VectorUnrollOpInterface, arith::SelectOp, arith::CmpFOp>(op)) {
       // Probably not a vectorizable op. Verify it doesn't use an
       // vectorized results.
       for (auto operand : op->getOperands()) {
@@ -229,7 +230,7 @@ public:
       // same. Assert for now when this path is taken. Will fix
       // later (lorenzo).
       auto reductionOp = builder.create<vector::ReductionOp>(
-        op.getLoc(), vector::CombiningKind::XOR, val);
+          op.getLoc(), vector::CombiningKind::XOR, val);
       assert(0 && "read comment above");
       auto reduceOp = builder.create<PxaReduceOp>(
           op.getLoc(), ArrayRef<Type>{op.getMemRefType()}, op.agg(),
@@ -401,7 +402,7 @@ std::unique_ptr<mlir::Pass> createVectorizePass(StringRef strategy,
 
 // TODO: Maybe move this to a generic utility somewhere
 template <typename OpTy, typename... Args>
-static OpTy replaceOp(Operation *op, Args &&... args) {
+static OpTy replaceOp(Operation *op, Args &&...args) {
   OpBuilder builder(op);
   auto newOp = builder.create<OpTy>(op->getLoc(), std::forward<Args>(args)...);
   op->getResult(0).replaceAllUsesWith(newOp.getResult());

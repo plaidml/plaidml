@@ -10,11 +10,11 @@
 #include <vector>
 
 #include "mlir/Dialect/Affine/IR/AffineValueMap.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Support/DebugStringHelper.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/FormatVariadic.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 #include "pmlc/dialect/pxa/analysis/affine_expr.h"
 #include "pmlc/util/bilp/ilp_solver.h"
@@ -226,8 +226,8 @@ void StrideInfo::print(raw_ostream &os, Block *relative) const {
 }
 
 std::ostream &operator<<(std::ostream &os, const StrideInfo &x) {
-  //os << debugString(x);
-  // TODO: lorenzo fix this.
+  // os << debugString(x);
+  //  TODO: lorenzo fix this.
   os << debugString(x.offset);
   return os;
 }

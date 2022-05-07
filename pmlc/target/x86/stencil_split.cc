@@ -1,9 +1,9 @@
 // Copyright 2020 Intel Corporation
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
-#include "mlir/Pass/Pass.h"
-#include "mlir/Support/DebugStringHelper.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Math/IR/Math.h"
+#include "mlir/Pass/Pass.h"
+#include "mlir/Support/DebugStringHelper.h"
 #include "pmlc/dialect/pxa/ir/matchers.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/dialect/pxa/transforms/autotile.h"
@@ -201,8 +201,8 @@ private:
          !isa<pxa::PxaLoadOp>(rootedInstructions.front()))) {
       newMemFirst = builder.create<mlir::memref::AllocOp>(loc, memRefType);
       firstAffineParallelOp = builder.create<AffineParallelOp>(
-          loc, reductionTypes, arith::AtomicRMWKind::assign, lbMap, lbOps, ubMap,
-          ubOps, steps);
+          loc, reductionTypes, arith::AtomicRMWKind::assign, lbMap, lbOps,
+          ubMap, ubOps, steps);
       auto bodyBuilder =
           OpBuilder::atBlockBegin(firstAffineParallelOp.getBody());
       Operation *lastInstr;
@@ -270,8 +270,8 @@ private:
          !isa<pxa::PxaLoadOp>(secondRootedInstructions.front()))) {
       newMemSecond = builder.create<mlir::memref::AllocOp>(loc, memRefType);
       secondAffineParallelOp = builder.create<AffineParallelOp>(
-          loc, reductionTypes, arith::AtomicRMWKind::assign, lbMap, lbOps, ubMap,
-          ubOps, steps);
+          loc, reductionTypes, arith::AtomicRMWKind::assign, lbMap, lbOps,
+          ubMap, ubOps, steps);
 
       auto bodyBuilder =
           OpBuilder::atBlockBegin(secondAffineParallelOp.getBody());
@@ -334,8 +334,8 @@ private:
     {
       AffineParallelOp reduceAffineParallelOp =
           builder.create<AffineParallelOp>(loc, reductionTypes,
-                                           arith::AtomicRMWKind::assign, lbMap, lbOps,
-                                           ubMap, ubOps, steps);
+                                           arith::AtomicRMWKind::assign, lbMap,
+                                           lbOps, ubMap, ubOps, steps);
 
       auto bodyBuilder =
           OpBuilder::atBlockBegin(reduceAffineParallelOp.getBody());

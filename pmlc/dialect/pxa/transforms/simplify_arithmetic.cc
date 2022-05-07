@@ -1,12 +1,12 @@
 // Copyright 2020 Intel Corporation
 
-#include "mlir/Support/LLVM.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/IR/AffineValueMap.h"
-#include "mlir/Support/DebugStringHelper.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Support/DebugStringHelper.h"
+#include "mlir/Support/LLVM.h"
 
 #include "pmlc/dialect/pxa/analysis/memref_access.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
@@ -34,9 +34,11 @@ bool checkIfZero(arith::ConstantOp constantVal) {
     auto denseAttr = value.cast<DenseElementsAttr>();
     if (!denseAttr.isSplat())
       return false;
-    if ((denseAttr.getType().getElementType().isa<IntegerType>()) && (denseAttr.getSplatValue<APInt>().isZero()))
+    if ((denseAttr.getType().getElementType().isa<IntegerType>()) &&
+        (denseAttr.getSplatValue<APInt>().isZero()))
       return true;
-    if ((denseAttr.getType().getElementType().isa<FloatType>()) && (denseAttr.getSplatValue<APFloat>().isZero()))
+    if ((denseAttr.getType().getElementType().isa<FloatType>()) &&
+        (denseAttr.getSplatValue<APFloat>().isZero()))
       return true;
   }
 
@@ -45,7 +47,7 @@ bool checkIfZero(arith::ConstantOp constantVal) {
     auto floatAttr = value.cast<FloatAttr>();
     if (floatAttr.getValueAsDouble() == 0.0)
       return true;
-  } 
+  }
   if (auto intType = valueType.dyn_cast<IntegerType>()) {
     auto intAttr = value.cast<IntegerAttr>();
     if (intAttr.getInt() == 0)
@@ -66,7 +68,8 @@ void replaceAssignLoadAdd(PxaReduceOpInterface &reduceOp) {
 
   // The memref operand needs to come from reduce op assign
   auto reduceAssignOp = dyn_cast<PxaReduceOpInterface>(memRefOp);
-  if (!reduceAssignOp || reduceAssignOp.getAgg() != arith::AtomicRMWKind::assign)
+  if (!reduceAssignOp ||
+      reduceAssignOp.getAgg() != arith::AtomicRMWKind::assign)
     return;
 
   // Check if both reduce add and assign are of the same type, vector or scalar
@@ -107,15 +110,15 @@ void replaceAssignLoadAdd(PxaReduceOpInterface &reduceOp) {
   OpBuilder builder(reduceOp);
   if (isa<PxaVectorReduceOp>(reduceOp.getOperation())) {
     auto newReduceOp = builder.create<PxaVectorReduceOp>(
-        reduceOp.getLoc(), arith::AtomicRMWKind::assign, reduceOp.getValueToStore(),
-        reduceAssignOp.getMemRef(), reduceOp.getAffineMap(),
-        reduceOp.getIdxs());
+        reduceOp.getLoc(), arith::AtomicRMWKind::assign,
+        reduceOp.getValueToStore(), reduceAssignOp.getMemRef(),
+        reduceOp.getAffineMap(), reduceOp.getIdxs());
     reduceOp.getReduceResult().replaceAllUsesWith(newReduceOp.getResult());
   } else {
     auto newReduceOp = builder.create<PxaReduceOp>(
-        reduceOp.getLoc(), arith::AtomicRMWKind::assign, reduceOp.getValueToStore(),
-        reduceAssignOp.getMemRef(), reduceOp.getAffineMap(),
-        reduceOp.getIdxs());
+        reduceOp.getLoc(), arith::AtomicRMWKind::assign,
+        reduceOp.getValueToStore(), reduceAssignOp.getMemRef(),
+        reduceOp.getAffineMap(), reduceOp.getIdxs());
     reduceOp.getReduceResult().replaceAllUsesWith(newReduceOp.getResult());
   }
 
