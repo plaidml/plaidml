@@ -70,7 +70,9 @@ def ContractionOp : TileOp<"contract", [
     void setSources(mlir::ArrayRef<mlir::AffineMap> srcs);
     void setConstraints(mlir::IntegerSet cons);
 
-    mlir::RankedTensorType getResultType() { return result().getType().cast<mlir::RankedTensorType>(); }
+    mlir::RankedTensorType getResultType() { 
+      return result().getType().cast<mlir::RankedTensorType>(); 
+    }
 
     mlir::LogicalResult materializeOperands(mlir::OpBuilder& builder);
   }];

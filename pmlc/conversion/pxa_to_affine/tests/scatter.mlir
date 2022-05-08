@@ -26,6 +26,6 @@ func @scatter1d(%arg0: memref<8xf32>, %arg1: memref<4xi32>, %arg2: memref<4xf32>
 // CHECK:   %[[r0:.*]] = affine.load %[[arg2]][%[[arg4]]] : memref<4xf32>
 // CHECK:   %[[r1:.*]] = affine.load %[[arg1]][%[[arg4]]] : memref<4xi32>
 // CHECK:   %[[r2:.*]] = arith.index_cast %[[r1]] : i32 to index
-// CHECK:   %{{.*}} = atomic_rmw addf %[[r0]], %[[arg3]][%[[r2]]] : (f32, memref<8xf32>) -> f32
+// CHECK:   %{{.*}} = memref.atomic_rmw addf %[[r0]], %[[arg3]][%[[r2]]] : (f32, memref<8xf32>) -> f32
 // CHECK: return
 
