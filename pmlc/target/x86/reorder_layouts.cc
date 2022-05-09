@@ -624,7 +624,7 @@ struct ReorderWeightLayoutsPass
       return;
     }
 
-    bool oneFilterOut = (*ranges)[6] == 1;
+    bool depthwise = (*ranges)[6] == 1;
 
     MLIRContext *context = &getContext();
     ImplicitLocOpBuilder builder(op->getLoc(), op);
@@ -636,16 +636,16 @@ struct ReorderWeightLayoutsPass
     RankedTensorType blockedFilterType = conv->getBlockedFilterType(blockSize);
 
     // (k1, c1, r, s, k0, c0) -> (r, s, k1 * B + k0, c1 * B + c0)
-    AffineMap filterSourceMap = AffineMap::get(
-        6, 0,
-        ArrayRef<AffineExpr>{
-            getAffineDimExpr(2, context),
-            getAffineDimExpr(3, context),
-            getBlockedExpr(context, 0, 4, blockSize),
-            oneFilterOut ? getAffineConstantExpr(0, context)
-                         : getBlockedExpr(context, 1, 5, blockSize),
-        },
-        context);
+    AffineMap filterSourceMap =
+        AffineMap::get(6, 0,
+                       ArrayRef<AffineExpr>{
+                           getAffineDimExpr(2, context),
+                           getAffineDimExpr(3, context),
+                           getBlockedExpr(context, 0, 4, blockSize),
+                           depthwise ? getAffineDimExpr(5, context)
+                                     : getBlockedExpr(context, 1, 5, blockSize),
+                       },
+                       context);
 
     // (k1, c1, r, s, k0, c0) -> (k1, c1, r, s, k0, c0)
     AffineMap filterSinkMap = AffineMap::getMultiDimIdentityMap(6, context);
@@ -657,7 +657,7 @@ struct ReorderWeightLayoutsPass
     // Adjust convolution
     RankedTensorType blockedOutputType = conv->getBlockedOutputType(blockSize);
 
-    // oldInput = (n, h, w, c0, r, s, k0) -> (n, h + r, w + s, k0)
+    // oldInput = (n, h, w, c, r, s, k) -> (n, h + r, w + s, k)
     // newInput = (n, h, w, c0, r, s, k0, c1, k1) ->
     //            (n, h + r, w + s, k1 * B + k0)
     AffineMap newInputMap =
@@ -666,7 +666,8 @@ struct ReorderWeightLayoutsPass
                            conv->input.idxMap.getResult(0),
                            conv->input.idxMap.getResult(1),
                            conv->input.idxMap.getResult(2),
-                           getBlockedExpr(context, 8, 6, blockSize),
+                           depthwise ? getBlockedExpr(context, 7, 3, blockSize)
+                                     : getBlockedExpr(context, 8, 6, blockSize),
                        },
                        context);
 
@@ -675,8 +676,10 @@ struct ReorderWeightLayoutsPass
     AffineMap newFilterMap =
         AffineMap::get(9, 0,
                        ArrayRef<AffineExpr>{
-                           getAffineDimExpr(8, context),
-                           getAffineDimExpr(7, context),
+                           depthwise ? getAffineDimExpr(7, context)
+                                     : getAffineDimExpr(8, context),
+                           depthwise ? getAffineDimExpr(8, context)
+                                     : getAffineDimExpr(7, context),
                            conv->filter.idxMap.getResult(0),
                            conv->filter.idxMap.getResult(1),
                            conv->filter.idxMap.getResult(2),

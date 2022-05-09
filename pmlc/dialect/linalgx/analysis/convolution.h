@@ -43,7 +43,7 @@ struct ConvCapture {
          shape[0],                                 //
          shape[1],                                 //
          blockSize,                                //
-         blockSize},
+         shape[3] == 1 ? 1 : blockSize},
         filter.type.getElementType());
   }
 
