@@ -4,8 +4,7 @@
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
 #include "mlir/Conversion/MathToLLVM/MathToLLVM.h"
 #include "mlir/Conversion/MemRefToLLVM/MemRefToLLVM.h"
-// #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
-// #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
+#include "mlir/Conversion/FuncToLLVM/ConvertFuncToLLVM.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/Pass/Pass.h"
@@ -303,11 +302,10 @@ struct LowerToLLVMPass : public LowerToLLVMBase<LowerToLLVMPass> {
     LLVMTypeConverter typeConverter(context);
 
     RewritePatternSet patterns(context);
-    // populateLoopToStdConversionPatterns(patterns);
-    // populateStdToLLVMConversionPatterns(typeConverter, patterns);
     populateMemRefToLLVMConversionPatterns(typeConverter, patterns);
     populateMathToLLVMConversionPatterns(typeConverter, patterns);
     populateStdXToLLVMConversionPatterns(typeConverter, patterns);
+    populateFuncToLLVMConversionPatterns(typeConverter, patterns);
 
     LLVMConversionTarget target(*context);
     target.addIllegalDialect<stdx::StdXDialect>();
