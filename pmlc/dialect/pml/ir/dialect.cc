@@ -104,7 +104,7 @@ Attribute ScheduleAttr::parse(AsmParser &parser,
 }
 
 void ScheduleAttr::print(AsmPrinter &printer) const {
-  printer << "schedule<" << getMap() << ", [";
+  printer << "<" << getMap() << ", [";
   llvm::interleaveComma(getAxes(), printer,
                         [&](AxisAttr axis) { printAxisAttr(printer, axis); });
   printer << "]>";
