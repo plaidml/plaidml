@@ -10,7 +10,7 @@ func @inception_v3(%arg0: tensor<1x2x35x35x32xf32>) -> tensor<1x35x35x256xf32> {
   %1 = linalgx.copy(%arg0, %0) {inputMap = #map3, outputMap = #map2}
     : tensor<1x2x35x35x32xf32>, tensor<1x35x35x64xf32> -> tensor<1x35x35x64xf32>
   %2 = linalg.init_tensor [1, 35, 35, 256] : tensor<1x35x35x256xf32>
-  %3 = linalg.fill(%cst, %2) : f32, tensor<1x35x35x256xf32> -> tensor<1x35x35x256xf32>
+  %3 = linalg.fill ins(%cst : f32) outs(%2 : tensor<1x35x35x256xf32>) -> tensor<1x35x35x256xf32>
   %4 = linalg.generic
     {indexing_maps = [#map1, #map1], iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
     ins(%1 : tensor<1x35x35x64xf32>) outs(%3 : tensor<1x35x35x256xf32>) attrs = {iterator_ranges = [1, 35, 35, 64]} {
