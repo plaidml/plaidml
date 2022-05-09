@@ -5,6 +5,7 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Support/DebugStringHelper.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Dialect/Func/Transforms/FuncConversions.h"
 
 #include "pmlc/conversion/linalg_to_pxa/pass_detail.h"
 #include "pmlc/conversion/tile_to_pxa/pass_detail.h"
@@ -478,7 +479,7 @@ struct LowerLinalgToPXAPass
     linalg::populateLinalgNamedOpsGeneralizationPatterns(patterns);
     // populateLinalgTensorCollapseOpGeneralizationPatterns(patterns);
     // populateLinalgTensorExpandOpGeneralizationPatterns(patterns);
-    //  populateLinalgPoolingOpGeneralizationPatterns(patterns);
+    // populateLinalgPoolingOpGeneralizationPatterns(patterns);
     patterns.add<linalg::PadOpTransformationPattern>(op.getContext());
     (void)applyPatternsAndFoldGreedily(op, std::move(patterns));
   }
@@ -491,18 +492,22 @@ struct LowerLinalgToPXAPass
 
     ConversionTarget target(getContext());
     LinalgToPXATypeConverter converter;
-    target.addLegalDialect<AffineDialect, //
-                                          // StandardOpsDialect,    //
-                           math::MathDialect,     //
-                           memref::MemRefDialect, //
-                           scf::SCFDialect,       //
-                           layer::LayerDialect,   //
-                           pxa::PXADialect,       //
-                           arith::ArithmeticDialect, stdx::StdXDialect>();
+    target.addLegalDialect<AffineDialect, 
+                           math::MathDialect,     
+                           memref::MemRefDialect, 
+                           scf::SCFDialect,       
+                           layer::LayerDialect,   
+                           pxa::PXADialect,       
+                           arith::ArithmeticDialect, 
+                           stdx::StdXDialect>();
+   
+    // Module op is legal. 
     target.addLegalOp<ModuleOp>();
+    
     target.addDynamicallyLegalOp<func::FuncOp>([&](func::FuncOp op) {
-      return converter.isSignatureLegal(op.getFunctionType());
+      return converter.isSignatureLegal(op.getFunctionType()) && converter.isLegal(&op.getBody());
     });
+    
     target.addDynamicallyLegalOp<stdx::ClosureOp>([&](stdx::ClosureOp op) {
       return converter.isSignatureLegal(op.getFunctionType());
     });
@@ -511,25 +516,30 @@ struct LowerLinalgToPXAPass
       return (!op.getType().isa<TensorType>() && !op.getType().isF32());
     });
 
-    // target.addDynamicallyLegalOp<ConstantOp>(
-    //    [&](ConstantOp op) { return !op.getType().isa<TensorType>(); });
+    // Linalg is illegal.
+    target.addIllegalDialect<linalg::LinalgDialect>();
 
     RewritePatternSet patterns(&getContext());
-    patterns.insert<ConstantOpConversion,              //
-                    FuncOpConversion<func::FuncOp>,    //
-                    FuncOpConversion<stdx::ClosureOp>, //
-                    GenericOpConversion,               //
-                    IndexOpConversion,                 //
-                    InitTensorOpConversion,            //
-                    YieldOpConversion>(&getContext());
+    patterns.insert<YieldOpConversion, 
+                    ConstantOpConversion,              
+                    FuncOpConversion<stdx::ClosureOp>,
+                    FuncOpConversion<func::FuncOp>, 
+                    GenericOpConversion,               
+                    IndexOpConversion,                 
+                    InitTensorOpConversion>(&getContext());
 
     tile_to_pxa::populateTileToPXASpecialPatterns(patterns);
+    populateReturnOpTypeConversionPattern(patterns, converter);
+    // populateFunctionOpInterfaceTypeConversionPattern<func::FuncOp>(patterns, converter);
+
+    target.markUnknownOpDynamicallyLegal([&](Operation *op) {
+      return isLegalForReturnOpTypeConversionPattern(op, converter); });
 
     if (failed(applyFullConversion(module, target, std::move(patterns)))) {
       signalPassFailure();
       return;
     }
-
+    
     for (func::FuncOp funcOp : module.getOps<func::FuncOp>()) {
       for (func::ReturnOp returnOp : funcOp.getOps<func::ReturnOp>()) {
         connectResults(funcOp, returnOp);
