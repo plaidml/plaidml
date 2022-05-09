@@ -1,6 +1,7 @@
 // Copyright 2021, Intel Corporation
 
 #include "pmlc/conversion/linalg_to_pxa/pass_detail.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 
 namespace pmlc::conversion::linalg_to_pxa {
 
@@ -12,13 +13,14 @@ void buildSimpleYieldBody(OpBuilder &builder, Location loc, unsigned numInputs,
   builder.create<linalg::YieldOp>(loc, args[0]);
 }
 
-// TensorCollapseShapeOp does not have proper iterator_types() and
+// tensor::CollapseShapeOp does not have proper iterator_types() and
 // getLoopsToShapesMap()
+// TODO: Lorenzo: check if this is still true.
 struct GeneralizeTensorCollapseShapeOp
-    : public OpRewritePattern<linalg::TensorCollapseShapeOp> {
-  using OpRewritePattern<linalg::TensorCollapseShapeOp>::OpRewritePattern;
+    : public OpRewritePattern<tensor::CollapseShapeOp> {
+  using OpRewritePattern<tensor::CollapseShapeOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(linalg::TensorCollapseShapeOp op,
+  LogicalResult matchAndRewrite(tensor::CollapseShapeOp op,
                                 PatternRewriter &rewriter) const override {
     auto srcType = op.src().getType().cast<ShapedType>();
     auto srcShape = srcType.getShape();
@@ -74,13 +76,13 @@ void populateLinalgTensorCollapseOpGeneralizationPatterns(
   patterns.add<GeneralizeTensorCollapseShapeOp>(patterns.getContext());
 }
 
-// TensorExpandShapeOp does not have proper iterator_types() and
+// tensor::ExpandShapeOp does not have proper iterator_types() and
 // getLoopsToShapesMap()
 struct GeneralizeTensorExpandShapeOp
-    : public OpRewritePattern<linalg::TensorExpandShapeOp> {
-  using OpRewritePattern<linalg::TensorExpandShapeOp>::OpRewritePattern;
+    : public OpRewritePattern<tensor::ExpandShapeOp> {
+  using OpRewritePattern<tensor::ExpandShapeOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(linalg::TensorExpandShapeOp op,
+  LogicalResult matchAndRewrite(tensor::ExpandShapeOp op,
                                 PatternRewriter &rewriter) const override {
     auto dstType = op.result().getType().cast<ShapedType>();
     auto dstShape = dstType.getShape();

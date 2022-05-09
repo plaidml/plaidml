@@ -5,7 +5,7 @@ pml_cc_library(
   SRCS
     linalg_to_pxa.cc
     #pooling.cc
-    #reshape.cc
+    reshape.cc
     utils.cc
   DEPS
     ::passes-gen
