@@ -2,8 +2,11 @@
 // RUN:     -x86-convert-pxa-to-affine \
 // RUN:     -lower-affine \
 // RUN:     -canonicalize \
-// RUN:     -convert-scf-to-std \
+// RUN:     -convert-scf-to-cf \
 // RUN:     -x86-convert-std-to-llvm \
+// RUN:     -convert-arith-to-llvm \
+// RUN:     -convert-memref-to-llvm \
+// RUN:     -convert-func-to-llvm -reconcile-unrealized-casts \
 // RUN:   | pmlc-jit | FileCheck %s
 
 !eltwise = type memref<8x3xf32>
@@ -20,7 +23,7 @@ func @fill_2d(%buf : memref<?x?xf32>, %alt : i1) {
     // i = linear offset
     %i = affine.apply affine_map<(x, y)[Y] -> (x * Y + y)>(%x, %y)[%Y]
     // t = alt ? i : 0
-    %t = select %alt, %i, %c0 : index
+    %t = arith.select %alt, %i, %c0 : index
     // v = x + y + t - 5
     %1 = arith.addi %x, %y : index
     %2 = arith.addi %1, %t : index
