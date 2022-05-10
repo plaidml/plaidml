@@ -3,7 +3,7 @@
 
 include "mlir/Pass/PassBase.td"
 
-def RegulateDepthwise : FunctionPass<"linalgx-regulate-depthwise"> {
+def RegulateDepthwise : Pass<"linalgx-regulate-depthwise", "mlir::func::FuncOp"> {
   let summary = "Regulate depthwise convolutions";
   let constructor = "pmlc::dialect::linalgx::createRegulateDepthwisePass()";
 }
