@@ -1,6 +1,5 @@
 #pragma once
 
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
