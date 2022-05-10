@@ -2,6 +2,7 @@ message("Fetching xsmm")
 FetchContent_Declare(
   xsmm
   URL      https://github.com/libxsmm/libxsmm/archive/394294d7f62efdd25033ee46e73abd4ccb3ded59.zip
+  URL_HASH SHA256=b2307f0374fac07f74414dc4365e078aa97d7abc59204c7955a658ad4e8a676e
 )
 
 FetchContent_GetProperties(xsmm)
