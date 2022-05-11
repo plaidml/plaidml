@@ -1,4 +1,4 @@
-// RUN: pmlc-opt --linalgx-regulate-convolution %s | FileCheck %s
+// RUN: pmlc-opt --linalgx-regulate-depthwise %s | FileCheck %s
 
 #map0 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1 + d6, d2 + d7, d3 + d4 - d5)>
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d6, d7, d3 + d4 - d5, d5)>
