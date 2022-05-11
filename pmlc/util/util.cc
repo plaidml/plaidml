@@ -1,5 +1,7 @@
 // Copyright 2019, Intel Corporation
 
+#include <limits>
+
 #include "pmlc/util/util.h"
 
 #include "mlir/IR/BuiltinOps.h"
@@ -109,6 +111,13 @@ void splitAffineMaps(AffineMap from, SmallVectorImpl<AffineMap> &into) {
     into.push_back(
         AffineMap::get(from.getNumDims(), from.getNumSymbols(), expr));
   }
+}
+
+unsigned dimPosition(AffineExpr expr) {
+  if (auto dimExpr = expr.dyn_cast<AffineDimExpr>()) {
+    return dimExpr.getPosition();
+  }
+  return std::numeric_limits<unsigned>::max();
 }
 
 } // namespace pmlc::util

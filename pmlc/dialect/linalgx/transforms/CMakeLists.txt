@@ -3,8 +3,9 @@
   HRDS
     pass_detail.h
     passes.h
+    regulate_depthwise.h
   SRCS
-    regulate_conv.cc
+    regulate_depthwise.cc
   DEPS
     LLVMSupport
     MLIRIR

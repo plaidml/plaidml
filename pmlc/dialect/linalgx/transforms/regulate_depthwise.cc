@@ -8,20 +8,21 @@
 
 #include "pmlc/dialect/linalgx/analysis/convolution.h"
 #include "pmlc/dialect/linalgx/transforms/pass_detail.h"
-#include "pmlc/dialect/linalgx/transforms/regulate_conv.h"
+#include "pmlc/dialect/linalgx/transforms/regulate_depthwise.h"
 
 #include "pmlc/util/logging.h"
+#include "pmlc/util/util.h"
 
 using namespace mlir; // NOLINT
 
 namespace pmlc::dialect::linalgx {
 
-struct RegulateConvolutionPass
-    : public RegulateConvolutionBase<RegulateConvolutionPass> {
-  RegulateConvolutionPass() = default;
+struct RegulateDepthwisePass
+    : public RegulateDepthwiseBase<RegulateDepthwisePass> {
+  RegulateDepthwisePass() = default;
   void runOnFunction() final {
     auto func = getFunction();
-    func.walk([&](linalg::GenericOp op) { regulateConvolution(op); });
+    func.walk([&](linalg::GenericOp op) { regulateDepthwise(op); });
   }
 
   void joinAffineMapResult(SmallVector<AffineExpr, 12> &results,
@@ -89,7 +90,26 @@ struct RegulateConvolutionPass
     return {newInputMap, newFilterMap, newOutputMap};
   }
 
-  void regulateConvolution(linalg::GenericOp op) {
+  SmallVector<AffineMap, 3> reorderMaps(SmallVector<AffineMap, 3> &origMaps,
+                                        SmallVector<unsigned> &order) {
+    if (util::dimPosition(origMaps[0].getResult(3)) == 3) {
+      order = {0, 1, 2, 3, 6, 4, 5};
+      auto context = origMaps[0].getContext();
+      SmallVector<AffineExpr> results;
+      for (unsigned d : order) {
+        results.emplace_back(getAffineDimExpr(d, context));
+      }
+      AffineMap orderMap =
+          AffineMap::get(origMaps[0].getNumDims(), origMaps[0].getNumSymbols(),
+                         results, context);
+      return {origMaps[0].compose(orderMap), origMaps[1].compose(orderMap),
+              origMaps[2].compose(orderMap)};
+    }
+    order = {0, 1, 2, 3, 4, 5, 6};
+    return origMaps;
+  }
+
+  void regulateDepthwise(linalg::GenericOp op) {
     Optional<ConvCapture> conv = detectConv(op);
     if (!conv) {
       IVLOG(3, "Cannot reorder: not a convolution. " << debugString(op));
@@ -119,43 +139,49 @@ struct RegulateConvolutionPass
     }
 
     llvm::SmallBitVector usedDims;
-    auto newMaps =
+    auto tmpMaps =
         simplifyMaps(*ranges, conv->input.idxMap, conv->filter.idxMap,
                      conv->output.idxMap, usedDims);
     if (usedDims.all()) {
       IVLOG(1, "Nothing to be simplified.");
       return;
     }
-    AffineMap inputMap = newMaps[0];
-    AffineMap filterMap = newMaps[1];
-    AffineMap outputMap = newMaps[2];
-    if (inputMap.getNumDims() != 7 || filterMap.getNumDims() != 7 ||
-        outputMap.getNumDims() != 7) {
-      IVLOG(1, "Cannot reorder: number of indexes is not 7.");
+    unsigned numDims = 7;
+    if (tmpMaps[0].getNumDims() != numDims ||
+        tmpMaps[1].getNumDims() != numDims ||
+        tmpMaps[2].getNumDims() != numDims) {
+      IVLOG(1, "Cannot regulate: number of indexes is not 7.");
       return;
     }
 
     // check that we have (channels-last logical ordering):
-    // (n, h, w, c), (r, s, c, k) -> (n, h, w, k)
-    if (inputMap.getResult(3) != filterMap.getResult(2)) {
-      IVLOG(1, "Cannot reorder: expected channels-last logical ordering.");
-      return;
-    }
-    if (filterMap.getResult(3) != outputMap.getResult(3) &&
-        filterMap.getResult(3) ==
-            getAffineConstantExpr(0, filterMap.getContext())) {
-      IVLOG(1, "Cannot reorder: expected channels-last logical ordering.");
+    // (n, h, w, c), (r, s, c, c') -> (n, h, w, c)
+    if (tmpMaps[0].getResult(3) != tmpMaps[1].getResult(2) ||
+        tmpMaps[0].getResult(3) != tmpMaps[2].getResult(3)) {
+      IVLOG(1, "Cannot regulate: expected channels-last logical ordering.");
       return;
     }
 
+    SmallVector<unsigned> order;
+    auto newMaps = reorderMaps(tmpMaps, order);
+    AffineMap inputMap = newMaps[0];
+    AffineMap filterMap = newMaps[1];
+    AffineMap outputMap = newMaps[2];
+
     auto iterTypes = op.iterator_types().getValue();
-    SmallVector<StringRef, 8> newIterTypes;
-    SmallVector<int64_t, 8> newRanges;
+    SmallVector<StringRef, 8> tmpIterTypes;
+    SmallVector<int64_t, 8> tmpRanges;
     for (unsigned i = 0; i < iterTypes.size(); ++i) {
       if (usedDims[i]) {
-        newIterTypes.emplace_back(iterTypes[i].cast<StringAttr>().getValue());
-        newRanges.emplace_back((*ranges)[i]);
+        tmpIterTypes.emplace_back(iterTypes[i].cast<StringAttr>().getValue());
+        tmpRanges.emplace_back((*ranges)[i]);
       }
+    }
+    SmallVector<StringRef, 8> newIterTypes(numDims);
+    SmallVector<int64_t, 8> newRanges(numDims);
+    for (unsigned i = 0; i < numDims; ++i) {
+      newIterTypes[order[i]] = tmpIterTypes[i];
+      newRanges[order[i]] = tmpRanges[i];
     }
 
     ImplicitLocOpBuilder builder(op->getLoc(), op);
@@ -180,8 +206,8 @@ struct RegulateConvolutionPass
   }
 };
 
-std::unique_ptr<mlir::Pass> createRegulateConvolutionPass() {
-  return std::make_unique<RegulateConvolutionPass>();
+std::unique_ptr<mlir::Pass> createRegulateDepthwisePass() {
+  return std::make_unique<RegulateDepthwisePass>();
 }
 
 } // namespace pmlc::dialect::linalgx
