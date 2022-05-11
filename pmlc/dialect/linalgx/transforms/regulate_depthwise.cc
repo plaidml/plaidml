@@ -8,7 +8,7 @@
 
 #include "pmlc/dialect/linalgx/analysis/convolution.h"
 #include "pmlc/dialect/linalgx/transforms/pass_detail.h"
-#include "pmlc/dialect/linalgx/transforms/regulate_conv.h"
+#include "pmlc/dialect/linalgx/transforms/regulate_depthwise.h"
 
 #include "pmlc/util/logging.h"
 #include "pmlc/util/util.h"
@@ -17,12 +17,12 @@ using namespace mlir; // NOLINT
 
 namespace pmlc::dialect::linalgx {
 
-struct RegulateConvolutionPass
-    : public RegulateConvolutionBase<RegulateConvolutionPass> {
-  RegulateConvolutionPass() = default;
+struct RegulateDepthwisePass
+    : public RegulateDepthwiseBase<RegulateDepthwisePass> {
+  RegulateDepthwisePass() = default;
   void runOnFunction() final {
     auto func = getFunction();
-    func.walk([&](linalg::GenericOp op) { regulateConvolution(op); });
+    func.walk([&](linalg::GenericOp op) { regulateDepthwise(op); });
   }
 
   void joinAffineMapResult(SmallVector<AffineExpr, 12> &results,
@@ -109,7 +109,7 @@ struct RegulateConvolutionPass
     return origMaps;
   }
 
-  void regulateConvolution(linalg::GenericOp op) {
+  void regulateDepthwise(linalg::GenericOp op) {
     Optional<ConvCapture> conv = detectConv(op);
     if (!conv) {
       IVLOG(3, "Cannot reorder: not a convolution. " << debugString(op));
@@ -206,8 +206,8 @@ struct RegulateConvolutionPass
   }
 };
 
-std::unique_ptr<mlir::Pass> createRegulateConvolutionPass() {
-  return std::make_unique<RegulateConvolutionPass>();
+std::unique_ptr<mlir::Pass> createRegulateDepthwisePass() {
+  return std::make_unique<RegulateDepthwisePass>();
 }
 
 } // namespace pmlc::dialect::linalgx

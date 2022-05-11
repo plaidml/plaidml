@@ -624,7 +624,8 @@ struct ReorderWeightLayoutsPass
       return;
     }
 
-    bool depthwise = (*ranges)[6] == 1;
+    bool depthwise = (*ranges)[6] == 1 && conv->input.idxMap.getResult(3) ==
+                                              conv->output.idxMap.getResult(3);
 
     MLIRContext *context = &getContext();
     ImplicitLocOpBuilder builder(op->getLoc(), op);
