@@ -38,6 +38,7 @@
 #include "pmlc/conversion/tile_to_linalg/passes.h"
 #include "pmlc/conversion/tile_to_pxa/passes.h"
 #include "pmlc/dialect/layer/transforms/passes.h"
+#include "pmlc/dialect/linalgx/transforms/passes.h"
 #include "pmlc/dialect/pml/transforms/passes.h"
 #include "pmlc/dialect/pxa/transforms/passes.h"
 #include "pmlc/dialect/pxa/transforms/stencil.h"
@@ -57,6 +58,7 @@ using namespace mlir; // NOLINT[build/namespaces]
 namespace pmlc::target::x86 {
 
 namespace layer = dialect::layer;
+namespace linalgx = dialect::linalgx;
 namespace pml = dialect::pml;
 namespace pxa = dialect::pxa;
 namespace stdx = dialect::stdx;
@@ -262,6 +264,7 @@ void pipelineBuilderStage1(OpPassManager &pm) {
   }
 
   pm.addPass(pmlc::conversion::tile_to_linalg::createLowerTileToLinalgPass());
+  pm.addNestedPass<FuncOp>(linalgx::createRegulateDepthwisePass());
   if (!util::getEnvVar("PLAIDML_REORDER").empty())
     pm.addNestedPass<FuncOp>(createReorderLayoutsPass());
   else

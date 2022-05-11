@@ -59,6 +59,8 @@ mlir::AffineValueMap getRangesValueMap(mlir::AffineParallelOp op);
 void splitAffineMaps(mlir::AffineMap from,
                      mlir::SmallVectorImpl<mlir::AffineMap> &into);
 
+unsigned dimPosition(mlir::AffineExpr expr);
+
 } // namespace pmlc::util
 
 namespace llvm {

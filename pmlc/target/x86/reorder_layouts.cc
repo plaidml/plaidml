@@ -63,6 +63,34 @@ static SmallVector<int64_t, 4> extractVector(ArrayAttr arrayAttr) {
                       [](IntegerAttr attr) { return attr.getInt(); }));
 }
 
+// check that we have (channels-last logical ordering):
+// (n, h, w, c), (r, s, c, k) -> (n, h, w, k) or
+// (n, h, w, c), (r, s, c, 1) -> (n, h, w, c)
+bool testChannels(AffineExpr cin, AffineExpr cout, AffineExpr fin,
+                  AffineExpr fout) {
+  if (cin != fin) {
+    return false;
+  }
+  if (cout == fout) {
+    return true;
+  }
+  if (cin == cout && fout == getAffineConstantExpr(1, fout.getContext())) {
+    return true;
+  }
+  return false;
+}
+
+// Return AffineConstantExpr(1) if expr's range is 1.
+// Otherwise, return expr directly.
+AffineExpr isSizeOne(AffineExpr expr, SmallVector<int64_t, 4> &ranges) {
+  if (auto dim = expr.dyn_cast<AffineDimExpr>()) {
+    if (ranges[dim.getPosition()] == 1) {
+      return getAffineConstantExpr(1, expr.getContext());
+    }
+  }
+  return expr;
+}
+
 // Forward a reorder thru linalg.pad_tensor operations.
 struct PropagateReorderThruPadTensorOpPattern
     : public OpRewritePattern<linalg::PadTensorOp> {
@@ -556,14 +584,6 @@ struct ReorderWeightLayoutsPass
       return;
     }
 
-    // check that we have (channels-last logical ordering):
-    // (n, h, w, c), (r, s, c, k) -> (n, h, w, k)
-    if (conv->input.idxMap.getResult(3) != conv->filter.idxMap.getResult(2) ||
-        conv->filter.idxMap.getResult(3) != conv->output.idxMap.getResult(3)) {
-      IVLOG(1, "Cannot reorder: expected channels-last logical ordering.");
-      return;
-    }
-
     // dims: (n, h, w, c, r, s, k)
     Optional<SmallVector<int64_t, 4>> ranges = op.getStaticLoopRanges();
     if (!ranges) {
@@ -576,6 +596,15 @@ struct ReorderWeightLayoutsPass
       return;
     }
 
+    // check that we have (channels-last logical ordering):
+    if (!testChannels(conv->input.idxMap.getResult(3),
+                      conv->output.idxMap.getResult(3),
+                      conv->filter.idxMap.getResult(2),
+                      isSizeOne(conv->filter.idxMap.getResult(3), *ranges))) {
+      IVLOG(1, "Cannot reorder: expected channels-last logical ordering.");
+      return;
+    }
+
     SmallVector<int64_t, 4> feasibleSizes = {32, 16};
     int64_t blockSize = 0;
     std::string blockSizeStr = util::getEnvVar("PLAIDML_BLOCK_SIZE");
@@ -583,7 +612,8 @@ struct ReorderWeightLayoutsPass
       blockSize = std::stoi(blockSizeStr);
     }
     for (int64_t size : feasibleSizes) {
-      if ((*ranges)[3] % size == 0 && (*ranges)[6] % size == 0) {
+      if ((*ranges)[3] % size == 0 &&
+          ((*ranges)[6] % size == 0 || (*ranges)[6] == 1)) {
         blockSize = size;
         break;
       }
@@ -593,6 +623,9 @@ struct ReorderWeightLayoutsPass
       IVLOG(1, "Cannot reorder: incompatible layout. op: " << debugString(op));
       return;
     }
+
+    bool depthwise = (*ranges)[6] == 1 && conv->input.idxMap.getResult(3) ==
+                                              conv->output.idxMap.getResult(3);
 
     MLIRContext *context = &getContext();
     ImplicitLocOpBuilder builder(op->getLoc(), op);
@@ -610,7 +643,8 @@ struct ReorderWeightLayoutsPass
                            getAffineDimExpr(2, context),
                            getAffineDimExpr(3, context),
                            getBlockedExpr(context, 0, 4, blockSize),
-                           getBlockedExpr(context, 1, 5, blockSize),
+                           depthwise ? getAffineDimExpr(5, context)
+                                     : getBlockedExpr(context, 1, 5, blockSize),
                        },
                        context);
 
@@ -624,7 +658,7 @@ struct ReorderWeightLayoutsPass
     // Adjust convolution
     RankedTensorType blockedOutputType = conv->getBlockedOutputType(blockSize);
 
-    // oldInput = (n, h, w, c0, r, s, k0) -> (n, h + r, w + s, k0)
+    // oldInput = (n, h, w, c, r, s, k) -> (n, h + r, w + s, k)
     // newInput = (n, h, w, c0, r, s, k0, c1, k1) ->
     //            (n, h + r, w + s, k1 * B + k0)
     AffineMap newInputMap =
@@ -633,7 +667,8 @@ struct ReorderWeightLayoutsPass
                            conv->input.idxMap.getResult(0),
                            conv->input.idxMap.getResult(1),
                            conv->input.idxMap.getResult(2),
-                           getBlockedExpr(context, 8, 6, blockSize),
+                           depthwise ? getBlockedExpr(context, 7, 3, blockSize)
+                                     : getBlockedExpr(context, 8, 6, blockSize),
                        },
                        context);
 
@@ -642,8 +677,10 @@ struct ReorderWeightLayoutsPass
     AffineMap newFilterMap =
         AffineMap::get(9, 0,
                        ArrayRef<AffineExpr>{
-                           getAffineDimExpr(8, context),
-                           getAffineDimExpr(7, context),
+                           depthwise ? getAffineDimExpr(7, context)
+                                     : getAffineDimExpr(8, context),
+                           depthwise ? getAffineDimExpr(8, context)
+                                     : getAffineDimExpr(7, context),
                            conv->filter.idxMap.getResult(0),
                            conv->filter.idxMap.getResult(1),
                            conv->filter.idxMap.getResult(2),
