@@ -137,8 +137,8 @@ private:
     return ret;
   }
 
-  double getCost(const pxa::StencilOption &stencil,
-                 ArrayRef<int64_t> tileSizes) {
+  std::pair<double, double> getCost(const pxa::StencilOption &stencil,
+                                    ArrayRef<int64_t> tileSizes) {
     int64_t tiledIdxCount = getTiledIdxCount();
     double inputStride =
         getStride(tileSizes, tiledIdxCount,
@@ -147,7 +147,7 @@ private:
         getStride(tileSizes, tiledIdxCount,
                   stencil.values[0].strideInfo.strides, stencil.indexes);
 
-    return (inputStride + outputStride);
+    return std::make_pair((inputStride + outputStride), 0.0);
   }
 
   void transform(const pxa::StencilOption &stencil,

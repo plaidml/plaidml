@@ -38,7 +38,7 @@ StencilBase::StencilBase(AffineParallelOp op,
                          ArrayRef<StencilIndexRequirement> requirements)
     : op(op), blockArgs(op.getIVs().begin(), op.getIVs().end()),
       requirements(requirements.begin(), requirements.end()),
-      bestCost(std::numeric_limits<double>::infinity()),
+      bestCost(std::numeric_limits<double>::infinity()), stride(0.0),
       schedule(op->getAttrOfType<pml::ScheduleAttr>(pml::kScheduleAttrName)) {
   if (schedule)
     IVLOG(1, "Using schedule: " << schedule);
@@ -90,6 +90,19 @@ StrideInfo StencilBase::getStrideInfo(Value value) {
           .Default([](Operation *) { return None; });
   assert(maybeInfo.hasValue() && "StrideInfo must be computable");
   return *maybeInfo;
+}
+
+double StencilBase::getStride(ArrayRef<int64_t> tileSizes, int tiledIdxCount,
+                              DenseMap<mlir::BlockArgument, int64_t> strides,
+                              SmallVector<mlir::BlockArgument, 8> indexes) {
+  for (size_t j = 0; j < tiledIdxCount; j++) {
+    for (const auto &kvp : strides) {
+      if (indexes[j] == kvp.first) {
+        return static_cast<double>(kvp.second);
+      }
+    }
+  }
+  return 0.0;
 }
 
 bool StencilIndexRequirement::check(ArrayRef<ValueStrideInfo> values,
@@ -152,8 +165,10 @@ void StencilBase::recursiveTileIndex(const StencilOption &stencil,
     IVLOG(3, "Considering Tile " << tileSizes);
     auto cost = getCost(stencil, tileSizes);
     IVLOG(3, "Tile cost = " << cost);
-    if (cost < bestCost) {
-      bestCost = cost;
+    if (cost.first < bestCost ||
+        (cost.first == bestCost && cost.second < stride)) {
+      bestCost = cost.first;
+      stride = cost.second;
       bestStencil = stencil;
       bestTiling.assign(tileSizes.begin(), tileSizes.end());
     }
