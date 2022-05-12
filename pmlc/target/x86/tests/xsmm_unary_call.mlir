@@ -11,7 +11,7 @@
 
 !eltwise = type memref<8x3xf32>
 
-func private @print_memref_f32(memref<*xf32>)
+func private @printMemrefF32(memref<*xf32>) attributes { llvm.emit_c_interface }
 
 func @fill_2d(%buf : memref<?x?xf32>, %alt : i1) {
   %c0 = arith.constant 0 : index
@@ -35,7 +35,7 @@ func @fill_2d(%buf : memref<?x?xf32>, %alt : i1) {
   return
 }
 
-func @main() {
+func @main() attributes { llvm.emit_c_interface } {
   %false = arith.constant 0 : i1
   %true = arith.constant 1 : i1
   %A = memref.alloc() : !eltwise
@@ -46,7 +46,7 @@ func @main() {
   %B_2d = memref.cast %B : !eltwise to memref<?x?xf32>
   %B_ud = memref.cast %B : !eltwise to memref<*xf32>
   call @fill_2d(%B_2d, %true) : (memref<?x?xf32>, i1) -> ()
-  call @print_memref_f32(%A_ud) : (memref<*xf32>) -> ()
+  call @printMemrefF32(%A_ud) : (memref<*xf32>) -> ()
   // CHECK:  [-5,   -4,   -3],
   // CHECK:  [-4,   -3,   -2],
   // CHECK:  [-3,   -2,   -1],
@@ -55,7 +55,7 @@ func @main() {
   // CHECK:  [0,   1,   2],
   // CHECK:  [1,   2,   3],
   // CHECK:  [2,   3,   4]
-  call @print_memref_f32(%B_ud) : (memref<*xf32>) -> ()
+  call @printMemrefF32(%B_ud) : (memref<*xf32>) -> ()
   // CHECK:  [-5,   -3,   -1],
   // CHECK:  [-1,   1,   3],
   // CHECK:  [3,   5,   7],
@@ -65,7 +65,7 @@ func @main() {
   // CHECK:  [19,   21,   23],
   // CHECK:  [23,   25,   27]
   call @exp_xsmm(%A, %B) : (!eltwise, !eltwise) -> ()
-  call @print_memref_f32(%B_ud) : (memref<*xf32>) -> ()
+  call @printMemrefF32(%B_ud) : (memref<*xf32>) -> ()
   // CHECK:  [-5,   0.0183152,   0.0497804],
   // CHECK:  [-1,   0.0497804,   0.135335],
   // CHECK:  [3,   0.135335,   0.367705],
@@ -75,7 +75,7 @@ func @main() {
   // CHECK:  [19,   7.38904,   20.0837],
   // CHECK:  [23,   20.0837,   54.5965]
   call @relu_xsmm(%B, %B) : (!eltwise, !eltwise) -> ()
-  call @print_memref_f32(%B_ud) : (memref<*xf32>) -> ()
+  call @printMemrefF32(%B_ud) : (memref<*xf32>) -> ()
   // CHECK:  [-5,   0.0183152,   0.0497804],
   // CHECK:  [0,   0.0497804,   0.135335],
   // CHECK:  [3,   0.135335,   0.367705],
