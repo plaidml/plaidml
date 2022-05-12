@@ -53,8 +53,7 @@ void registerBuiltins() {
   REGISTER_SYMBOL(malloc);
 
   // RunnerUtils functions
-  // TODO: Lorenzo re-enable this method.
-  // REGISTER_SYMBOL(mlirCifacePrintMemrefF32);
+  REGISTER_SYMBOL(_mlir_ciface_printMemrefF32);
   REGISTER_SYMBOL(plaidml_rt_trace);
 }
 
