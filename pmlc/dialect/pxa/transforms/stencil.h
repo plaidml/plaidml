@@ -163,8 +163,8 @@ protected:
   //    `perm` and `requirements`.
   // Returns the cost as a double. If the proposed tiling is illegal, the
   // cost `std::numeric_limits<double>::infinity()` should be returned.
-  virtual double getCost(const StencilOption &stencil,
-                         mlir::ArrayRef<int64_t> tileSizes) = 0;
+  virtual std::pair<double, double>
+  getCost(const StencilOption &stencil, mlir::ArrayRef<int64_t> tileSizes) = 0;
 
   // Transform `op` based on the already-determined optimal tiling. The
   // tiling is provided as paramters to `transform` (same as for `getCost`):
@@ -188,6 +188,10 @@ protected:
 
   // The number of indexes whose semantics must be considered in the tiling
   unsigned getTiledIdxCount() const { return requirements.size(); }
+
+  double getStride(mlir::ArrayRef<int64_t> tileSizes, int tiledIdxCount,
+                   mlir::DenseMap<mlir::BlockArgument, int64_t> strides,
+                   mlir::SmallVector<mlir::BlockArgument, 8> indexes);
 
   // The BlockArguments of `op` (stored as a set for easy lookup)
   BlockArgumentSet getBlockArgsAsSet() const { return blockArgs; }
@@ -225,6 +229,7 @@ private:
   // Note: The bestCost, bestStencil, and bestTiling all must refer to the
   // same permutation & tiling choices and should only be modified together
   double bestCost;
+  double stride;
   StencilOption bestStencil;
   mlir::SmallVector<int64_t, 8> bestTiling;
 

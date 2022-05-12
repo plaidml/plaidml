@@ -40,19 +40,6 @@ struct GemmOperand {
   }
 };
 
-double getStride(ArrayRef<int64_t> tileSizes, int tiledIdxCount,
-                 DenseMap<mlir::BlockArgument, int64_t> strides,
-                 SmallVector<mlir::BlockArgument, 8> indexes) {
-  for (size_t j = 0; j < tiledIdxCount; j++) {
-    for (const auto &kvp : strides) {
-      if (indexes[j] == kvp.first) {
-        return static_cast<double>(kvp.second);
-      }
-    }
-  }
-  return 0.0;
-}
-
 bool isLocallyDefined(AffineParallelOp op, Value source) {
   if (!source.isa<BlockArgument>()) {
     // If the definition of load's source is in "op", it is too complex to
@@ -113,8 +100,8 @@ private:
     return ret;
   }
 
-  double getCost(const pxa::StencilOption &stencil,
-                 ArrayRef<int64_t> tileSizes) {
+  std::pair<double, double> getCost(const pxa::StencilOption &stencil,
+                                    ArrayRef<int64_t> tileSizes) {
     int64_t tiledIdxCount = getTiledIdxCount();
     double inputStride1 =
         getStride(tileSizes, tiledIdxCount,
@@ -126,7 +113,7 @@ private:
         getStride(tileSizes, tiledIdxCount,
                   stencil.values[0].strideInfo.strides, stencil.indexes);
 
-    return (inputStride1 + inputStride2 + outputStride);
+    return std::make_pair((inputStride1 + inputStride2 + outputStride), 0.0);
   }
 
   void transform(const pxa::StencilOption &stencil,
