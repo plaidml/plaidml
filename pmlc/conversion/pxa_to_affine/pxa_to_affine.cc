@@ -366,8 +366,8 @@ struct LowerPXAToAffinePass
 
 PXAToAffineConversionTarget::PXAToAffineConversionTarget(MLIRContext &ctx)
     : ConversionTarget(ctx) {
-  addLegalDialect<AffineDialect, //
-                                 // StandardOpsDialect, //
+  addLegalDialect<AffineDialect,
+                  arith::ArithmeticDialect,
                   memref::MemRefDialect>();
   addIllegalDialect<pxa::PXADialect>();
   addDynamicallyLegalOp<AffineParallelOp>([](AffineParallelOp op) {
