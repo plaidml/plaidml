@@ -7,7 +7,7 @@
 func @closure() {
   %cst = arith.constant 0.0 : f32
   %0 = linalg.init_tensor [8, 32] : tensor<8x32xf32>
-  %1 = linalg.fill(%cst, %0) : f32, tensor<8x32xf32> -> tensor<8x32xf32>
+  %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<8x32xf32>) -> tensor<8x32xf32>
   stdx.closure(%arg0: tensor<8x16xf32>, %arg1: tensor<16x32xf32>)
       -> tensor<8x32xf32> {
     %2 = linalg.generic {

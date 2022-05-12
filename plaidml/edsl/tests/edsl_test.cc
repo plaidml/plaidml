@@ -105,6 +105,38 @@ TEST_F(CppEdsl, BindDims) {
   }
 }
 
+TEST_F(CppEdsl, SimpleTensor) {
+  auto A = Placeholder(DType::FLOAT32, {3, 3});
+  auto C = A;
+  auto program = makeProgram("simple_tensor", {A}, {C});
+
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.SimpleTensor
+  // CHECK: module @simple_tensor {
+  // CHECK: func @main(%arg0: tensor<3x3xf32>) -> tensor<3x3xf32> {
+  // CHECK:  %0 = tile.ident %arg0 : (tensor<3x3xf32>) -> tensor<3x3xf32>
+  // CHECK:  return %0 : tensor<3x3xf32>
+  // }
+  // }
+  // clang-format on
+}
+
+TEST_F(CppEdsl, SimpleAdd) {
+  auto A = Placeholder(DType::FLOAT32, {3, 3});
+  auto B = Placeholder(DType::FLOAT32, {3, 3});
+  auto C = A + B;
+  auto program = makeProgram("simple_add", {A, B}, {C});
+
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.SimpleAdd
+  // clang-format on
+  //
+  std::vector<float> A_input{1, 2, 3, 4, 5, 6, 7, 8, 9};
+  std::vector<float> B_input{1, 2, 3, 4, 5, 6, 7, 8, 9};
+  std::vector<float> C_output{2, 4, 6, 8, 10, 12, 14, 16, 18};
+  checkExact(program, {A_input, B_input}, {C_output});
+}
+
 TEST_F(CppEdsl, HigherPrecisionConstants) {
   auto A = Placeholder(DType::FLOAT32, {3, 3});
   auto C = A + cast(Tensor{1}, DType::UINT64) + cast(Tensor{2.0}, DType::FLOAT64);
@@ -811,7 +843,7 @@ TEST_F(CppEdsl, RepeatElements) {
   // clang-format on
   runProgram(program);
 }
-
+/*
 TEST_F(CppEdsl, UseDefault) {
   auto P = Placeholder(DType::FLOAT32, {1, 7, 10, 10});
   auto I = Placeholder(DType::FLOAT32, {1, 10, 10});
@@ -828,7 +860,7 @@ TEST_F(CppEdsl, UseDefault) {
   // clang-format on
   runProgram(program);
 }
-
+*/
 TEST_F(CppEdsl, UniqueNames) {
   TensorShape shape(DType::FLOAT32, {1});
   auto A = Placeholder(shape, "A");

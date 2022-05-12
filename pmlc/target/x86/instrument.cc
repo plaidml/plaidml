@@ -1,13 +1,13 @@
 // Copyright 2021 Intel Corporation
 
-#include "llvm/ADT/TypeSwitch.h"
-#include "llvm/Support/FormatVariadic.h"
-
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"
+#include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/FormatVariadic.h"
 
 #include "pmlc/target/x86/pass_detail.h"
 
@@ -43,12 +43,12 @@ static FlatSymbolRefAttr lookupOrCreateFn(ModuleOp module, StringRef name,
                                           TypeRange argTypes,
                                           TypeRange resultTypes) {
   OpBuilder builder(module.getBodyRegion());
-  if (auto fn = module.lookupSymbol<FuncOp>(name))
+  if (auto fn = module.lookupSymbol<func::FuncOp>(name))
     return FlatSymbolRefAttr::get(fn);
 
   FunctionType funcType = builder.getFunctionType(argTypes, resultTypes);
-  auto fn = builder.create<FuncOp>(module.getLoc(), name, funcType,
-                                   builder.getStringAttr("private"));
+  auto fn = builder.create<func::FuncOp>(module.getLoc(), name, funcType,
+                                         builder.getStringAttr("private"));
   return FlatSymbolRefAttr::get(fn);
 }
 
@@ -66,12 +66,12 @@ struct ProfileKernelsPass : public ProfileKernelsBase<ProfileKernelsPass> {
       OpBuilder builder(op);
       Value idValue = builder.create<arith::ConstantIntOp>(loc, id++, 64);
       Value tagZero = builder.create<arith::ConstantIntOp>(loc, 0, 64);
-      auto call = builder.create<CallOp>(loc, TypeRange{}, func,
-                                         ValueRange{idValue, tagZero});
+      auto call = builder.create<LLVM::CallOp>(loc, TypeRange{}, func,
+                                               ValueRange{idValue, tagZero});
       builder.setInsertionPointAfter(op);
       Value tagOne = builder.create<arith::ConstantIntOp>(loc, 1, 64);
-      builder.create<CallOp>(loc, TypeRange{}, func,
-                             ValueRange{idValue, tagOne});
+      builder.create<LLVM::CallOp>(loc, TypeRange{}, func,
+                                   ValueRange{idValue, tagOne});
 
       return WalkResult::skip();
     });
@@ -96,7 +96,7 @@ struct ProfileLinkingPass : public ProfileLinkingBase<ProfileLinkingPass> {
     int64_t id = 0;
     MLIRContext *context = module.getContext();
     module.walk([&](LLVM::CallOp op) {
-      if (op.callee().getValue() != kInstrument)
+      if (op.getCallee().getValue() != kInstrument)
         return;
 
       Location loc = op.getLoc();
@@ -107,7 +107,7 @@ struct ProfileLinkingPass : public ProfileLinkingBase<ProfileLinkingPass> {
       Value globalStr =
           getOrCreateGlobalString(loc, builder, locSymbol, locStrRef, module);
       builder.create<LLVM::CallOp>(
-          loc, ArrayRef<Type>{}, *op.callee(),
+          loc, ArrayRef<Type>{}, *op.getCallee(),
           ArrayRef<Value>{op.getOperand(0), op.getOperand(1), globalStr});
       op.erase();
     });

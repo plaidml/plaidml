@@ -2,8 +2,8 @@
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/IR/AffineValueMap.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Support/DebugStringHelper.h"
 
 #include "pmlc/dialect/pxa/analysis/strides.h"
@@ -24,8 +24,8 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
     this->onlyParallelNested = onlyParallelNested;
   }
 
-  void runOnFunction() final {
-    auto func = getFunction();
+  void runOnOperation() final {
+    auto func = getOperation();
     func.walk([&](memref::AllocOp op) { runOnAlloc(op); });
   }
 
@@ -48,7 +48,7 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
     IVLOG(2, "Considering: " << debugString(*op.getOperation()));
 
     for (auto &use : getIndirectUses(op)) {
-      if (isa<ReturnOp>(use.getOwner())) {
+      if (isa<func::ReturnOp>(use.getOwner())) {
         IVLOG(2, "Found ReturnOp user, cannot resize allocation");
         return;
       } else if (isa<pmlc::dialect::stdx::ReshapeOp>(use.getOwner())) {

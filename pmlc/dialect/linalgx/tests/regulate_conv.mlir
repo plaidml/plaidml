@@ -14,8 +14,8 @@ func @main(%arg0: tensor<1x114x114x32xf32>, %arg1: tensor<3x3x32x1xf32>, %arg2: 
 // CHECK-SAME: iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]
 // CHECK-SAME: iterator_ranges = [1, 112, 112, 32, 3, 3, 1]
     ^bb0(%arg3: f32, %arg4: f32, %arg5: f32):  // no predecessors
-      %1 = mulf %arg3, %arg4 : f32
-      %2 = addf %arg5, %1 : f32
+      %1 = arith.mulf %arg3, %arg4 : f32
+      %2 = arith.addf %arg5, %1 : f32
       linalg.yield %2 : f32
     } -> tensor<1x112x112x32xf32>
     return %0 : tensor<1x112x112x32xf32>

@@ -53,7 +53,7 @@ void registerBuiltins() {
   REGISTER_SYMBOL(malloc);
 
   // RunnerUtils functions
-  REGISTER_SYMBOL(_mlir_ciface_print_memref_f32);
+  REGISTER_SYMBOL(_mlir_ciface_printMemrefF32);
   REGISTER_SYMBOL(plaidml_rt_trace);
 }
 

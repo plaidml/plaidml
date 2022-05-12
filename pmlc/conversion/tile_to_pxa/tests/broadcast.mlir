@@ -5,10 +5,11 @@ func @broadcast_has_dim_one(%arg0: tensor<1x2x3x4xui64>, %arg1: tensor<2x1x3x4xu
   %0 = tile.cmp_ge %arg0, %arg1 : (tensor<1x2x3x4xui64>, tensor<2x1x3x4xui64>) -> tensor<2x2x3x4xi1>
   return %0 : tensor<2x2x3x4xi1>
 
+  // CHECK: %[[CST:.*]] = arith.constant 0 : index
   // CHECK: pxa.load
-  // CHECK-SAME:  %{{.*}}[0, %{{.*}}, %{{.*}}, %{{.*}}] : memref<1x2x3x4xi64>
+  // CHECK-SAME:  %{{.*}}[%[[CST]], %{{.*}}, %{{.*}}, %{{.*}}] : memref<1x2x3x4xi64>
   // CHECK: pxa.load
-  // CHECK-SAME:  %{{.*}}[%{{.*}}, 0, %{{.*}}, %{{.*}}] : memref<2x1x3x4xi64>
+  // CHECK-SAME:  %{{.*}}[%{{.*}}, %[[CST]], %{{.*}}, %{{.*}}] : memref<2x1x3x4xi64>
 }
 
 // CHECK-LABEL: func @broadcast_matrix_scalar

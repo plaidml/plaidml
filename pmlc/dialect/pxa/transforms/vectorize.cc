@@ -11,7 +11,8 @@
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/TypeSwitch.h"
 
-#include "mlir/Dialect/Vector/VectorOps.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/Interfaces/VectorInterfaces.h"
 
@@ -29,7 +30,7 @@ namespace pmlc::dialect::pxa {
 using pmlc::dialect::pxa::PxaReduceOp;
 
 static std::string getValueName(Operation *op, Value value) {
-  AsmState state(op->getParentOfType<FuncOp>());
+  AsmState state(op->getParentOfType<func::FuncOp>());
   std::string str;
   llvm::raw_string_ostream os(str);
   value.printAsOperand(os, state);
@@ -45,30 +46,55 @@ private:
   DenseSet<Operation *> vectorizedOps;
   DenseSet<Operation *> zeroStrideReductions;
 
-  const char *stringifyAtomicRMWKindForVectorReductionOp(AtomicRMWKind val) {
+  const char *
+  stringifyAtomicRMWKindForVectorReductionOp(arith::AtomicRMWKind val) {
     switch (val) {
-    case AtomicRMWKind::addf:
+    case arith::AtomicRMWKind::addf:
       return "add";
-    case AtomicRMWKind::addi:
+    case arith::AtomicRMWKind::addi:
       return "add";
-    case AtomicRMWKind::assign:
+    case arith::AtomicRMWKind::assign:
       return "invalid";
-    case AtomicRMWKind::maxf:
+    case arith::AtomicRMWKind::maxf:
       return "max";
-    case AtomicRMWKind::maxs:
+    case arith::AtomicRMWKind::maxs:
       return "max";
-    case AtomicRMWKind::maxu:
+    case arith::AtomicRMWKind::maxu:
       return "max";
-    case AtomicRMWKind::minf:
+    case arith::AtomicRMWKind::minf:
       return "min";
-    case AtomicRMWKind::mins:
+    case arith::AtomicRMWKind::mins:
       return "min";
-    case AtomicRMWKind::minu:
+    case arith::AtomicRMWKind::minu:
       return "min";
-    case AtomicRMWKind::mulf:
+    case arith::AtomicRMWKind::mulf:
       return "mul";
-    case AtomicRMWKind::muli:
+    case arith::AtomicRMWKind::muli:
       return "mul";
+    }
+    llvm_unreachable("Invalid aggregation type");
+  }
+
+  vector::CombiningKind getCombiningKind(arith::AtomicRMWKind val) {
+    switch (val) {
+    case arith::AtomicRMWKind::addf:
+    case arith::AtomicRMWKind::addi:
+      return vector::CombiningKind::ADD;
+    case arith::AtomicRMWKind::maxf:
+      return vector::CombiningKind::MAXF;
+    case arith::AtomicRMWKind::maxs:
+      return vector::CombiningKind::MAXSI;
+    case arith::AtomicRMWKind::maxu:
+      return vector::CombiningKind::MAXUI;
+    case arith::AtomicRMWKind::mulf:
+    case arith::AtomicRMWKind::muli:
+      return vector::CombiningKind::MUL;
+    case arith::AtomicRMWKind::minf:
+      return vector::CombiningKind::MINF;
+    case arith::AtomicRMWKind::mins:
+      return vector::CombiningKind::MINSI;
+    case arith::AtomicRMWKind::minu:
+      return vector::CombiningKind::MINUI;
     }
     llvm_unreachable("Invalid aggregation type");
   }
@@ -107,7 +133,7 @@ private:
       // see the vector::ReductionOp verification code
       // (https://github.com/llvm/llvm-project/blob/master/mlir/lib/Dialect/Vector/VectorOps.cpp#L134).
       Type elementType = op.getMemRefType().getElementType();
-      if (op.agg() == AtomicRMWKind::assign ||
+      if (op.agg() == arith::AtomicRMWKind::assign ||
           (!elementType.isF32() && !elementType.isF64() &&
            !elementType.isSignlessInteger(32) &&
            !elementType.isSignlessInteger(64))) {
@@ -130,8 +156,8 @@ private:
       return op->emitRemark("Vectorize op: Failed, interior loops");
     }
     // TODO: consider more generic way to add ops supported here
-    if (!isa<arith::ExtFOp, arith::TruncFOp, arith::IndexCastOp, VectorUnrollOpInterface, SelectOp,
-             arith::CmpFOp>(op)) {
+    if (!isa<arith::ExtFOp, arith::TruncFOp, arith::IndexCastOp,
+             VectorUnrollOpInterface, arith::SelectOp, arith::CmpFOp>(op)) {
       // Probably not a vectorizable op. Verify it doesn't use an
       // vectorized results.
       for (auto operand : op->getOperands()) {
@@ -214,12 +240,9 @@ public:
       val = broadcast.getResult();
     }
     if (zeroStrideReductions.count(op.getOperation())) {
-      // Add vector_reduction only if the stride is 0
+      // Add vector_reduction only if the stride is 0.
       auto reductionOp = builder.create<vector::ReductionOp>(
-          op.getLoc(), op.getMemRefType().getElementType(),
-          builder.getStringAttr(
-              stringifyAtomicRMWKindForVectorReductionOp(op.agg())),
-          val, ValueRange{});
+          op.getLoc(), getCombiningKind(op.agg()), val);
       auto reduceOp = builder.create<PxaReduceOp>(
           op.getLoc(), ArrayRef<Type>{op.getMemRefType()}, op.agg(),
           reductionOp.getResult(), op.memref(), op.map(), op.idxs());
@@ -314,7 +337,7 @@ LogicalResult vectorizeOverOutputs(AffineParallelOp op, unsigned vectorWidth) {
     return op.emitRemark(
         "vectorizeOverOutputs: Failed, could not compute StrideInfo");
   }
-  IVLOG(3, "StrideInfo: " << debugString(*maybeSI));
+  // IVLOG(3, "StrideInfo: " << debugString(*maybeSI));
   SmallVector<BlockArgument, 4> options;
   for (auto ba : op.getIVs()) {
     if (maybeSI->strides.count(ba) && maybeSI->strides[ba] == 1) {
@@ -364,8 +387,8 @@ struct VectorizePass : public VectorizeBase<VectorizePass> {
     this->vectorWidth = vectorWidth;
   }
 
-  void runOnFunction() final {
-    auto func = getFunction();
+  void runOnOperation() final {
+    auto func = getOperation();
     auto it = strategies.find(strategy);
     if (it == strategies.end()) {
       emitError(func.getLoc(), "Invalid strategy specified: ") << strategy;
@@ -390,7 +413,7 @@ std::unique_ptr<mlir::Pass> createVectorizePass(StringRef strategy,
 
 // TODO: Maybe move this to a generic utility somewhere
 template <typename OpTy, typename... Args>
-static OpTy replaceOp(Operation *op, Args &&... args) {
+static OpTy replaceOp(Operation *op, Args &&...args) {
   OpBuilder builder(op);
   auto newOp = builder.create<OpTy>(op->getLoc(), std::forward<Args>(args)...);
   op->getResult(0).replaceAllUsesWith(newOp.getResult());

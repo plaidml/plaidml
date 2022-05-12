@@ -4,8 +4,8 @@
 #define __PML_PXA_OPS__
 
 include "mlir/Dialect/Affine/IR/AffineMemoryOpInterfaces.td"
-include "mlir/Dialect/StandardOps/IR/StandardOpsBase.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
+include "mlir/Dialect/Arithmetic/IR/ArithmeticBase.td"
 
 include "pmlc/util/enums.td"
 include "interfaces.td"
@@ -15,16 +15,15 @@ def PXA_Dialect : Dialect {
   let cppNamespace = "pmlc::dialect::pxa";
 }
 
-class PXA_Op<string mnemonic, list<OpTrait> traits = []> :
+class PXA_Op<string mnemonic, list<Trait> traits = []> :
     Op<PXA_Dialect, mnemonic, traits>;
 
-class PXA_OpWithPP<string mnemonic, list<OpTrait> traits = []> :
+class PXA_OpWithPP<string mnemonic, list<Trait> traits = []> :
     PXA_Op<mnemonic, traits> {
-  let printer = [{ print$cppClass(p, *this); }];
-  let parser = [{ return parse$cppClass(parser, result); }];
+  let hasCustomAssemblyFormat = 1;
 }
 
-class PxaReduceOpBase<string mnemonic, list<OpTrait> traits = []> :
+class PxaReduceOpBase<string mnemonic, list<Trait> traits = []> :
     PXA_OpWithPP<mnemonic, !listconcat(traits, [
         PxaGenericOpInterface,
         DeclareOpInterfaceMethods<PxaReduceOpInterface>,
@@ -88,7 +87,7 @@ class PxaReduceOpBase<string mnemonic, list<OpTrait> traits = []> :
     operand_range getMapOperands() { return idxs(); }
     static mlir::StringRef getMapAttrName() { return "map"; }
     mlir::AffineMapAttr getAffineMapAttr() { return mapAttr(); }
-    mlir::AtomicRMWKind getAgg() { return agg(); }
+    mlir::arith::AtomicRMWKind getAgg() { return agg(); }
   }];
 }
 
@@ -108,7 +107,7 @@ def PxaReduceOp : PxaReduceOpBase<"reduce"> {
 
   let builders = [
     OpBuilder<(ins
-      "mlir::AtomicRMWKind":$agg,
+      "mlir::arith::AtomicRMWKind":$agg,
       "mlir::Value":$val,
       "mlir::Value":$memref,
       "mlir::AffineMap":$map,
@@ -139,7 +138,7 @@ def PxaVectorReduceOp : PxaReduceOpBase<"vector_reduce"> {
 
   let builders = [
     OpBuilder<(ins
-      "mlir::AtomicRMWKind":$agg,
+      "mlir::arith::AtomicRMWKind":$agg,
       "mlir::Value":$val,
       "mlir::Value":$memref,
       "mlir::AffineMap":$map,
@@ -154,7 +153,7 @@ def PxaVectorReduceOp : PxaReduceOpBase<"vector_reduce"> {
   }];
 }
 
-class PxaLoadOpBase<string mnemonic, list<OpTrait> traits = []> :
+class PxaLoadOpBase<string mnemonic, list<Trait> traits = []> :
     PXA_OpWithPP<mnemonic, !listconcat(traits, [
         PxaGenericOpInterface,
         DeclareOpInterfaceMethods<PxaReadOpInterface>,
@@ -353,7 +352,7 @@ def PxaStoreOp : PXA_OpWithPP<"store", [MemRefsNormalizable]> {
 
   let builders = [
     OpBuilder<(ins
-      "mlir::AtomicRMWKind":$agg,
+      "mlir::arith::AtomicRMWKind":$agg,
       "mlir::Value":$val,
       "mlir::Value":$mem,
       "mlir::ValueRange":$idxs

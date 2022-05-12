@@ -27,7 +27,7 @@ func @doubleFor(%m : tensor<16x16xf32>) -> tensor<16x16xf32> {
 // CHECK: scf.for {{.*}} = %[[c0]] to %[[c4]] step %[[c1]] iter_args(%[[arg3:.*]] = %[[arg0]])
 // CHECK:   %[[r0:.*]] = scf.for {{.*}} = %[[c0]] to %[[c4]] step %[[c1]] iter_args(%[[arg5:.*]] = %[[arg3]])
 // CHECK:     linalg.init_tensor [16, 16] : tensor<16x16xf32>
-// CHECK:     linalg.fill(%[[cst]], %{{.*}}) : f32, tensor<16x16xf32> -> tensor<16x16xf32>
+// CHECK:     linalg.fill ins(%[[cst]] : f32) outs({{.*}} : tensor<16x16xf32>) -> tensor<16x16xf32>
 // CHECK:     %[[r1:.*]] = linalg.generic
 // CHECK:       mulf
 // CHECK:       addf

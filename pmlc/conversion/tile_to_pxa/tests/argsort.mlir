@@ -6,7 +6,8 @@ func @argsort0(%arg0: tensor<20xf32>) -> tensor<20xsi32> {
 }
 
 // CHECK-LABEL: func @argsort0
-// CHECK:     %[[RET:.*]] = layer.box "argsort" (%[[OUT:.*]], %[[IN:.*]]) = (%arg1, %arg0)
+// CHECK:     %[[RET:.*]] = layer.box "argsort"(%arg1, %arg0) {attrs = {}} : memref<20xi32>, memref<20xf32> -> memref<20xi32> {
+// CHECK:       ^bb0(%[[OUT:.*]]: memref<20xi32>, %[[IN:.*]]: memref<20xf32>):
 // CHECK-DAG:   %[[C0:.*]] = arith.constant 0 : index
 // CHECK-DAG:   %[[C1:.*]] = arith.constant 1 : index
 // CHECK-DAG:   %[[C20:.*]] = arith.constant 20 : index
@@ -33,7 +34,8 @@ func @argsort1(%arg0: tensor<5x4xf32>) -> tensor<5x4xsi32> {
 }
 
 // CHECK-LABEL: func @argsort1
-// CHECK:     %[[RET:.*]] = layer.box "argsort" (%[[OUT:.*]], %[[IN:.*]]) = (%arg1, %arg0)
+// CHECK:     %[[RET:.*]] = layer.box "argsort"(%arg1, %arg0) {attrs = {}} : memref<5x4xi32>, memref<5x4xf32> -> memref<5x4xi32> {
+// CHECK:       ^bb0(%[[OUT:.*]]: memref<5x4xi32>, %[[IN:.*]]: memref<5x4xf32>):
 // CHECK-DAG:   %[[C0:.*]] = arith.constant 0 : index
 // CHECK-DAG:   %[[C1:.*]] = arith.constant 1 : index
 // CHECK-DAG:   %[[C5:.*]] = arith.constant 5 : index

@@ -3,6 +3,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/DebugStringHelper.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 #include "pmlc/dialect/tile/ir/ops.h"
 #include "pmlc/dialect/tile/transforms/pass_detail.h"
@@ -15,8 +16,8 @@ namespace pmlc::dialect::tile {
 namespace {
 
 struct MaterializePass : public MaterializeBase<MaterializePass> {
-  void runOnFunction() final {
-    auto func = getFunction();
+  void runOnOperation() final {
+    auto func = getOperation();
     func.walk([&](MaterializeOperandsOpInterface op) {
       OpBuilder builder(op);
       if (failed(op.materializeOperands(builder))) {

@@ -1,7 +1,7 @@
 // Copyright 2022 Intel Corporation
 
 #include "mlir/IR/Matchers.h"
-
+#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "pmlc/dialect/linalgx/analysis/convolution.h"
 
 using namespace mlir; // NOLINT
@@ -24,10 +24,10 @@ Optional<ConvCapture> detectConv(linalg::GenericOp op) {
   Operation *yieldOp = block->getTerminator();
   if (matchPattern(
           yieldOp,
-          m_Op<linalg::YieldOp>(m_Op<AddFOp>(
-              m_Val(args[2]), m_Op<MulFOp>(m_Val(args[0]), m_Val(args[1]))))) ||
+          m_Op<linalg::YieldOp>(m_Op<arith::AddFOp>(
+              m_Val(args[2]), m_Op<arith::MulFOp>(m_Val(args[0]), m_Val(args[1]))))) ||
       matchPattern(yieldOp,
-                   m_Op<linalg::YieldOp>(m_Op<AddFOp>(m_Op<MulFOp>(
+                   m_Op<linalg::YieldOp>(m_Op<arith::AddFOp>(m_Op<arith::MulFOp>(
                                              m_Val(args[0]), m_Val(args[1]))),
                                          m_Val(args[2]))))
     return ConvCapture{values, idxMaps, {0, 1, 2}};

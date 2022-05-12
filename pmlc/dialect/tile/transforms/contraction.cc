@@ -10,7 +10,7 @@
 
 #include "mlir/IR/Matchers.h"
 #include "mlir/Support/DebugStringHelper.h"
-
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "pmlc/dialect/tile/transforms/pass_detail.h"
 #include "pmlc/util/bilp/ilp_solver.h"
 #include "pmlc/util/logging.h"
@@ -793,8 +793,8 @@ struct ComputeBoundsImpl {
 };
 
 struct ComputeBoundsPass : public ComputeBoundsBase<ComputeBoundsPass> {
-  void runOnFunction() final {
-    auto func = getFunction();
+  void runOnOperation() final {
+    auto func = getOperation();
     func.walk([this](ContractionOp op) {
       try {
         ComputeBoundsImpl impl(op);

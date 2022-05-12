@@ -3,7 +3,6 @@
 #include "pmlc/dialect/pml/ir/dialect.h"
 
 #include "mlir/IR/DialectImplementation.h"
-#include "mlir/IR/Identifier.h"
 #include "mlir/IR/OpDefinition.h"
 #include "llvm/ADT/TypeSwitch.h"
 
@@ -22,7 +21,7 @@ void PMLDialect::initialize() {
 #include "pmlc/dialect/pml/ir/attrdef.cc.inc" // NOLINT
       >();
 }
-
+/*
 Attribute PMLDialect::parseAttribute(DialectAsmParser &parser,
                                      Type type) const {
   StringRef attrTag;
@@ -42,8 +41,8 @@ void PMLDialect::printAttribute(Attribute attr,
   if (succeeded(generatedAttributePrinter(attr, printer)))
     return;
 }
-
-static ParseResult parseAxisAttr(MLIRContext *context, DialectAsmParser &parser,
+*/
+static ParseResult parseAxisAttr(MLIRContext *context, AsmParser &parser,
                                  AxisAttr &attr) {
   StringRef typeStr;
   IntegerAttr range;
@@ -60,11 +59,11 @@ static ParseResult parseAxisAttr(MLIRContext *context, DialectAsmParser &parser,
   return success();
 }
 
-static void printAxisAttr(DialectAsmPrinter &printer, AxisAttr axis) {
+static void printAxisAttr(AsmPrinter &printer, AxisAttr axis) {
   printer << axis.getName().getValue() << ':' << axis.getRange();
 }
 
-Attribute AxisAttr::parse(DialectAsmParser &parser,
+Attribute AxisAttr::parse(AsmParser &parser,
                           Type type) {
   AxisAttr attr;
   if (parser.parseLess() ||                   //
@@ -74,11 +73,11 @@ Attribute AxisAttr::parse(DialectAsmParser &parser,
   return attr;
 }
 
-void AxisAttr::print(DialectAsmPrinter &printer) const {
+void AxisAttr::print(AsmPrinter &printer) const {
   printer << "axis<" << getName().getValue() << ':' << getRange() << '>';
 }
 
-Attribute ScheduleAttr::parse(DialectAsmParser &parser,
+Attribute ScheduleAttr::parse(AsmParser &parser,
                               Type type) {
   AffineMap map;
   if (parser.parseLess() ||         //
@@ -104,8 +103,8 @@ Attribute ScheduleAttr::parse(DialectAsmParser &parser,
   return parser.getChecked<ScheduleAttr>(parser.getContext(), map, axes);
 }
 
-void ScheduleAttr::print(DialectAsmPrinter &printer) const {
-  printer << "schedule<" << getMap() << ", [";
+void ScheduleAttr::print(AsmPrinter &printer) const {
+  printer << "<" << getMap() << ", [";
   llvm::interleaveComma(getAxes(), printer,
                         [&](AxisAttr axis) { printAxisAttr(printer, axis); });
   printer << "]>";
@@ -164,7 +163,7 @@ ScheduleAttr ScheduleAttr::removeAxes(DenseSet<StringRef> names) {
   return ScheduleAttr::get(getContext(), map, axes);
 }
 
-Attribute PatternAttr::parse(DialectAsmParser &parser,
+Attribute PatternAttr::parse(AsmParser &parser,
                              Type type) {
   StringAttr op;
   DictionaryAttr dict;
@@ -179,11 +178,11 @@ Attribute PatternAttr::parse(DialectAsmParser &parser,
   return parser.getChecked<PatternAttr>(parser.getContext(), op, dict);
 }
 
-void PatternAttr::print(DialectAsmPrinter &printer) const {
+void PatternAttr::print(AsmPrinter &printer) const {
   printer << "pattern<" << getOp() << ", " << getDict() << '>';
 }
 
-Attribute ApplyAttr::parse(DialectAsmParser &parser,
+Attribute ApplyAttr::parse(AsmParser &parser,
                            Type type) {
   PatternAttr pattern;
   DictionaryAttr dict;
@@ -198,7 +197,7 @@ Attribute ApplyAttr::parse(DialectAsmParser &parser,
   return parser.getChecked<ApplyAttr>(parser.getContext(), pattern, dict);
 }
 
-void ApplyAttr::print(DialectAsmPrinter &printer) const {
+void ApplyAttr::print(AsmPrinter &printer) const {
   printer << "apply<" << getPattern() << ", " << getDict() << '>';
 }
 

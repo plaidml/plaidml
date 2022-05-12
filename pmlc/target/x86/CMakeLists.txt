@@ -45,11 +45,9 @@ pml_cc_library(
     MLIRMemRef
     MLIROpenMPToLLVM
     MLIRSCFToOpenMP
-    MLIRSCFToStandard
-    MLIRStandardOpsTransforms
-    MLIRStandardToLLVM
     MLIRReconcileUnrealizedCasts
     MLIRArithmeticToLLVM
+    MLIRSCFToControlFlow
     omp
     xsmm
 )

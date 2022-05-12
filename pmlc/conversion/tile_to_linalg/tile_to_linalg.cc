@@ -3,6 +3,8 @@
 #include <limits>
 #include <utility>
 
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
@@ -55,8 +57,8 @@ static FlatSymbolRefAttr createStubTraceFunc(ModuleOp module, StringAttr msg) {
   OpBuilder builder(context);
   builder.setInsertionPointToStart(module.getBody());
   auto funcType = FunctionType::get(context, {}, {});
-  auto funcOp = builder.create<FuncOp>(module.getLoc(), symbol, funcType,
-                                       ArrayRef<NamedAttribute>{});
+  auto funcOp = builder.create<func::FuncOp>(module.getLoc(), symbol, funcType,
+                                             ArrayRef<NamedAttribute>{});
   funcOp->setAttr("msg", msg);
   funcOp->setAttr("trace", builder.getUnitAttr());
   funcOp->setAttr("id", builder.getI64IntegerAttr(uniqueId));
@@ -68,7 +70,7 @@ struct ConstantOpConversion : public OpConversionPattern<tile::ConstantOp> {
   using OpConversionPattern<tile::ConstantOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(tile::ConstantOp op, ArrayRef<Value> operands,
+  matchAndRewrite(tile::ConstantOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
     TileToLinalgTypeConverter typeConverter;
     Type newType = typeConverter.convertType(op.getType());
@@ -99,16 +101,14 @@ struct AlwaysTrue : Matcher {
   bool match(Operation *op) const final { return true; }
 };
 
-template <typename InnerPredicate>
-struct ResultIs : Matcher {
+template <typename InnerPredicate> struct ResultIs : Matcher {
   bool match(Operation *op) const final {
     InnerPredicate pred;
     return pred.match(op->getResult(0).getType());
   }
 };
 
-template <typename InnerPredicate>
-struct AnyOperandIs : Matcher {
+template <typename InnerPredicate> struct AnyOperandIs : Matcher {
   bool match(Operation *op) const final {
     for (auto operand : op->getOperands()) {
       InnerPredicate pred;
@@ -120,8 +120,7 @@ struct AnyOperandIs : Matcher {
   }
 };
 
-template <typename InnerPredicate>
-struct OperandsAre : Matcher {
+template <typename InnerPredicate> struct OperandsAre : Matcher {
   bool match(Operation *op) const final {
     for (auto operand : op->getOperands()) {
       InnerPredicate pred;
@@ -133,8 +132,7 @@ struct OperandsAre : Matcher {
   }
 };
 
-template <typename InnerPredicate>
-struct FirstOperandIs : Matcher {
+template <typename InnerPredicate> struct FirstOperandIs : Matcher {
   bool match(Operation *op) const final {
     InnerPredicate pred;
     if (op->getNumOperands() == 0) {
@@ -144,8 +142,7 @@ struct FirstOperandIs : Matcher {
   }
 };
 
-template <typename InnerPredicate>
-struct AnyComparandIs : Matcher {
+template <typename InnerPredicate> struct AnyComparandIs : Matcher {
   bool match(Operation *op) const final {
     SmallVector<Value, 4> allOperands(op->getOperands());
     tile::ContractionOpAdaptor adaptor(allOperands);
@@ -156,8 +153,7 @@ struct AnyComparandIs : Matcher {
   }
 };
 
-template <typename InnerPredicate>
-struct ComparandsAre : Matcher {
+template <typename InnerPredicate> struct ComparandsAre : Matcher {
   bool match(Operation *op) const final {
     SmallVector<Value, 4> allOperands(op->getOperands());
     tile::ContractionOpAdaptor adaptor(allOperands);
@@ -168,8 +164,7 @@ struct ComparandsAre : Matcher {
   }
 };
 
-template <typename InnerPredicate>
-struct Not {
+template <typename InnerPredicate> struct Not {
   bool match(Type type) const {
     InnerPredicate pred;
     return !pred.match(type);
@@ -236,14 +231,14 @@ struct NotOp {
   Value create(OpBuilder &builder, Location loc, Type resultType,
                ValueRange operands, TypeRange types) {
     // -(x + 1) = -1 - x
-    auto negOne = builder.create<mlir::arith::ConstantIntOp>(loc, -1, resultType);
+    auto negOne =
+        builder.create<mlir::arith::ConstantIntOp>(loc, -1, resultType);
     auto sub = builder.create<mlir::arith::SubIOp>(loc, negOne, operands[0]);
     return sub.getResult();
   }
 };
 
-template <typename OpType>
-struct StdOp {
+template <typename OpType> struct StdOp {
   Value create(OpBuilder &builder, Location loc, Type resultType,
                ValueRange operands, TypeRange types) {
     SmallVector<Value, 2> promoted;
@@ -261,14 +256,13 @@ struct SelectOp {
     SmallVector<Value, 2> promoted;
     promoteTypes(builder, loc, operands.drop_front(), types.drop_front(),
                  &promoted);
-    auto op = builder.create<mlir::SelectOp>(loc, operands[0], promoted[0],
-                                             promoted[1]);
+    auto op = builder.create<arith::SelectOp>(loc, operands[0], promoted[0],
+                                              promoted[1]);
     return op.getResult();
   }
 };
 
-template <arith::CmpFPredicate predicate>
-struct CmpFloatOp {
+template <arith::CmpFPredicate predicate> struct CmpFloatOp {
   Value create(OpBuilder &builder, Location loc, Type resultType,
                ValueRange operands, TypeRange types) {
     SmallVector<Value, 2> promoted;
@@ -279,8 +273,7 @@ struct CmpFloatOp {
   }
 };
 
-template <arith::CmpIPredicate predicate>
-struct CmpIntOp {
+template <arith::CmpIPredicate predicate> struct CmpIntOp {
   Value create(OpBuilder &builder, Location loc, Type resultType,
                ValueRange operands, TypeRange types) {
     SmallVector<Value, 2> promoted;
@@ -304,8 +297,7 @@ struct CmpIntInequalityOp {
   }
 };
 
-template <typename OpType>
-struct LogicalOp {
+template <typename OpType> struct LogicalOp {
   Value create(OpBuilder &builder, Location loc, Type resultType,
                ValueRange operands, TypeRange types) {
     SmallVector<Value, 2> promoted;
@@ -317,13 +309,16 @@ struct LogicalOp {
         auto zero =
             builder.create<mlir::arith::ConstantFloatOp>(loc, value, floatType);
         promoted.push_back(
-            builder.create<mlir::arith::CmpFOp>(loc, arith::CmpFPredicate::ONE, operand, zero)
+            builder
+                .create<mlir::arith::CmpFOp>(loc, arith::CmpFPredicate::ONE,
+                                             operand, zero)
                 .getResult());
       } else if (auto intType = fromType.dyn_cast<IntegerType>()) {
         auto zero = builder.create<mlir::arith::ConstantIntOp>(loc, 0, intType);
-        promoted.push_back(
-            builder.create<mlir::arith::CmpIOp>(loc, arith::CmpIPredicate::ne, operand, zero)
-                .getResult());
+        promoted.push_back(builder
+                               .create<mlir::arith::CmpIOp>(
+                                   loc, arith::CmpIPredicate::ne, operand, zero)
+                               .getResult());
       } else {
         llvm_unreachable("Unknown type for LogicalOp");
       }
@@ -343,12 +338,17 @@ struct LogicalNotOp {
     auto fromType = input.getType();
     if (auto floatType = fromType.dyn_cast<FloatType>()) {
       auto value = convertFloatUsingType(llvm::APFloat(0.0), floatType);
-      auto zero = builder.create<mlir::arith::ConstantFloatOp>(loc, value, floatType);
-      return builder.create<mlir::arith::CmpFOp>(loc, arith::CmpFPredicate::OEQ, input, zero)
+      auto zero =
+          builder.create<mlir::arith::ConstantFloatOp>(loc, value, floatType);
+      return builder
+          .create<mlir::arith::CmpFOp>(loc, arith::CmpFPredicate::OEQ, input,
+                                       zero)
           .getResult();
     } else if (auto intType = fromType.dyn_cast<IntegerType>()) {
       auto zero = builder.create<mlir::arith::ConstantIntOp>(loc, 0, intType);
-      return builder.create<mlir::arith::CmpIOp>(loc, arith::CmpIPredicate::eq, input, zero)
+      return builder
+          .create<mlir::arith::CmpIOp>(loc, arith::CmpIPredicate::eq, input,
+                                       zero)
           .getResult();
     } else {
       llvm_unreachable("Unknown type for LogicalNotOp");
@@ -362,19 +362,23 @@ static Value createInit(OpBuilder &builder, Location loc, Type type,
     switch (agg) {
     case AggregationKind::add: {
       auto value = convertFloatUsingType(llvm::APFloat(0.0), floatType);
-      return builder.create<mlir::arith::ConstantFloatOp>(loc, value, floatType);
+      return builder.create<mlir::arith::ConstantFloatOp>(loc, value,
+                                                          floatType);
     }
     case AggregationKind::mul: {
       auto value = convertFloatUsingType(llvm::APFloat(1.0), floatType);
-      return builder.create<mlir::arith::ConstantFloatOp>(loc, value, floatType);
+      return builder.create<mlir::arith::ConstantFloatOp>(loc, value,
+                                                          floatType);
     }
     case AggregationKind::min: {
       auto value = llvm::APFloat::getInf(floatType.getFloatSemantics(), false);
-      return builder.create<mlir::arith::ConstantFloatOp>(loc, value, floatType);
+      return builder.create<mlir::arith::ConstantFloatOp>(loc, value,
+                                                          floatType);
     }
     case AggregationKind::max: {
       auto value = llvm::APFloat::getInf(floatType.getFloatSemantics(), true);
-      return builder.create<mlir::arith::ConstantFloatOp>(loc, value, floatType);
+      return builder.create<mlir::arith::ConstantFloatOp>(loc, value,
+                                                          floatType);
     }
     default:
       llvm_unreachable("Unsupported aggregation for createInit");
@@ -398,27 +402,25 @@ static Value createInit(OpBuilder &builder, Location loc, Type type,
   llvm_unreachable("Unknown type for createInit");
 }
 
-template <typename CmpOpBuilder>
-struct CondOp {
+template <typename CmpOpBuilder> struct CondOp {
   Value create(OpBuilder &builder, Location loc, Type resultType,
                ValueRange operands, TypeRange types) {
     CmpOpBuilder cmpOpBuilder;
     auto cmp = cmpOpBuilder.create(builder, loc, resultType,
                                    operands.take_front(2), types.take_front(2));
-    return builder.create<mlir::SelectOp>(loc, cmp, operands[0], operands[1])
+    return builder.create<arith::SelectOp>(loc, cmp, operands[0], operands[1])
         .getResult();
   }
 };
 
-template <typename CmpOpBuilder>
-struct ContractionCondOp {
+template <typename CmpOpBuilder> struct ContractionCondOp {
   Value create(OpBuilder &builder, Location loc, Type resultType,
                ValueRange operands, TypeRange types) {
     CmpOpBuilder cmpOpBuilder;
     auto cmp = cmpOpBuilder.create(builder, loc, resultType,
                                    operands.take_front(2), types.take_front(2));
     auto zero = createInit(builder, loc, resultType, AggregationKind::add);
-    return builder.create<mlir::SelectOp>(loc, cmp, operands[2], zero)
+    return builder.create<arith::SelectOp>(loc, cmp, operands[2], zero)
         .getResult();
   }
 };
@@ -474,17 +476,21 @@ Value getAggResult(OpBuilder &builder, Location loc, AggregationKind agg,
     return storedValue;
   case AggregationKind::add:
     if (aggType.isa<IntegerType>()) {
-      return createAggOp<StdOp<arith::AddIOp>>(builder, loc, aggValue, storedValue);
+      return createAggOp<StdOp<arith::AddIOp>>(builder, loc, aggValue,
+                                               storedValue);
     } else if (aggType.isa<FloatType>()) {
-      return createAggOp<StdOp<arith::AddFOp>>(builder, loc, aggValue, storedValue);
+      return createAggOp<StdOp<arith::AddFOp>>(builder, loc, aggValue,
+                                               storedValue);
     } else {
       llvm_unreachable("Invalid aggregation value type.");
     }
   case AggregationKind::mul:
     if (aggType.isa<IntegerType>()) {
-      return createAggOp<StdOp<arith::MulIOp>>(builder, loc, aggValue, storedValue);
+      return createAggOp<StdOp<arith::MulIOp>>(builder, loc, aggValue,
+                                               storedValue);
     } else if (aggType.isa<FloatType>()) {
-      return createAggOp<StdOp<arith::MulFOp>>(builder, loc, aggValue, storedValue);
+      return createAggOp<StdOp<arith::MulFOp>>(builder, loc, aggValue,
+                                               storedValue);
     } else {
       llvm_unreachable("Invalid aggregation value type.");
     }
@@ -568,13 +574,8 @@ template <typename FromOpType, typename IntoOpBuilder,
 struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
   using OpConversionPattern<FromOpType>::OpConversionPattern;
 
-  LogicalResult match(Operation *op) const final {
-    Matcher pred;
-    return pred(op);
-  }
-
-  void rewrite(FromOpType op, ArrayRef<Value> operands,
-               ConversionPatternRewriter &rewriter) const final {
+  void rewrite(FromOpType op, typename FromOpType::Adaptor adaptor,
+               ConversionPatternRewriter &rewriter) const {
     Location loc = op.getLoc();
     MLIRContext *context = op.getContext();
     TensorInitializer init(rewriter, op, op.result().getType(),
@@ -585,11 +586,11 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
 
     // Build indexing maps
     SmallVector<AffineMap, 4> idxMaps;
-    for (size_t i = 0; i < operands.size(); i++) {
+    for (size_t i = 0; i < adaptor.getOperands().size(); i++) {
       Optional<tile::PaddingInfo> maybePadding =
           tile::getPaddingInfo(op->getOperand(i).getDefiningOp());
-      AffineMap idxMap =
-          buildBroadcastMap(rewriter, loc, operands[i], initType, maybePadding);
+      AffineMap idxMap = buildBroadcastMap(
+          rewriter, loc, adaptor.getOperands()[i], initType, maybePadding);
       idxMaps.emplace_back(idxMap);
     }
 
@@ -601,7 +602,7 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
     auto genericOp = rewriter.create<linalg::GenericOp>(
         loc,
         /*resultTensorTypes=*/TypeRange{initType},
-        /*inputs=*/operands,
+        /*inputs=*/adaptor.getOperands(),
         /*outputs=*/ValueRange{init.resultTensor},
         /*indexingMaps=*/idxMaps,
         /*iteratorTypes=*/
@@ -631,23 +632,34 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
     if (Optional<tile::PaddingInfo> maybePadding = tile::getPaddingInfo(op)) {
       Value initValue = createInit(rewriter, loc, initType.getElementType(),
                                    maybePadding->agg);
-      auto pad = rewriter.create<linalg::PadTensorOp>(
-          loc,
-          /*source=*/outTensor,
-          /*staticLow=*/maybePadding->lower,
-          /*staticHigh=*/maybePadding->upper,
-          /*low=*/ValueRange{},
-          /*high=*/ValueRange{});
+      auto pad =
+          rewriter.create<tensor::PadOp>(loc,
+                                         /*source=*/outTensor,
+                                         /*staticLow=*/maybePadding->lower,
+                                         /*staticHigh=*/maybePadding->upper,
+                                         /*low=*/ValueRange{},
+                                         /*high=*/ValueRange{});
       SmallVector<Type, 4> padArgs(numDims, rewriter.getIndexType());
       OpBuilder::InsertionGuard guard(rewriter);
-      Block *padBody =
-          rewriter.createBlock(&pad.region(), pad.region().begin(), padArgs);
-      rewriter.create<linalg::YieldOp>(loc, ValueRange{initValue});
+      SmallVector<Location> locs(padArgs.size(), loc);
+      Block *padBody = rewriter.createBlock(&pad.region(), pad.region().begin(),
+                                            padArgs, locs);
+      rewriter.create<tensor::YieldOp>(loc, initValue);
       outTensor = pad.getResult();
     }
 
     // Replace output with the newly allocated buffer
     rewriter.replaceOp(op, outTensor);
+  }
+
+  LogicalResult
+  matchAndRewrite(FromOpType op, typename FromOpType::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
+    Matcher pred;
+    if (failed(pred(op)))
+      return failure();
+    rewrite(op, adaptor, rewriter);
+    return success();
   }
 };
 
@@ -657,28 +669,11 @@ struct ContractionOpConversion
     : public OpConversionPattern<tile::ContractionOp> {
   using OpConversionPattern<tile::ContractionOp>::OpConversionPattern;
 
-  LogicalResult match(Operation *op) const final {
-    if (auto cionOp = dyn_cast<tile::ContractionOp>(op)) {
-      if (cionOp.combo() != comboKind) {
-        return failure();
-      }
-      if (!cionOp.lowerBounds().hasValue() ||
-          !cionOp.upperBounds().hasValue()) {
-        cionOp.emitError("contraction bounds must be computed");
-        return failure();
-      }
-      Matcher pred;
-      return pred(cionOp);
-    }
-    return failure();
-  }
-
-  void rewrite(tile::ContractionOp op, ArrayRef<Value> operands,
-               ConversionPatternRewriter &rewriter) const final {
+  void rewrite(tile::ContractionOp op, OpAdaptor adaptor,
+               ConversionPatternRewriter &rewriter) const {
     MLIRContext *context = op.getContext();
     Location loc = op.getLoc();
-    tile::ContractionOpAdaptor adaptor(operands);
-    ValueRange cionOperands = adaptor.operands();
+    ValueRange cionOperands = adaptor.getOperands();
 
     TensorInitializer init(rewriter, op, op.result().getType(),
                            /*padding=*/false);
@@ -723,18 +718,19 @@ struct ContractionOpConversion
     if (maybeOpPadding) {
       Value exteriorValue = createInit(
           rewriter, loc, resultType.getElementType(), maybeOpPadding->agg);
-      auto pad = rewriter.create<linalg::PadTensorOp>(
-          loc,
-          /*source=*/initValue,
-          /*staticLow=*/maybeOpPadding->lower,
-          /*staticHigh=*/maybeOpPadding->upper,
-          /*low=*/ValueRange{},
-          /*high=*/ValueRange{});
+      auto pad =
+          rewriter.create<tensor::PadOp>(loc,
+                                         /*source=*/initValue,
+                                         /*staticLow=*/maybeOpPadding->lower,
+                                         /*staticHigh=*/maybeOpPadding->upper,
+                                         /*low=*/ValueRange{},
+                                         /*high=*/ValueRange{});
       SmallVector<Type, 4> padArgs(numDims, rewriter.getIndexType());
       OpBuilder::InsertionGuard guard(rewriter);
-      Block *padBody =
-          rewriter.createBlock(&pad.region(), pad.region().begin(), padArgs);
-      rewriter.create<linalg::YieldOp>(loc, ValueRange{exteriorValue});
+      SmallVector<Location> locs(padArgs.size(), loc);
+      Block *padBody = rewriter.createBlock(&pad.region(), pad.region().begin(),
+                                            padArgs, locs);
+      rewriter.create<tensor::YieldOp>(loc, exteriorValue);
       initValue = pad.getResult();
       resultType = initValue.getType().cast<RankedTensorType>();
     }
@@ -799,7 +795,7 @@ struct ContractionOpConversion
     auto genericOp = rewriter.create<linalg::GenericOp>(
         loc,
         /*resultTensorTypes=*/resultType,
-        /*inputs=*/cionOperands,
+        /*inputs=*/cionOperands.drop_front(),
         /*outputs=*/initValue,
         /*indexingMaps=*/idxMaps,
         /*iteratorTypes=*/iterTypes,
@@ -832,14 +828,29 @@ struct ContractionOpConversion
     // Replace output with the newly allocated buffer
     rewriter.replaceOp(op, genericOp.getResult(0));
   }
+
+  LogicalResult
+  matchAndRewrite(tile::ContractionOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
+    if (op.combo() != comboKind)
+      return failure();
+    // TODO. Lorenzo: Move this to verifier?
+    if ((!op.lowerBounds().hasValue()) || (!op.upperBounds().hasValue()))
+      return failure();
+    Matcher pred;
+    if (failed(pred(op)))
+      return failure();
+    rewrite(op, adaptor, rewriter);
+    return success();
+  }
 };
 
 struct IndexOpConversion : public OpConversionPattern<tile::IndexOp> {
   using OpConversionPattern<tile::IndexOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(tile::IndexOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
+  matchAndRewrite(tile::IndexOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
     // Gather some basic info
     Location loc = op.getLoc();
     MLIRContext *context = op.getContext();
@@ -865,8 +876,8 @@ struct IndexOpConversion : public OpConversionPattern<tile::IndexOp> {
         [&](OpBuilder &builder, Location loc, ValueRange args) {
           auto index =
               builder.create<linalg::IndexOp>(loc, op.axis().getZExtValue());
-          auto cast = builder.create<arith::IndexCastOp>(loc, index.getResult(),
-                                                  resultType.getElementType());
+          auto cast = builder.create<arith::IndexCastOp>(
+              loc, resultType.getElementType(), index.getResult());
           builder.create<linalg::YieldOp>(loc, ValueRange{cast.getResult()});
         });
 
@@ -917,11 +928,8 @@ struct ReshapeOpConversion : public OpConversionPattern<tile::ReshapeOp> {
   using OpConversionPattern<tile::ReshapeOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(tile::ReshapeOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
-    // Create an adaptor, to interpret the operands
-    tile::ReshapeOpAdaptor adaptor(operands);
-
+  matchAndRewrite(tile::ReshapeOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
     auto tensor = adaptor.tensor();
 
     TileToLinalgTypeConverter typeConverter;
@@ -931,11 +939,11 @@ struct ReshapeOpConversion : public OpConversionPattern<tile::ReshapeOp> {
     auto dstShape = resultType.cast<RankedTensorType>().getShape();
 
     if (auto dims = matchShape(dstShape, srcShape)) {
-      rewriter.replaceOpWithNewOp<linalg::TensorCollapseShapeOp>(op, resultType,
-                                                                 tensor, *dims);
+      rewriter.replaceOpWithNewOp<tensor::CollapseShapeOp>(op, resultType,
+                                                           tensor, *dims);
     } else if (auto dims = matchShape(srcShape, dstShape)) {
-      rewriter.replaceOpWithNewOp<linalg::TensorExpandShapeOp>(op, resultType,
-                                                               tensor, *dims);
+      rewriter.replaceOpWithNewOp<tensor::ExpandShapeOp>(op, resultType, tensor,
+                                                         *dims);
     } else {
       // General reshape. Collapse the tensor into 1-D and then expand it to the
       // result shape.
@@ -947,13 +955,13 @@ struct ReshapeOpConversion : public OpConversionPattern<tile::ReshapeOp> {
       }
       auto tmpType = RankedTensorType::get(
           ArrayRef{size}, resultType.cast<RankedTensorType>().getElementType());
-      auto collapse = rewriter.create<linalg::TensorCollapseShapeOp>(
+      auto collapse = rewriter.create<tensor::CollapseShapeOp>(
           op.getLoc(), tmpType, tensor, collapseDims);
       ReassociationIndices expandDims;
       for (unsigned i = 0; i < dstShape.size(); ++i) {
         expandDims.emplace_back(i);
       }
-      rewriter.replaceOpWithNewOp<linalg::TensorExpandShapeOp>(
+      rewriter.replaceOpWithNewOp<tensor::ExpandShapeOp>(
           op, resultType, collapse.getResult(), expandDims);
     }
     return success();
@@ -964,11 +972,8 @@ struct ShapeOpConversion : public OpConversionPattern<tile::ShapeOp> {
   using OpConversionPattern<tile::ShapeOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(tile::ShapeOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
-    // Create an adaptor
-    tile::ShapeOpAdaptor adaptor(operands);
-
+  matchAndRewrite(tile::ShapeOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
     // Gather some basic info
     auto loc = op.getLoc();
     TileToLinalgTypeConverter typeConverter;
@@ -997,8 +1002,8 @@ struct CastOpConversion : public OpConversionPattern<tile::CastOp> {
   using OpConversionPattern<tile::CastOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(tile::CastOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
+  matchAndRewrite(tile::CastOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
     Location loc = op.getLoc();
     MLIRContext *context = op.getContext();
 
@@ -1006,13 +1011,13 @@ struct CastOpConversion : public OpConversionPattern<tile::CastOp> {
     RankedTensorType initType = init.getType();
     unsigned numDims = initType.getRank();
     AffineMap inputMap =
-        buildBroadcastMap(rewriter, loc, operands[0], initType);
+        buildBroadcastMap(rewriter, loc, adaptor.getOperands()[0], initType);
     AffineMap outputMap = AffineMap::getMultiDimIdentityMap(numDims, context);
 
     auto genericOp = rewriter.create<linalg::GenericOp>(
         loc,
         /*resultTensorTypes=*/TypeRange{initType},
-        /*inputs=*/operands,
+        /*inputs=*/adaptor.getOperands(),
         /*outputs=*/ValueRange{init.resultTensor},
         /*indexingMaps=*/ArrayRef<AffineMap>{inputMap, outputMap},
         /*iteratorTypes=*/
@@ -1021,7 +1026,7 @@ struct CastOpConversion : public OpConversionPattern<tile::CastOp> {
         /*libraryCall=*/"",
         [&](OpBuilder &builder, Location loc, ValueRange args) {
           Type originalSrcType = getElementType(op.tensor());
-          Type convertedSrcType = getElementType(operands[0]);
+          Type convertedSrcType = getElementType(adaptor.getOperands()[0]);
           // Create the standard cast op
           bool resultIsSigned =
               getElementType(op.result().getType()).isSignedInteger();
@@ -1042,9 +1047,9 @@ struct FuncOpConversion : public OpConversionPattern<FuncLikeOp> {
   using OpConversionPattern<FuncLikeOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(FuncLikeOp op, ArrayRef<Value> operands,
+  matchAndRewrite(FuncLikeOp op, typename FuncLikeOp::Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
-    FunctionType type = op.getType();
+    FunctionType type = op.getFunctionType();
 
     // Convert the function signature
     TileToLinalgTypeConverter typeConverter;
@@ -1075,13 +1080,24 @@ struct FuncOpConversion : public OpConversionPattern<FuncLikeOp> {
   }
 };
 
-struct ReturnOpConversion : public OpConversionPattern<ReturnOp> {
-  using OpConversionPattern<ReturnOp>::OpConversionPattern;
+struct ReturnOpConversion : public OpConversionPattern<func::ReturnOp> {
+  using OpConversionPattern<func::ReturnOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(ReturnOp op, ArrayRef<Value> operands,
+  matchAndRewrite(func::ReturnOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
-    rewriter.replaceOpWithNewOp<ReturnOp>(op, operands);
+    rewriter.replaceOpWithNewOp<func::ReturnOp>(op, adaptor.getOperands());
+    return success();
+  }
+};
+
+struct YieldXOpConversion : public OpConversionPattern<stdx::YieldOp> {
+  using OpConversionPattern<stdx::YieldOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(stdx::YieldOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
+    rewriter.replaceOpWithNewOp<stdx::YieldOp>(op, adaptor.getOperands());
     return success();
   }
 };
@@ -1090,12 +1106,11 @@ struct PragmaOpConversion : public OpConversionPattern<tile::PragmaOp> {
   using OpConversionPattern<tile::PragmaOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(tile::PragmaOp op, ArrayRef<Value> operands,
+  matchAndRewrite(tile::PragmaOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
     if (op.op() == "trace") {
       return failure();
     }
-    tile::PragmaOpAdaptor adaptor(operands);
     rewriter.replaceOp(op, adaptor.tensor());
     return success();
   }
@@ -1106,13 +1121,13 @@ struct SpecialOpConversion : public OpConversionPattern<SpecialOp> {
   using OpConversionPattern<SpecialOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(SpecialOp op, ArrayRef<Value> operands,
+  matchAndRewrite(SpecialOp op, typename SpecialOp::Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
     TileToLinalgTypeConverter typeConverter;
     SmallVector<Type> resultTypes;
     (void)typeConverter.convertTypes(op->getResultTypes(), resultTypes);
-    rewriter.replaceOpWithNewOp<SpecialOp>(op, resultTypes, operands,
-                                           op->getAttrs());
+    rewriter.replaceOpWithNewOp<SpecialOp>(
+        op, resultTypes, adaptor.getOperands(), op->getAttrs());
     return success();
   }
 };
@@ -1121,19 +1136,19 @@ struct TraceOpConversion : public OpConversionPattern<tile::PragmaOp> {
   using OpConversionPattern<tile::PragmaOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(tile::PragmaOp op, ArrayRef<Value> operands,
+  matchAndRewrite(tile::PragmaOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
     if (op.op() != "trace") {
       return failure();
     }
-    tile::PragmaOpAdaptor adaptor(operands);
     auto module = op->getParentOfType<ModuleOp>();
-    auto msg = op.attrs().getNamed("msg");
+    llvm::Optional<NamedAttribute> msg = op.attrs().getNamed("msg");
     if (!msg) {
       return failure();
     }
-    auto symbol = createStubTraceFunc(module, msg->second.cast<StringAttr>());
-    rewriter.create<CallOp>(op.getLoc(), symbol, TypeRange{});
+    auto symbol =
+        createStubTraceFunc(module, msg->getValue().cast<StringAttr>());
+    rewriter.create<func::CallOp>(op.getLoc(), symbol, TypeRange{});
     rewriter.replaceOp(op, adaptor.tensor());
     return success();
   }
@@ -1143,13 +1158,12 @@ struct ScfForOpConversion : public OpConversionPattern<scf::ForOp> {
   using OpConversionPattern<scf::ForOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(scf::ForOp op, ArrayRef<Value> operands,
+  matchAndRewrite(scf::ForOp op, OpAdaptor oldFor,
                   ConversionPatternRewriter &rewriter) const final {
-    scf::ForOpAdaptor oldFor(operands);
     auto &oldBodyOps = op.getBody()->getOperations();
-    auto newOp = rewriter.create<scf::ForOp>(op.getLoc(), oldFor.lowerBound(),
-                                             oldFor.upperBound(), oldFor.step(),
-                                             oldFor.initArgs());
+    auto newOp = rewriter.create<scf::ForOp>(
+        op.getLoc(), oldFor.getLowerBound(), oldFor.getUpperBound(),
+        oldFor.getStep(), oldFor.getInitArgs());
     auto &newBodyOps = newOp.getBody()->getOperations();
     newBodyOps.splice(std::prev(newBodyOps.end()), oldBodyOps,
                       oldBodyOps.begin(), oldBodyOps.end());
@@ -1158,7 +1172,7 @@ struct ScfForOpConversion : public OpConversionPattern<scf::ForOp> {
     for (unsigned i = 0; i < oldArgs.size(); ++i) {
       oldArgs[i].replaceAllUsesWith(newArgs[i]);
     }
-    rewriter.replaceOp(op, newOp.results());
+    rewriter.replaceOp(op, newOp.getResults());
     return success();
   }
 };
@@ -1186,33 +1200,28 @@ struct LowerTileToLinalgPass
         }
       }
     };
-    module.walk([&](ReturnOp op) { injectIdent(op); });
+    module.walk([&](func::ReturnOp op) { injectIdent(op); });
     module.walk([&](stdx::YieldOp op) { injectIdent(op); });
 
     // Set up target (i.e. what is legal)
     ConversionTarget target(getContext());
     TileToLinalgTypeConverter converter;
-    target.addLegalDialect<mlir::AffineDialect,         //
-                           mlir::linalg::LinalgDialect, //
-                           mlir::StandardOpsDialect,    //
-                           mlir::math::MathDialect,     //
-                           mlir::memref::MemRefDialect, //
-                           mlir::scf::SCFDialect,       //
-                           layer::LayerDialect,         //
-                           arith::ArithmeticDialect,
-                           stdx::StdXDialect>();
-    target.addLegalOp<scf::ForOp,   //
-                      scf::YieldOp, //
-                      scf::IfOp>();
-    target.addLegalOp<mlir::ModuleOp, //
-                      ReturnOp>();
-    target.addDynamicallyLegalOp<FuncOp>(
-        [&](FuncOp op) { return converter.isSignatureLegal(op.getType()); });
-    target.addDynamicallyLegalOp<stdx::ClosureOp>([&](stdx::ClosureOp op) {
-      return converter.isSignatureLegal(op.getType());
+    target.addLegalDialect<
+        AffineDialect, linalg::LinalgDialect, math::MathDialect,
+        memref::MemRefDialect, scf::SCFDialect, layer::LayerDialect,
+        tensor::TensorDialect, arith::ArithmeticDialect, stdx::StdXDialect>();
+    target.addLegalOp<scf::ForOp, scf::YieldOp, scf::IfOp>();
+    target.addLegalOp<mlir::ModuleOp, func::ReturnOp, func::CallOp>();
+    target.addDynamicallyLegalOp<func::FuncOp>([&](func::FuncOp op) {
+      return converter.isSignatureLegal(op.getFunctionType());
     });
-    target.addDynamicallyLegalOp<ReturnOp>(
-        [&](ReturnOp op) { return converter.isLegal(op); });
+    target.addDynamicallyLegalOp<stdx::ClosureOp>([&](stdx::ClosureOp op) {
+      return converter.isSignatureLegal(op.getFunctionType());
+    });
+    target.addDynamicallyLegalOp<func::ReturnOp>(
+        [&](func::ReturnOp op) { return converter.isLegal(op); });
+    target.addDynamicallyLegalOp<stdx::YieldOp>(
+        [&](stdx::YieldOp op) { return converter.isLegal(op); });
     target.addDynamicallyLegalOp<scf::ForOp>(
         [&](scf::ForOp op) { return converter.isLegal(op.getResultTypes()); });
 
@@ -1226,39 +1235,44 @@ struct LowerTileToLinalgPass
         [&](tile::ScatterOp op) { return converter.isLegal(op); });
 
     // Setup rewrite patterns
-    using CmpIntLtOp =
-        CmpIntInequalityOp<arith::CmpIPredicate::slt, arith::CmpIPredicate::ult>;
-    using CmpIntLeOp =
-        CmpIntInequalityOp<arith::CmpIPredicate::sle, arith::CmpIPredicate::ule>;
-    using CmpIntGtOp =
-        CmpIntInequalityOp<arith::CmpIPredicate::sgt, arith::CmpIPredicate::ugt>;
-    using CmpIntGeOp =
-        CmpIntInequalityOp<arith::CmpIPredicate::sge, arith::CmpIPredicate::uge>;
+    using CmpIntLtOp = CmpIntInequalityOp<arith::CmpIPredicate::slt,
+                                          arith::CmpIPredicate::ult>;
+    using CmpIntLeOp = CmpIntInequalityOp<arith::CmpIPredicate::sle,
+                                          arith::CmpIPredicate::ule>;
+    using CmpIntGtOp = CmpIntInequalityOp<arith::CmpIPredicate::sgt,
+                                          arith::CmpIPredicate::ugt>;
+    using CmpIntGeOp = CmpIntInequalityOp<arith::CmpIPredicate::sge,
+                                          arith::CmpIPredicate::uge>;
     RewritePatternSet patterns(&getContext());
     patterns.insert<
-        CastOpConversion,                     //
-        ConstantOpConversion,                 //
-        FuncOpConversion<FuncOp>,             //
-        FuncOpConversion<stdx::ClosureOp>,    //
-        IndexOpConversion,                    //
-        PragmaOpConversion,                   //
-        ReshapeOpConversion,                  //
-        ReturnOpConversion,                   //
+        CastOpConversion,                  //
+        ConstantOpConversion,              //
+        FuncOpConversion<func::FuncOp>,    //
+        FuncOpConversion<stdx::ClosureOp>, //
+        IndexOpConversion,                 //
+        PragmaOpConversion,                //
+        ReshapeOpConversion,               //
+        ReturnOpConversion,                //
+        YieldXOpConversion,
         SpecialOpConversion<tile::ArgSortOp>, //
         SpecialOpConversion<tile::GatherOp>,  //
         SpecialOpConversion<tile::PrngOp>,    //
         SpecialOpConversion<tile::ScatterOp>, //
         ShapeOpConversion,                    //
         TraceOpConversion,                    //
-        ScfForOpConversion,                   //
+        ScfForOpConversion,
         ContractionOpConversion<CombinationKind::none, FirstOperand>,
-        ContractionOpConversion<CombinationKind::add, StdOp<mlir::arith::AddFOp>,
+        ContractionOpConversion<CombinationKind::add,
+                                StdOp<mlir::arith::AddFOp>,
                                 ResultIs<EltwiseFloat>>,
-        ContractionOpConversion<CombinationKind::add, StdOp<mlir::arith::AddIOp>,
+        ContractionOpConversion<CombinationKind::add,
+                                StdOp<mlir::arith::AddIOp>,
                                 ResultIs<EltwiseInteger>>,
-        ContractionOpConversion<CombinationKind::mul, StdOp<mlir::arith::MulFOp>,
+        ContractionOpConversion<CombinationKind::mul,
+                                StdOp<mlir::arith::MulFOp>,
                                 ResultIs<EltwiseFloat>>,
-        ContractionOpConversion<CombinationKind::mul, StdOp<mlir::arith::MulIOp>,
+        ContractionOpConversion<CombinationKind::mul,
+                                StdOp<mlir::arith::MulIOp>,
                                 ResultIs<EltwiseInteger>>,
         ContractionOpConversion<CombinationKind::eq,
                                 CmpFloatOp<arith::CmpFPredicate::OEQ>,
@@ -1270,9 +1284,10 @@ struct LowerTileToLinalgPass
             CombinationKind::cond,
             ContractionCondOp<CmpFloatOp<arith::CmpFPredicate::OEQ>>,
             AnyComparandIs<EltwiseFloat>>,
-        ContractionOpConversion<CombinationKind::cond,
-                                ContractionCondOp<CmpIntOp<arith::CmpIPredicate::eq>>,
-                                AnyComparandIs<EltwiseInteger>>,
+        ContractionOpConversion<
+            CombinationKind::cond,
+            ContractionCondOp<CmpIntOp<arith::CmpIPredicate::eq>>,
+            AnyComparandIs<EltwiseInteger>>,
         EltwiseOpConversion<tile::ExpOp, StdOp<math::ExpOp>>,
         EltwiseOpConversion<tile::LogOp, StdOp<math::LogOp>,
                             ResultIs<EltwiseFloat>>,
@@ -1338,27 +1353,33 @@ struct LowerTileToLinalgPass
                             ResultIs<EltwiseSigned>>,
         EltwiseOpConversion<tile::ModOp, StdOp<mlir::arith::RemUIOp>,
                             ResultIs<EltwiseUnsigned>>,
-        EltwiseOpConversion<tile::CmpEqOp, CmpFloatOp<arith::CmpFPredicate::OEQ>,
+        EltwiseOpConversion<tile::CmpEqOp,
+                            CmpFloatOp<arith::CmpFPredicate::OEQ>,
                             AnyOperandIs<EltwiseFloat>>,
         EltwiseOpConversion<tile::CmpEqOp, CmpIntOp<arith::CmpIPredicate::eq>,
                             OperandsAre<Not<EltwiseFloat>>>,
-        EltwiseOpConversion<tile::CmpNeOp, CmpFloatOp<arith::CmpFPredicate::ONE>,
+        EltwiseOpConversion<tile::CmpNeOp,
+                            CmpFloatOp<arith::CmpFPredicate::ONE>,
                             AnyOperandIs<EltwiseFloat>>,
         EltwiseOpConversion<tile::CmpNeOp, CmpIntOp<arith::CmpIPredicate::ne>,
                             OperandsAre<Not<EltwiseFloat>>>,
-        EltwiseOpConversion<tile::CmpLtOp, CmpFloatOp<arith::CmpFPredicate::OLT>,
+        EltwiseOpConversion<tile::CmpLtOp,
+                            CmpFloatOp<arith::CmpFPredicate::OLT>,
                             AnyOperandIs<EltwiseFloat>>,
         EltwiseOpConversion<tile::CmpLtOp, CmpIntLtOp,
                             OperandsAre<Not<EltwiseFloat>>>,
-        EltwiseOpConversion<tile::CmpLeOp, CmpFloatOp<arith::CmpFPredicate::OLE>,
+        EltwiseOpConversion<tile::CmpLeOp,
+                            CmpFloatOp<arith::CmpFPredicate::OLE>,
                             AnyOperandIs<EltwiseFloat>>,
         EltwiseOpConversion<tile::CmpLeOp, CmpIntLeOp,
                             OperandsAre<Not<EltwiseFloat>>>,
-        EltwiseOpConversion<tile::CmpGtOp, CmpFloatOp<arith::CmpFPredicate::OGT>,
+        EltwiseOpConversion<tile::CmpGtOp,
+                            CmpFloatOp<arith::CmpFPredicate::OGT>,
                             AnyOperandIs<EltwiseFloat>>,
         EltwiseOpConversion<tile::CmpGtOp, CmpIntGtOp,
                             OperandsAre<Not<EltwiseFloat>>>,
-        EltwiseOpConversion<tile::CmpGeOp, CmpFloatOp<arith::CmpFPredicate::OGE>,
+        EltwiseOpConversion<tile::CmpGeOp,
+                            CmpFloatOp<arith::CmpFPredicate::OGE>,
                             AnyOperandIs<EltwiseFloat>>,
         EltwiseOpConversion<tile::CmpGeOp, CmpIntGeOp,
                             OperandsAre<Not<EltwiseFloat>>>,

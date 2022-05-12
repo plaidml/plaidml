@@ -2,7 +2,7 @@
 
 #include "llvm/Support/Process.h"
 
-#include "mlir/Support/MlirOptMain.h"
+#include "mlir/Tools/mlir-opt/MlirOptMain.h"
 
 #include "pmlc/all_dialects.h"
 #include "pmlc/all_passes.h"

@@ -12,8 +12,7 @@
 namespace pmlc::dialect::pxa {
 
 struct CachePlan {
-  template <typename OpType>
-  struct OpInfo {
+  template <typename OpType> struct OpInfo {
     OpType op;
     RelativeAccessPattern rap;
   };
@@ -36,7 +35,8 @@ struct CachePlan {
   mlir::AffineParallelOp middleBand;
   bool wholeBlock;
 
-  CachePlan(mlir::AffineParallelOp outerBand, mlir::AffineParallelOp middleBand, bool wholeBlock)
+  CachePlan(mlir::AffineParallelOp outerBand, mlir::AffineParallelOp middleBand,
+            bool wholeBlock)
       : outerBand(outerBand), middleBand(middleBand), wholeBlock(wholeBlock) {}
 
   void addLoad(PxaLoadOp op);

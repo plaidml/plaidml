@@ -29,35 +29,35 @@ void BoxOp::build(OpBuilder &builder, OperationState &result, StringRef op,
   auto *body = new Block();
   // Add all the block arguments.
   for (Value operand : operands) {
-    body->addArgument(operand.getType());
+    body->addArgument(operand.getType(), operand.getLoc());
   }
   bodyRegion->push_back(body);
 }
-
-void printBoxOp(OpAsmPrinter &p, BoxOp op) {
-  p << " \"" << op.op() << "\" (" << op.getBody()->getArguments() << ") = (";
-  p.printOperands(op.operands());
+#if 0
+void BoxOp::print(OpAsmPrinter &p) {
+  p << " \"" << op() << "\" (" << getBody()->getArguments() << ") = (";
+  p.printOperands(operands());
   p << ") : ";
-  p.printFunctionalType(op);
-  p.printRegion(op.body(),
+  p.printFunctionalType(*this);
+  p.printRegion(body(),
                 /*printEntryBlockArgs=*/false,
                 /*printBlockTerminators=*/true);
   SmallVector<StringRef, 2> elidedAttrs{"op"};
-  auto attrs = op.attrs().cast<DictionaryAttr>();
-  if (attrs.empty()) {
+  auto att = attrs().cast<DictionaryAttr>();
+  if (att.empty()) {
     elidedAttrs.push_back("attrs");
   }
-  p.printOptionalAttrDict(op->getAttrs(), elidedAttrs);
+  p.printOptionalAttrDict((*this)->getAttrs(), elidedAttrs);
 }
 
-ParseResult parseBoxOp(OpAsmParser &parser, OperationState &result) {
+ParseResult BoxOp::parse(OpAsmParser &parser, OperationState &result) {
   StringAttr opName;
   FunctionType funcType;
-  SmallVector<OpAsmParser::OperandType, 4> inner;
-  SmallVector<OpAsmParser::OperandType, 4> outer;
+  SmallVector<OpAsmParser::Argument, 4> inner;
+  SmallVector<OpAsmParser::UnresolvedOperand, 4> outer;
   auto loc = parser.getCurrentLocation();
   if (parser.parseAttribute(opName, "op", result.attributes) ||
-      parser.parseRegionArgumentList(inner, OpAsmParser::Delimiter::Paren) ||
+      parser.parseArgumentList(inner, OpAsmParser::Delimiter::Paren) ||
       parser.parseEqual() ||
       parser.parseOperandList(outer, OpAsmParser::Delimiter::Paren) ||
       parser.parseColonType(funcType) ||
@@ -67,7 +67,8 @@ ParseResult parseBoxOp(OpAsmParser &parser, OperationState &result) {
   }
   result.addTypes(funcType.getResults());
   Region *body = result.addRegion();
-  if (parser.parseRegion(*body, inner, funcType.getInputs()) ||
+  SmallVector<Type> argTypes;
+  if (parser.parseRegion(*body, inner) ||
       parser.parseOptionalAttrDict(result.attributes)) {
     return failure();
   }
@@ -77,7 +78,7 @@ ParseResult parseBoxOp(OpAsmParser &parser, OperationState &result) {
   }
   return success();
 }
-
+#endif
 void LayerDialect::initialize() {
   addOperations<
 #define GET_OP_LIST

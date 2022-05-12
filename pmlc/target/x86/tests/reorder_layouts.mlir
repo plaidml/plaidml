@@ -9,13 +9,13 @@
 func @main(%arg0: tensor<1x56x56x64xf32>, %arg1: tensor<1x1x64x64xf32> {stdx.const}, %arg2: tensor<64xf32> {stdx.const}) -> tensor<1x56x56x64xf32> {
   %cst = arith.constant 0.000000e+00 : f32
   %T0 = linalg.init_tensor [1, 56, 56, 64] : tensor<1x56x56x64xf32>
-  %1 = linalg.fill(%cst, %T0) : f32, tensor<1x56x56x64xf32> -> tensor<1x56x56x64xf32>
+  %TC = linalg.fill ins(%cst : f32) outs(%T0 : tensor<1x56x56x64xf32>) -> tensor<1x56x56x64xf32>
 
   // convolution
   %2 = linalg.generic {
     indexing_maps = [#input, #filter, #output],
     iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]
-  } ins(%arg0, %arg1 : tensor<1x56x56x64xf32>, tensor<1x1x64x64xf32>) outs(%1 : tensor<1x56x56x64xf32>) {
+  } ins(%arg0, %arg1 : tensor<1x56x56x64xf32>, tensor<1x1x64x64xf32>) outs(%TC : tensor<1x56x56x64xf32>) {
   ^bb0(%arg3: f32, %arg4: f32, %arg5: f32):  // no predecessors
     %5 = arith.mulf %arg3, %arg4 : f32
     %6 = arith.addf %arg5, %5 : f32

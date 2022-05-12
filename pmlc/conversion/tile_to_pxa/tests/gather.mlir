@@ -28,12 +28,12 @@ func @gather2(%arg0: tensor<3x2xf32>, %arg1: tensor<4xf32>) -> tensor<3x4xf32> {
 // CHECK: %[[CI:.*]] = arith.fptosi %[[CF]] : f32 to i32
 // CHECK: %[[CMP0:.*]] = arith.cmpi slt, %[[FI]], %{{.*}}: i32
 // CHECK: %[[CMP1:.*]] = arith.cmpi slt, %[[FI]], %{{.*}}: i32
-// CHECK: %{{.*}} = select %[[CMP0]],  %{{.*}}, %[[FI]] : i32
-// CHECK: %[[FLOOR:.*]] = select %[[CMP1]], %{{.*}},  %{{.*}} : i32
+// CHECK: %{{.*}} = arith.select %[[CMP0]],  %{{.*}}, %[[FI]] : i32
+// CHECK: %[[FLOOR:.*]] = arith.select %[[CMP1]], %{{.*}},  %{{.*}} : i32
 // CHECK: %[[CMP2:.*]] = arith.cmpi slt, %[[CI]], %{{.*}}: i32
 // CHECK: %[[CMP3:.*]] = arith.cmpi slt, %[[CI]], %{{.*}}: i32
-// CHECK: %{{.*}} = select %[[CMP2]],  %{{.*}}, %[[CI]] : i32
-// CHECK: %[[CEIL:.*]] = select %[[CMP3]], %{{.*}},  %{{.*}} : i32
+// CHECK: %{{.*}} = arith.select %[[CMP2]],  %{{.*}}, %[[CI]] : i32
+// CHECK: %[[CEIL:.*]] = arith.select %[[CMP3]], %{{.*}},  %{{.*}} : i32
 // CHECK: %[[FIDX:.*]] = arith.index_cast %[[FLOOR]] : i32 to index
 // CHECK: %[[CIDX:.*]] = arith.index_cast %[[CEIL]] : i32 to index
 // CHECK: %[[G1:.*]] = memref.load %{{.*}}[%[[I]], %[[CIDX]]] : memref<3x2xf32>

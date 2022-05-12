@@ -15,7 +15,7 @@ func @dot(%arg0: tensor<1x784xf32>, %arg1: tensor<784x512xf32>) -> tensor<1x512x
 // CHECK-SAME: (%[[arg0:.*]]: tensor<1x784xf32>, %[[arg1:.*]]: tensor<784x512xf32>) -> tensor<1x512xf32>
 // CHECK: %[[cst:.*]] = arith.constant 0.000000e+00 : f32
 // CHECK: %[[init:.*]] = linalg.init_tensor [1, 512] : tensor<1x512xf32>
-// CHECK: %[[broadcast:.*]] = linalg.fill(%[[cst]], %[[init]]) : f32, tensor<1x512xf32> -> tensor<1x512xf32>
+// CHECK: %[[broadcast:.*]] = linalg.fill ins(%[[cst]] : f32) outs(%[[init]] : tensor<1x512xf32>) -> tensor<1x512xf32>
 // CHECK: %[[result:.*]] = linalg.generic
 // CHECK-SAME:               iterator_types = ["reduction", "parallel", "parallel"]}
 // CHECK-SAME:               ins(%[[arg0]], %[[arg1]] : tensor<1x784xf32>, tensor<784x512xf32>)

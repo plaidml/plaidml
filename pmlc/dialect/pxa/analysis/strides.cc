@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "mlir/Dialect/Affine/IR/AffineValueMap.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Support/DebugStringHelper.h"
 #include "llvm/ADT/TypeSwitch.h"
@@ -167,7 +168,7 @@ AffineValueExpr StrideInfo::toValueExpr(MLIRContext *ctx) const {
   for (auto kvp : strides) {
     unsigned loopDepth = 0;
     auto parent = kvp.first.getOwner()->getParentOp();
-    while (!dyn_cast<FuncOp>(parent)) {
+    while (!dyn_cast<func::FuncOp>(parent)) {
       loopDepth++;
       parent = parent->getParentOp();
     }
@@ -225,7 +226,9 @@ void StrideInfo::print(raw_ostream &os, Block *relative) const {
 }
 
 std::ostream &operator<<(std::ostream &os, const StrideInfo &x) {
-  os << debugString(x);
+  // os << debugString(x);
+  //  TODO: lorenzo fix this.
+  os << debugString(x.offset);
   return os;
 }
 
@@ -288,10 +291,15 @@ Optional<StrideInfo> computeStrideInfo(Value expr) {
     return None;
   }
 
-  // Try for the affine apply case
+  // Try for the affine apply case.
   if (auto op = dyn_cast_or_null<AffineApplyOp>(expr.getDefiningOp()))
     return computeStrideInfo(op.getAffineMap().getResult(0),
                              op.getMapOperands());
+
+  // Try constant op.
+  if (arith::ConstantIndexOp op =
+          dyn_cast_or_null<arith::ConstantIndexOp>(expr.getDefiningOp()))
+    return StrideInfo(op.value());
 
   IVLOG(1, "Failed stride info: op = " << debugString(expr));
 

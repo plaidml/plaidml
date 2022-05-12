@@ -3,7 +3,6 @@
 #include <string>
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/DebugStringHelper.h"
 
@@ -59,34 +58,35 @@ private:
     Value load1, load2, reduce;
     Operation *yield = op.getBody()->getTerminator();
     if (matchPattern(
-            yield,
-            m_Op<AffineYieldOp>(m_Capture(
-                &reduce, m_PxaReduceOp(
-                             AtomicRMWKind::addf,
-                             m_Op<arith::MulFOp>(m_Capture(&load1, m_Op<PxaLoadOp>()),
-                                          m_Capture(&load2, m_Op<PxaLoadOp>())),
-                             m_Any())))) ||
+            yield, m_Op<AffineYieldOp>(m_Capture(
+                       &reduce,
+                       m_PxaReduceOp(arith::AtomicRMWKind::addf,
+                                     m_Op<arith::MulFOp>(
+                                         m_Capture(&load1, m_Op<PxaLoadOp>()),
+                                         m_Capture(&load2, m_Op<PxaLoadOp>())),
+                                     m_Any())))) ||
         matchPattern(
-            yield,
-            m_Op<AffineYieldOp>(m_Capture(
-                &reduce, m_PxaReduceOp(
-                             AtomicRMWKind::addi,
-                             m_Op<arith::MulIOp>(m_Capture(&load1, m_Op<PxaLoadOp>()),
-                                          m_Capture(&load2, m_Op<PxaLoadOp>())),
-                             m_Any()))))) {
+            yield, m_Op<AffineYieldOp>(m_Capture(
+                       &reduce,
+                       m_PxaReduceOp(arith::AtomicRMWKind::addi,
+                                     m_Op<arith::MulIOp>(
+                                         m_Capture(&load1, m_Op<PxaLoadOp>()),
+                                         m_Capture(&load2, m_Op<PxaLoadOp>())),
+                                     m_Any()))))) {
       return StencilCapture{{reduce}, {load1, load2}};
     }
     return llvm::None;
   }
 
-  double getCost(const StencilOption &stencil, ArrayRef<int64_t> tileSize) {
+  std::pair<double, double> getCost(const StencilOption &stencil,
+                                    ArrayRef<int64_t> tileSize) {
     SmallVector<Type, 3> types;
     for (const ValueStrideInfo &vsi : stencil.values) {
       types.push_back(vsi.value.getType());
     }
     auto cost = stencilCostFn(tileSize, types);
     if (cost.throughput == 0) {
-      return std::numeric_limits<double>::infinity();
+      return std::make_pair(std::numeric_limits<double>::infinity(), 0);
     }
 
     // The middle idxs are the accumulation indexes, i.e. those used on loads
@@ -149,6 +149,9 @@ private:
 
     unsigned totInnerLoop = tileSize[0] * tileSize[1] * tileSize[2];
     double innerTime = totInnerLoop / cost.throughput;
+    auto strideVal =
+        getStride(tileSize, tileSize.size(),
+                  stencil.values[0].strideInfo.strides, stencil.indexes);
 
     IVLOG(4, "Outer: loop = " << totOuterLoop);
     if (VLOG_IS_ON(4)) {
@@ -170,7 +173,7 @@ private:
     IVLOG(3, " middle count: " << totMiddleLoop);
     IVLOG(3, " startup cost: " << cost.startupCost);
     IVLOG(3, " inner time:   " << innerTime);
-    return perf;
+    return std::make_pair(perf, strideVal);
   }
 
   void transform(const StencilOption &stencil, ArrayRef<int64_t> tileSize) {

@@ -5,14 +5,14 @@
 #include <utility>
 #include <vector>
 
-#include "mlir/Analysis/AffineStructures.h"
+#include "mlir/Dialect/Affine/Analysis/AffineStructures.h"
 #include "mlir/Pass/Pass.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/dialect/pxa/transforms/pass_detail.h"
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/IR/AffineValueMap.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "pmlc/dialect/pxa/transforms/tile.h"
 
 #include "mlir/Support/DebugStringHelper.h"
@@ -42,10 +42,10 @@ unsigned getNestedIVCount(AffineParallelOp op) {
 void buildNestLoop(AffineParallelOp op) {
   OpBuilder builder(op.getBody(), op.getBody()->begin());
   Block *outerBody = op.getBody();
-  llvm::SmallVector<mlir::AtomicRMWKind, 8> reductions;
+  llvm::SmallVector<arith::AtomicRMWKind, 8> reductions;
   for (Attribute attr : op.reductions()) {
     auto intAttr = attr.dyn_cast<IntegerAttr>();
-    reductions.push_back(*mlir::symbolizeAtomicRMWKind(intAttr.getInt()));
+    reductions.push_back(*arith::symbolizeAtomicRMWKind(intAttr.getInt()));
   }
   auto inner = builder.create<AffineParallelOp>(
       op.getLoc(), op.getResultTypes(), reductions, ArrayRef<int64_t>{1});
@@ -62,8 +62,8 @@ void buildNestLoop(AffineParallelOp op) {
 struct NestLoopsPass : public NestLoopsBase<NestLoopsPass> {
   NestLoopsPass() = default;
   explicit NestLoopsPass(unsigned minLoopIVs) { this->minLoopIVs = minLoopIVs; }
-  void runOnFunction() final {
-    auto func = getFunction();
+  void runOnOperation() final {
+    auto func = getOperation();
     // Nest output loops
     for (auto op : func.getBody().getOps<AffineParallelOp>()) {
       while (getNestedIVCount(op) < minLoopIVs) {

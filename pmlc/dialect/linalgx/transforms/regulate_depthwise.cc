@@ -5,6 +5,8 @@
 #include "llvm/ADT/SmallBitVector.h"
 
 #include "mlir/Support/DebugStringHelper.h"
+#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 #include "pmlc/dialect/linalgx/analysis/convolution.h"
 #include "pmlc/dialect/linalgx/transforms/pass_detail.h"
@@ -20,8 +22,8 @@ namespace pmlc::dialect::linalgx {
 struct RegulateDepthwisePass
     : public RegulateDepthwiseBase<RegulateDepthwisePass> {
   RegulateDepthwisePass() = default;
-  void runOnFunction() final {
-    auto func = getFunction();
+  void runOnOperation() final {
+    auto func = getOperation();
     func.walk([&](linalg::GenericOp op) { regulateDepthwise(op); });
   }
 
@@ -194,8 +196,8 @@ struct RegulateDepthwisePass
         /*doc=*/"",
         /*libraryCall=*/"",
         [](OpBuilder &builder, Location loc, ValueRange args) {
-          auto mul = builder.create<MulFOp>(loc, args[0], args[1]);
-          auto add = builder.create<AddFOp>(loc, args[2], mul);
+          auto mul = builder.create<arith::MulFOp>(loc, args[0], args[1]);
+          auto add = builder.create<arith::AddFOp>(loc, args[2], mul);
           builder.create<linalg::YieldOp>(loc, ValueRange{add});
         });
     newOp->setAttr("iterator_ranges", builder.getI64ArrayAttr(newRanges));

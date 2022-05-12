@@ -7,11 +7,12 @@
 
 #include "llvm/Support/MathExtras.h"
 
-#include "mlir/Analysis/AffineStructures.h"
+#include "mlir/Dialect/Affine/Analysis/AffineStructures.h"
 #include "mlir/IR/AffineExprVisitor.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 #include "pmlc/dialect/tile/ir/ops.h"
 #include "pmlc/dialect/tile/transforms/padding.h"
@@ -27,16 +28,16 @@ using namespace mlir; // NOLINT
 namespace {
 
 struct PadRangesPass : public PadRangesBase<PadRangesPass> {
-  void runOnFunction() final;
+  void runOnOperation() final;
 };
 
-void PadRangesPass::runOnFunction() {
+void PadRangesPass::runOnOperation() {
   assert(maxPowerOfTwo >= minPowerOfTwo);
   assert(util::math::IsPo2(maxPowerOfTwo));
   assert(util::math::IsPo2(minPowerOfTwo));
   assert(maxIncrease >= 0.0);
   assert(maxIncrease < 1.0);
-  auto func = getFunction();
+  auto func = getOperation();
   func.walk([&](ContractionOp op) {
     // Skip some cases where the padding pass can't operate.
     if (op.getNumSymbols()) {

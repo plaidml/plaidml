@@ -4,7 +4,6 @@
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/IR/AffineValueMap.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
 
 using namespace mlir; // NOLINT

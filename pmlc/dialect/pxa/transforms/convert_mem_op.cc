@@ -1,7 +1,7 @@
 // Copyright 2021 Intel Corporation
 
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -22,7 +22,7 @@ bool isLoopArgumentOrConstant(Value value) {
     return isa<AffineParallelOp>(arg.getOwner()->getParentOp());
   }
   if (auto defOp = value.getDefiningOp()) {
-    return isa<ConstantOp>(defOp);
+    return isa<arith::ConstantOp>(defOp);
   }
   return false;
 }
@@ -44,8 +44,8 @@ struct MemOpPattern final : public OpRewritePattern<MemOp> {
     if (auto store = dyn_cast<memref::StoreOp>(op.getOperation())) {
       // Convert to PxaReduceOp
       auto result = rewriter.create<PxaReduceOp>(
-          op.getLoc(), AtomicRMWKind::assign, store.getValueToStore(), memRef,
-          affineMap, idxs);
+          op.getLoc(), arith::AtomicRMWKind::assign, store.getValueToStore(),
+          memRef, affineMap, idxs);
       if (auto loop =
               dyn_cast<AffineParallelOp>(op.getOperation()->getParentOp())) {
         // Fix affine.yield
@@ -86,7 +86,7 @@ struct MemOpPattern final : public OpRewritePattern<MemOp> {
 
 struct ConvertMemOpPass : public ConvertMemOpBase<ConvertMemOpPass> {
 public:
-  void runOnFunction() override {
+  void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
     patterns.insert<MemOpPattern<memref::LoadOp>, //

@@ -57,7 +57,7 @@ func @argmax_1(%arg0: memref<1x256x256x16xf16>, %arg1: memref<1x256x16xf16>, %ar
           %6 = pxa.load %arg0[0, %arg3 * 4 + %arg4, %arg5, %arg6] : memref<1x256x256x16xf16>
           %7 = pxa.load %arg1[0, %arg5, %arg6] : memref<1x256x16xf16>
           %8 = arith.cmpf "oeq", %6, %7 : f16
-          %9 = select %8, %4, %c0_i32 : i32
+          %9 = arith.select %8, %4, %c0_i32 : i32
           %10 = pxa.reduce maxu %9, %arg2[0, %arg5, %arg6] : memref<1x256x16xi32>
           affine.yield %10 : memref<1x256x16xi32>
         }

@@ -4,6 +4,7 @@
 #define __PML_SCHEDULE__
 
 include "mlir/IR/OpBase.td"
+include "mlir/IR/AttrTypeBase.td"
 
 def PML_Dialect : Dialect {
   let name = "pml";
@@ -17,6 +18,7 @@ def PML_AxisAttr : AttrDef<PML_Dialect, "Axis"> {
     "mlir::StringAttr":$name,
     "int64_t":$range
   );
+  let hasCustomAssemblyFormat = 1;
 }
 
 def PML_ScheduleAttr : AttrDef<PML_Dialect, "Schedule"> {
@@ -32,6 +34,7 @@ def PML_ScheduleAttr : AttrDef<PML_Dialect, "Schedule"> {
     mlir::Optional<AxisDim> getAxisResultDim(mlir::StringRef name);
     ScheduleAttr removeAxes(mlir::DenseSet<mlir::StringRef> names);
   }];
+  let hasCustomAssemblyFormat = 1;
 }
 
 def PML_PatternAttr : AttrDef<PML_Dialect, "Pattern"> {
@@ -41,6 +44,8 @@ def PML_PatternAttr : AttrDef<PML_Dialect, "Pattern"> {
     "mlir::StringAttr":$op,
     "mlir::DictionaryAttr":$dict
   );
+
+  let hasCustomAssemblyFormat = 1;
 }
 
 def PML_ApplyAttr : AttrDef<PML_Dialect, "Apply"> {
@@ -50,6 +55,7 @@ def PML_ApplyAttr : AttrDef<PML_Dialect, "Apply"> {
     "PatternAttr":$pattern,
     "mlir::DictionaryAttr":$dict
   );
+  let hasCustomAssemblyFormat = 1;
 }
 
 #endif // __PML_SCHEDULE__

@@ -72,7 +72,7 @@ public:
     return std::tie(inner, curIt) == std::tie(rhs.inner, rhs.curIt);
   }
 
-  const mlir::OpOperand &operator*() const { return *curIt; }
+  mlir::OpOperand &operator*() const { return *curIt; }
   mlir::OpOperand &operator*() { return *curIt; }
 
   IndirectUsesIterator &operator++();

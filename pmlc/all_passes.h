@@ -7,7 +7,7 @@
 #include "mlir/Dialect/LLVMIR/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/SCF/Passes.h"
-#include "mlir/Dialect/StandardOps/Transforms/Passes.h"
+#include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Transforms/Passes.h"
 
 #include "mlir-hlo/Dialect/mhlo/transforms/register_passes.h"
@@ -52,12 +52,12 @@ inline void registerAllPasses() {
   mlir::registerLinalgPasses();
   mlir::LLVM::registerLLVMPasses();
   mlir::registerSCFPasses();
-  mlir::registerStandardPasses();
+  mlir::memref::registerMemRefPasses();
 
   // XLA
   mlir::mhlo::registerAllMhloPasses();
-  mlir::lmhlo::registerAllLmhloPasses();
-  mlir::disc_ral::registerAllDiscRalPasses();
+  // mlir::lmhlo::registerAllLmhloPasses();
+  // mlir::disc_ral::registerAllDiscRalPasses();
   mlir::hlo::registerAllHloPasses();
 
   //

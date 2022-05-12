@@ -3,6 +3,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "pmlc/dialect/affinex/transforms/pass_detail.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 using namespace mlir; // NOLINT
 
@@ -11,9 +12,9 @@ namespace pmlc::dialect::affinex {
 struct AffinexDeadMemRefElimination
     : public AffinexDeadMemRefEliminationBase<AffinexDeadMemRefElimination> {
 
-  void runOnFunction() override {
+  void runOnOperation() override {
     llvm::SmallVector<Operation *, 8> opsToErase;
-    getFunction().walk([&](memref::AllocOp alloc) {
+    getOperation().walk([&](memref::AllocOp alloc) {
       auto memref = alloc.getResult();
       for (Operation *user : memref.getUsers()) {
         if (isa<AffineWriteOpInterface, memref::DeallocOp>(user)) {

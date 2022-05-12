@@ -24,8 +24,7 @@ func @eltwise_add_f32(%arg0: tensor<4x1xf32>) -> (tensor<4x1xf32>) {
 // CHECK-LABEL: func @eltwise_add_f32
 // CHECK: affine.parallel
 // CHECK-NEXT: pxa.load
-// CHECK-NEXT: sitofp {{.*}} i32 to f32
-// CHECK-NEXT: addf {{.*}} : f32
+// CHECK-NEXT: arith.addf {{.*}} : f32
 // CHECK: pxa.reduce assign {{.*}} : memref<4x1xf32>
 
 func @eltwise_add_f64(%arg0: tensor<4x1xf64>) -> (tensor<4x1xf64>) {
@@ -37,8 +36,7 @@ func @eltwise_add_f64(%arg0: tensor<4x1xf64>) -> (tensor<4x1xf64>) {
 // CHECK-LABEL: func @eltwise_add_f64
 // CHECK: affine.parallel
 // CHECK-NEXT: pxa.load
-// CHECK-NEXT: sitofp {{.*}} i32 to f64
-// CHECK-NEXT: addf {{.*}} : f64
+// CHECK-NEXT: arith.addf {{.*}} : f64
 // CHECK-NEXT: pxa.reduce assign {{.*}} : memref<4x1xf64>
 
 func @eltwise_add_i32(%arg0: tensor<4x1xsi32>) -> (tensor<4x1xsi32>) {
@@ -50,7 +48,7 @@ func @eltwise_add_i32(%arg0: tensor<4x1xsi32>) -> (tensor<4x1xsi32>) {
 // CHECK-LABEL: func @eltwise_add_i32
 // CHECK: affine.parallel
 // CHECK-NEXT: pxa.load
-// CHECK-NEXT: addi {{.*}} i32
+// CHECK-NEXT: arith.addi {{.*}} i32
 // CHECK-NEXT: pxa.reduce assign {{.*}} : memref<4x1xi32>
 
 
@@ -63,7 +61,7 @@ func @eltwise_add_i64(%arg0: tensor<4x1xui64>) -> (tensor<4x1xui64>) {
 // CHECK-LABEL: func @eltwise_add_i64
 // CHECK: affine.parallel
 // CHECK-NEXT: pxa.load
-// CHECK-NEXT: addi {{.*}} i64
+// CHECK-NEXT: arith.addi {{.*}} i64
 // CHECK-NEXT: pxa.reduce assign {{.*}} : memref<4x1xi64>
 
 func @eltwise_add_i8(%arg0: tensor<4x1xsi8>) -> (tensor<4x1xsi8>) {
@@ -75,5 +73,5 @@ func @eltwise_add_i8(%arg0: tensor<4x1xsi8>) -> (tensor<4x1xsi8>) {
 // CHECK-LABEL: func @eltwise_add_i8
 // CHECK: affine.parallel
 // CHECK-NEXT: pxa.load
-// CHECK-NEXT: addi {{.*}} i8
+// CHECK-NEXT: arith.addi {{.*}} i8
 // CHECK-NEXT: pxa.reduce assign {{.*}} : memref<4x1xi8>

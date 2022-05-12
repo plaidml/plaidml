@@ -37,8 +37,7 @@ struct CaptureMatcher {
   mlir::Value *capture;
 };
 
-template <typename Pattern>
-struct CaptureAndContinueMatcher {
+template <typename Pattern> struct CaptureAndContinueMatcher {
   CaptureAndContinueMatcher(mlir::Value *capture, Pattern pattern)
       : capture(capture), pattern(pattern) {}
   bool match(mlir::Value value) {

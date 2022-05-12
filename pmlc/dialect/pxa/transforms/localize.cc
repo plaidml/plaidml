@@ -1,7 +1,7 @@
 // Copyright 2020 Intel Corporation
 
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Dominance.h"
 #include "mlir/Support/DebugStringHelper.h"
 
@@ -36,8 +36,8 @@ private:
 };
 
 struct LocalizePass : public LocalizeBase<LocalizePass> {
-  void runOnFunction() final {
-    FuncOp f = getFunction();
+  void runOnOperation() final {
+    func::FuncOp f = getOperation();
     DenseMap<Operation *, Block *> toMove;
     auto &analysis = getAnalysis<LocalizeAnalysis>();
 

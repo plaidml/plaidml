@@ -1,43 +1,59 @@
 // RUN: pmlc-opt %s \
 // RUN:     -convert-linalg-to-loops \
-// RUN:     -x86-convert-pxa-to-affine \
-// RUN:     -lower-affine \
-// RUN:     -canonicalize \
-// RUN:     -convert-scf-to-std \
-// RUN:     -x86-convert-std-to-llvm \
+// RUN:     -x86-convert-pxa-to-affine -canonicalize \
+// RUN:     -lower-affine -canonicalize \
+// RUN:     -convert-scf-to-openmp -canonicalize \
+// RUN:     -convert-arith-to-llvm -canonicalize \
+// RUN:     -convert-scf-to-cf -canonicalize \
+// RUN:     -convert-memref-to-llvm -canonicalize \
+// RUN:     -convert-openmp-to-llvm -canonicalize \
+// RUN:     -x86-convert-std-to-llvm -canonicalize \
+// RUN:     -reconcile-unrealized-casts \  
 // RUN:   | pmlc-jit -e baseline | FileCheck %s
 // RUN: pmlc-opt %s \
 // RUN:     -convert-linalg-to-loops \
-// RUN:     -x86-convert-pxa-to-affine \
-// RUN:     -lower-affine \
-// RUN:     -canonicalize \
-// RUN:     -convert-scf-to-std \
-// RUN:     -x86-convert-std-to-llvm \
+// RUN:     -x86-convert-pxa-to-affine -canonicalize \
+// RUN:     -lower-affine -canonicalize \
+// RUN:     -convert-scf-to-openmp -canonicalize \
+// RUN:     -convert-arith-to-llvm -canonicalize \
+// RUN:     -convert-scf-to-cf -canonicalize \
+// RUN:     -convert-memref-to-llvm -canonicalize \
+// RUN:     -convert-openmp-to-llvm -canonicalize \
+// RUN:     -x86-convert-std-to-llvm -canonicalize \
+// RUN:     -reconcile-unrealized-casts \ 
 // RUN:   | pmlc-jit -e tiled | FileCheck %s
 // RUN: pmlc-opt %s \
 // RUN:     -convert-linalg-to-loops \
-// RUN:     -x86-convert-pxa-to-affine \
-// RUN:     -lower-affine \
-// RUN:     -canonicalize \
-// RUN:     -convert-scf-to-std \
-// RUN:     -x86-convert-std-to-llvm \
+// RUN:     -x86-convert-pxa-to-affine -canonicalize \
+// RUN:     -lower-affine -canonicalize \
+// RUN:     -convert-scf-to-openmp -canonicalize \
+// RUN:     -convert-arith-to-llvm -canonicalize \
+// RUN:     -convert-scf-to-cf -canonicalize \
+// RUN:     -convert-memref-to-llvm -canonicalize \
+// RUN:     -convert-openmp-to-llvm -canonicalize \
+// RUN:     -x86-convert-std-to-llvm -canonicalize \
+// RUN:     -reconcile-unrealized-casts \ 
 // RUN:   | pmlc-jit -e xsmm | FileCheck %s
 // RUN: pmlc-opt %s \
 // RUN:     -convert-linalg-to-loops \
-// RUN:     -x86-convert-pxa-to-affine \
-// RUN:     -lower-affine \
-// RUN:     -canonicalize \
-// RUN:     -convert-scf-to-std \
-// RUN:     -x86-convert-std-to-llvm \
+// RUN:     -x86-convert-pxa-to-affine -canonicalize \
+// RUN:     -lower-affine -canonicalize \
+// RUN:     -convert-scf-to-openmp -canonicalize \
+// RUN:     -convert-arith-to-llvm -canonicalize \
+// RUN:     -convert-scf-to-cf -canonicalize \
+// RUN:     -convert-memref-to-llvm -canonicalize \
+// RUN:     -convert-openmp-to-llvm -canonicalize \
+// RUN:     -x86-convert-std-to-llvm -canonicalize \
+// RUN:     -reconcile-unrealized-casts \ 
 // RUN:   | pmlc-jit -e xsmm_brgemm_offs | FileCheck %s
 
 !I_memref = type memref<1x6x5x7xf32>
 !K_memref = type memref<1x1x7x11xf32>
 !O_memref = type memref<1x6x5x11xf32>
 
-func private @print_memref_f32(memref<*xf32>)
+func private @printMemrefF32(memref<*xf32>) attributes {llvm.emit_c_interface}
 
-func @baseline() {
+func @baseline() attributes {llvm.emit_c_interface} {
   %dot = constant @dot : (memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()
   call @test_dot(%dot) : ((memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()) -> ()
 
@@ -47,7 +63,7 @@ func @baseline() {
   return
 }
 
-func @tiled() {
+func @tiled() attributes {llvm.emit_c_interface} {
   %dot = constant @dot_tiled : (memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()
   call @test_dot(%dot) : ((memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()) -> ()
 
@@ -57,7 +73,7 @@ func @tiled() {
   return
 }
 
-func @xsmm() {
+func @xsmm() attributes {llvm.emit_c_interface} {
   %dot = constant @dot : (memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()
   call @test_dot(%dot) : ((memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()) -> ()
 
@@ -67,7 +83,7 @@ func @xsmm() {
   return
 }
 
-func @xsmm_brgemm_offs() {
+func @xsmm_brgemm_offs() attributes {llvm.emit_c_interface} {
   %dot = constant @dot : (memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()
   call @test_dot(%dot) : ((memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()) -> ()
 
@@ -87,7 +103,7 @@ func @fill_2d(%buf : memref<?x?xf32>, %alt : i1) {
     // i = linear offset
     %i = affine.apply affine_map<(x, y)[Y] -> (x * Y + y)>(%x, %y)[%Y]
     // t = alt ? i : 0
-    %t = select %alt, %i, %c0 : index
+    %t = arith.select %alt, %i, %c0 : index
     // v = x + y + t - 5
     %1 = arith.addi %x, %y : index
     %2 = arith.addi %1, %t : index
@@ -113,7 +129,7 @@ func @fill_4d(%buf : memref<?x?x?x?xf32>, %alt : i1) {
     // i = linear offset
     %i = affine.apply affine_map<(x, y, z, w)[Y, Z, W] -> (x * Y + y * W + z * W + w)>(%x, %y, %z, %w)[%Y, %Z, %W]
     // t = alt ? i : 0
-    %t = select %alt, %i, %c0 : index
+    %t = arith.select %alt, %i, %c0 : index
     %j = affine.apply affine_map<(x, y, z, w) -> (x + y + z + w)>(%x, %y, %z, %w)
     // v = j + t - 5
     %2 = arith.addi %j, %t : index
@@ -141,9 +157,9 @@ func @test_dot(%impl : (memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()
   %C_2d = memref.cast %C : memref<8x8xf32> to memref<?x?xf32>
   %C_ud = memref.cast %C : memref<8x8xf32> to memref<*xf32>
 
-  linalg.fill(%f0, %C) : f32, memref<8x8xf32>
+  linalg.fill ins(%f0 : f32) outs(%C : memref<8x8xf32>)
   call_indirect %impl(%A_2d, %B_2d, %C_2d) : (memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()
-  call @print_memref_f32(%C_ud) : (memref<*xf32>) -> ()
+  call @printMemrefF32(%C_ud) : (memref<*xf32>) -> ()
   // CHECK:  [60,   36,   12,   -12,   -36,   -60,   -84,   -108],
   // CHECK:  [272,   264,   256,   248,   240,   232,   224,   216],
   // CHECK:  [484,   492,   500,   508,   516,   524,   532,   540],
@@ -207,9 +223,9 @@ func @test_conv2(%impl : (!I_memref, !K_memref, !O_memref) -> ()) {
   %O_2d = memref.cast %O : !O_memref to memref<?x?x?x?xf32>
   %O_ud = memref.cast %O : !O_memref to memref<*xf32>
 
-  linalg.fill(%f0, %O) : f32, !O_memref
+  linalg.fill ins(%f0 : f32) outs(%O : !O_memref)
   call_indirect %impl(%I, %K, %O) : (!I_memref, !K_memref, !O_memref) -> ()
-  call @print_memref_f32(%O_ud) : (memref<*xf32>) -> ()
+  call @printMemrefF32(%O_ud) : (memref<*xf32>) -> ()
   // CHECK: [-98,     -126,     -154,     -182,     -210,     -238,     -266,     -294,     -322,     -350,     -378],
   // CHECK: [119,     105,     91,     77,     63,     49,     35,     21,     7,     -7,     -21],
   // CHECK: [336,     336,     336,     336,     336,     336,     336,     336,     336,     336,     336],

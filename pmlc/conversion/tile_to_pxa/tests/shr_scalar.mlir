@@ -11,5 +11,5 @@ module {
 // CHECK-LABEL: func @bit_right_scalar
 // CHECK: affine.parallel
 // CHECK: pxa.load
-// CHECK: shift_right_unsigned
+// CHECK: arith.shrui
 // CHECK: pxa.reduce assign

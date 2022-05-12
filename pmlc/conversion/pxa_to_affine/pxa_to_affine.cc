@@ -1,7 +1,7 @@
 // Copyright 2020 Intel Corporation
 
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/IntegerSet.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
@@ -30,7 +30,7 @@ struct AffineParallelOpConversion
   using OpConversionPattern<AffineParallelOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(AffineParallelOp op, ArrayRef<Value> operands,
+  matchAndRewrite(AffineParallelOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
     // Make a map for induction variable
     llvm::SmallVector<Value, 8> ivs;
@@ -44,7 +44,7 @@ struct AffineParallelOpConversion
         // don't like 0 index affine.parallel
         newOp = rewriter.create<AffineParallelOp>(
             op.getLoc(),                                                 //
-            ArrayRef<Type>{}, ArrayRef<AtomicRMWKind>{},                 //
+            ArrayRef<Type>{}, ArrayRef<arith::AtomicRMWKind>{},          //
             AffineMap::getConstantMap(0, op.getContext()), ValueRange(), //
             AffineMap::getConstantMap(1, op.getContext()), ValueRange(), //
             ArrayRef<int64_t>{1});
@@ -54,10 +54,10 @@ struct AffineParallelOpConversion
         util::splitAffineMaps(op.lowerBoundsMap(), lbMaps);
         util::splitAffineMaps(op.upperBoundsMap(), ubMaps);
         newOp = rewriter.create<AffineParallelOp>(
-            op.getLoc(),                                 //
-            ArrayRef<Type>{}, ArrayRef<AtomicRMWKind>{}, //
-            lbMaps, op.getLowerBoundsOperands(),         //
-            ubMaps, op.getUpperBoundsOperands(),         //
+            op.getLoc(),                                        //
+            ArrayRef<Type>{}, ArrayRef<arith::AtomicRMWKind>{}, //
+            lbMaps, op.getLowerBoundsOperands(),                //
+            ubMaps, op.getUpperBoundsOperands(),                //
             steps);
         for (Value iv : newOp.getIVs()) {
           ivs.push_back(iv);
@@ -101,7 +101,7 @@ struct AffineIfOpConversion : public OpConversionPattern<AffineIfOp> {
   using OpConversionPattern<AffineIfOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(AffineIfOp op, ArrayRef<Value> operands,
+  matchAndRewrite(AffineIfOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
     // Make a new if value
     auto newIf = rewriter.create<AffineIfOp>(op.getLoc(), op.getIntegerSet(),
@@ -131,7 +131,7 @@ struct PxaLoadOpConversion : public OpConversionPattern<pxa::PxaLoadOp> {
   using OpConversionPattern<pxa::PxaLoadOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(pxa::PxaLoadOp op, ArrayRef<Value> operands,
+  matchAndRewrite(pxa::PxaLoadOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
     rewriter.replaceOpWithNewOp<AffineLoadOp>(op, op.memref(),
                                               op.getAffineMap(), op.idxs());
@@ -144,7 +144,7 @@ struct PxaVectorLoadOpConversion
   using OpConversionPattern<pxa::PxaVectorLoadOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(pxa::PxaVectorLoadOp op, ArrayRef<Value> operands,
+  matchAndRewrite(pxa::PxaVectorLoadOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
     rewriter.replaceOpWithNewOp<AffineVectorLoadOp>(
         op, op.getVectorType(), op.memref(), op.getAffineMap(), op.idxs());
@@ -153,41 +153,48 @@ struct PxaVectorLoadOpConversion
 };
 
 static Value createReduction(ConversionPatternRewriter &rewriter, Location loc,
-                             AtomicRMWKind agg, Value source, Value val) {
+                             arith::AtomicRMWKind agg, Value source,
+                             Value val) {
   switch (agg) {
-  case AtomicRMWKind::assign:
+  case arith::AtomicRMWKind::assign:
     return val;
-  case AtomicRMWKind::addf:
+  case arith::AtomicRMWKind::addf:
     return rewriter.create<arith::AddFOp>(loc, source, val);
-  case AtomicRMWKind::addi:
+  case arith::AtomicRMWKind::addi:
     return rewriter.create<arith::AddIOp>(loc, source, val);
-  case AtomicRMWKind::maxf: {
-    auto cmp = rewriter.create<arith::CmpFOp>(loc, arith::CmpFPredicate::OGT, val, source);
-    return rewriter.create<SelectOp>(loc, cmp, val, source);
+  case arith::AtomicRMWKind::maxf: {
+    auto cmp = rewriter.create<arith::CmpFOp>(loc, arith::CmpFPredicate::OGT,
+                                              val, source);
+    return rewriter.create<arith::SelectOp>(loc, cmp, val, source);
   }
-  case AtomicRMWKind::maxu: {
-    auto cmp = rewriter.create<arith::CmpIOp>(loc, arith::CmpIPredicate::ugt, val, source);
-    return rewriter.create<SelectOp>(loc, cmp, val, source);
+  case arith::AtomicRMWKind::maxu: {
+    auto cmp = rewriter.create<arith::CmpIOp>(loc, arith::CmpIPredicate::ugt,
+                                              val, source);
+    return rewriter.create<arith::SelectOp>(loc, cmp, val, source);
   }
-  case AtomicRMWKind::maxs: {
-    auto cmp = rewriter.create<arith::CmpIOp>(loc, arith::CmpIPredicate::sgt, val, source);
-    return rewriter.create<SelectOp>(loc, cmp, val, source);
+  case arith::AtomicRMWKind::maxs: {
+    auto cmp = rewriter.create<arith::CmpIOp>(loc, arith::CmpIPredicate::sgt,
+                                              val, source);
+    return rewriter.create<arith::SelectOp>(loc, cmp, val, source);
   }
-  case AtomicRMWKind::minf: {
-    auto cmp = rewriter.create<arith::CmpFOp>(loc, arith::CmpFPredicate::OLT, val, source);
-    return rewriter.create<SelectOp>(loc, cmp, val, source);
+  case arith::AtomicRMWKind::minf: {
+    auto cmp = rewriter.create<arith::CmpFOp>(loc, arith::CmpFPredicate::OLT,
+                                              val, source);
+    return rewriter.create<arith::SelectOp>(loc, cmp, val, source);
   }
-  case AtomicRMWKind::minu: {
-    auto cmp = rewriter.create<arith::CmpIOp>(loc, arith::CmpIPredicate::ult, val, source);
-    return rewriter.create<SelectOp>(loc, cmp, val, source);
+  case arith::AtomicRMWKind::minu: {
+    auto cmp = rewriter.create<arith::CmpIOp>(loc, arith::CmpIPredicate::ult,
+                                              val, source);
+    return rewriter.create<arith::SelectOp>(loc, cmp, val, source);
   }
-  case AtomicRMWKind::mins: {
-    auto cmp = rewriter.create<arith::CmpIOp>(loc, arith::CmpIPredicate::slt, val, source);
-    return rewriter.create<SelectOp>(loc, cmp, val, source);
+  case arith::AtomicRMWKind::mins: {
+    auto cmp = rewriter.create<arith::CmpIOp>(loc, arith::CmpIPredicate::slt,
+                                              val, source);
+    return rewriter.create<arith::SelectOp>(loc, cmp, val, source);
   }
-  case AtomicRMWKind::mulf:
+  case arith::AtomicRMWKind::mulf:
     return rewriter.create<arith::MulFOp>(loc, source, val);
-  case AtomicRMWKind::muli:
+  case arith::AtomicRMWKind::muli:
     return rewriter.create<arith::MulIOp>(loc, source, val);
   default:
     llvm_unreachable("Unsupported aggregation for "
@@ -199,7 +206,7 @@ struct PxaReduceOpConversion : public OpConversionPattern<pxa::PxaReduceOp> {
   using OpConversionPattern<pxa::PxaReduceOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(pxa::PxaReduceOp op, ArrayRef<Value> operands,
+  matchAndRewrite(pxa::PxaReduceOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
     auto source = rewriter.create<AffineLoadOp>(op.getLoc(), op.memref(),
                                                 op.map(), op.idxs());
@@ -217,7 +224,7 @@ struct PxaVectorReduceOpConversion
   using OpConversionPattern<pxa::PxaVectorReduceOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(pxa::PxaVectorReduceOp op, ArrayRef<Value> operands,
+  matchAndRewrite(pxa::PxaVectorReduceOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
     auto source = rewriter.create<AffineVectorLoadOp>(
         op.getLoc(), op.getVectorType(), op.memref(), op.getAffineMap(),
@@ -235,31 +242,29 @@ struct PxaStoreOpConversion : public OpConversionPattern<pxa::PxaStoreOp> {
   using OpConversionPattern<pxa::PxaStoreOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(pxa::PxaStoreOp op, ArrayRef<Value> operands,
+  matchAndRewrite(pxa::PxaStoreOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
     Value memref = op.memref();
-    AtomicRMWKind agg = op.agg();
-    if (agg == AtomicRMWKind::assign) {
+    arith::AtomicRMWKind agg = op.agg();
+    if (agg == arith::AtomicRMWKind::assign) {
       rewriter.create<memref::StoreOp>(op.getLoc(), op.value(), memref,
                                        op.indices());
     } else {
       Type resultType = memref.getType().cast<MemRefType>().getElementType();
-      rewriter.create<AtomicRMWOp>(op.getLoc(), resultType, agg, op.value(),
-                                   memref, op.indices());
+      rewriter.create<memref::AtomicRMWOp>(op.getLoc(), resultType, agg,
+                                           op.value(), memref, op.indices());
     }
     rewriter.replaceOp(op, memref);
     return success();
   }
 };
 
-template <typename Op>
-struct IsExternal {
+template <typename Op> struct IsExternal {
   static bool check(Op op) { return false; }
 };
 
-template <>
-struct IsExternal<FuncOp> {
-  static bool check(FuncOp op) { return op.isExternal(); }
+template <> struct IsExternal<func::FuncOp> {
+  static bool check(func::FuncOp op) { return op.isExternal(); }
 };
 
 template <typename FuncLikeOp>
@@ -267,9 +272,9 @@ struct FuncOpConversion : public OpConversionPattern<FuncLikeOp> {
   using OpConversionPattern<FuncLikeOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(FuncLikeOp op, ArrayRef<Value> operands,
+  matchAndRewrite(FuncLikeOp op, typename FuncLikeOp::Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
-    FunctionType type = op.getType();
+    FunctionType type = op.getFunctionType();
     if (IsExternal<FuncLikeOp>::check(op)) {
       return success();
     }
@@ -308,18 +313,19 @@ struct ReluOpConversion : public OpConversionPattern<stdx::ReluOp> {
   using OpConversionPattern<stdx::ReluOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(stdx::ReluOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
-    stdx::ReluOp::Adaptor adaptor(operands);
+  matchAndRewrite(stdx::ReluOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
     Location loc = op->getLoc();
 
     auto floatType = adaptor.value().getType().cast<FloatType>();
     llvm::APFloat value = convertFloatUsingType(llvm::APFloat(0.0), floatType);
     auto zero = rewriter.create<arith::ConstantFloatOp>(loc, value, floatType);
-    auto cmpOp =
-        rewriter.create<arith::CmpFOp>(loc, arith::CmpFPredicate::OLT, adaptor.value(), zero)
-            .getResult();
-    rewriter.replaceOpWithNewOp<SelectOp>(op, cmpOp, zero, adaptor.value());
+    auto cmpOp = rewriter
+                     .create<arith::CmpFOp>(loc, arith::CmpFPredicate::OLT,
+                                            adaptor.value(), zero)
+                     .getResult();
+    rewriter.replaceOpWithNewOp<arith::SelectOp>(op, cmpOp, zero,
+                                                 adaptor.value());
 
     return success();
   }
@@ -330,7 +336,7 @@ struct ReturnOpConversion : public OpConversionPattern<ReturnLikeOp> {
   using OpConversionPattern<ReturnLikeOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(ReturnLikeOp op, ArrayRef<Value> operands,
+  matchAndRewrite(ReturnLikeOp op, typename ReturnLikeOp::Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
     SmallVector<Value, 1> results;
     rewriter.replaceOpWithNewOp<ReturnLikeOp>(op, results);
@@ -360,8 +366,8 @@ struct LowerPXAToAffinePass
 
 PXAToAffineConversionTarget::PXAToAffineConversionTarget(MLIRContext &ctx)
     : ConversionTarget(ctx) {
-  addLegalDialect<AffineDialect,      //
-                  StandardOpsDialect, //
+  addLegalDialect<AffineDialect,
+                  arith::ArithmeticDialect,
                   memref::MemRefDialect>();
   addIllegalDialect<pxa::PXADialect>();
   addDynamicallyLegalOp<AffineParallelOp>([](AffineParallelOp op) {
@@ -369,30 +375,31 @@ PXAToAffineConversionTarget::PXAToAffineConversionTarget(MLIRContext &ctx)
   });
   addDynamicallyLegalOp<AffineIfOp>(
       [](AffineIfOp op) { return op.getNumResults() == 0; });
-  addDynamicallyLegalOp<FuncOp>([](FuncOp op) {
-    return op.isExternal() || op.getType().getNumResults() == 0;
+  addDynamicallyLegalOp<func::FuncOp>([](func::FuncOp op) {
+    return op.isExternal() || op.getFunctionType().getNumResults() == 0;
   });
-  addDynamicallyLegalOp<ReturnOp>(
-      [](ReturnOp op) { return op.getNumOperands() == 0; });
-  addDynamicallyLegalOp<stdx::ClosureOp>(
-      [](stdx::ClosureOp op) { return op.getType().getNumResults() == 0; });
+  addDynamicallyLegalOp<func::ReturnOp>(
+      [](func::ReturnOp op) { return op.getNumOperands() == 0; });
+  addDynamicallyLegalOp<stdx::ClosureOp>([](stdx::ClosureOp op) {
+    return op.getFunctionType().getNumResults() == 0;
+  });
   addDynamicallyLegalOp<stdx::YieldOp>(
       [](stdx::YieldOp op) { return op.getNumOperands() == 0; });
 }
 
 void populatePXAToAffineConversionPatterns(RewritePatternSet &patterns) {
-  patterns.insert<                       //
-      AffineIfOpConversion,              //
-      AffineParallelOpConversion,        //
-      FuncOpConversion<FuncOp>,          //
-      FuncOpConversion<stdx::ClosureOp>, //
-      PxaLoadOpConversion,               //
-      PxaReduceOpConversion,             //
-      PxaVectorLoadOpConversion,         //
-      PxaVectorReduceOpConversion,       //
-      PxaStoreOpConversion,              //
-      ReluOpConversion,                  //
-      ReturnOpConversion<ReturnOp>,      //
+  patterns.insert<                        //
+      AffineIfOpConversion,               //
+      AffineParallelOpConversion,         //
+      FuncOpConversion<func::FuncOp>,     //
+      FuncOpConversion<stdx::ClosureOp>,  //
+      PxaLoadOpConversion,                //
+      PxaReduceOpConversion,              //
+      PxaVectorLoadOpConversion,          //
+      PxaVectorReduceOpConversion,        //
+      PxaStoreOpConversion,               //
+      ReluOpConversion,                   //
+      ReturnOpConversion<func::ReturnOp>, //
       ReturnOpConversion<stdx::YieldOp>>(patterns.getContext());
 }
 

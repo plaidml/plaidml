@@ -191,54 +191,54 @@ Value ContractionOp::getSymbol(unsigned i) {
   return *std::next(operands().begin(), getNumTensors() + i);
 }
 
-void printContractionOp(OpAsmPrinter *printer, ContractionOp op) {
+void ContractionOp::print(OpAsmPrinter &printer) {
   SmallVector<StringRef, 3> elidedAttrs = {"agg", "combo", "name"};
-  *printer << ' ' << util::stringifyAggregationKind(op.agg());
-  *printer << ", ";
-  *printer << util::stringifyCombinationKind(op.combo());
-  *printer << ", ";
-  printer->printOperand(op.init());
-  auto numTensors = op.getNumTensors();
+  printer << ' ' << util::stringifyAggregationKind(agg());
+  printer << ", ";
+  printer << util::stringifyCombinationKind(combo());
+  printer << ", ";
+  printer.printOperand(init());
+  auto numTensors = getNumTensors();
   for (unsigned i = 0; i < numTensors; i++) {
-    *printer << ", ";
-    printer->printOperand(op.getTensor(i));
+    printer << ", ";
+    printer.printOperand(getTensor(i));
   }
-  auto numSymbols = op.getNumSymbols();
+  auto numSymbols = getNumSymbols();
   if (numSymbols) {
-    *printer << " [";
+    printer << " [";
     for (unsigned i = 0; i < numSymbols; i++) {
       if (i) {
-        *printer << ", ";
+        printer << ", ";
       }
-      printer->printOperand(op.getSymbol(i));
+      printer.printOperand(getSymbol(i));
     }
-    *printer << ']';
+    printer << ']';
   }
-  printer->printOptionalAttrDict(op->getAttrs(), elidedAttrs);
-  *printer << " : ";
-  printer->printType(op.init().getType());
-  *printer << ", ";
+  printer.printOptionalAttrDict((*this)->getAttrs(), elidedAttrs);
+  printer << " : ";
+  printer.printType(init().getType());
+  printer << ", ";
   for (unsigned i = 0; i < numTensors; i++) {
     if (i) {
-      *printer << ", ";
+      printer << ", ";
     }
-    printer->printType(op.getTensor(i).getType());
+    printer.printType(getTensor(i).getType());
   }
-  *printer << " -> ";
-  printer->printType(op.result().getType());
+  printer << " -> ";
+  printer.printType(result().getType());
 }
 
-ParseResult parseContractionOp(OpAsmParser *parser, OperationState &result) {
+ParseResult ContractionOp::parse(OpAsmParser &parser, OperationState &result) {
   StringRef strAgg;
   StringRef strCombo;
-  OpAsmParser::OperandType init;
-  SmallVector<OpAsmParser::OperandType, 3> tensors;
-  SmallVector<OpAsmParser::OperandType, 8> symbols;
+  OpAsmParser::UnresolvedOperand init;
+  SmallVector<OpAsmParser::UnresolvedOperand, 3> tensors;
+  SmallVector<OpAsmParser::UnresolvedOperand, 8> symbols;
   SmallVector<Type, 4> types;
   Type resultType;
-  if (parser->parseKeyword(&strAgg) || parser->parseComma() ||
-      parser->parseKeyword(&strCombo) || parser->parseComma() ||
-      parser->parseOperand(init) || parser->parseComma()) {
+  if (parser.parseKeyword(&strAgg) || parser.parseComma() ||
+      parser.parseKeyword(&strCombo) || parser.parseComma() ||
+      parser.parseOperand(init) || parser.parseComma()) {
     return failure();
   }
 
@@ -246,34 +246,34 @@ ParseResult parseContractionOp(OpAsmParser *parser, OperationState &result) {
   if (!agg) {
     return failure();
   }
-  result.addAttribute("agg", parser->getBuilder().getI64IntegerAttr(
+  result.addAttribute("agg", parser.getBuilder().getI64IntegerAttr(
                                  static_cast<int64_t>(agg.getValue())));
 
   auto combo = util::symbolizeCombinationKind(strCombo);
   if (!combo) {
     return failure();
   }
-  result.addAttribute("combo", parser->getBuilder().getI64IntegerAttr(
+  result.addAttribute("combo", parser.getBuilder().getI64IntegerAttr(
                                    static_cast<int64_t>(combo.getValue())));
 
   auto numTensors = ContractionOp::getNumTensors(combo.getValue());
-  if (parser->parseOperandList(tensors, numTensors) ||
-      parser->parseOperandList(symbols,
+  if (parser.parseOperandList(tensors, numTensors) ||
+      parser.parseOperandList(symbols,
                                OpAsmParser::Delimiter::OptionalSquare) ||
-      parser->parseOptionalAttrDict(result.attributes) ||
-      parser->parseColonTypeList(types) || parser->parseArrow() ||
-      parser->parseType(resultType)) {
+      parser.parseOptionalAttrDict(result.attributes) ||
+      parser.parseColonTypeList(types) || parser.parseArrow() ||
+      parser.parseType(resultType)) {
     return failure();
   }
 
   // TODO: parse a FunctionType here
 
-  auto loc = parser->getCurrentLocation();
-  auto indexType = parser->getBuilder().getIndexType();
+  auto loc = parser.getCurrentLocation();
+  auto indexType = parser.getBuilder().getIndexType();
   auto tensorTypes = llvm::makeArrayRef(types).drop_front();
-  if (parser->resolveOperand(init, types.front(), result.operands) ||
-      parser->resolveOperands(tensors, tensorTypes, loc, result.operands) ||
-      parser->resolveOperands(symbols, indexType, result.operands)) {
+  if (parser.resolveOperand(init, types.front(), result.operands) ||
+      parser.resolveOperands(tensors, tensorTypes, loc, result.operands) ||
+      parser.resolveOperands(symbols, indexType, result.operands)) {
     return failure();
   }
 
@@ -294,61 +294,61 @@ bool isEltwiseAny(Type type) {
   return isAnyScalar(type);
 }
 
-LogicalResult verifyContractionOp(ContractionOp op) {
-  auto numTensors = op.getNumTensors();
-  auto numSymbols = op.getNumSymbols();
-  SmallVector<Value, 8> variadic(op.operands());
+LogicalResult ContractionOp::verify() {
+  auto numTensors = getNumTensors();
+  auto numSymbols = getNumSymbols();
+  SmallVector<Value, 8> variadic(operands());
   if (variadic.size() < numTensors) {
-    return op.emitOpError("combo '")
-           << util::stringifyCombinationKind(op.combo()) << "' requires "
+    return emitOpError("combo '")
+           << util::stringifyCombinationKind(combo()) << "' requires "
            << numTensors << " tensor operands";
   }
-  auto shape = op.shape();
-  auto resultType = op.result().getType().cast<RankedTensorType>();
-  if (!resultType.hasStaticShape() && !shape.hasValue()) {
-    return op.emitOpError(
+  auto s = shape();
+  auto resultType = result().getType().cast<RankedTensorType>();
+  if (!resultType.hasStaticShape() && !s.hasValue()) {
+    return emitOpError(
         "attribute 'shape' is required when result type is dynamic");
   }
-  unsigned expectedSymbols = op.sink().getNumSymbols();
-  if (shape.hasValue()) {
-    expectedSymbols += shape->getNumSymbols();
+  unsigned expectedSymbols = sink().getNumSymbols();
+  if (s.hasValue()) {
+    expectedSymbols += s->getNumSymbols();
   }
-  for (auto src : op.srcs()) {
+  for (auto src : srcs()) {
     auto map = src.cast<AffineMapAttr>();
     expectedSymbols += map.getValue().getNumSymbols();
   }
-  if (op.cons().hasValue()) {
-    expectedSymbols += op.cons().getValue().getNumSymbols();
+  if (cons().hasValue()) {
+    expectedSymbols += cons().getValue().getNumSymbols();
   }
   if (expectedSymbols != numSymbols) {
-    return op.emitOpError("has incorrect number of symbols: expected ")
+    return emitOpError("has incorrect number of symbols: expected ")
            << expectedSymbols << " but found " << numSymbols;
   }
   for (unsigned i = 0; i < numTensors; i++) {
-    auto type = op.getTensor(i).getType();
+    auto type = getTensor(i).getType();
     if (!isEltwiseAny(type)) {
-      return op.emitOpError("tensor #")
+      return emitOpError("tensor #")
              << i << " must be eltwise-any, but got " << type;
     }
   }
   for (unsigned i = 0; i < numSymbols; i++) {
-    auto type = op.getSymbol(i).getType();
+    auto type = getSymbol(i).getType();
     if (!type.isa<IndexType>()) {
-      return op.emitOpError("symbol #")
+      return emitOpError("symbol #")
              << i << " must be index, but got " << type;
     }
   }
   return success();
 }
 
-LogicalResult verifyReshapeOp(ReshapeOp op) {
-  auto inType = op.tensor().getType().cast<RankedTensorType>();
-  auto outType = op.result().getType().cast<RankedTensorType>();
+LogicalResult ReshapeOp::verify() {
+  auto inType = tensor().getType().cast<RankedTensorType>();
+  auto outType = result().getType().cast<RankedTensorType>();
   if (inType.getElementType() != outType.getElementType()) {
-    return op.emitOpError("element type mismatch");
+    return emitOpError("element type mismatch");
   }
   if (inType.getNumElements() != outType.getNumElements()) {
-    return op.emitOpError("element count mismatch");
+    return emitOpError("element count mismatch");
   }
   return success();
 }
