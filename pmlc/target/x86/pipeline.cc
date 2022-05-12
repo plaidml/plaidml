@@ -15,13 +15,10 @@
 #include "mlir/Conversion/MemRefToLLVM/MemRefToLLVM.h"
 #include "mlir/Conversion/OpenMPToLLVM/ConvertOpenMPToLLVM.h"
 #include "mlir/Conversion/SCFToOpenMP/SCFToOpenMP.h"
-// #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
-// #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
 #include "mlir/Dialect/Affine/Passes.h"
 #include "mlir/Dialect/Math/Transforms/Passes.h"
 #include "mlir/Dialect/OpenMP/OpenMPDialect.h"
 #include "mlir/Dialect/SCF/SCF.h"
-// #include "mlir/Dialect/StandardOps/Transforms/Passes.h"
 #include "mlir/Dialect/Affine/LoopUtils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
@@ -265,7 +262,7 @@ void pipelineBuilderStage1(OpPassManager &pm) {
   }
 
   pm.addPass(pmlc::conversion::tile_to_linalg::createLowerTileToLinalgPass());
-  pm.addNestedPass<FuncOp>(linalgx::createRegulateDepthwisePass());
+  pm.addNestedPass<func::FuncOp>(linalgx::createRegulateDepthwisePass());
   if (!util::getEnvVar("PLAIDML_REORDER").empty())
     pm.addNestedPass<func::FuncOp>(createReorderLayoutsPass());
   else
