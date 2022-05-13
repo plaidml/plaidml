@@ -165,7 +165,7 @@ func @pxa_vector_reduce_min(%arg0: memref<100x100xf32>, %arg1: memref<100x100xf3
     // CHECK: %[[MUL:.*]] = arith.mulf %{{.*}}, %{{.*}} : vector<4xf32>
     // CHECK: %[[LOAD:.*]] = affine.vector_load %[[ARG2:.*]][%[[ARG3:.*]], %[[ARG4:.*]]] : memref<100x100xf32>, vector<4xf32>
     // CHECK: %[[AGG:.*]] = arith.cmpf olt, %[[MUL]], %[[LOAD]] : vector<4xf32>
-    // CHECK: %[[SEL:.*]] = select %[[AGG]], %[[MUL]], %[[LOAD]] : vector<4xi1>, vector<4xf32>
+    // CHECK: %[[SEL:.*]] = arith.select %[[AGG]], %[[MUL]], %[[LOAD]] : vector<4xi1>, vector<4xf32>
     // CHECK: affine.vector_store %[[SEL]], %[[ARG2]][%[[ARG3]], %[[ARG4]]] : memref<100x100xf32>, vector<4xf32>
     affine.yield %red : memref<100x100xf32>
   }

@@ -5,6 +5,7 @@
 
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Func/Transforms/FuncConversions.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
@@ -410,19 +411,14 @@ static arith::AtomicRMWKind convertAgg(AggregationKind agg, Type type) {
   }
   llvm_unreachable("Invalid agg type in convertAgg");
 }
-#if 0
+
 template <typename FromOpType, typename IntoOpBuilder,
           typename Matcher = AlwaysTrue>
 struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
   using OpConversionPattern<FromOpType>::OpConversionPattern;
 
-  LogicalResult match(Operation *op) const final {
-    Matcher pred;
-    return pred(op);
-  }
-
   void rewrite(FromOpType op, typename FromOpType::Adaptor adaptor,
-               ConversionPatternRewriter &rewriter) const final {
+               ConversionPatternRewriter &rewriter) const {
     auto loc = op.getLoc();
     BufferAllocator alloc(rewriter, op.getOperation(), op.result().getType());
 
@@ -467,6 +463,16 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
     // Replace output with the newly allocated buffer
     rewriter.replaceOp(op, forOp.getResult(0));
   }
+
+  LogicalResult
+  matchAndRewrite(FromOpType op, typename FromOpType::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
+    Matcher pred;
+    if (failed(pred(op)))
+      return failure();
+    rewrite(op, adaptor, rewriter);
+    return success();
+  }
 };
 
 template <CombinationKind comboKind, typename ComboBuilder,
@@ -475,42 +481,22 @@ struct ContractionOpConversion
     : public OpConversionPattern<tile::ContractionOp> {
   using OpConversionPattern<tile::ContractionOp>::OpConversionPattern;
 
-  LogicalResult match(Operation *op) const final {
-    if (auto cionOp = dyn_cast<tile::ContractionOp>(op)) {
-      if (cionOp.combo() != comboKind) {
-        return failure();
-      }
-      if (!cionOp.lowerBounds().hasValue() ||
-          !cionOp.upperBounds().hasValue()) {
-        cionOp.emitError("contraction bounds must be computed");
-        return failure();
-      }
-      Matcher pred;
-      return pred(cionOp);
-    }
-    return failure();
-  }
-
-  void rewrite(tile::ContractionOp op, OpAdaptor adaptor,
-               ConversionPatternRewriter &rewriter) const final {
-    try {
-      tryRewrite(op, adaptor.getOperands(), rewriter);
-    } catch (const std::exception &ex) {
-      op.emitError(ex.what());
-    }
-  }
-
-  void tryRewrite(tile::ContractionOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const {
-    // Create an adaptor
-    tile::ContractionOpAdaptor cionAdaptor(operands);
-    auto cionOperands = cionAdaptor.operands();
+  LogicalResult matchAndRewrite(tile::ContractionOp op, OpAdaptor adaptor,
+                                ConversionPatternRewriter &rewriter) const final {
+    if (op.combo() != comboKind)
+      return failure();
+    if (!op.lowerBounds().hasValue() || !op.upperBounds().hasValue())
+      return failure();
+    Matcher pred;
+    if (failed(pred(op)))
+      return failure();
+    
     auto loc = op.getLoc();
 
     if (auto attr = op->getAttrOfType<StringAttr>("trace")) {
       auto module = op->getParentOfType<ModuleOp>();
       auto symbol = createStubTraceFunc(module, attr);
-      rewriter.create<CallOp>(loc, symbol, ArrayRef<Type>{});
+      rewriter.create<func::CallOp>(loc, symbol, ArrayRef<Type>{});
     }
 
     BufferAllocator alloc(rewriter, op.getOperation(), op.result().getType());
@@ -524,7 +510,7 @@ struct ContractionOpConversion
         /*ranges=*/shape);
     auto parallelBuilder = parallel.getBodyBuilder();
     auto maybePadding = tile::getPaddingInfo(op.init().getDefiningOp());
-    auto load = buildBroadcastLoad(parallelBuilder, loc, cionAdaptor.init(),
+    auto load = buildBroadcastLoad(parallelBuilder, loc, adaptor.init(),
                                    shape.size(), maybePadding);
     auto store = buildSimpleStore(parallelBuilder, loc, load,
                                   alloc.resultMemRef, tile::getPaddingInfo(op));
@@ -582,9 +568,10 @@ struct ContractionOpConversion
 
     // Create the loads + casts
     SmallVector<Value, 4> scalars;
+    SmallVector<Value> operands = adaptor.getOperands().drop_front();
     auto srcs = op.srcs().getValue();
     for (size_t i = 0; i < srcs.size(); i++) {
-      auto operand = cionOperands[i];
+      auto operand = operands[i];
       if (!operand.getType().isa<MemRefType>()) {
         scalars.push_back(operand);
       } else {
@@ -625,10 +612,10 @@ struct ContractionOpConversion
     rewriter.create<AffineYieldOp>(loc, ValueRange{reduceOp});
 
     // Replace the op
-    rewriter.replaceOp(op, forOp.getResult(0));
+    rewriter.replaceOp(op, forOp.getResult(0));  
+    return success();
   }
 };
-#endif
 
 struct IndexOpConversion : public OpConversionPattern<tile::IndexOp> {
   using OpConversionPattern<tile::IndexOp>::OpConversionPattern;
@@ -896,22 +883,16 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
     // Set up target (i.e. what is legal)
     ConversionTarget target(getContext());
     TileToPXATypeConverter converter;
-    target.addLegalDialect<mlir::AffineDialect, //
-                                                // mlir::StandardOpsDialect, //
-                           mlir::math::MathDialect,     //
-                           mlir::memref::MemRefDialect, //
-                           mlir::scf::SCFDialect,       //
-                           layer::LayerDialect,         //
-                           pxa::PXADialect,             //
-                           arith::ArithmeticDialect,    //
-                           stdx::StdXDialect>();
-    target.addLegalOp<scf::ForOp,   //
-                      scf::YieldOp, //
-                      scf::IfOp>();
-    target.addLegalOp<mlir::ModuleOp, //
-                      func::ReturnOp>();
+    target.addLegalDialect<mlir::AffineDialect, mlir::math::MathDialect,
+                           mlir::memref::MemRefDialect, mlir::scf::SCFDialect,
+                           layer::LayerDialect, pxa::PXADialect,
+                           arith::ArithmeticDialect, stdx::StdXDialect>();
+
+    target.addLegalOp<ModuleOp>();
+    target.addIllegalDialect<tile::TileDialect>();
     target.addDynamicallyLegalOp<func::FuncOp>([&](func::FuncOp op) {
-      return converter.isSignatureLegal(op.getFunctionType());
+      return converter.isSignatureLegal(op.getFunctionType()) &&
+             converter.isLegal(&op.getBody());
     });
     target.addDynamicallyLegalOp<stdx::ClosureOp>([&](stdx::ClosureOp op) {
       return converter.isSignatureLegal(op.getFunctionType());
@@ -932,22 +913,26 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
     patterns.insert<
         CastOpConversion,                  //
         ConstantOpConversion,              //
-        FuncOpConversion<func::FuncOp>,          //
+        FuncOpConversion<func::FuncOp>,    //
         FuncOpConversion<stdx::ClosureOp>, //
         IndexOpConversion,                 //
         PragmaOpConversion,                //
         ReshapeOpConversion,               //
         ShapeOpConversion,                 //
         TraceOpConversion,                 //
-        ScfForOpConversion/*,                //
+        ScfForOpConversion,                //
         ContractionOpConversion<CombinationKind::none, FirstOperand>,
-        ContractionOpConversion<CombinationKind::add, StdOp<mlir::arith::AddFOp>,
+        ContractionOpConversion<CombinationKind::add,
+                                StdOp<mlir::arith::AddFOp>,
                                 ResultIs<EltwiseFloat>>,
-        ContractionOpConversion<CombinationKind::add, StdOp<mlir::arith::AddIOp>,
+        ContractionOpConversion<CombinationKind::add,
+                                StdOp<mlir::arith::AddIOp>,
                                 ResultIs<EltwiseInteger>>,
-        ContractionOpConversion<CombinationKind::mul, StdOp<mlir::arith::MulFOp>,
+        ContractionOpConversion<CombinationKind::mul,
+                                StdOp<mlir::arith::MulFOp>,
                                 ResultIs<EltwiseFloat>>,
-        ContractionOpConversion<CombinationKind::mul, StdOp<mlir::arith::MulIOp>,
+        ContractionOpConversion<CombinationKind::mul,
+                                StdOp<mlir::arith::MulIOp>,
                                 ResultIs<EltwiseInteger>>,
         ContractionOpConversion<CombinationKind::eq,
                                 CmpFloatOp<arith::CmpFPredicate::OEQ>,
@@ -1026,27 +1011,33 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
                             ResultIs<EltwiseSigned>>,
         EltwiseOpConversion<tile::ModOp, StdOp<mlir::arith::RemUIOp>,
                             ResultIs<EltwiseUnsigned>>,
-        EltwiseOpConversion<tile::CmpEqOp, CmpFloatOp<arith::CmpFPredicate::OEQ>,
+        EltwiseOpConversion<tile::CmpEqOp,
+                            CmpFloatOp<arith::CmpFPredicate::OEQ>,
                             AnyOperandIs<EltwiseFloat>>,
         EltwiseOpConversion<tile::CmpEqOp, CmpIntOp<arith::CmpIPredicate::eq>,
                             OperandsAre<Not<EltwiseFloat>>>,
-        EltwiseOpConversion<tile::CmpNeOp, CmpFloatOp<arith::CmpFPredicate::ONE>,
+        EltwiseOpConversion<tile::CmpNeOp,
+                            CmpFloatOp<arith::CmpFPredicate::ONE>,
                             AnyOperandIs<EltwiseFloat>>,
         EltwiseOpConversion<tile::CmpNeOp, CmpIntOp<arith::CmpIPredicate::ne>,
                             OperandsAre<Not<EltwiseFloat>>>,
-        EltwiseOpConversion<tile::CmpLtOp, CmpFloatOp<arith::CmpFPredicate::OLT>,
+        EltwiseOpConversion<tile::CmpLtOp,
+                            CmpFloatOp<arith::CmpFPredicate::OLT>,
                             AnyOperandIs<EltwiseFloat>>,
         EltwiseOpConversion<tile::CmpLtOp, CmpIntLtOp,
                             OperandsAre<Not<EltwiseFloat>>>,
-        EltwiseOpConversion<tile::CmpLeOp, CmpFloatOp<arith::CmpFPredicate::OLE>,
+        EltwiseOpConversion<tile::CmpLeOp,
+                            CmpFloatOp<arith::CmpFPredicate::OLE>,
                             AnyOperandIs<EltwiseFloat>>,
         EltwiseOpConversion<tile::CmpLeOp, CmpIntLeOp,
                             OperandsAre<Not<EltwiseFloat>>>,
-        EltwiseOpConversion<tile::CmpGtOp, CmpFloatOp<arith::CmpFPredicate::OGT>,
+        EltwiseOpConversion<tile::CmpGtOp,
+                            CmpFloatOp<arith::CmpFPredicate::OGT>,
                             AnyOperandIs<EltwiseFloat>>,
         EltwiseOpConversion<tile::CmpGtOp, CmpIntGtOp,
                             OperandsAre<Not<EltwiseFloat>>>,
-        EltwiseOpConversion<tile::CmpGeOp, CmpFloatOp<arith::CmpFPredicate::OGE>,
+        EltwiseOpConversion<tile::CmpGeOp,
+                            CmpFloatOp<arith::CmpFPredicate::OGE>,
                             AnyOperandIs<EltwiseFloat>>,
         EltwiseOpConversion<tile::CmpGeOp, CmpIntGeOp,
                             OperandsAre<Not<EltwiseFloat>>>,
@@ -1069,9 +1060,14 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         EltwiseOpConversion<tile::LogicalXorOp, LogicalOp<mlir::arith::XOrIOp>>,
         EltwiseOpConversion<tile::ReluOp, StdOp<stdx::ReluOp>>,
         EltwiseOpConversion<tile::SelectOp, SelectOpBuilder>,
-        EltwiseOpConversion<tile::IdentOp, FirstOperand>*/>(&getContext());
+        EltwiseOpConversion<tile::IdentOp, FirstOperand>>(&getContext());
 
     populateTileToPXASpecialPatterns(patterns);
+    populateReturnOpTypeConversionPattern(patterns, converter);
+
+    target.markUnknownOpDynamicallyLegal([&](Operation *op) {
+      return isLegalForReturnOpTypeConversionPattern(op, converter);
+    });
 
     // Run the conversion
     if (failed(

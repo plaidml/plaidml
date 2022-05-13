@@ -23,7 +23,7 @@ func @matrixPower(%m : tensor<16x16xf32>) -> tensor<16x16xf32> {
 // CHECK: %[[c4:.*]] = arith.constant 4
 // CHECK: scf.for {{.*}} = %[[c0]] to %[[c4]] step %[[c1]] iter_args(%[[arg2:.*]] = %[[arg0]])
 // CHECK:   %[[t1:.*]] = linalg.init_tensor [16, 16] : tensor<16x16xf32>
-// CHECK:   %[[t2:.*]] = linalg.fill(%[[cst]], %[[t1]]) : f32, tensor<16x16xf32> -> tensor<16x16xf32> 
+// CHECK:   %[[t2:.*]] = linalg.fill ins(%[[cst]] : f32) outs(%[[t1]] : tensor<16x16xf32>) -> tensor<16x16xf32> 
 // CHECK:   %[[t3:.*]] = linalg.generic
 // CHECK-SAME: iterator_types = ["parallel", "parallel", "reduction"]}
 // CHECK-SAME: ins(%[[arg2]], %[[arg0]] : tensor<16x16xf32>, tensor<16x16xf32>) outs(%[[t2]] : tensor<16x16xf32>)

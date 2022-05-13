@@ -4,6 +4,7 @@
 #include <utility>
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
@@ -568,19 +569,13 @@ struct TensorInitializer {
   }
 };
 
-#if 0
 template <typename FromOpType, typename IntoOpBuilder,
           typename Matcher = AlwaysTrue>
 struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
   using OpConversionPattern<FromOpType>::OpConversionPattern;
 
-  LogicalResult match(Operation *op) const final {
-    Matcher pred;
-    return pred(op);
-  }
-
   void rewrite(FromOpType op, typename FromOpType::Adaptor adaptor,
-               ConversionPatternRewriter &rewriter) const final {
+               ConversionPatternRewriter &rewriter) const {
     Location loc = op.getLoc();
     MLIRContext *context = op.getContext();
     TensorInitializer init(rewriter, op, op.result().getType(),
@@ -591,11 +586,11 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
 
     // Build indexing maps
     SmallVector<AffineMap, 4> idxMaps;
-    for (size_t i = 0; i < operands.size(); i++) {
+    for (size_t i = 0; i < adaptor.getOperands().size(); i++) {
       Optional<tile::PaddingInfo> maybePadding =
           tile::getPaddingInfo(op->getOperand(i).getDefiningOp());
-      AffineMap idxMap =
-          buildBroadcastMap(rewriter, loc, operands[i], initType, maybePadding);
+      AffineMap idxMap = buildBroadcastMap(
+          rewriter, loc, adaptor.getOperands()[i], initType, maybePadding);
       idxMaps.emplace_back(idxMap);
     }
 
@@ -607,7 +602,7 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
     auto genericOp = rewriter.create<linalg::GenericOp>(
         loc,
         /*resultTensorTypes=*/TypeRange{initType},
-        /*inputs=*/operands,
+        /*inputs=*/adaptor.getOperands(),
         /*outputs=*/ValueRange{init.resultTensor},
         /*indexingMaps=*/idxMaps,
         /*iteratorTypes=*/
@@ -637,23 +632,34 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
     if (Optional<tile::PaddingInfo> maybePadding = tile::getPaddingInfo(op)) {
       Value initValue = createInit(rewriter, loc, initType.getElementType(),
                                    maybePadding->agg);
-      auto pad = rewriter.create<linalg::PadTensorOp>(
-          loc,
-          /*source=*/outTensor,
-          /*staticLow=*/maybePadding->lower,
-          /*staticHigh=*/maybePadding->upper,
-          /*low=*/ValueRange{},
-          /*high=*/ValueRange{});
+      auto pad =
+          rewriter.create<tensor::PadOp>(loc,
+                                         /*source=*/outTensor,
+                                         /*staticLow=*/maybePadding->lower,
+                                         /*staticHigh=*/maybePadding->upper,
+                                         /*low=*/ValueRange{},
+                                         /*high=*/ValueRange{});
       SmallVector<Type, 4> padArgs(numDims, rewriter.getIndexType());
       OpBuilder::InsertionGuard guard(rewriter);
-      Block *padBody =
-          rewriter.createBlock(&pad.region(), pad.region().begin(), padArgs);
-      rewriter.create<linalg::YieldOp>(loc, ValueRange{initValue});
+      SmallVector<Location> locs(padArgs.size(), loc);
+      Block *padBody = rewriter.createBlock(&pad.region(), pad.region().begin(),
+                                            padArgs, locs);
+      rewriter.create<tensor::YieldOp>(loc, initValue);
       outTensor = pad.getResult();
     }
 
     // Replace output with the newly allocated buffer
     rewriter.replaceOp(op, outTensor);
+  }
+
+  LogicalResult
+  matchAndRewrite(FromOpType op, typename FromOpType::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
+    Matcher pred;
+    if (failed(pred(op)))
+      return failure();
+    rewrite(op, adaptor, rewriter);
+    return success();
   }
 };
 
@@ -663,24 +669,8 @@ struct ContractionOpConversion
     : public OpConversionPattern<tile::ContractionOp> {
   using OpConversionPattern<tile::ContractionOp>::OpConversionPattern;
 
-  LogicalResult match(Operation *op) const final {
-    if (auto cionOp = dyn_cast<tile::ContractionOp>(op)) {
-      if (cionOp.combo() != comboKind) {
-        return failure();
-      }
-      if (!cionOp.lowerBounds().hasValue() ||
-          !cionOp.upperBounds().hasValue()) {
-        cionOp.emitError("contraction bounds must be computed");
-        return failure();
-      }
-      Matcher pred;
-      return pred(cionOp);
-    }
-    return failure();
-  }
-
   void rewrite(tile::ContractionOp op, OpAdaptor adaptor,
-               ConversionPatternRewriter &rewriter) const final {
+               ConversionPatternRewriter &rewriter) const {
     MLIRContext *context = op.getContext();
     Location loc = op.getLoc();
     ValueRange cionOperands = adaptor.getOperands();
@@ -728,18 +718,19 @@ struct ContractionOpConversion
     if (maybeOpPadding) {
       Value exteriorValue = createInit(
           rewriter, loc, resultType.getElementType(), maybeOpPadding->agg);
-      auto pad = rewriter.create<linalg::PadTensorOp>(
-          loc,
-          /*source=*/initValue,
-          /*staticLow=*/maybeOpPadding->lower,
-          /*staticHigh=*/maybeOpPadding->upper,
-          /*low=*/ValueRange{},
-          /*high=*/ValueRange{});
+      auto pad =
+          rewriter.create<tensor::PadOp>(loc,
+                                         /*source=*/initValue,
+                                         /*staticLow=*/maybeOpPadding->lower,
+                                         /*staticHigh=*/maybeOpPadding->upper,
+                                         /*low=*/ValueRange{},
+                                         /*high=*/ValueRange{});
       SmallVector<Type, 4> padArgs(numDims, rewriter.getIndexType());
       OpBuilder::InsertionGuard guard(rewriter);
-      Block *padBody =
-          rewriter.createBlock(&pad.region(), pad.region().begin(), padArgs);
-      rewriter.create<linalg::YieldOp>(loc, ValueRange{exteriorValue});
+      SmallVector<Location> locs(padArgs.size(), loc);
+      Block *padBody = rewriter.createBlock(&pad.region(), pad.region().begin(),
+                                            padArgs, locs);
+      rewriter.create<tensor::YieldOp>(loc, exteriorValue);
       initValue = pad.getResult();
       resultType = initValue.getType().cast<RankedTensorType>();
     }
@@ -804,7 +795,7 @@ struct ContractionOpConversion
     auto genericOp = rewriter.create<linalg::GenericOp>(
         loc,
         /*resultTensorTypes=*/resultType,
-        /*inputs=*/cionOperands,
+        /*inputs=*/cionOperands.drop_front(),
         /*outputs=*/initValue,
         /*indexingMaps=*/idxMaps,
         /*iteratorTypes=*/iterTypes,
@@ -837,8 +828,22 @@ struct ContractionOpConversion
     // Replace output with the newly allocated buffer
     rewriter.replaceOp(op, genericOp.getResult(0));
   }
+
+  LogicalResult
+  matchAndRewrite(tile::ContractionOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
+    if (op.combo() != comboKind)
+      return failure();
+    // TODO. Lorenzo: Move this to verifier?
+    if ((!op.lowerBounds().hasValue()) || (!op.upperBounds().hasValue()))
+      return failure();
+    Matcher pred;
+    if (failed(pred(op)))
+      return failure();
+    rewrite(op, adaptor, rewriter);
+    return success();
+  }
 };
-#endif
 
 struct IndexOpConversion : public OpConversionPattern<tile::IndexOp> {
   using OpConversionPattern<tile::IndexOp>::OpConversionPattern;
@@ -1190,19 +1195,12 @@ struct LowerTileToLinalgPass
     // Set up target (i.e. what is legal)
     ConversionTarget target(getContext());
     TileToLinalgTypeConverter converter;
-    target.addLegalDialect<mlir::AffineDialect,         //
-                           mlir::linalg::LinalgDialect, //
-                           // mlir::StandardOpsDialect,    //
-                           mlir::math::MathDialect,     //
-                           mlir::memref::MemRefDialect, //
-                           mlir::scf::SCFDialect,       //
-                           layer::LayerDialect,         //
-                           arith::ArithmeticDialect, stdx::StdXDialect>();
-    target.addLegalOp<scf::ForOp,   //
-                      scf::YieldOp, //
-                      scf::IfOp>();
-    target.addLegalOp<mlir::ModuleOp, //
-                      func::ReturnOp>();
+    target.addLegalDialect<
+        AffineDialect, linalg::LinalgDialect, math::MathDialect,
+        memref::MemRefDialect, scf::SCFDialect, layer::LayerDialect,
+        tensor::TensorDialect, arith::ArithmeticDialect, stdx::StdXDialect>();
+    target.addLegalOp<scf::ForOp, scf::YieldOp, scf::IfOp>();
+    target.addLegalOp<mlir::ModuleOp, func::ReturnOp>();
     target.addDynamicallyLegalOp<func::FuncOp>([&](func::FuncOp op) {
       return converter.isSignatureLegal(op.getFunctionType());
     });
@@ -1234,13 +1232,13 @@ struct LowerTileToLinalgPass
                                           arith::CmpIPredicate::uge>;
     RewritePatternSet patterns(&getContext());
     patterns.insert<
-        CastOpConversion,                     //
-        ConstantOpConversion,                 //
-        FuncOpConversion<func::FuncOp>,             //
-        FuncOpConversion<stdx::ClosureOp>,    //
-        IndexOpConversion,                    //
-        PragmaOpConversion,                   //
-        //ReshapeOpConversion,                  //
+        CastOpConversion,                  //
+        ConstantOpConversion,              //
+        FuncOpConversion<func::FuncOp>,    //
+        FuncOpConversion<stdx::ClosureOp>, //
+        IndexOpConversion,                 //
+        PragmaOpConversion,                //
+        // ReshapeOpConversion,                  //
         ReturnOpConversion,                   //
         SpecialOpConversion<tile::ArgSortOp>, //
         SpecialOpConversion<tile::GatherOp>,  //
@@ -1248,15 +1246,19 @@ struct LowerTileToLinalgPass
         SpecialOpConversion<tile::ScatterOp>, //
         ShapeOpConversion,                    //
         TraceOpConversion,                    //
-        ScfForOpConversion/*,                   
+        ScfForOpConversion,
         ContractionOpConversion<CombinationKind::none, FirstOperand>,
-        ContractionOpConversion<CombinationKind::add, StdOp<mlir::arith::AddFOp>,
+        ContractionOpConversion<CombinationKind::add,
+                                StdOp<mlir::arith::AddFOp>,
                                 ResultIs<EltwiseFloat>>,
-        ContractionOpConversion<CombinationKind::add, StdOp<mlir::arith::AddIOp>,
+        ContractionOpConversion<CombinationKind::add,
+                                StdOp<mlir::arith::AddIOp>,
                                 ResultIs<EltwiseInteger>>,
-        ContractionOpConversion<CombinationKind::mul, StdOp<mlir::arith::MulFOp>,
+        ContractionOpConversion<CombinationKind::mul,
+                                StdOp<mlir::arith::MulFOp>,
                                 ResultIs<EltwiseFloat>>,
-        ContractionOpConversion<CombinationKind::mul, StdOp<mlir::arith::MulIOp>,
+        ContractionOpConversion<CombinationKind::mul,
+                                StdOp<mlir::arith::MulIOp>,
                                 ResultIs<EltwiseInteger>>,
         ContractionOpConversion<CombinationKind::eq,
                                 CmpFloatOp<arith::CmpFPredicate::OEQ>,
@@ -1268,9 +1270,10 @@ struct LowerTileToLinalgPass
             CombinationKind::cond,
             ContractionCondOp<CmpFloatOp<arith::CmpFPredicate::OEQ>>,
             AnyComparandIs<EltwiseFloat>>,
-        ContractionOpConversion<CombinationKind::cond,
-                                ContractionCondOp<CmpIntOp<arith::CmpIPredicate::eq>>,
-                                AnyComparandIs<EltwiseInteger>>,
+        ContractionOpConversion<
+            CombinationKind::cond,
+            ContractionCondOp<CmpIntOp<arith::CmpIPredicate::eq>>,
+            AnyComparandIs<EltwiseInteger>>,
         EltwiseOpConversion<tile::ExpOp, StdOp<math::ExpOp>>,
         EltwiseOpConversion<tile::LogOp, StdOp<math::LogOp>,
                             ResultIs<EltwiseFloat>>,
@@ -1336,27 +1339,33 @@ struct LowerTileToLinalgPass
                             ResultIs<EltwiseSigned>>,
         EltwiseOpConversion<tile::ModOp, StdOp<mlir::arith::RemUIOp>,
                             ResultIs<EltwiseUnsigned>>,
-        EltwiseOpConversion<tile::CmpEqOp, CmpFloatOp<arith::CmpFPredicate::OEQ>,
+        EltwiseOpConversion<tile::CmpEqOp,
+                            CmpFloatOp<arith::CmpFPredicate::OEQ>,
                             AnyOperandIs<EltwiseFloat>>,
         EltwiseOpConversion<tile::CmpEqOp, CmpIntOp<arith::CmpIPredicate::eq>,
                             OperandsAre<Not<EltwiseFloat>>>,
-        EltwiseOpConversion<tile::CmpNeOp, CmpFloatOp<arith::CmpFPredicate::ONE>,
+        EltwiseOpConversion<tile::CmpNeOp,
+                            CmpFloatOp<arith::CmpFPredicate::ONE>,
                             AnyOperandIs<EltwiseFloat>>,
         EltwiseOpConversion<tile::CmpNeOp, CmpIntOp<arith::CmpIPredicate::ne>,
                             OperandsAre<Not<EltwiseFloat>>>,
-        EltwiseOpConversion<tile::CmpLtOp, CmpFloatOp<arith::CmpFPredicate::OLT>,
+        EltwiseOpConversion<tile::CmpLtOp,
+                            CmpFloatOp<arith::CmpFPredicate::OLT>,
                             AnyOperandIs<EltwiseFloat>>,
         EltwiseOpConversion<tile::CmpLtOp, CmpIntLtOp,
                             OperandsAre<Not<EltwiseFloat>>>,
-        EltwiseOpConversion<tile::CmpLeOp, CmpFloatOp<arith::CmpFPredicate::OLE>,
+        EltwiseOpConversion<tile::CmpLeOp,
+                            CmpFloatOp<arith::CmpFPredicate::OLE>,
                             AnyOperandIs<EltwiseFloat>>,
         EltwiseOpConversion<tile::CmpLeOp, CmpIntLeOp,
                             OperandsAre<Not<EltwiseFloat>>>,
-        EltwiseOpConversion<tile::CmpGtOp, CmpFloatOp<arith::CmpFPredicate::OGT>,
+        EltwiseOpConversion<tile::CmpGtOp,
+                            CmpFloatOp<arith::CmpFPredicate::OGT>,
                             AnyOperandIs<EltwiseFloat>>,
         EltwiseOpConversion<tile::CmpGtOp, CmpIntGtOp,
                             OperandsAre<Not<EltwiseFloat>>>,
-        EltwiseOpConversion<tile::CmpGeOp, CmpFloatOp<arith::CmpFPredicate::OGE>,
+        EltwiseOpConversion<tile::CmpGeOp,
+                            CmpFloatOp<arith::CmpFPredicate::OGE>,
                             AnyOperandIs<EltwiseFloat>>,
         EltwiseOpConversion<tile::CmpGeOp, CmpIntGeOp,
                             OperandsAre<Not<EltwiseFloat>>>,
@@ -1379,7 +1388,7 @@ struct LowerTileToLinalgPass
         EltwiseOpConversion<tile::LogicalXorOp, LogicalOp<mlir::arith::XOrIOp>>,
         EltwiseOpConversion<tile::ReluOp, StdOp<stdx::ReluOp>>,
         EltwiseOpConversion<tile::SelectOp, SelectOp>,
-        EltwiseOpConversion<tile::IdentOp, FirstOperand>*/>(&getContext());
+        EltwiseOpConversion<tile::IdentOp, FirstOperand>>(&getContext());
 
     // Run the conversion
     if (failed(applyFullConversion(module, target, std::move(patterns)))) {
