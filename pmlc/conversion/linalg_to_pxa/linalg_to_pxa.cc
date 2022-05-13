@@ -501,9 +501,9 @@ struct LowerLinalgToPXAPass
                            arith::ArithmeticDialect, 
                            stdx::StdXDialect>();
    
-    // Module op is legal. 
-    target.addLegalOp<ModuleOp>();
-    
+    // Module op is legal.
+    target.addLegalOp<ModuleOp, func::CallOp>();
+
     target.addDynamicallyLegalOp<func::FuncOp>([&](func::FuncOp op) {
       return converter.isSignatureLegal(op.getFunctionType()) && converter.isLegal(&op.getBody());
     });
@@ -530,7 +530,6 @@ struct LowerLinalgToPXAPass
 
     tile_to_pxa::populateTileToPXASpecialPatterns(patterns);
     populateReturnOpTypeConversionPattern(patterns, converter);
-    // populateFunctionOpInterfaceTypeConversionPattern<func::FuncOp>(patterns, converter);
 
     target.markUnknownOpDynamicallyLegal([&](Operation *op) {
       return isLegalForReturnOpTypeConversionPattern(op, converter); });
