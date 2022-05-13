@@ -1200,7 +1200,7 @@ struct LowerTileToLinalgPass
         memref::MemRefDialect, scf::SCFDialect, layer::LayerDialect,
         tensor::TensorDialect, arith::ArithmeticDialect, stdx::StdXDialect>();
     target.addLegalOp<scf::ForOp, scf::YieldOp, scf::IfOp>();
-    target.addLegalOp<mlir::ModuleOp, func::ReturnOp>();
+    target.addLegalOp<mlir::ModuleOp, func::ReturnOp, func::CallOp>();
     target.addDynamicallyLegalOp<func::FuncOp>([&](func::FuncOp op) {
       return converter.isSignatureLegal(op.getFunctionType());
     });
