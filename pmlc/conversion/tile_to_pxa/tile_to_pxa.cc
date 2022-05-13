@@ -888,7 +888,7 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
                            layer::LayerDialect, pxa::PXADialect,
                            arith::ArithmeticDialect, stdx::StdXDialect>();
 
-    target.addLegalOp<ModuleOp>();
+    target.addLegalOp<ModuleOp, func::CallOp>();
     target.addIllegalDialect<tile::TileDialect>();
     target.addDynamicallyLegalOp<func::FuncOp>([&](func::FuncOp op) {
       return converter.isSignatureLegal(op.getFunctionType()) &&
