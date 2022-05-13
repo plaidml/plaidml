@@ -923,7 +923,7 @@ matchShape(ArrayRef<int64_t> srcShape, ArrayRef<int64_t> dstShape) {
   }
   return result;
 }
-#if 0
+
 struct ReshapeOpConversion : public OpConversionPattern<tile::ReshapeOp> {
   using OpConversionPattern<tile::ReshapeOp>::OpConversionPattern;
 
@@ -939,11 +939,11 @@ struct ReshapeOpConversion : public OpConversionPattern<tile::ReshapeOp> {
     auto dstShape = resultType.cast<RankedTensorType>().getShape();
 
     if (auto dims = matchShape(dstShape, srcShape)) {
-      rewriter.replaceOpWithNewOp<linalg::TensorCollapseShapeOp>(op, resultType,
-                                                                 tensor, *dims);
+      rewriter.replaceOpWithNewOp<tensor::CollapseShapeOp>(op, resultType,
+                                                           tensor, *dims);
     } else if (auto dims = matchShape(srcShape, dstShape)) {
-      rewriter.replaceOpWithNewOp<linalg::TensorExpandShapeOp>(op, resultType,
-                                                               tensor, *dims);
+      rewriter.replaceOpWithNewOp<tensor::ExpandShapeOp>(op, resultType, tensor,
+                                                         *dims);
     } else {
       // General reshape. Collapse the tensor into 1-D and then expand it to the
       // result shape.
@@ -955,19 +955,19 @@ struct ReshapeOpConversion : public OpConversionPattern<tile::ReshapeOp> {
       }
       auto tmpType = RankedTensorType::get(
           ArrayRef{size}, resultType.cast<RankedTensorType>().getElementType());
-      auto collapse = rewriter.create<linalg::TensorCollapseShapeOp>(
+      auto collapse = rewriter.create<tensor::CollapseShapeOp>(
           op.getLoc(), tmpType, tensor, collapseDims);
       ReassociationIndices expandDims;
       for (unsigned i = 0; i < dstShape.size(); ++i) {
         expandDims.emplace_back(i);
       }
-      rewriter.replaceOpWithNewOp<linalg::TensorExpandShapeOp>(
+      rewriter.replaceOpWithNewOp<tensor::ExpandShapeOp>(
           op, resultType, collapse.getResult(), expandDims);
     }
     return success();
   }
 };
-#endif
+
 struct ShapeOpConversion : public OpConversionPattern<tile::ShapeOp> {
   using OpConversionPattern<tile::ShapeOp>::OpConversionPattern;
 
@@ -1232,13 +1232,13 @@ struct LowerTileToLinalgPass
                                           arith::CmpIPredicate::uge>;
     RewritePatternSet patterns(&getContext());
     patterns.insert<
-        CastOpConversion,                  //
-        ConstantOpConversion,              //
-        FuncOpConversion<func::FuncOp>,    //
-        FuncOpConversion<stdx::ClosureOp>, //
-        IndexOpConversion,                 //
-        PragmaOpConversion,                //
-        // ReshapeOpConversion,                  //
+        CastOpConversion,                     //
+        ConstantOpConversion,                 //
+        FuncOpConversion<func::FuncOp>,       //
+        FuncOpConversion<stdx::ClosureOp>,    //
+        IndexOpConversion,                    //
+        PragmaOpConversion,                   //
+        ReshapeOpConversion,                  //
         ReturnOpConversion,                   //
         SpecialOpConversion<tile::ArgSortOp>, //
         SpecialOpConversion<tile::GatherOp>,  //
