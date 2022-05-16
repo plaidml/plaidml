@@ -105,6 +105,33 @@ TEST_F(CppEdsl, BindDims) {
   }
 }
 
+TEST_F(CppEdsl, SimpleTensor) {
+  auto A = Placeholder(DType::FLOAT32, {3, 3});
+  auto C = A;
+  auto program = makeProgram("simple_tensor", {A}, {C});
+
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.SimpleTensor
+  // CHECK: module @simple_tensor {
+  // CHECK: func @main(%arg0: tensor<3x3xf32>) -> tensor<3x3xf32> {
+  // CHECK:  %0 = tile.ident %arg0 : (tensor<3x3xf32>) -> tensor<3x3xf32>
+  // CHECK:  return %0 : tensor<3x3xf32>
+  // }
+  // }
+  // clang-format on
+}
+
+TEST_F(CppEdsl, SimpleAdd) {
+  auto A = Placeholder(DType::FLOAT32, {3, 3});
+  auto B = Placeholder(DType::FLOAT32, {3, 3});
+  auto C = A + B;
+  auto program = makeProgram("simple_add", {A, B}, {C});
+
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.SimpleAdd
+  // clang-format on
+}
+
 TEST_F(CppEdsl, HigherPrecisionConstants) {
   auto A = Placeholder(DType::FLOAT32, {3, 3});
   auto C = A + cast(Tensor{1}, DType::UINT64) + cast(Tensor{2.0}, DType::FLOAT64);

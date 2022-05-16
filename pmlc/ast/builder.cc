@@ -484,7 +484,7 @@ struct ProgramBuilder {
     context->getOrLoadDialect<dialect::tile::TileDialect>();
     context->getOrLoadDialect<dialect::layer::LayerDialect>();
     context->getOrLoadDialect<math::MathDialect>();
-    // context->getOrLoadDialect<StandardOpsDialect>();
+    context->getOrLoadDialect<func::FuncDialect>();
   }
 
   std::shared_ptr<Program> build(const ProgramArguments &args) {
@@ -610,12 +610,13 @@ struct ProgramBuilder {
     pm.addPass(createCSEPass());
     auto result = pm.run(module);
 
+    llvm::errs() << debugString(module) << "\n";
+
     program->tileIR = debugString(module);
     IVLOG(2, "\n" << program->tileIR);
     if (failed(result)) {
       throw std::runtime_error("Program build failure.");
     }
-
     return program;
   }
 
@@ -672,6 +673,7 @@ struct ProgramBuilder {
     }
     for (const ExprNodePtr &operand : node->operands) {
       Value value = builder.lookupNode(operand);
+      assert(value && "must be non null");
       operands.push_back(value);
     }
     using IntrinsicBuilder = std::function<Value()>;
@@ -684,12 +686,13 @@ struct ProgramBuilder {
             .Case("scatter", [&]() { return makeScatterOp(node, operands); })
             .Case("gather", [&]() { return makeGatherOp(node, operands); })
             .Default([&]() {
+              Location loc = builder.getUnknownLoc();
               OperationState state(
                   NameLoc::get(StringAttr::get(context, node->str())),
                   lookupOperation(node->op));
               state.addOperands(operands);
               state.addTypes(resultTypes);
-              Operation *op = Operation::create(state);
+              Operation *op = builder.create(state);
               return op->getResult(0);
             });
     return intrinsicBuilder();
@@ -932,6 +935,9 @@ struct ProgramBuilder {
       RegisteredOperationName::lookup(opName, context); 
     if (!opInfo) 
       throw std::runtime_error("Unknown EDSL primitive: " + op.str());
+    // for (RegisteredOperationName name : context->getRegisteredOperations())
+    //  llvm::errs() << name.getStringRef().str() << " \n";
+    assert(context->isOperationRegistered(opInfo->getStringRef().str()));
     return opInfo->getStringRef().str();
   }
 
