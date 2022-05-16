@@ -1,38 +1,42 @@
 // RUN: pmlc-opt %s \
 // RUN:     -x86-convert-pxa-to-affine \
 // RUN:     -lower-affine \
+// RUN:     -convert-scf-to-openmp \
+// RUN:     -convert-arith-to-llvm \ 
+// RUN:     -convert-memref-to-llvm \ 
+// RUN:     -convert-openmp-to-llvm \
 // RUN:     -canonicalize \
-// RUN:     -convert-scf-to-cf \
-// RUN:     -x86-convert-std-to-llvm \
-// RUN:     -convert-arith-to-llvm \
-// RUN:     -convert-memref-to-llvm \
-// RUN:     -convert-func-to-llvm -reconcile-unrealized-casts \
+// RUN:     -x86-convert-std-to-llvm \ 
+// RUN:     -canonicalize -reconcile-unrealized-casts \
 // RUN:   | pmlc-jit | FileCheck %s
 
 !eltwise = type memref<8x3xf32>
 
 func private @printMemrefF32(memref<*xf32>) attributes { llvm.emit_c_interface }
 
-func @fill_2d(%buf : memref<?x?xf32>, %alt : i1) {
-  %c0 = arith.constant 0 : index
-  %c1 = arith.constant 1 : index
-  %c5 = arith.constant 5 : index
-  %X = memref.dim %buf, %c0 : memref<?x?xf32>
-  %Y = memref.dim %buf, %c1 : memref<?x?xf32>
-  affine.parallel (%x, %y) = (0, 0) to (%X, %Y) {
-    // i = linear offset
-    %i = affine.apply affine_map<(x, y)[Y] -> (x * Y + y)>(%x, %y)[%Y]
-    // t = alt ? i : 0
-    %t = arith.select %alt, %i, %c0 : index
-    // v = x + y + t - 5
-    %1 = arith.addi %x, %y : index
-    %2 = arith.addi %1, %t : index
-    %v = arith.subi %2, %c5 : index
-    %v_i64 = arith.index_cast %v : index to i64
-    %v_f32 = arith.sitofp %v_i64 : i64 to f32
-    memref.store %v_f32, %buf[%x, %y] : memref<?x?xf32>
-  }
-  return
+func @fill_2d(%arg0: memref<?x?xf32>, %arg1: i1) {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    %c5 = arith.constant 5 : index
+    %0 = memref.dim %arg0, %c0 : memref<?x?xf32>
+    %1 = memref.dim %arg0, %c1 : memref<?x?xf32>
+    %c0_0 = arith.constant 0 : index
+    %c0_1 = arith.constant 0 : index
+    %c1_2 = arith.constant 1 : index
+    %c1_3 = arith.constant 1 : index
+    scf.parallel (%arg2, %arg3) = (%c0_0, %c0_1) to (%0, %1) step (%c1_2, %c1_3) {
+      %2 = arith.muli %arg2, %1 : index
+      %3 = arith.addi %2, %arg3 : index
+      %4 = arith.select %arg1, %3, %c0 : index
+      %5 = arith.addi %arg2, %arg3 : index
+      %6 = arith.addi %5, %4 : index
+      %7 = arith.subi %6, %c5 : index
+      %8 = arith.index_cast %7 : index to i64
+      %9 = arith.sitofp %8 : i64 to f32
+      memref.store %9, %arg0[%arg2, %arg3] : memref<?x?xf32>
+      scf.yield
+    }
+    return
 }
 
 func @main() attributes { llvm.emit_c_interface } {

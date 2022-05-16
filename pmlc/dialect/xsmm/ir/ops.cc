@@ -125,8 +125,39 @@ ParseResult BRGemmOffsInvokeF32Op::parse(OpAsmParser &parser,
       parser.resolveOperands(b.indices, indexType, result.operands));
 }
 
+BRGemmOffsInvokeF32Op::operand_range BRGemmOffsInvokeF32Op::getOperandsForA() {
+  auto aType = a().getType().cast<MemRefType>();
+  auto cType = c().getType().cast<MemRefType>();
+  return getOperands().slice(4 + cType.getRank(), aType.getRank());
+}
+
+BRGemmOffsInvokeF32Op::operand_range BRGemmOffsInvokeF32Op::getOperandsForB() {
+  auto aType = a().getType().cast<MemRefType>();
+  auto bType = b().getType().cast<MemRefType>();
+  auto cType = c().getType().cast<MemRefType>();
+  return getOperands().slice(4 + cType.getRank() + aType.getRank(),
+                             bType.getRank());
+}
+
+BRGemmOffsInvokeF32Op::operand_range BRGemmOffsInvokeF32Op::getOperandsForC() {
+  auto cType = c().getType().cast<MemRefType>();
+  return getOperands().slice(4, cType.getRank());
+}
+
 void BRGemmOffsInvokeF32Op::print(OpAsmPrinter &p) {
-  assert(0 && "implement me");
+  auto funcType = FunctionType::get(
+      getContext(), {a().getType(), b().getType()}, {c().getType()});
+  p << ' ' << ptr() << ", ";
+  p << c() << '[';
+  p.printOperands(getOperandsForC());
+  p << "] = " << a() << '[';
+  p.printOperands(getOperandsForA());
+  p << "], " << b() << '[';
+  p.printOperands(getOperandsForB());
+  p << "] : " << funcType;
+  p << " aOffsets = " << aOffsets();
+  p << " bOffsets = " << bOffsets();
+  p << " numBatches = " << numBatches();
 }
 
 //

@@ -16,6 +16,7 @@
 #include "mlir/Conversion/MathToLLVM/MathToLLVM.h"
 #include "mlir/Conversion/MemRefToLLVM/MemRefToLLVM.h"
 #include "mlir/Conversion/OpenMPToLLVM/ConvertOpenMPToLLVM.h"
+#include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
 #include "mlir/Conversion/SCFToOpenMP/SCFToOpenMP.h"
 #include "mlir/Dialect/Affine/LoopUtils.h"
 #include "mlir/Dialect/Affine/Passes.h"
@@ -103,12 +104,13 @@ struct ConvertStandardToLLVMPass
     populateMemRefToLLVMConversionPatterns(converter, patterns);
     populateMathToLLVMConversionPatterns(converter, patterns);
     populateFuncToLLVMConversionPatterns(converter, patterns);
+    populateReconcileUnrealizedCastsPatterns(patterns);
     conversion::stdx_to_llvm::populateStdXToLLVMConversionPatterns(converter,
                                                                    patterns);
     populateOpenMPToLLVMConversionPatterns(converter, patterns);
 
     LLVMConversionTarget target(*context);
-    target.addIllegalOp<UnrealizedConversionCastOp>();
+    // target.addIllegalOp<UnrealizedConversionCastOp>();
     target.addDynamicallyLegalOp<omp::ParallelOp, omp::WsLoopOp>(
         [&](Operation *op) { return converter.isLegal(&op->getRegion(0)); });
     target.addLegalOp<omp::BarrierOp, omp::FlushOp, omp::TaskyieldOp,
