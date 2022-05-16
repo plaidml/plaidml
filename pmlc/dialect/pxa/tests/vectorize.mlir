@@ -70,7 +70,7 @@ func @vectorize_reduce_stride_0(%a: memref<1x4x128x24xf32>, %b: memref<1x4x128x2
     %3 = arith.mulf %1, %2 : f32
     // CHECK: mulf %{{.*}}, %{{.*}} : vector<8xf32>
     %4 = pxa.reduce addf %3, %c[0, 0, 0, 0] : memref<1x1x1x1xf32>
-    // CHECK:      vector.reduction "add", %{{.*}} : vector<8xf32> into f32
+    // CHECK:      vector.reduction <add>, %{{.*}} : vector<8xf32> into f32
     // CHECK-NEXT: pxa.reduce addf %{{.*}}, %{{.*}}[0, 0, 0, 0] : memref<1x1x1x1xf32>
     affine.yield %4 : memref<1x1x1x1xf32>
     // CHECK: affine.yield %{{.*}} : memref<1x1x1x1xf32>

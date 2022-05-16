@@ -19,7 +19,7 @@ func @grn(%arg0: index, %arg1: memref<1x4x128x24xf16>, %arg2: memref<1x4x128x24x
       %16 = arith.extf %15 : f16 to f32
       // CHECK: mulf %{{.*}}, %{{.*}} : vector<8xf32>
       %17 = arith.mulf %16, %16 : f32
-      // CHECK: vector.reduction "add", %{{.*}} : vector<8xf32> into f32
+      // CHECK: vector.reduction <add>, %{{.*}} : vector<8xf32> into f32
       // CHECK-NEXT: pxa.reduce addf
       %18 = pxa.reduce addf %17, %3[0, 0, 0, 0] : memref<1x1x1x1xf32>
       affine.yield %18 : memref<1x1x1x1xf32>
