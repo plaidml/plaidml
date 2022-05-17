@@ -9,6 +9,8 @@
 #include <vector>
 
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
+#include "mlir/Conversion/ArithmeticToLLVM/ArithmeticToLLVM.h"
+#include "mlir/Conversion/ControlFlowToLLVM/ControlFlowToLLVM.h"
 #include "mlir/Conversion/FuncToLLVM/ConvertFuncToLLVM.h"
 #include "mlir/Conversion/FuncToLLVM/ConvertFuncToLLVMPass.h"
 #include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
@@ -17,6 +19,7 @@
 #include "mlir/Conversion/MemRefToLLVM/MemRefToLLVM.h"
 #include "mlir/Conversion/OpenMPToLLVM/ConvertOpenMPToLLVM.h"
 #include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
+#include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Conversion/SCFToOpenMP/SCFToOpenMP.h"
 #include "mlir/Dialect/Affine/LoopUtils.h"
 #include "mlir/Dialect/Affine/Passes.h"
@@ -101,16 +104,16 @@ struct ConvertStandardToLLVMPass
     RewritePatternSet patterns(context);
     populateExpandTanhPattern(patterns);
     populateXSMMToLLVMConversionPatterns(converter, patterns);
-    populateMemRefToLLVMConversionPatterns(converter, patterns);
-    populateMathToLLVMConversionPatterns(converter, patterns);
-    populateFuncToLLVMConversionPatterns(converter, patterns);
-    populateReconcileUnrealizedCastsPatterns(patterns);
     conversion::stdx_to_llvm::populateStdXToLLVMConversionPatterns(converter,
                                                                    patterns);
+    populateSCFToControlFlowConversionPatterns(patterns);
+    arith::populateArithmeticToLLVMConversionPatterns(converter, patterns);
+    populateMemRefToLLVMConversionPatterns(converter, patterns);
+    cf::populateControlFlowToLLVMConversionPatterns(converter, patterns);
+    populateFuncToLLVMConversionPatterns(converter, patterns);
     populateOpenMPToLLVMConversionPatterns(converter, patterns);
 
     LLVMConversionTarget target(*context);
-    // target.addIllegalOp<UnrealizedConversionCastOp>();
     target.addDynamicallyLegalOp<omp::ParallelOp, omp::WsLoopOp>(
         [&](Operation *op) { return converter.isLegal(&op->getRegion(0)); });
     target.addLegalOp<omp::BarrierOp, omp::FlushOp, omp::TaskyieldOp,
@@ -376,11 +379,11 @@ void pipelineBuilderStage3(OpPassManager &pm) {
 void pipelineBuilderStage4(OpPassManager &pm) {
   if (pmlc::util::getEnvVar("PLAIDML_BOUNDS_CHECK") == "1")
     pm.addNestedPass<func::FuncOp>(stdx::createBoundsCheckPass());
-
   pm.addPass(createLowerToLLVMPass());
   pm.addPass(createTraceLinkingPass());
   if (pmlc::util::getEnvVar("PLAIDML_PROFILE") == "1")
     pm.addPass(createProfileLinkingPass());
+  pm.addPass(createReconcileUnrealizedCastsPass());
 }
 
 void pipelineBuilder(OpPassManager &pm) {

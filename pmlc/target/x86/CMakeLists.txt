@@ -47,6 +47,7 @@ pml_cc_library(
     MLIRSCFToOpenMP
     MLIRReconcileUnrealizedCasts
     MLIRArithmeticToLLVM
+    MLIRSCFToControlFlow
     omp
     xsmm
 )
