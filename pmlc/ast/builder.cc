@@ -9,6 +9,7 @@
 #include <unordered_set>
 #include <vector>
 
+#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/IR/BlockAndValueMapping.h"
@@ -483,6 +484,7 @@ struct ProgramBuilder {
     context->getOrLoadDialect<dialect::pml::PMLDialect>();
     context->getOrLoadDialect<dialect::tile::TileDialect>();
     context->getOrLoadDialect<dialect::layer::LayerDialect>();
+    context->getOrLoadDialect<arith::ArithmeticDialect>();
     context->getOrLoadDialect<math::MathDialect>();
     context->getOrLoadDialect<func::FuncDialect>();
   }
@@ -610,7 +612,8 @@ struct ProgramBuilder {
     pm.addPass(createCSEPass());
     auto result = pm.run(module);
 
-    llvm::errs() << debugString(module) << "\n";
+    // llvm::errs() << "-----> Module\n";
+    // llvm::errs() << debugString(module) << "\n";
 
     program->tileIR = debugString(module);
     IVLOG(2, "\n" << program->tileIR);
