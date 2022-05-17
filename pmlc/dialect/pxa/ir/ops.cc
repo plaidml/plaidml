@@ -90,71 +90,6 @@ static LogicalResult replaceDimOrSym(AffineMap *map,
   return success();
 }
 
-/// Iterate over `operands` and fold away all those produced by an AffineApplyOp
-/// iteratively. Perform canonicalization of map and operands as well as
-/// AffineMap simplification. `map` and `operands` are mutated in place.
-static void composeAffineMapAndOperands(AffineMap *map,
-                                        SmallVectorImpl<Value> *operands) {
-  if (map->getNumResults() == 0) {
-    canonicalizeMapAndOperands(map, operands);
-    *map = simplifyAffineMap(*map);
-    return;
-  }
-
-  MLIRContext *ctx = map->getContext();
-  SmallVector<Value, 4> dims(operands->begin(),
-                             operands->begin() + map->getNumDims());
-  SmallVector<Value, 4> syms(operands->begin() + map->getNumDims(),
-                             operands->end());
-
-  // Iterate over dims and symbols coming from AffineApplyOp and replace until
-  // exhaustion. This iteratively mutates `map`, `dims` and `syms`. Both `dims`
-  // and `syms` can only increase by construction.
-  // The implementation uses a `while` loop to support the case of symbols
-  // that may be constructed from dims ;this may be overkill.
-  while (true) {
-    bool changed = false;
-    for (unsigned pos = 0; pos != dims.size() + syms.size(); ++pos)
-      if ((changed |= succeeded(replaceDimOrSym(map, pos, dims, syms))))
-        break;
-    if (!changed)
-      break;
-  }
-
-  // Clear operands so we can fill them anew.
-  operands->clear();
-
-  // At this point we may have introduced null operands, prune them out before
-  // canonicalizing map and operands.
-  unsigned nDims = 0, nSyms = 0;
-  SmallVector<AffineExpr, 4> dimReplacements, symReplacements;
-  dimReplacements.reserve(dims.size());
-  symReplacements.reserve(syms.size());
-  for (auto *container : {&dims, &syms}) {
-    bool isDim = (container == &dims);
-    auto &repls = isDim ? dimReplacements : symReplacements;
-    for (auto en : llvm::enumerate(*container)) {
-      Value v = en.value();
-      if (!v) {
-        assert(isDim ? !map->isFunctionOfDim(en.index())
-                     : !map->isFunctionOfSymbol(en.index()) &&
-                           "map is function of unexpected expr@pos");
-        repls.push_back(getAffineConstantExpr(0, ctx));
-        continue;
-      }
-      repls.push_back(isDim ? getAffineDimExpr(nDims++, ctx)
-                            : getAffineSymbolExpr(nSyms++, ctx));
-      operands->push_back(v);
-    }
-  }
-  *map = map->replaceDimsAndSymbols(dimReplacements, symReplacements, nDims,
-                                    nSyms);
-
-  // Canonicalize and simplify before returning.
-  canonicalizeMapAndOperands(map, operands);
-  *map = simplifyAffineMap(*map);
-}
-
 /// Simplify operations by composing maps that supply results into them.
 template <typename AffineOpTy>
 struct SimplifyAffineOp : public OpRewritePattern<AffineOpTy> {
@@ -172,11 +107,12 @@ struct SimplifyAffineOp : public OpRewritePattern<AffineOpTy> {
                       std::is_same<AffineOpTy, PxaLoadOp>::value ||
                       std::is_same<AffineOpTy, PxaVectorLoadOp>::value,
                   "affine reduce/vector_reduce or load op expected");
+
     auto map = affineOp.getAffineMap();
     AffineMap oldMap = map;
     auto oldOperands = affineOp.getMapOperands();
     SmallVector<Value, 8> resultOperands(oldOperands);
-    composeAffineMapAndOperands(&map, &resultOperands);
+    fullyComposeAffineMapAndOperands(&map, &resultOperands);
     if (map == oldMap && std::equal(oldOperands.begin(), oldOperands.end(),
                                     resultOperands.begin()))
       return failure();
