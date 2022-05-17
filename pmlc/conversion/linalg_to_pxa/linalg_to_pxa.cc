@@ -175,8 +175,6 @@ static AffineParallelOp copyBuffer(OpBuilder &builder, Location loc,
   return forOp;
 }
 
-// TODO: lorenzo:
-// See linal_to_pxa/test/shape.mlir
 struct ConstantOpConversion : public OpConversionPattern<arith::ConstantOp> {
   using OpConversionPattern<arith::ConstantOp>::OpConversionPattern;
 
@@ -184,7 +182,7 @@ struct ConstantOpConversion : public OpConversionPattern<arith::ConstantOp> {
   matchAndRewrite(arith::ConstantOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
     static int constCount = 0;
-    Attribute origValue = op.getValue();
+    Attribute origValue = adaptor.getValue();
     if (auto origType = origValue.getType().dyn_cast<ShapedType>()) {
       LinalgToPXATypeConverter typeConverter;
       MemRefType newType =
@@ -424,7 +422,22 @@ struct GenericOpConversion : public OpConversionPattern<linalg::GenericOp> {
       op->emitError("No linalg.yield in generic op.");
     }
 
+    // auto m = op->getParentOfType<ModuleOp>();
+    // llvm::errs() << "-----------------\n";
+    // m.dump();
+    // llvm::errs() << "------------------\n";
     rewriter.replaceOp(op, forOp.getResults());
+    return success();
+  }
+};
+
+struct YieldXOpConversion : public OpConversionPattern<stdx::YieldOp> {
+  using OpConversionPattern<stdx::YieldOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(stdx::YieldOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
+    rewriter.replaceOpWithNewOp<stdx::YieldOp>(op, adaptor.getOperands());
     return success();
   }
 };
@@ -475,11 +488,9 @@ struct LowerLinalgToPXAPass
 
   void performLinalgTransforms(ModuleOp op) {
     RewritePatternSet patterns(op.getContext());
-    // populateLinalgConvGeneralizationPatterns(patterns);
     linalg::populateLinalgNamedOpsGeneralizationPatterns(patterns);
     populateLinalgTensorCollapseOpGeneralizationPatterns(patterns);
     populateLinalgTensorExpandOpGeneralizationPatterns(patterns);
-    // populateLinalgPoolingOpGeneralizationPatterns(patterns);
     patterns.add<linalg::PadOpTransformationPattern>(op.getContext());
     (void)applyPatternsAndFoldGreedily(op, std::move(patterns));
   }
@@ -505,9 +516,13 @@ struct LowerLinalgToPXAPass
     target.addLegalOp<ModuleOp, func::CallOp>();
 
     target.addDynamicallyLegalOp<func::FuncOp>([&](func::FuncOp op) {
-      return converter.isSignatureLegal(op.getFunctionType()) && converter.isLegal(&op.getBody());
+      return converter.isSignatureLegal(op.getFunctionType()) &&
+             converter.isLegal(&op.getBody());
     });
-    
+
+    target.addDynamicallyLegalOp<stdx::YieldOp>(
+        [&](stdx::YieldOp op) { return converter.isLegal(op); });
+
     target.addDynamicallyLegalOp<stdx::ClosureOp>([&](stdx::ClosureOp op) {
       return converter.isSignatureLegal(op.getFunctionType());
     });
@@ -520,12 +535,11 @@ struct LowerLinalgToPXAPass
     target.addIllegalDialect<linalg::LinalgDialect>();
 
     RewritePatternSet patterns(&getContext());
-    patterns.insert<YieldOpConversion, 
-                    ConstantOpConversion,              
-                    FuncOpConversion<stdx::ClosureOp>,
-                    FuncOpConversion<func::FuncOp>, 
-                    GenericOpConversion,               
-                    IndexOpConversion,                 
+    patterns.insert<YieldOpConversion, ConstantOpConversion,
+                    // YieldXOpConversion,
+                    // FuncOpConversion<stdx::ClosureOp>,
+                    FuncOpConversion<func::FuncOp>, GenericOpConversion,
+                    // IndexOpConversion,
                     InitTensorOpConversion>(&getContext());
 
     tile_to_pxa::populateTileToPXASpecialPatterns(patterns);

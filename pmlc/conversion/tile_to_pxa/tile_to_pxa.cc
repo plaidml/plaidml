@@ -832,6 +832,17 @@ struct TraceOpConversion : public OpConversionPattern<tile::PragmaOp> {
   }
 };
 
+struct YieldXOpConversion : public OpConversionPattern<stdx::YieldOp> {
+  using OpConversionPattern<stdx::YieldOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(stdx::YieldOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
+    rewriter.replaceOpWithNewOp<stdx::YieldOp>(op, adaptor.getOperands());
+    return success();
+  }
+};
+
 struct ScfForOpConversion : public OpConversionPattern<scf::ForOp> {
   using OpConversionPattern<scf::ForOp>::OpConversionPattern;
 
@@ -899,6 +910,8 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
     });
     target.addDynamicallyLegalOp<scf::ForOp>(
         [&](scf::ForOp op) { return converter.isLegal(op.getResultTypes()); });
+    target.addDynamicallyLegalOp<stdx::YieldOp>(
+        [&](stdx::YieldOp op) { return converter.isLegal(op); });
 
     // Setup rewrite patterns
     using CmpIntLtOp = CmpIntInequalityOp<arith::CmpIPredicate::slt,
@@ -917,6 +930,7 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         FuncOpConversion<stdx::ClosureOp>, //
         IndexOpConversion,                 //
         PragmaOpConversion,                //
+        YieldXOpConversion,
         ReshapeOpConversion,               //
         ShapeOpConversion,                 //
         TraceOpConversion,                 //

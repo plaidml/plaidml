@@ -1097,7 +1097,6 @@ struct YieldXOpConversion : public OpConversionPattern<stdx::YieldOp> {
   LogicalResult
   matchAndRewrite(stdx::YieldOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
-    assert(0 && "converting op");
     rewriter.replaceOpWithNewOp<stdx::YieldOp>(op, adaptor.getOperands());
     return success();
   }
