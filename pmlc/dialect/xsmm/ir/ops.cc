@@ -48,9 +48,8 @@ GemmInvokeF32Op::operand_range GemmInvokeF32Op::getOperandsForC() {
 }
 
 void GemmInvokeF32Op::print(OpAsmPrinter &p) {
-  auto funcType =
-      FunctionType::get(getContext(), {a().getType(), b().getType()},
-                        {c().getType()});
+  auto funcType = FunctionType::get(
+      getContext(), {a().getType(), b().getType()}, {c().getType()});
   p << ' ' << ptr() << ", ";
   p << c() << '[';
   p.printOperands(getOperandsForC());
@@ -61,7 +60,8 @@ void GemmInvokeF32Op::print(OpAsmPrinter &p) {
   p << "] : " << funcType;
 }
 
-ParseResult GemmInvokeF32Op::parse(OpAsmParser &parser, OperationState &result) {
+ParseResult GemmInvokeF32Op::parse(OpAsmParser &parser,
+                                   OperationState &result) {
   auto &builder = parser.getBuilder();
   auto indexType = builder.getIndexType();
   auto i64Type = builder.getIntegerType(64);
@@ -91,7 +91,7 @@ ParseResult GemmInvokeF32Op::parse(OpAsmParser &parser, OperationState &result) 
 //
 
 ParseResult BRGemmOffsInvokeF32Op::parse(OpAsmParser &parser,
-                                       OperationState &result) {
+                                         OperationState &result) {
   auto &builder = parser.getBuilder();
   auto indexType = builder.getIndexType();
   auto i64Type = builder.getIntegerType(64);
@@ -218,7 +218,13 @@ ParseResult UnaryInvokeOp::parse(OpAsmParser &parser, OperationState &result) {
 //
 
 void BinaryInvokeOp::print(OpAsmPrinter &p) {
-  assert(0 && "implement me");
+  auto funcType =
+      FunctionType::get(getContext(), {input1().getType(), input2().getType()},
+                        {output().getType()});
+  p << ' ' << output() << " = ";
+  p << ptr() << '(';
+  p.printOperands(ValueRange{input1(), input2()});
+  p << ") : " << funcType;
 }
 
 ParseResult BinaryInvokeOp::parse(OpAsmParser &parser, OperationState &result) {
@@ -230,11 +236,46 @@ ParseResult BinaryInvokeOp::parse(OpAsmParser &parser, OperationState &result) {
 // --- BinaryDispatchOp ---
 //
 
-void BinaryDispatchOp::print(OpAsmPrinter &p) {
-  assert(0 && "implement me");
+static std::string stringfy(BinaryKind kind) {
+  switch (kind) {
+  case BinaryKind::NONE:
+    return "none";
+  case BinaryKind::ADD:
+    return "add";
+  case BinaryKind::MUL:
+    return "mul";
+  case BinaryKind::SUB:
+    return "sub";
+  case BinaryKind::DIV:
+    return "div";
+  case BinaryKind::MULADD:
+    return "muladd";
+  case BinaryKind::MATMUL:
+    return "matmul";
+  case BinaryKind::MUL_AND_REDUCE_TO_SCALAR_OP_ADD:
+    return "mul_and_reduce_to_scalar_op_add";
+  case BinaryKind::PACK:
+    return "pack";
+  }
+  llvm_unreachable("kind not right");
 }
 
-ParseResult BinaryDispatchOp::parse(OpAsmParser &parser, OperationState &result) {
+void BinaryDispatchOp::print(OpAsmPrinter &p) {
+  p << '{';
+  p << ' ' << "bcastType1 = " << bcastType1();
+  p << ' ' << "bcastType2 = " << bcastType2();
+  p << ' ' << "compute_type = " << compute_type();
+  p << ' ' << "func_type = " << func_type();
+  p << ' ' << "kind = " << stringfy(kind());
+  p << ' ' << "ldi1 = " << ldi1();
+  p << ' ' << "ldi2 = " << ldi2();
+  p << ' ' << "ldo = " << ldo();
+  p << ' ' << "tile = " << tile();
+  p << '}';
+}
+
+ParseResult BinaryDispatchOp::parse(OpAsmParser &parser,
+                                    OperationState &result) {
   assert(0 && "implement me");
   return failure();
 }
@@ -244,10 +285,11 @@ ParseResult BinaryDispatchOp::parse(OpAsmParser &parser, OperationState &result)
 //
 
 void BRGemmInvokeF32Op::print(OpAsmPrinter &p) {
-  assert(0 && "implement me");
+  // assert(0 && "implement me");
 }
 
-ParseResult BRGemmInvokeF32Op::parse(OpAsmParser &parser, OperationState &result) {
+ParseResult BRGemmInvokeF32Op::parse(OpAsmParser &parser,
+                                     OperationState &result) {
   assert(0 && "implement me");
   return failure();
 }
