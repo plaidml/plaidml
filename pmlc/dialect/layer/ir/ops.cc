@@ -33,7 +33,7 @@ void BoxOp::build(OpBuilder &builder, OperationState &result, StringRef op,
   }
   bodyRegion->push_back(body);
 }
-
+#if 0
 void BoxOp::print(OpAsmPrinter &p) {
   p << " \"" << op() << "\" (" << getBody()->getArguments() << ") = (";
   p.printOperands(operands());
@@ -78,7 +78,7 @@ ParseResult BoxOp::parse(OpAsmParser &parser, OperationState &result) {
   }
   return success();
 }
-
+#endif
 void LayerDialect::initialize() {
   addOperations<
 #define GET_OP_LIST

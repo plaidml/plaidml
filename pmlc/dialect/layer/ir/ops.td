@@ -22,7 +22,7 @@ def BoxOp : LayerOp<"box", [IsolatedFromAbove]> {
   let arguments = (ins
     Variadic<AnyType>:$operands,
     StrAttr:$op,
-    DictionaryAttr:$attrs);
+    OptionalAttr<DictionaryAttr>:$attrs);
   let results = (outs Variadic<AnyType>:$results);
   let regions = (region SizedRegion<1>:$body);
 
@@ -39,7 +39,10 @@ def BoxOp : LayerOp<"box", [IsolatedFromAbove]> {
   let extraClassDeclaration = [{
     mlir::Block *getBody();
   }];
-  let hasCustomAssemblyFormat = 1;
+  
+  let assemblyFormat = [{
+    $op `(` $operands `)` attr-dict `:` type($operands) `->` type($results) $body
+  }];
 }
 
 def ReturnOp : LayerOp<"return", [
