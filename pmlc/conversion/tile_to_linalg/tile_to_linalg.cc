@@ -1091,6 +1091,18 @@ struct ReturnOpConversion : public OpConversionPattern<func::ReturnOp> {
   }
 };
 
+struct YieldXOpConversion : public OpConversionPattern<stdx::YieldOp> {
+  using OpConversionPattern<stdx::YieldOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(stdx::YieldOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
+    assert(0 && "converting op");
+    rewriter.replaceOpWithNewOp<stdx::YieldOp>(op, adaptor.getOperands());
+    return success();
+  }
+};
+
 struct PragmaOpConversion : public OpConversionPattern<tile::PragmaOp> {
   using OpConversionPattern<tile::PragmaOp>::OpConversionPattern;
 
@@ -1209,6 +1221,8 @@ struct LowerTileToLinalgPass
     });
     target.addDynamicallyLegalOp<func::ReturnOp>(
         [&](func::ReturnOp op) { return converter.isLegal(op); });
+    target.addDynamicallyLegalOp<stdx::YieldOp>(
+        [&](stdx::YieldOp op) { return converter.isLegal(op); });
     target.addDynamicallyLegalOp<scf::ForOp>(
         [&](scf::ForOp op) { return converter.isLegal(op.getResultTypes()); });
 
@@ -1232,14 +1246,15 @@ struct LowerTileToLinalgPass
                                           arith::CmpIPredicate::uge>;
     RewritePatternSet patterns(&getContext());
     patterns.insert<
-        CastOpConversion,                     //
-        ConstantOpConversion,                 //
-        FuncOpConversion<func::FuncOp>,       //
-        FuncOpConversion<stdx::ClosureOp>,    //
-        IndexOpConversion,                    //
-        PragmaOpConversion,                   //
-        ReshapeOpConversion,                  //
-        ReturnOpConversion,                   //
+        CastOpConversion,                  //
+        ConstantOpConversion,              //
+        FuncOpConversion<func::FuncOp>,    //
+        FuncOpConversion<stdx::ClosureOp>, //
+        IndexOpConversion,                 //
+        PragmaOpConversion,                //
+        ReshapeOpConversion,               //
+        ReturnOpConversion,                //
+        YieldXOpConversion,
         SpecialOpConversion<tile::ArgSortOp>, //
         SpecialOpConversion<tile::GatherOp>,  //
         SpecialOpConversion<tile::PrngOp>,    //
