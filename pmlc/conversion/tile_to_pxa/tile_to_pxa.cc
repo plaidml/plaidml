@@ -931,10 +931,10 @@ struct LowerTileToPXAPass : public LowerTileToPXABase<LowerTileToPXAPass> {
         IndexOpConversion,                 //
         PragmaOpConversion,                //
         YieldXOpConversion,
-        ReshapeOpConversion,               //
-        ShapeOpConversion,                 //
-        TraceOpConversion,                 //
-        ScfForOpConversion,                //
+        ReshapeOpConversion, //
+        ShapeOpConversion,   //
+        TraceOpConversion,   //
+        ScfForOpConversion,  //
         ContractionOpConversion<CombinationKind::none, FirstOperand>,
         ContractionOpConversion<CombinationKind::add,
                                 StdOp<mlir::arith::AddFOp>,
