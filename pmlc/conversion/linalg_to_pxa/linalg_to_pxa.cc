@@ -500,7 +500,7 @@ struct LowerLinalgToPXAPass
     // Convert named/structured ops to GenericOps.
     performLinalgTransforms(module);
 
-    module.dump();
+    //module.dump();
     //assert(0);
 
     ConversionTarget target(getContext());
