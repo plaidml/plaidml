@@ -182,7 +182,7 @@ struct ConstantOpConversion : public OpConversionPattern<arith::ConstantOp> {
   matchAndRewrite(arith::ConstantOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
     static int constCount = 0;
-    Attribute origValue = adaptor.getValue();
+    Attribute origValue = op.getValue();
     if (auto origType = origValue.getType().dyn_cast<ShapedType>()) {
       LinalgToPXATypeConverter typeConverter;
       MemRefType newType =
@@ -535,12 +535,16 @@ struct LowerLinalgToPXAPass
     target.addIllegalDialect<linalg::LinalgDialect>();
 
     RewritePatternSet patterns(&getContext());
-    patterns.insert<YieldOpConversion, ConstantOpConversion,
-                    // YieldXOpConversion,
-                    // FuncOpConversion<stdx::ClosureOp>,
-                    FuncOpConversion<func::FuncOp>, GenericOpConversion,
-                    // IndexOpConversion,
+    // clang-format off
+    patterns.insert<YieldOpConversion, 
+                    ConstantOpConversion,
+                    YieldXOpConversion,
+                    FuncOpConversion<stdx::ClosureOp>,
+                    FuncOpConversion<func::FuncOp>, 
+                    GenericOpConversion,
+                    IndexOpConversion,
                     InitTensorOpConversion>(&getContext());
+    // clang-format on
 
     tile_to_pxa::populateTileToPXASpecialPatterns(patterns);
     populateReturnOpTypeConversionPattern(patterns, converter);
