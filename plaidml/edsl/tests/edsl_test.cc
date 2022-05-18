@@ -666,7 +666,7 @@ Tensor Convolution2(Tensor I, Tensor K, const std::string& I_layout = "NHWC", co
       .outAccess(n, x0, x1, co)
       .sum(I(n, x0 + k0 - (K0 / 2), x1 + k1 - (K1 / 2), ci) * K(k0, k1, ci, co));
 }
-#if 0
+
 TEST_F(CppEdsl, Convolution) {
   auto I = Placeholder(DType::FLOAT32, {1, 56, 56, 64});
   auto K = Placeholder(DType::FLOAT32, {3, 3, 64, 64});
@@ -843,7 +843,7 @@ TEST_F(CppEdsl, RepeatElements) {
   // clang-format on
   runProgram(program);
 }
-
+/*
 TEST_F(CppEdsl, UseDefault) {
   auto P = Placeholder(DType::FLOAT32, {1, 7, 10, 10});
   auto I = Placeholder(DType::FLOAT32, {1, 10, 10});
@@ -860,7 +860,7 @@ TEST_F(CppEdsl, UseDefault) {
   // clang-format on
   runProgram(program);
 }
-
+*/
 TEST_F(CppEdsl, UniqueNames) {
   TensorShape shape(DType::FLOAT32, {1});
   auto A = Placeholder(shape, "A");
@@ -2696,6 +2696,6 @@ TEST_F(CppEdsl, FunkySum) {
   std::vector<float> output = {2, 5, 4, 9, 6};
   checkExact(program, {input1, input2}, {output});
 }
-#endif
+
 }  // namespace
 }  // namespace plaidml::edsl
