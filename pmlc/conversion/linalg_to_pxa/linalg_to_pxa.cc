@@ -422,10 +422,9 @@ struct GenericOpConversion : public OpConversionPattern<linalg::GenericOp> {
       op->emitError("No linalg.yield in generic op.");
     }
 
-    // auto m = op->getParentOfType<ModuleOp>();
-    // llvm::errs() << "-----------------\n";
-    // m.dump();
-    // llvm::errs() << "------------------\n";
+    // TODO: lorenzo quick fix. Must spend more time 
+    // to see why this is the case.
+    op->getResults().replaceAllUsesWith(forOp.getResults());
     rewriter.replaceOp(op, forOp.getResults());
     return success();
   }
@@ -500,6 +499,9 @@ struct LowerLinalgToPXAPass
 
     // Convert named/structured ops to GenericOps.
     performLinalgTransforms(module);
+
+    module.dump();
+    //assert(0);
 
     ConversionTarget target(getContext());
     LinalgToPXATypeConverter converter;

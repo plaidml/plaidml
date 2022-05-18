@@ -108,6 +108,7 @@ struct ConvertStandardToLLVMPass
                                                                    patterns);
     populateSCFToControlFlowConversionPatterns(patterns);
     arith::populateArithmeticToLLVMConversionPatterns(converter, patterns);
+    populateMathToLLVMConversionPatterns(converter, patterns);
     populateMemRefToLLVMConversionPatterns(converter, patterns);
     cf::populateControlFlowToLLVMConversionPatterns(converter, patterns);
     populateFuncToLLVMConversionPatterns(converter, patterns);

@@ -414,7 +414,7 @@ TEST_F(CppEdsl, DISABLED_ConstCast) {
   std::vector<float> expected = {3.0};
   checkExact(program, {}, {expected});
 }
-#if 0
+
 TEST_F(CppEdsl, Dot) {
   const int64_t M = 8;
   const int64_t N = 32;
@@ -666,7 +666,7 @@ Tensor Convolution2(Tensor I, Tensor K, const std::string& I_layout = "NHWC", co
       .outAccess(n, x0, x1, co)
       .sum(I(n, x0 + k0 - (K0 / 2), x1 + k1 - (K1 / 2), ci) * K(k0, k1, ci, co));
 }
-
+#if 0
 TEST_F(CppEdsl, Convolution) {
   auto I = Placeholder(DType::FLOAT32, {1, 56, 56, 64});
   auto K = Placeholder(DType::FLOAT32, {3, 3, 64, 64});
