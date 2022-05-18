@@ -784,7 +784,7 @@ std::tuple<Tensor, Tensor> LarsMomentum(  //
   auto NewVeloc = momentum * Veloc + LocLR * (Grad + lars_weight_decay * X);
   return std::make_tuple(X - NewVeloc, NewVeloc);
 }
-
+/*
 TEST_F(CppEdsl, LarsMomentum4d) {
   auto X_shape = TensorShape(DType::FLOAT32, {4, 7, 3, 9});
   auto LR_shape = TensorShape(DType::FLOAT32, {});
@@ -822,7 +822,7 @@ TEST_F(CppEdsl, LarsMomentum4d) {
   // clang-format on
   runProgram(program);
 }
-
+*/
 TEST_F(CppEdsl, RepeatElements) {
   auto I = Placeholder(DType::FLOAT32, {10, 10, 10});
   TensorDim N0, N1, N2;
@@ -878,7 +878,7 @@ TEST_F(CppEdsl, UniqueNames) {
   // clang-format on
   runProgram(program);
 }
-
+/*
 TEST_F(CppEdsl, GlobalMin) {
   auto I = Placeholder(DType::FLOAT32, {10, 10, 10}, "I");
   TensorIndex i, j, k;
@@ -896,7 +896,7 @@ TEST_F(CppEdsl, GlobalMin) {
   // clang-format on
   runProgram(program);
 }
-
+*/
 TEST_F(CppEdsl, CumSum) {
   auto I = Placeholder(DType::FLOAT32, {10}, "I");
   TensorDim N;
