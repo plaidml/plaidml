@@ -31,15 +31,16 @@ func @grn(%arg0: tensor<1x224x128x24xf16>) -> tensor<1x224x128x24xf16> {
 }
 
 // CHECK: func @grn(%[[in:.*]]: memref<1x224x128x24xf16>, %[[out:.*]]: memref<1x224x128x24xf16>) -> memref<1x224x128x24xf16>
-// CHECK:   %[[epsilon:.*]] = arith.constant 1.001360e-05 : f16
-// CHECK:   %[[zero:.*]] = arith.constant 0.000000e+00 : f16
-// CHECK:   %[[one:.*]] = arith.constant 1.000000e+00 : f16
+// CHECK-DAG:   %[[epsilon:.*]] = arith.constant 1.001360e-05 : f16
+// CHECK-DAG:   %[[zero:.*]] = arith.constant 0.000000e+00 : f16
+// CHECK-DAG:   %[[one:.*]] = arith.constant 1.000000e+00 : f16
+// CHECK-DAG:   %[[zeroI:.*]] = arith.constant 0 : index
 // CHECK:   %[[P0:.*]] = affine.parallel (%[[i:.*]], %[[j:.*]]) = (0, 0) to (224, 128) reduce ("assign") -> (memref<1x224x128x24xf16>)
 // CHECK:     %[[T0:.*]] = memref.alloc() : memref<1x1x1x1xf16>
 // CHECK:     %[[T1:.*]] = pxa.reduce assign %[[zero]], %[[T0]][0, 0, 0, 0] : memref<1x1x1x1xf16>
 // CHECK:     %[[P1:.*]] = affine.parallel (%[[k:.*]]) = (0) to (24) reduce ("assign") -> (memref<1x1x1x1xf16>)
-// CHECK:       %[[X0:.*]] = pxa.load %[[in]][0, %[[i]], %[[j]], %[[k]]] : memref<1x224x128x24xf16>
-// CHECK:       %[[X1:.*]] = pxa.load %[[in]][0, %[[i]], %[[j]], %[[k]]] : memref<1x224x128x24xf16>
+// CHECK:       %[[X0:.*]] = pxa.load %[[in]][%[[zeroI]], %[[i]], %[[j]], %[[k]]] : memref<1x224x128x24xf16>
+// CHECK:       %[[X1:.*]] = pxa.load %[[in]][%[[zeroI]], %[[i]], %[[j]], %[[k]]] : memref<1x224x128x24xf16>
 // CHECK:       %[[X2:.*]] = arith.mulf %[[X0]], %[[X1]] : f16
 // CHECK:       %[[X3:.*]] = pxa.reduce addf %[[X2]], %[[T1]][0, 0, 0, 0] : memref<1x1x1x1xf16>
 // CHECK:       affine.yield %[[X3]] : memref<1x1x1x1xf16>
@@ -49,9 +50,9 @@ func @grn(%arg0: tensor<1x224x128x24xf16>) -> tensor<1x224x128x24xf16> {
 // CHECK:     %[[X8:.*]] = arith.cmpf olt, %[[X7]], %[[epsilon]] : f16
 // CHECK:     %[[X9:.*]] = arith.select %[[X8]], %[[epsilon]], %[[X7]] : f16
 // CHECK:     %[[P1:.*]] = affine.parallel (%[[k:.*]]) = (0) to (24) reduce ("assign") -> (memref<1x224x128x24xf16>)
-// CHECK:       %[[X11:.*]] = pxa.load %[[in]][0, %[[i]], %[[j]], %[[k]]] : memref<1x224x128x24xf16>
+// CHECK:       %[[X11:.*]] = pxa.load %[[in]][%[[zeroI]], %[[i]], %[[j]], %[[k]]] : memref<1x224x128x24xf16>
 // CHECK:       %[[X12:.*]] = arith.divf %[[X11]], %[[X9]] : f16
-// CHECK:       %[[X13:.*]] = pxa.reduce assign %[[X12]], %[[out]][0, %[[i]], %[[j]], %[[k]]] : memref<1x224x128x24xf16>
+// CHECK:       %[[X13:.*]] = pxa.reduce assign %[[X12]], %[[out]][%[[zeroI]], %[[i]], %[[j]], %[[k]]] : memref<1x224x128x24xf16>
 // CHECK:       affine.yield %[[X13]] : memref<1x224x128x24xf16>
 // CHECK:     affine.yield %[[P1]] : memref<1x224x128x24xf16>
 // CHECK:   return %[[P0]] : memref<1x224x128x24xf16>
