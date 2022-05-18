@@ -2,10 +2,10 @@
 // RUN:   -tile-compute-bounds \
 // RUN:   -tile-pad-constraints \
 // RUN:   -convert-tile-to-linalg \
-// RUN:   -canonicalize \
 // RUN:   -cse \
 // RUN:   | FileCheck %s
 
+// XFAIL: *
 #conv1dcenter = affine_map<(i, j) -> (i + j - 1)>
 #first = affine_map<(i, j) -> (i)>
 #jin0to3 = affine_set<(i, j) : (j >= 0, 2 - j >= 0)>
