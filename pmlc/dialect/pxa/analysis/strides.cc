@@ -291,10 +291,15 @@ Optional<StrideInfo> computeStrideInfo(Value expr) {
     return None;
   }
 
-  // Try for the affine apply case
+  // Try for the affine apply case.
   if (auto op = dyn_cast_or_null<AffineApplyOp>(expr.getDefiningOp()))
     return computeStrideInfo(op.getAffineMap().getResult(0),
                              op.getMapOperands());
+
+  // Try constant op.
+  if (arith::ConstantIndexOp op =
+          dyn_cast_or_null<arith::ConstantIndexOp>(expr.getDefiningOp()))
+    return StrideInfo(op.value());
 
   IVLOG(1, "Failed stride info: op = " << debugString(expr));
 
