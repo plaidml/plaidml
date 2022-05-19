@@ -525,7 +525,7 @@ TEST_F(CppEdsl, DoubleDot) {
   // CHECK: module @double_dot
   // CHECK: -> tensor<10x40xf32> {
   // CHECK: %[[cst:.*]] = tile.constant(0.000000e+00 : f64) : tensor<f32>
-  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = affine_map<({{.*}}}) -> ({{.*}})>, srcs = [affine_map<({{.*}}) -> ({{.*}})>, affine_map<({{.*}}) -> ({{.*}})>]} : tensor<f32>, tensor<10x20xf32>, tensor<20x30xf32> -> tensor<10x30xf32>
+  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = affine_map<({{.*}}) -> ({{.*}})>, srcs = [affine_map<({{.*}}) -> ({{.*}})>, affine_map<({{.*}}) -> ({{.*}})>]} : tensor<f32>, tensor<10x20xf32>, tensor<20x30xf32> -> tensor<10x30xf32>
   // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = affine_map<({{.*}}) -> ({{.*}})>, srcs = [affine_map<({{.*}}) -> ({{.*}})>, affine_map<({{.*}}) -> ({{.*}})>]} : tensor<f32>, tensor<10x30xf32>, tensor<30x40xf32> -> tensor<10x40xf32>
   // CHECK: return %{{.*}} : tensor<10x40xf32>
   // clang-format on
@@ -1004,8 +1004,8 @@ TEST_F(CppEdsl, DupOut) {
   // clang-format off
   // CHECK: module @dup_out
   // CHECK: %[[cst:.*]] = tile.constant(0.000000e+00 : f64) : tensor<f32>
-  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}, #map{{[0-9]*}}]} : tensor<f32>, tensor<10x20xf32>, tensor<20x30xf32> -> tensor<10x30xf32>
-  // CHECK: %[[out:.*]] = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}, #map{{[0-9]*}}]} : tensor<f32>, tensor<10x30xf32>, tensor<30x40xf32> -> tensor<10x40xf32>
+  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = affine_map<({{.*}}) -> ({{.*}})>}, srcs = [affine_map<({{.*}}) -> ({{.*}})>, affine_map<({{.*}}) -> ({{.*}})>]} : tensor<f32>, tensor<10x20xf32>, tensor<20x30xf32> -> tensor<10x30xf32>
+  // CHECK: %[[out:.*]] = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = affine_map<({{.*}}) -> ({{.*}})>, srcs = [affine_map<({{.*}}) -> ({{.*}})>, affine_map<({{.*}}) -> ({{.*}})>]} : tensor<f32>, tensor<10x30xf32>, tensor<30x40xf32> -> tensor<10x40xf32>
   // CHECK: %[[i2:.*]] = tile.ident %[[out]] : (tensor<10x40xf32>) -> tensor<10x40xf32>
   // CHECK: %[[i3:.*]] = tile.ident %[[out]] : (tensor<10x40xf32>) -> tensor<10x40xf32>
   // CHECK: return %[[out]], %[[i2]], %[[i3]] : tensor<10x40xf32>, tensor<10x40xf32>, tensor<10x40xf32>
