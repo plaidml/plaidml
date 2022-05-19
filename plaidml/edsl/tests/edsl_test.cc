@@ -784,7 +784,45 @@ std::tuple<Tensor, Tensor> LarsMomentum(  //
   auto NewVeloc = momentum * Veloc + LocLR * (Grad + lars_weight_decay * X);
   return std::make_tuple(X - NewVeloc, NewVeloc);
 }
-
+/*
+TEST_F(CppEdsl, LarsMomentum4d) {
+  auto X_shape = TensorShape(DType::FLOAT32, {4, 7, 3, 9});
+  auto LR_shape = TensorShape(DType::FLOAT32, {});
+  auto X = Placeholder(X_shape);
+  auto Grad = Placeholder(X_shape);
+  auto Veloc = Placeholder(X_shape);
+  auto LR = Placeholder(LR_shape);
+  auto R = LarsMomentum(X, Grad, Veloc, LR, 1. / 1024., 1. / 2048., 1. / 8.);
+  auto program = makeProgram("lars_momentum4d", {X, Grad, Veloc, LR}, {std::get<0>(R), std::get<1>(R)});
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.LarsMomentum4d
+  // CHECK: module @lars_momentum4d
+  // CHECK-DAG: tile.constant(0.000000e+00 : f64) : tensor<f32>
+  // CHECK-DAG: tile.constant(1.250000e-01 : f64) : tensor<f32>
+  // CHECK-DAG: tile.constant(9.765625E-4 : f64) : tensor<f32>
+  // CHECK-DAG: tile.constant(4.8828125E-4 : f64) : tensor<f32>
+  // CHECK: tile.mul %{{.*}}, %{{.*}} : (tensor<4x7x3x9xf32>, tensor<f32>) -> tensor<4x7x3x9xf32>
+  // CHECK: tile.mul %{{.*}}, %{{.*}} : (tensor<f32>, tensor<f32>) -> tensor<f32>
+  // CHECK: tile.mul %{{.*}}, %{{.*}} : (tensor<4x7x3x9xf32>, tensor<4x7x3x9xf32>) -> tensor<4x7x3x9xf32>
+  // CHECK: tile.contract add, none, %{{.*}}, %{{.*}} {sink = #{{.*}}, srcs = [#{{.*}}]} : tensor<f32>, tensor<4x7x3x9xf32> -> tensor<f32>
+  // CHECK: tile.sqrt %{{.*}} : (tensor<f32>) -> tensor<f32>
+  // CHECK: tile.mul %{{.*}}, %{{.*}} : (tensor<f32>, tensor<f32>) -> tensor<f32>
+  // CHECK: tile.mul %{{.*}}, %{{.*}} : (tensor<4x7x3x9xf32>, tensor<4x7x3x9xf32>) -> tensor<4x7x3x9xf32>
+  // CHECK: tile.contract add, none, %{{.*}}, %{{.*}} {sink = #{{.*}}, srcs = [#{{.*}}]} : tensor<f32>, tensor<4x7x3x9xf32> -> tensor<f32>
+  // CHECK: tile.sqrt %{{.*}} : (tensor<f32>) -> tensor<f32>
+  // CHECK: tile.mul %{{.*}}, %{{.*}} : (tensor<f32>, tensor<f32>) -> tensor<f32>
+  // CHECK: tile.add %{{.*}}, %{{.*}} : (tensor<f32>, tensor<f32>) -> tensor<f32>
+  // CHECK: tile.div %{{.*}}, %{{.*}} : (tensor<f32>, tensor<f32>) -> tensor<f32>
+  // CHECK: tile.mul %{{.*}}, %{{.*}} : (tensor<4x7x3x9xf32>, tensor<f32>) -> tensor<4x7x3x9xf32>
+  // CHECK: tile.add %{{.*}}, %{{.*}} : (tensor<4x7x3x9xf32>, tensor<4x7x3x9xf32>) -> tensor<4x7x3x9xf32>
+  // CHECK: tile.mul %{{.*}}, %{{.*}} : (tensor<f32>, tensor<4x7x3x9xf32>) -> tensor<4x7x3x9xf32>
+  // CHECK: tile.add %{{.*}}, %{{.*}} : (tensor<4x7x3x9xf32>, tensor<4x7x3x9xf32>) -> tensor<4x7x3x9xf32>
+  // CHECK: tile.sub %{{.*}}, %{{.*}} : (tensor<4x7x3x9xf32>, tensor<4x7x3x9xf32>) -> tensor<4x7x3x9xf32>
+  // CHECK: return %{{.*}}, %{{.*}} : tensor<4x7x3x9xf32>, tensor<4x7x3x9xf32>
+  // clang-format on
+  runProgram(program);
+}
+*/
 TEST_F(CppEdsl, RepeatElements) {
   auto I = Placeholder(DType::FLOAT32, {10, 10, 10});
   TensorDim N0, N1, N2;
@@ -805,7 +843,24 @@ TEST_F(CppEdsl, RepeatElements) {
   // clang-format on
   runProgram(program);
 }
-
+/*
+TEST_F(CppEdsl, UseDefault) {
+  auto P = Placeholder(DType::FLOAT32, {1, 7, 10, 10});
+  auto I = Placeholder(DType::FLOAT32, {1, 10, 10});
+  TensorDim B, N1, N2;
+  TensorIndex b, i1, i2;
+  I.bind_dims(B, N1, N2);
+  Tensor O = Contraction().outShape(B, 7, N1, N2).outAccess(b, 3, i1, i2).assign(I(b, i1, i2)).init(P);
+  auto program = makeProgram("use_default", {I, P}, {O});
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.UseDefault
+  // CHECK: module @use_default
+  // CHECK: tile.contract assign, none, %{{.*}}, %{{.*}} {sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}]} : tensor<1x7x10x10xf32>, tensor<1x10x10xf32> -> tensor<1x7x10x10xf32>
+  // CHECK: return %{{.*}} : tensor<1x7x10x10xf32>
+  // clang-format on
+  runProgram(program);
+}
+*/
 TEST_F(CppEdsl, UniqueNames) {
   TensorShape shape(DType::FLOAT32, {1});
   auto A = Placeholder(shape, "A");
@@ -823,7 +878,25 @@ TEST_F(CppEdsl, UniqueNames) {
   // clang-format on
   runProgram(program);
 }
-
+/*
+TEST_F(CppEdsl, GlobalMin) {
+  auto I = Placeholder(DType::FLOAT32, {10, 10, 10}, "I");
+  TensorIndex i, j, k;
+  Tensor I_Neg = -I;
+  Tensor O = -Contraction().max(I_Neg(i, j, k)).build();
+  auto program = makeProgram("global_min", {I}, {O});
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.GlobalMin
+  // CHECK: module @global_min
+  // CHECK: %[[cst:.*]] = tile.constant(0xFFF0000000000000 : f64) : tensor<f32>
+  // CHECK: tile.neg %{{.*}} : (tensor<10x10x10xf32>) -> tensor<10x10x10xf32>
+  // CHECK: tile.contract max, none, %[[cst]], %{{.*}} {sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}]} : tensor<f32>, tensor<10x10x10xf32> -> tensor<f32>
+  // CHECK: tile.neg %{{.*}} : (tensor<f32>) -> tensor<f32>
+  // CHECK: return %{{.*}} : tensor<f32>
+  // clang-format on
+  runProgram(program);
+}
+*/
 TEST_F(CppEdsl, CumSum) {
   auto I = Placeholder(DType::FLOAT32, {10}, "I");
   TensorDim N;
