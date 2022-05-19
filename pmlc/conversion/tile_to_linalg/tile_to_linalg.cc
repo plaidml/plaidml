@@ -704,6 +704,14 @@ struct ContractionOpConversion
               builder.create<linalg::YieldOp>(loc, args.take_front());
             });
         initValue = broadcastOp.getResult(0);
+      } else {
+        // If the initializer is the exact type of the output, just create a
+        // copy to write into
+        auto copyOp =
+            rewriter.create<linalg::CopyOp>(loc,
+                                            /*inputs=*/initValue,
+                                            /*outputs=*/init.resultTensor);
+        initValue = copyOp.getResult(0);
       }
     } else {
       // Deal with scalar initializer values.
