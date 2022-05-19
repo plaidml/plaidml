@@ -2082,7 +2082,8 @@ TEST_F(CppEdsl, Layer) {
   // clang-format off
   // CHECK-LABEL: CppEdsl.Layer
   // CHECK: module @relu
-  // CHECK: %[[X0:.*]] = layer.box "relu" (%[[arg1:.*]]) = (%{{.*}}) : (tensor<10x20xf32>) -> tensor<10x20xf32>
+  // CHECK: %[[X0:.*]] = layer.box "relu"(%{{.*}}) {{{.*}}} : tensor<10x20xf32> -> tensor<10x20xf32>
+  // CHECK-NEXT: ^{{.*}}(%[[arg1:.*]]: tensor<10x20xf32>):
   // CHECK:   %[[cst:.*]] = tile.constant(0.000000e+00 : f64) : tensor<f32>
   // CHECK:   %[[X1:.*]] = tile.cmp_lt %[[arg1]], %[[cst]] : (tensor<10x20xf32>, tensor<f32>) -> tensor<10x20xi1>
   // CHECK:   %[[X2:.*]] = tile.select %[[X1]], %[[cst]], %[[arg1]] : (tensor<10x20xi1>, tensor<f32>, tensor<10x20xf32>) -> tensor<10x20xf32>
@@ -2101,7 +2102,8 @@ TEST_F(CppEdsl, LayerOperandOrder) {
   // CHECK-LABEL: CppEdsl.LayerOperandOrder
   // CHECK: module @LayerOperandOrder
   // CHECK: func @main(%[[ARG0:.*]]: tensor<10x20xf32>, %[[ARG1:.*]]: tensor<10x20xf32>) -> tensor<10x20xf32>
-  // CHECK:   %[[X0:.*]] = layer.box "sum" (%[[ARG2:.*]], %[[ARG3:.*]]) = (%[[ARG0]], %[[ARG1]]) : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
+  // CHECK:   %[[X0:.*]] = layer.box "sum"(%{{.*}}, %{{.*}}) {{{.*}}} : tensor<10x20xf32>, tensor<10x20xf32> -> tensor<10x20xf32>
+  // CHECK-NEXT: ^{{.*}}(%[[ARG2:.*]]: tensor<10x20xf32>, %[[ARG3:.*]]: tensor<10x20xf32>):
   // CHECK:     %[[X1:.*]] = tile.add %[[ARG2]], %[[ARG3]] : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
   // CHECK:     layer.return %[[X1]] : tensor<10x20xf32>
   // CHECK:   return %[[X0]] : tensor<10x20xf32>
@@ -2130,7 +2132,8 @@ TEST_F(CppEdsl, LayerMultipleReturnValues) {
   // CHECK-LABEL: CppEdsl.LayerMultipleReturnValues
   // CHECK: module @LayerMultipleReturnValues
   // CHECK: func @main(%[[ARG0:.*]]: tensor<10x5xf32>) -> (tensor<10x5x5xf32>, tensor<10x5xsi32>) {
-  // CHECK:   %[[X0:.*]]:2 = layer.box "two_output" (%[[ARG1:.*]]) = (%[[ARG0]]) : (tensor<10x5xf32>) -> (tensor<10x5x5xf32>, tensor<10x5xsi32>) {
+  // CHECK:   %[[X0:.*]]:2 = layer.box "two_output"(%{{.*}}) {{{.*}}} : tensor<10x5xf32> -> tensor<10x5x5xf32>, tensor<10x5xsi32>
+  // CHECK-NEXT: ^{{.*}}(%[[ARG1:.*]]: tensor<10x5xf32>):
   // CHECK:      %[[X1:.*]] = tile.argsort asc %[[ARG1]][{{[0-9]*}}] : (tensor<10x5xf32>) -> tensor<10x5xsi32>
   // CHECK:      %[[X2:.*]] = tile.gather %[[ARG1]] %[[X1]] {{{.*}}} : (tensor<10x5xf32>, tensor<10x5xsi32>) -> tensor<10x5x5xf32>
   // CHECK:      layer.return %[[X2]], %[[X1]] : tensor<10x5x5xf32>, tensor<10x5xsi32>
@@ -2151,7 +2154,8 @@ TEST_F(CppEdsl, LayerEmbeddedConst) {
   // CHECK-LABEL: CppEdsl.LayerEmbeddedConst
   // CHECK: module @LayerEmbeddedConst
   // CHECK: func @main(%[[ARG0:.*]]: tensor<10x20xf32>, %[[ARG1:.*]]: tensor<10x20xf32> {stdx.const}) -> tensor<10x20xf32>
-  // CHECK:   %[[X0:.*]] = layer.box "sum" (%[[ARG2:.*]], %[[ARG3:.*]]) = (%[[ARG0]], %[[ARG1]]) : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
+  // CHECK:   %[[X0:.*]] = layer.box "sum"(%{{.*}}, %{{.*}}) {{{.*}}} : tensor<10x20xf32>, tensor<10x20xf32> -> tensor<10x20xf32>
+  // CHECK-NEXT: ^{{.*}}(%[[ARG2:.*]]: tensor<10x20xf32>, %[[ARG3:.*]]: tensor<10x20xf32>):
   // CHECK:     %[[X1:.*]] = tile.add %[[ARG2]], %[[ARG3]] : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
   // CHECK:     layer.return %[[X1]] : tensor<10x20xf32>
   // CHECK:   return %[[X0]] : tensor<10x20xf32>
@@ -2172,7 +2176,8 @@ TEST_F(CppEdsl, LayerUnusedOperand) {
   // CHECK-LABEL: CppEdsl.LayerUnusedOperand
   // CHECK: module @LayerUnusedOperand
   // CHECK: func @main(%[[ARG0:.*]]: tensor<10x20xf32>, %[[ARG1:.*]]: tensor<10x20xf32> {stdx.const}, %[[ARG2:.*]]: tensor<10x20xf32> {stdx.const}) -> tensor<10x20xf32>
-  // CHECK:   %[[X0:.*]] = layer.box "sum" (%[[ARG3:.*]], %[[ARG4:.*]], %[[ARG5:.*]]) = (%[[ARG0]], %[[ARG1]], %[[ARG2]]) : (tensor<10x20xf32>, tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
+  // CHECK:   %[[X0:.*]] = layer.box "sum"(%{{.*}}, %{{.*}}, %{{.*}}) {{{.*}}} : tensor<10x20xf32>, tensor<10x20xf32>, tensor<10x20xf32> -> tensor<10x20xf32>
+  // CHECK-NEXT: ^{{.*}}(%[[ARG3:.*]]: tensor<10x20xf32>, %[[ARG4:.*]]: tensor<10x20xf32>, %[[ARG5:.*]]: tensor<10x20xf32>):
   // CHECK:     %[[X1:.*]] = tile.add %[[ARG3]], %[[ARG5]] : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
   // CHECK:     layer.return %[[X1]] : tensor<10x20xf32>
   // CHECK:   return %[[X0]] : tensor<10x20xf32>
@@ -2212,10 +2217,12 @@ TEST_F(CppEdsl, LayerMulti) {
   // CHECK-LABEL: CppEdsl.LayerMulti
   // CHECK: module @LayerMulti
   // CHECK: func @main(%[[ARG0:.*]]: tensor<10x20xf32>, %[[ARG1:.*]]: tensor<10x20xf32> {stdx.const}, %[[ARG2:.*]]: tensor<10x20xf32> {stdx.const}) -> tensor<10x20xf32> {
-  // CHECK:   %[[X0:.*]] = layer.box "sum" (%[[ARG3:.*]], %[[ARG4:.*]]) = (%[[ARG0]], %[[ARG1]]) : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32> {
+  // CHECK:   %[[X0:.*]] = layer.box "sum"(%{{.*}}, %{{.*}}) {{{.*}}} : tensor<10x20xf32>, tensor<10x20xf32> -> tensor<10x20xf32>
+  // CHECK-NEXT: ^{{.*}}(%[[ARG3:.*]]: tensor<10x20xf32>, %[[ARG4:.*]]: tensor<10x20xf32>):
   // CHECK:     %[[X2:.*]] = tile.add %[[ARG3]], %[[ARG4]] : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
   // CHECK:     layer.return %[[X2]] : tensor<10x20xf32>
-  // CHECK:   %[[X1:.*]] = layer.box "sum" (%[[ARG3:.*]], %[[ARG4:.*]]) = (%[[X0]], %[[ARG2]]) : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32> {
+  // CHECK:   %[[X1:.*]] = layer.box "sum"(%{{.*}}, %{{.*}}) {{{.*}}} : tensor<10x20xf32>, tensor<10x20xf32> -> tensor<10x20xf32>
+  // CHECK-NEXT: ^{{.*}}(%[[ARG3:.*]]: tensor<10x20xf32>, %[[ARG4:.*]]: tensor<10x20xf32>):
   // CHECK:     %[[X2:.*]] = tile.add %[[ARG3]], %[[ARG4]] : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
   // CHECK:     layer.return %[[X2]] : tensor<10x20xf32>
   // CHECK:   return %[[X1]] : tensor<10x20xf32>
@@ -2241,7 +2248,8 @@ TEST_F(CppEdsl, LayerException) {
   // CHECK-LABEL: CppEdsl.LayerException
   // CHECK: module @LayerException
   // CHECK: func @main(%[[ARG0:.*]]: tensor<10x20xf32>, %[[ARG1:.*]]: tensor<10x20xf32> {stdx.const}) -> tensor<10x20xf32>
-  // CHECK:   %[[X0:.*]] = layer.box "sum" (%[[ARG2:.*]], %[[ARG3:.*]]) = (%[[ARG0]], %[[ARG1]]) : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
+  // CHECK:   %[[X0:.*]] = layer.box "sum"(%{{.*}}, %{{.*}}) {{{.*}}} : tensor<10x20xf32>, tensor<10x20xf32> -> tensor<10x20xf32>
+  // CHECK-NEXT: ^{{.*}}(%[[ARG2:.*]]: tensor<10x20xf32>, %[[ARG3:.*]]: tensor<10x20xf32>):
   // CHECK:     %[[X1:.*]] = tile.add %[[ARG2]], %[[ARG3]] : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
   // CHECK:     layer.return %[[X1]] : tensor<10x20xf32>
   // CHECK:   return %[[X0]] : tensor<10x20xf32>
