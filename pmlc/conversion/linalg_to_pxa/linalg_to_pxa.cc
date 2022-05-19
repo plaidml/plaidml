@@ -347,10 +347,7 @@ struct GenericOpConversion : public OpConversionPattern<linalg::GenericOp> {
     SmallVector<AffineMap, 4> idxMaps = llvm::to_vector<4>(
         adaptor.indexing_maps().getAsValueRange<AffineMapAttr>());
 
-    auto ranges = op.getStaticLoopRanges();
-    if (!ranges.size()) {
-      op.emitError("LinalgOp does not have static ranges.");
-    }
+    SmallVector<int64_t, 8> ranges = op.getStaticLoopRanges();
     auto loc = op.getLoc();
     SmallVector<arith::AtomicRMWKind, 4> reductions(
         outputs.size(), arith::AtomicRMWKind::assign);
