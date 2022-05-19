@@ -844,6 +844,23 @@ TEST_F(CppEdsl, RepeatElements) {
   runProgram(program);
 }
 
+TEST_F(CppEdsl, UseDefault) {
+  auto P = Placeholder(DType::FLOAT32, {1, 7, 10, 10});
+  auto I = Placeholder(DType::FLOAT32, {1, 10, 10});
+  TensorDim B, N1, N2;
+  TensorIndex b, i1, i2;
+  I.bind_dims(B, N1, N2);
+  Tensor O = Contraction().outShape(B, 7, N1, N2).outAccess(b, 3, i1, i2).assign(I(b, i1, i2)).init(P);
+  auto program = makeProgram("use_default", {I, P}, {O});
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.UseDefault
+  // CHECK: module @use_default
+  // CHECK: tile.contract assign, none, %{{.*}}, %{{.*}} {sink = affine_map<({{.*}}) -> ({{.*}})>, srcs = [affine_map<({{.*}}) -> ({{.*}})>]} : tensor<1x7x10x10xf32>, tensor<1x10x10xf32> -> tensor<1x7x10x10xf32>
+  // CHECK: return %{{.*}} : tensor<1x7x10x10xf32>
+  // clang-format on
+  runProgram(program);
+}
+
 TEST_F(CppEdsl, UniqueNames) {
   TensorShape shape(DType::FLOAT32, {1});
   auto A = Placeholder(shape, "A");
