@@ -2,9 +2,9 @@
 // RUN:   -tile-compute-bounds \
 // RUN:   -tile-pad-constraints \
 // RUN:   -convert-tile-to-linalg \
+// RUN:   -canonicalize \
 // RUN:   -cse \
 // RUN:   | FileCheck %s
-
 // XFAIL: *
 #conv1dcenter = affine_map<(i, j) -> (i + j - 1)>
 #first = affine_map<(i, j) -> (i)>

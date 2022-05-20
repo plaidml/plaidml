@@ -278,7 +278,7 @@ void pipelineBuilderStage1(OpPassManager &pm) {
 
   pm.addPass(stdx::createMainClosurePass());
   pm.addPass(createLoopInvariantCodeMotionPass());
-  pm.addPass(createCanonicalizerPass());
+  // pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 }
 
