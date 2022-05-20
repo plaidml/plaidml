@@ -291,8 +291,8 @@ struct GenericOpConversion : public OpConversionPattern<linalg::GenericOp> {
     SmallVector<Type, 4> outputTypes;
 
     // Copy all output operands in case they are shared with others
-    for (auto out : op.getOutputOperands()) {
-      Value operand = out->get();
+    for (auto out : adaptor.outputs()) {
+      Value operand = out;
       BufferAllocator allocResult(rewriter, op, operand.getType());
       Value newOut;
       if (operand.isa<BlockArgument>() ||
@@ -303,7 +303,7 @@ struct GenericOpConversion : public OpConversionPattern<linalg::GenericOp> {
       } else {
         newOut = allocResult.resultMemRef;
       }
-      out->set(newOut);
+      out = newOut;
       outputs.emplace_back(newOut);
       outputTypes.emplace_back(newOut.getType());
     }
