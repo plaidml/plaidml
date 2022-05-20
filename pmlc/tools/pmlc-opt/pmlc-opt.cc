@@ -22,7 +22,7 @@ int main(int argc, char **argv) {
 
   mlir::DialectRegistry registry;
   registerAllDialects(registry);
-  return failed(mlir::MlirOptMain(argc, argv, "PMLC modular optimizer driver\n",
-                                  registry,
-                                  /*preloadDialectsInContext=*/true));
+  return mlir::asMainReturnCode(
+      mlir::MlirOptMain(argc, argv, "PMLC modular optimizer driver\n", registry,
+                        /*preloadDialectsInContext=*/true));
 }
