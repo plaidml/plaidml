@@ -15,6 +15,7 @@
 #include <stdexcept>
 
 #include "mlir/ExecutionEngine/OptUtils.h"
+#include "mlir/InitAllDialects.h"
 #include "mlir/Support/FileUtilities.h"
 
 #include "llvm/Support/CommandLine.h"
@@ -91,7 +92,8 @@ int JitRunnerMain(int argc, char **argv) {
   }
 
   DialectRegistry registry;
-  registerAllDialects(registry);
+  mlir::registerAllDialects(registry);
+  pmlc::registerAllDialects(registry);
 
   auto context = std::make_unique<MLIRContext>(registry);
   auto program = std::make_shared<Program>(std::move(context), std::move(file),

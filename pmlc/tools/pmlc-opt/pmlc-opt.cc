@@ -4,6 +4,8 @@
 
 #include "mlir/Tools/mlir-opt/MlirOptMain.h"
 
+#include "mlir/InitAllDialects.h"
+#include "mlir/InitAllPasses.h"
 #include "pmlc/all_dialects.h"
 #include "pmlc/all_passes.h"
 #include "pmlc/util/logging.h"
@@ -18,10 +20,13 @@ int main(int argc, char **argv) {
     IVLOG(level, "PLAIDML_VERBOSE=" << level);
   }
 
-  registerAllPasses();
+  mlir::registerAllPasses();
+  pmlc::registerAllPasses();
 
   mlir::DialectRegistry registry;
-  registerAllDialects(registry);
+  mlir::registerAllDialects(registry);
+  pmlc::registerAllDialects(registry);
+
   return mlir::asMainReturnCode(
       mlir::MlirOptMain(argc, argv, "PMLC modular optimizer driver\n", registry,
                         /*preloadDialectsInContext=*/true));
