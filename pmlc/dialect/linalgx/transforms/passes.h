@@ -11,6 +11,7 @@
 namespace pmlc::dialect::linalgx {
 
 std::unique_ptr<mlir::Pass> createRegulateDepthwisePass();
+std::unique_ptr<mlir::Pass> createNameConvVariablesPass();
 
 /// Generate the code for registering passes.
 #define GEN_PASS_REGISTRATION

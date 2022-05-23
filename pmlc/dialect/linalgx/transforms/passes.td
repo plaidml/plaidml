@@ -8,4 +8,8 @@ def RegulateDepthwise : FunctionPass<"linalgx-regulate-depthwise"> {
   let constructor = "pmlc::dialect::linalgx::createRegulateDepthwisePass()";
 }
 
+def NameConvVariables : FunctionPass<"linalgx-name-conv-variables"> {
+  let summary = "Name variables of convolution as n, c, h, w and so on";
+  let constructor = "pmlc::dialect::linalgx::createNameConvVariablesPass()";
+}
 #endif // __PMLC_DIALECT_LINALGX_PASSES__

@@ -4,8 +4,10 @@
     pass_detail.h
     passes.h
     regulate_depthwise.h
+    name_conv_variables.h
   SRCS
     regulate_depthwise.cc
+    name_conv_variables.cc
   DEPS
     LLVMSupport
     MLIRIR

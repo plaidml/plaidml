@@ -265,6 +265,8 @@ void pipelineBuilderStage1(OpPassManager &pm) {
 
   pm.addPass(pmlc::conversion::tile_to_linalg::createLowerTileToLinalgPass());
   pm.addNestedPass<FuncOp>(linalgx::createRegulateDepthwisePass());
+  if (!util::getEnvVar("PLAIDML_THREAD_DIST_CONFIG_FILE").empty())
+    pm.addNestedPass<FuncOp>(linalgx::createNameConvVariablesPass());
   if (!util::getEnvVar("PLAIDML_REORDER").empty())
     pm.addNestedPass<FuncOp>(createReorderLayoutsPass());
   else
