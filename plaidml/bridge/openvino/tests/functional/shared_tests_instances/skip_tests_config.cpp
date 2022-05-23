@@ -15,18 +15,12 @@ std::vector<std::string> disabledTestPatterns() {
       "DetectionOutput3In.*",
       "EmbeddingSegmentsSum.*",
       "smoke/EmbeddingSegmentsSumLayerTest.*",
-      "smoke_Set1.*",
-      "smoke_Set2/GatherNDLayerTest.*",
       "smoke/NmsLayerTest.CompareWithRefs.*",
-      "smoke/PriorBoxLayerTest.*",
       "smoke/ProposalLayerTest.*",
       "smoke_PSROIPooling.*",
       "smoke/RegionYoloLayerTest.*",
       "smoke_TestsROIAlign_max.*",
       "smoke/ROIPoolingLayerTest.*",
-      "smoke_ShuffleChannels4D.*",
-      "smoke_ShuffleChannelsNegativeAxis4D.*",
-      "smoke/SqueezeUnsqueezeLayerTest.*",
 #ifdef SMOKE_TESTS_ONLY
       "^(?!smoke).*",
 #endif  // SMOKE_TESTS_ONLY
