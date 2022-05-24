@@ -40,7 +40,4 @@ void populateLinalgTensorCollapseOpGeneralizationPatterns(
 void populateLinalgTensorExpandOpGeneralizationPatterns(
     mlir::RewritePatternSet &patterns);
 
-// void populateLinalgPoolingOpGeneralizationPatterns(
-//     mlir::RewritePatternSet &patterns);
-
 } // namespace pmlc::conversion::linalg_to_pxa
