@@ -203,7 +203,8 @@ struct ConstantOpConversion : public OpConversionPattern<arith::ConstantOp> {
       rewriter.replaceOpWithNewOp<memref::GetGlobalOp>(op, newType,
                                                        globalOp.sym_name());
       return success();
-    } else if (origValue.getType().isF32()) {
+    }
+    if (origValue.getType().isF32()) {
       Type elementType = origValue.getType();
       MemRefType memRefType = MemRefType::get({}, elementType);
       auto shapeType = RankedTensorType::get({}, elementType);

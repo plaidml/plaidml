@@ -36,7 +36,8 @@ namespace {
 static Type getElementType(Type type) {
   if (auto tensorType = type.dyn_cast<TensorType>()) {
     return tensorType.getElementType();
-  } else if (auto memRefType = type.dyn_cast<MemRefType>()) {
+  }
+  if (auto memRefType = type.dyn_cast<MemRefType>()) {
     return memRefType.getElementType();
   }
   return type;
@@ -95,14 +96,16 @@ struct AlwaysTrue : Matcher {
   bool match(Operation *op) const final { return true; }
 };
 
-template <typename InnerPredicate> struct ResultIs : Matcher {
+template <typename InnerPredicate>
+struct ResultIs : Matcher {
   bool match(Operation *op) const final {
     InnerPredicate pred;
     return pred.match(op->getResult(0).getType());
   }
 };
 
-template <typename InnerPredicate> struct AnyOperandIs : Matcher {
+template <typename InnerPredicate>
+struct AnyOperandIs : Matcher {
   bool match(Operation *op) const final {
     for (auto operand : op->getOperands()) {
       InnerPredicate pred;
@@ -114,7 +117,8 @@ template <typename InnerPredicate> struct AnyOperandIs : Matcher {
   }
 };
 
-template <typename InnerPredicate> struct OperandsAre : Matcher {
+template <typename InnerPredicate>
+struct OperandsAre : Matcher {
   bool match(Operation *op) const final {
     for (auto operand : op->getOperands()) {
       InnerPredicate pred;
@@ -126,7 +130,8 @@ template <typename InnerPredicate> struct OperandsAre : Matcher {
   }
 };
 
-template <typename InnerPredicate> struct FirstOperandIs : Matcher {
+template <typename InnerPredicate>
+struct FirstOperandIs : Matcher {
   bool match(Operation *op) const final {
     InnerPredicate pred;
     if (op->getNumOperands() == 0) {
@@ -136,7 +141,8 @@ template <typename InnerPredicate> struct FirstOperandIs : Matcher {
   }
 };
 
-template <typename InnerPredicate> struct AnyComparandIs : Matcher {
+template <typename InnerPredicate>
+struct AnyComparandIs : Matcher {
   bool match(Operation *op) const final {
     SmallVector<Value, 4> allOperands(op->getOperands());
     tile::ContractionOpAdaptor adaptor(allOperands);
@@ -147,7 +153,8 @@ template <typename InnerPredicate> struct AnyComparandIs : Matcher {
   }
 };
 
-template <typename InnerPredicate> struct ComparandsAre : Matcher {
+template <typename InnerPredicate>
+struct ComparandsAre : Matcher {
   bool match(Operation *op) const final {
     SmallVector<Value, 4> allOperands(op->getOperands());
     tile::ContractionOpAdaptor adaptor(allOperands);
@@ -158,7 +165,8 @@ template <typename InnerPredicate> struct ComparandsAre : Matcher {
   }
 };
 
-template <typename InnerPredicate> struct Not {
+template <typename InnerPredicate>
+struct Not {
   bool match(Type type) const {
     InnerPredicate pred;
     return !pred.match(type);
@@ -237,7 +245,8 @@ struct NotOp {
   }
 };
 
-template <typename OpType> struct StdOp {
+template <typename OpType>
+struct StdOp {
   Value create(ConversionPatternRewriter &rewriter, Location loc,
                Type resultType, ArrayRef<Value> operands,
                ArrayRef<Type> types) {
@@ -263,7 +272,8 @@ struct SelectOpBuilder {
   }
 };
 
-template <arith::CmpFPredicate predicate> struct CmpFloatOp {
+template <arith::CmpFPredicate predicate>
+struct CmpFloatOp {
   Value create(ConversionPatternRewriter &rewriter, Location loc,
                Type resultType, ArrayRef<Value> operands,
                ArrayRef<Type> types) {
@@ -275,7 +285,8 @@ template <arith::CmpFPredicate predicate> struct CmpFloatOp {
   }
 };
 
-template <arith::CmpIPredicate predicate> struct CmpIntOp {
+template <arith::CmpIPredicate predicate>
+struct CmpIntOp {
   Value create(ConversionPatternRewriter &rewriter, Location loc,
                Type resultType, ArrayRef<Value> operands,
                ArrayRef<Type> types) {
@@ -301,7 +312,8 @@ struct CmpIntInequalityOp {
   }
 };
 
-template <typename OpType> struct LogicalOp {
+template <typename OpType>
+struct LogicalOp {
   Value create(ConversionPatternRewriter &rewriter, Location loc,
                Type resultType, ArrayRef<Value> operands,
                ArrayRef<Type> types) {
@@ -351,7 +363,8 @@ struct LogicalNotOp {
           .create<mlir::arith::CmpFOp>(loc, arith::CmpFPredicate::OEQ, input,
                                        zero)
           .getResult();
-    } else if (auto intType = fromType.dyn_cast<IntegerType>()) {
+    }
+    if (auto intType = fromType.dyn_cast<IntegerType>()) {
       auto zero = rewriter.create<mlir::arith::ConstantIntOp>(loc, 0, intType);
       return rewriter
           .create<mlir::arith::CmpIOp>(loc, arith::CmpIPredicate::eq, input,
@@ -363,7 +376,8 @@ struct LogicalNotOp {
   }
 };
 
-template <typename CmpOpBuilder> struct CondOp {
+template <typename CmpOpBuilder>
+struct CondOp {
   Value create(ConversionPatternRewriter &rewriter, Location loc,
                Type resultType, ArrayRef<Value> operands,
                ArrayRef<Type> types) {
@@ -426,7 +440,8 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
     auto forOp = rewriter.create<AffineParallelOp>(
         loc,
         /*resultTypes=*/ArrayRef<Type>{alloc.memRefType},
-        /*reductions=*/ArrayRef<arith::AtomicRMWKind>{arith::AtomicRMWKind::assign},
+        /*reductions=*/
+        ArrayRef<arith::AtomicRMWKind>{arith::AtomicRMWKind::assign},
         /*ranges=*/alloc.rankedTensorType.getShape());
     if (Attribute attr = op->getAttr("name"))
       forOp->setAttr("name", attr);
@@ -441,9 +456,9 @@ struct EltwiseOpConversion : public OpConversionPattern<FromOpType> {
     for (size_t i = 0; i < adaptor.getOperands().size(); i++) {
       auto maybePadding =
           tile::getPaddingInfo(op->getOperand(i).getDefiningOp());
-      scalars.push_back(buildBroadcastLoad(rewriter, loc, adaptor.getOperands()[i],
-                                           alloc.memRefType.getRank(),
-                                           maybePadding));
+      scalars.push_back(
+          buildBroadcastLoad(rewriter, loc, adaptor.getOperands()[i],
+                             alloc.memRefType.getRank(), maybePadding));
     }
 
     // Create the standard op
@@ -481,8 +496,9 @@ struct ContractionOpConversion
     : public OpConversionPattern<tile::ContractionOp> {
   using OpConversionPattern<tile::ContractionOp>::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(tile::ContractionOp op, OpAdaptor adaptor,
-                                ConversionPatternRewriter &rewriter) const final {
+  LogicalResult
+  matchAndRewrite(tile::ContractionOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
     if (op.combo() != comboKind)
       return failure();
     if (!op.lowerBounds().hasValue() || !op.upperBounds().hasValue())
@@ -490,7 +506,7 @@ struct ContractionOpConversion
     Matcher pred;
     if (failed(pred(op)))
       return failure();
-    
+
     auto loc = op.getLoc();
 
     if (auto attr = op->getAttrOfType<StringAttr>("trace")) {
@@ -506,7 +522,8 @@ struct ContractionOpConversion
     auto parallel = rewriter.create<AffineParallelOp>(
         loc,
         /*resultTypes=*/ArrayRef<Type>{alloc.memRefType},
-        /*reductions=*/ArrayRef<arith::AtomicRMWKind>{arith::AtomicRMWKind::assign},
+        /*reductions=*/
+        ArrayRef<arith::AtomicRMWKind>{arith::AtomicRMWKind::assign},
         /*ranges=*/shape);
     auto parallelBuilder = parallel.getBodyBuilder();
     auto maybePadding = tile::getPaddingInfo(op.init().getDefiningOp());
@@ -540,7 +557,8 @@ struct ContractionOpConversion
     auto forOp = rewriter.create<AffineParallelOp>(
         loc,
         /*resultTypes=*/ArrayRef<Type>{alloc.memRefType},
-        /*reductions=*/ArrayRef<arith::AtomicRMWKind>{arith::AtomicRMWKind::assign},
+        /*reductions=*/
+        ArrayRef<arith::AtomicRMWKind>{arith::AtomicRMWKind::assign},
         /*lbMaps=*/lbMaps,
         /*lbArgs=*/ArrayRef<Value>{},
         /*ubMaps=*/ubMaps,
@@ -612,7 +630,7 @@ struct ContractionOpConversion
     rewriter.create<AffineYieldOp>(loc, ValueRange{reduceOp});
 
     // Replace the op
-    rewriter.replaceOp(op, forOp.getResult(0));  
+    rewriter.replaceOp(op, forOp.getResult(0));
     return success();
   }
 };

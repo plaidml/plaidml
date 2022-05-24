@@ -31,7 +31,8 @@ namespace {
 static Type getElementType(Type type) {
   if (auto tensorType = type.dyn_cast<TensorType>()) {
     return tensorType.getElementType();
-  } else if (auto memRefType = type.dyn_cast<MemRefType>()) {
+  }
+  if (auto memRefType = type.dyn_cast<MemRefType>()) {
     return memRefType.getElementType();
   }
   return type;
@@ -355,7 +356,8 @@ struct LogicalNotOp {
           .create<mlir::arith::CmpFOp>(loc, arith::CmpFPredicate::OEQ, input,
                                        zero)
           .getResult();
-    } else if (auto intType = fromType.dyn_cast<IntegerType>()) {
+    }
+    if (auto intType = fromType.dyn_cast<IntegerType>()) {
       auto zero = builder.create<mlir::arith::ConstantIntOp>(loc, 0, intType);
       return builder
           .create<mlir::arith::CmpIOp>(loc, arith::CmpIPredicate::eq, input,
@@ -512,10 +514,10 @@ Value getAggResult(OpBuilder &builder, Location loc, AggregationKind agg,
       if (intType.isSignedInteger()) {
         return createAggOp<CondOp<CmpIntOp<arith::CmpIPredicate::slt>>>(
             builder, loc, aggValue, storedValue);
-      } else {
-        return createAggOp<CondOp<CmpIntOp<arith::CmpIPredicate::ult>>>(
-            builder, loc, aggValue, storedValue);
       }
+      return createAggOp<CondOp<CmpIntOp<arith::CmpIPredicate::ult>>>(
+          builder, loc, aggValue, storedValue);
+
     } else if (aggType.isa<FloatType>()) {
       return createAggOp<CondOp<CmpFloatOp<arith::CmpFPredicate::OLT>>>(
           builder, loc, aggValue, storedValue);
@@ -527,10 +529,10 @@ Value getAggResult(OpBuilder &builder, Location loc, AggregationKind agg,
       if (intType.isSignedInteger()) {
         return createAggOp<CondOp<CmpIntOp<arith::CmpIPredicate::sgt>>>(
             builder, loc, aggValue, storedValue);
-      } else {
-        return createAggOp<CondOp<CmpIntOp<arith::CmpIPredicate::ugt>>>(
-            builder, loc, aggValue, storedValue);
       }
+      return createAggOp<CondOp<CmpIntOp<arith::CmpIPredicate::ugt>>>(
+          builder, loc, aggValue, storedValue);
+
     } else if (aggType.isa<FloatType>()) {
       return createAggOp<CondOp<CmpFloatOp<arith::CmpFPredicate::OGT>>>(
           builder, loc, aggValue, storedValue);
