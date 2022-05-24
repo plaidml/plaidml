@@ -214,7 +214,7 @@ ParseResult UnaryInvokeOp::parse(OpAsmParser &parser, OperationState &result) {
 }
 
 //
-// ---- UnaryInvokeOp ----
+// ---- BinaryInvokeOp ----
 //
 
 void BinaryInvokeOp::print(OpAsmPrinter &p) {

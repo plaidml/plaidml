@@ -278,6 +278,8 @@ void pipelineBuilderStage1(OpPassManager &pm) {
 
   pm.addPass(stdx::createMainClosurePass());
   pm.addPass(createLoopInvariantCodeMotionPass());
+  // TODO: Need to investigate why enabling this pass
+  // breaks tests.
   // pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 }

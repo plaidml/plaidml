@@ -17,18 +17,4 @@ def LowerLinalgToPXA : Pass<"convert-linalg-to-pxa", "mlir::ModuleOp"> {
   ];
 }
 
-def ConvertLinalgToPXA : Pass<"convert-linalg-to-pxa-new", "mlir::ModuleOp"> {
-  let summary = "Convert Linalg dialect to PXA dialect";
-  let constructor = "pmlc::conversion::linalg_to_pxa::createConvertLinalgToPXAPass()";
-  let dependentDialects = [
-    "mlir::AffineDialect",
-    "mlir::math::MathDialect",
-    "mlir::memref::MemRefDialect",
-    "mlir::scf::SCFDialect",
-    "pmlc::dialect::layer::LayerDialect",
-    "pmlc::dialect::pxa::PXADialect",
-    "pmlc::dialect::stdx::StdXDialect",
-  ];
-}
-
 #endif // __PMLC_CONVERSION_LINALG_TO_PXA_PASSES__
