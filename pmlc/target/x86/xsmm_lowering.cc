@@ -419,7 +419,6 @@ struct BinaryPxaGenericOpConversion
       return failure();
 
     Location loc = op.getLoc();
-    // pxa::PxaGenericOp::Adaptor adaptor(operands, op->getAttrDictionary());
     Type resultType = rewriter.getI64Type();
     SmallVector<util::StrideArray> inputs =
         getStrideArrays(adaptor.inputs(), op.inputTileMaps());
