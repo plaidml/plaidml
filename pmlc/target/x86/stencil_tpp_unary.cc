@@ -82,7 +82,7 @@ private:
     if (!source.isa<BlockArgument>()) {
       // If the definition of load's source is in "op", it is too complex to
       // stencil
-      auto defOp = source.getDefiningOp();
+      auto *defOp = source.getDefiningOp();
       while (!isa<func::FuncOp>(defOp)) {
         if (defOp == op.getOperation())
           return;
@@ -117,7 +117,7 @@ private:
     if (!source.isa<BlockArgument>()) {
       // If the definition of load's source is in "op", it is too complex to
       // stencil
-      auto defOp = source.getDefiningOp();
+      auto *defOp = source.getDefiningOp();
       while (!isa<func::FuncOp>(defOp)) {
         if (defOp == op.getOperation())
           return;

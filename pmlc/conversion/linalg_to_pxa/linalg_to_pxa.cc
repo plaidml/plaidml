@@ -321,7 +321,7 @@ struct GenericOpConversion : public OpConversionPattern<linalg::GenericOp> {
     auto outputArgs = op.getBody()->getArguments();
     for (unsigned i = 0; i < outputs.size(); ++i) {
       for (auto &use : outputArgs[numInputs + i].getUses()) {
-        auto useOp = use.getOwner();
+        auto *useOp = use.getOwner();
         if (toRemove.count(useOp) || useOp->getNumResults() != 1) {
           continue;
         }
@@ -339,7 +339,7 @@ struct GenericOpConversion : public OpConversionPattern<linalg::GenericOp> {
         // The reduction-like op and the related op will not be copied to the
         // parallel loop.
         toRemove.insert(useOp);
-        if (auto relatedOp = ri.getRelatedOp()) {
+        if (auto *relatedOp = ri.getRelatedOp()) {
           toRemove.insert(relatedOp);
         }
       }
@@ -393,7 +393,7 @@ struct GenericOpConversion : public OpConversionPattern<linalg::GenericOp> {
         toMove.emplace_back(&origOp);
       }
     }
-    for (auto newOp : toMove) {
+    for (auto *newOp : toMove) {
       newOp->moveBefore(body, body->getOperations().end());
     }
 

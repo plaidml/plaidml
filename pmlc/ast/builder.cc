@@ -580,7 +580,7 @@ struct ProgramBuilder {
       if (!value) {
         throw std::runtime_error("Output not found while building program.");
       }
-      auto defOp = value.getDefiningOp();
+      auto *defOp = value.getDefiningOp();
       if (!defOp || isa<tile::ReshapeOp>(defOp) ||
           returnOperands.count(value)) {
         value = builder.create<tile::IdentOp>(builder.getUnknownLoc(),
@@ -739,7 +739,7 @@ struct ProgramBuilder {
       assert(op && "Unexpected block argument");
       Operation *clonedOp = bodyBuilder.clone(*op, mapper);
 
-      auto itLayerResults = std::find(results.begin(), results.end(), value);
+      auto *itLayerResults = std::find(results.begin(), results.end(), value);
       if (itLayerResults != results.end()) {
         if (auto opResultVal = value.cast<OpResult>()) {
           auto idxLayerResults = std::distance(results.begin(), itLayerResults);

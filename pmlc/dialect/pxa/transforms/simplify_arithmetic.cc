@@ -62,7 +62,7 @@ void replaceAssignLoadAdd(PxaReduceOpInterface &reduceOp) {
       reduceOp.getAgg() != arith::AtomicRMWKind::addi)
     return;
 
-  auto memRefOp = reduceOp.getMemRef().getDefiningOp();
+  auto *memRefOp = reduceOp.getMemRef().getDefiningOp();
   if (!memRefOp)
     return;
 
@@ -81,7 +81,7 @@ void replaceAssignLoadAdd(PxaReduceOpInterface &reduceOp) {
 
   // Value assigned in the reduce assign op needs to come from constant op and
   // be 0
-  auto assignValOp = reduceAssignOp.getValueToStore().getDefiningOp();
+  auto *assignValOp = reduceAssignOp.getValueToStore().getDefiningOp();
   if (!assignValOp)
     return;
 

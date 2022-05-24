@@ -59,7 +59,8 @@ static void setupTargetTriple(llvm::Module *llvmModule) {
   // Setup the machine properties from the current architecture.
   auto targetTriple = llvm::sys::getDefaultTargetTriple();
   std::string errorMessage;
-  auto target = llvm::TargetRegistry::lookupTarget(targetTriple, errorMessage);
+  const auto *target =
+      llvm::TargetRegistry::lookupTarget(targetTriple, errorMessage);
   if (!target) {
     throw std::runtime_error("NO target: " + errorMessage);
   }
@@ -113,7 +114,7 @@ public:
   MemRefDescriptor(void *data, Type type)
       : rankedType(type.cast<RankedTensorType>()),
         memory(computeSize(rankedType)) {
-    auto base = reinterpret_cast<Base *>(memory.data());
+    auto *base = reinterpret_cast<Base *>(memory.data());
     base->basePtr = data;
     base->data = data;
     auto rank = rankedType.getRank();
@@ -130,7 +131,7 @@ public:
   void *ptr() { return memory.data(); }
 
   void set(void *data) {
-    auto base = reinterpret_cast<Base *>(memory.data());
+    auto *base = reinterpret_cast<Base *>(memory.data());
     base->basePtr = data;
     base->data = data;
   }
@@ -158,19 +159,19 @@ struct EngineImpl {
 };
 
 static void *tryResolveSymbol(StringRef symbol) {
-  if (auto ptr = resolveSymbol(symbol))
+  if (auto *ptr = resolveSymbol(symbol))
     return ptr;
   if (symbol[0] == '_') {
-    if (auto ptr = resolveSymbol(symbol.drop_front()))
+    if (auto *ptr = resolveSymbol(symbol.drop_front()))
       return ptr;
   }
 
-  auto ptr = llvm::sys::DynamicLibrary::SearchForAddressOfSymbol(symbol.str());
+  auto *ptr = llvm::sys::DynamicLibrary::SearchForAddressOfSymbol(symbol.str());
   if (ptr)
     return ptr;
 
   if (symbol[0] == '_') {
-    if (auto ptr = llvm::sys::DynamicLibrary::SearchForAddressOfSymbol(
+    if (auto *ptr = llvm::sys::DynamicLibrary::SearchForAddressOfSymbol(
             symbol.drop_front().str())) {
       return ptr;
     }
@@ -182,7 +183,7 @@ static void *tryResolveSymbol(StringRef symbol) {
 struct MCJITEngineImpl : EngineImpl {
   struct Runtime : public llvm::LegacyJITSymbolResolver {
     llvm::JITSymbol findSymbol(const std::string &symbol) override {
-      auto ptr = tryResolveSymbol(symbol);
+      auto *ptr = tryResolveSymbol(symbol);
       if (!ptr) {
         throw std::runtime_error(
             llvm::formatv("Could not find symbol: {0}", symbol));

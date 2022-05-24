@@ -31,7 +31,7 @@ struct TraceLinkingPass : public TraceLinkingBase<TraceLinkingPass> {
       OpBuilder builder(context);
       auto module = op->getParentOfType<ModuleOp>();
       auto traceRef = getOrInsertTrace(loc, builder, module);
-      auto block = op.addEntryBlock();
+      auto *block = op.addEntryBlock();
       builder.setInsertionPointToStart(block);
       auto id = op->getAttrOfType<IntegerAttr>("id").getValue().getZExtValue();
       auto msgStr = op->getAttrOfType<StringAttr>("msg").getValue().str();

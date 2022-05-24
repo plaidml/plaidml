@@ -18,7 +18,8 @@ namespace pmlc::dialect::pxa {
 
 namespace {
 
-template <typename T> static void printStrideInfo(T op) {
+template <typename T>
+static void printStrideInfo(T op) {
   auto info = computeStrideInfo(op);
   llvm::outs() << "strides: ";
   if (!info) {
@@ -33,7 +34,7 @@ template <typename T> static void printStrideInfo(T op) {
 
 struct TestStrideInfoPass : public TestStrideInfoBase<TestStrideInfoPass> {
   void runOnOperation() final {
-    auto op = getOperation();
+    auto *op = getOperation();
     op->walk([&](Operation *op) {
       llvm::TypeSwitch<Operation *>(op)
           .Case<PxaLoadOp>([](auto op) { printStrideInfo(op); })
@@ -45,7 +46,7 @@ struct TestStrideInfoPass : public TestStrideInfoBase<TestStrideInfoPass> {
 struct TestIndirectValuesIteratorPass
     : public TestIndirectValuesIteratorBase<TestIndirectValuesIteratorPass> {
   void runOnOperation() final {
-    auto op = getOperation();
+    auto *op = getOperation();
     op->walk([&](memref::AllocOp allocOp) {
       llvm::outs() << "alloc: ";
       printDef(allocOp.getOperation());
@@ -70,7 +71,7 @@ struct TestIndirectValuesIteratorPass
 struct TestIndirectUsesIteratorPass
     : public TestIndirectUsesIteratorBase<TestIndirectUsesIteratorPass> {
   void runOnOperation() final {
-    auto op = getOperation();
+    auto *op = getOperation();
     op->walk([&](memref::AllocOp allocOp) {
       llvm::outs() << "alloc: ";
       printDef(allocOp.getOperation());

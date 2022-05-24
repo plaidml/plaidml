@@ -53,7 +53,7 @@ AffineValueExpr::AffineValueExpr(AffineExprKind kind, AffineValueExpr a,
     : operands(a.operands.begin(), a.operands.end()) {
   SmallVector<AffineExpr, 4> repl_b;
   for (auto v : b.operands) {
-    auto it = std::find(operands.begin(), operands.end(), v);
+    auto *it = std::find(operands.begin(), operands.end(), v);
     unsigned idx;
     if (it == operands.end()) {
       idx = operands.size();

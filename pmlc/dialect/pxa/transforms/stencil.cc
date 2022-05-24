@@ -225,7 +225,7 @@ void StencilBase::performStenciling() {
     ordered.push_back(std::make_pair(
         ordered.size(), ValueStrideInfo{value, getStrideInfo(value)}));
   }
-  auto itLastStoreFirstLoad = ordered.begin() + firstLoadIdx;
+  auto *itLastStoreFirstLoad = ordered.begin() + firstLoadIdx;
   std::sort(ordered.begin(), itLastStoreFirstLoad, cmp);
   do { // Each store tensor permutation
     std::sort(itLastStoreFirstLoad, ordered.end(), cmp);

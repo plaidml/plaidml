@@ -42,7 +42,7 @@ private:
     }
     std::list<Operation *> rootedInstructions;
     while (!capturedFirst.empty()) {
-      auto capturedVal = capturedFirst.front();
+      auto *capturedVal = capturedFirst.front();
       capturedFirst.pop_front();
       if (find(rootedInstructions.begin(), rootedInstructions.end(),
                capturedVal) != rootedInstructions.end()) {
@@ -64,7 +64,7 @@ private:
         while (!nestedParallelOps.empty()) {
           auto nestedOp = nestedParallelOps.front();
           nestedParallelOps.pop_front();
-          auto body = cast<AffineParallelOp>(nestedOp).getBody();
+          auto *body = cast<AffineParallelOp>(nestedOp).getBody();
           for (auto instr = body->begin(); instr != body->end(); instr++) {
             if (isa<AffineParallelOp>(instr)) {
               nestedParallelOps.push_back(cast<AffineParallelOp>(instr));
@@ -86,7 +86,7 @@ private:
         capturedFirst.push_back(second->getDefiningOp());
       }
       while (!capturedFirst.empty()) {
-        auto capturedVal = capturedFirst.front();
+        auto *capturedVal = capturedFirst.front();
         capturedFirst.pop_front();
         if (find(secondRootedInstructions.begin(),
                  secondRootedInstructions.end(),
@@ -109,7 +109,7 @@ private:
           while (!nestedParallelOps.empty()) {
             auto nestedOp = nestedParallelOps.front();
             nestedParallelOps.pop_front();
-            auto body = cast<AffineParallelOp>(nestedOp).getBody();
+            auto *body = cast<AffineParallelOp>(nestedOp).getBody();
             for (auto instr = body->begin(); instr != body->end(); instr++) {
               if (isa<AffineParallelOp>(instr)) {
                 nestedParallelOps.push_back(cast<AffineParallelOp>(instr));
@@ -129,7 +129,7 @@ private:
     std::list<Operation *> thirdRootedInstructions;
     capturedFirst.push_back(reduce->getDefiningOp());
     while (!capturedFirst.empty()) {
-      auto capturedVal = capturedFirst.front();
+      auto *capturedVal = capturedFirst.front();
       capturedFirst.pop_front();
       if (capturedVal != first->getDefiningOp() &&
           (second == NULL || capturedVal != second->getDefiningOp()) &&
@@ -208,7 +208,7 @@ private:
       Operation *lastInstr;
       std::map<Operation *, Operation *> origToCloneInstrMap;
       std::list<Operation *> clonedInstr;
-      for (auto firstBlockInstr : rootedInstructions) {
+      for (auto *firstBlockInstr : rootedInstructions) {
         lastInstr = (bodyBuilder.clone(*firstBlockInstr));
         clonedInstr.push_back(lastInstr);
         origToCloneInstrMap[firstBlockInstr] = lastInstr;
@@ -218,7 +218,7 @@ private:
           while (!nestedParallelOps.empty()) {
             auto nestedOp = nestedParallelOps.front();
             nestedParallelOps.pop_front();
-            auto body = cast<AffineParallelOp>(nestedOp).getBody();
+            auto *body = cast<AffineParallelOp>(nestedOp).getBody();
             for (auto instr = body->begin(); instr != body->end(); instr++) {
               if (isa<AffineParallelOp>(instr)) {
                 nestedParallelOps.push_back(cast<AffineParallelOp>(instr));
@@ -228,8 +228,8 @@ private:
           }
         }
       }
-      for (auto clonedInstrItr : clonedInstr) {
-        for (auto firstBlockInstr : rootedInstructions) {
+      for (auto *clonedInstrItr : clonedInstr) {
+        for (auto *firstBlockInstr : rootedInstructions) {
           for (int i = 0; i < firstBlockInstr->getNumResults(); i++) {
             clonedInstrItr->replaceUsesOfWith(
                 firstBlockInstr->getResult(i),
@@ -243,7 +243,7 @@ private:
           lastInstr->getResult(0), newMemFirst, idMap, range);
       clonedInstr.push_back(reduceOp);
 
-      for (auto clonedInstrItr : clonedInstr) {
+      for (auto *clonedInstrItr : clonedInstr) {
         for (int i = 0; i < clonedInstrItr->getNumOperands(); i++) {
           Value operand = clonedInstrItr->getOperand(i);
           if (std::find(op.getIVs().begin(), op.getIVs().end(), operand) !=
@@ -278,7 +278,7 @@ private:
       Operation *lastInstr;
       std::map<Operation *, Operation *> origToCloneInstrMap;
       std::list<Operation *> clonedInstr;
-      for (auto firstBlockInstr : secondRootedInstructions) {
+      for (auto *firstBlockInstr : secondRootedInstructions) {
         lastInstr = (bodyBuilder.clone(*firstBlockInstr));
         origToCloneInstrMap[firstBlockInstr] = lastInstr;
         clonedInstr.push_back(lastInstr);
@@ -288,7 +288,7 @@ private:
           while (!nestedParallelOps.empty()) {
             auto nestedOp = nestedParallelOps.front();
             nestedParallelOps.pop_front();
-            auto body = cast<AffineParallelOp>(nestedOp).getBody();
+            auto *body = cast<AffineParallelOp>(nestedOp).getBody();
             for (auto instr = body->begin(); instr != body->end(); instr++) {
               if (isa<AffineParallelOp>(instr)) {
                 nestedParallelOps.push_back(cast<AffineParallelOp>(instr));
@@ -298,8 +298,8 @@ private:
           }
         }
       }
-      for (auto clonedInstrItr : clonedInstr) {
-        for (auto firstBlockInstr : secondRootedInstructions) {
+      for (auto *clonedInstrItr : clonedInstr) {
+        for (auto *firstBlockInstr : secondRootedInstructions) {
           for (int i = 0; i < firstBlockInstr->getNumResults(); i++) {
             clonedInstrItr->replaceUsesOfWith(
                 firstBlockInstr->getResult(i),
@@ -312,7 +312,7 @@ private:
           lastInstr->getResult(0), newMemSecond, idMap, range);
 
       clonedInstr.push_back(reduceOp);
-      for (auto clonedInstrItr : clonedInstr) {
+      for (auto *clonedInstrItr : clonedInstr) {
         for (int i = 0; i < clonedInstrItr->getNumOperands(); i++) {
           Value operand = clonedInstrItr->getOperand(i);
           if (std::find(op.getIVs().begin(), op.getIVs().end(), operand) !=
@@ -357,15 +357,15 @@ private:
       Operation *lastInstr;
       std::map<Operation *, Operation *> origToCloneInstrMap;
       std::list<Operation *> clonedInstr;
-      for (auto firstBlockInstr : thirdRootedInstructions) {
+      for (auto *firstBlockInstr : thirdRootedInstructions) {
         lastInstr = (bodyBuilder.clone(*firstBlockInstr));
         origToCloneInstrMap[firstBlockInstr] = lastInstr;
         clonedInstr.push_back(lastInstr);
       }
-      for (auto firstBlockInstr : thirdRootedInstructions) {
+      for (auto *firstBlockInstr : thirdRootedInstructions) {
         if (firstBlockInstr ==
             reduce->getDefiningOp()->getOperand(0).getDefiningOp()) {
-          auto reductionInstr = origToCloneInstrMap[firstBlockInstr];
+          auto *reductionInstr = origToCloneInstrMap[firstBlockInstr];
           if (firstLoadMem != NULL) {
             reductionInstr->replaceUsesOfWith(reductionInstr->getOperand(0),
                                               firstLoadMem->getResult(0));
@@ -376,7 +376,7 @@ private:
           }
         }
         for (int i = 0; i < firstBlockInstr->getNumResults(); i++) {
-          for (auto clonedInstrItr : clonedInstr)
+          for (auto *clonedInstrItr : clonedInstr)
             clonedInstrItr->replaceUsesOfWith(
                 firstBlockInstr->getResult(i),
                 origToCloneInstrMap[firstBlockInstr]->getResult(i));
@@ -388,7 +388,7 @@ private:
       if (secondLoadMem) {
         clonedInstr.push_back(secondLoadMem);
       }
-      for (auto clonedInstrItr : clonedInstr) {
+      for (auto *clonedInstrItr : clonedInstr) {
         for (int i = 0; i < clonedInstrItr->getNumOperands(); i++) {
           Block *parentBlock = clonedInstrItr->getBlock();
           // Cloned instruction uses induction variable as an argument
@@ -436,7 +436,7 @@ private:
                            m_Op<OpTy0>(m_Capture(firstOp), m_Capture(secondOp)),
                            m_Any())));
 
-    auto affineYield = op.getBody()->getTerminator();
+    auto *affineYield = op.getBody()->getTerminator();
     if (matchBinaryPattern) {
       if (!matchPattern(affineYield, binaryPattern)) {
         return {NULL, NULL, NULL};

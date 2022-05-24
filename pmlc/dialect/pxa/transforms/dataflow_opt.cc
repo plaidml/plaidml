@@ -27,7 +27,7 @@ struct MemRefDataFlowOptPass
     // Walk all load's and perform reduce to load forwarding.
     func::FuncOp f = getOperation();
     f.walk([&](PxaReadOpInterface loadOp) {
-      auto defOp = loadOp.getMemRef().getDefiningOp();
+      auto *defOp = loadOp.getMemRef().getDefiningOp();
       if (!defOp) {
         return;
       }

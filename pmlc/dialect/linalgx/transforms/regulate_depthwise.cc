@@ -4,9 +4,9 @@
 
 #include "llvm/ADT/SmallBitVector.h"
 
-#include "mlir/Support/DebugStringHelper.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Support/DebugStringHelper.h"
 
 #include "pmlc/dialect/linalgx/analysis/convolution.h"
 #include "pmlc/dialect/linalgx/transforms/pass_detail.h"
@@ -44,7 +44,7 @@ struct RegulateDepthwisePass
                                          AffineMap outputMap,
                                          llvm::SmallBitVector &usedDims) {
     size_t origNumDims = ranges.size();
-    auto context = inputMap.getContext();
+    auto *context = inputMap.getContext();
     SmallVector<AffineExpr, 8> rangeValues;
     // Find out the zero dimensions
     for (unsigned i = 0; i < origNumDims; ++i) {
@@ -96,7 +96,7 @@ struct RegulateDepthwisePass
                                         SmallVector<unsigned> &order) {
     if (util::dimPosition(origMaps[0].getResult(3)) == 3) {
       order = {0, 1, 2, 3, 6, 4, 5};
-      auto context = origMaps[0].getContext();
+      auto *context = origMaps[0].getContext();
       SmallVector<AffineExpr> results;
       for (unsigned d : order) {
         results.emplace_back(getAffineDimExpr(d, context));

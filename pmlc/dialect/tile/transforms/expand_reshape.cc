@@ -1,15 +1,13 @@
 // Copyright 2020, Intel Corporation
 
 #include "pmlc/dialect/tile/transforms/expand_reshape.h"
-
-#include <numeric>
-
-#include "mlir/Pass/Pass.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Pass/Pass.h"
 #include "pmlc/dialect/stdx/ir/ops.h"
 #include "pmlc/dialect/tile/ir/ops.h"
 #include "pmlc/dialect/tile/transforms/pass_detail.h"
 #include "pmlc/util/logging.h"
+#include <memory> // NOLINT
 
 using namespace mlir;                // NOLINT
 using namespace pmlc::dialect::stdx; // NOLINT
@@ -61,7 +59,7 @@ static int computeNumIdxs(ArrayRef<int64_t> srcShape,
 }
 
 Value flattenTensor(OpBuilder &builder, Value src) {
-  auto context = builder.getContext();
+  auto *context = builder.getContext();
   auto srcType = src.getType().cast<RankedTensorType>();
   auto shape = srcType.getShape();
   unsigned numIdxs = shape.size();
@@ -106,7 +104,7 @@ Value reshapeTensor(OpBuilder &builder, Value src, ArrayRef<int64_t> dstShape) {
     return Value();
   }
 
-  auto context = builder.getContext();
+  auto *context = builder.getContext();
   SmallVector<int64_t, 4> srcDims(srcShape.begin(), srcShape.end());
   SmallVector<int64_t, 4> dstDims(dstShape.begin(), dstShape.end());
   SmallVector<int64_t, 4> ranges;

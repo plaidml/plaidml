@@ -73,7 +73,7 @@ private:
     os.flush();
 
     auto name = pass->getName().str();
-    if (auto passInfo = pass->lookupPassInfo()) {
+    if (const auto *passInfo = pass->lookupPassInfo()) {
       auto passArg = passInfo->getPassArgument();
       if (!passArg.empty()) {
         name = passArg.str();

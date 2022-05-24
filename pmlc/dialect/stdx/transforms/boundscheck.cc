@@ -4,11 +4,11 @@
 
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/DebugStringHelper.h"
 #include "mlir/Transforms/DialectConversion.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 #include "pmlc/dialect/stdx/transforms/pass_detail.h"
 #include "pmlc/util/logging.h"
@@ -41,7 +41,7 @@ public:
 
   FlatSymbolRefAttr getOrInsertFunc() {
     const char *symbol = "plaidml_rt_bounds_check";
-    auto context = module.getContext();
+    auto *context = module.getContext();
     if (module.lookupSymbol(symbol)) {
       return SymbolRefAttr::get(context, symbol);
     }
@@ -67,7 +67,7 @@ public:
       args.push_back(idxVal);
       args.push_back(rangeVal);
       opBuilder.create<func::CallOp>(op.getOperation()->getLoc(), func,
-                               ArrayRef<Type>{}, args);
+                                     ArrayRef<Type>{}, args);
     }
   }
 };

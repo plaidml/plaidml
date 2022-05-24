@@ -51,7 +51,7 @@ static AffineParallelOp createCopyLoop(OpBuilder &builder,               //
   assert(size.size() == srcOffset.size());
   assert(size.size() == dstOffset.size());
   size_t dims = size.size();
-  auto ctx = builder.getContext();
+  auto *ctx = builder.getContext();
   auto loop = builder.create<AffineParallelOp>(
       loc, dstMemRef.getType(), arith::AtomicRMWKind::assign, size);
   SmallVector<StrideInfo, 4> srcAccess;
@@ -285,7 +285,7 @@ LogicalResult cacheReduce(AffineParallelOp par, PxaReduceOp reduce) {
 }
 
 static bool isInitialized(Value memref) {
-  if (auto op = memref.getDefiningOp()) {
+  if (auto *op = memref.getDefiningOp()) {
     if (isa<memref::AllocOp>(op)) {
       return false;
     }
@@ -434,7 +434,7 @@ void CachePlan::execute() {
       // copy local -> global
       entry.copyFrom = true;
       OpBuilder::InsertionGuard guard(builder);
-      auto yield = entry.band.getBody()->getTerminator();
+      auto *yield = entry.band.getBody()->getTerminator();
       builder.setInsertionPoint(yield);
       auto &finalUse = *finalValue.use_begin();
       auto copyLoop = createCopyLoop(

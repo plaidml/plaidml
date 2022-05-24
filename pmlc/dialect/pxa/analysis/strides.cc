@@ -167,7 +167,7 @@ AffineValueExpr StrideInfo::toValueExpr(MLIRContext *ctx) const {
 
   for (auto kvp : strides) {
     unsigned loopDepth = 0;
-    auto parent = kvp.first.getOwner()->getParentOp();
+    auto *parent = kvp.first.getOwner()->getParentOp();
     while (!dyn_cast<func::FuncOp>(parent)) {
       loopDepth++;
       parent = parent->getParentOp();
@@ -227,7 +227,7 @@ void StrideInfo::print(raw_ostream &os, Block *relative) const {
 
 std::ostream &operator<<(std::ostream &os, const StrideInfo &x) {
   // os << debugString(x);
-  //  TODO: lorenzo fix this.
+  // TODO: lorenzo fix this.
   os << debugString(x.offset);
   return os;
 }

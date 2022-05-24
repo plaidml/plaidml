@@ -51,7 +51,7 @@ static FlatSymbolRefAttr createStubTraceFunc(ModuleOp module, StringAttr msg) {
   static unsigned idCounter = 0;
   auto uniqueId = idCounter++;
   auto symbol = llvm::formatv("__trace_{0}", uniqueId).str();
-  auto context = module.getContext();
+  auto *context = module.getContext();
   OpBuilder builder(context);
   builder.setInsertionPointToStart(module.getBody());
   auto funcType = FunctionType::get(context, {}, {});
@@ -569,7 +569,7 @@ struct ContractionOpConversion
     if (Attribute attr = op->getAttr("schedule"))
       forOp->setAttr("schedule", attr);
 
-    auto body = forOp.getBody();
+    auto *body = forOp.getBody();
     rewriter.setInsertionPointToStart(body);
     auto idxs = body->getArguments();
 
@@ -658,7 +658,7 @@ struct IndexOpConversion : public OpConversionPattern<tile::IndexOp> {
         /*reductions=*/
         ArrayRef<arith::AtomicRMWKind>{arith::AtomicRMWKind::assign},
         /*ranges=*/resultType.getShape());
-    auto body = forOp.getBody();
+    auto *body = forOp.getBody();
     rewriter.setInsertionPointToStart(body);
     auto idxs = body->getArguments();
 
@@ -749,7 +749,7 @@ struct CastOpConversion : public OpConversionPattern<tile::CastOp> {
         /*reductions=*/
         ArrayRef<arith::AtomicRMWKind>{arith::AtomicRMWKind::assign},
         /*ranges=*/alloc.rankedTensorType.getShape());
-    auto body = forOp.getBody();
+    auto *body = forOp.getBody();
     rewriter.setInsertionPointToStart(body);
 
     // Create the load

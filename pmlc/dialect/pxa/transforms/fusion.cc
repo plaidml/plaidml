@@ -163,7 +163,7 @@ struct FusionInfo {
   }
 
   static bool isOutermostLoop(AffineParallelOp ap) {
-    auto currOp = ap->getParentOp();
+    auto *currOp = ap->getParentOp();
     while (!isa<AffineParallelOp>(currOp) && !isa<func::FuncOp>(currOp)) {
       currOp = currOp->getParentOp();
     }
@@ -748,7 +748,7 @@ struct FusionPass : public FusionBase<FusionPass> {
       // dependencies.
       Operation *nearestReader = nullptr;
       for (auto res : fuseA.results()) {
-        for (auto user : res.getUsers()) {
+        for (auto *user : res.getUsers()) {
           Operation *op = block.findAncestorOpInBlock(*user);
           if (!nearestReader || opOrder[op] < opOrder[nearestReader]) {
             nearestReader = op;
@@ -795,7 +795,7 @@ struct FusionPass : public FusionBase<FusionPass> {
       if (getOpLoopNest(affineParallelOp) == 0)
         outermost.insert(affineParallelOp->getBlock());
     });
-    for (auto block : outermost) {
+    for (auto *block : outermost) {
       performFusion(*block);
     }
 

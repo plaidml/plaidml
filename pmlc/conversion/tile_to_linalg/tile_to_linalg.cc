@@ -54,7 +54,7 @@ static FlatSymbolRefAttr createStubTraceFunc(ModuleOp module, StringAttr msg) {
   static unsigned idCounter = 0;
   auto uniqueId = idCounter++;
   auto symbol = llvm::formatv("__trace_{0}", uniqueId).str();
-  auto context = module.getContext();
+  auto *context = module.getContext();
   OpBuilder builder(context);
   builder.setInsertionPointToStart(module.getBody());
   auto funcType = FunctionType::get(context, {}, {});

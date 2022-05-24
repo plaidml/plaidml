@@ -182,7 +182,7 @@ Value buildBroadcastLoad(OpBuilder &builder, Location loc, Value operand,
     return operand;
   }
   // handle broadcasts
-  auto body = builder.getBlock();
+  auto *body = builder.getBlock();
   auto operandType = operand.getType().cast<MemRefType>();
   assert(operandType.getRank() <= outRank && "result rank < operand rank");
   ArrayRef<int64_t> shape = operandType.getShape();

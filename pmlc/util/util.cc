@@ -64,15 +64,15 @@ void wrapFunctionAndPackArguments(llvm::Module *module, StringRef funcName,
 
   // Given a function `foo(<...>) -> T`, define the interface function
   // `mlir_foo(i8**) -> T`.
-  auto newType = llvm::FunctionType::get(func->getReturnType(),
-                                         builder.getInt8PtrTy()->getPointerTo(),
-                                         /*isVarArg=*/false);
+  auto *newType = llvm::FunctionType::get(
+      func->getReturnType(), builder.getInt8PtrTy()->getPointerTo(),
+      /*isVarArg=*/false);
   auto funcCst = module->getOrInsertFunction(newName, newType);
   llvm::Function *interfaceFunc = cast<llvm::Function>(funcCst.getCallee());
 
   // Extract the arguments from the type-erased argument list and cast them to
   // the proper types.
-  auto bb = llvm::BasicBlock::Create(ctx);
+  auto *bb = llvm::BasicBlock::Create(ctx);
   bb->insertInto(interfaceFunc);
   builder.SetInsertPoint(bb);
   llvm::Value *argList = interfaceFunc->arg_begin();

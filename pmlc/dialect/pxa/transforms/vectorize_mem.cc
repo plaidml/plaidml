@@ -95,7 +95,8 @@ struct VectorizeMemImpl {
   };
 
   // Apply checks for vector ops, qualify those for vectorization
-  template <typename T> LogicalResult checkMemOp(T memOp) {
+  template <typename T>
+  LogicalResult checkMemOp(T memOp) {
     auto defOp = memOp.getMemRef().getDefiningOp();
     // Check if vector_load reads from global memory. Currently it is not
     // allowed to use block ops on in-kernel memory
@@ -235,7 +236,7 @@ struct VectorizeMemImpl {
     // vector.extractelement later. In case of no tiling it would be 0,
     // if tiled then the outer parallel op IV.
     llvm::SmallPtrSet<Operation *, 8> idxNoChange;
-    for (auto user : blockArg.getUsers()) {
+    for (auto *user : blockArg.getUsers()) {
       if (user != memOp)
         idxNoChange.insert(user);
     }
@@ -392,7 +393,7 @@ struct VectorizeMemImpl {
 
     // Iterate over vectlo loads and reduce assigns at once, previously
     // we checked that all the parameters for these match.
-    for (auto memOp : llvm::make_early_inc_range(memOpsPlan.memOps)) {
+    for (auto *memOp : llvm::make_early_inc_range(memOpsPlan.memOps)) {
       if (auto vectorLoad = dyn_cast<PxaVectorLoadOp>(memOp))
         replaceVectorLoad(vectorLoad);
       else if (auto vectorReduce = dyn_cast<PxaVectorReduceOp>(memOp))

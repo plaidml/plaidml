@@ -74,7 +74,7 @@ Value getNextIndirectUse(mlir::OpOperand &use) {
 
 Operation *getPrevWriter(Value value) {
   while (auto opResult = value.dyn_cast<OpResult>()) {
-    auto op = opResult.getOwner();
+    auto *op = opResult.getOwner();
     if (isa<AffineParallelOp, AffineIfOp>(op)) {
       value = getPrevIndirectDef(opResult);
     } else {
@@ -96,7 +96,7 @@ Value getIndirectDef(Value value) {
 
 Value getIndirectDefOutsideScope(Value value, Operation *scope) {
   while (auto opResult = value.dyn_cast<OpResult>()) {
-    auto op = opResult.getOwner();
+    auto *op = opResult.getOwner();
     if (!scope->isAncestor(op)) {
       return opResult;
     }

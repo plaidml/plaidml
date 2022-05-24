@@ -21,7 +21,7 @@ bool isLoopArgumentOrConstant(Value value) {
   if (auto arg = value.dyn_cast<BlockArgument>()) {
     return isa<AffineParallelOp>(arg.getOwner()->getParentOp());
   }
-  if (auto defOp = value.getDefiningOp()) {
+  if (auto *defOp = value.getDefiningOp()) {
     return isa<arith::ConstantOp>(defOp);
   }
   return false;
