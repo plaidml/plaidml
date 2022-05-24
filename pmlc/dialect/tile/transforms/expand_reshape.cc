@@ -7,7 +7,8 @@
 #include "pmlc/dialect/tile/ir/ops.h"
 #include "pmlc/dialect/tile/transforms/pass_detail.h"
 #include "pmlc/util/logging.h"
-#include <memory> // NOLINT
+#include <memory>  // NOLINT
+#include <numeric> // NOLINT
 
 using namespace mlir;                // NOLINT
 using namespace pmlc::dialect::stdx; // NOLINT
