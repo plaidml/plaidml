@@ -8,10 +8,6 @@ pml_cc_binary(
     MLIRParser
     MLIRPass
     MLIRTransformUtils
-    #MLIRBufferizationTransforms
-    #MLIRBufferization
-    # This is from mlir-hlo. Should be included here?
-    # It does not link without.
     MLIRBufferTransforms
     MLIRSupport
     pmlc::init_passes_and_dialects
