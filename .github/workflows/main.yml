@@ -1,4 +1,4 @@
-name: CI
+name: PlaidML CI
 
 on:
   push:
@@ -138,59 +138,13 @@ jobs:
 
       - name: Analysis
         run: python ci/analysis.py ci/test ${path} --precision=${precision}
-
-  openvino:
-    needs: build-linux_x86_64-release
-    runs-on: [self-hosted, "target=${{matrix.platform}}"]
-    strategy:
-      fail-fast: false
-      matrix:
-        platform: [pml-llvm-cpu]
-        test:
-          - benchmark_app
-          # - accuracy_check # FIXME: this seems to fail currently
-        model:
-          - mobilenet-v2
-          - resnet-50-pytorch
-          #- yolo-v2-tiny-ava-0001
-        dtype: [FP16]
-
-    env:
-      build_type: Release
-      dtype: ${{matrix.dtype}}
-      model: ${{matrix.model}}
-      model_path: "networks/openvino/${{matrix.model}}/${{matrix.dtype}}/${{matrix.model}}.xml"
-      platform: ${{matrix.platform}}
-      test: ${{matrix.test}}
-
-    steps:
-      - uses: actions/checkout@v2
-
-      - uses: conda-incubator/setup-miniconda@v2
-        with:
-          activate-environment: build
-          channels: conda-forge,defaults
-          environment-file: environment.yml
-          mamba-version: "*"
-          miniconda-version: "latest"
-
-      - uses: actions/download-artifact@v2
-        with:
-          name: ${{env.build_root}},${{env.build_type}},kits
-
-      - name: Extract testkit
-        run: tar xvf PlaidML-${version}-${system}-testkit.tar.gz
-
-      - name: "Running model: ${{matrix.model}}"
-        run: python ci/openvino.py ${test} ${model_path} --pkgdir=testkit --outdir=ci/test/${path}
-
+ 
   report:
     needs:
       #- build-linux_x86_64-debug
       - build-linux_x86_64-release
       - keras
       - plaidbench
-      - openvino
     runs-on: [self-hosted, build=linux_x86_64]
     steps:
       - run: echo "OK"
