@@ -612,9 +612,6 @@ struct ProgramBuilder {
     pm.addPass(createCSEPass());
     auto result = pm.run(module);
 
-    // llvm::errs() << "-----> Module\n";
-    // llvm::errs() << debugString(module) << "\n";
-
     program->tileIR = debugString(module);
     IVLOG(2, "\n" << program->tileIR);
     if (failed(result)) {
@@ -935,11 +932,9 @@ struct ProgramBuilder {
   std::string lookupOperation(StringRef op) {
     auto opName = tile::TileDialect::getCanonicalOpName(op);
     Optional<RegisteredOperationName> opInfo =
-      RegisteredOperationName::lookup(opName, context); 
-    if (!opInfo) 
+        RegisteredOperationName::lookup(opName, context);
+    if (!opInfo)
       throw std::runtime_error("Unknown EDSL primitive: " + op.str());
-    // for (RegisteredOperationName name : context->getRegisteredOperations())
-    //  llvm::errs() << name.getStringRef().str() << " \n";
     assert(context->isOperationRegistered(opInfo->getStringRef().str()));
     return opInfo->getStringRef().str();
   }

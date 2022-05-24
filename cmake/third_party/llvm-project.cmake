@@ -39,7 +39,6 @@ else()
     URL https://github.com/plaidml/llvm-project/archive/3b8d5b76a2ae3c8fbe65ade73deb0ba7134e0072.tar.gz
     URL_HASH SHA256=bcfcc418da3d4c0df95124674af071cbf8b3128e6f3500831868b735c448f84c
   )
-  #FetchContent_MakeAvailable(llvm-project)
   # Check if population has already been performed
   FetchContent_GetProperties(llvm-project)
   if(NOT llvm-project_POPULATED)

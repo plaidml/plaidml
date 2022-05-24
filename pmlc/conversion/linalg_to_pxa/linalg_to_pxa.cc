@@ -2,10 +2,10 @@
 
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Func/Transforms/FuncConversions.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Support/DebugStringHelper.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "mlir/Dialect/Func/Transforms/FuncConversions.h"
 
 #include "pmlc/conversion/linalg_to_pxa/pass_detail.h"
 #include "pmlc/conversion/tile_to_pxa/pass_detail.h"
@@ -419,7 +419,7 @@ struct GenericOpConversion : public OpConversionPattern<linalg::GenericOp> {
       op->emitError("No linalg.yield in generic op.");
     }
 
-    // TODO: lorenzo quick fix. Must spend more time 
+    // TODO: lorenzo quick fix. Must spend more time
     // to see why this is the case.
     op->getResults().replaceAllUsesWith(forOp.getResults());
     rewriter.replaceOp(op, forOp.getResults());
@@ -497,20 +497,13 @@ struct LowerLinalgToPXAPass
     // Convert named/structured ops to GenericOps.
     performLinalgTransforms(module);
 
-    //module.dump();
-    //assert(0);
-
     ConversionTarget target(getContext());
     LinalgToPXATypeConverter converter;
-    target.addLegalDialect<AffineDialect, 
-                           math::MathDialect,     
-                           memref::MemRefDialect, 
-                           scf::SCFDialect,       
-                           layer::LayerDialect,   
-                           pxa::PXADialect,       
-                           arith::ArithmeticDialect, 
-                           stdx::StdXDialect>();
-   
+    target.addLegalDialect<AffineDialect, math::MathDialect,
+                           memref::MemRefDialect, scf::SCFDialect,
+                           layer::LayerDialect, pxa::PXADialect,
+                           arith::ArithmeticDialect, stdx::StdXDialect>();
+
     // Module op is legal.
     target.addLegalOp<ModuleOp, func::CallOp>();
 
@@ -534,12 +527,13 @@ struct LowerLinalgToPXAPass
     target.addIllegalDialect<linalg::LinalgDialect>();
 
     RewritePatternSet patterns(&getContext());
+
     // clang-format off
-    patterns.insert<YieldOpConversion, 
+    patterns.insert<YieldOpConversion,
                     ConstantOpConversion,
                     YieldXOpConversion,
                     FuncOpConversion<stdx::ClosureOp>,
-                    FuncOpConversion<func::FuncOp>, 
+                    FuncOpConversion<func::FuncOp>,
                     GenericOpConversion,
                     IndexOpConversion,
                     InitTensorOpConversion>(&getContext());
@@ -549,13 +543,14 @@ struct LowerLinalgToPXAPass
     populateReturnOpTypeConversionPattern(patterns, converter);
 
     target.markUnknownOpDynamicallyLegal([&](Operation *op) {
-      return isLegalForReturnOpTypeConversionPattern(op, converter); });
+      return isLegalForReturnOpTypeConversionPattern(op, converter);
+    });
 
     if (failed(applyFullConversion(module, target, std::move(patterns)))) {
       signalPassFailure();
       return;
     }
-    
+
     for (func::FuncOp funcOp : module.getOps<func::FuncOp>()) {
       for (func::ReturnOp returnOp : funcOp.getOps<func::ReturnOp>()) {
         connectResults(funcOp, returnOp);
