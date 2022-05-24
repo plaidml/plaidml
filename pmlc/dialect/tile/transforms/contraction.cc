@@ -8,9 +8,9 @@
 
 #include "llvm/Support/FormatVariadic.h"
 
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/Support/DebugStringHelper.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "pmlc/dialect/tile/transforms/pass_detail.h"
 #include "pmlc/util/bilp/ilp_solver.h"
 #include "pmlc/util/logging.h"
@@ -54,13 +54,13 @@ void Constraints::MergeParallelConstraints() {
           constraints.erase(i);
           i = constraints.begin();
           continue;
-        } else { // i-- exists
-          i--;
-          constraints.erase(i + 1);
-          i++; // This is the same value of i we would have checked next if not
-               // deleting
-          continue;
-        }
+        } // i-- exists
+        i--;
+        constraints.erase(i + 1);
+        i++; // This is the same value of i we would have checked next if not
+             // deleting
+        continue;
+
       } else {
         // Constraint is trivially false; fail indicating no solutions
         std::string ErrorMessage =

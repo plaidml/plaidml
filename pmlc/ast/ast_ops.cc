@@ -141,7 +141,8 @@ struct GatherOp : Intrinsic {
     if (!mode) {
       throw std::runtime_error("'gather' primitive expects the 'mode' argument "
                                "to be a constant integer");
-    } else if (mode.getValue() == 1) {
+    }
+    if (mode.getValue() == 1) {
       if (!isDataTypeInteger(idxs.elementType)) {
         throw std::runtime_error(
             "'gather' ND mode requires indices elements to be integers.");

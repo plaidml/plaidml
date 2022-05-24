@@ -51,7 +51,8 @@ struct ResizeTmpsPass : public ResizeTmpsBase<ResizeTmpsPass> {
       if (isa<func::ReturnOp>(use.getOwner())) {
         IVLOG(2, "Found ReturnOp user, cannot resize allocation");
         return;
-      } else if (isa<pmlc::dialect::stdx::ReshapeOp>(use.getOwner())) {
+      }
+      if (isa<pmlc::dialect::stdx::ReshapeOp>(use.getOwner())) {
         IVLOG(2, "Found ReshapeOp user, cannot resize allocation");
         return;
       }
