@@ -18,11 +18,11 @@ env:
   python_arch: manylinux1_x86_64
 
 jobs:
-  build-linux_x86_64-debug:
-    uses: plaidml/plaidml/.github/workflows/build.yml@plaidml-v1
-    with:
-      build_type: Debug
-      check: lit
+  #build-linux_x86_64-debug:
+  #  uses: plaidml/plaidml/.github/workflows/build.yml@plaidml-v1
+  #  with:
+  #    build_type: Debug
+  #    check: lit
 
   build-linux_x86_64-release:
     uses: plaidml/plaidml/.github/workflows/build.yml@plaidml-v1
@@ -141,7 +141,7 @@ jobs:
  
   report:
     needs:
-      - build-linux_x86_64-debug
+      #- build-linux_x86_64-debug
       - build-linux_x86_64-release
       - keras
       - plaidbench
