@@ -21,7 +21,7 @@ class StdX_Op<string mnemonic, list<Trait> traits = []> :
 
 def ReshapeOp : StdX_Op<"reshape",
   [DeclareOpInterfaceMethods<ViewLikeOpInterface>]> {
-  let summary = "tensor reshape operation";
+  let summary = "memref reshape operation";
   let arguments = (ins AnyMemRef:$tensor);
   let results = (outs AnyMemRef:$result);
   let assemblyFormat = [{
