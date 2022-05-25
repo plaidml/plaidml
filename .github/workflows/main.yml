@@ -71,7 +71,7 @@ jobs:
         run: python plaidml/bridge/keras/${test}.py
 
   plaidbench:
-    needs: build-linux_x86_64-release
+    needs: keras
     runs-on: [self-hosted, "target=${{matrix.platform}}"]
     timeout-minutes: 10
     strategy:
