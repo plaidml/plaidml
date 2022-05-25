@@ -22,7 +22,7 @@ jobs:
     uses: plaidml/plaidml/.github/workflows/build.yml@plaidml-v1
     with:
       build_type: Debug
-      check: core
+      check: lit
 
   build-linux_x86_64-release:
     uses: plaidml/plaidml/.github/workflows/build.yml@plaidml-v1
