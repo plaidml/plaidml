@@ -44,7 +44,7 @@ jobs:
           python configure --ci --temp=/tmp/${build_root}/${build_type} --type=${build_type} &> logs/configure.log
 
       - name: ninja check-${{inputs.check}}
-        run: export  KMP_AFFINITY=disabled && ninja -C ${build_root}/${build_type} check-${check} &> logs/check-${check}.log
+        run: ninja -C ${build_root}/${build_type} check-${check} &> logs/check-${check}.log
 
       - name: ninja package
         run: ninja -C ${build_root}/${build_type} package
