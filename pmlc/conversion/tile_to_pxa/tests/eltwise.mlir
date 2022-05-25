@@ -2,7 +2,7 @@
 
 // CHECK-LABEL: func @bit_not
 func @bit_not(%arg0: tensor<10x20xsi32>) -> tensor<10x20xsi32> {
-  // CHECK: %[[negOne:.*]] = constant -1 : i32
+  // CHECK: %[[negOne:.*]] = arith.constant -1 : i32
   // CHECK: affine.parallel
   // CHECK: pxa.load
   // CHECK: subi %[[negOne]], %{{.*}}
@@ -13,7 +13,7 @@ func @bit_not(%arg0: tensor<10x20xsi32>) -> tensor<10x20xsi32> {
 
 // CHECK-LABEL: func @neg_i32
 func @neg_i32(%arg0: tensor<10x20xsi32>) -> tensor<10x20xsi32> {
-  // CHECK: %[[c0:.*]] = constant 0 : i32
+  // CHECK: %[[c0:.*]] = arith.constant 0 : i32
   // CHECK: affine.parallel
   // CHECK: pxa.load
   // CHECK: subi %[[c0]], %{{.*}}

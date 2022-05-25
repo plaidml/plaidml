@@ -22,6 +22,7 @@ set(LIBOMP_OMPD_SUPPORT OFF CACHE BOOL "" FORCE)
 set(OPENMP_ENABLE_LIBOMPTARGET OFF CACHE BOOL "" FORCE)
 set(OPENMP_ENABLE_OMPT_TOOLS OFF CACHE BOOL "" FORCE)
 set(OPENMP_STANDALONE_BUILD ON CACHE BOOL "" FORCE)
+set(LIBOMP_ENABLE_ASSERTIONS OFF CACHE BOOL "" FORCE)
 
 list(APPEND LLVM_EXTERNAL_PROJECTS mlir_hlo)
 set(LLVM_EXTERNAL_MLIR_HLO_SOURCE_DIR ${CMAKE_SOURCE_DIR}/vendor/mlir-hlo)
@@ -33,14 +34,17 @@ if(LOCAL_LLVM_DIR)
   set(LLVM_EXTERNAL_MLIR_SOURCE_DIR "${LLVM_SOURCE_DIR}/mlir")
   add_subdirectory(${LLVM_SOURCE_DIR}/llvm ${LLVM_BINARY_DIR} EXCLUDE_FROM_ALL)
 else()
-  message("Fetching LLVM")
+  message(STATUS "Fetching LLVM")
   FetchContent_Declare(
     llvm-project
-    URL      https://github.com/plaidml/llvm-project/archive/ca67cd422f5b490444e244418f98c661b73fd978.tar.gz
-    URL_HASH SHA256=5fd6c8e0328704227c7b35af81bee1158160db70b44948fa11cd466f06fa8bdf
+    URL https://github.com/plaidml/llvm-project/archive/3b8d5b76a2ae3c8fbe65ade73deb0ba7134e0072.tar.gz
+    URL_HASH SHA256=bcfcc418da3d4c0df95124674af071cbf8b3128e6f3500831868b735c448f84c
   )
+  # Check if population has already been performed
   FetchContent_GetProperties(llvm-project)
   if(NOT llvm-project_POPULATED)
+    message(STATUS "Populate LLVM") 
+    # Fetch the content using previously declared details
     FetchContent_Populate(llvm-project)
     set(LLVM_SOURCE_DIR ${llvm-project_SOURCE_DIR})
     set(LLVM_BINARY_DIR ${llvm-project_BINARY_DIR})

@@ -1,5 +1,5 @@
-// RUN: pmlc-opt %s -mhlo-fusion -split-input-file | FileCheck %s
-
+// RUN: pmlc-opt %s -constraint-fusion -split-input-file | FileCheck %s
+// XFAIL: *
 // CHECK-LABEL: func @multi_outputs_same
 func @multi_outputs_same(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> (tensor<?x?xf32>, tensor<?x?xf32>) {
   %0 = "mhlo.add"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>

@@ -23,10 +23,10 @@
 #include "llvm/ExecutionEngine/Orc/RTDyldObjectLinkingLayer.h"
 #include "llvm/ExecutionEngine/SectionMemoryManager.h"
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/MC/TargetRegistry.h"
 #include "llvm/Support/DynamicLibrary.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/Host.h"
-#include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
@@ -323,8 +323,8 @@ struct OrcJITEngineImpl : EngineImpl {
       throw std::runtime_error(os.str());
     }
 
-    auto addr = expectedSymbol->getAddress();
-    return reinterpret_cast<Function>(addr);
+    // auto addr = expectedSymbol->getAddress();
+    return reinterpret_cast<Function>(expectedSymbol->getValue());
   }
 
   std::unique_ptr<llvm::orc::LLJIT> jit;
@@ -345,7 +345,7 @@ public:
     std::call_once(is_initialized, []() {
       llvm::InitializeNativeTarget();
       llvm::InitializeNativeTargetAsmPrinter();
-      initializeLLVMPasses();
+      // initializeLLVMPasses();
       llvm::sys::DynamicLibrary::LoadLibraryPermanently(nullptr);
     });
     registerLLVMDialectTranslation(*program->context);

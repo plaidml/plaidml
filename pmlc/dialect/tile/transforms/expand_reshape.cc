@@ -5,8 +5,7 @@
 #include <numeric>
 
 #include "mlir/Pass/Pass.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
-
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "pmlc/dialect/stdx/ir/ops.h"
 #include "pmlc/dialect/tile/ir/ops.h"
 #include "pmlc/dialect/tile/transforms/pass_detail.h"
@@ -195,7 +194,7 @@ Value reshapeTensor(OpBuilder &builder, Value src, ArrayRef<int64_t> dstShape) {
 }
 
 struct ExpandReshapePass : public ExpandReshapeBase<ExpandReshapePass> {
-  void runOnFunction() final;
+  void runOnOperation() final;
 
   // Expand in-order reshape operation
   void expandReshape(ReshapeOp reshapeOp);
@@ -226,8 +225,8 @@ void ExpandReshapePass::expandReshape(ReshapeOp reshapeOp) {
   reshapeOp.erase();
 }
 
-void ExpandReshapePass::runOnFunction() {
-  auto func = getFunction();
+void ExpandReshapePass::runOnOperation() {
+  auto func = getOperation();
   // Save the reshape operations in another buffer. Otherwise, removing a
   // reshape may crash the next loop iteration sometimes.
   auto ops = func.getOps<ReshapeOp>();

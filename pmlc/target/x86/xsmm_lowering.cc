@@ -3,8 +3,7 @@
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
-#include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
-#include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
+#include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Support/DebugStringHelper.h"
@@ -138,7 +137,7 @@ struct GemmLowering {
   static constexpr size_t LDB_IDX = 2;
   static constexpr size_t LDC_IDX = 0;
 
-  GemmLowering(pxa::PxaGenericOp op, ArrayRef<Value> operands,
+  GemmLowering(pxa::PxaGenericOp op, ValueRange operands,
                ConversionPatternRewriter &rewriter)
       : op(op), rewriter(rewriter), loc(op.getLoc()),
         adaptor(operands, op->getAttrDictionary()),
@@ -330,14 +329,14 @@ struct GemmPxaGenericOpConversion
   using OpConversionPattern<pxa::PxaGenericOp>::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(pxa::PxaGenericOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
+  matchAndRewrite(pxa::PxaGenericOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
     if (op.kernel() != "tpp_gemm")
       return failure();
     if (op.outputs().size() != 1 || op.inputs().size() != 2)
       return failure();
 
-    GemmLowering lowering(op, operands, rewriter);
+    GemmLowering lowering(op, adaptor.getOperands(), rewriter);
     return lowering.performLowering();
   }
 };
@@ -352,15 +351,15 @@ struct UnaryPxaGenericOpConversion
       : OpConversionPattern(context), kernelName(kernelName), kind(kind) {}
 
   LogicalResult
-  matchAndRewrite(pxa::PxaGenericOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
+  matchAndRewrite(pxa::PxaGenericOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
     if (op.kernel() != kernelName)
       return failure();
     if (op.outputs().size() != 1 || op.inputs().size() != 1)
       return failure();
 
     Location loc = op.getLoc();
-    pxa::PxaGenericOp::Adaptor adaptor(operands, op->getAttrDictionary());
+    // pxa::PxaGenericOp::Adaptor adaptor(operands, op->getAttrDictionary());
     Type resultType = rewriter.getI64Type();
     SmallVector<util::StrideArray> inputs =
         getStrideArrays(adaptor.inputs(), op.inputTileMaps());
@@ -412,15 +411,14 @@ struct BinaryPxaGenericOpConversion
       : OpConversionPattern(context), kernelName(kernelName), kind(kind) {}
 
   LogicalResult
-  matchAndRewrite(pxa::PxaGenericOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
+  matchAndRewrite(pxa::PxaGenericOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
     if (op.kernel() != kernelName)
       return failure();
     if (op.outputs().size() != 1 || op.inputs().size() != 2)
       return failure();
 
     Location loc = op.getLoc();
-    pxa::PxaGenericOp::Adaptor adaptor(operands, op->getAttrDictionary());
     Type resultType = rewriter.getI64Type();
     SmallVector<util::StrideArray> inputs =
         getStrideArrays(adaptor.inputs(), op.inputTileMaps());
@@ -473,8 +471,8 @@ struct XSMMGemmDispatchF32Lowering
   using ConvertOpToLLVMPattern<xsmm::GemmDispatchF32Op>::ConvertOpToLLVMPattern;
 
   LogicalResult
-  matchAndRewrite(xsmm::GemmDispatchF32Op op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
+  matchAndRewrite(xsmm::GemmDispatchF32Op op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
     auto func = getOrInsertFunc(op, rewriter);
 
     IntegerType int32Type = rewriter.getI32Type();
@@ -529,9 +527,10 @@ struct XSMMGemmInvokeF32Lowering
   using ConvertOpToLLVMPattern<xsmm::GemmInvokeF32Op>::ConvertOpToLLVMPattern;
 
   LogicalResult
-  matchAndRewrite(xsmm::GemmInvokeF32Op op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
-    xsmm::GemmInvokeF32Op::Adaptor transformed(operands);
+  matchAndRewrite(xsmm::GemmInvokeF32Op op, OpAdaptor transformed,
+                  ConversionPatternRewriter &rewriter) const final {
+    // TODO: lorenzo check if this is safe. I would expect the operand
+    // from the adaptor and not the op.
     auto aType = op.a().getType().cast<MemRefType>();
     auto bType = op.b().getType().cast<MemRefType>();
     auto cType = op.c().getType().cast<MemRefType>();
@@ -589,8 +588,8 @@ struct XSMMBRGemmDispatchF32Lowering
       xsmm::BRGemmDispatchF32Op>::ConvertOpToLLVMPattern;
 
   LogicalResult
-  matchAndRewrite(xsmm::BRGemmDispatchF32Op op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
+  matchAndRewrite(xsmm::BRGemmDispatchF32Op op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
     auto func = getOrInsertFunc(op, rewriter);
 
     IntegerType int32Type = rewriter.getI32Type();
@@ -645,9 +644,8 @@ struct XSMMBRGemmInvokeF32Lowering
   using ConvertOpToLLVMPattern<xsmm::BRGemmInvokeF32Op>::ConvertOpToLLVMPattern;
 
   LogicalResult
-  matchAndRewrite(xsmm::BRGemmInvokeF32Op op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
-    xsmm::BRGemmInvokeF32Op::Adaptor transformed(operands);
+  matchAndRewrite(xsmm::BRGemmInvokeF32Op op, OpAdaptor transformed,
+                  ConversionPatternRewriter &rewriter) const final {
     auto aType = op.a().getType().cast<MemRefType>();
     auto bType = op.b().getType().cast<MemRefType>();
     auto cType = op.c().getType().cast<MemRefType>();
@@ -711,8 +709,8 @@ struct XSMMBRGemmOffsDispatchF32Lowering
       xsmm::BRGemmOffsDispatchF32Op>::ConvertOpToLLVMPattern;
 
   LogicalResult
-  matchAndRewrite(xsmm::BRGemmOffsDispatchF32Op op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
+  matchAndRewrite(xsmm::BRGemmOffsDispatchF32Op op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
     auto func = getOrInsertFunc(op, rewriter);
 
     IntegerType int32Type = rewriter.getI32Type();
@@ -769,12 +767,12 @@ struct XSMMBRGemmOffsInvokeF32Lowering
       xsmm::BRGemmOffsInvokeF32Op>::ConvertOpToLLVMPattern;
 
   LogicalResult
-  matchAndRewrite(xsmm::BRGemmOffsInvokeF32Op op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
+  matchAndRewrite(xsmm::BRGemmOffsInvokeF32Op op, OpAdaptor transformed,
+                  ConversionPatternRewriter &rewriter) const final {
+    // TODO: lorenzo: how to avoid static?
     static int aOffsetGlobalVarCount = 0;
     static int bOffsetGlobalVarCount = 0;
 
-    xsmm::BRGemmOffsInvokeF32Op::Adaptor transformed(operands);
     auto aType = op.a().getType().cast<MemRefType>();
     auto bType = op.b().getType().cast<MemRefType>();
     auto cType = op.c().getType().cast<MemRefType>();
@@ -830,19 +828,19 @@ struct XSMMBRGemmOffsInvokeF32Lowering
     auto bOffsetsBase =
         rewriter.create<LLVM::AddressOfOp>(op->getLoc(), bOffsets);
 
-    SmallVector<Value, 4> aOffsetOperands = {aOffsetsBase};
+    SmallVector<Value> aOffsetOperands;
     aOffsetOperands.insert(aOffsetOperands.end(), aOffsetType.getRank() + 1,
                            createIndexConstant(rewriter, op->getLoc(), 0));
 
-    SmallVector<Value, 4> bOffsetOperands = {bOffsetsBase};
+    SmallVector<Value> bOffsetOperands;
     bOffsetOperands.insert(bOffsetOperands.end(), bOffsetType.getRank() + 1,
                            createIndexConstant(rewriter, op->getLoc(), 0));
 
-    auto aOffsetsPtr = rewriter.create<LLVM::GEPOp>(op->getLoc(), longPtrType,
-                                                    aOffsetOperands);
+    auto aOffsetsPtr = rewriter.create<LLVM::GEPOp>(
+        op->getLoc(), longPtrType, aOffsetsBase, aOffsetOperands);
 
-    auto bOffsetsPtr = rewriter.create<LLVM::GEPOp>(op->getLoc(), longPtrType,
-                                                    bOffsetOperands);
+    auto bOffsetsPtr = rewriter.create<LLVM::GEPOp>(
+        op->getLoc(), longPtrType, bOffsetsBase, bOffsetOperands);
 
     auto func = getOrInsertFunc(op, rewriter);
     rewriter.create<LLVM::CallOp>(
@@ -910,8 +908,8 @@ struct XSMMUnaryDispatchLowering
   using ConvertOpToLLVMPattern<xsmm::UnaryDispatchOp>::ConvertOpToLLVMPattern;
 
   LogicalResult
-  matchAndRewrite(xsmm::UnaryDispatchOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
+  matchAndRewrite(xsmm::UnaryDispatchOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
     Location loc = op->getLoc();
     LLVM::LLVMFuncOp func = getOrInsertFunc(op, rewriter);
 
@@ -1004,10 +1002,9 @@ struct XSMMUnaryInvokeLowering
   using ConvertOpToLLVMPattern<xsmm::UnaryInvokeOp>::ConvertOpToLLVMPattern;
 
   LogicalResult
-  matchAndRewrite(xsmm::UnaryInvokeOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
+  matchAndRewrite(xsmm::UnaryInvokeOp op, OpAdaptor transformed,
+                  ConversionPatternRewriter &rewriter) const final {
     Location loc = op->getLoc();
-    xsmm::UnaryInvokeOp::Adaptor transformed(operands);
     auto inputType = op.input().getType().cast<MemRefType>();
     auto outputType = op.output().getType().cast<MemRefType>();
     Type voidPtrType = getVoidPtrType();
@@ -1068,8 +1065,8 @@ struct XSMMBinaryDispatchLowering
   using ConvertOpToLLVMPattern<xsmm::BinaryDispatchOp>::ConvertOpToLLVMPattern;
 
   LogicalResult
-  matchAndRewrite(xsmm::BinaryDispatchOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
+  matchAndRewrite(xsmm::BinaryDispatchOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
     Location loc = op->getLoc();
     LLVM::LLVMFuncOp func = getOrInsertFunc(op, rewriter);
 
@@ -1177,10 +1174,9 @@ struct XSMMBinaryInvokeLowering
   using ConvertOpToLLVMPattern<xsmm::BinaryInvokeOp>::ConvertOpToLLVMPattern;
 
   LogicalResult
-  matchAndRewrite(xsmm::BinaryInvokeOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
+  matchAndRewrite(xsmm::BinaryInvokeOp op, OpAdaptor transformed,
+                  ConversionPatternRewriter &rewriter) const final {
     Location loc = op->getLoc();
-    xsmm::BinaryInvokeOp::Adaptor transformed(operands);
     auto inputType1 = op.input1().getType().cast<MemRefType>();
     auto inputType2 = op.input2().getType().cast<MemRefType>();
     auto outputType = op.output().getType().cast<MemRefType>();

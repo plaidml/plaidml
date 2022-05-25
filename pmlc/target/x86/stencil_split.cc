@@ -1,8 +1,9 @@
 // Copyright 2020 Intel Corporation
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/DebugStringHelper.h"
-
 #include "pmlc/dialect/pxa/ir/matchers.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/dialect/pxa/transforms/autotile.h"
@@ -200,8 +201,8 @@ private:
          !isa<pxa::PxaLoadOp>(rootedInstructions.front()))) {
       newMemFirst = builder.create<mlir::memref::AllocOp>(loc, memRefType);
       firstAffineParallelOp = builder.create<AffineParallelOp>(
-          loc, reductionTypes, AtomicRMWKind::assign, lbMap, lbOps, ubMap,
-          ubOps, steps);
+          loc, reductionTypes, arith::AtomicRMWKind::assign, lbMap, lbOps,
+          ubMap, ubOps, steps);
       auto bodyBuilder =
           OpBuilder::atBlockBegin(firstAffineParallelOp.getBody());
       Operation *lastInstr;
@@ -238,7 +239,7 @@ private:
       }
 
       auto reduceOp = bodyBuilder.create<pxa::PxaReduceOp>(
-          firstAffineParallelOp.getLoc(), AtomicRMWKind::assign,
+          firstAffineParallelOp.getLoc(), arith::AtomicRMWKind::assign,
           lastInstr->getResult(0), newMemFirst, idMap, range);
       clonedInstr.push_back(reduceOp);
 
@@ -269,8 +270,8 @@ private:
          !isa<pxa::PxaLoadOp>(secondRootedInstructions.front()))) {
       newMemSecond = builder.create<mlir::memref::AllocOp>(loc, memRefType);
       secondAffineParallelOp = builder.create<AffineParallelOp>(
-          loc, reductionTypes, AtomicRMWKind::assign, lbMap, lbOps, ubMap,
-          ubOps, steps);
+          loc, reductionTypes, arith::AtomicRMWKind::assign, lbMap, lbOps,
+          ubMap, ubOps, steps);
 
       auto bodyBuilder =
           OpBuilder::atBlockBegin(secondAffineParallelOp.getBody());
@@ -307,7 +308,7 @@ private:
         }
       }
       auto reduceOp = bodyBuilder.create<pxa::PxaReduceOp>(
-          secondAffineParallelOp.getLoc(), AtomicRMWKind::assign,
+          secondAffineParallelOp.getLoc(), arith::AtomicRMWKind::assign,
           lastInstr->getResult(0), newMemSecond, idMap, range);
 
       clonedInstr.push_back(reduceOp);
@@ -333,8 +334,8 @@ private:
     {
       AffineParallelOp reduceAffineParallelOp =
           builder.create<AffineParallelOp>(loc, reductionTypes,
-                                           AtomicRMWKind::assign, lbMap, lbOps,
-                                           ubMap, ubOps, steps);
+                                           arith::AtomicRMWKind::assign, lbMap,
+                                           lbOps, ubMap, ubOps, steps);
 
       auto bodyBuilder =
           OpBuilder::atBlockBegin(reduceAffineParallelOp.getBody());
@@ -431,7 +432,7 @@ private:
 
     auto binaryPattern = m_Op<AffineYieldOp>(m_Capture(
         reduce,
-        pxa::m_PxaReduceOp(AtomicRMWKind::assign,
+        pxa::m_PxaReduceOp(arith::AtomicRMWKind::assign,
                            m_Op<OpTy0>(m_Capture(firstOp), m_Capture(secondOp)),
                            m_Any())));
 
@@ -444,7 +445,7 @@ private:
     }
 
     auto unaryPattern = m_Op<AffineYieldOp>(m_Capture(
-        reduce, pxa::m_PxaReduceOp(AtomicRMWKind::assign,
+        reduce, pxa::m_PxaReduceOp(arith::AtomicRMWKind::assign,
                                    m_Op<OpTy0>(m_Capture(firstOp)), m_Any())));
 
     if (!matchPattern(affineYield, unaryPattern)) {
@@ -454,15 +455,15 @@ private:
   }
 
   SmallVector<Value *, 3> captureTopLevel(AffineParallelOp op) {
-    auto retVal = maybeCaptureTopLevel<AddFOp>(true, op);
+    auto retVal = maybeCaptureTopLevel<arith::AddFOp>(true, op);
     if (retVal[0] == NULL) {
-      retVal = maybeCaptureTopLevel<MulFOp>(true, op);
+      retVal = maybeCaptureTopLevel<arith::MulFOp>(true, op);
     }
     if (retVal[0] == NULL) {
-      retVal = maybeCaptureTopLevel<SubFOp>(true, op);
+      retVal = maybeCaptureTopLevel<arith::SubFOp>(true, op);
     }
     if (retVal[0] == NULL) {
-      retVal = maybeCaptureTopLevel<DivFOp>(true, op);
+      retVal = maybeCaptureTopLevel<arith::DivFOp>(true, op);
     }
     if (retVal[0] == NULL) {
       retVal = maybeCaptureTopLevel<stdx::ReluOp>(false, op);
@@ -494,8 +495,8 @@ public:
 } // namespace
 
 struct StencilSplitPass : public StencilSplitBase<StencilSplitPass> {
-  void runOnFunction() final {
-    getFunction().walk([](AffineParallelOp op) {
+  void runOnOperation() final {
+    getOperation().walk([](AffineParallelOp op) {
       StencilSplitImpl splitImpl;
       splitImpl.performSplit(op);
     });

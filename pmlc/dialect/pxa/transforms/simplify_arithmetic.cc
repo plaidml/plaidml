@@ -2,8 +2,11 @@
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/IR/AffineValueMap.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Support/DebugStringHelper.h"
+#include "mlir/Support/LLVM.h"
 
 #include "pmlc/dialect/pxa/analysis/memref_access.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
@@ -21,9 +24,9 @@ namespace {
 /// which is basically side effect of the fusion pass.
 
 // Helper function to detect if constant op is 0
-bool checkIfZero(ConstantOp constantVal) {
+bool checkIfZero(arith::ConstantOp constantVal) {
   auto valueType = constantVal.getType();
-  auto value = constantVal.value();
+  auto value = constantVal.getValue();
 
   // Special handling for vector type
   if (auto vectorType = valueType.dyn_cast<VectorType>()) {
@@ -31,28 +34,32 @@ bool checkIfZero(ConstantOp constantVal) {
     auto denseAttr = value.cast<DenseElementsAttr>();
     if (!denseAttr.isSplat())
       return false;
-    value = denseAttr.getSplatValue();
+    if ((denseAttr.getType().getElementType().isa<IntegerType>()) &&
+        (denseAttr.getSplatValue<APInt>().isZero()))
+      return true;
+    if ((denseAttr.getType().getElementType().isa<FloatType>()) &&
+        (denseAttr.getSplatValue<APFloat>().isZero()))
+      return true;
   }
 
   // Float and integer types are supported
   if (auto floatType = valueType.dyn_cast<FloatType>()) {
     auto floatAttr = value.cast<FloatAttr>();
-    if (floatAttr.getValueAsDouble() != 0.0)
-      return false;
-  } else if (auto intType = valueType.dyn_cast<IntegerType>()) {
-    auto intAttr = value.cast<IntegerAttr>();
-    if (intAttr.getInt() != 0)
-      return false;
-  } else {
-    return false;
+    if (floatAttr.getValueAsDouble() == 0.0)
+      return true;
   }
-  return true;
+  if (auto intType = valueType.dyn_cast<IntegerType>()) {
+    auto intAttr = value.cast<IntegerAttr>();
+    if (intAttr.getInt() == 0)
+      return true;
+  }
+  return false;
 }
 
 void replaceAssignLoadAdd(PxaReduceOpInterface &reduceOp) {
   // Consider only addf and addi kinds
-  if (reduceOp.getAgg() != AtomicRMWKind::addf &&
-      reduceOp.getAgg() != AtomicRMWKind::addi)
+  if (reduceOp.getAgg() != arith::AtomicRMWKind::addf &&
+      reduceOp.getAgg() != arith::AtomicRMWKind::addi)
     return;
 
   auto memRefOp = reduceOp.getMemRef().getDefiningOp();
@@ -61,7 +68,8 @@ void replaceAssignLoadAdd(PxaReduceOpInterface &reduceOp) {
 
   // The memref operand needs to come from reduce op assign
   auto reduceAssignOp = dyn_cast<PxaReduceOpInterface>(memRefOp);
-  if (!reduceAssignOp || reduceAssignOp.getAgg() != AtomicRMWKind::assign)
+  if (!reduceAssignOp ||
+      reduceAssignOp.getAgg() != arith::AtomicRMWKind::assign)
     return;
 
   // Check if both reduce add and assign are of the same type, vector or scalar
@@ -77,7 +85,7 @@ void replaceAssignLoadAdd(PxaReduceOpInterface &reduceOp) {
   if (!assignValOp)
     return;
 
-  auto constantVal = dyn_cast<ConstantOp>(assignValOp);
+  auto constantVal = dyn_cast<arith::ConstantOp>(assignValOp);
   if (!constantVal || !checkIfZero(constantVal))
     return;
 
@@ -102,15 +110,15 @@ void replaceAssignLoadAdd(PxaReduceOpInterface &reduceOp) {
   OpBuilder builder(reduceOp);
   if (isa<PxaVectorReduceOp>(reduceOp.getOperation())) {
     auto newReduceOp = builder.create<PxaVectorReduceOp>(
-        reduceOp.getLoc(), AtomicRMWKind::assign, reduceOp.getValueToStore(),
-        reduceAssignOp.getMemRef(), reduceOp.getAffineMap(),
-        reduceOp.getIdxs());
+        reduceOp.getLoc(), arith::AtomicRMWKind::assign,
+        reduceOp.getValueToStore(), reduceAssignOp.getMemRef(),
+        reduceOp.getAffineMap(), reduceOp.getIdxs());
     reduceOp.getReduceResult().replaceAllUsesWith(newReduceOp.getResult());
   } else {
     auto newReduceOp = builder.create<PxaReduceOp>(
-        reduceOp.getLoc(), AtomicRMWKind::assign, reduceOp.getValueToStore(),
-        reduceAssignOp.getMemRef(), reduceOp.getAffineMap(),
-        reduceOp.getIdxs());
+        reduceOp.getLoc(), arith::AtomicRMWKind::assign,
+        reduceOp.getValueToStore(), reduceAssignOp.getMemRef(),
+        reduceOp.getAffineMap(), reduceOp.getIdxs());
     reduceOp.getReduceResult().replaceAllUsesWith(newReduceOp.getResult());
   }
 
@@ -121,8 +129,8 @@ void replaceAssignLoadAdd(PxaReduceOpInterface &reduceOp) {
 
 struct SimplifyArithmeticPass
     : public SimplifyArithmeticBase<SimplifyArithmeticPass> {
-  void runOnFunction() final {
-    FuncOp f = getFunction();
+  void runOnOperation() final {
+    func::FuncOp f = getOperation();
     f.walk(
         [&](PxaReduceOpInterface reduceOp) { replaceAssignLoadAdd(reduceOp); });
   }

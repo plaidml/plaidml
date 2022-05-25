@@ -7,39 +7,35 @@ include "mlir/IR/OpBase.td"
 include "mlir/Interfaces/LoopLikeInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/ViewLikeInterface.td"
-include "mlir/Dialect/StandardOps/IR/StandardOpsBase.td"
 
 def StdX_Dialect : Dialect {
   let name = "stdx";
   let cppNamespace = "pmlc::dialect::stdx";
 }
 
-class StdX_Op<string mnemonic, list<OpTrait> traits = []> :
+class StdX_Op<string mnemonic, list<Trait> traits = []> :
     Op<StdX_Dialect, mnemonic, traits> {
-  let printer = [{ print$cppClass(p, *this); }];
-  let parser = [{ return parse$cppClass(parser, result); }];
-  let verifier = [{ return verify$cppClass(*this); }];
+  let hasCustomAssemblyFormat = 1;
+  let hasVerifier = 1;
 }
 
 def ReshapeOp : StdX_Op<"reshape",
   [DeclareOpInterfaceMethods<ViewLikeOpInterface>]> {
-  let summary = "tensor reshape operation";
+  let summary = "memref reshape operation";
   let arguments = (ins AnyMemRef:$tensor);
   let results = (outs AnyMemRef:$result);
   let assemblyFormat = [{
     `(` $tensor `)` attr-dict `:` functional-type($tensor, results)
   }];
-  let verifier = ?;
 }
 
-class StdX_UnaryFuncOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
+class StdX_UnaryFuncOp<string mnemonic, list<Trait> traits = [NoSideEffect]> :
     Op<StdX_Dialect, mnemonic, traits> {
   let arguments = (ins AnyType:$value);
   let results = (outs AnyType);
   let assemblyFormat = [{
     `(` $value `)` attr-dict `:` functional-type(operands, results)
   }];
-  let verifier = ?;
 }
 
 def ACosOp : StdX_UnaryFuncOp<"acos"> {
@@ -85,7 +81,6 @@ def PowOp : StdX_Op<"pow"> {
   let assemblyFormat = [{
     `(` $base `,` $exponent `)` attr-dict `:` functional-type(operands, results)
   }];
-  let verifier = ?;
 }
 
 def ReluOp : StdX_UnaryFuncOp<"relu"> {
@@ -114,7 +109,6 @@ def SubgroupBroadcastOp : StdX_Op<"subgroup_broadcast", [NoSideEffect, AllTypesM
   let assemblyFormat = [{
     `(` $value `,` $localid `)` attr-dict `:` type($value)
   }];
-  let verifier = ?;
 }
 
 def SubgroupBlockReadINTELOp : StdX_Op<"subgroup_block_read_intel", [NoSideEffect]> {
@@ -183,11 +177,9 @@ def ClosureOp : StdX_Op<"closure", [
   let arguments = (ins TypeAttr:$type);
   let regions = (region SizedRegion<1>:$body);
 
-  let printer = [{ return print$cppClass(p, *this); }];
-  let parser = [{ return parse$cppClass(parser, result); }];
-
+  let hasCustomAssemblyFormat = 1;
   let extraClassDeclaration = [{
-      mlir::FunctionType getType() { return type().cast<mlir::FunctionType>(); }
+      mlir::FunctionType getFunctionType() { return type().cast<mlir::FunctionType>(); }
       void setType(mlir::FunctionType type) {
         typeAttr(mlir::TypeAttr::get(type));
       }

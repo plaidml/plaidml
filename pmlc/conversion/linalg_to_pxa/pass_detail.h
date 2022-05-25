@@ -3,7 +3,7 @@
 #pragma once
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
-#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/SCF.h"
@@ -38,9 +38,6 @@ void populateLinalgTensorCollapseOpGeneralizationPatterns(
     mlir::RewritePatternSet &patterns);
 
 void populateLinalgTensorExpandOpGeneralizationPatterns(
-    mlir::RewritePatternSet &patterns);
-
-void populateLinalgPoolingOpGeneralizationPatterns(
     mlir::RewritePatternSet &patterns);
 
 } // namespace pmlc::conversion::linalg_to_pxa

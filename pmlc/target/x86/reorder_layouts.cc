@@ -1,7 +1,8 @@
 // Copyright 2021, Intel Corporation
 
-#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/Support/DebugStringHelper.h"
@@ -93,14 +94,14 @@ AffineExpr isSizeOne(AffineExpr expr, SmallVector<int64_t, 4> &ranges) {
 
 // Forward a reorder thru linalg.pad_tensor operations.
 struct PropagateReorderThruPadTensorOpPattern
-    : public OpRewritePattern<linalg::PadTensorOp> {
-  using OpRewritePattern<linalg::PadTensorOp>::OpRewritePattern;
+    : public OpRewritePattern<tensor::PadOp> {
+  using OpRewritePattern<tensor::PadOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(linalg::PadTensorOp op,
+  LogicalResult matchAndRewrite(tensor::PadOp op,
                                 PatternRewriter &rewriter) const final {
     Optional<ReorderInfo> info = getReorderInfo(&op->getOpOperand(0));
     if (!info) {
-      IVLOG(1, "Unrecognized PadTensorOp: " << debugString(op));
+      IVLOG(1, "Unrecognized PadOp: " << debugString(op));
       return failure();
     }
 
@@ -114,13 +115,12 @@ struct PropagateReorderThruPadTensorOpPattern
     lower.insert(lower.begin() + 1, 0);
     upper.insert(upper.begin() + 1, 0);
 
-    auto newOp =
-        rewriter.create<linalg::PadTensorOp>(op->getLoc(),
-                                             /*source=*/info->sourceValue,
-                                             /*staticLow=*/lower,
-                                             /*staticHigh=*/upper,
-                                             /*low=*/ValueRange{},
-                                             /*high=*/ValueRange{});
+    auto newOp = rewriter.create<tensor::PadOp>(op->getLoc(),
+                                                /*source=*/info->sourceValue,
+                                                /*staticLow=*/lower,
+                                                /*staticHigh=*/upper,
+                                                /*low=*/ValueRange{},
+                                                /*high=*/ValueRange{});
     SmallVector<Type, 4> padArgs(lower.size(), rewriter.getIndexType());
     {
       OpBuilder::InsertionGuard guard(rewriter);
@@ -360,8 +360,8 @@ struct FoldBroadcastReordersPattern : public OpRewritePattern<linalgx::CopyOp> {
 };
 
 struct ReorderLayoutsPass : public ReorderLayoutsBase<ReorderLayoutsPass> {
-  void runOnFunction() final {
-    FuncOp func = getFunction();
+  void runOnOperation() final {
+    func::FuncOp func = getOperation();
     MLIRContext *context = func.getContext();
 
     func.walk([&](linalg::GenericOp op) { reorderConvolution(op); });
@@ -540,8 +540,8 @@ struct ReorderLayoutsPass : public ReorderLayoutsBase<ReorderLayoutsPass> {
         /*doc=*/"",
         /*libraryCall=*/"",
         [](OpBuilder &builder, Location loc, ValueRange args) {
-          auto mul = builder.create<MulFOp>(loc, args[0], args[1]);
-          auto add = builder.create<AddFOp>(loc, args[2], mul);
+          auto mul = builder.create<arith::MulFOp>(loc, args[0], args[1]);
+          auto add = builder.create<arith::AddFOp>(loc, args[2], mul);
           builder.create<linalg::YieldOp>(loc, ValueRange{add});
         });
 
@@ -564,8 +564,8 @@ struct ReorderLayoutsPass : public ReorderLayoutsBase<ReorderLayoutsPass> {
 
 struct ReorderWeightLayoutsPass
     : public ReorderWeightLayoutsBase<ReorderWeightLayoutsPass> {
-  void runOnFunction() final {
-    FuncOp func = getFunction();
+  void runOnOperation() final {
+    func::FuncOp func = getOperation();
     MLIRContext *context = func.getContext();
 
     func.walk([&](linalg::GenericOp op) { reorderConvolution(op); });
@@ -719,8 +719,8 @@ struct ReorderWeightLayoutsPass
         /*doc=*/"",
         /*libraryCall=*/"",
         [](OpBuilder &builder, Location loc, ValueRange args) {
-          auto mul = builder.create<MulFOp>(loc, args[0], args[1]);
-          auto add = builder.create<AddFOp>(loc, args[2], mul);
+          auto mul = builder.create<arith::MulFOp>(loc, args[0], args[1]);
+          auto add = builder.create<arith::AddFOp>(loc, args[2], mul);
           builder.create<linalg::YieldOp>(loc, ValueRange{add});
         });
 

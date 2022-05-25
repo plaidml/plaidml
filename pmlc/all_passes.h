@@ -2,14 +2,6 @@
 
 #pragma once
 
-#include "mlir/Conversion/Passes.h"
-#include "mlir/Dialect/Affine/Passes.h"
-#include "mlir/Dialect/LLVMIR/Transforms/Passes.h"
-#include "mlir/Dialect/Linalg/Passes.h"
-#include "mlir/Dialect/SCF/Passes.h"
-#include "mlir/Dialect/StandardOps/Transforms/Passes.h"
-#include "mlir/Transforms/Passes.h"
-
 #include "mlir-hlo/Dialect/mhlo/transforms/register_passes.h"
 #include "mlir-hlo/Transforms/register_passes.h"
 
@@ -29,35 +21,18 @@
 #include "pmlc/target/x86/passes.h"
 #include "pmlc/transforms/passes.h"
 
-// This function may be called to register the MLIR passes with the
-// global registry.
-// If you're building a compiler, you likely don't need this: you would build a
-// pipeline programmatically without the need to register with the global
-// registry, since it would already be calling the creation routine of the
-// individual passes.
-// The global registry is interesting to interact with the command-line tools.
+// This function may be called to register the MLIR passes with the global
+// registry.  If you're building a compiler, you likely don't need this: you
+// would build a pipeline programmatically without the need to register with
+// the global registry, since it would already be calling the creation routine
+// of the individual passes.  The global registry is interesting to interact
+// with the command-line tools.
+
+namespace pmlc {
+
 inline void registerAllPasses() {
-  //
-  // MLIR Core
-  //
-
-  // General passes
-  mlir::registerTransformsPasses();
-
-  // Conversion passes
-  mlir::registerConversionPasses();
-
-  // Dialect passes
-  mlir::registerAffinePasses();
-  mlir::registerLinalgPasses();
-  mlir::LLVM::registerLLVMPasses();
-  mlir::registerSCFPasses();
-  mlir::registerStandardPasses();
-
   // XLA
   mlir::mhlo::registerAllMhloPasses();
-  mlir::lmhlo::registerAllLmhloPasses();
-  mlir::disc_ral::registerAllDiscRalPasses();
   mlir::hlo::registerAllHloPasses();
 
   //
@@ -88,3 +63,5 @@ inline void registerAllPasses() {
 
   pmlc::rt::registerRuntimes();
 }
+
+} // end namespace pmlc

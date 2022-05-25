@@ -35,50 +35,52 @@ Value createCastOp(OpBuilder &builder, Location loc, Value from,
   if (auto intoFloatType = intoType.dyn_cast<FloatType>()) {
     if (auto fromFloatType = fromType.dyn_cast<FloatType>()) {
       if (fromFloatType.getWidth() < intoFloatType.getWidth()) {
-        // FPExtOp: FloatType -> wider FloatType
-        return builder.create<FPExtOp>(loc, from, intoType).getResult();
+        // arith::ExtFOp: FloatType -> wider FloatType
+        return builder.create<arith::ExtFOp>(loc, intoType, from).getResult();
       }
-      // FPTruncOp: FloatType -> narrower FloatType
-      return builder.create<FPTruncOp>(loc, from, intoType).getResult();
+      // arith::TruncFOp: FloatType -> narrower FloatType
+      return builder.create<arith::TruncFOp>(loc, intoType, from).getResult();
     }
     if (auto fromIntType = fromType.dyn_cast<IntegerType>()) {
       if (fromSigned) {
-        // SIToFPOp: IntegerType -> FloatType
-        return builder.create<SIToFPOp>(loc, from, intoType).getResult();
+        // arith::SIToFPOp: IntegerType -> FloatType
+        return builder.create<arith::SIToFPOp>(loc, intoType, from).getResult();
       }
-      // UIToFPOp: IntegerType -> FloatType
-      return builder.create<UIToFPOp>(loc, intoType, from).getResult();
+      // arith::UIToFPOp: IntegerType -> FloatType
+      return builder.create<arith::UIToFPOp>(loc, intoType, from).getResult();
     }
     if (auto fromIndexType = fromType.dyn_cast<IndexType>()) {
       IntegerType i64Type = builder.getIntegerType(64);
-      auto intCastOp = builder.create<IndexCastOp>(loc, from, i64Type);
-      return builder.create<SIToFPOp>(loc, intCastOp, intoType).getResult();
+      auto intCastOp = builder.create<arith::IndexCastOp>(loc, i64Type, from);
+      return builder.create<arith::SIToFPOp>(loc, intoType, intCastOp)
+          .getResult();
     }
   }
   if (auto intoIntType = intoType.dyn_cast<IntegerType>()) {
     if (auto fromIntType = fromType.dyn_cast<IntegerType>()) {
       if (fromIntType.getWidth() < intoIntType.getWidth()) {
         if (fromSigned) {
-          // SignExtendIOp: IntegerType -> wider signed int
-          return builder.create<SignExtendIOp>(loc, from, intoType).getResult();
+          // arith::ExtSIOp: IntegerType -> wider signed int
+          return builder.create<arith::ExtSIOp>(loc, intoType, from)
+              .getResult();
         }
-        // ZeroExtendIOp: IntegerType -> wider unsigned int
-        return builder.create<ZeroExtendIOp>(loc, from, intoType).getResult();
+        // arith::ExtUIOp: IntegerType -> wider unsigned int
+        return builder.create<arith::ExtUIOp>(loc, intoType, from).getResult();
       }
-      // TruncateIOp: IntegerType -> narrower IntegerType
-      return builder.create<TruncateIOp>(loc, from, intoType).getResult();
+      // arith::TruncIOp: IntegerType -> narrower IntegerType
+      return builder.create<arith::TruncIOp>(loc, intoType, from).getResult();
     }
     if (auto fromFloatType = fromType.dyn_cast<FloatType>()) {
       if (intoSigned) {
-        // FPToSIOp: FloatType -> signed IntegerType
-        return builder.create<FPToSIOp>(loc, from, intoType).getResult();
+        // arith::FPToSIOp: FloatType -> signed IntegerType
+        return builder.create<arith::FPToSIOp>(loc, intoType, from).getResult();
       }
-      // FPToUIOp: FloatType -> unsigned IntegerType
-      return builder.create<FPToUIOp>(loc, from, intoType).getResult();
+      // arith::FPToUIOp: FloatType -> unsigned IntegerType
+      return builder.create<arith::FPToUIOp>(loc, intoType, from).getResult();
     }
     if (auto fromIndexType = fromType.dyn_cast<IndexType>()) {
       IntegerType intType = builder.getIntegerType(intoIntType.getWidth());
-      return builder.create<IndexCastOp>(loc, from, intType);
+      return builder.create<arith::IndexCastOp>(loc, intType, from);
     }
   }
   llvm_unreachable("Unsupported cast op");
@@ -92,7 +94,7 @@ Value buildSimpleStore(OpBuilder &builder, Location loc, Value scalar,
   if (elementType != scalar.getType()) {
     scalar = createCastOp(builder, loc, scalar, false, elementType, false);
   }
-  AtomicRMWKind aggOp = AtomicRMWKind::assign;
+  arith::AtomicRMWKind aggOp = arith::AtomicRMWKind::assign;
   AffineMap idMap = builder.getMultiDimIdentityMap(memRefType.getRank());
   auto storeOp = builder.create<pxa::PxaReduceOp>(loc, aggOp, scalar, memRef,
                                                   idMap, body->getArguments());
@@ -132,19 +134,23 @@ Value createInit(OpBuilder &builder, Location loc, Type type,
     switch (agg) {
     case AggregationKind::add: {
       auto value = convertFloatUsingType(llvm::APFloat(0.0), floatType);
-      return builder.create<mlir::ConstantFloatOp>(loc, value, floatType);
+      return builder.create<mlir::arith::ConstantFloatOp>(loc, value,
+                                                          floatType);
     }
     case AggregationKind::mul: {
       auto value = convertFloatUsingType(llvm::APFloat(1.0), floatType);
-      return builder.create<mlir::ConstantFloatOp>(loc, value, floatType);
+      return builder.create<mlir::arith::ConstantFloatOp>(loc, value,
+                                                          floatType);
     }
     case AggregationKind::min: {
       auto value = llvm::APFloat::getInf(floatType.getFloatSemantics(), false);
-      return builder.create<mlir::ConstantFloatOp>(loc, value, floatType);
+      return builder.create<mlir::arith::ConstantFloatOp>(loc, value,
+                                                          floatType);
     }
     case AggregationKind::max: {
       auto value = llvm::APFloat::getInf(floatType.getFloatSemantics(), true);
-      return builder.create<mlir::ConstantFloatOp>(loc, value, floatType);
+      return builder.create<mlir::arith::ConstantFloatOp>(loc, value,
+                                                          floatType);
     }
     default:
       llvm_unreachable("Unsupported aggregation for createInit");
@@ -152,14 +158,14 @@ Value createInit(OpBuilder &builder, Location loc, Type type,
   } else if (auto intType = type.dyn_cast<IntegerType>()) {
     switch (agg) {
     case AggregationKind::add:
-      return builder.create<mlir::ConstantIntOp>(loc, 0, intType);
+      return builder.create<mlir::arith::ConstantIntOp>(loc, 0, intType);
     case AggregationKind::mul:
-      return builder.create<mlir::ConstantIntOp>(loc, 1, intType);
+      return builder.create<mlir::arith::ConstantIntOp>(loc, 1, intType);
     case AggregationKind::min:
-      return builder.create<mlir::ConstantIntOp>(
+      return builder.create<mlir::arith::ConstantIntOp>(
           loc, std::numeric_limits<int>::max(), intType);
     case AggregationKind::max:
-      return builder.create<mlir::ConstantIntOp>(
+      return builder.create<mlir::arith::ConstantIntOp>(
           loc, std::numeric_limits<int>::min(), intType);
     default:
       llvm_unreachable("Unsupported aggregation for createInit");
@@ -185,7 +191,7 @@ Value buildBroadcastLoad(OpBuilder &builder, Location loc, Value operand,
     unsigned j = outRank - i - 1;
     unsigned k = operandType.getRank() - i - 1;
     if (shape[k] == 1) {
-      operandIdxs[k] = builder.create<mlir::ConstantIndexOp>(loc, 0);
+      operandIdxs[k] = builder.create<mlir::arith::ConstantIndexOp>(loc, 0);
     } else {
       operandIdxs[k] = body->getArgument(j);
     }
@@ -222,7 +228,8 @@ BufferAllocator::BufferAllocator(OpBuilder &builder, Operation *op,
     auto parallel = builder.create<AffineParallelOp>(
         loc,
         /*resultTypes=*/ArrayRef<Type>{memRefType},
-        /*reductions=*/ArrayRef<AtomicRMWKind>{AtomicRMWKind::assign},
+        /*reductions=*/
+        ArrayRef<arith::AtomicRMWKind>{arith::AtomicRMWKind::assign},
         /*ranges=*/shape);
     auto parallelBuilder = parallel.getBodyBuilder();
     auto load =

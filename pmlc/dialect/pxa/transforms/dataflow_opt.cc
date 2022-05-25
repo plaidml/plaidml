@@ -2,7 +2,7 @@
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/IR/AffineValueMap.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Support/DebugStringHelper.h"
 
 #include "pmlc/dialect/pxa/analysis/memref_access.h"
@@ -23,9 +23,9 @@ struct MemRefDataFlowOptPass
     this->onlyParallelNested = onlyParallelNested;
   }
 
-  void runOnFunction() final {
+  void runOnOperation() final {
     // Walk all load's and perform reduce to load forwarding.
-    FuncOp f = getFunction();
+    func::FuncOp f = getOperation();
     f.walk([&](PxaReadOpInterface loadOp) {
       auto defOp = loadOp.getMemRef().getDefiningOp();
       if (!defOp) {
@@ -33,7 +33,7 @@ struct MemRefDataFlowOptPass
       }
 
       auto reduceOp = dyn_cast_or_null<PxaReduceOpInterface>(defOp);
-      if (!reduceOp || reduceOp.getAgg() != AtomicRMWKind::assign) {
+      if (!reduceOp || reduceOp.getAgg() != arith::AtomicRMWKind::assign) {
         return;
       }
 

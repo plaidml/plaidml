@@ -8,14 +8,14 @@
 #include <utility>
 #include <vector>
 
-#include "mlir/Analysis/AffineStructures.h"
+#include "mlir/Dialect/Affine/Analysis/AffineStructures.h"
 #include "mlir/Pass/Pass.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/dialect/pxa/transforms/pass_detail.h"
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/IR/AffineValueMap.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "pmlc/dialect/pxa/transforms/tile.h"
 
 #include "mlir/Support/DebugStringHelper.h"
@@ -62,8 +62,8 @@ struct GPUThreadPass : public GPUThreadBase<GPUThreadPass> {
   GPUThreadPass() = default;
   explicit GPUThreadPass(unsigned maxThreads) { this->maxThreads = maxThreads; }
   void threadOp(AffineParallelOp op) {}
-  void runOnFunction() final {
-    auto func = getFunction();
+  void runOnOperation() final {
+    auto func = getOperation();
     // Nest outermost loops into 'blocks' and 'threads'
     for (auto op : func.getOps<AffineParallelOp>()) {
       gpuThreadParallelOp(maxThreads, op);

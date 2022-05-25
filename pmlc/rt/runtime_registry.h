@@ -51,8 +51,7 @@ void registerFactory(mlir::StringRef id, Factory factory);
 // makeStaticFactory is a template function returning a Factory that
 // instantiates an instance of the supplied concrete Runtime class.  The Runtime
 // class must be DefaultConstructible.
-template <class R>
-Factory makeStaticFactory() {
+template <class R> Factory makeStaticFactory() {
   return Factory{[]() { return std::make_shared<R>(); }};
 }
 
@@ -78,8 +77,7 @@ struct FactoryRegistration {
 //
 //   RuntimeRegistration<OpenCLRuntime> reg{"opencl"};
 //
-template <class R>
-struct RuntimeRegistration {
+template <class R> struct RuntimeRegistration {
   explicit RuntimeRegistration(mlir::StringRef id) {
     registerFactory(id, makeStaticFactory<R>());
   }

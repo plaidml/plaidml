@@ -11,7 +11,7 @@ module {
 // CHECK-LABEL: func @bit_right_scalar
 // CHECK: linalg.init_tensor [3, 3]
 // CHECK: linalg.generic
-// CHECK:   sexti
-// CHECK:   shift_right_unsigned
+// CHECK:   arith.extsi
+// CHECK:   arith.shrui
 // CHECK:   linalg.yield
 // CHECK: return

@@ -12,7 +12,7 @@ def LayerDialect : Dialect {
   let cppNamespace = "pmlc::dialect::layer";
 }
 
-class LayerOp<string mnemonic, list<OpTrait> traits = []>
+class LayerOp<string mnemonic, list<Trait> traits = []>
     : Op<LayerDialect, mnemonic, traits> {
 }
 
@@ -22,7 +22,7 @@ def BoxOp : LayerOp<"box", [IsolatedFromAbove]> {
   let arguments = (ins
     Variadic<AnyType>:$operands,
     StrAttr:$op,
-    DictionaryAttr:$attrs);
+    OptionalAttr<DictionaryAttr>:$attrs);
   let results = (outs Variadic<AnyType>:$results);
   let regions = (region SizedRegion<1>:$body);
 
@@ -39,9 +39,10 @@ def BoxOp : LayerOp<"box", [IsolatedFromAbove]> {
   let extraClassDeclaration = [{
     mlir::Block *getBody();
   }];
-
-  let printer = [{ print$cppClass(p, *this); }];
-  let parser = [{ return parse$cppClass(parser, result); }];
+  
+  let assemblyFormat = [{
+    $op `(` $operands `)` attr-dict `:` type($operands) `->` type($results) $body
+  }];
 }
 
 def ReturnOp : LayerOp<"return", [

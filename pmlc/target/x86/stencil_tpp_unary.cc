@@ -1,8 +1,9 @@
 // Copyright 2020 Intel Corporation
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/DebugStringHelper.h"
-
 #include "pmlc/dialect/pxa/ir/matchers.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/dialect/pxa/transforms/autotile.h"
@@ -66,7 +67,7 @@ private:
     Value load, reduce;
     auto pattern = m_Op<AffineYieldOp>(m_Capture(
         &reduce,
-        pxa::m_PxaReduceOp(AtomicRMWKind::assign,
+        pxa::m_PxaReduceOp(arith::AtomicRMWKind::assign,
                            m_Op<OpTy>(m_Capture(&load, m_Op<pxa::PxaLoadOp>())),
                            m_Any())));
 
@@ -82,7 +83,7 @@ private:
       // If the definition of load's source is in "op", it is too complex to
       // stencil
       auto defOp = source.getDefiningOp();
-      while (!isa<FuncOp>(defOp)) {
+      while (!isa<func::FuncOp>(defOp)) {
         if (defOp == op.getOperation())
           return;
         defOp = defOp->getParentOp();
@@ -103,7 +104,7 @@ private:
     Value load, reduce;
     auto pattern = m_Op<AffineYieldOp>(m_Capture(
         &reduce,
-        pxa::m_PxaReduceOp(AtomicRMWKind::assign,
+        pxa::m_PxaReduceOp(arith::AtomicRMWKind::assign,
                            m_Capture(&load, m_Op<pxa::PxaLoadOp>()), m_Any())));
 
     Operation *yield = op.getBody()->getTerminator();
@@ -117,7 +118,7 @@ private:
       // If the definition of load's source is in "op", it is too complex to
       // stencil
       auto defOp = source.getDefiningOp();
-      while (!isa<FuncOp>(defOp)) {
+      while (!isa<func::FuncOp>(defOp)) {
         if (defOp == op.getOperation())
           return;
         defOp = defOp->getParentOp();
@@ -235,8 +236,8 @@ public:
 } // namespace
 
 struct StencilTppUnaryPass : public StencilTppUnaryBase<StencilTppUnaryPass> {
-  void runOnFunction() final {
-    getFunction().walk([](AffineParallelOp op) {
+  void runOnOperation() final {
+    getOperation().walk([](AffineParallelOp op) {
       if (op.getIVs().size() >= 2) {
         StencilImpl stencil(op);
         stencil.performStenciling();

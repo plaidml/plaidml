@@ -5,6 +5,7 @@
 
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "pmlc/dialect/tile/ir/interfaces.td"
+include "mlir/IR/EnumAttr.td"
 
 def TileDialect : Dialect {
   let name = "tile";
@@ -16,7 +17,7 @@ def TileDialect : Dialect {
   }];
 }
 
-class TileOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
+class TileOp<string mnemonic, list<Trait> traits = [NoSideEffect]> :
     Op<TileDialect, mnemonic, traits> {}
 
 class HasFolder {

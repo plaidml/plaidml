@@ -3,7 +3,6 @@
 #include "pmlc/dialect/pml/ir/dialect.h"
 
 #include "mlir/IR/DialectImplementation.h"
-#include "mlir/IR/Identifier.h"
 #include "mlir/IR/OpDefinition.h"
 #include "llvm/ADT/TypeSwitch.h"
 
@@ -23,32 +22,11 @@ void PMLDialect::initialize() {
       >();
 }
 
-Attribute PMLDialect::parseAttribute(DialectAsmParser &parser,
-                                     Type type) const {
-  StringRef attrTag;
-  if (failed(parser.parseKeyword(&attrTag)))
-    return Attribute();
-  Attribute attr;
-  auto parseResult =
-      generatedAttributeParser(getContext(), parser, attrTag, type, attr);
-  if (parseResult.hasValue())
-    return attr;
-  parser.emitError(parser.getNameLoc(), "unknown schedule attribute");
-  return Attribute();
-}
-
-void PMLDialect::printAttribute(Attribute attr,
-                                DialectAsmPrinter &printer) const {
-  if (succeeded(generatedAttributePrinter(attr, printer)))
-    return;
-}
-
-static ParseResult parseAxisAttr(MLIRContext *context, DialectAsmParser &parser,
+static ParseResult parseAxisAttr(MLIRContext *context, AsmParser &parser,
                                  AxisAttr &attr) {
   StringRef typeStr;
   IntegerAttr range;
-  if (parser.parseKeyword(&typeStr) || //
-      parser.parseColon() ||           //
+  if (parser.parseKeyword(&typeStr) || parser.parseColon() ||
       parser.parseAttribute(range)) {
     parser.emitError(parser.getNameLoc(), "expected '$type:$range'");
     return failure();
@@ -60,30 +38,25 @@ static ParseResult parseAxisAttr(MLIRContext *context, DialectAsmParser &parser,
   return success();
 }
 
-static void printAxisAttr(DialectAsmPrinter &printer, AxisAttr axis) {
+static void printAxisAttr(AsmPrinter &printer, AxisAttr axis) {
   printer << axis.getName().getValue() << ':' << axis.getRange();
 }
 
-Attribute AxisAttr::parse(MLIRContext *context, DialectAsmParser &parser,
-                          Type type) {
+Attribute AxisAttr::parse(AsmParser &parser, Type type) {
   AxisAttr attr;
-  if (parser.parseLess() ||                   //
-      parseAxisAttr(context, parser, attr) || //
+  if (parser.parseLess() || parseAxisAttr(parser.getContext(), parser, attr) ||
       parser.parseGreater())
     return {};
   return attr;
 }
 
-void AxisAttr::print(DialectAsmPrinter &printer) const {
+void AxisAttr::print(AsmPrinter &printer) const {
   printer << "axis<" << getName().getValue() << ':' << getRange() << '>';
 }
 
-Attribute ScheduleAttr::parse(MLIRContext *context, DialectAsmParser &parser,
-                              Type type) {
+Attribute ScheduleAttr::parse(AsmParser &parser, Type type) {
   AffineMap map;
-  if (parser.parseLess() ||         //
-      parser.parseAffineMap(map) || //
-      parser.parseComma() ||        //
+  if (parser.parseLess() || parser.parseAffineMap(map) || parser.parseComma() ||
       parser.parseLSquare()) {
     parser.emitError(parser.getNameLoc(), "expected '$map, $axes'");
     return {};
@@ -92,20 +65,19 @@ Attribute ScheduleAttr::parse(MLIRContext *context, DialectAsmParser &parser,
   SmallVector<AxisAttr> axes;
   do {
     AxisAttr axis;
-    if (parseAxisAttr(context, parser, axis))
+    if (parseAxisAttr(parser.getContext(), parser, axis))
       return {};
     axes.push_back(axis);
   } while (succeeded(parser.parseOptionalComma()));
 
-  if (parser.parseRSquare() || //
-      parser.parseGreater())
+  if (parser.parseRSquare() || parser.parseGreater())
     return {};
 
-  return parser.getChecked<ScheduleAttr>(context, map, axes);
+  return parser.getChecked<ScheduleAttr>(parser.getContext(), map, axes);
 }
 
-void ScheduleAttr::print(DialectAsmPrinter &printer) const {
-  printer << "schedule<" << getMap() << ", [";
+void ScheduleAttr::print(AsmPrinter &printer) const {
+  printer << "<" << getMap() << ", [";
   llvm::interleaveComma(getAxes(), printer,
                         [&](AxisAttr axis) { printAxisAttr(printer, axis); });
   printer << "]>";
@@ -164,41 +136,34 @@ ScheduleAttr ScheduleAttr::removeAxes(DenseSet<StringRef> names) {
   return ScheduleAttr::get(getContext(), map, axes);
 }
 
-Attribute PatternAttr::parse(MLIRContext *context, DialectAsmParser &parser,
-                             Type type) {
+Attribute PatternAttr::parse(AsmParser &parser, Type type) {
   StringAttr op;
   DictionaryAttr dict;
-  if (parser.parseLess() ||          //
-      parser.parseAttribute(op) ||   //
-      parser.parseComma() ||         //
-      parser.parseAttribute(dict) || //
-      parser.parseGreater()) {
+  if (parser.parseLess() || parser.parseAttribute(op) || parser.parseComma() ||
+      parser.parseAttribute(dict) || parser.parseGreater()) {
     parser.emitError(parser.getNameLoc(), "expected '$op, $dict'");
     return {};
   }
-  return parser.getChecked<PatternAttr>(context, op, dict);
+  return parser.getChecked<PatternAttr>(parser.getContext(), op, dict);
 }
 
-void PatternAttr::print(DialectAsmPrinter &printer) const {
+void PatternAttr::print(AsmPrinter &printer) const {
   printer << "pattern<" << getOp() << ", " << getDict() << '>';
 }
 
-Attribute ApplyAttr::parse(MLIRContext *context, DialectAsmParser &parser,
-                           Type type) {
+Attribute ApplyAttr::parse(AsmParser &parser, Type type) {
   PatternAttr pattern;
   DictionaryAttr dict;
-  if (parser.parseLess() ||             //
-      parser.parseAttribute(pattern) || //
-      parser.parseComma() ||            //
-      parser.parseAttribute(dict) ||    //
+  if (parser.parseLess() || parser.parseAttribute(pattern) ||
+      parser.parseComma() || parser.parseAttribute(dict) ||
       parser.parseGreater()) {
     parser.emitError(parser.getNameLoc(), "expected '$pattern, $dict'");
     return {};
   }
-  return parser.getChecked<ApplyAttr>(context, pattern, dict);
+  return parser.getChecked<ApplyAttr>(parser.getContext(), pattern, dict);
 }
 
-void ApplyAttr::print(DialectAsmPrinter &printer) const {
+void ApplyAttr::print(AsmPrinter &printer) const {
   printer << "apply<" << getPattern() << ", " << getDict() << '>';
 }
 

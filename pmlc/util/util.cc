@@ -81,7 +81,8 @@ void wrapFunctionAndPackArguments(llvm::Module *module, StringRef funcName,
   for (auto &indexedArg : llvm::enumerate(func->args())) {
     llvm::Value *argIndex = llvm::Constant::getIntegerValue(
         builder.getInt64Ty(), APInt(64, indexedArg.index()));
-    llvm::Value *argPtrPtr = builder.CreateGEP(argList, argIndex);
+    llvm::Value *argPtrPtr =
+        builder.CreateGEP(builder.getInt8PtrTy(), argList, argIndex);
     llvm::Value *argPtr = builder.CreateLoad(builder.getInt8PtrTy(), argPtrPtr);
     llvm::Type *dstType = indexedArg.value().getType();
     llvm::Value *arg = dstType->isIntegerTy()

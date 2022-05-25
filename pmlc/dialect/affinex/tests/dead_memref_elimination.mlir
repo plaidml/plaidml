@@ -2,7 +2,7 @@
 
 // CHECK: alloc_store
 func @alloc_store () {
-  %cst = constant 0.000000e+00 : f32
+  %cst = arith.constant 0.000000e+00 : f32
   // CHECK-NOT: memref.alloc
   %0 = memref.alloc() : memref<1xf32>
   // CHECK-NOT: affine.store
@@ -23,7 +23,7 @@ func @alloc_dealloc () {
 
 // CHECK: alloc_used
 func @alloc_used () {
-  %cst = constant 0.000000e+00 : f32
+  %cst = arith.constant 0.000000e+00 : f32
   // CHECK: alloc
   %0 = memref.alloc() : memref<1xf32>
   // CHECK: affine.store
@@ -31,7 +31,7 @@ func @alloc_used () {
   // CHECK: affine.load
   %1 = affine.load %0[0] : memref<1xf32>
   // CHECK: addf
-  %2 = addf %1, %1 : f32
+  %2 = arith.addf %1, %1 : f32
   // CHECK: return
   return
 }

@@ -1,8 +1,9 @@
 // Copyright 2020 Intel Corporation
 
-#include "mlir/Analysis/LoopAnalysis.h"
+#include "mlir/Dialect/Affine/Analysis/LoopAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
-#include "mlir/Transforms/LoopUtils.h"
+#include "mlir/Dialect/Affine/LoopUtils.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "pmlc/dialect/affinex/transforms/pass_detail.h"
 
 using namespace mlir; // NOLINT
@@ -14,11 +15,11 @@ struct AffinexLoopUnroll : public AffinexLoopUnrollBase<AffinexLoopUnroll> {
     this->operationLimit = operationLimit;
   }
 
-  void runOnFunction() override {
+  void runOnOperation() override {
     DenseMap<Operation *, uint64_t> opCount;
     SmallVector<AffineForOp, 4> loopsToUnroll;
 
-    getFunction().walk([&](Operation *op) {
+    getOperation().walk([&](Operation *op) {
       auto count = opCount[op];
       if (AffineForOp forOp = dyn_cast<AffineForOp>(op)) {
         Optional<uint64_t> tripCount = getConstantTripCount(forOp);

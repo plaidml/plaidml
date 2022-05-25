@@ -4,6 +4,7 @@
 #define __PML_XSMM_OPS__
 
 include "mlir/Interfaces/SideEffectInterfaces.td"
+include "mlir/IR/EnumAttr.td"
 
 #ifndef OP_BASE
 include "mlir/IR/OpBase.td"
@@ -88,18 +89,15 @@ def XSMM_Dialect : Dialect {
   let cppNamespace = "pmlc::dialect::xsmm";
 }
 
-class XSMM_Op<string mnemonic, list<OpTrait> traits = []>
+class XSMM_Op<string mnemonic, list<Trait> traits = []>
     : Op<XSMM_Dialect, mnemonic, traits> {
-  let printer = [{ print$cppClass(p, *this); }];
-  let parser = [{ return parse$cppClass(parser, result); }];
+  let hasCustomAssemblyFormat = 1;
 }
 
 def XSMM_GemmDispatchF32Op : XSMM_Op<"gemm.dispatch.f32", [NoSideEffect]> {
   let summary = "query LIBXSMM's code registry based on GEMM shape";
   let arguments = (ins I64ArrayAttr:$tile, I64ArrayAttr:$tileld);
   let results = (outs I64:$ptr);
-  let printer = ?;
-  let parser = ?;
   let assemblyFormat = "$tile `,` $tileld attr-dict";
 }
 
@@ -123,8 +121,6 @@ def XSMM_BRGemmDispatchF32Op : XSMM_Op<"brgemm.dispatch.f32", [NoSideEffect]> {
   let summary = "query LIBXSMM's code registry based on GEMM shape";
   let arguments = (ins I64ArrayAttr:$tile, I64ArrayAttr:$tileld);
   let results = (outs I64:$ptr);
-  let printer = ?;
-  let parser =  ?;
   let assemblyFormat = "$tile `,` $tileld attr-dict";
 }
 
@@ -137,8 +133,6 @@ def XSMM_BRGemmInvokeF32Op : XSMM_Op<"brgemm.invoke.f32"> {
     I64Attr:$numBatches,
     Variadic<Index>:$indices);
 
-  let printer = ?;
-  let parser = ?;
 
   let extraClassDeclaration = [{
     operand_range getOperandsForA();
@@ -151,8 +145,6 @@ def XSMM_BRGemmOffsDispatchF32Op : XSMM_Op<"brgemm.offs.dispatch.f32", [NoSideEf
   let summary = "query LIBXSMM's code registry based on GEMM shape";
   let arguments = (ins I64ArrayAttr:$tile, I64ArrayAttr:$tileld);
   let results = (outs I64:$ptr);
-  let printer = ?;
-  let parser =  ?;
   let assemblyFormat = "$tile `,` $tileld attr-dict";
 }
 
@@ -166,8 +158,6 @@ def XSMM_BRGemmOffsInvokeF32Op : XSMM_Op<"brgemm.offs.invoke.f32"> {
     I64ArrayAttr:$aOffsets,
     I64ArrayAttr:$bOffsets,
     Variadic<Index>:$indices);
-
-  let printer = ?;
 
   let extraClassDeclaration = [{
     operand_range getOperandsForA();
@@ -225,8 +215,6 @@ def XSMM_BinaryDispatchOp : XSMM_Op<"binary.dispatch", [NoSideEffect]> {
     I32Attr:$bcastType2
   );
   let results = (outs I64:$ptr);
-  let printer = ?;
-  let parser = ?;
 }
  
 def XSMM_BinaryInvokeOp : XSMM_Op<"binary.invoke"> {
@@ -238,8 +226,6 @@ def XSMM_BinaryInvokeOp : XSMM_Op<"binary.invoke"> {
     Arg<AnyMemRef, "the input memref to load from", [MemRead]>:$input2,
     Variadic<Index>:$indices
   );
-  let printer = ?;
-  let parser = ?;
 }
  
 #endif // __PML_XSMM_OPS__

@@ -1,6 +1,7 @@
 // Copyright 2021 Intel Corporation
 
-#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Interfaces/LoopLikeInterface.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
@@ -12,7 +13,7 @@ namespace pmlc::transforms {
 namespace {
 
 struct HoistingPass final : public HoistingPassBase<HoistingPass> {
-  void runOnFunction() final;
+  void runOnOperation() final;
   LogicalResult moveLoopInvariantCode(LoopLikeOpInterface looplike);
 };
 
@@ -62,11 +63,11 @@ static bool canBeHoisted(Operation *op,
   return true;
 }
 
-void HoistingPass::runOnFunction() {
+void HoistingPass::runOnOperation() {
   // Walk through all loops in a function in innermost-loop-first order. This
   // way, we first LICM from the inner loop, and place the ops in
   // the outer loop, which in turn can be further LICM'ed.
-  getFunction()->walk([&](LoopLikeOpInterface loopLike) {
+  getOperation()->walk([&](LoopLikeOpInterface loopLike) {
     if (failed(moveLoopInvariantCode(loopLike)))
       signalPassFailure();
   });
@@ -102,7 +103,9 @@ HoistingPass::moveLoopInvariantCode(LoopLikeOpInterface looplike) {
 
   // For all instructions that we found to be invariant, move outside of the
   // loop.
-  return looplike.moveOutOfLoop(opsToMove);
+  for (Operation *op : opsToMove)
+    looplike.moveOutOfLoop(op);
+  return success();
 }
 
 } // namespace

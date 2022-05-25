@@ -1,8 +1,8 @@
 // Copyright 2020 Intel Corporation
 
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/SCF.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Support/DebugStringHelper.h"
 
@@ -25,10 +25,10 @@ struct DeallocPlacementPass
 
   void runOnOperation() final {
     ModuleOp op = getOperation();
-    op.walk([&](FuncOp fn) { runOnFunction(fn); });
+    op.walk([&](func::FuncOp fn) { runOnFunction(fn); });
   }
 
-  void runOnFunction(FuncOp fn) {
+  void runOnFunction(func::FuncOp fn) {
     // Place deallocation for AllocOp
     fn.walk([&](memref::AllocOp alloc) {
       IVLOG(3, "alloc: " << debugString(*alloc));
@@ -71,7 +71,7 @@ struct DeallocPlacementPass
         auto copyLoopOp = builder.create<AffineParallelOp>(
             forOp.getLoc(),
             /*resultTypes=*/resType,
-            /*reductions=*/AtomicRMWKind::assign,
+            /*reductions=*/arith::AtomicRMWKind::assign,
             /*ranges=*/resType.getShape());
 
         Block *body = copyLoopOp.getBody();
@@ -82,7 +82,7 @@ struct DeallocPlacementPass
 
         AffineMap idMap = builder.getMultiDimIdentityMap(resType.getRank());
         auto reduce = builder.create<pxa::PxaReduceOp>(
-            forOp.getLoc(), AtomicRMWKind::assign, load, newBuf, idMap,
+            forOp.getLoc(), arith::AtomicRMWKind::assign, load, newBuf, idMap,
             builder.getBlock()->getArguments());
 
         builder.create<AffineYieldOp>(forOp.getLoc(),
@@ -106,7 +106,7 @@ struct DeallocPlacementPass
       assert(ancestor && "use and alloc do not have a common ancestor");
       IVLOG(3, "  ancestor: " << debugString(*use));
 
-      if (isa<ReturnOp>(ancestor)) {
+      if (isa<func::ReturnOp>(ancestor)) {
         IVLOG(3, "  return");
         return None;
       }

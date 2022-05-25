@@ -2,7 +2,7 @@
 
 #include "pmlc/dialect/pml/transforms/pass_detail.h"
 
-#include "mlir/Parser.h"
+#include "mlir/Parser/Parser.h"
 
 using namespace mlir; // NOLINT
 

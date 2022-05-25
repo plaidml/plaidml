@@ -1,11 +1,10 @@
 // Copyright 2021 Intel Corporation
 
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/Transforms/RegionUtils.h"
-
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "pmlc/dialect/stdx/transforms/pass_detail.h"
 #include "pmlc/dialect/stdx/transforms/passes.h"
 
@@ -23,12 +22,12 @@ struct ValuesWithCast {
 struct SplitClosurePass : public SplitClosureBase<SplitClosurePass> {
   void runOnOperation() final {
     ModuleOp module = getOperation();
-    FuncOp main = module.lookupSymbol<FuncOp>("main");
+    func::FuncOp main = module.lookupSymbol<func::FuncOp>("main");
     if (!main)
       return;
 
-    auto it = main.body().op_begin<ClosureOp>();
-    if (it == main.body().op_end<ClosureOp>())
+    auto it = main.getBody().op_begin<ClosureOp>();
+    if (it == main.getBody().op_end<ClosureOp>())
       return;
 
     splitClosure(*it);
@@ -37,8 +36,8 @@ struct SplitClosurePass : public SplitClosureBase<SplitClosurePass> {
   void splitClosure(ClosureOp op) {
     MLIRContext *context = &getContext();
     ModuleOp module = getOperation();
-    FuncOp func = op->getParentOfType<FuncOp>();
-    auto &funcOps = func.body().front().getOperations();
+    func::FuncOp func = op->getParentOfType<func::FuncOp>();
+    auto &funcOps = func.getBody().front().getOperations();
     auto itOp = Block::iterator(op);
     auto itNextOp = std::next(itOp);
 
@@ -47,7 +46,7 @@ struct SplitClosurePass : public SplitClosureBase<SplitClosurePass> {
       addUsedValue(*operand, values);
     });
 
-    Block *cleanup = func.body().front().splitBlock(itNextOp);
+    Block *cleanup = func.getBody().front().splitBlock(itNextOp);
     getUsedValuesDefinedOutside(cleanup, values);
 
     SmallVector<Type> packedTypes;
@@ -67,32 +66,32 @@ struct SplitClosurePass : public SplitClosureBase<SplitClosurePass> {
 
     auto tupleType = TupleType::get(context, packedTypes);
     auto initFuncType =
-        FunctionType::get(context, func.getType().getInputs(), {tupleType});
-    auto mainFuncType = FunctionType::get(context, op.getType().getInputs(),
-                                          func.getType().getResults());
+        FunctionType::get(context, func.getFunctionType().getInputs(), {tupleType});
+    auto mainFuncType = FunctionType::get(context, op.getFunctionType().getInputs(),
+                                          func.getFunctionType().getResults());
     auto finiFuncType = FunctionType::get(context, {tupleType}, {});
 
     ImplicitLocOpBuilder builder(op.getLoc(), func);
-    auto init = builder.create<FuncOp>("init", initFuncType);
-    auto main = builder.create<FuncOp>("main", mainFuncType);
-    auto fini = builder.create<FuncOp>("fini", finiFuncType);
+    auto init = builder.create<func::FuncOp>("init", initFuncType);
+    auto main = builder.create<func::FuncOp>("main", mainFuncType);
+    auto fini = builder.create<func::FuncOp>("fini", finiFuncType);
 
     // Construct the `init` function.
     builder.setInsertionPointToStart(init.addEntryBlock());
     auto packOp = builder.create<PackOp>(tupleType, packedValues);
-    builder.create<ReturnOp>(packOp.getResult());
-    auto &initOps = init.body().front().getOperations();
+    builder.create<func::ReturnOp>(packOp.getResult());
+    auto &initOps = init.getBody().front().getOperations();
     initOps.splice(initOps.begin(), funcOps, funcOps.begin(), itOp);
 
     // Construct the new `main` function.
-    main.body().takeBody(op.body());
-    Operation *yield = main.body().front().getTerminator();
+    main.getBody().takeBody(op.body());
+    Operation *yield = main.getBody().front().getTerminator();
     builder.setInsertionPoint(yield);
-    builder.create<ReturnOp>();
+    builder.create<func::ReturnOp>();
     yield->erase();
 
-    main.insertArgument(0, tupleType, /*argAttrs=*/nullptr);
-    builder.setInsertionPointToStart(&main.body().front());
+    main.insertArgument(0, tupleType, /*argAttrs=*/nullptr, main.getLoc());
+    builder.setInsertionPointToStart(&main.getBody().front());
     auto mainUnpackOp =
         builder.create<UnpackOp>(packedTypes, main.getArgument(0));
     replaceWithUnpacked(valuesWithCast, mainUnpackOp, main, builder);
@@ -101,11 +100,11 @@ struct SplitClosurePass : public SplitClosureBase<SplitClosurePass> {
     builder.setInsertionPointToStart(fini.addEntryBlock());
     auto finiUnpackOp =
         builder.create<UnpackOp>(packedTypes, fini.getArgument(0));
-    auto &finiOps = fini.body().front().getOperations();
+    auto &finiOps = fini.getBody().front().getOperations();
     finiOps.splice(finiOps.end(), funcOps, cleanup->begin(),
                    std::prev(cleanup->end()));
     replaceWithUnpacked(valuesWithCast, finiUnpackOp, fini, builder);
-    builder.create<ReturnOp>();
+    builder.create<func::ReturnOp>();
 
     // NOTE: we need to replace these at the end so that the `values` used in
     // `replaceWithUnpacked` remain valid.
@@ -117,7 +116,7 @@ struct SplitClosurePass : public SplitClosureBase<SplitClosurePass> {
   }
 
   void replaceWithUnpacked(ArrayRef<ValuesWithCast> values, UnpackOp unpackOp,
-                           FuncOp func, OpBuilder &builder) {
+                           func::FuncOp func, OpBuilder &builder) {
     for (auto it : llvm::enumerate(values)) {
       Value value = it.value().value;
       memref::CastOp castOp = it.value().castOp;
@@ -127,7 +126,7 @@ struct SplitClosurePass : public SplitClosureBase<SplitClosurePass> {
             castOp.getLoc(), castOp.dest().getType(), newValue);
       }
       value.replaceUsesWithIf(newValue, [&](OpOperand &operand) {
-        return operand.getOwner()->getParentOfType<FuncOp>() == func;
+        return operand.getOwner()->getParentOfType<func::FuncOp>() == func;
       });
     }
   }

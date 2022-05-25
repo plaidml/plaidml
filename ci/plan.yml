@@ -149,7 +149,7 @@ RULES:
       model:
         - mobilenet-v2
         - resnet-50-pytorch
-        - yolo-v2-tiny-ava-0001
+        # - yolo-v2-tiny-ava-0001  # Corrupt gather interpolation mode
       dtype: FP16
       test:
         - benchmark_app

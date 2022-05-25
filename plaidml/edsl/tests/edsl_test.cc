@@ -105,6 +105,38 @@ TEST_F(CppEdsl, BindDims) {
   }
 }
 
+TEST_F(CppEdsl, SimpleTensor) {
+  auto A = Placeholder(DType::FLOAT32, {3, 3});
+  auto C = A;
+  auto program = makeProgram("simple_tensor", {A}, {C});
+
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.SimpleTensor
+  // CHECK: module @simple_tensor {
+  // CHECK: func @main(%arg0: tensor<3x3xf32>) -> tensor<3x3xf32> {
+  // CHECK:  %0 = tile.ident %arg0 : (tensor<3x3xf32>) -> tensor<3x3xf32>
+  // CHECK:  return %0 : tensor<3x3xf32>
+  // }
+  // }
+  // clang-format on
+}
+
+TEST_F(CppEdsl, SimpleAdd) {
+  auto A = Placeholder(DType::FLOAT32, {3, 3});
+  auto B = Placeholder(DType::FLOAT32, {3, 3});
+  auto C = A + B;
+  auto program = makeProgram("simple_add", {A, B}, {C});
+
+  // clang-format off
+  // CHECK-LABEL: CppEdsl.SimpleAdd
+  // clang-format on
+  //
+  std::vector<float> A_input{1, 2, 3, 4, 5, 6, 7, 8, 9};
+  std::vector<float> B_input{1, 2, 3, 4, 5, 6, 7, 8, 9};
+  std::vector<float> C_output{2, 4, 6, 8, 10, 12, 14, 16, 18};
+  checkExact(program, {A_input, B_input}, {C_output});
+}
+
 TEST_F(CppEdsl, HigherPrecisionConstants) {
   auto A = Placeholder(DType::FLOAT32, {3, 3});
   auto C = A + cast(Tensor{1}, DType::UINT64) + cast(Tensor{2.0}, DType::FLOAT64);
@@ -493,8 +525,8 @@ TEST_F(CppEdsl, DoubleDot) {
   // CHECK: module @double_dot
   // CHECK: -> tensor<10x40xf32> {
   // CHECK: %[[cst:.*]] = tile.constant(0.000000e+00 : f64) : tensor<f32>
-  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}, #map{{[0-9]*}}]} : tensor<f32>, tensor<10x20xf32>, tensor<20x30xf32> -> tensor<10x30xf32>
-  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}, #map{{[0-9]*}}]} : tensor<f32>, tensor<10x30xf32>, tensor<30x40xf32> -> tensor<10x40xf32>
+  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = affine_map<({{.*}}) -> ({{.*}})>, srcs = [affine_map<({{.*}}) -> ({{.*}})>, affine_map<({{.*}}) -> ({{.*}})>]} : tensor<f32>, tensor<10x20xf32>, tensor<20x30xf32> -> tensor<10x30xf32>
+  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = affine_map<({{.*}}) -> ({{.*}})>, srcs = [affine_map<({{.*}}) -> ({{.*}})>, affine_map<({{.*}}) -> ({{.*}})>]} : tensor<f32>, tensor<10x30xf32>, tensor<30x40xf32> -> tensor<10x40xf32>
   // CHECK: return %{{.*}} : tensor<10x40xf32>
   // clang-format on
   runProgram(program);
@@ -600,20 +632,20 @@ TEST_F(CppEdsl, MnistMlp) {
   // CHECK: module @mnist_mlp
   // CHECK-DAG: %[[cst:.*]] = tile.constant(0.000000e+00 : f64) : tensor<f32>
   // CHECK-DAG: %[[cst0:.*]] = tile.constant(0xFFF0000000000000 : f64) : tensor<f32>
-  // CHECK: %[[X0:.*]] = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}, #map{{[0-9]*}}]} : tensor<f32>, tensor<1x784xf32>, tensor<784x512xf32> -> tensor<1x512xf32>
+  // CHECK: %[[X0:.*]] = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = affine_map<({{.*}}) -> ({{.*}})>, srcs = [affine_map<({{.*}}) -> ({{.*}})>, affine_map<({{.*}}) -> ({{.*}})>]} : tensor<f32>, tensor<1x784xf32>, tensor<784x512xf32> -> tensor<1x512xf32>
   // CHECK: %[[X1:.*]] = tile.add %{{.*}}, %{{.*}} : (tensor<1x512xf32>, tensor<512xf32>) -> tensor<1x512xf32>
   // CHECK: %[[X2:.*]] = tile.cmp_lt %{{.*}}, %[[cst]] : (tensor<1x512xf32>, tensor<f32>) -> tensor<1x512xi1>
   // CHECK: %[[X3:.*]] = tile.select %{{.*}}, %[[cst]], %{{.*}} : (tensor<1x512xi1>, tensor<f32>, tensor<1x512xf32>) -> tensor<1x512xf32>
-  // CHECK: %[[X4:.*]] = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}, #map{{[0-9]*}}]} : tensor<f32>, tensor<1x512xf32>, tensor<512x512xf32> -> tensor<1x512xf32>
+  // CHECK: %[[X4:.*]] = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = affine_map<({{.*}}) -> ({{.*}})>, srcs = [affine_map<({{.*}}) -> ({{.*}})>, affine_map<({{.*}}) -> ({{.*}})>]} : tensor<f32>, tensor<1x512xf32>, tensor<512x512xf32> -> tensor<1x512xf32>
   // CHECK: %[[X5:.*]] = tile.add %{{.*}}, %{{.*}} : (tensor<1x512xf32>, tensor<512xf32>) -> tensor<1x512xf32>
   // CHECK: %[[X6:.*]] = tile.cmp_lt %{{.*}}, %[[cst]] : (tensor<1x512xf32>, tensor<f32>) -> tensor<1x512xi1>
   // CHECK: %[[X7:.*]] = tile.select %{{.*}}, %[[cst]], %{{.*}} : (tensor<1x512xi1>, tensor<f32>, tensor<1x512xf32>) -> tensor<1x512xf32>
-  // CHECK: %[[X8:.*]] = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}, #map{{[0-9]*}}]} : tensor<f32>, tensor<1x512xf32>, tensor<512x10xf32> -> tensor<1x10xf32>
+  // CHECK: %[[X8:.*]] = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = affine_map<({{.*}}) -> ({{.*}})>, srcs = [affine_map<({{.*}}) -> ({{.*}})>, affine_map<({{.*}}) -> ({{.*}})>]} : tensor<f32>, tensor<1x512xf32>, tensor<512x10xf32> -> tensor<1x10xf32>
   // CHECK: %[[X9:.*]] = tile.add %{{.*}}, %{{.*}} : (tensor<1x10xf32>, tensor<10xf32>) -> tensor<1x10xf32>
-  // CHECK: %[[X10:.*]] = tile.contract max, none, %[[cst0]], %{{.*}} {sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}]} : tensor<f32>, tensor<1x10xf32> -> tensor<1x1xf32>
+  // CHECK: %[[X10:.*]] = tile.contract max, none, %[[cst0]], %{{.*}} {sink = affine_map<({{.*}}) -> ({{.*}})>, srcs = [affine_map<({{.*}}) -> ({{.*}})>]} : tensor<f32>, tensor<1x10xf32> -> tensor<1x1xf32>
   // CHECK: %[[X11:.*]] = tile.sub %{{.*}}, %{{.*}} : (tensor<1x10xf32>, tensor<1x1xf32>) -> tensor<1x10xf32>
   // CHECK: %[[X12:.*]] = tile.exp %{{.*}} : (tensor<1x10xf32>) -> tensor<1x10xf32>
-  // CHECK: %[[X13:.*]] = tile.contract add, none, %[[cst]], %{{.*}} {sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}]} : tensor<f32>, tensor<1x10xf32> -> tensor<1x1xf32>
+  // CHECK: %[[X13:.*]] = tile.contract add, none, %[[cst]], %{{.*}} {sink = affine_map<({{.*}}) -> ({{.*}})>, srcs = [affine_map<({{.*}}) -> ({{.*}})>]} : tensor<f32>, tensor<1x10xf32> -> tensor<1x1xf32>
   // CHECK: %[[X14:.*]] = tile.div %{{.*}}, %{{.*}} : (tensor<1x10xf32>, tensor<1x1xf32>) -> tensor<1x10xf32>
   // CHECK: return %{{.*}} : tensor<1x10xf32>
   // clang-format on
@@ -643,7 +675,7 @@ TEST_F(CppEdsl, Convolution) {
   // CHECK-LABEL: CppEdsl.Convolution
   // CHECK: module @convolution
   // CHECK: %[[cst:.*]] = tile.constant(0.000000e+00 : f64) : tensor<f32>
-  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}, #map{{[0-9]*}}]} : tensor<f32>, tensor<1x56x56x64xf32>, tensor<3x3x64x64xf32> -> tensor<1x56x56x64xf32>
+  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = affine_map<({{.*}}) -> ({{.*}})>, srcs = [affine_map<({{.*}}) -> ({{.*}})>, affine_map<({{.*}}) -> ({{.*}})>]} : tensor<f32>, tensor<1x56x56x64xf32>, tensor<3x3x64x64xf32> -> tensor<1x56x56x64xf32>
   // CHECK: return %{{.*}} : tensor<1x56x56x64xf32>
   // clang-format on
   runProgram(program);
@@ -705,26 +737,26 @@ TEST_F(CppEdsl, MnistCnn) {
   // CHECK: module @mnist_cnn
   // CHECK-DAG: %[[cst:.*]] = tile.constant(0.000000e+00 : f64) : tensor<f32>
   // CHECK-DAG: %[[cst_0:.*]] = tile.constant(0xFFF0000000000000 : f64) : tensor<f32>
-  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}, #map{{[0-9]*}}]} : tensor<f32>, tensor<1x224x224x1xf32>, tensor<3x3x1x32xf32> -> tensor<1x224x224x32xf32>
+  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = affine_map<({{.*}}) -> ({{.*}})>, srcs = [affine_map<({{.*}}) -> ({{.*}})>, affine_map<({{.*}}) -> ({{.*}})>]} : tensor<f32>, tensor<1x224x224x1xf32>, tensor<3x3x1x32xf32> -> tensor<1x224x224x32xf32>
   // CHECK: tile.add %{{.*}}, %{{.*}} : (tensor<1x224x224x32xf32>, tensor<32xf32>) -> tensor<1x224x224x32xf32>
   // CHECK: tile.cmp_lt %{{.*}}, %[[cst]] : (tensor<1x224x224x32xf32>, tensor<f32>) -> tensor<1x224x224x32xi1>
   // CHECK: tile.select %{{.*}}, %[[cst]], %{{.*}} : (tensor<1x224x224x32xi1>, tensor<f32>, tensor<1x224x224x32xf32>) -> tensor<1x224x224x32xf32>
-  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}, #map{{[0-9]*}}]} : tensor<f32>, tensor<1x224x224x32xf32>, tensor<3x3x32x64xf32> -> tensor<1x224x224x64xf32>
+  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = affine_map<({{.*}}) -> ({{.*}})>, srcs = [affine_map<({{.*}}) -> ({{.*}})>, affine_map<({{.*}}) -> ({{.*}})>]} : tensor<f32>, tensor<1x224x224x32xf32>, tensor<3x3x32x64xf32> -> tensor<1x224x224x64xf32>
   // CHECK: tile.add %{{.*}}, %{{.*}} : (tensor<1x224x224x64xf32>, tensor<64xf32>) -> tensor<1x224x224x64xf32>
   // CHECK: tile.cmp_lt %{{.*}}, %[[cst]] : (tensor<1x224x224x64xf32>, tensor<f32>) -> tensor<1x224x224x64xi1>
   // CHECK: tile.select %{{.*}}, %[[cst]], %{{.*}} : (tensor<1x224x224x64xi1>, tensor<f32>, tensor<1x224x224x64xf32>) -> tensor<1x224x224x64xf32>
-  // CHECK: tile.contract max, none, %[[cst_0]], %{{.*}} {cons = #set{{[0-9]*}}, sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}]} : tensor<f32>, tensor<1x224x224x64xf32> -> tensor<1x112x112x64xf32>
+  // CHECK: tile.contract max, none, %[[cst_0]], %{{.*}} {cons = affine_set<({{.*}}) : ({{.*}})>, sink = affine_map<({{.*}}) -> ({{.*}})>, srcs = [affine_map<({{.*}}) -> ({{.*}})>]} : tensor<f32>, tensor<1x224x224x64xf32> -> tensor<1x112x112x64xf32>
   // CHECK: tile.reshape %{{.*}} : (tensor<1x112x112x64xf32>) -> tensor<1x802816xf32>
-  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}, #map{{[0-9]*}}]} : tensor<f32>, tensor<1x802816xf32>, tensor<802816x128xf32> -> tensor<1x128xf32>
+  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = affine_map<({{.*}}) -> ({{.*}})>, srcs = [affine_map<({{.*}}) -> ({{.*}})>, affine_map<({{.*}}) -> ({{.*}})>]} : tensor<f32>, tensor<1x802816xf32>, tensor<802816x128xf32> -> tensor<1x128xf32>
   // CHECK: tile.add %{{.*}}, %{{.*}} : (tensor<1x128xf32>, tensor<128xf32>) -> tensor<1x128xf32>
   // CHECK: tile.cmp_lt %{{.*}}, %[[cst]] : (tensor<1x128xf32>, tensor<f32>) -> tensor<1x128xi1>
   // CHECK: tile.select %{{.*}}, %[[cst]], %{{.*}} : (tensor<1x128xi1>, tensor<f32>, tensor<1x128xf32>) -> tensor<1x128xf32>
-  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}, #map{{[0-9]*}}]} : tensor<f32>, tensor<1x128xf32>, tensor<128x100xf32> -> tensor<1x100xf32>
+  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = affine_map<({{.*}}) -> ({{.*}})>, srcs = [affine_map<({{.*}}) -> ({{.*}})>, affine_map<({{.*}}) -> ({{.*}})>]} : tensor<f32>, tensor<1x128xf32>, tensor<128x100xf32> -> tensor<1x100xf32>
   // CHECK: tile.add %{{.*}}, %{{.*}} : (tensor<1x100xf32>, tensor<100xf32>) -> tensor<1x100xf32>
-  // CHECK: tile.contract max, none,  %[[cst_0]], %{{.*}} {sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}]} : tensor<f32>, tensor<1x100xf32> -> tensor<1x1xf32>
+  // CHECK: tile.contract max, none,  %[[cst_0]], %{{.*}} {sink = affine_map<({{.*}}) -> ({{.*}})>, srcs = [affine_map<({{.*}}) -> ({{.*}})>]} : tensor<f32>, tensor<1x100xf32> -> tensor<1x1xf32>
   // CHECK: tile.sub %{{.*}}, %{{.*}} : (tensor<1x100xf32>, tensor<1x1xf32>) -> tensor<1x100xf32>
   // CHECK: tile.exp %{{.*}} : (tensor<1x100xf32>) -> tensor<1x100xf32>
-  // CHECK: tile.contract add, none, %[[cst]], %{{.*}} {sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}]} : tensor<f32>, tensor<1x100xf32> -> tensor<1x1xf32>
+  // CHECK: tile.contract add, none, %[[cst]], %{{.*}} {sink = affine_map<({{.*}}) -> ({{.*}})>, srcs = [affine_map<({{.*}}) -> ({{.*}})>]} : tensor<f32>, tensor<1x100xf32> -> tensor<1x1xf32>
   // CHECK: tile.div %{{.*}}, %{{.*}} : (tensor<1x100xf32>, tensor<1x1xf32>) -> tensor<1x100xf32>
   // CHECK: return %{{.*}} : tensor<1x100xf32>
   // clang-format on
@@ -772,11 +804,11 @@ TEST_F(CppEdsl, LarsMomentum4d) {
   // CHECK: tile.mul %{{.*}}, %{{.*}} : (tensor<4x7x3x9xf32>, tensor<f32>) -> tensor<4x7x3x9xf32>
   // CHECK: tile.mul %{{.*}}, %{{.*}} : (tensor<f32>, tensor<f32>) -> tensor<f32>
   // CHECK: tile.mul %{{.*}}, %{{.*}} : (tensor<4x7x3x9xf32>, tensor<4x7x3x9xf32>) -> tensor<4x7x3x9xf32>
-  // CHECK: tile.contract add, none, %{{.*}}, %{{.*}} {sink = #{{.*}}, srcs = [#{{.*}}]} : tensor<f32>, tensor<4x7x3x9xf32> -> tensor<f32>
+  // CHECK: tile.contract add, none, %{{.*}}, %{{.*}} {sink = affine_map<({{.*}}) -> ({{.*}})>, srcs = [affine_map<({{.*}}) -> ({{.*}})>]} : tensor<f32>, tensor<4x7x3x9xf32> -> tensor<f32>
   // CHECK: tile.sqrt %{{.*}} : (tensor<f32>) -> tensor<f32>
   // CHECK: tile.mul %{{.*}}, %{{.*}} : (tensor<f32>, tensor<f32>) -> tensor<f32>
   // CHECK: tile.mul %{{.*}}, %{{.*}} : (tensor<4x7x3x9xf32>, tensor<4x7x3x9xf32>) -> tensor<4x7x3x9xf32>
-  // CHECK: tile.contract add, none, %{{.*}}, %{{.*}} {sink = #{{.*}}, srcs = [#{{.*}}]} : tensor<f32>, tensor<4x7x3x9xf32> -> tensor<f32>
+  // CHECK: tile.contract add, none, %{{.*}}, %{{.*}} {sink = affine_map<({{.*}}) -> ({{.*}})>, srcs = [affine_map<({{.*}}) -> ({{.*}})>]} : tensor<f32>, tensor<4x7x3x9xf32> -> tensor<f32>
   // CHECK: tile.sqrt %{{.*}} : (tensor<f32>) -> tensor<f32>
   // CHECK: tile.mul %{{.*}}, %{{.*}} : (tensor<f32>, tensor<f32>) -> tensor<f32>
   // CHECK: tile.add %{{.*}}, %{{.*}} : (tensor<f32>, tensor<f32>) -> tensor<f32>
@@ -806,25 +838,8 @@ TEST_F(CppEdsl, RepeatElements) {
   // CHECK-LABEL: CppEdsl.RepeatElements
   // CHECK: module @repeat_elts
   // CHECK: %[[cst:.*]] = tile.constant(0.000000e+00 : f64) : tensor<f32>
-  // CHECK: tile.contract assign, none, %[[cst]], %{{.*}} {cons = #set{{[0-9]*}}, sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}]} : tensor<f32>, tensor<10x10x10xf32> -> tensor<10x30x10xf32>
+  // CHECK: tile.contract assign, none, %[[cst]], %{{.*}} {cons = affine_set<({{.*}}) : ({{.*}})>, sink = affine_map<({{.*}}) -> ({{.*}})>, srcs = [affine_map<({{.*}}) -> ({{.*}})>]} : tensor<f32>, tensor<10x10x10xf32> -> tensor<10x30x10xf32>
   // CHECK: return %{{.*}} : tensor<10x30x10xf32>
-  // clang-format on
-  runProgram(program);
-}
-
-TEST_F(CppEdsl, UseDefault) {
-  auto P = Placeholder(DType::FLOAT32, {1, 7, 10, 10});
-  auto I = Placeholder(DType::FLOAT32, {1, 10, 10});
-  TensorDim B, N1, N2;
-  TensorIndex b, i1, i2;
-  I.bind_dims(B, N1, N2);
-  Tensor O = Contraction().outShape(B, 7, N1, N2).outAccess(b, 3, i1, i2).assign(I(b, i1, i2)).init(P);
-  auto program = makeProgram("use_default", {I, P}, {O});
-  // clang-format off
-  // CHECK-LABEL: CppEdsl.UseDefault
-  // CHECK: module @use_default
-  // CHECK: tile.contract assign, none, %{{.*}}, %{{.*}} {sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}]} : tensor<1x7x10x10xf32>, tensor<1x10x10xf32> -> tensor<1x7x10x10xf32>
-  // CHECK: return %{{.*}} : tensor<1x7x10x10xf32>
   // clang-format on
   runProgram(program);
 }
@@ -858,7 +873,7 @@ TEST_F(CppEdsl, GlobalMin) {
   // CHECK: module @global_min
   // CHECK: %[[cst:.*]] = tile.constant(0xFFF0000000000000 : f64) : tensor<f32>
   // CHECK: tile.neg %{{.*}} : (tensor<10x10x10xf32>) -> tensor<10x10x10xf32>
-  // CHECK: tile.contract max, none, %[[cst]], %{{.*}} {sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}]} : tensor<f32>, tensor<10x10x10xf32> -> tensor<f32>
+  // CHECK: tile.contract max, none, %[[cst]], %{{.*}} {sink = affine_map<({{.*}}) -> ({{.*}})>, srcs = [affine_map<({{.*}}) -> ({{.*}})>]} : tensor<f32>, tensor<10x10x10xf32> -> tensor<f32>
   // CHECK: tile.neg %{{.*}} : (tensor<f32>) -> tensor<f32>
   // CHECK: return %{{.*}} : tensor<f32>
   // clang-format on
@@ -876,7 +891,7 @@ TEST_F(CppEdsl, CumSum) {
   // CHECK-LABEL: CppEdsl.CumSum
   // CHECK: module @cumsum
   // CHECK: %[[cst:.*]] = tile.constant(0.000000e+00 : f64) : tensor<f32>
-  // CHECK: tile.contract add, none, %[[cst]], %{{.*}} {cons = #set{{[0-9]*}}, sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}]} : tensor<f32>, tensor<10xf32> -> tensor<10xf32>
+  // CHECK: tile.contract add, none, %[[cst]], %{{.*}} {cons = affine_set<({{.*}}) : ({{.*}})>, sink = affine_map<({{.*}}) -> ({{.*}})>, srcs = [affine_map<({{.*}}) -> ({{.*}})>]} : tensor<f32>, tensor<10xf32> -> tensor<10xf32>
   // CHECK: return %{{.*}} : tensor<10xf32>
   // clang-format on
   runProgram(program);
@@ -927,7 +942,7 @@ TEST_F(CppEdsl, ComplexConv2d) {
   // CHECK-LABEL: CppEdsl.ComplexConv2d
   // CHECK: module @complex_conv_2d
   // CHECK: %[[cst:.*]] = tile.constant(0.000000e+00 : f64) : tensor<f32>
-  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}, #map{{[0-9]*}}]} : tensor<f32>, tensor<1x224x224x3x3xf32>, tensor<3x3x3x3x32xf32> -> tensor<1x112x112x3x32xf32>
+  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = affine_map<({{.*}}) -> ({{.*}})>, srcs = [affine_map<({{.*}}) -> ({{.*}})>, affine_map<({{.*}}) -> ({{.*}})>]} : tensor<f32>, tensor<1x224x224x3x3xf32>, tensor<3x3x3x3x32xf32> -> tensor<1x112x112x3x32xf32>
   // CHECK: return %{{.*}} : tensor<1x112x112x3x32xf32>
   // clang-format on
   runProgram(program);
@@ -1030,7 +1045,7 @@ TEST_F(CppEdsl, DefractLong) {
   // CHECK-LABEL: CppEdsl.DefractLong
   // CHECK: module @defract_long
   // CHECK: %[[cst:.*]] = tile.constant(0.000000e+00 : f64) : tensor<f32>
-  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}, #map{{[0-9]*}}]} : tensor<f32>, tensor<1x3x3x1xf32>, tensor<1x3x3x1xf32> -> tensor<1x5x5x1xf32>
+  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = affine_map<({{.*}}) -> ({{.*}})>, srcs = [affine_map<({{.*}}) -> ({{.*}})>, affine_map<({{.*}}) -> ({{.*}})>]} : tensor<f32>, tensor<1x3x3x1xf32>, tensor<1x3x3x1xf32> -> tensor<1x5x5x1xf32>
   // CHECK: return %{{.*}} : tensor<1x5x5x1xf32>
   // clang-format on
   runProgram(program);
@@ -1045,8 +1060,8 @@ TEST_F(CppEdsl, DupOut) {
   // clang-format off
   // CHECK: module @dup_out
   // CHECK: %[[cst:.*]] = tile.constant(0.000000e+00 : f64) : tensor<f32>
-  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}, #map{{[0-9]*}}]} : tensor<f32>, tensor<10x20xf32>, tensor<20x30xf32> -> tensor<10x30xf32>
-  // CHECK: %[[out:.*]] = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}, #map{{[0-9]*}}]} : tensor<f32>, tensor<10x30xf32>, tensor<30x40xf32> -> tensor<10x40xf32>
+  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = affine_map<({{.*}}) -> ({{.*}})>, srcs = [affine_map<({{.*}}) -> ({{.*}})>, affine_map<({{.*}}) -> ({{.*}})>]} : tensor<f32>, tensor<10x20xf32>, tensor<20x30xf32> -> tensor<10x30xf32>
+  // CHECK: %[[out:.*]] = tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = affine_map<({{.*}}) -> ({{.*}})>, srcs = [affine_map<({{.*}}) -> ({{.*}})>, affine_map<({{.*}}) -> ({{.*}})>]} : tensor<f32>, tensor<10x30xf32>, tensor<30x40xf32> -> tensor<10x40xf32>
   // CHECK: %[[i2:.*]] = tile.ident %[[out]] : (tensor<10x40xf32>) -> tensor<10x40xf32>
   // CHECK: %[[i3:.*]] = tile.ident %[[out]] : (tensor<10x40xf32>) -> tensor<10x40xf32>
   // CHECK: return %[[out]], %[[i2]], %[[i3]] : tensor<10x40xf32>, tensor<10x40xf32>, tensor<10x40xf32>
@@ -1156,7 +1171,7 @@ TEST_F(CppEdsl, ConvI8) {
   // CHECK-LABEL: CppEdsl.ConvI8
   // CHECK: module @convolution
   // CHECK: %[[cst:.*]] = tile.constant(0 : i64) : tensor<si8>
-  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = #map{{[0-9]*}}, srcs = [#map{{[0-9]*}}, #map{{[0-9]*}}]} : tensor<si8>, tensor<1x224x224x3xsi8>, tensor<3x3x3x32xsi8> -> tensor<1x224x224x32xsi8>
+  // CHECK: tile.contract add, mul, %[[cst]], %{{.*}}, %{{.*}} {sink = affine_map<({{.*}}) -> ({{.*}})>, srcs = [affine_map<({{.*}}) -> ({{.*}})>, affine_map<({{.*}}) -> ({{.*}})>]} : tensor<si8>, tensor<1x224x224x3xsi8>, tensor<3x3x3x32xsi8> -> tensor<1x224x224x32xsi8>
   // CHECK: return %{{.*}} : tensor<1x224x224x32xsi8>
   // clang-format on
   runProgram(program);
@@ -2123,7 +2138,8 @@ TEST_F(CppEdsl, Layer) {
   // clang-format off
   // CHECK-LABEL: CppEdsl.Layer
   // CHECK: module @relu
-  // CHECK: %[[X0:.*]] = layer.box "relu" (%[[arg1:.*]]) = (%{{.*}}) : (tensor<10x20xf32>) -> tensor<10x20xf32>
+  // CHECK: %[[X0:.*]] = layer.box "relu"(%{{.*}}) {{{.*}}} : tensor<10x20xf32> -> tensor<10x20xf32>
+  // CHECK-NEXT: ^{{.*}}(%[[arg1:.*]]: tensor<10x20xf32>):
   // CHECK:   %[[cst:.*]] = tile.constant(0.000000e+00 : f64) : tensor<f32>
   // CHECK:   %[[X1:.*]] = tile.cmp_lt %[[arg1]], %[[cst]] : (tensor<10x20xf32>, tensor<f32>) -> tensor<10x20xi1>
   // CHECK:   %[[X2:.*]] = tile.select %[[X1]], %[[cst]], %[[arg1]] : (tensor<10x20xi1>, tensor<f32>, tensor<10x20xf32>) -> tensor<10x20xf32>
@@ -2142,7 +2158,8 @@ TEST_F(CppEdsl, LayerOperandOrder) {
   // CHECK-LABEL: CppEdsl.LayerOperandOrder
   // CHECK: module @LayerOperandOrder
   // CHECK: func @main(%[[ARG0:.*]]: tensor<10x20xf32>, %[[ARG1:.*]]: tensor<10x20xf32>) -> tensor<10x20xf32>
-  // CHECK:   %[[X0:.*]] = layer.box "sum" (%[[ARG2:.*]], %[[ARG3:.*]]) = (%[[ARG0]], %[[ARG1]]) : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
+  // CHECK:   %[[X0:.*]] = layer.box "sum"(%{{.*}}, %{{.*}}) {{{.*}}} : tensor<10x20xf32>, tensor<10x20xf32> -> tensor<10x20xf32>
+  // CHECK-NEXT: ^{{.*}}(%[[ARG2:.*]]: tensor<10x20xf32>, %[[ARG3:.*]]: tensor<10x20xf32>):
   // CHECK:     %[[X1:.*]] = tile.add %[[ARG2]], %[[ARG3]] : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
   // CHECK:     layer.return %[[X1]] : tensor<10x20xf32>
   // CHECK:   return %[[X0]] : tensor<10x20xf32>
@@ -2171,7 +2188,8 @@ TEST_F(CppEdsl, LayerMultipleReturnValues) {
   // CHECK-LABEL: CppEdsl.LayerMultipleReturnValues
   // CHECK: module @LayerMultipleReturnValues
   // CHECK: func @main(%[[ARG0:.*]]: tensor<10x5xf32>) -> (tensor<10x5x5xf32>, tensor<10x5xsi32>) {
-  // CHECK:   %[[X0:.*]]:2 = layer.box "two_output" (%[[ARG1:.*]]) = (%[[ARG0]]) : (tensor<10x5xf32>) -> (tensor<10x5x5xf32>, tensor<10x5xsi32>) {
+  // CHECK:   %[[X0:.*]]:2 = layer.box "two_output"(%{{.*}}) {{{.*}}} : tensor<10x5xf32> -> tensor<10x5x5xf32>, tensor<10x5xsi32>
+  // CHECK-NEXT: ^{{.*}}(%[[ARG1:.*]]: tensor<10x5xf32>):
   // CHECK:      %[[X1:.*]] = tile.argsort asc %[[ARG1]][{{[0-9]*}}] : (tensor<10x5xf32>) -> tensor<10x5xsi32>
   // CHECK:      %[[X2:.*]] = tile.gather %[[ARG1]] %[[X1]] {{{.*}}} : (tensor<10x5xf32>, tensor<10x5xsi32>) -> tensor<10x5x5xf32>
   // CHECK:      layer.return %[[X2]], %[[X1]] : tensor<10x5x5xf32>, tensor<10x5xsi32>
@@ -2192,7 +2210,8 @@ TEST_F(CppEdsl, LayerEmbeddedConst) {
   // CHECK-LABEL: CppEdsl.LayerEmbeddedConst
   // CHECK: module @LayerEmbeddedConst
   // CHECK: func @main(%[[ARG0:.*]]: tensor<10x20xf32>, %[[ARG1:.*]]: tensor<10x20xf32> {stdx.const}) -> tensor<10x20xf32>
-  // CHECK:   %[[X0:.*]] = layer.box "sum" (%[[ARG2:.*]], %[[ARG3:.*]]) = (%[[ARG0]], %[[ARG1]]) : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
+  // CHECK:   %[[X0:.*]] = layer.box "sum"(%{{.*}}, %{{.*}}) {{{.*}}} : tensor<10x20xf32>, tensor<10x20xf32> -> tensor<10x20xf32>
+  // CHECK-NEXT: ^{{.*}}(%[[ARG2:.*]]: tensor<10x20xf32>, %[[ARG3:.*]]: tensor<10x20xf32>):
   // CHECK:     %[[X1:.*]] = tile.add %[[ARG2]], %[[ARG3]] : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
   // CHECK:     layer.return %[[X1]] : tensor<10x20xf32>
   // CHECK:   return %[[X0]] : tensor<10x20xf32>
@@ -2213,7 +2232,8 @@ TEST_F(CppEdsl, LayerUnusedOperand) {
   // CHECK-LABEL: CppEdsl.LayerUnusedOperand
   // CHECK: module @LayerUnusedOperand
   // CHECK: func @main(%[[ARG0:.*]]: tensor<10x20xf32>, %[[ARG1:.*]]: tensor<10x20xf32> {stdx.const}, %[[ARG2:.*]]: tensor<10x20xf32> {stdx.const}) -> tensor<10x20xf32>
-  // CHECK:   %[[X0:.*]] = layer.box "sum" (%[[ARG3:.*]], %[[ARG4:.*]], %[[ARG5:.*]]) = (%[[ARG0]], %[[ARG1]], %[[ARG2]]) : (tensor<10x20xf32>, tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
+  // CHECK:   %[[X0:.*]] = layer.box "sum"(%{{.*}}, %{{.*}}, %{{.*}}) {{{.*}}} : tensor<10x20xf32>, tensor<10x20xf32>, tensor<10x20xf32> -> tensor<10x20xf32>
+  // CHECK-NEXT: ^{{.*}}(%[[ARG3:.*]]: tensor<10x20xf32>, %[[ARG4:.*]]: tensor<10x20xf32>, %[[ARG5:.*]]: tensor<10x20xf32>):
   // CHECK:     %[[X1:.*]] = tile.add %[[ARG3]], %[[ARG5]] : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
   // CHECK:     layer.return %[[X1]] : tensor<10x20xf32>
   // CHECK:   return %[[X0]] : tensor<10x20xf32>
@@ -2253,10 +2273,12 @@ TEST_F(CppEdsl, LayerMulti) {
   // CHECK-LABEL: CppEdsl.LayerMulti
   // CHECK: module @LayerMulti
   // CHECK: func @main(%[[ARG0:.*]]: tensor<10x20xf32>, %[[ARG1:.*]]: tensor<10x20xf32> {stdx.const}, %[[ARG2:.*]]: tensor<10x20xf32> {stdx.const}) -> tensor<10x20xf32> {
-  // CHECK:   %[[X0:.*]] = layer.box "sum" (%[[ARG3:.*]], %[[ARG4:.*]]) = (%[[ARG0]], %[[ARG1]]) : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32> {
+  // CHECK:   %[[X0:.*]] = layer.box "sum"(%{{.*}}, %{{.*}}) {{{.*}}} : tensor<10x20xf32>, tensor<10x20xf32> -> tensor<10x20xf32>
+  // CHECK-NEXT: ^{{.*}}(%[[ARG3:.*]]: tensor<10x20xf32>, %[[ARG4:.*]]: tensor<10x20xf32>):
   // CHECK:     %[[X2:.*]] = tile.add %[[ARG3]], %[[ARG4]] : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
   // CHECK:     layer.return %[[X2]] : tensor<10x20xf32>
-  // CHECK:   %[[X1:.*]] = layer.box "sum" (%[[ARG3:.*]], %[[ARG4:.*]]) = (%[[X0]], %[[ARG2]]) : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32> {
+  // CHECK:   %[[X1:.*]] = layer.box "sum"(%{{.*}}, %{{.*}}) {{{.*}}} : tensor<10x20xf32>, tensor<10x20xf32> -> tensor<10x20xf32>
+  // CHECK-NEXT: ^{{.*}}(%[[ARG3:.*]]: tensor<10x20xf32>, %[[ARG4:.*]]: tensor<10x20xf32>):
   // CHECK:     %[[X2:.*]] = tile.add %[[ARG3]], %[[ARG4]] : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
   // CHECK:     layer.return %[[X2]] : tensor<10x20xf32>
   // CHECK:   return %[[X1]] : tensor<10x20xf32>
@@ -2282,7 +2304,8 @@ TEST_F(CppEdsl, LayerException) {
   // CHECK-LABEL: CppEdsl.LayerException
   // CHECK: module @LayerException
   // CHECK: func @main(%[[ARG0:.*]]: tensor<10x20xf32>, %[[ARG1:.*]]: tensor<10x20xf32> {stdx.const}) -> tensor<10x20xf32>
-  // CHECK:   %[[X0:.*]] = layer.box "sum" (%[[ARG2:.*]], %[[ARG3:.*]]) = (%[[ARG0]], %[[ARG1]]) : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
+  // CHECK:   %[[X0:.*]] = layer.box "sum"(%{{.*}}, %{{.*}}) {{{.*}}} : tensor<10x20xf32>, tensor<10x20xf32> -> tensor<10x20xf32>
+  // CHECK-NEXT: ^{{.*}}(%[[ARG2:.*]]: tensor<10x20xf32>, %[[ARG3:.*]]: tensor<10x20xf32>):
   // CHECK:     %[[X1:.*]] = tile.add %[[ARG2]], %[[ARG3]] : (tensor<10x20xf32>, tensor<10x20xf32>) -> tensor<10x20xf32>
   // CHECK:     layer.return %[[X1]] : tensor<10x20xf32>
   // CHECK:   return %[[X0]] : tensor<10x20xf32>

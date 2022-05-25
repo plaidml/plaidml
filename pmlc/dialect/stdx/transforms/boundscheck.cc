@@ -5,10 +5,10 @@
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/DebugStringHelper.h"
 #include "mlir/Transforms/DialectConversion.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 #include "pmlc/dialect/stdx/transforms/pass_detail.h"
 #include "pmlc/util/logging.h"
@@ -50,7 +50,7 @@ public:
     ArrayRef<Type> results{};
     auto funcType = builder.getFunctionType(inputs, results);
     ArrayRef<NamedAttribute> attrs{};
-    builder.create<FuncOp>(loc, symbol, funcType, attrs).setPrivate();
+    builder.create<func::FuncOp>(loc, symbol, funcType, attrs).setPrivate();
     return SymbolRefAttr::get(context, symbol);
   }
 
@@ -61,12 +61,12 @@ public:
     for (size_t i = 0; i < dimSizes.size(); i++) {
       auto idxVal = op.getIndices()[i];
       auto rangeVal =
-          opBuilder.create<ConstantIntOp>(loc, dimSizes[i], i64Type);
+          opBuilder.create<arith::ConstantIntOp>(loc, dimSizes[i], i64Type);
       SmallVector<Value, 2> args;
       idxVal.getType().template dyn_cast<mlir::IntegerType>();
       args.push_back(idxVal);
       args.push_back(rangeVal);
-      opBuilder.create<CallOp>(op.getOperation()->getLoc(), func,
+      opBuilder.create<func::CallOp>(op.getOperation()->getLoc(), func,
                                ArrayRef<Type>{}, args);
     }
   }
@@ -75,8 +75,8 @@ public:
 } // namespace
 
 struct BoundsCheckPass : public BoundsCheckBase<BoundsCheckPass> {
-  void runOnFunction() final {
-    auto func = getFunction();
+  void runOnOperation() final {
+    auto func = getOperation();
     func.walk([&](Operation *op) {
       TypeSwitch<Operation *>(op)
           .Case<memref::LoadOp>([](auto op) {

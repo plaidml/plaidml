@@ -3,13 +3,14 @@
 #pragma once
 
 #include "mlir/Dialect/Affine/IR/AffineValueMap.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/OpDefinition.h"
-
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "pmlc/dialect/pxa/ir/stride_range.h"
 
 namespace mlir {
+
+// TODO: Lorenzo check fw decl for Memref.
 
 struct OpOperandVector : public SmallVector<OpOperand *> {
   operator SmallVector<Value>();

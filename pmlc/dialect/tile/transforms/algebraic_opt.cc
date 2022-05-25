@@ -6,6 +6,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/DebugStringHelper.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 #include "pmlc/dialect/tile/ir/ops.h"
 #include "pmlc/dialect/tile/transforms/pass_detail.h"
@@ -74,8 +75,8 @@ struct AddInitPattern final : public OpRewritePattern<AddOp> {
 };
 
 struct AlgebraicOptPass : public AlgebraicOptBase<AlgebraicOptPass> {
-  void runOnFunction() final {
-    FuncOp op = getFunction();
+  void runOnOperation() final {
+    func::FuncOp op = getOperation();
     MLIRContext *context = &getContext();
 
     RewritePatternSet patterns(context);

@@ -3,9 +3,9 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/IR/AffineValueMap.h"
 #include "mlir/Dialect/Affine/Utils.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Support/DebugStringHelper.h"
-
 #include "pmlc/dialect/pxa/analysis/strides.h"
 #include "pmlc/dialect/pxa/analysis/uses.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
@@ -83,7 +83,7 @@ struct FusionInfo {
   }
 
   void collectReductionIdxs(PxaReduceOp reduce) {
-    if (reduce.agg() == AtomicRMWKind::assign) {
+    if (reduce.agg() == arith::AtomicRMWKind::assign) {
       return;
     }
     DenseSet<BlockArgument> idxs;
@@ -96,7 +96,7 @@ struct FusionInfo {
         }
       }
       currOp = currOp->getParentOp();
-    } while (!isa<FuncOp>(currOp));
+    } while (!isa<func::FuncOp>(currOp));
 
     auto maybeStrideInfo = computeStrideInfo(reduce);
     if (maybeStrideInfo) {
@@ -164,7 +164,7 @@ struct FusionInfo {
 
   static bool isOutermostLoop(AffineParallelOp ap) {
     auto currOp = ap->getParentOp();
-    while (!isa<AffineParallelOp>(currOp) && !isa<FuncOp>(currOp)) {
+    while (!isa<AffineParallelOp>(currOp) && !isa<func::FuncOp>(currOp)) {
       currOp = currOp->getParentOp();
     }
     return !isa<AffineParallelOp>(currOp);
@@ -204,9 +204,10 @@ struct FusionInfo {
       const auto &sb = stridesB[i];
       // If the offsets don't match, bail
       if (sa.offset != sb.offset) {
-        opB.getOperation()->emitRemark(
-            "Failed to fuse with def offsets mismatch: i = ")
-            << i << ", A: " << debugString(sa) << ", B: " << debugString(sb);
+        // opB.getOperation()->emitRemark(
+        //     "Failed to fuse with def offsets mismatch: i = ")
+        //     << i << ", A: " << debugString(sa) << ", B: " << debugString(sb);
+        opB.getOperation()->emitRemark("Failed to fuse");
         return false;
       }
       // If either are empty, nothing to do
@@ -214,8 +215,8 @@ struct FusionInfo {
         continue;
 
       // If there are multiple indexes, give up
-      IVLOG(3, "sa: " << debugString(sa));
-      IVLOG(3, "sb: " << debugString(sb));
+      // IVLOG(3, "sa: " << debugString(sa));
+      // IVLOG(3, "sb: " << debugString(sb));
 
       // Pick the largest unique stride from each side
       auto pickUniqueTop = [&](const auto &options) {
@@ -588,8 +589,8 @@ struct FusionInfo {
     }
 
     // Construct the new outer parallel op
-    SmallVector<AtomicRMWKind, 8> reductions(typesC.size(),
-                                             AtomicRMWKind::assign);
+    SmallVector<arith::AtomicRMWKind, 8> reductions(
+        typesC.size(), arith::AtomicRMWKind::assign);
     MLIRContext *context = aInfo.op.getContext();
     auto apC = builder.create<AffineParallelOp>(
         FusedLoc::get(context, {aInfo.op.getLoc(), bInfo.op.getLoc()}),
@@ -785,8 +786,8 @@ struct FusionPass : public FusionBase<FusionPass> {
     return opLoopNest;
   }
 
-  void runOnFunction() final {
-    FuncOp func = getFunction();
+  void runOnOperation() final {
+    func::FuncOp func = getOperation();
 
     // Collect the blocks contain the top-level AffineParallelOps
     SmallPtrSet<Block *, 4> outermost;

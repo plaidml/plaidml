@@ -5,7 +5,7 @@
 
 include "pmlc/dialect/tile/ir/base.td"
 
-class EltwiseOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
+class EltwiseOp<string mnemonic, list<Trait> traits = [NoSideEffect]> :
     Op<TileDialect, mnemonic, !listconcat(traits, [
       MaterializeOperandsOpInterface
     ])>;
@@ -39,7 +39,7 @@ def ConstantOp :
   let assemblyFormat = "`(` $value `)` attr-dict `:` type($result)";
 }
 
-class EW_UnaryOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
+class EW_UnaryOp<string mnemonic, list<Trait> traits = [NoSideEffect]> :
     EltwiseOp<mnemonic, traits> {
   let arguments = (ins EltwiseAny:$operand);
   let results = (outs EltwiseAny:$result);
@@ -53,7 +53,7 @@ class EW_UnaryOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
   }];
 }
 
-class EW_BinaryOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
+class EW_BinaryOp<string mnemonic, list<Trait> traits = [NoSideEffect]> :
     EltwiseOp<mnemonic, traits> {
   let arguments = (ins EltwiseAny:$lhs, EltwiseAny:$rhs);
   let results = (outs EltwiseAny:$result);
@@ -76,7 +76,7 @@ def EW_CastOp : Op<TileDialect, "cast", [NoSideEffect]>, HasFolder {
   }];
 }
 
-class EW_CompareOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
+class EW_CompareOp<string mnemonic, list<Trait> traits = [NoSideEffect]> :
     EltwiseOp<mnemonic, traits> {
   let arguments = (ins EltwiseAny:$lhs, EltwiseAny:$rhs);
   let results = (outs EltwiseBool:$result);
@@ -90,27 +90,27 @@ class EW_CompareOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
   }];
 }
 
-class EW_UnaryIntOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
+class EW_UnaryIntOp<string mnemonic, list<Trait> traits = [NoSideEffect]> :
     EW_UnaryOp<mnemonic, traits>,
     Arguments<(ins EltwiseInteger:$operand)>,
     Results<(outs EltwiseInteger:$result)>;
 
-class EW_UnaryFloatOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
+class EW_UnaryFloatOp<string mnemonic, list<Trait> traits = [NoSideEffect]> :
     EW_UnaryOp<mnemonic, traits>,
     Arguments<(ins EltwiseFloat:$operand)>,
     Results<(outs EltwiseFloat:$result)>;
 
-class EW_BinaryIntOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
+class EW_BinaryIntOp<string mnemonic, list<Trait> traits = [NoSideEffect]> :
     EW_BinaryOp<mnemonic, traits>,
     Arguments<(ins EltwiseInteger:$lhs, EltwiseInteger:$rhs)>,
     Results<(outs EltwiseInteger:$result)>;
 
-class EW_BinaryLogicOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
+class EW_BinaryLogicOp<string mnemonic, list<Trait> traits = [NoSideEffect]> :
     EW_BinaryOp<mnemonic, traits>,
     Arguments<(ins EltwiseAny:$lhs, EltwiseAny:$rhs)>,
     Results<(outs EltwiseBool:$result)>;
 
-class EW_UnaryLogicOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
+class EW_UnaryLogicOp<string mnemonic, list<Trait> traits = [NoSideEffect]> :
     EW_UnaryOp<mnemonic, traits>,
     Arguments<(ins EltwiseAny:$operand)>,
     Results<(outs EltwiseBool:$result)>;

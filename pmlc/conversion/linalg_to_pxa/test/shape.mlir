@@ -1,7 +1,7 @@
 // RUN: pmlc-opt -convert-linalg-to-pxa %s | FileCheck %s
 
 func @main(%arg0: tensor<3x3x3x3x4xf32> {stdx.const}) -> tensor<5xi32> {
-  %cst = constant dense<[3, 3, 3, 3, 4]> : tensor<5xi32>
+  %cst = arith.constant dense<[3, 3, 3, 3, 4]> : tensor<5xi32>
   return %cst : tensor<5xi32>
 }
 

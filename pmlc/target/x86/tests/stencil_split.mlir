@@ -11,10 +11,10 @@ func @main(%A: memref<256x256xf32>, %B: memref<256x256xf32>,%C: memref<256x256xf
     %1 = affine.parallel (%ix, %iy) = (0, 0) to (2, 2) reduce ("assign") -> (memref<256x256xf32>) {
       %2 = pxa.load %A[%ix + %ox * 2, %iy + %oy * 2] : memref<256x256xf32>
       %3 = pxa.load %B[%ix + %ox * 2, %iy + %oy * 2] : memref<256x256xf32>
-      %4 = addf %2, %3 : f32
+      %4 = arith.addf %2, %3 : f32
       %5 = pxa.load %C[%ix+%ox*2, %iy+%oy*2]:memref<256x256xf32>
       %6 = stdx.relu(%5):(f32)->f32
-      %7 = addf %4, %6:f32
+      %7 = arith.addf %4, %6:f32
       %8 = stdx.relu(%7):(f32)->f32
       %9 = pxa.reduce assign %8, %D[%ix + %ox * 2, %iy + %oy * 2] : memref<256x256xf32>
       affine.yield %9 : memref<256x256xf32>

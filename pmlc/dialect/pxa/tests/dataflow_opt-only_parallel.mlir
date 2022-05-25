@@ -3,7 +3,7 @@
 // CHECK-LABEL: func @simple
 func @simple(%out : memref<2xf32>) -> memref<2xf32> {
   // CHECK: constant 0.0
-  %zero = constant 0.0 : f32
+  %zero = arith.constant 0.0 : f32
   %buf = memref.alloc() : memref<2xf32>
   // CHECK-NEXT: memref.alloc()
   %buf2 = memref.alloc() : memref<1xf32>

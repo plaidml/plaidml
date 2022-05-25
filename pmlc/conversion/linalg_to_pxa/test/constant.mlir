@@ -4,7 +4,7 @@
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 
 func @main() -> tensor<1x224x224x3xf32> {
-  %cst = constant dense<"0x00000000"> : tensor<f32>
+  %cst = arith.constant dense<"0x00000000"> : tensor<f32>
   %0 = linalg.init_tensor [1, 224, 224, 3] : tensor<1x224x224x3xf32>
   %1 = linalg.generic {
     indexing_maps = [#map0, #map1],
