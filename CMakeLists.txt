@@ -45,8 +45,8 @@ endif()
 option(PML_BUILD_TESTS "Builds PML unit tests" ON)
 option(PML_ENABLE_DEVKIT "Enable the devkit" ON)
 option(PML_INCLUDE_LLVM "Fetch and include the llvm-project" ON)
-option(PML_OPENVINO_BRIDGE "Enable the OpenVINO plugin" ON)
-option(PML_ENABLE_ASSERTIONS "Enable assertions" ON)
+option(PML_OPENVINO_BRIDGE "Enable the OpenVINO plugin" OFF)
+option(PML_ENABLE_ASSERTIONS "Enable assertions" OFF)
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
   option(PML_ENABLE_ASSERTIONS "Enable assertions" OFF)
@@ -55,18 +55,18 @@ else()
 endif()
 
 # Enable assertion LLVM style.
-if( PML_ENABLE_ASSERTIONS )
+if(PML_ENABLE_ASSERTIONS)
   # MSVC doesn't like _DEBUG on release builds.
   if(NOT MSVC)
     add_definitions(-D_DEBUG)
   endif()
   # On Release builds cmake automatically defines NDEBUG, so we
   # explicitly undefine it:
-  if( CMAKE_BUILD_TYPE STREQUAL "Release" )
+  if(CMAKE_BUILD_TYPE STREQUAL "Release")
     add_definitions( -UNDEBUG )
   endif()
 else()
-  if( NOT CMAKE_BUILD_TYPE STREQUAL "Release" )
+  if(NOT CMAKE_BUILD_TYPE STREQUAL "Release")
     add_definitions( -DNDEBUG )
   endif()
 endif()
