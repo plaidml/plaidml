@@ -1,6 +1,6 @@
 // RUN: pmlc-opt -layer-inline-layers %s | FileCheck %s
 
-func @relu(%arg0: tensor<10x20xf32>) -> tensor<10x20xf32> {
+func.func @relu(%arg0: tensor<10x20xf32>) -> tensor<10x20xf32> {
   %0 = layer.box "relu" (%arg0) : tensor<10x20xf32> -> tensor<10x20xf32> {
     ^bb0(%arg1 : tensor<10x20xf32>):
       %cst = tile.constant(0.000000e+00 : f64) : tensor<f32>
@@ -11,7 +11,7 @@ func @relu(%arg0: tensor<10x20xf32>) -> tensor<10x20xf32> {
   return %0 : tensor<10x20xf32>
 }
 
-// CHECK-LABEL: func @relu
+// CHECK-LABEL: func.func @relu
 // CHECK-NOT:     layer.box
 // CHECK:         tile.constant
 // CHECK:         tile.cmp_lt

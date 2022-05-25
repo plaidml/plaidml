@@ -7,7 +7,7 @@
 #map4 = affine_map<() -> (0, 0, 9, 0, 0, 0, 2)>
 #set = affine_set<(d0, d1, d2, d3, d4, d5, d6) : (d2 - d6 * 4 >= 0, -d2 + d6 * 4 + 3 >= 0)>
 
-func @main(%arg0: tensor<1x1x3x1xf32> {stdx.const}, %arg1: tensor<1x4x1x1xf32> {stdx.const}) -> tensor<1x1x9x1xf32> {
+func.func @main(%arg0: tensor<1x1x3x1xf32> {stdx.const}, %arg1: tensor<1x4x1x1xf32> {stdx.const}) -> tensor<1x1x9x1xf32> {
   %cst = tile.constant(0.000000e+00 : f64) : tensor<f32>
   %conv = tile.contract add, mul, %cst, %arg0, %arg1 {
     cons = #set, lowerBounds = #map0, sink = #map1, srcs = [#map2, #map3], upperBounds = #map4

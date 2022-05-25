@@ -1,6 +1,6 @@
 // RUN: pmlc-opt -convert-tile-to-pxa -cse %s | FileCheck %s
 
-func @const_add(%arg0: tensor<4xsi32> {stdx.const}, %arg1: tensor<4xsi32> {stdx.const}) {
+func.func @const_add(%arg0: tensor<4xsi32> {stdx.const}, %arg1: tensor<4xsi32> {stdx.const}) {
   %0 = tile.add %arg0, %arg1 : (tensor<4xsi32>, tensor<4xsi32>) -> tensor<4xsi32>
   stdx.closure() -> tensor<4xsi32> {
     stdx.yield %0 : tensor<4xsi32>
@@ -8,7 +8,7 @@ func @const_add(%arg0: tensor<4xsi32> {stdx.const}, %arg1: tensor<4xsi32> {stdx.
   return
 }
 
-// CHECK-LABEL: func @const_add
+// CHECK-LABEL: func.func @const_add
 //       CHECK:   memref.alloc
 //       CHECK:   %[[SUM:.*]] = affine.parallel
 //       CHECK:     pxa.load

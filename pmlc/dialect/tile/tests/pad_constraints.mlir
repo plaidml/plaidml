@@ -23,12 +23,12 @@
 
 // CHECK: #[[$complexOut:.*]] = affine_set<(d0, d1, d2, d3) : (d0 + d1 - 4 >= 0)>
 
-func @pad_input(%arg0: tensor<10xf32>) -> tensor<10xf32> {
+func.func @pad_input(%arg0: tensor<10xf32>) -> tensor<10xf32> {
   %c0 = tile.constant(0.0 : f64) : tensor<f32>
   %0 = tile.contract add, none, %c0, %arg0 {cons=#jin0to3, srcs=[#conv1dcenter], sink=#first}
     : tensor<f32>, tensor<10xf32> -> tensor<10xf32>
   return %0 : tensor<10xf32>
-  // CHECK-LABEL: func @pad_input
+  // CHECK-LABEL: func.func @pad_input
   // CHECK: tile.ident
   // CHECK-SAME: padLower = [1]
   // CHECK-SAME: padType = 1
@@ -37,13 +37,13 @@ func @pad_input(%arg0: tensor<10xf32>) -> tensor<10xf32> {
   // CHECK-NOT: cons=
 }
 
-func @in_place(%arg0: tensor<10xf32>) -> tensor<10xf32> {
+func.func @in_place(%arg0: tensor<10xf32>) -> tensor<10xf32> {
   %c0 = tile.constant(0.0 : f64) : tensor<f32>
   %0 = tile.sin %arg0 : (tensor<10xf32>) -> tensor<10xf32>
   %1 = tile.contract add, none, %c0, %0 {cons=#jin0to3, srcs=[#conv1dcenter], sink=#first}
     : tensor<f32>, tensor<10xf32> -> tensor<10xf32>
   return %1 : tensor<10xf32>
-  // CHECK-LABEL: func @in_place
+  // CHECK-LABEL: func.func @in_place
   // CHECK: tile.sin
   // CHECK-SAME: padLower = [1]
   // CHECK-SAME: padType = 1
@@ -52,13 +52,13 @@ func @in_place(%arg0: tensor<10xf32>) -> tensor<10xf32> {
   // CHECK-NOT: cons=
 }
 
-func @justify(%arg0: tensor<10xf32>) -> tensor<10xf32> {
+func.func @justify(%arg0: tensor<10xf32>) -> tensor<10xf32> {
   %c0 = tile.constant(0.0 : f64) : tensor<f32>
   %0 = tile.sin %arg0 : (tensor<10xf32>) -> tensor<10xf32>
   %1 = tile.contract add, none, %c0, %0 {cons=#jin0to3, srcs=[#conv1djustify], sink=#first}
      : tensor<f32>, tensor<10xf32> -> tensor<10xf32>
   return %1 : tensor<10xf32>
-  // CHECK-LABEL: func @justify
+  // CHECK-LABEL: func.func @justify
   // CHECK: tile.sin
   // CHECK-SAME: padLower = [0]
   // CHECK-SAME: padUpper = [2]
@@ -66,52 +66,52 @@ func @justify(%arg0: tensor<10xf32>) -> tensor<10xf32> {
   // CHECK-NOT: cons=
 }
 
-func @valid_no_pad(%arg0: tensor<12xf32>) -> tensor<10xf32> {
+func.func @valid_no_pad(%arg0: tensor<12xf32>) -> tensor<10xf32> {
   %c0 = tile.constant(0.0 : f64) : tensor<f32>
   %0 = tile.sin %arg0 : (tensor<12xf32>) -> tensor<12xf32>
   %1 = tile.contract add, none, %c0, %0 {cons=#jin0to3, srcs=[#conv1djustify], sink=#first}
     : tensor<f32>, tensor<12xf32> -> tensor<10xf32>
   return %1 : tensor<10xf32>
-  // CHECK-LABEL: func @valid_no_pad
+  // CHECK-LABEL: func.func @valid_no_pad
   // CHECK-NOT: ident
   // CHECK-NOT: pad
   // CHECK: return
 }
 
-func @pad_max(%arg0: tensor<10xf32>) -> tensor<10xf32> {
+func.func @pad_max(%arg0: tensor<10xf32>) -> tensor<10xf32> {
   %c0 = tile.constant(0.0 : f64) : tensor<f32>
   %0 = tile.contract max, none, %c0, %arg0 {cons=#jin0to3, srcs=[#conv1dcenter], sink=#first}
     : tensor<f32>, tensor<10xf32> -> tensor<10xf32>
   return %0 : tensor<10xf32>
-  // CHECK-LABEL: func @pad_max
+  // CHECK-LABEL: func.func @pad_max
   // CHECK: padType = 2
   // CHECK: tile.contract
   // CHECK-NOT: cons=
 }
 
-func @pad_min(%arg0: tensor<10xf32>) -> tensor<10xf32> {
+func.func @pad_min(%arg0: tensor<10xf32>) -> tensor<10xf32> {
   %c0 = tile.constant(0.0 : f64) : tensor<f32>
   %0 = tile.contract min, none, %c0, %arg0 {cons=#jin0to3, srcs=[#conv1dcenter], sink=#first}
     : tensor<f32>, tensor<10xf32> -> tensor<10xf32>
   return %0 : tensor<10xf32>
-  // CHECK-LABEL: func @pad_min
+  // CHECK-LABEL: func.func @pad_min
   // CHECK: padType = 3
   // CHECK: tile.contract
   // CHECK-NOT: cons=
 }
 
-func @no_pad_assign(%arg0: tensor<10xf32>) -> tensor<10xf32> {
+func.func @no_pad_assign(%arg0: tensor<10xf32>) -> tensor<10xf32> {
   %c0 = tile.constant(0.0 : f64) : tensor<f32>
   %0 = tile.contract assign, none, %c0, %arg0 {cons=#jin0to3, srcs=[#conv1dcenter], sink=#first}
     : tensor<f32>, tensor<10xf32> -> tensor<10xf32>
   return %0 : tensor<10xf32>
-  // CHECK-LABEL: func @no_pad_assign
+  // CHECK-LABEL: func.func @no_pad_assign
   // CHECK-NOT: ident
   // CHECK-NOT: pad
   // CHECK: return
 }
 
-func @no_pad_conflict(%arg0: tensor<10xf32>) -> tensor<10xf32> {
+func.func @no_pad_conflict(%arg0: tensor<10xf32>) -> tensor<10xf32> {
   %c0 = tile.constant(0.0 : f64) : tensor<f32>
   %0 = tile.contract min, none, %c0, %arg0 {cons=#jin0to3, srcs=[#conv1dcenter], sink=#first}
     : tensor<f32>, tensor<10xf32> -> tensor<10xf32>
@@ -119,13 +119,13 @@ func @no_pad_conflict(%arg0: tensor<10xf32>) -> tensor<10xf32> {
     : tensor<f32>, tensor<10xf32> -> tensor<10xf32>
   %2 = tile.add %0, %1 : (tensor<10xf32>, tensor<10xf32>) -> tensor<10xf32>
   return %2 : tensor<10xf32>
-  // CHECK-LABEL: func @no_pad_conflict
+  // CHECK-LABEL: func.func @no_pad_conflict
   // CHECK-NOT: ident
   // CHECK-NOT: pad
   // CHECK: return
 }
 
-func @pad_fake_conflict(%arg0: tensor<10xf32>) -> tensor<10xf32> {
+func.func @pad_fake_conflict(%arg0: tensor<10xf32>) -> tensor<10xf32> {
   %c0 = tile.constant(0.0 : f64) : tensor<f32>
   %0 = tile.contract min, none, %c0, %arg0 {cons=#jis0, srcs=[#conv1dcenter], sink=#first}
     : tensor<f32>, tensor<10xf32> -> tensor<10xf32>
@@ -133,13 +133,13 @@ func @pad_fake_conflict(%arg0: tensor<10xf32>) -> tensor<10xf32> {
     : tensor<f32>, tensor<10xf32> -> tensor<10xf32>
   %2 = tile.add %0, %1 : (tensor<10xf32>, tensor<10xf32>) -> tensor<10xf32>
   return %2 : tensor<10xf32>
-  // CHECK-LABEL: func @pad_fake_conflict
+  // CHECK-LABEL: func.func @pad_fake_conflict
   // CHECK: padType = 2
   // CHECK: tile.contract
   // CHECK-NOT: cons=
 }
 
-func @pad_worst_case(%arg0: tensor<10xf32>) -> tensor<10xf32> {
+func.func @pad_worst_case(%arg0: tensor<10xf32>) -> tensor<10xf32> {
   %c0 = tile.constant(0.0 : f64) : tensor<f32>
   %0 = tile.contract min, none, %c0, %arg0 {cons=#jin0to3, srcs=[#conv1dcenter], sink=#first}
     : tensor<f32>, tensor<10xf32> -> tensor<10xf32>
@@ -147,7 +147,7 @@ func @pad_worst_case(%arg0: tensor<10xf32>) -> tensor<10xf32> {
     : tensor<f32>, tensor<10xf32> -> tensor<10xf32>
   %2 = tile.add %0, %1 : (tensor<10xf32>, tensor<10xf32>) -> tensor<10xf32>
   return %2 : tensor<10xf32>
-  // CHECK-LABEL: func @pad_worst_case
+  // CHECK-LABEL: func.func @pad_worst_case
   // CHECK: ident
   // CHECK-SAME: padLower = [1]
   // CHECK-SAME: padType = 3
@@ -156,12 +156,12 @@ func @pad_worst_case(%arg0: tensor<10xf32>) -> tensor<10xf32> {
   // CHECK-NOT: cons=
 }
 
-func @pad_add_mul(%arg0: tensor<10xf32>, %arg1: tensor<3xf32>) -> tensor<10xf32> {
+func.func @pad_add_mul(%arg0: tensor<10xf32>, %arg1: tensor<3xf32>) -> tensor<10xf32> {
   %c0 = tile.constant(0.0 : f64) : tensor<f32>
   %0 = tile.contract add, mul, %c0, %arg0, %arg1 {srcs=[#conv1dcenter, #second], sink=#first}
     : tensor<f32>, tensor<10xf32>, tensor<3xf32> -> tensor<10xf32>
   return %0 : tensor<10xf32>
-  // CHECK-LABEL: func @pad_add_mul
+  // CHECK-LABEL: func.func @pad_add_mul
   // CHECK: ident
   // CHECK-SAME: padLower = [1]
   // CHECK-SAME: padType = 1
@@ -170,12 +170,12 @@ func @pad_add_mul(%arg0: tensor<10xf32>, %arg1: tensor<3xf32>) -> tensor<10xf32>
   // CHECK-NOT: cons=
 }
 
-func @no_pad_add_add(%arg0: tensor<10xf32>, %arg1: tensor<3xf32>) -> tensor<10xf32> {
+func.func @no_pad_add_add(%arg0: tensor<10xf32>, %arg1: tensor<3xf32>) -> tensor<10xf32> {
   %c0 = tile.constant(0.0 : f64) : tensor<f32>
   %0 = tile.contract add, add, %c0, %arg0, %arg1 {srcs=[#conv1dcenter, #second], sink=#first}
     : tensor<f32>, tensor<10xf32>, tensor<3xf32> -> tensor<10xf32>
   return %0 : tensor<10xf32>
-  // CHECK-LABEL: func @no_pad_add_add
+  // CHECK-LABEL: func.func @no_pad_add_add
   // CHECK-NOT: ident
   // CHECK-NOT: pad
   // CHECK: tile.contract
@@ -183,14 +183,14 @@ func @no_pad_add_add(%arg0: tensor<10xf32>, %arg1: tensor<3xf32>) -> tensor<10xf
   // CHECK: return
 }
 
-func @pad_contraction(%A: tensor<10xf32>, %B: tensor<3xf32>) -> tensor<10xf32> {
+func.func @pad_contraction(%A: tensor<10xf32>, %B: tensor<3xf32>) -> tensor<10xf32> {
   %c0 = tile.constant(0.0 : f64) : tensor<f32>
   %0 = tile.contract add, mul, %c0, %A, %B {srcs=[#conv1dcenter, #second], sink=#first}
     : tensor<f32>, tensor<10xf32>, tensor<3xf32> -> tensor<10xf32>
   %1 = tile.contract add, mul, %c0, %0, %B {srcs=[#conv1dcenter, #second], sink=#first}
     : tensor<f32>, tensor<10xf32>, tensor<3xf32> -> tensor<10xf32>
   return %1 : tensor<10xf32>
-  // CHECK-LABEL: func @pad_contraction
+  // CHECK-LABEL: func.func @pad_contraction
   // CHECK: tile.contract
   // CHECK-SAME: padLower = [1]
   // CHECK-SAME: padType = 1
@@ -199,12 +199,12 @@ func @pad_contraction(%A: tensor<10xf32>, %B: tensor<3xf32>) -> tensor<10xf32> {
   // CHECK-NOT: cons=
 }
 
-func @check_cons_removal(%A: tensor<10x10xf32>, %B: tensor<3x3xf32>) -> tensor<10x10xf32> {
+func.func @check_cons_removal(%A: tensor<10x10xf32>, %B: tensor<3x3xf32>) -> tensor<10x10xf32> {
   %c0 = tile.constant(0.0 : f64) : tensor<f32>
   %0 = tile.contract add, mul, %c0, %A, %B {srcs=[#conv2dinput, #conv2dkernel], sink=#conv2doutput, cons=#complex}
     : tensor<f32>, tensor<10x10xf32>, tensor<3x3xf32> -> tensor<10x10xf32>
   return %0 : tensor<10x10xf32>
-  // CHECK-LABEL: func @check_cons_removal
+  // CHECK-LABEL: func.func @check_cons_removal
   // CHECK: ident 
   // CHECK-SAME: padLower = [1, 1]
   // CHECK-SAME: padType = 1

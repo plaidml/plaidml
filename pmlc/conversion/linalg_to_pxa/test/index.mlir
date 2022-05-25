@@ -2,7 +2,7 @@
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 
-func @test_index() -> (tensor<16x16xindex>, tensor<16x16xi64>) {
+func.func @test_index() -> (tensor<16x16xindex>, tensor<16x16xi64>) {
   %out0 = linalg.init_tensor [16, 16] : tensor<16x16xindex>
   %out1 = linalg.init_tensor [16, 16] : tensor<16x16xi64>
   %t0, %t1 = linalg.generic {
@@ -18,7 +18,7 @@ func @test_index() -> (tensor<16x16xindex>, tensor<16x16xi64>) {
   return %t0, %t1 : tensor<16x16xindex>, tensor<16x16xi64>
 }
 
-// CHECK-LABEL: func @test_index
+// CHECK-LABEL: func.func @test_index
 //  CHECK-SAME: (%[[arg0:.*]]: memref<16x16xindex>, %[[arg1:.*]]: memref<16x16xi64>) -> (memref<16x16xindex>, memref<16x16xi64>)
 //       CHECK:   %[[out0:.*]]:2 = affine.parallel (%[[arg2:.*]], %[[arg3:.*]]) = (0, 0) to (16, 16) reduce ("assign", "assign") -> (memref<16x16xindex>, memref<16x16xi64>)
 //       CHECK:     %[[t0:.*]] = arith.index_cast %[[arg3]] : index to i64

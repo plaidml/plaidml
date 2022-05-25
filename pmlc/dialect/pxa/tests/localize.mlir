@@ -1,7 +1,7 @@
 // RUN: pmlc-opt -pxa-localize -canonicalize %s | FileCheck %s
 
-// CHECK-LABEL: func @simple
-func @simple(%arg0: memref<3x4xf16>) -> memref<3x4xf16> {
+// CHECK-LABEL: func.func @simple
+func.func @simple(%arg0: memref<3x4xf16>) -> memref<3x4xf16> {
   %cst = arith.constant 0.0 : f16
   // CHECK: memref.alloc()
   %0 = memref.alloc() : memref<3x4xf16>

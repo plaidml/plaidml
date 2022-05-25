@@ -28,6 +28,7 @@ pml_cc_library(
     MLIRHLOAnalysis
     MLIRHLOTestAnalysis
     MLIRTransforms
+    GmlStBufferizableOpInterface
     pmlc::conversion::linalg_to_pxa
     pmlc::conversion::pxa_to_affine
     pmlc::conversion::stdx_to_llvm

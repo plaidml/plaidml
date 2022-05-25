@@ -1,7 +1,7 @@
 // RUN: pmlc-opt -affinex-loop-unroll="operation-limit=12" %s | FileCheck %s
 
 // CHECK: simple
-func @simple() {
+func.func @simple() {
   // CHECK: constant
   %cst = arith.constant 0.000000e+00 : f32
   // CHECK: addf
@@ -14,7 +14,7 @@ func @simple() {
 }
 
 // CHECK: nested
-func @nested() {
+func.func @nested() {
   // CHECK: constant
   %cst = arith.constant 0.000000e+00 : f32
   // CHECK: affine.for
@@ -42,7 +42,7 @@ func @nested() {
 }
 
 // CHECK: nested_over_limit_1
-func @nested_over_limit_1() {
+func.func @nested_over_limit_1() {
   // CHECK: constant
   %cst = arith.constant 0.000000e+00 : f32
   // CHECK: affine.for
@@ -64,7 +64,7 @@ func @nested_over_limit_1() {
 }
 
 // CHECK: nested_over_limit_2
-func @nested_over_limit_2() {
+func.func @nested_over_limit_2() {
   // CHECK: constant
   %cst = arith.constant 0.000000e+00 : f32
   // CHECK: affine.for
@@ -88,7 +88,7 @@ func @nested_over_limit_2() {
 
 #set = affine_set<(i, j) : (j - i - 1 >= 0)>
 // CHECK: conditional_if
-func @conditional_if() {
+func.func @conditional_if() {
   // CHECK: constant
   %cst = arith.constant 0.000000e+00 : f32
   // CHECK: affine.for
@@ -118,7 +118,7 @@ func @conditional_if() {
 }
 
 // CHECK: conditional_if_over_limit
-func @conditional_if_over_limit() {
+func.func @conditional_if_over_limit() {
   // CHECK: constant
   %cst = arith.constant 0.000000e+00 : f32
   // CHECK: affine.for
@@ -145,7 +145,7 @@ func @conditional_if_over_limit() {
 }
 
 // CHECK: conditional_if_else
-func @conditional_if_else() {
+func.func @conditional_if_else() {
   // CHECK: constant
   %cst = arith.constant 0.000000e+00 : f32
   // CHECK: affine.for
@@ -181,7 +181,7 @@ func @conditional_if_else() {
 }
 
 // CHECK: conditional_if_else_over_limit
-func @conditional_if_else_over_limit() {
+func.func @conditional_if_else_over_limit() {
   // CHECK: constant
   %cst = arith.constant 0.000000e+00 : f32
   // CHECK: affine.for
@@ -214,7 +214,7 @@ func @conditional_if_else_over_limit() {
 }
 
 // CHECK: double_nested
-func @double_nested() {
+func.func @double_nested() {
   // CHECK: constant
   %cst = arith.constant 0.000000e+00 : f32
   // CHECK: affine.for
@@ -262,7 +262,7 @@ func @double_nested() {
 }
 
 // CHECK: parallel_no_unroll
-func @parallel_no_unroll() {
+func.func @parallel_no_unroll() {
   // CHECK: constant
   %cst = arith.constant 0.000000e+00 : f32
   // CHECK: affine.for
@@ -278,7 +278,7 @@ func @parallel_no_unroll() {
 }
 
 // CHECK: variable_index
-func @variable_index(%arg: memref<1xindex>) {
+func.func @variable_index(%arg: memref<1xindex>) {
   // CHECK: constant
   %cst = arith.constant 0.000000e+00 : f32
   // CHECK: affine.load

@@ -4,7 +4,7 @@
 #map1 = affine_map<(i, j, k) -> (j, i)>
 #map2 = affine_map<(i, j, k) -> (i, k)>
 
-func @dot(%arg0: tensor<1x784xf32>, %arg1: tensor<784x512xf32>) -> tensor<1x512xf32> {
+func.func @dot(%arg0: tensor<1x784xf32>, %arg1: tensor<784x512xf32>) -> tensor<1x512xf32> {
   %c0 = tile.constant(0.0 : f64) : tensor<f32>
   %2 = tile.contract add, mul, %c0, %arg0, %arg1 {sink=#map0, srcs=[#map1, #map2]} :
     tensor<f32>, tensor<1x784xf32>, tensor<784x512xf32> -> tensor<1x512xf32>
@@ -16,7 +16,7 @@ func @dot(%arg0: tensor<1x784xf32>, %arg1: tensor<784x512xf32>) -> tensor<1x512x
 // CHECK: #map2 = affine_map<(d0, d1, d2) -> (d1, d0)>
 // CHECK: #map3 = affine_map<(d0, d1, d2) -> (d0, d2)>
 // CHECK: #map4 = affine_map<() -> (783, 0, 511)>
-// CHECK-LABEL: func @dot
+// CHECK-LABEL: func.func @dot
 // CHECK: tile.contract
 // CHECK-SAME: lowerBounds = #map0
 // CHECK-SAME: sink = #map1
@@ -31,7 +31,7 @@ func @dot(%arg0: tensor<1x784xf32>, %arg1: tensor<784x512xf32>) -> tensor<1x512x
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
 #set0 = affine_set<(d0, d1) : (d0 >= 0, -d0 + 9 >= 0, d1 >= 0, -d1 + 9 >= 0)>
 
-func @no_reduce(%arg0: tensor<10x10xf32>) -> tensor<100xf32> {
+func.func @no_reduce(%arg0: tensor<10x10xf32>) -> tensor<100xf32> {
   %cst = tile.constant(0.0 : f64) : tensor<f32>
   %0 = tile.contract assign, none, %cst, %arg0 {cons = #set0, sink = #map0, srcs = [#map1]} : tensor<f32>, tensor<10x10xf32> -> tensor<100xf32>
   return %0 : tensor<100xf32>
@@ -41,4 +41,4 @@ func @no_reduce(%arg0: tensor<10x10xf32>) -> tensor<100xf32> {
 // CHECK: #map1 = affine_map<(d0, d1) -> (d1 + d0 * 10)>
 // CHECK: #map2 = affine_map<(d0, d1) -> (d0, d1)>
 // CHECK: #map3 = affine_map<() -> (9, 9)>
-// CHECK-LABEL: func @no_reduce
+// CHECK-LABEL: func.func @no_reduce

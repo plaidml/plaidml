@@ -1,6 +1,6 @@
 // RUN: pmlc-opt -convert-linalg-to-pxa -cse %s | FileCheck %s
 
-func @test_pad(%arg0: tensor<4x8x8x16xf32>) -> tensor<8x10x14x20xf32> {
+func.func @test_pad(%arg0: tensor<4x8x8x16xf32>) -> tensor<8x10x14x20xf32> {
   %pad_value = arith.constant 0.000000e+00 : f32
   %0 = tensor.pad %arg0 low[2, 2, 4, 4] high[2, 0, 2, 0] {
     ^bb0(%arg1 : index, %arg2 : index, %arg3 : index, %arg4 : index):
@@ -11,7 +11,7 @@ func @test_pad(%arg0: tensor<4x8x8x16xf32>) -> tensor<8x10x14x20xf32> {
 
 
 // CHECK memref.global "private" constant @cst_scalar_memref_0 : memref<f32> = dense<0.000000e+00>
-// CHECK-LABEL: func @test_pad
+// CHECK-LABEL: func.func @test_pad
 //  CHECK-SAME: (%[[arg0:.*]]: memref<4x8x8x16xf32>, %[[arg1:.*]]: memref<8x10x14x20xf32>) -> memref<8x10x14x20xf32>
 //	 CHECK: %[[cst_0:.*]] = memref.get_global @cst_scalar_memref_0 : memref<f32>
 //	 CHECK: %[[c0:.*]] = pxa.load %[[cst_0]][] : memref<f32>

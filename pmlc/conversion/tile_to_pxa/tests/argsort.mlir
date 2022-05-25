@@ -1,11 +1,11 @@
 // RUN: pmlc-opt -convert-tile-to-pxa -canonicalize -cse %s | FileCheck %s
 
-func @argsort0(%arg0: tensor<20xf32>) -> tensor<20xsi32> {
+func.func @argsort0(%arg0: tensor<20xf32>) -> tensor<20xsi32> {
   %0 = tile.argsort "asc" %arg0[0] : (tensor<20xf32>) -> tensor<20xsi32>
   return %0 : tensor<20xsi32>
 }
 
-// CHECK-LABEL: func @argsort0
+// CHECK-LABEL: func.func @argsort0
 // CHECK:     %[[RET:.*]] = layer.box "argsort"(%arg1, %arg0) {attrs = {}} : memref<20xi32>, memref<20xf32> -> memref<20xi32> {
 // CHECK:       ^bb0(%[[OUT:.*]]: memref<20xi32>, %[[IN:.*]]: memref<20xf32>):
 // CHECK-DAG:   %[[C0:.*]] = arith.constant 0 : index
@@ -28,12 +28,12 @@ func @argsort0(%arg0: tensor<20xf32>) -> tensor<20xsi32> {
 // CHECK:       layer.return %[[OUT]] : memref<20xi32>
 // CHECK:     return %[[RET]] : memref<20xi32>
 
-func @argsort1(%arg0: tensor<5x4xf32>) -> tensor<5x4xsi32> {
+func.func @argsort1(%arg0: tensor<5x4xf32>) -> tensor<5x4xsi32> {
   %0 = tile.argsort "desc" %arg0[0] : (tensor<5x4xf32>) -> tensor<5x4xsi32>
   return %0 : tensor<5x4xsi32>
 }
 
-// CHECK-LABEL: func @argsort1
+// CHECK-LABEL: func.func @argsort1
 // CHECK:     %[[RET:.*]] = layer.box "argsort"(%arg1, %arg0) {attrs = {}} : memref<5x4xi32>, memref<5x4xf32> -> memref<5x4xi32> {
 // CHECK:       ^bb0(%[[OUT:.*]]: memref<5x4xi32>, %[[IN:.*]]: memref<5x4xf32>):
 // CHECK-DAG:   %[[C0:.*]] = arith.constant 0 : index

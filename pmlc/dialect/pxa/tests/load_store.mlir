@@ -1,7 +1,7 @@
 // RUN: pmlc-opt -canonicalize -pxa-convert-mem-op %s | FileCheck %s
 
 // CHECK-LABEL: @load_store
-func @load_store(%arg0: memref<5x25x13x13xf32>, %arg1: memref<2xi32>, %arg2: memref<5x25x13x13xf32>) {
+func.func @load_store(%arg0: memref<5x25x13x13xf32>, %arg1: memref<2xi32>, %arg2: memref<5x25x13x13xf32>) {
 // CHECK-SAME: (%[[arg0:.*]]: memref<5x25x13x13xf32>, %[[arg1:.*]]: memref<2xi32>, %[[arg2:.*]]: memref<5x25x13x13xf32>)
   %0 = affine.parallel (%arg3) = (0) to (2) reduce ("assign") -> (memref<5x25x13x13xf32>) {
   // CHECK: affine.parallel (%[[arg3:.*]]) = (0) to (2)

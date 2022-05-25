@@ -1,7 +1,7 @@
 // RUN: pmlc-opt -pxa-fusion -canonicalize %s | FileCheck %s
 // RUN: pmlc-opt -pxa-fusion="mem-threshold=10000" -canonicalize %s | FileCheck %s -check-prefix=LIMIT
 
-func @mvn(%arg0: memref<1x224x128x24xf16>) -> memref<1x1x1x24xf16> {
+func.func @mvn(%arg0: memref<1x224x128x24xf16>) -> memref<1x1x1x24xf16> {
   %cst = arith.constant 0.000000e+00 : f16
   %c28672_i32 = arith.constant 28672 : i32
   %0 = memref.alloc() : memref<1x1x1x24xf16>
@@ -17,7 +17,7 @@ func @mvn(%arg0: memref<1x224x128x24xf16>) -> memref<1x1x1x24xf16> {
   return %2 : memref<1x1x1x24xf16>
 }
 
-// CHECK: func @mvn
+// CHECK: func.func @mvn
 // CHECK: affine.parallel
 // CHECK:   pxa.reduce
 // CHECK:   affine.parallel
@@ -29,7 +29,7 @@ func @mvn(%arg0: memref<1x224x128x24xf16>) -> memref<1x1x1x24xf16> {
 
 // prevent over-fusion by setting a memory activity threshold
 
-// LIMIT: func @mvn
+// LIMIT: func.func @mvn
 // LIMIT: affine.parallel
 // LIMIT:   pxa.reduce
 // LIMIT:   affine.yield

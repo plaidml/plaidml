@@ -4,7 +4,7 @@
 #map1 = affine_map<(i, j, k) -> (j, i)>
 #map2 = affine_map<(i, j, k) -> (i, k)>
 
-func @double_dot(
+func.func @double_dot(
   %arg0: tensor<10x20xf32>,
   %arg1: tensor<20x30xf32>,
   %arg2: tensor<30x40xf32>
@@ -17,7 +17,7 @@ func @double_dot(
   return %1 : tensor<10x40xf32>
 }
 
-// CHECK-LABEL: func @double_dot
+// CHECK-LABEL: func.func @double_dot
 //  CHECK-SAME:   %{{.*}}: tensor<10x20xf32>
 //  CHECK-SAME:   %{{.*}}: tensor<20x30xf32>
 //  CHECK-SAME:   %{{.*}}: tensor<30x40xf32>

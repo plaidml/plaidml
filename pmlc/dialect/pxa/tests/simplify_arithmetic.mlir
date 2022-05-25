@@ -1,7 +1,7 @@
 // RUN: pmlc-opt -pxa-simplify-arithmetic -canonicalize %s | FileCheck %s
 
-// CHECK-LABEL: func @simple
-func @simple(%out : memref<2xf32>) -> memref<2xf32> {
+// CHECK-LABEL: func.func @simple
+func.func @simple(%out : memref<2xf32>) -> memref<2xf32> {
   %zero = arith.constant 0.0 : f32
   %buf = memref.alloc() : memref<2xf32>
   %0 = affine.parallel (%i) = (0) to (2) reduce ("assign") -> (memref<2xf32>) {
@@ -16,8 +16,8 @@ func @simple(%out : memref<2xf32>) -> memref<2xf32> {
   return %0 : memref<2xf32>
 }
 
-// CHECK-LABEL: func @simple_vector
-func @simple_vector(%out : memref<2xvector<16xf32>>) -> memref<2x16xf32> {
+// CHECK-LABEL: func.func @simple_vector
+func.func @simple_vector(%out : memref<2xvector<16xf32>>) -> memref<2x16xf32> {
   %zero = arith.constant 0 : index
   %cst = arith.constant dense<0.000000e+00> : vector<16xf32>
   %buf = memref.alloc() : memref<2x16xf32>

@@ -1,7 +1,7 @@
 // RUN: pmlc-opt -pxa-resize-tmps -canonicalize %s | FileCheck %s
 
-// CHECK-LABEL: func @simple_resize
-func @simple_resize(%I: memref<2x3xf32>) -> (memref<2x3xf32>) {
+// CHECK-LABEL: func.func @simple_resize
+func.func @simple_resize(%I: memref<2x3xf32>) -> (memref<2x3xf32>) {
   %O = memref.alloc() : memref<2x3xf32>
   // CHECK: memref.alloc() : memref<2x3xf32>
   %O3 = affine.parallel (%i, %j) = (0, 0) to (2, 3) reduce ("assign") -> (memref<2x3xf32>) {
@@ -20,8 +20,8 @@ func @simple_resize(%I: memref<2x3xf32>) -> (memref<2x3xf32>) {
   return %O3 : memref<2x3xf32>
 }
 
-// CHECK-LABEL: func @inner_indexes
-func @inner_indexes(%I: memref<100x100xf32>) -> (memref<100x100xf32>) {
+// CHECK-LABEL: func.func @inner_indexes
+func.func @inner_indexes(%I: memref<100x100xf32>) -> (memref<100x100xf32>) {
   %O = memref.alloc() : memref<100x100xf32>
   // CHECK: memref.alloc() : memref<100x100xf32>
   %O4 = affine.parallel (%i1, %j1) = (0, 0) to (100, 100) step (10, 10) reduce ("assign") -> (memref<100x100xf32>) {
@@ -45,8 +45,8 @@ func @inner_indexes(%I: memref<100x100xf32>) -> (memref<100x100xf32>) {
   return %O4 : memref<100x100xf32>
 }
 
-func @no_resize_return() -> memref<10x10xf32> {
-// CHECK-LABEL: func @no_resize_return
+func.func @no_resize_return() -> memref<10x10xf32> {
+// CHECK-LABEL: func.func @no_resize_return
   %cst = arith.constant 0.000000e+00 : f32
   %0 = memref.alloc() : memref<10x10xf32>
   // CHECK: memref.alloc() : memref<10x10xf32>
@@ -58,8 +58,8 @@ func @no_resize_return() -> memref<10x10xf32> {
 }
 
 #set0 = affine_set<(d0, d1, d2, d3) : (d0 * -30 - d1 + 221 >= 0, d2 * -30 - d3 + 221 >= 0)>
-func @no_resize_expand(%arg0: memref<32x30xf32>) -> memref<1x222x222x32xf32> {
-// CHECK-LABEL: func @no_resize_expand
+func.func @no_resize_expand(%arg0: memref<32x30xf32>) -> memref<1x222x222x32xf32> {
+// CHECK-LABEL: func.func @no_resize_expand
   %0 = memref.alloc() : memref<1x30x32x8x8x32xf32>
   %1 = memref.alloc() : memref<1x222x222x32xf32>
   // CHECK: memref.alloc() : memref<1x222x222x32xf32>

@@ -3,7 +3,7 @@
 #map0 = affine_map<(d0, d1, d2, d3) -> ()>
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 
-func @main() -> tensor<1x224x224x3xf32> {
+func.func @main() -> tensor<1x224x224x3xf32> {
   %cst = arith.constant dense<"0x00000000"> : tensor<f32>
   %0 = linalg.init_tensor [1, 224, 224, 3] : tensor<1x224x224x3xf32>
   %1 = linalg.generic {
@@ -17,5 +17,5 @@ func @main() -> tensor<1x224x224x3xf32> {
 }
 
 // CHECK: memref.global "private" constant @[[cst:.*]] : memref<f32> = dense<0.000000e+00>
-// CHECK: func @main
+// CHECK: func.func @main
 // CHECK: memref.get_global @[[cst]] : memref<f32>

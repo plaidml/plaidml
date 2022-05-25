@@ -7,7 +7,7 @@
 // RUN:   --canonicalize \
 // RUN:   | FileCheck %s
 
-func @basic(%arg0: memref<100x100xf32>, %arg1: memref<100x100xf32>) -> (memref<100x100xf32>) {
+func.func @basic(%arg0: memref<100x100xf32>, %arg1: memref<100x100xf32>) -> (memref<100x100xf32>) {
   %a = memref.alloc() : memref<100x100xf32>
   %r = affine.parallel (%i, %j, %k) = (0, 0, 0) to (100, 100, 100) reduce ("assign") -> (memref<100x100xf32>) {
     %0 = affine.load %arg1[%i, %k] : memref<100x100xf32>
@@ -19,7 +19,7 @@ func @basic(%arg0: memref<100x100xf32>, %arg1: memref<100x100xf32>) -> (memref<1
   return %r : memref<100x100xf32>
 }
 
-// CHECK-LABEL: func @basic
+// CHECK-LABEL: func.func @basic
 //       CHECK:   affine.parallel ({{.*}}, {{.*}}) = (0, 0) to (2, 25)
 //       CHECK:     affine.parallel ({{.*}}, {{.*}}) = (0, 0) to (50, 4)
 //       CHECK:       affine.parallel ({{.*}}) = (0) to (100)

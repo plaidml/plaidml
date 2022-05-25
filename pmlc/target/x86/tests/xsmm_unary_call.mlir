@@ -12,9 +12,9 @@
 
 !eltwise = type memref<8x3xf32>
 
-func private @printMemrefF32(memref<*xf32>) attributes { llvm.emit_c_interface }
+func.func private @printMemrefF32(memref<*xf32>) attributes { llvm.emit_c_interface }
 
-func @fill_2d(%arg0: memref<?x?xf32>, %arg1: i1) {
+func.func @fill_2d(%arg0: memref<?x?xf32>, %arg1: i1) {
     %c0 = arith.constant 0 : index
     %c1 = arith.constant 1 : index
     %c5 = arith.constant 5 : index
@@ -39,7 +39,7 @@ func @fill_2d(%arg0: memref<?x?xf32>, %arg1: i1) {
     return
 }
 
-func @main() attributes { llvm.emit_c_interface } {
+func.func @main() attributes { llvm.emit_c_interface } {
   %false = arith.constant 0 : i1
   %true = arith.constant 1 : i1
   %A = memref.alloc() : !eltwise
@@ -93,7 +93,7 @@ func @main() attributes { llvm.emit_c_interface } {
   return
 }
 
-func @exp_xsmm(%I: !eltwise, %O: !eltwise) {
+func.func @exp_xsmm(%I: !eltwise, %O: !eltwise) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %exp = xsmm.unary.dispatch EXP(f32, [8, 2], 3, 3, 0) : (f32) -> f32
@@ -101,7 +101,7 @@ func @exp_xsmm(%I: !eltwise, %O: !eltwise) {
   return
 }
 
-func @relu_xsmm(%I: !eltwise, %O: !eltwise) {
+func.func @relu_xsmm(%I: !eltwise, %O: !eltwise) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %relu = xsmm.unary.dispatch RELU(f32, [7, 3], 3, 3, 0) : (f32) -> f32

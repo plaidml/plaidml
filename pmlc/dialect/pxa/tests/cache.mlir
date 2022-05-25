@@ -2,7 +2,7 @@
 
 #map0 = affine_map<(d0, d1) -> (d0 * 4 + d1)>
 
-func @argmax_0(%arg0: memref<1x256x256x16xf16>, %arg1: memref<1x256x16xf16>) {
+func.func @argmax_0(%arg0: memref<1x256x256x16xf16>, %arg1: memref<1x256x16xf16>) {
   %cst = arith.constant 0xFC00 : f16
   %0 = affine.parallel (%arg2) = (0) to (64) reduce ("assign") -> (memref<1x256x16xf16>) {
     %1 = affine.parallel () = () to () reduce ("assign") -> (memref<1x256x16xf16>) {
@@ -22,7 +22,7 @@ func @argmax_0(%arg0: memref<1x256x256x16xf16>, %arg1: memref<1x256x16xf16>) {
   return
 }
 
-// CHECK-LABEL: func @argmax_0
+// CHECK-LABEL: func.func @argmax_0
 // CHECK:       affine.parallel (%{{.*}}) = (0) to (64)
 // CHECK:         %[[cache2:.*]] = memref.alloc() {cache} : memref<1x4x16xf16>
 // CHECK:         %[[copy2:.*]] = affine.parallel (%{{.*}}, %{{.*}}, %{{.*}}) = (0, 0, 0) to (1, 4, 16)
@@ -46,7 +46,7 @@ func @argmax_0(%arg0: memref<1x256x256x16xf16>, %arg1: memref<1x256x16xf16>) {
 // CHECK:         {cache_out}
 // CHECK:       {outer, outermost}
 
-func @argmax_1(%arg0: memref<1x256x256x16xf16>, %arg1: memref<1x256x16xf16>, %arg2: memref<1x256x16xi32>) {
+func.func @argmax_1(%arg0: memref<1x256x256x16xf16>, %arg1: memref<1x256x16xf16>, %arg2: memref<1x256x16xi32>) {
   %c0_i32 = arith.constant 0 : i32
   %0 = affine.parallel () = () to () reduce ("assign") -> (memref<1x256x16xi32>) {
     %1 = affine.parallel (%arg3) = (0) to (64) reduce ("assign") -> (memref<1x256x16xi32>) {
@@ -70,7 +70,7 @@ func @argmax_1(%arg0: memref<1x256x256x16xf16>, %arg1: memref<1x256x16xf16>, %ar
   return
 }
 
-// CHECK-LABEL: func @argmax_1
+// CHECK-LABEL: func.func @argmax_1
 // CHECK:       affine.parallel () = () to ()
 // CHECK:         %[[cache2:.*]] = memref.alloc() {cache} : memref<1x256x16xi32>
 // CHECK:         %[[copy2:.*]] = affine.parallel (%{{.*}}, %{{.*}}, %{{.*}}) = (0, 0, 0) to (1, 256, 16)

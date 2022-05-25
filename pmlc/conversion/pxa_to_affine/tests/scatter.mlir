@@ -1,6 +1,6 @@
 // RUN: pmlc-opt %s -convert-pxa-to-affine | FileCheck %s
 
-func @scatter1d(%arg0: memref<8xf32>, %arg1: memref<4xi32>, %arg2: memref<4xf32>, %arg3: memref<8xf32>) -> memref<8xf32> {
+func.func @scatter1d(%arg0: memref<8xf32>, %arg1: memref<4xi32>, %arg2: memref<4xf32>, %arg3: memref<8xf32>) -> memref<8xf32> {
   %0 = affine.parallel (%arg4) = (0) to (8) reduce ("assign") -> (memref<8xf32>) {
     %2 = pxa.load %arg0[%arg4] : memref<8xf32>
     %3 = pxa.reduce assign %2, %arg3[%arg4] : memref<8xf32>

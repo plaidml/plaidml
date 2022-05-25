@@ -4,7 +4,7 @@
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 
-func @closure() {
+func.func @closure() {
   %cst = arith.constant 0.0 : f32
   %0 = linalg.init_tensor [8, 32] : tensor<8x32xf32>
   %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<8x32xf32>) -> tensor<8x32xf32>
@@ -25,7 +25,7 @@ func @closure() {
   return
 }
 
-// CHECK-LABEL: func @closure()
+// CHECK-LABEL: func.func @closure()
 //       CHECK:   memref.alloc
 //       CHECK:   memref.alloc
 //       CHECK:   %[[fill:.*]] = affine.parallel
@@ -48,7 +48,7 @@ func @closure() {
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 
-func @closure_yield(%arg0: tensor<3x3xf32> {stdx.const}) {
+func.func @closure_yield(%arg0: tensor<3x3xf32> {stdx.const}) {
   %0 = linalg.init_tensor [3, 3] : tensor<3x3xf32>
   stdx.closure() -> tensor<3x3xf32> {
     %1 = linalg.generic {indexing_maps = [#map, #map],
@@ -63,7 +63,7 @@ func @closure_yield(%arg0: tensor<3x3xf32> {stdx.const}) {
   return
 }
 
-// CHECK-LABEL: func @closure_yield
+// CHECK-LABEL: func.func @closure_yield
 //  CHECK-SAME: (%[[arg0:.*]]: memref<3x3xf32> {stdx.const})
 //       CHECK:   stdx.closure(%[[arg1:.*]]: memref<3x3xf32>)
 //       CHECK:     %[[t0:.*]] = affine.parallel

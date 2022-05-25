@@ -3,7 +3,7 @@
 #map0 = affine_map<(d0, d1, d2) -> (d0, d1)>
 #map1 = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map2 = affine_map<(d0, d1, d2) -> (d2, d1)>
-func @matrixPower(%m : tensor<16x16xf32>) -> tensor<16x16xf32> {
+func.func @matrixPower(%m : tensor<16x16xf32>) -> tensor<16x16xf32> {
   %fzero = tile.constant(0.0 : f32) : tensor<16x16xf32>
   %zero = arith.constant 0 : index
   %one = arith.constant 1 : index

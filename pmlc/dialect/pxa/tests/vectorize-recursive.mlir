@@ -1,6 +1,6 @@
 // RUN: pmlc-opt -pxa-vectorize="strategy=recursive" -verify-diagnostics %s | FileCheck %s
 
-func @grn(%arg0: index, %arg1: memref<1x4x128x24xf16>, %arg2: memref<1x4x128x24xf16>) -> memref<1x4x128x24xf16> {
+func.func @grn(%arg0: index, %arg1: memref<1x4x128x24xf16>, %arg2: memref<1x4x128x24xf16>) -> memref<1x4x128x24xf16> {
   %cst = arith.constant 0.000000e+00 : f16
   %cst_0 = arith.constant 1.000000e+00 : f16
   %cst_1 = arith.constant 1.001360e-05 : f16

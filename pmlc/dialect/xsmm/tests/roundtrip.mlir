@@ -1,7 +1,7 @@
 // RUN: pmlc-opt %s | pmlc-opt | FileCheck %s
 
-// CHECK-LABEL: func @dot
-func @dot(%A: memref<8x8xf32>, %B: memref<8x8xf32>, %C: memref<8x8xf32>) -> () {
+// CHECK-LABEL: func.func @dot
+func.func @dot(%A: memref<8x8xf32>, %B: memref<8x8xf32>, %C: memref<8x8xf32>) -> () {
   affine.parallel (%i, %j, %k) = (0, 0, 0) to (8, 8, 8) step (2, 2, 2) {
     // CHECK: xsmm.gemm.dispatch.f32 [2, 2, 2], [2, 2, 2]
     %1 = xsmm.gemm.dispatch.f32 [2, 2, 2], [2, 2, 2]
@@ -15,9 +15,9 @@ func @dot(%A: memref<8x8xf32>, %B: memref<8x8xf32>, %C: memref<8x8xf32>) -> () {
 }
 
 
-// CHECK-LABEL: func @relu
+// CHECK-LABEL: func.func @relu
 // CHECK-SAME: (%[[IN:.*]]: memref<8x8xf32>, %[[OUT:.*]]: memref<8x8xf32>)
-func @relu(%I: memref<8x8xf32>, %O: memref<8x8xf32>) -> () {
+func.func @relu(%I: memref<8x8xf32>, %O: memref<8x8xf32>) -> () {
   // CHECK: affine.parallel (%[[IX:.*]], %[[JX:.*]]) = (0, 0) to (8, 8) step (2, 2)
   affine.parallel (%i, %j) = (0, 0) to (8, 8) step (2, 2) {
     // CHECK: %[[PTR:.*]] = xsmm.unary.dispatch RELU(f32, [2, 2], 2, 2, 0) : (f32) -> f32

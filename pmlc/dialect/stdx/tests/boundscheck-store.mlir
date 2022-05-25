@@ -1,7 +1,7 @@
 // RUN: pmlc-opt -stdx-check-bounds %s | FileCheck %s
 
 module {
-  func @simpleStore(%A: memref<20x10xf32>, %i: index, %j: index, %f: f32) -> () {
+  func.func @simpleStore(%A: memref<20x10xf32>, %i: index, %j: index, %f: f32) -> () {
     memref.store %f, %A[%i, %j] : memref<20x10xf32>
     return
   }

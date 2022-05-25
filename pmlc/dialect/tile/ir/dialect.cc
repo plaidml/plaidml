@@ -52,7 +52,7 @@ Operation *TileDialect::materializeConstant(OpBuilder &builder, Attribute value,
   }
   return builder.create<tile::ConstantOp>(loc, type, value);
 }
-
+/*
 void TileDialect::printType(Type type, DialectAsmPrinter &printer) const {
   llvm::TypeSwitch<Type>(type)
       .Case<APFloatType>([&](auto deviceType) { printer << "fx"; })
@@ -79,7 +79,7 @@ Type TileDialect::parseType(DialectAsmParser &parser) const {
         return Type();
       })();
 }
-
+*/
 } // namespace pmlc::dialect::tile
 
 #include "pmlc/dialect/tile/ir/dialect.cc.inc" // NOLINT

@@ -1,6 +1,6 @@
 // RUN: pmlc-opt -convert-tile-to-linalg -cse %s | FileCheck %s
 
-func @contract_tensor_init(%arg0: tensor<3x3xf32>, %arg1: tensor<3xf32>, %arg2: tensor<3xf32>) -> tensor<3xf32> {
+func.func @contract_tensor_init(%arg0: tensor<3x3xf32>, %arg1: tensor<3xf32>, %arg2: tensor<3xf32>) -> tensor<3xf32> {
   %0 = tile.contract add, mul, %arg2, %arg0, %arg1 {
     sink = affine_map<(d0, d1) -> (d0)>,
     srcs = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d1)>],
@@ -10,7 +10,7 @@ func @contract_tensor_init(%arg0: tensor<3x3xf32>, %arg1: tensor<3xf32>, %arg2: 
   return %0 : tensor<3xf32>
 }
 
-// CHECK-LABEL: func @contract_tensor_init
+// CHECK-LABEL: func.func @contract_tensor_init
 // CHECK: linalg.generic
 // CHECK:   mulf
 // CHECK:   addf

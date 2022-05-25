@@ -2,7 +2,7 @@
 
 #map0 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 
-func @multi_init() -> tensor<1x112x112x32xf32> {
+func.func @multi_init() -> tensor<1x112x112x32xf32> {
   %cst = arith.constant 0.00000000 : f32
   %0 = linalg.init_tensor [1, 112, 112, 32] : tensor<1x112x112x32xf32>
   %1 = linalg.generic {
@@ -23,7 +23,7 @@ func @multi_init() -> tensor<1x112x112x32xf32> {
   return %3 : tensor<1x112x112x32xf32>
 }
 
-// CHECK-LABEL: func @multi_init
+// CHECK-LABEL: func.func @multi_init
 //  CHECK-SAME: (%[[arg0:.*]]: memref<1x112x112x32xf32>) -> memref<1x112x112x32xf32>
 //       CHECK: %[[buf0:.*]] = memref.alloc() : memref<1x112x112x32xf32>
 //       CHECK: %[[buf1:.*]] = memref.alloc() : memref<1x112x112x32xf32>

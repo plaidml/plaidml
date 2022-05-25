@@ -7,8 +7,8 @@
 !ui16 = type tensor<ui16>
 !ui32 = type tensor<ui32>
 
-// CHECK-LABEL: func @cmp_f32_f32
-func @cmp_f32_f32(%f32: !f32) -> (!i1, !i1, !i1, !i1, !i1, !i1) {
+// CHECK-LABEL: func.func @cmp_f32_f32
+func.func @cmp_f32_f32(%f32: !f32) -> (!i1, !i1, !i1, !i1, !i1, !i1) {
   %c0 = tile.constant(0.0 : f32) : !f32
   %1 = tile.cmp_eq %f32, %c0 : (!f32, !f32) -> !i1
   // CHECK: linalg.generic
@@ -31,8 +31,8 @@ func @cmp_f32_f32(%f32: !f32) -> (!i1, !i1, !i1, !i1, !i1, !i1) {
   return %1, %2, %3, %4, %5, %6 : !i1, !i1, !i1, !i1, !i1, !i1
 }
 
-// CHECK-LABEL: func @cmp_i32_i32
-func @cmp_i32_i32(%i32: !si32) -> (!i1, !i1, !i1, !i1, !i1, !i1) {
+// CHECK-LABEL: func.func @cmp_i32_i32
+func.func @cmp_i32_i32(%i32: !si32) -> (!i1, !i1, !i1, !i1, !i1, !i1) {
   %0 = tile.constant(0 : i32) : !si32
   %1 = tile.cmp_eq %i32, %0 : (!si32, !si32) -> !i1
   // CHECK: linalg.generic
@@ -55,8 +55,8 @@ func @cmp_i32_i32(%i32: !si32) -> (!i1, !i1, !i1, !i1, !i1, !i1) {
   return %1, %2, %3, %4, %5, %6 : !i1, !i1, !i1, !i1, !i1, !i1
 }
 
-// CHECK-LABEL: func @cmp_i32_f32
-func @cmp_i32_f32(%i32: !si32) -> (!i1, !i1, !i1, !i1, !i1, !i1) {
+// CHECK-LABEL: func.func @cmp_i32_f32
+func.func @cmp_i32_f32(%i32: !si32) -> (!i1, !i1, !i1, !i1, !i1, !i1) {
   %0 = tile.constant(0.0 : f32) : !f32
   %1 = tile.cmp_eq %i32, %0 : (!si32, !f32) -> !i1
 // CHECK: linalg.generic
@@ -85,8 +85,8 @@ func @cmp_i32_f32(%i32: !si32) -> (!i1, !i1, !i1, !i1, !i1, !i1) {
   return %1, %2, %3, %4, %5, %6 : !i1, !i1, !i1, !i1, !i1, !i1
 }
 
-// CHECK-LABEL: func @cmp_i16_i16
-func @cmp_i16_i16(%i16: !si16) -> !i1 {
+// CHECK-LABEL: func.func @cmp_i16_i16
+func.func @cmp_i16_i16(%i16: !si16) -> !i1 {
   %c0 = tile.constant(0 : i64) : !si16
   %0 = tile.cmp_lt %i16, %c0 : (!si16, !si16) -> !i1
   // CHECK: linalg.generic
@@ -94,8 +94,8 @@ func @cmp_i16_i16(%i16: !si16) -> !i1 {
   return %0 : !i1
 }
 
-// CHECK-LABEL: func @cmp_i16_u16
-func @cmp_i16_u16(%i16: !si16) -> !i1 {
+// CHECK-LABEL: func.func @cmp_i16_u16
+func.func @cmp_i16_u16(%i16: !si16) -> !i1 {
   %c0 = tile.constant(0 : i64) : !ui16
   %0 = tile.cmp_lt %i16, %c0 : (!si16, !ui16) -> !i1
   // CHECK: linalg.generic
@@ -103,8 +103,8 @@ func @cmp_i16_u16(%i16: !si16) -> !i1 {
   return %0 : !i1
 }
 
-// CHECK-LABEL: func @cmp_i16_i32
-func @cmp_i16_i32(%i16: !si16) -> !i1 {
+// CHECK-LABEL: func.func @cmp_i16_i32
+func.func @cmp_i16_i32(%i16: !si16) -> !i1 {
   %c0 = tile.constant(0 : i64) : !si32
   %0 = tile.cmp_lt %i16, %c0 : (!si16, !si32) -> !i1
   // CHECK: linalg.generic
@@ -113,8 +113,8 @@ func @cmp_i16_i32(%i16: !si16) -> !i1 {
   return %0 : !i1
 }
 
-// CHECK-LABEL: func @cmp_i16_u32
-func @cmp_i16_u32(%i16: !si16) -> !i1 {
+// CHECK-LABEL: func.func @cmp_i16_u32
+func.func @cmp_i16_u32(%i16: !si16) -> !i1 {
   %c0 = tile.constant(0 : i64) : !ui32
   %0 = tile.cmp_lt %i16, %c0 : (!si16, !ui32) -> !i1
   // CHECK: linalg.generic
@@ -123,8 +123,8 @@ func @cmp_i16_u32(%i16: !si16) -> !i1 {
   return %0 : !i1
 }
 
-// CHECK-LABEL: func @cmp_u16_u16
-func @cmp_u16_u16(%u16: !ui16) -> !i1 {
+// CHECK-LABEL: func.func @cmp_u16_u16
+func.func @cmp_u16_u16(%u16: !ui16) -> !i1 {
   %c0 = tile.constant(0 : i64) : !ui16
   %0 = tile.cmp_lt %u16, %c0 : (!ui16, !ui16) -> !i1
   // CHECK: linalg.generic
@@ -132,8 +132,8 @@ func @cmp_u16_u16(%u16: !ui16) -> !i1 {
   return %0 : !i1
 }
 
-// CHECK-LABEL: func @cmp_u16_i32
-func @cmp_u16_i32(%u16: !ui16) -> !i1 {
+// CHECK-LABEL: func.func @cmp_u16_i32
+func.func @cmp_u16_i32(%u16: !ui16) -> !i1 {
   %c0 = tile.constant(0 : i64) : !si32
   %0 = tile.cmp_lt %u16, %c0 : (!ui16, !si32) -> !i1
   // CHECK: linalg.generic
@@ -142,8 +142,8 @@ func @cmp_u16_i32(%u16: !ui16) -> !i1 {
   return %0 : !i1
 }
 
-// CHECK-LABEL: func @cmp_u16_u32
-func @cmp_u16_u32(%u16: !ui16) -> !i1 {
+// CHECK-LABEL: func.func @cmp_u16_u32
+func.func @cmp_u16_u32(%u16: !ui16) -> !i1 {
   %c0 = tile.constant(0 : i64) : !ui32
   %0 = tile.cmp_lt %u16, %c0 : (!ui16, !ui32) -> !i1
   // CHECK: linalg.generic

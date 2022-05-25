@@ -1,7 +1,7 @@
 // RUN: pmlc-opt -pxa-dataflow-opt -canonicalize %s | FileCheck %s
 
-// CHECK-LABEL: func @simple
-func @simple(%out : memref<2xf32>) -> memref<2xf32> {
+// CHECK-LABEL: func.func @simple
+func.func @simple(%out : memref<2xf32>) -> memref<2xf32> {
   // CHECK: constant 0.0
   %zero = arith.constant 0.0 : f32
   %buf = memref.alloc() : memref<2xf32>
@@ -16,8 +16,8 @@ func @simple(%out : memref<2xf32>) -> memref<2xf32> {
   return %0 : memref<2xf32>
 }
 
-// CHECK-LABEL: func @grn
-func @grn(%arg0: memref<1x4x4x3xf16>) -> memref<1x4x4x3xf16> {
+// CHECK-LABEL: func.func @grn
+func.func @grn(%arg0: memref<1x4x4x3xf16>) -> memref<1x4x4x3xf16> {
   %cst = arith.constant 1.001360e-05 : f16
   %cst_0 = arith.constant 0.000000e+00 : f16
   %cst_1 = arith.constant 1.000000e+00 : f16

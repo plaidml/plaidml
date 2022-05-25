@@ -1,6 +1,6 @@
 // RUN: pmlc-opt -split-input-file -pxa-dealloc-placement %s | FileCheck %s
 
-func @double_for(%arg0: memref<16x16xf32>, %arg1: memref<16x16xf32>) -> memref<16x16xf32> {
+func.func @double_for(%arg0: memref<16x16xf32>, %arg1: memref<16x16xf32>) -> memref<16x16xf32> {
   %cst = arith.constant 0.0 : f32
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
@@ -25,7 +25,7 @@ func @double_for(%arg0: memref<16x16xf32>, %arg1: memref<16x16xf32>) -> memref<1
   }
   return %0 : memref<16x16xf32>
 }
-// CHECK-LABEL: func @double_for
+// CHECK-LABEL: func.func @double_for
 //  CHECK-SAME: (%[[arg0:.*]]: memref<16x16xf32>, %[[arg1:.*]]: memref<16x16xf32>)
 //       CHECK:   %[[t0:.*]] = memref.alloc() : memref<16x16xf32>
 //       CHECK:   %[[t1:.*]] = affine.parallel (%[[arg2:.*]], %[[arg3:.*]]) = (0, 0) to (16, 16)
@@ -47,7 +47,7 @@ func @double_for(%arg0: memref<16x16xf32>, %arg1: memref<16x16xf32>) -> memref<1
 
 // -----
 
-func @matrix_power(%arg0: memref<16x16xf32>, %arg1: memref<16x16xf32>) -> memref<16x16xf32> {
+func.func @matrix_power(%arg0: memref<16x16xf32>, %arg1: memref<16x16xf32>) -> memref<16x16xf32> {
   %cst = arith.constant 0.0 : f32
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
@@ -82,7 +82,7 @@ func @matrix_power(%arg0: memref<16x16xf32>, %arg1: memref<16x16xf32>) -> memref
   return %0 : memref<16x16xf32>
 }
 
-// CHECK-LABEL: func @matrix_power
+// CHECK-LABEL: func.func @matrix_power
 // CHECK-SAME: (%[[arg0:.*]]: memref<16x16xf32>, %[[arg1:.*]]: memref<16x16xf32>)
 //      CHECK:   %[[t0:.*]] = memref.alloc() : memref<16x16xf32>
 //      CHECK:   %[[t1:.*]] = affine.parallel (%[[arg2:.*]], %[[arg3:.*]]) = (0, 0) to (16, 16)
@@ -105,7 +105,7 @@ func @matrix_power(%arg0: memref<16x16xf32>, %arg1: memref<16x16xf32>) -> memref
 #map1 = affine_map<(d0, d1, d2) -> (0, d0, 0, d2)>
 #map2 = affine_map<(d0, d1, d2) -> (0, 0, d2, d1)>
 
-func @post_fusion(%arg0: memref<16xf32>, %arg1: memref<1x1x32x16xf32>, %arg2: memref<1x1x16x96xf32>, %arg3: memref<96xf32>, %arg4: memref<1x112x112x32xf32>, %arg5: memref<1x112x112x96xf32>) -> memref<1x112x112x96xf32> {
+func.func @post_fusion(%arg0: memref<16xf32>, %arg1: memref<1x1x32x16xf32>, %arg2: memref<1x1x16x96xf32>, %arg3: memref<96xf32>, %arg4: memref<1x112x112x32xf32>, %arg5: memref<1x112x112x96xf32>) -> memref<1x112x112x96xf32> {
   %8 = memref.alloc() : memref<1x112x112x16xf32>
   %9 = affine.parallel (%arg109) = (0) to (8) reduce ("assign") -> (memref<1x112x112x16xf32>) {
     %148 = affine.parallel (%arg110, %arg111, %arg112) = (0, 0, 0) to (112, 112, 2) reduce ("assign") -> (memref<1x112x112x16xf32>) {
@@ -137,7 +137,7 @@ func @post_fusion(%arg0: memref<16xf32>, %arg1: memref<1x1x32x16xf32>, %arg2: me
   return %12 : memref<1x112x112x96xf32>
 }
 
-// CHECK-LABEL: func @post_fusion
+// CHECK-LABEL: func.func @post_fusion
 //       CHECK:   %[[alloc:.*]] = memref.alloc
 //       CHECK:   affine.parallel
 //       CHECK:     affine.parallel

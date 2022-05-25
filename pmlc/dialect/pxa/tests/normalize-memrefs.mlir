@@ -3,8 +3,8 @@
 // CHECK-NOT: affine_map
 #block = affine_map<(d0) -> (d0 floordiv 10, d0 mod 10)>
 
-// CHECK-LABEL: func @pxa_norm() -> memref<10x10xf32>
-func @pxa_norm() ->  memref<100xf32, #block> {
+// CHECK-LABEL: func.func @pxa_norm() -> memref<10x10xf32>
+func.func @pxa_norm() ->  memref<100xf32, #block> {
   %0 = memref.alloc() : memref<100xf32, #block>
   // CHECK: %1 = affine.parallel (%{{.*}}) = (0) to (100) reduce ("assign") -> (memref<10x10xf32>)
   %1 = affine.parallel (%i) = (0) to (100) reduce ("assign") ->  memref<100xf32, #block> {

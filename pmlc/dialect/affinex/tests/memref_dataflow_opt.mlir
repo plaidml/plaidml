@@ -1,7 +1,7 @@
 // RUN: pmlc-opt -affinex-memref-dataflow-opt %s | FileCheck %s
 
 // CHECK: simple
-func @simple(%arg: memref<1xf32>) {
+func.func @simple(%arg: memref<1xf32>) {
   // CHECK: %[[CST:.*]] = arith.constant
   %cst = arith.constant 0.000000e+00 : f32
   // CHECK: affine.store %[[CST]],
@@ -14,7 +14,7 @@ func @simple(%arg: memref<1xf32>) {
 }
 
 // CHECK: no_store
-func @no_store(%arg: memref<1xf32>) {
+func.func @no_store(%arg: memref<1xf32>) {
   // CHECK: %[[LD:.*]] = affine.load
   %0 = affine.load %arg[1] : memref<1xf32>
   // CHECK: addf %[[LD]], %[[LD]]
@@ -23,7 +23,7 @@ func @no_store(%arg: memref<1xf32>) {
 }
 
 // CHECK: re_store
-func @re_store(%arg: memref<1xf32>) {
+func.func @re_store(%arg: memref<1xf32>) {
   // CHECK: %[[CST0:.*]] = arith.constant
   %cst_0 = arith.constant 0.000000e+00 : f32
   // CHECK-NOT: affine.store %[[CST0]]
@@ -40,7 +40,7 @@ func @re_store(%arg: memref<1xf32>) {
 }
 
 // CHECK: diff_location
-func @diff_location(%arg: memref<2xf32>) {
+func.func @diff_location(%arg: memref<2xf32>) {
   // CHECK: %[[CST:.*]] = arith.constant
   %cst = arith.constant 0.000000e+00 : f32
   // CHECK: affine.store %[[CST]]
@@ -53,7 +53,7 @@ func @diff_location(%arg: memref<2xf32>) {
 }
 
 // CHECK: diff_memref
-func @diff_memref(%arg0: memref<1xf32>, %arg1: memref<1xf32>) {
+func.func @diff_memref(%arg0: memref<1xf32>, %arg1: memref<1xf32>) {
   // CHECK: %[[CST:.*]] = arith.constant
   %cst = arith.constant 0.000000e+00 : f32
   // CHECK: affine.store %[[CST]]
@@ -66,7 +66,7 @@ func @diff_memref(%arg0: memref<1xf32>, %arg1: memref<1xf32>) {
 }
 
 // CHECK: multi_location
-func @multi_location(%arg: memref<2xf32>) {
+func.func @multi_location(%arg: memref<2xf32>) {
   // CHECK: %[[CST0:.*]] = arith.constant
   %cst_0 = arith.constant 0.000000e+00 : f32
   // CHECK: affine.store %[[CST0]]
@@ -87,7 +87,7 @@ func @multi_location(%arg: memref<2xf32>) {
 }
 
 // CHECK: multi_memref
-func @multi_memref(%arg0: memref<1xf32>, %arg1: memref<1xf32>) {
+func.func @multi_memref(%arg0: memref<1xf32>, %arg1: memref<1xf32>) {
   // CHECK: %[[CST0:.*]] = arith.constant
   %cst_0 = arith.constant 0.000000e+00 : f32
   // CHECK: affine.store %[[CST0]]
@@ -108,7 +108,7 @@ func @multi_memref(%arg0: memref<1xf32>, %arg1: memref<1xf32>) {
 }
 
 // CHECK: multi_block
-func @multi_block(%arg: memref<1xf32>) {
+func.func @multi_block(%arg: memref<1xf32>) {
   // CHECK: %[[CST:.*]] = arith.constant
   %cst = arith.constant 0.000000e+00 : f32
   affine.for %i = 0 to 1 {
@@ -137,7 +137,7 @@ func @multi_block(%arg: memref<1xf32>) {
 }
 
 // CHECK: multi_block_neg
-func @multi_block_neg(%arg: memref<1xf32>) {
+func.func @multi_block_neg(%arg: memref<1xf32>) {
   // CHECK: %[[CST:.*]] = arith.constant
   %cst = arith.constant 0.000000e+00 : f32
   affine.for %i = 0 to 1 {
@@ -154,7 +154,7 @@ func @multi_block_neg(%arg: memref<1xf32>) {
 }
 
 // CHECK: res2a_accum
-func @res2a_accum(%arg0: memref<1x56x56x64xf32>, %arg1: memref<1x1x64x64xf32>, %arg2: memref<1x56x56x64xf32>) {
+func.func @res2a_accum(%arg0: memref<1x56x56x64xf32>, %arg1: memref<1x1x64x64xf32>, %arg2: memref<1x56x56x64xf32>) {
   // CHECK: %[[CST:.*]] = arith.constant
   %cst = arith.constant dense<0.000000e+00> : vector<16xf32>
   %c0 = arith.constant 0 : index

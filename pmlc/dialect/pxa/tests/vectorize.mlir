@@ -1,7 +1,7 @@
 // RUN: pmlc-opt -pxa-vectorize -verify-diagnostics %s | FileCheck %s
 
-// CHECK-LABEL: func @vectorize_gemm
-func @vectorize_gemm(%arg0: memref<64x64xf32>, %arg1: memref<64x64xf32>) -> (memref<64x64xf32>, memref<64xf32>) {
+// CHECK-LABEL: func.func @vectorize_gemm
+func.func @vectorize_gemm(%arg0: memref<64x64xf32>, %arg1: memref<64x64xf32>) -> (memref<64x64xf32>, memref<64xf32>) {
   %a = memref.alloc() : memref<64x64xf32>
   %b = memref.alloc() : memref<64xf32>
   // expected-remark@+1 {{Vectorize: Failed, !vectorizable}}
@@ -41,8 +41,8 @@ func @vectorize_gemm(%arg0: memref<64x64xf32>, %arg1: memref<64x64xf32>) -> (mem
   return %r1, %r2 : memref<64x64xf32>, memref<64xf32>
 }
 
-// CHECK-LABEL: func @vector_set
-func @vector_set(%val: f32) -> (memref<64xf32>) {
+// CHECK-LABEL: func.func @vector_set
+func.func @vector_set(%val: f32) -> (memref<64xf32>) {
   %a = memref.alloc() : memref<64xf32>
   %o = affine.parallel (%i) = (0) to (64) reduce ("assign") -> (memref<64xf32>) {
   // CHECK: affine.parallel (%{{.*}}) = (0) to (64) step (8) reduce ("assign") -> (memref<64xf32>)
@@ -55,8 +55,8 @@ func @vector_set(%val: f32) -> (memref<64xf32>) {
   return %o : memref<64xf32>
 }
 
-// CHECK-LABEL: func @vectorize_reduce_stride_0
-func @vectorize_reduce_stride_0(%a: memref<1x4x128x24xf32>, %b: memref<1x4x128x24xf32>, %c: memref<1x1x1x1xf32>) -> memref<1x1x1x1xf32> {
+// CHECK-LABEL: func.func @vectorize_reduce_stride_0
+func.func @vectorize_reduce_stride_0(%a: memref<1x4x128x24xf32>, %b: memref<1x4x128x24xf32>, %c: memref<1x1x1x1xf32>) -> memref<1x1x1x1xf32> {
   // expected-remark@+2 {{Vectorize: Failed, dimension is not a multiple of the vector width}}
   // expected-remark@+1 {{Vectorize: Failed, !vectorizable}}
   %o = affine.parallel (%arg0, %arg1, %arg2, %i) = (0, 0, 0, 0) to (1, 128, 128, 24) reduce ("assign") -> (memref<1x1x1x1xf32>) {

@@ -1,6 +1,6 @@
 // RUN: pmlc-opt -pxa-fusion -pxa-normalize -canonicalize %s | FileCheck %s
 
-func @simple_fusion(%A: memref<2x3xf32>, %B: memref<2x3xf32>, %C: memref<2x3xf32>, %D: memref<2x3xf32>) -> memref<2x3xf32> {
+func.func @simple_fusion(%A: memref<2x3xf32>, %B: memref<2x3xf32>, %C: memref<2x3xf32>, %D: memref<2x3xf32>) -> memref<2x3xf32> {
   %T = memref.alloc() : memref<2x3xf32>
   %4 = affine.parallel (%i, %j) = (0, 0) to (2, 3) reduce ("assign") -> (memref<2x3xf32>) {
     %0 = pxa.load %A[%i, %j] : memref<2x3xf32>
@@ -19,7 +19,7 @@ func @simple_fusion(%A: memref<2x3xf32>, %B: memref<2x3xf32>, %C: memref<2x3xf32
   return %5 : memref<2x3xf32>
 }
 
-// CHECK-LABEL: func @simple_fusion
+// CHECK-LABEL: func.func @simple_fusion
 // CHECK:       affine.parallel (%{{.*}}, %{{.*}}) = (0, 0) to (2, 3)
 // CHECK:         pxa.load
 // CHECK:         pxa.load
@@ -34,7 +34,7 @@ func @simple_fusion(%A: memref<2x3xf32>, %B: memref<2x3xf32>, %C: memref<2x3xf32
 
 // -----
 
-func @fusion_different_idxs(%A: memref<2x3xf32>, %B: memref<2x3xf32>, %C: memref<2x3x4xf32>, %D: memref<2x3x4xf32>) -> memref<2x3x4xf32> {
+func.func @fusion_different_idxs(%A: memref<2x3xf32>, %B: memref<2x3xf32>, %C: memref<2x3x4xf32>, %D: memref<2x3x4xf32>) -> memref<2x3x4xf32> {
   %T = memref.alloc() : memref<2x3xf32>
   %4 = affine.parallel (%i, %j) = (0, 0) to (2, 3) reduce ("assign") -> (memref<2x3xf32>) {
     %0 = pxa.load %A[%i, %j] : memref<2x3xf32>
@@ -53,7 +53,7 @@ func @fusion_different_idxs(%A: memref<2x3xf32>, %B: memref<2x3xf32>, %C: memref
   return %5 : memref<2x3x4xf32>
 }
 
-// CHECK-LABEL: func @fusion_different_idxs
+// CHECK-LABEL: func.func @fusion_different_idxs
 // CHECK:       affine.parallel (%{{.*}}, %{{.*}}) = (0, 0) to (2, 3)
 // CHECK:         pxa.load
 // CHECK:         pxa.load
@@ -69,7 +69,7 @@ func @fusion_different_idxs(%A: memref<2x3xf32>, %B: memref<2x3xf32>, %C: memref
 
 // -----
 
-func @resnet50_tail(%arg0: memref<1000xf32>, %arg1: memref<1x1000xf32>, %out: memref<1x1000xf32>) -> memref<1x1000xf32> {
+func.func @resnet50_tail(%arg0: memref<1000xf32>, %arg1: memref<1x1000xf32>, %out: memref<1x1000xf32>) -> memref<1x1000xf32> {
   %cst = arith.constant 0xFF800000 : f32
   %cst_1 = arith.constant 0.000000e+00 : f32
   %1 = memref.alloc() : memref<1x1000xf32>
@@ -103,7 +103,7 @@ func @resnet50_tail(%arg0: memref<1000xf32>, %arg1: memref<1x1000xf32>, %out: me
   return %8 : memref<1x1000xf32>
 }
 
-// CHECK-LABEL: func @resnet50_tail
+// CHECK-LABEL: func.func @resnet50_tail
 // CHECK:         %[[out0:.*]] = affine.parallel (%{{.*}}) = (0) to (1000) reduce ("assign") -> (memref<1x1000xf32>)
 // CHECK:           pxa.load
 // CHECK:           pxa.load

@@ -4,8 +4,8 @@
 #I_tile = affine_map<(m, k) -> (0, m, 0, k)>
 #K_tile = affine_map<(k, n) -> (0, 0, k, n)>
 
-// CHECK-LABEL: func @gemm
-func @gemm(%I: memref<1x56x56x64xf32>, %K: memref<1x1x64x64xf32>, %O: memref<1x56x56x64xf32>) -> memref<1x56x56x64xf32> {
+// CHECK-LABEL: func.func @gemm
+func.func @gemm(%I: memref<1x56x56x64xf32>, %K: memref<1x1x64x64xf32>, %O: memref<1x56x56x64xf32>) -> memref<1x56x56x64xf32> {
   %0 = affine.parallel (%x, %y) = (0, 0) to (56, 56) step (14, 1) reduce ("assign") -> (memref<1x56x56x64xf32>) {
     //      CHECK: pxa.generic (%{{.*}}[0, %{{.*}}, %{{.*}}, 0]: #{{.*}}) <addf>
     // CHECK-SAME: @tpp_gemm(%{{.*}}[0, %{{.*}}, %{{.*}}, 0]: #{{.*}}, %{{.*}}[{{.*}}, %{{.*}}, %{{.*}}, 0]: #{{.*}}) tile: [14, 64, 64]
@@ -26,8 +26,8 @@ func @gemm(%I: memref<1x56x56x64xf32>, %K: memref<1x1x64x64xf32>, %O: memref<1x5
 
 #tile = affine_map<(x, y) -> (0, x, 0, y)>
 
-// CHECK-LABEL: func @relu
-func @relu(%I: memref<1x56x56x64xf32>, %O: memref<1x56x56x64xf32>) -> memref<1x56x56x64xf32> {
+// CHECK-LABEL: func.func @relu
+func.func @relu(%I: memref<1x56x56x64xf32>, %O: memref<1x56x56x64xf32>) -> memref<1x56x56x64xf32> {
   %0 = affine.parallel (%x, %y) = (0, 0) to (56, 56) step (14, 1) reduce ("assign") -> (memref<1x56x56x64xf32>) {
     //      CHECK: pxa.generic (%{{.*}}[0, %{{.*}}, %{{.*}}, 0]: #{{.*}}) <assign>
     // CHECK-SAME: @tpp_relu(%{{.*}}[0, %{{.*}}, %{{.*}}, 0]: #{{.*}}) tile: [4, 64]

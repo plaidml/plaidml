@@ -7,9 +7,9 @@
 // RUN:   -x86-convert-std-to-llvm \
 // RUN:   | pmlc-jit | FileCheck %s
 
-func private @printMemrefF32(memref<*xf32>) attributes { llvm.emit_c_interface }
+func.func private @printMemrefF32(memref<*xf32>) attributes { llvm.emit_c_interface }
 
-func @main() attributes {llvm.emit_c_interface} {
+func.func @main() attributes {llvm.emit_c_interface} {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index

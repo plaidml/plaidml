@@ -1,13 +1,13 @@
 // RUN: pmlc-opt -convert-stdx-to-llvm -canonicalize -cse %s | FileCheck %s
 
 module {
-  func @reshaper0(%arg0: memref<1x1x60xf32>) -> memref<60xf32> {
+  func.func @reshaper0(%arg0: memref<1x1x60xf32>) -> memref<60xf32> {
     %0 = stdx.reshape(%arg0) : (memref<1x1x60xf32>) -> memref<60xf32>
     return %0 : memref<60xf32>
   }
 }
 
-// CHECK-LABEL: func @reshaper0
+// CHECK-LABEL: llvm.func @reshaper0
 // CHECK: undef : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<1 x i64>, array<1 x i64>)>
 // CHECK: %[[index0:.*]] = llvm.mlir.constant(60 : index)
 // CHECK: insertvalue %[[index0]], %{{.*}}[3, 0]
@@ -18,13 +18,13 @@ module {
 // -----
 
 module {
-  func @reshaper1(%arg0: memref<2x4x5xf32>) -> memref<2x20xf32> {
+  func.func @reshaper1(%arg0: memref<2x4x5xf32>) -> memref<2x20xf32> {
     %0 = stdx.reshape(%arg0) : (memref<2x4x5xf32>) -> memref<2x20xf32>
     return %0 : memref<2x20xf32>
   }
 }
 
-// CHECK-LABEL: func @reshaper1
+// CHECK-LABEL: llvm.func @reshaper1
 // CHECK: undef : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
 // CHECK: %[[index0:.*]] = llvm.mlir.constant(2 : index)
 // CHECK: insertvalue %[[index0]], %{{.*}}[3, 0]
@@ -38,13 +38,13 @@ module {
 // -----
 
 module {
-  func @reshaper2(%arg0: memref<5x2x3xf32>) -> memref<5x6xf32> {
+  func.func @reshaper2(%arg0: memref<5x2x3xf32>) -> memref<5x6xf32> {
     %0 = stdx.reshape(%arg0) : (memref<5x2x3xf32>) -> memref<5x6xf32>
     return %0 : memref<5x6xf32>
   }
 }
 
-// CHECK-LABEL: func @reshaper2
+// CHECK-LABEL: llvm.func @reshaper2
 // CHECK: undef : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
 // CHECK: %[[index0:.*]] = llvm.mlir.constant(5 : index)
 // CHECK: insertvalue %[[index0]], %{{.*}}[3, 0]
@@ -59,13 +59,13 @@ module {
 // -----
 
 module {
-  func @squeeze(%arg0: memref<4x2x1x3x2xf32>) -> memref<4x2x3x2xf32> {
+  func.func @squeeze(%arg0: memref<4x2x1x3x2xf32>) -> memref<4x2x3x2xf32> {
     %0 = stdx.reshape(%arg0) : (memref<4x2x1x3x2xf32>) -> memref<4x2x3x2xf32>
     return %0 : memref<4x2x3x2xf32>
   }
 }
 
-// CHECK-LABEL: func @squeeze
+// CHECK-LABEL: llvm.func @squeeze
 // CHECK: undef : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<4 x i64>, array<4 x i64>)>
 // CHECK: %[[index0:.*]] = llvm.mlir.constant(4 : index)
 // CHECK: insertvalue %[[index0]], %{{.*}}[3, 0]

@@ -4,14 +4,14 @@
 #map1 = affine_map<(i, j, k) -> (j, i)>
 #map2 = affine_map<(i, j, k) -> (i, k)>
 
-func @dot(%arg0: tensor<1x784xf32>, %arg1: tensor<784x512xf32>) -> tensor<1x512xf32> {
+func.func @dot(%arg0: tensor<1x784xf32>, %arg1: tensor<784x512xf32>) -> tensor<1x512xf32> {
   %c0 = tile.constant(0.0 : f64) : tensor<f32>
   %2 = tile.contract add, mul, %c0, %arg0, %arg1 {sink=#map0, srcs=[#map1, #map2]} :
     tensor<f32>, tensor<1x784xf32>, tensor<784x512xf32> -> tensor<1x512xf32>
   return %2 : tensor<1x512xf32>
 }
 
-// CHECK: func @dot
+// CHECK: func.func @dot
 // CHECK-SAME: (%[[arg0:.*]]: tensor<1x784xf32>, %[[arg1:.*]]: tensor<784x512xf32>) -> tensor<1x512xf32>
 // CHECK: %[[cst:.*]] = arith.constant 0.000000e+00 : f32
 // CHECK: %[[init:.*]] = linalg.init_tensor [1, 512] : tensor<1x512xf32>

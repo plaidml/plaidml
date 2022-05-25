@@ -1,11 +1,11 @@
 // RUN: pmlc-opt -convert-tile-to-pxa -canonicalize -cse -split-input-file %s | FileCheck %s
 
-func @gather1(%arg0: tensor<4xsi32>, %arg1: tensor<3x2xf32>) -> tensor<4x2xf32> {
+func.func @gather1(%arg0: tensor<4xsi32>, %arg1: tensor<3x2xf32>) -> tensor<4x2xf32> {
   %0 = "tile.gather"(%arg1, %arg0) : (tensor<3x2xf32>, tensor<4xsi32>) -> tensor<4x2xf32>
   return %0 : tensor<4x2xf32>
 }
 
-// CHECK-LABEL: func @gather1
+// CHECK-LABEL: func.func @gather1
 // CHECK: affine.parallel (%[[I:.*]], %[[J:.*]]) = (0, 0) to (4, 2)
 // CHECK: %[[IDX_RAW:.*]] = pxa.load {{%.*}}[%[[I]]] : memref<4xi32>
 // CHECK: %[[IDX:.*]] = arith.index_cast %[[IDX_RAW]] : i32 to index
@@ -14,12 +14,12 @@ func @gather1(%arg0: tensor<4xsi32>, %arg1: tensor<3x2xf32>) -> tensor<4x2xf32> 
 // CHECK: affine.yield %[[OUT]] : memref<4x2xf32>
 
 
-func @gather2(%arg0: tensor<3x2xf32>, %arg1: tensor<4xf32>) -> tensor<3x4xf32> {
+func.func @gather2(%arg0: tensor<3x2xf32>, %arg1: tensor<4xf32>) -> tensor<3x4xf32> {
   %0 = tile.gather %arg0 %arg1 {axis = 1 : index, mode = 0 : i64} : (tensor<3x2xf32>, tensor<4xf32>) -> tensor<3x4xf32>
   return %0 : tensor<3x4xf32>
 }
 
-// CHECK-LABEL: func @gather2
+// CHECK-LABEL: func.func @gather2
 // CHECK: affine.parallel (%[[I:.*]], %[[J:.*]]) = (0, 0) to (3, 4)
 // CHECK: %[[IDX:.*]] = pxa.load {{%.*}}[%[[J]]] : memref<4xf32>
 // CHECK: %[[FF:.*]] = math.floor %[[IDX]] : f32

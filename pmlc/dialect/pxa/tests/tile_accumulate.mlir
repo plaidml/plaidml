@@ -1,6 +1,6 @@
 // RUN: pmlc-opt -pxa-tile-accumulate -pxa-nest-loops %s | FileCheck %s
 
-// CHECK-LABEL: func @cumsum
+// CHECK-LABEL: func.func @cumsum
 #map0 = affine_map<(d0) -> (d0)>
 #map1 = affine_map<() -> (0)>
 #map2 = affine_map<() -> (10)>
@@ -9,7 +9,7 @@
 
 #set0 = affine_set<(d0, d1) : (d0 - d1 >= 0)>
 
-func @cumsum(%arg0: memref<10xf32> {tile.name = "I"}) -> memref<10xf32> {
+func.func @cumsum(%arg0: memref<10xf32> {tile.name = "I"}) -> memref<10xf32> {
 %cst = arith.constant 0.000000e+00 : f32
 %0 = memref.alloc() : memref<10xf32>
 // CHECK: affine.parallel
@@ -33,8 +33,8 @@ func @cumsum(%arg0: memref<10xf32> {tile.name = "I"}) -> memref<10xf32> {
 return %2 : memref<10xf32>
 }
 
-// CHECK-LABEL: func @mixed
-func @mixed() {
+// CHECK-LABEL: func.func @mixed
+func.func @mixed() {
   // CHECK: memref.alloc()
   // CHECK-NEXT: constant
   %ret_s = memref.alloc() : memref<3xf32>

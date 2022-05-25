@@ -3,7 +3,7 @@
 // RUN: -convert-memref-to-llvm -convert-func-to-llvm='emit-c-wrappers=1' \
 // RUN: -reconcile-unrealized-casts %s | pmlc-jit | FileCheck %s
 
-func @main() attributes {llvm.emit_c_interface} {
+func.func @main() attributes {llvm.emit_c_interface} {
   %c0 = arith.constant 0 : index
   %c10 = arith.constant 10 : index // out of bounds
   %buf = memref.alloc() : memref<20x10xf32>

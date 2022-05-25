@@ -16,7 +16,7 @@
 #map0 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>
 #map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d4)>
 
-func @grn(%arg0: tensor<1x224x128x24xf16>) -> tensor<1x224x128x24xf16> {
+func.func @grn(%arg0: tensor<1x224x128x24xf16>) -> tensor<1x224x128x24xf16> {
   %cst = tile.constant(1.000000e-05 : f64) : tensor<f16>
   %cst_0 = tile.constant(0.000000e+00 : f64) : tensor<f16>
   %cst_1 = tile.constant(1.000000e+00 : f64) : tensor<f16>
@@ -30,7 +30,7 @@ func @grn(%arg0: tensor<1x224x128x24xf16>) -> tensor<1x224x128x24xf16> {
   return %6 : tensor<1x224x128x24xf16>
 }
 
-// CHECK: func @grn(%[[in:.*]]: memref<1x224x128x24xf16>, %[[out:.*]]: memref<1x224x128x24xf16>) -> memref<1x224x128x24xf16>
+// CHECK: func.func @grn(%[[in:.*]]: memref<1x224x128x24xf16>, %[[out:.*]]: memref<1x224x128x24xf16>) -> memref<1x224x128x24xf16>
 // CHECK-DAG:   %[[epsilon:.*]] = arith.constant 1.001360e-05 : f16
 // CHECK-DAG:   %[[zero:.*]] = arith.constant 0.000000e+00 : f16
 // CHECK-DAG:   %[[one:.*]] = arith.constant 1.000000e+00 : f16

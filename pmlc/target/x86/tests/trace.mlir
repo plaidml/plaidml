@@ -1,7 +1,7 @@
 // RUN: pmlc-opt -target-llvm_cpu %s | FileCheck %s
 // RUN: pmlc-opt -target-llvm_cpu %s | pmlc-jit | FileCheck %s --check-prefix=JIT
 
-func @main() {
+func.func @main() {
   %c1 = arith.constant 1.0 : f32
   tile.pragma %c1 "trace" {msg = "msg"} : f32
   return

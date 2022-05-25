@@ -1,6 +1,6 @@
 // RUN: pmlc-opt -pxa-cache="whole-block=true" %s | FileCheck %s
 
-func @cache(%arg0: memref<1x512x28x28xf16>, %arg1: memref<1x1024x14x14xf16>) {
+func.func @cache(%arg0: memref<1x512x28x28xf16>, %arg1: memref<1x1024x14x14xf16>) {
   %0 = affine.parallel (%arg3, %arg4, %arg5) = (0, 0, 0) to (1024, 14, 14) step (16, 1, 14) reduce ("assign") -> (memref<1x1024x14x14xf16>) {
     %1 = affine.parallel (%arg6, %arg7, %arg8) = (%arg3, %arg4, %arg5) to (%arg3 + 16, %arg4 + 1, %arg5 + 14) step (16, 1, 14) reduce ("assign") -> (memref<1x1024x14x14xf16>) {
       %2 = affine.parallel (%arg9, %arg10, %arg11) = (%arg6, %arg7, %arg8) to (%arg6 + 16, %arg7 + 1, %arg8 + 14) reduce ("assign") -> (memref<1x1024x14x14xf16>) {

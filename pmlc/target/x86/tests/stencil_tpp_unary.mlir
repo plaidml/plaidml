@@ -1,7 +1,7 @@
 // RUN: pmlc-opt -x86-stencil-tpp-unary -pxa-normalize -canonicalize %s | FileCheck %s
 
-// CHECK-LABEL: func @relu
-func @relu(%I: memref<10x20xf32>, %O: memref<10x20xf32>) -> memref<10x20xf32> {
+// CHECK-LABEL: func.func @relu
+func.func @relu(%I: memref<10x20xf32>, %O: memref<10x20xf32>) -> memref<10x20xf32> {
   // CHECK: affine.parallel
   %0 = affine.parallel (%ox, %oy) = (0, 0) to (5, 10) reduce ("assign") -> (memref<10x20xf32>) {
     // CHECK: pxa.generic (%{{.*}}[%{{.*}} * 2, %{{.*}} * 2]: #{{.*}}) <assign> @tpp_relu(%{{.*}}[%{{.*}} * 2, %{{.*}} * 2]: #{{.*}}) tile: [2, 2] : (memref<10x20xf32>) -> memref<10x20xf32>
@@ -16,8 +16,8 @@ func @relu(%I: memref<10x20xf32>, %O: memref<10x20xf32>) -> memref<10x20xf32> {
   return %0 : memref<10x20xf32>
 }
 
-// CHECK-LABEL: func @resnet_2d
-func @resnet_2d(%I: memref<1x7x1x64xf32>, %O: memref<1x7x7x512xf32>) -> memref<1x7x7x512xf32> {
+// CHECK-LABEL: func.func @resnet_2d
+func.func @resnet_2d(%I: memref<1x7x1x64xf32>, %O: memref<1x7x7x512xf32>) -> memref<1x7x7x512xf32> {
   // CHECK: affine.parallel
   %257 = affine.parallel (%arg3, %arg4) = (0, 0) to (7, 8) reduce ("assign") -> (memref<1x7x7x512xf32>) {
     // CHECK: pxa.generic (%{{.*}}[0, 0, %{{.*}}, %{{.*}} * 64]: #{{.*}}) <assign> @tpp_relu(%{{.*}}[0, 0, 0, 0]: #{{.*}}) tile: [7, 64] : (memref<1x7x1x64xf32>) -> memref<1x7x7x512xf32>
@@ -32,8 +32,8 @@ func @resnet_2d(%I: memref<1x7x1x64xf32>, %O: memref<1x7x7x512xf32>) -> memref<1
   return %257 : memref<1x7x7x512xf32>
 }
 
-// CHECK-LABEL: func @resnet_3d_legal
-func @resnet_3d_legal(%I: memref<1x112x16x8xf32>, %O: memref<1x112x16x8xf32>) -> memref<1x112x16x8xf32> {
+// CHECK-LABEL: func.func @resnet_3d_legal
+func.func @resnet_3d_legal(%I: memref<1x112x16x8xf32>, %O: memref<1x112x16x8xf32>) -> memref<1x112x16x8xf32> {
     // CHECK: affine.parallel
     %8 = affine.parallel (%arg111, %arg112) = (0, 0) to (7, 8) reduce ("assign") -> (memref<1x112x16x8xf32>) {
       // CHECK: pxa.generic
@@ -49,8 +49,8 @@ func @resnet_3d_legal(%I: memref<1x112x16x8xf32>, %O: memref<1x112x16x8xf32>) ->
 }
 
 // Only compatible layouts with matching stride 1 IVs are allowed.
-// CHECK-LABEL: func @resnet_2d_illegal
-func @resnet_2d_illegal(%I: memref<1x64x7x1xf32>, %O: memref<1x512x7x7xf32>) -> memref<1x512x7x7xf32> {
+// CHECK-LABEL: func.func @resnet_2d_illegal
+func.func @resnet_2d_illegal(%I: memref<1x64x7x1xf32>, %O: memref<1x512x7x7xf32>) -> memref<1x512x7x7xf32> {
   // CHECK: affine.parallel
   %82 = affine.parallel (%arg3, %arg4) = (0, 0) to (8, 7) reduce ("assign") -> (memref<1x512x7x7xf32>) {
     // CHECK: affine.parallel
@@ -66,8 +66,8 @@ func @resnet_2d_illegal(%I: memref<1x64x7x1xf32>, %O: memref<1x512x7x7xf32>) -> 
   return %82 : memref<1x512x7x7xf32>
 }
 
-// CHECK-LABEL: func @resnet_2d_f16
-func @resnet_2d_f16(%I: memref<1x7x1x64xf16>, %O: memref<1x7x7x512xf16>) -> memref<1x7x7x512xf16> {
+// CHECK-LABEL: func.func @resnet_2d_f16
+func.func @resnet_2d_f16(%I: memref<1x7x1x64xf16>, %O: memref<1x7x7x512xf16>) -> memref<1x7x7x512xf16> {
   // CHECK: affine.parallel
   %257 = affine.parallel (%arg3, %arg4) = (0, 0) to (7, 8) reduce ("assign") -> (memref<1x7x7x512xf16>) {
     // CHECK: affine.parallel
@@ -83,8 +83,8 @@ func @resnet_2d_f16(%I: memref<1x7x1x64xf16>, %O: memref<1x7x7x512xf16>) -> memr
   return %257 : memref<1x7x7x512xf16>
 }
 
-// CHECK-LABEL: func @resnet_conv1_relu
-func @resnet_conv1_relu(%arg0: memref<1x112x112x64xf32>, %arg1: memref<1x112x112x64xf32>) -> memref<1x112x112x64xf32> {
+// CHECK-LABEL: func.func @resnet_conv1_relu
+func.func @resnet_conv1_relu(%arg0: memref<1x112x112x64xf32>, %arg1: memref<1x112x112x64xf32>) -> memref<1x112x112x64xf32> {
   // CHECK: affine.parallel
   %0 = affine.parallel (%arg5) = (0) to (56) reduce ("assign") -> (memref<1x112x112x64xf32>) {
     // CHECK: affine.parallel
@@ -103,8 +103,8 @@ func @resnet_conv1_relu(%arg0: memref<1x112x112x64xf32>, %arg1: memref<1x112x112
   return %0 : memref<1x112x112x64xf32>
 }
 
-// CHECK-LABEL: func @stencil_unary_do_nothing
-func @stencil_unary_do_nothing(%arg0: memref<1x64x56x56xf32>) -> memref<1x64x56x56xf32> {
+// CHECK-LABEL: func.func @stencil_unary_do_nothing
+func.func @stencil_unary_do_nothing(%arg0: memref<1x64x56x56xf32>) -> memref<1x64x56x56xf32> {
   %0 = memref.alloc() : memref<1x64x56x56xf32>
   // CHECK: affine.parallel
   %1 = affine.parallel (%arg1, %arg2) = (0, 0) to (56, 2) reduce ("assign") -> (memref<1x64x56x56xf32>) {
@@ -130,8 +130,8 @@ func @stencil_unary_do_nothing(%arg0: memref<1x64x56x56xf32>) -> memref<1x64x56x
   return %1 : memref<1x64x56x56xf32>
 }
 
-// CHECK-LABEL: func @tanh
-func @tanh(%I: memref<10x20xf32>, %O: memref<10x20xf32>) -> memref<10x20xf32> {
+// CHECK-LABEL: func.func @tanh
+func.func @tanh(%I: memref<10x20xf32>, %O: memref<10x20xf32>) -> memref<10x20xf32> {
   // CHECK: affine.parallel
   %0 = affine.parallel (%ox, %oy) = (0, 0) to (5, 10) reduce ("assign") -> (memref<10x20xf32>) {
     // CHECK: pxa.generic (%{{.*}}[%{{.*}} * 2, %{{.*}} * 2]: #{{.*}}) <assign> @tpp_tanh(%{{.*}}[%{{.*}} * 2, %{{.*}} * 2]: #{{.*}}) tile: [2, 2] : (memref<10x20xf32>) -> memref<10x20xf32>
@@ -146,8 +146,8 @@ func @tanh(%I: memref<10x20xf32>, %O: memref<10x20xf32>) -> memref<10x20xf32> {
   return %0 : memref<10x20xf32>
 }
 
-// CHECK-LABEL: func @exp
-func @exp(%I: memref<10x20xf32>, %O: memref<10x20xf32>) -> memref<10x20xf32> {
+// CHECK-LABEL: func.func @exp
+func.func @exp(%I: memref<10x20xf32>, %O: memref<10x20xf32>) -> memref<10x20xf32> {
   // CHECK: affine.parallel
   %0 = affine.parallel (%ox, %oy) = (0, 0) to (5, 10) reduce ("assign") -> (memref<10x20xf32>) {
     // CHECK: pxa.generic (%{{.*}}[%{{.*}} * 2, %{{.*}} * 2]: #{{.*}}) <assign> @tpp_exp(%{{.*}}[%{{.*}} * 2, %{{.*}} * 2]: #{{.*}}) tile: [2, 2] : (memref<10x20xf32>) -> memref<10x20xf32>

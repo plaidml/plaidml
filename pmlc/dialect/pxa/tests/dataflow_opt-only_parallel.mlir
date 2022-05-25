@@ -1,7 +1,7 @@
 // RUN: pmlc-opt -pxa-dataflow-opt="only-parallel-nested=true" -canonicalize %s | FileCheck %s
 
-// CHECK-LABEL: func @simple
-func @simple(%out : memref<2xf32>) -> memref<2xf32> {
+// CHECK-LABEL: func.func @simple
+func.func @simple(%out : memref<2xf32>) -> memref<2xf32> {
   // CHECK: constant 0.0
   %zero = arith.constant 0.0 : f32
   %buf = memref.alloc() : memref<2xf32>

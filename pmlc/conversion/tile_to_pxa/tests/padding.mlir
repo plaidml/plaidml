@@ -4,14 +4,14 @@
 #first = affine_map<(i, j) -> (i)>
 #jin0to3 = affine_set<(i, j) : (j >= 0, 2 - j >= 0)>
 
-func @pad_input(%arg0: tensor<10xf32>) -> tensor<10xf32> {
+func.func @pad_input(%arg0: tensor<10xf32>) -> tensor<10xf32> {
   %c0 = tile.constant(0.0 : f64) : tensor<f32>
   %0 = tile.contract add, none, %c0, %arg0 {cons=#jin0to3, srcs=[#conv1dcenter], sink=#first}
     : tensor<f32>, tensor<10xf32> -> tensor<10xf32>
   return %0 : tensor<10xf32>
 }
 
-// CHECK-LABEL: func @pad_input
+// CHECK-LABEL: func.func @pad_input
 // CHECK: %[[TMP:.*]] = memref.alloc() : memref<12xf32>
 // CHECK: %[[CLEAR:.*]] = affine.parallel (%{{.*}}) = (0) to (12)
 // CHECK:   pxa.reduce assign %{{.*}}, %[[TMP]][%{{.*}}] : memref<12xf32>
@@ -30,7 +30,7 @@ func @pad_input(%arg0: tensor<10xf32>) -> tensor<10xf32> {
 #first = affine_map<(i, j) -> (i)>
 #second = affine_map<(i, j) -> (j)>
 
-func @pad_contraction(%A: tensor<10xf32>, %B: tensor<1xf32>, %C: tensor<3xf32>) -> tensor<10xf32> {
+func.func @pad_contraction(%A: tensor<10xf32>, %B: tensor<1xf32>, %C: tensor<3xf32>) -> tensor<10xf32> {
   %c0 = tile.constant(0.0 : f64) : tensor<f32>
   %0 = tile.contract add, mul, %c0, %A, %B {srcs=[#conv1dcenter, #second], sink=#first}
     : tensor<f32>, tensor<10xf32>, tensor<1xf32> -> tensor<10xf32>
@@ -39,7 +39,7 @@ func @pad_contraction(%A: tensor<10xf32>, %B: tensor<1xf32>, %C: tensor<3xf32>) 
   return %1 : tensor<10xf32>
 }
 
-// CHECK-LABEL: func @pad_contraction
+// CHECK-LABEL: func.func @pad_contraction
 // CHECK: %[[TMP:.*]] = memref.alloc() : memref<12xf32>
 // fill exterior
 // CHECK: %[[CLEAR:.*]] = affine.parallel (%{{.*}}) = (0) to (12)

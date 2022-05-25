@@ -2,7 +2,7 @@
 
 // CHECK-LABEL: @dot0
 // CHECK-SAME: (%[[arg0:.*]]: memref<100x100xf32>, %[[arg1:.*]]: memref<100x100xf32>) -> memref<100x100xf32>
-func @dot0(%arg0: memref<100x100xf32>, %arg1: memref<100x100xf32>) -> memref<100x100xf32> {
+func.func @dot0(%arg0: memref<100x100xf32>, %arg1: memref<100x100xf32>) -> memref<100x100xf32> {
   %obuf = memref.alloc() : memref<100x100xf32>
   // CHECK: %[[obuf:.*]] = memref.alloc() : memref<100x100xf32>
   // CHECK: affine.parallel (%[[arg2:.*]], %[[arg3:.*]], %[[arg4:.*]]) = (0, 0, 0) to (100, 100, 100) step (10, 10, 10)
@@ -22,7 +22,7 @@ func @dot0(%arg0: memref<100x100xf32>, %arg1: memref<100x100xf32>) -> memref<100
 
 // CHECK-LABEL: @dot1
 // CHECK-SAME: (%[[arg0:.*]]: memref<100x100xf32>, %[[arg1:.*]]: memref<100x100xf32>) -> memref<100x100xf32>
-func @dot1(%arg0: memref<100x100xf32>, %arg1: memref<100x100xf32>) -> memref<100x100xf32> {
+func.func @dot1(%arg0: memref<100x100xf32>, %arg1: memref<100x100xf32>) -> memref<100x100xf32> {
   %obuf = memref.alloc() : memref<100x100xf32>
   // CHECK: %[[obuf:.*]] = memref.alloc() : memref<100x100xf32>
   // CHECK: affine.parallel (%[[arg2:.*]], %[[arg3:.*]], %[[arg4:.*]]) = (0, 0, 0) to (200, 200, 200) step (10, 10, 10)

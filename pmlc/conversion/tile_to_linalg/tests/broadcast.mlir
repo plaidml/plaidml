@@ -7,11 +7,11 @@
 // CHECK: #[[map4:.*]] = affine_map<(d0, d1) -> (d0, d1)>
 // CHECK: #[[map9:.*]] = affine_map<(d0, d1, d2, d3) -> (d3)>
 
-func @broadcast_has_dim_one(%arg0: tensor<1x2x3x4xui64>, %arg1: tensor<2x1x3x4xui64>) -> tensor<2x2x3x4xi1> {
+func.func @broadcast_has_dim_one(%arg0: tensor<1x2x3x4xui64>, %arg1: tensor<2x1x3x4xui64>) -> tensor<2x2x3x4xi1> {
   %0 = tile.cmp_ge %arg0, %arg1 : (tensor<1x2x3x4xui64>, tensor<2x1x3x4xui64>) -> tensor<2x2x3x4xi1>
   return %0 : tensor<2x2x3x4xi1>
 }
-//      CHECK: func @broadcast_has_dim_one
+//      CHECK: func.func @broadcast_has_dim_one
 //      CHECK:   linalg.init_tensor [2, 2, 3, 4]
 //      CHECK:   linalg.generic
 // CHECK-SAME:     indexing_maps = [#[[map0]], #[[map1]], #[[map2]]]
@@ -19,11 +19,11 @@ func @broadcast_has_dim_one(%arg0: tensor<1x2x3x4xui64>, %arg1: tensor<2x1x3x4xu
 //      CHECK:       cmpi uge
 //      CHECK:       linalg.yield
 
-func @broadcast_matrix_scalar(%arg0: tensor<ui64>, %arg1: tensor<3x4xui64>) -> tensor<3x4xi1> {
+func.func @broadcast_matrix_scalar(%arg0: tensor<ui64>, %arg1: tensor<3x4xui64>) -> tensor<3x4xi1> {
   %0 = tile.cmp_ge %arg0, %arg1 : (tensor<ui64>, tensor<3x4xui64>) -> tensor<3x4xi1>
   return %0 : tensor<3x4xi1>
 }
-//      CHECK: func @broadcast_matrix_scalar
+//      CHECK: func.func @broadcast_matrix_scalar
 //      CHECK:   linalg.init_tensor [3, 4]
 //      CHECK:   linalg.generic
 // CHECK-SAME:     indexing_maps = [#[[map3]], #[[map4]], #[[map4]]]
@@ -31,7 +31,7 @@ func @broadcast_matrix_scalar(%arg0: tensor<ui64>, %arg1: tensor<3x4xui64>) -> t
 //      CHECK:       cmpi uge
 //      CHECK:       linalg.yield
 
-func @matmul(%arg0: tensor<1x784xf32>, %arg1: tensor<784x512xf32>, %arg2: tensor<512xf32>) -> tensor<1x512xf32> {
+func.func @matmul(%arg0: tensor<1x784xf32>, %arg1: tensor<784x512xf32>, %arg2: tensor<512xf32>) -> tensor<1x512xf32> {
   %0 = tile.contract add, mul, %arg2, %arg0, %arg1 {
     lowerBounds = affine_map<() -> (0, 0, 0)>,
     upperBounds = affine_map<() -> (0, 511, 783)>,
@@ -42,7 +42,7 @@ func @matmul(%arg0: tensor<1x784xf32>, %arg1: tensor<784x512xf32>, %arg2: tensor
     ]} : tensor<512xf32>, tensor<1x784xf32>, tensor<784x512xf32> -> tensor<1x512xf32>
   return %0 : tensor<1x512xf32>
 }
-//      CHECK: func @matmul
+//      CHECK: func.func @matmul
 //      CHECK:   linalg.init_tensor
 //      CHECK:   linalg.generic
 // CHECK-SAME:   ins({{.*}} : tensor<512xf32>) outs({{.*}} : tensor<1x512xf32>)
@@ -53,11 +53,11 @@ func @matmul(%arg0: tensor<1x784xf32>, %arg1: tensor<784x512xf32>, %arg2: tensor
 //      CHECK:     linalg.yield
 //      CHECK:   return
 
-func @bias_add(%arg0: tensor<1x56x56x64xf32>, %arg1: tensor<64xf32>) -> tensor<1x56x56x64xf32> {
+func.func @bias_add(%arg0: tensor<1x56x56x64xf32>, %arg1: tensor<64xf32>) -> tensor<1x56x56x64xf32> {
   %0 = tile.add %arg0, %arg1 : (tensor<1x56x56x64xf32>, tensor<64xf32>) -> tensor<1x56x56x64xf32>
   return %0 : tensor<1x56x56x64xf32>
 }
-//      CHECK: func @bias_add
+//      CHECK: func.func @bias_add
 //      CHECK:   linalg.init_tensor
 //      CHECK:   linalg.generic
 // CHECK-SAME:     indexing_maps = [#[[map2]], #[[map9]], #[[map2]]]

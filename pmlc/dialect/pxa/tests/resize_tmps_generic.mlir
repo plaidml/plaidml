@@ -3,8 +3,8 @@
 #map1 = affine_map<(d0, d1, d2, d3, d4) -> (0, d0 * 2 + d3, d4, d2)>
 #map2 = affine_map<(d0, d1, d2, d3, d4) -> (d3, d4, d2, d1)>
 
-// CHECK-LABEL: func @resize_tmp_generic
-func @resize_tmp_generic(%arg0: memref<64xf32>, %arg1: memref<1x230x230x3xf32>, %arg2: memref<7x7x3x64xf32>, %arg3: memref<1x114x114x64xf32>) -> memref<1x114x114x64xf32> {
+// CHECK-LABEL: func.func @resize_tmp_generic
+func.func @resize_tmp_generic(%arg0: memref<64xf32>, %arg1: memref<1x230x230x3xf32>, %arg2: memref<7x7x3x64xf32>, %arg3: memref<1x114x114x64xf32>) -> memref<1x114x114x64xf32> {
   %0 = affine.parallel (%arg4, %arg5) = (0, 0) to (7, 8) reduce ("assign") -> (memref<1x114x114x64xf32>) {
   // CHECK: affine.parallel
     %1 = affine.parallel (%arg6) = (0) to (14) reduce ("assign") -> (memref<1x114x114x64xf32>) {

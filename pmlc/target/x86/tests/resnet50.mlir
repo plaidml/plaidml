@@ -10,7 +10,7 @@
 #map9 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4 - 1, d2 + d5 - 1, d6)>
 
 
-func @conv1(%I: tensor<1x230x230x3xf32>, %K: tensor<7x7x3x64xf32>, %B: tensor<64xf32>) -> tensor<1x112x112x64xf32> {
+func.func @conv1(%I: tensor<1x230x230x3xf32>, %K: tensor<7x7x3x64xf32>, %B: tensor<64xf32>) -> tensor<1x112x112x64xf32> {
   %zero = tile.constant(0.0 : f64) : tensor<f32>
   %conv1 = tile.contract add, mul, %zero, %I, %K {sink = #map2, srcs = [#map3, #map4]} : tensor<f32>, tensor<1x230x230x3xf32>, tensor<7x7x3x64xf32> -> tensor<1x112x112x64xf32>
   %1 = tile.add %conv1, %B : (tensor<1x112x112x64xf32>, tensor<64xf32>) -> tensor<1x112x112x64xf32>
@@ -23,7 +23,7 @@ func @conv1(%I: tensor<1x230x230x3xf32>, %K: tensor<7x7x3x64xf32>, %B: tensor<64
 //     STAGE2: #[[MAP2:.*]] = affine_map<(d0, d1, d2, d3, d4) -> (d3, d4, d2, d1)>
 //     STAGE2: #[[MAP3:.*]] = affine_map<(d0, d1, d2, d3, d4) -> (0, d1, 0, d0)>
 //     STAGE2: #[[MAP4:.*]] = affine_map<(d0, d1) -> (0, d0, 0, d1)>
-//     STAGE2: func @conv1
+//     STAGE2: func.func @conv1
 //     STAGE2:   affine.parallel (%{{.*}}) = (0) to (8) reduce ("assign") -> (memref<1x112x112x64xf32>)
 //     STAGE2:     affine.parallel (%{{.*}}, %{{.*}}) = (0, 0) to (7, 14) reduce ("assign") -> (memref<1x112x112x64xf32>)
 // STAGE2-DAG:       memref.alloc() : memref<1x112x112x64xf32>
@@ -41,7 +41,7 @@ func @conv1(%I: tensor<1x230x230x3xf32>, %K: tensor<7x7x3x64xf32>, %B: tensor<64
 //     STAGE2:       memref.dealloc %{{.*}} : memref<1x16x1x64xf32>
 
 // TODO
-// STAGE3-LABEL: func @conv1
+// STAGE3-LABEL: func.func @conv1
 // TODO
 
 // -----
@@ -50,16 +50,16 @@ func @conv1(%I: tensor<1x230x230x3xf32>, %K: tensor<7x7x3x64xf32>, %B: tensor<64
 #filter = affine_map<(n, h, w, c, r, s, k) -> (r, s, k, c)>
 #input = affine_map<(n, h, w, c, r, s, k) -> (n, h + r, w + s, k)>
 
-func @res2a_branch2a(%I: tensor<1x56x56x64xf32>, %K: tensor<1x1x64x64xf32>, %B: tensor<64xf32>) -> tensor<1x56x56x64xf32> {
+func.func @res2a_branch2a(%I: tensor<1x56x56x64xf32>, %K: tensor<1x1x64x64xf32>, %B: tensor<64xf32>) -> tensor<1x56x56x64xf32> {
   %zero = tile.constant(0.0 : f64) : tensor<f32>
   %0 = tile.contract add, mul, %zero, %I, %K {sink = #output, srcs = [#input, #filter]} : tensor<f32>, tensor<1x56x56x64xf32>, tensor<1x1x64x64xf32> -> tensor<1x56x56x64xf32>
   %1 = tile.add %0, %B : (tensor<1x56x56x64xf32>, tensor<64xf32>) -> tensor<1x56x56x64xf32>
   %2 = tile.relu %1 : (tensor<1x56x56x64xf32>) -> tensor<1x56x56x64xf32>
   return %2 : tensor<1x56x56x64xf32>
 }
-// STAGE2-LABEL: func @res2a_branch2a
+// STAGE2-LABEL: func.func @res2a_branch2a
 // TODO
-// STAGE3-LABEL: func @res2a_branch2a
+// STAGE3-LABEL: func.func @res2a_branch2a
 // TODO
 
 // -----
@@ -68,14 +68,14 @@ func @res2a_branch2a(%I: tensor<1x56x56x64xf32>, %K: tensor<1x1x64x64xf32>, %B: 
 #map4 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d3)>
 #map9 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4 - 1, d2 + d5 - 1, d6)>
 
-func @res2a_branch2b(%I: tensor<1x56x56x64xf32>, %K: tensor<3x3x64x64xf32>, %B: tensor<64xf32>) -> tensor<1x56x56x64xf32> {
+func.func @res2a_branch2b(%I: tensor<1x56x56x64xf32>, %K: tensor<3x3x64x64xf32>, %B: tensor<64xf32>) -> tensor<1x56x56x64xf32> {
   %zero = tile.constant(0.0 : f64) : tensor<f32>
   %0 = tile.contract add, mul, %zero, %I, %K {sink = #map2, srcs = [#map9, #map4]} : tensor<f32>, tensor<1x56x56x64xf32>, tensor<3x3x64x64xf32> -> tensor<1x56x56x64xf32>
   %1 = tile.add %0, %B : (tensor<1x56x56x64xf32>, tensor<64xf32>) -> tensor<1x56x56x64xf32>
   %2 = tile.relu %1 : (tensor<1x56x56x64xf32>) -> tensor<1x56x56x64xf32>
   return %2 : tensor<1x56x56x64xf32>
 }
-// STAGE2-LABEL: func @res2a_branch2b
+// STAGE2-LABEL: func.func @res2a_branch2b
 // TODO
-// STAGE3-LABEL: func @res2a_branch2b
+// STAGE3-LABEL: func.func @res2a_branch2b
 // TODO

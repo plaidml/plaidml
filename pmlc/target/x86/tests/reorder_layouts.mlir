@@ -6,7 +6,7 @@
 #bias   = affine_map<(n, h, w, c) -> (c)>
 #act    = affine_map<(n, h, w, c) -> (n, h, w, c)>
 
-func @main(%arg0: tensor<1x56x56x64xf32>, %arg1: tensor<1x1x64x64xf32> {stdx.const}, %arg2: tensor<64xf32> {stdx.const}) -> tensor<1x56x56x64xf32> {
+func.func @main(%arg0: tensor<1x56x56x64xf32>, %arg1: tensor<1x1x64x64xf32> {stdx.const}, %arg2: tensor<64xf32> {stdx.const}) -> tensor<1x56x56x64xf32> {
   %cst = arith.constant 0.000000e+00 : f32
   %T0 = linalg.init_tensor [1, 56, 56, 64] : tensor<1x56x56x64xf32>
   %TC = linalg.fill ins(%cst : f32) outs(%T0 : tensor<1x56x56x64xf32>) -> tensor<1x56x56x64xf32>
@@ -54,7 +54,7 @@ func @main(%arg0: tensor<1x56x56x64xf32>, %arg1: tensor<1x1x64x64xf32> {stdx.con
 // CHECK: #[[map6:.*]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d7, d1, d2, d3)>
 // CHECK: #[[map7:.*]] = affine_map<(d0, d1, d2, d3, d4) -> (d1 * 32 + d4)>
 
-//      CHECK: func @main(
+//      CHECK: func.func @main(
 // CHECK-SAME:   %[[arg0:.*]]: tensor<1x56x56x64xf32>
 // CHECK-SAME:   %[[arg1:.*]]: tensor<1x1x64x64xf32> {stdx.const}
 // CHECK-SAME:   %[[arg2:.*]]: tensor<64xf32> {stdx.const}

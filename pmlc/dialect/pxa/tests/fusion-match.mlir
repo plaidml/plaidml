@@ -1,6 +1,6 @@
 // RUN: pmlc-opt -pxa-fusion="exactly-match=true" -pxa-normalize -canonicalize %s | FileCheck %s
 
-func @fusion_different_idxs(%A: memref<2x3xf32>, %B: memref<2x3xf32>, %C: memref<2x3x4xf32>, %D: memref<2x3x4xf32>) -> memref<2x3x4xf32> {
+func.func @fusion_different_idxs(%A: memref<2x3xf32>, %B: memref<2x3xf32>, %C: memref<2x3x4xf32>, %D: memref<2x3x4xf32>) -> memref<2x3x4xf32> {
   %T = memref.alloc() : memref<2x3xf32>
   %4 = affine.parallel (%i, %j) = (0, 0) to (2, 3) reduce ("assign") -> (memref<2x3xf32>) {
     %0 = pxa.load %A[%i, %j] : memref<2x3xf32>
@@ -19,7 +19,7 @@ func @fusion_different_idxs(%A: memref<2x3xf32>, %B: memref<2x3xf32>, %C: memref
   return %5 : memref<2x3x4xf32>
 }
 
-// CHECK-LABEL: func @fusion_different_idxs
+// CHECK-LABEL: func.func @fusion_different_idxs
 // CHECK:       affine.parallel (%{{.*}}, %{{.*}}) = (0, 0) to (2, 3)
 // CHECK:         pxa.load
 // CHECK:         pxa.load

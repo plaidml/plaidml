@@ -3,7 +3,7 @@
 #map0 = affine_map<(r, s, k0, k1, c0, c1) -> (r, s, k1 * 16 + k0, c1 * 16 + c0)>
 #map1 = affine_map<(r, s, k0, k1, c0, c1) -> (k1, c1, r, s, k0, c0)>
 
-func @main(%arg0: tensor<1x1x64x64xf32> {stdx.const}) {
+func.func @main(%arg0: tensor<1x1x64x64xf32> {stdx.const}) {
   stdx.closure() -> tensor<4x4x1x1x16x16xf32> {
     %zero = arith.constant 0.000000e+00 : f32
 
@@ -22,7 +22,7 @@ func @main(%arg0: tensor<1x1x64x64xf32> {stdx.const}) {
   return
 }
 
-// CHECK-LABEL: func @main
+// CHECK-LABEL: func.func @main
 //       CHECK:   constant
 //       CHECK:   linalg.init_tensor
 //       CHECK:   linalg.generic
