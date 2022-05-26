@@ -122,11 +122,13 @@ struct PropagateReorderThruPadTensorOpPattern
                                                 /*low=*/ValueRange{},
                                                 /*high=*/ValueRange{});
     SmallVector<Type, 4> padArgs(lower.size(), rewriter.getIndexType());
+    SmallVector<Location, 4> locs(lower.size(), op->getLoc());
     {
       OpBuilder::InsertionGuard guard(rewriter);
-      rewriter.createBlock(&newOp.region(), newOp.region().begin(), padArgs);
-      rewriter.create<linalg::YieldOp>(
-          op->getLoc(), ValueRange{op.getConstantPaddingValue()});
+      rewriter.createBlock(&newOp.region(), newOp.region().begin(), padArgs,
+                           locs);
+      rewriter.create<tensor::YieldOp>(op->getLoc(),
+                                       op.getConstantPaddingValue());
     }
 
     RankedTensorType resultType = op.getResultType();
