@@ -355,6 +355,8 @@ void pipelineBuilderStage2(OpPassManager &pm, const Options &options) {
   pm.addPass(createCSEPass());
 
   pm.addPass(createPRNGLinkingPass());
+  if (!pmlc::util::getEnvVar("PLAIDML_SHAPE_ANALYSIS_OUTPUT").empty())
+    pm.addPass(createShapeAnalysisPass());
 }
 
 void pipelineBuilderStage3(OpPassManager &pm) {

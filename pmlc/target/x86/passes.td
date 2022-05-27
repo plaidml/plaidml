@@ -43,6 +43,11 @@ def PRNGLinking : Pass<"x86-prng-linking", "mlir::ModuleOp"> {
   let constructor = "pmlc::target::x86::createPRNGLinkingPass()";
 }
 
+def ShapeAnalysis :Pass<"x86-shape-analysis", "mlir::ModuleOp">{
+  let summary = "Analyze shapes of TPP functions and surrounding loops";
+  let constructor = "pmlc::target::x86::createShapeAnalysisPass()";
+}
+
 def ReorderLayouts : Pass<"x86-reorder-layouts", "mlir::func::FuncOp"> {
   let summary = "Optimize data layouts for efficient reading";
   let constructor = "pmlc::target::x86::createReorderLayoutsPass()";

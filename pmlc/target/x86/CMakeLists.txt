@@ -7,6 +7,7 @@ pml_cc_library(
     heatmap.cc
     heatmap_impl.cc
     instrument.cc
+    shape_analysis.cc
     pipeline.cc
     register.cc
     reorder_layouts.cc
