@@ -51,3 +51,12 @@ func @brgemm(%arg0: memref<7x7x3x64xf32> {stdx.const}) -> () {
   xsmm.brgemm.offs.invoke.f32 %176, %171[%c0, %c0, %c0, %c0] = %114[%c0, %c0, %c0, %c0], %arg0[%c0, %c0, %c0, %c0], aOffsets = [1, 2], bOffsets = [1, 2], numBatches = 2 : (memref<1x230x230x3xf32>, memref<7x7x3x64xf32>) -> memref<1x1x16x64xf32>
   return 
 }
+
+// -----
+
+// CHECK-LABEL: func @binary_dispatch
+func @binary_dispatch() -> () {
+  // CHECK: xsmm.binary.dispatch ADD(bcast1 0 bcast2 0 ldo 32 ldi2 256 ldi1 256 tile [56, 32] compute f32 func (f32, f32) -> f32) : i64
+  %0 = xsmm.binary.dispatch ADD ( bcast1 0 bcast2 0 ldo 32 ldi2 256 ldi1 256 tile [56, 32] compute f32 func (f32, f32) -> f32 ) : i64
+  return 
+}

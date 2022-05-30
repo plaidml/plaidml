@@ -271,26 +271,6 @@ static std::string stringfy(BinaryKind kind) {
   llvm_unreachable("kind not right");
 }
 
-void BinaryDispatchOp::print(OpAsmPrinter &p) {
-  p << '{';
-  p << ' ' << "bcastType1 = " << bcastType1();
-  p << ' ' << "bcastType2 = " << bcastType2();
-  p << ' ' << "compute_type = " << compute_type();
-  p << ' ' << "func_type = " << func_type();
-  p << ' ' << "kind = " << stringfy(kind());
-  p << ' ' << "ldi1 = " << ldi1();
-  p << ' ' << "ldi2 = " << ldi2();
-  p << ' ' << "ldo = " << ldo();
-  p << ' ' << "tile = " << tile();
-  p << '}';
-}
-
-ParseResult BinaryDispatchOp::parse(OpAsmParser &parser,
-                                    OperationState &result) {
-  assert(0 && "implement me");
-  return failure();
-}
-
 //
 // --- BRGemmInvokeF32Op ---
 //
