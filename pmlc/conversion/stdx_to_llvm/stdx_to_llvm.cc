@@ -80,11 +80,6 @@ struct ASinHLowering : public LibMCallLowering<stdx::ASinHOp> {
   std::string getFuncName() const override { return "asinhf"; }
 };
 
-struct ATanLowering : public LibMCallLowering<stdx::ATanOp> {
-  using LibMCallLowering<stdx::ATanOp>::LibMCallLowering;
-  std::string getFuncName() const override { return "atanf"; }
-};
-
 struct ATanHLowering : public LibMCallLowering<stdx::ATanHOp> {
   using LibMCallLowering<stdx::ATanHOp>::LibMCallLowering;
   std::string getFuncName() const override { return "atanhf"; }
@@ -93,22 +88,6 @@ struct ATanHLowering : public LibMCallLowering<stdx::ATanHOp> {
 struct CosHLowering : public LibMCallLowering<stdx::CosHOp> {
   using LibMCallLowering<stdx::CosHOp>::LibMCallLowering;
   std::string getFuncName() const override { return "coshf"; }
-};
-
-struct ErfLowering : public LibMCallLowering<stdx::ErfOp> {
-  using LibMCallLowering<stdx::ErfOp>::LibMCallLowering;
-  std::string getFuncName() const override { return "erff"; }
-};
-
-struct FloorLowering : public LibMCallLowering<stdx::FloorOp> {
-  using LibMCallLowering<stdx::FloorOp>::LibMCallLowering;
-  std::string getFuncName() const override { return "floorf"; }
-};
-
-struct PowLowering : public LibMCallLowering<stdx::PowOp> {
-  using LibMCallLowering<stdx::PowOp>::LibMCallLowering;
-  std::string getFuncName() const override { return "powf"; }
-  size_t getArity() const override { return 2; }
 };
 
 struct RoundLowering : public LibMCallLowering<stdx::RoundOp> {
@@ -326,13 +305,9 @@ void populateStdXToLLVMConversionPatterns(LLVMTypeConverter &converter,
                   ACosHLowering,   //
                   ASinLowering,    //
                   ASinHLowering,   //
-                  ATanLowering,    //
                   ATanHLowering,   //
                   CosHLowering,    //
-                  ErfLowering,     //
-                  FloorLowering,   //
                   PackLowering,    //
-                  PowLowering,     //
                   ReshapeLowering, //
                   RoundLowering,   //
                   SinHLowering,    //

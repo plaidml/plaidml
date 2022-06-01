@@ -54,33 +54,12 @@ def ASinHOp : StdX_UnaryFuncOp<"asinh"> {
   let summary = "hyperbolic arcsine";
 }
 
-def ATanOp : StdX_UnaryFuncOp<"atan"> {
-  let summary = "arctangent";
-}
-
 def ATanHOp : StdX_UnaryFuncOp<"atanh"> {
   let summary = "hyperbolic arctangent";
 }
 
 def CosHOp : StdX_UnaryFuncOp<"cosh"> {
   let summary = "hyperbolic cosine";
-}
-
-def ErfOp : StdX_UnaryFuncOp<"erf"> {
-  let summary = "Gauss error function";
-}
-
-def FloorOp : StdX_UnaryFuncOp<"floor"> {
-  let summary = "integer floor";
-}
-
-def PowOp : StdX_Op<"pow"> {
-  let summary = "raise to power";
-  let arguments = (ins AnyType:$base, AnyType:$exponent);
-  let results = (outs AnyType);
-  let assemblyFormat = [{
-    `(` $base `,` $exponent `)` attr-dict `:` functional-type(operands, results)
-  }];
 }
 
 def ReluOp : StdX_UnaryFuncOp<"relu"> {

@@ -46,7 +46,7 @@ func @asin_f32(%arg0: tensor<8x9xf32>) -> tensor<8x9xf32> {
 func @atan_f32(%arg0: tensor<8x9xf32>) -> tensor<8x9xf32> {
   // CHECK: affine.parallel
   // CHECK: pxa.load
-  // CHECK: stdx.atan({{.*}}) : (f32) -> f32
+  // CHECK: math.atan {{.*}} : f32
   // CHECK: pxa.reduce assign
   %0 = tile.atan %arg0 : (tensor<8x9xf32>) -> tensor<8x9xf32>
   return %0 : tensor<8x9xf32>
@@ -66,7 +66,7 @@ func @cosh_f32(%arg0: tensor<8x9xf32>) -> tensor<8x9xf32> {
 func @erf_f32(%arg0: tensor<8x9xf32>) -> tensor<8x9xf32> {
   // CHECK: affine.parallel
   // CHECK: pxa.load
-  // CHECK: stdx.erf({{.*}}) : (f32) -> f32
+  // CHECK: math.erf {{.*}} : f32
   // CHECK: pxa.reduce assign
   %0 = tile.erf %arg0 : (tensor<8x9xf32>) -> tensor<8x9xf32>
   return %0 : tensor<8x9xf32>
@@ -76,7 +76,7 @@ func @erf_f32(%arg0: tensor<8x9xf32>) -> tensor<8x9xf32> {
 func @floor_f32(%arg0: tensor<8x9xf32>) -> tensor<8x9xf32> {
   // CHECK: affine.parallel
   // CHECK: pxa.load
-  // CHECK: stdx.floor({{.*}}) : (f32) -> f32
+  // CHECK: math.floor {{.*}} : f32
   // CHECK: pxa.reduce assign
   %0 = tile.floor %arg0 : (tensor<8x9xf32>) -> tensor<8x9xf32>
   return %0 : tensor<8x9xf32>
@@ -86,7 +86,7 @@ func @floor_f32(%arg0: tensor<8x9xf32>) -> tensor<8x9xf32> {
 func @pow_f32(%arg0: tensor<8x9xf32>, %arg1: tensor<8x9xf32>) -> tensor<8x9xf32> {
   // CHECK: affine.parallel
   // CHECK: pxa.load
-  // CHECK: stdx.pow({{.*}}, {{.*}}) : (f32, f32) -> f32
+  // CHECK: math.powf {{.*}}, {{.*}} : f32
   // CHECK: pxa.reduce assign
   %0 = tile.pow %arg0, %arg1 : (tensor<8x9xf32>, tensor<8x9xf32>) -> tensor<8x9xf32>
   return %0 : tensor<8x9xf32>
@@ -96,7 +96,7 @@ func @pow_f32(%arg0: tensor<8x9xf32>, %arg1: tensor<8x9xf32>) -> tensor<8x9xf32>
 func @pow_f32_to_si32(%arg0: tensor<8x9xf32>, %arg1: tensor<8x9xsi32>) -> tensor<8x9xf32> {
   // CHECK: affine.parallel
   // CHECK: pxa.load
-  // CHECK: stdx.pow({{.*}}, {{.*}}) : (f32, f32) -> f32
+  // CHECK: math.powf {{.*}}, {{.*}} : f32
   // CHECK: pxa.reduce assign
   %0 = tile.pow %arg0, %arg1 : (tensor<8x9xf32>, tensor<8x9xsi32>) -> tensor<8x9xf32>
   return %0 : tensor<8x9xf32>

@@ -16,6 +16,7 @@
 #include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/Conversion/MathToLLVM/MathToLLVM.h"
+#include "mlir/Conversion/MathToLibm/MathToLibm.h"
 #include "mlir/Conversion/MemRefToLLVM/MemRefToLLVM.h"
 #include "mlir/Conversion/OpenMPToLLVM/ConvertOpenMPToLLVM.h"
 #include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
@@ -103,6 +104,8 @@ struct ConvertStandardToLLVMPass
 
     RewritePatternSet patterns(context);
     populateExpandTanhPattern(patterns);
+    // populateMathPolynomialApproximationPatterns(patterns);
+    populateMathToLibmConversionPatterns(patterns, /*benefit=*/1);
     populateXSMMToLLVMConversionPatterns(converter, patterns);
     conversion::stdx_to_llvm::populateStdXToLLVMConversionPatterns(converter,
                                                                    patterns);
