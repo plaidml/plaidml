@@ -15,7 +15,6 @@ const std::vector<InferenceEngine::Precision> netPrecisions = {
 };
 
 const std::vector<std::vector<int64_t>> axes = {
-    {},
     {1},
 };
 const std::vector<float> eps = {
