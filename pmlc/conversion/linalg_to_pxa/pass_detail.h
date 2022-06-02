@@ -41,3 +41,9 @@ void populateLinalgTensorExpandOpGeneralizationPatterns(
     mlir::RewritePatternSet &patterns);
 
 } // namespace pmlc::conversion::linalg_to_pxa
+
+namespace pmlc::conversion::tile_to_pxa {
+
+void populateTileToPXASpecialPatterns(mlir::RewritePatternSet &patterns);
+
+} // namespace pmlc::conversion::tile_to_pxa
