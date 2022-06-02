@@ -215,6 +215,10 @@ def XSMM_BinaryDispatchOp : XSMM_Op<"binary.dispatch", [NoSideEffect]> {
     I32Attr:$bcastType2
   );
   let results = (outs I64:$ptr);
+  let assemblyFormat = [{
+    $kind `(` `bcast1` $bcastType1 `bcast2` $bcastType2 `ldo`
+              $ldo `ldi2` $ldi2 `ldi1` $ldi1 `tile` $tile `compute` $compute_type `func` $func_type `)` attr-dict `:` type($ptr)
+  }];
 }
  
 def XSMM_BinaryInvokeOp : XSMM_Op<"binary.invoke"> {
