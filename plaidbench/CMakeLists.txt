@@ -38,6 +38,8 @@ pml_py_library(
     plaidbench/networks/keras/nasnet_large.py
     plaidbench/networks/keras/nasnet_mobile.py
     plaidbench/networks/keras/resnet50.py
+    plaidbench/networks/keras/toy_gemms.py
+    plaidbench/networks/keras/toy_parallel_conv.py
     plaidbench/networks/keras/vgg16.py
     plaidbench/networks/keras/vgg19.py
     plaidbench/networks/keras/xception.py
