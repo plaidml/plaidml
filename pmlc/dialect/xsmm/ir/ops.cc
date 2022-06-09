@@ -20,8 +20,8 @@ void XSMMDialect::initialize() {
 }
 
 struct GemmOperand {
-  OpAsmParser::OperandType memref;
-  SmallVector<OpAsmParser::OperandType, 4> indices;
+  OpAsmParser::UnresolvedOperand memref;
+  SmallVector<OpAsmParser::UnresolvedOperand, 4> indices;
 };
 
 //
@@ -47,26 +47,26 @@ GemmInvokeF32Op::operand_range GemmInvokeF32Op::getOperandsForC() {
   return getOperands().slice(4, cType.getRank());
 }
 
-void printGemmInvokeF32Op(OpAsmPrinter &p, GemmInvokeF32Op op) {
-  auto funcType =
-      FunctionType::get(op.getContext(), {op.a().getType(), op.b().getType()},
-                        {op.c().getType()});
-  p << ' ' << op.ptr() << ", ";
-  p << op.c() << '[';
-  p.printOperands(op.getOperandsForC());
-  p << "] = " << op.a() << '[';
-  p.printOperands(op.getOperandsForA());
-  p << "], " << op.b() << '[';
-  p.printOperands(op.getOperandsForB());
+void GemmInvokeF32Op::print(OpAsmPrinter &p) {
+  auto funcType = FunctionType::get(
+      getContext(), {a().getType(), b().getType()}, {c().getType()});
+  p << ' ' << ptr() << ", ";
+  p << c() << '[';
+  p.printOperands(getOperandsForC());
+  p << "] = " << a() << '[';
+  p.printOperands(getOperandsForA());
+  p << "], " << b() << '[';
+  p.printOperands(getOperandsForB());
   p << "] : " << funcType;
 }
 
-ParseResult parseGemmInvokeF32Op(OpAsmParser &parser, OperationState &result) {
+ParseResult GemmInvokeF32Op::parse(OpAsmParser &parser,
+                                   OperationState &result) {
   auto &builder = parser.getBuilder();
   auto indexType = builder.getIndexType();
   auto i64Type = builder.getIntegerType(64);
   GemmOperand a, b, c;
-  OpAsmParser::OperandType ptr;
+  OpAsmParser::UnresolvedOperand ptr;
   FunctionType funcType;
   return failure(
       parser.parseOperand(ptr) || parser.parseComma() ||
@@ -90,8 +90,8 @@ ParseResult parseGemmInvokeF32Op(OpAsmParser &parser, OperationState &result) {
 // ---- BRGemmOffsInvokeF32Op ----
 //
 
-ParseResult parseBRGemmOffsInvokeF32Op(OpAsmParser &parser,
-                                       OperationState &result) {
+ParseResult BRGemmOffsInvokeF32Op::parse(OpAsmParser &parser,
+                                         OperationState &result) {
   auto &builder = parser.getBuilder();
   auto indexType = builder.getIndexType();
   auto i64Type = builder.getIntegerType(64);
@@ -99,30 +99,76 @@ ParseResult parseBRGemmOffsInvokeF32Op(OpAsmParser &parser,
   ArrayAttr aOffs, bOffs;
   IntegerAttr numBatchesAttr;
   FunctionType funcType;
-  OpAsmParser::OperandType ptr;
-  return failure(
-      parser.parseOperand(ptr) || parser.parseComma() ||
+  OpAsmParser::UnresolvedOperand ptr;
+
+  if (parser.parseOperand(ptr) || parser.parseComma() ||
       parser.parseOperand(c.memref) ||
       parser.parseOperandList(c.indices, OpAsmParser::Delimiter::Square) ||
       parser.parseEqual() || parser.parseOperand(a.memref) ||
       parser.parseOperandList(a.indices, OpAsmParser::Delimiter::Square) ||
       parser.parseComma() || parser.parseOperand(b.memref) ||
-      parser.parseOperandList(b.indices, OpAsmParser::Delimiter::Square) ||
-      parser.parseComma() ||
-      parser.parseAttribute(numBatchesAttr, i64Type, "numBatches",
-                            result.attributes) ||
-      parser.parseComma() ||
+      parser.parseOperandList(b.indices, OpAsmParser::Delimiter::Square))
+    return failure();
+
+  if (parser.parseComma() || parser.parseKeyword("aOffsets") ||
+      parser.parseEqual() ||
       parser.parseAttribute(aOffs, i64Type, "aOffsets", result.attributes) ||
-      parser.parseComma() ||
-      parser.parseAttribute(bOffs, i64Type, "bOffsets", result.attributes) ||
-      parser.parseColonType(funcType) ||
+      parser.parseComma() || parser.parseKeyword("bOffsets") ||
+      parser.parseEqual() ||
+      parser.parseAttribute(aOffs, i64Type, "bOffsets", result.attributes) ||
+      parser.parseComma() || parser.parseKeyword("numBatches") ||
+      parser.parseEqual() ||
+      parser.parseAttribute(numBatchesAttr, i64Type, "numBatches",
+                            result.attributes))
+    return failure();
+
+  if (parser.parseColonType(funcType) ||
       parser.resolveOperand(ptr, i64Type, result.operands) ||
       parser.resolveOperand(c.memref, funcType.getResult(0), result.operands) ||
       parser.resolveOperand(a.memref, funcType.getInput(0), result.operands) ||
       parser.resolveOperand(b.memref, funcType.getInput(1), result.operands) ||
       parser.resolveOperands(c.indices, indexType, result.operands) ||
       parser.resolveOperands(a.indices, indexType, result.operands) ||
-      parser.resolveOperands(b.indices, indexType, result.operands));
+      parser.resolveOperands(b.indices, indexType, result.operands))
+    return failure();
+
+  return success();
+}
+
+BRGemmOffsInvokeF32Op::operand_range BRGemmOffsInvokeF32Op::getOperandsForA() {
+  auto aType = a().getType().cast<MemRefType>();
+  auto cType = c().getType().cast<MemRefType>();
+  return getOperands().slice(4 + cType.getRank(), aType.getRank());
+}
+
+BRGemmOffsInvokeF32Op::operand_range BRGemmOffsInvokeF32Op::getOperandsForB() {
+  auto aType = a().getType().cast<MemRefType>();
+  auto bType = b().getType().cast<MemRefType>();
+  auto cType = c().getType().cast<MemRefType>();
+  return getOperands().slice(4 + cType.getRank() + aType.getRank(),
+                             bType.getRank());
+}
+
+BRGemmOffsInvokeF32Op::operand_range BRGemmOffsInvokeF32Op::getOperandsForC() {
+  auto cType = c().getType().cast<MemRefType>();
+  return getOperands().slice(4, cType.getRank());
+}
+
+void BRGemmOffsInvokeF32Op::print(OpAsmPrinter &p) {
+  auto funcType = FunctionType::get(
+      getContext(), {a().getType(), b().getType()}, {c().getType()});
+  p << ' ' << ptr() << ", ";
+  p << c() << '[';
+  p.printOperands(getOperandsForC());
+  p << "] = " << a() << '[';
+  p.printOperands(getOperandsForA());
+  p << "], " << b() << '[';
+  p.printOperands(getOperandsForB());
+  p << "], "
+    << "aOffsets = " << aOffsets();
+  p << ", bOffsets = " << bOffsets();
+  p << ", numBatches = " << numBatches();
+  p << " : " << funcType;
 }
 
 //
@@ -130,8 +176,8 @@ ParseResult parseBRGemmOffsInvokeF32Op(OpAsmParser &parser,
 //
 
 struct UnaryOperand {
-  OpAsmParser::OperandType memref;
-  SmallVector<OpAsmParser::OperandType, 4> indices;
+  OpAsmParser::UnresolvedOperand memref;
+  SmallVector<OpAsmParser::UnresolvedOperand, 4> indices;
 };
 
 Operation::operand_range UnaryInvokeOp::getOperandsForOutput() {
@@ -145,22 +191,22 @@ Operation::operand_range UnaryInvokeOp::getOperandsForInput() {
   return getOperands().slice(3 + outputType.getRank(), inputType.getRank());
 }
 
-void printUnaryInvokeOp(OpAsmPrinter &p, UnaryInvokeOp op) {
-  auto funcType = FunctionType::get(op.getContext(), {op.input().getType()},
-                                    {op.output().getType()});
-  p << ' ' << op.output() << '[';
-  p.printOperands(op.getOperandsForOutput());
-  p << "] = " << op.ptr() << '(' << op.input() << '[';
-  p.printOperands(op.getOperandsForInput());
+void UnaryInvokeOp::print(OpAsmPrinter &p) {
+  auto funcType = FunctionType::get(getContext(), {input().getType()},
+                                    {output().getType()});
+  p << ' ' << output() << '[';
+  p.printOperands(getOperandsForOutput());
+  p << "] = " << ptr() << '(' << input() << '[';
+  p.printOperands(getOperandsForInput());
   p << "]) : " << funcType;
 }
 
-ParseResult parseUnaryInvokeOp(OpAsmParser &parser, OperationState &result) {
+ParseResult UnaryInvokeOp::parse(OpAsmParser &parser, OperationState &result) {
   auto &builder = parser.getBuilder();
   auto indexType = builder.getIndexType();
   auto i64Type = builder.getIntegerType(64);
   UnaryOperand input, output;
-  OpAsmParser::OperandType ptr;
+  OpAsmParser::UnresolvedOperand ptr;
   FunctionType funcType;
   return failure(
       parser.parseOperand(output.memref) ||
@@ -176,6 +222,67 @@ ParseResult parseUnaryInvokeOp(OpAsmParser &parser, OperationState &result) {
                             result.operands) ||
       parser.resolveOperands(output.indices, indexType, result.operands) ||
       parser.resolveOperands(input.indices, indexType, result.operands));
+}
+
+//
+// ---- BinaryInvokeOp ----
+//
+
+void BinaryInvokeOp::print(OpAsmPrinter &p) {
+  auto funcType =
+      FunctionType::get(getContext(), {input1().getType(), input2().getType()},
+                        {output().getType()});
+  p << ' ' << output() << " = ";
+  p << ptr() << '(';
+  p.printOperands(ValueRange{input1(), input2()});
+  p << ") : " << funcType;
+}
+
+ParseResult BinaryInvokeOp::parse(OpAsmParser &parser, OperationState &result) {
+  assert(0 && "implement me");
+  return failure();
+}
+
+//
+// --- BinaryDispatchOp ---
+//
+
+static std::string stringfy(BinaryKind kind) {
+  switch (kind) {
+  case BinaryKind::NONE:
+    return "none";
+  case BinaryKind::ADD:
+    return "add";
+  case BinaryKind::MUL:
+    return "mul";
+  case BinaryKind::SUB:
+    return "sub";
+  case BinaryKind::DIV:
+    return "div";
+  case BinaryKind::MULADD:
+    return "muladd";
+  case BinaryKind::MATMUL:
+    return "matmul";
+  case BinaryKind::MUL_AND_REDUCE_TO_SCALAR_OP_ADD:
+    return "mul_and_reduce_to_scalar_op_add";
+  case BinaryKind::PACK:
+    return "pack";
+  }
+  llvm_unreachable("kind not right");
+}
+
+//
+// --- BRGemmInvokeF32Op ---
+//
+
+void BRGemmInvokeF32Op::print(OpAsmPrinter &p) {
+  // assert(0 && "implement me");
+}
+
+ParseResult BRGemmInvokeF32Op::parse(OpAsmParser &parser,
+                                     OperationState &result) {
+  assert(0 && "implement me");
+  return failure();
 }
 
 } // namespace pmlc::dialect::xsmm

@@ -12,6 +12,7 @@ pml_cc_library(
     reorder_layouts.cc
     stencil_tpp_unary.cc
     stencil_tpp_binary.cc
+    stencil_split.cc
     trace_linking.cc
     xsmm_lowering.cc
   DEPS
@@ -22,8 +23,9 @@ pml_cc_library(
     pmlc::conversion::pxa_to_affine
     pmlc::conversion::stdx_to_llvm
     pmlc::conversion::tile_to_linalg
-    pmlc::conversion::tile_to_pxa
     pmlc::dialect::layer::transforms
+    pmlc::dialect::linalgx::analysis
+    pmlc::dialect::linalgx::transforms
     pmlc::dialect::linalgx::ir
     pmlc::dialect::pml::transforms
     pmlc::dialect::pxa::analysis
@@ -42,9 +44,10 @@ pml_cc_library(
     MLIRMemRef
     MLIROpenMPToLLVM
     MLIRSCFToOpenMP
-    MLIRSCFToStandard
-    MLIRStandardOpsTransforms
-    MLIRStandardToLLVM
+    MLIRReconcileUnrealizedCasts
+    MLIRArithmeticToLLVM
+    MLIRSCFToControlFlow
+    MLIRMathToLibm
     omp
     xsmm
 )

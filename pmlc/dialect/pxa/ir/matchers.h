@@ -11,7 +11,7 @@ namespace pmlc::dialect::pxa {
 
 template <typename A, typename B>
 struct PxaReduceOpMatcher {
-  PxaReduceOpMatcher(mlir::AtomicRMWKind agg, A aMatcher, B bMatcher)
+  PxaReduceOpMatcher(mlir::arith::AtomicRMWKind agg, A aMatcher, B bMatcher)
       : agg(agg), aMatcher(aMatcher), bMatcher(bMatcher) {}
   bool match(mlir::Operation *op) {
     using mlir::detail::matchOperandOrValueAtIndex;
@@ -20,13 +20,13 @@ struct PxaReduceOpMatcher {
             matchOperandOrValueAtIndex(op, 0, aMatcher) &&
             matchOperandOrValueAtIndex(op, 1, bMatcher));
   }
-  mlir::AtomicRMWKind agg;
+  mlir::arith::AtomicRMWKind agg;
   A aMatcher;
   B bMatcher;
 };
 
 template <typename A, typename B>
-inline auto m_PxaReduceOp(mlir::AtomicRMWKind agg, A aMatcher, B bMatcher) {
+inline auto m_PxaReduceOp(mlir::arith::AtomicRMWKind agg, A aMatcher, B bMatcher) {
   return PxaReduceOpMatcher<A, B>(agg, aMatcher, bMatcher);
 }
 

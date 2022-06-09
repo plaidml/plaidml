@@ -2,8 +2,8 @@
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/IR/AffineValueMap.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Support/DebugStringHelper.h"
 
 #include "pmlc/dialect/pxa/analysis/strides.h"
@@ -86,7 +86,7 @@ struct SubgroupCostModel {
     // Preflight all loads/stores + cache
     bool safe = true;
     op.walk([&](PxaReduceOp red) {
-      if (red.agg() != AtomicRMWKind::addf) {
+      if (red.agg() != arith::AtomicRMWKind::addf) {
         // This isn't really unsafe, but basically this test removes
         // non-contraction like ops from consideration.  Eltwise ops are not
         // good to subgroup due to low computational density (we should
@@ -115,8 +115,7 @@ struct SubgroupCostModel {
     }
   }
 
-  template <typename OpType>
-  bool preflightIO(OpType ioOp) {
+  template <typename OpType> bool preflightIO(OpType ioOp) {
     IVLOG(3, "Preflight: " << debugString(*ioOp.getOperation()));
     if (ioOp.getOperation()->getBlock() != op.getBody()) {
       IVLOG(3, "Not part of block");
@@ -329,8 +328,8 @@ void SubgroupApply(AffineParallelOp op, SubgroupPlan plan) {
 }
 
 struct SubgroupsPass : public SubgroupsBase<SubgroupsPass> {
-  void runOnFunction() final {
-    auto func = getFunction();
+  void runOnOperation() final {
+    auto func = getOperation();
     func.walk([&](AffineParallelOp op) { doSubgroups(op); });
   }
 

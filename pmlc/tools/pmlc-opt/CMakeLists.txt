@@ -8,6 +8,7 @@ pml_cc_binary(
     MLIRParser
     MLIRPass
     MLIRTransformUtils
+    MLIRBufferTransforms
     MLIRSupport
     pmlc::init_passes_and_dialects
     pmlc::util

@@ -1,14 +1,12 @@
 // Copyright 2020, Intel Corporation
 
+#include "mlir/Conversion/ArithmeticToLLVM/ArithmeticToLLVM.h"
+#include "mlir/Conversion/FuncToLLVM/ConvertFuncToLLVM.h"
 #include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
 #include "mlir/Conversion/MathToLLVM/MathToLLVM.h"
 #include "mlir/Conversion/MemRefToLLVM/MemRefToLLVM.h"
-#include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
-#include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
-#include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/Pass/Pass.h"
 
@@ -29,16 +27,17 @@ struct LibMCallLowering : public ConvertOpToLLVMPattern<OpType> {
   using ConvertOpToLLVMPattern<OpType>::ConvertOpToLLVMPattern;
 
   LogicalResult
-  matchAndRewrite(OpType op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
+  matchAndRewrite(OpType op, typename OpType::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
     auto f32Type = rewriter.getF32Type();
     SmallVector<Type, 2> argTypes(getArity(), f32Type);
     auto funcType =
         LLVM::LLVMFunctionType::get(f32Type, argTypes, /*isVarArg=*/false);
     auto attr = rewriter.getStringAttr(getFuncName());
     auto sym = getOrInsertFuncOp(attr, funcType, op, rewriter);
-    rewriter.replaceOpWithNewOp<LLVM::CallOp>(
-        op, ArrayRef<Type>{f32Type}, SymbolRefAttr::get(attr), operands);
+    rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, ArrayRef<Type>{f32Type},
+                                              SymbolRefAttr::get(attr),
+                                              adaptor.getOperands());
     return success();
   }
 
@@ -81,11 +80,6 @@ struct ASinHLowering : public LibMCallLowering<stdx::ASinHOp> {
   std::string getFuncName() const override { return "asinhf"; }
 };
 
-struct ATanLowering : public LibMCallLowering<stdx::ATanOp> {
-  using LibMCallLowering<stdx::ATanOp>::LibMCallLowering;
-  std::string getFuncName() const override { return "atanf"; }
-};
-
 struct ATanHLowering : public LibMCallLowering<stdx::ATanHOp> {
   using LibMCallLowering<stdx::ATanHOp>::LibMCallLowering;
   std::string getFuncName() const override { return "atanhf"; }
@@ -94,22 +88,6 @@ struct ATanHLowering : public LibMCallLowering<stdx::ATanHOp> {
 struct CosHLowering : public LibMCallLowering<stdx::CosHOp> {
   using LibMCallLowering<stdx::CosHOp>::LibMCallLowering;
   std::string getFuncName() const override { return "coshf"; }
-};
-
-struct ErfLowering : public LibMCallLowering<stdx::ErfOp> {
-  using LibMCallLowering<stdx::ErfOp>::LibMCallLowering;
-  std::string getFuncName() const override { return "erff"; }
-};
-
-struct FloorLowering : public LibMCallLowering<stdx::FloorOp> {
-  using LibMCallLowering<stdx::FloorOp>::LibMCallLowering;
-  std::string getFuncName() const override { return "floorf"; }
-};
-
-struct PowLowering : public LibMCallLowering<stdx::PowOp> {
-  using LibMCallLowering<stdx::PowOp>::LibMCallLowering;
-  std::string getFuncName() const override { return "powf"; }
-  size_t getArity() const override { return 2; }
 };
 
 struct RoundLowering : public LibMCallLowering<stdx::RoundOp> {
@@ -166,8 +144,8 @@ struct ReshapeLowering : public ConvertOpToLLVMPattern<stdx::ReshapeOp> {
   using ConvertOpToLLVMPattern<stdx::ReshapeOp>::ConvertOpToLLVMPattern;
 
   LogicalResult
-  matchAndRewrite(stdx::ReshapeOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
+  matchAndRewrite(stdx::ReshapeOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
     MemRefType dstType = op.getResult().getType().cast<MemRefType>();
 
     if (!dstType.hasStaticShape())
@@ -181,7 +159,6 @@ struct ReshapeLowering : public ConvertOpToLLVMPattern<stdx::ReshapeOp> {
         }))
       return failure();
 
-    stdx::ReshapeOpAdaptor adaptor(operands);
     BaseViewConversionHelper baseDesc(rewriter, op->getLoc(), adaptor.tensor());
     BaseViewConversionHelper desc(rewriter, op->getLoc(),
                                   typeConverter->convertType(dstType));
@@ -228,8 +205,8 @@ struct PackLowering : public ConvertOpToLLVMPattern<stdx::PackOp> {
   using ConvertOpToLLVMPattern<stdx::PackOp>::ConvertOpToLLVMPattern;
 
   LogicalResult
-  matchAndRewrite(stdx::PackOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
+  matchAndRewrite(stdx::PackOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
     Location loc = op.getLoc();
     if (op.getNumOperands() == 0) {
       auto nullPtr = rewriter.create<LLVM::NullOp>(loc, getVoidPtrType());
@@ -252,7 +229,7 @@ struct PackLowering : public ConvertOpToLLVMPattern<stdx::PackOp> {
         loc, LLVM::LLVMPointerType::get(structType), rawPtr);
     // Make a value like struct holding all the fields
     Value structVal = rewriter.create<LLVM::UndefOp>(op.getLoc(), structType);
-    for (auto valIdx : llvm::enumerate(operands)) {
+    for (auto valIdx : llvm::enumerate(adaptor.getOperands())) {
       structVal = rewriter.create<LLVM::InsertValueOp>(
           loc, structType, structVal, valIdx.value(),
           rewriter.getI64ArrayAttr(valIdx.index()));
@@ -269,8 +246,8 @@ struct UnpackLowering : public ConvertOpToLLVMPattern<stdx::UnpackOp> {
   using ConvertOpToLLVMPattern<stdx::UnpackOp>::ConvertOpToLLVMPattern;
 
   LogicalResult
-  matchAndRewrite(stdx::UnpackOp op, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
+  matchAndRewrite(stdx::UnpackOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
     if (op.getNumResults() == 0) {
       rewriter.replaceOp(op, {});
       return success();
@@ -280,7 +257,7 @@ struct UnpackLowering : public ConvertOpToLLVMPattern<stdx::UnpackOp> {
     auto structType = getStructType(*typeConverter, op.getResultTypes());
     // Bitcast the input operand
     auto structPtr = rewriter.create<LLVM::BitcastOp>(
-        loc, LLVM::LLVMPointerType::get(structType), operands[0]);
+        loc, LLVM::LLVMPointerType::get(structType), adaptor.getOperands()[0]);
     // Load it
     auto structVal = rewriter.create<LLVM::LoadOp>(loc, structPtr);
     // Extract all the values
@@ -305,11 +282,11 @@ struct LowerToLLVMPass : public LowerToLLVMBase<LowerToLLVMPass> {
     LLVMTypeConverter typeConverter(context);
 
     RewritePatternSet patterns(context);
-    populateLoopToStdConversionPatterns(patterns);
-    populateStdToLLVMConversionPatterns(typeConverter, patterns);
     populateMemRefToLLVMConversionPatterns(typeConverter, patterns);
     populateMathToLLVMConversionPatterns(typeConverter, patterns);
     populateStdXToLLVMConversionPatterns(typeConverter, patterns);
+    populateFuncToLLVMConversionPatterns(typeConverter, patterns);
+    arith::populateArithmeticToLLVMConversionPatterns(typeConverter, patterns);
 
     LLVMConversionTarget target(*context);
     target.addIllegalDialect<stdx::StdXDialect>();
@@ -328,13 +305,9 @@ void populateStdXToLLVMConversionPatterns(LLVMTypeConverter &converter,
                   ACosHLowering,   //
                   ASinLowering,    //
                   ASinHLowering,   //
-                  ATanLowering,    //
                   ATanHLowering,   //
                   CosHLowering,    //
-                  ErfLowering,     //
-                  FloorLowering,   //
                   PackLowering,    //
-                  PowLowering,     //
                   ReshapeLowering, //
                   RoundLowering,   //
                   SinHLowering,    //

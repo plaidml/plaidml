@@ -4,7 +4,7 @@
 
 #include <vector>
 
-#include "mlir/Analysis/AffineStructures.h"
+#include "mlir/Dialect/Affine/Analysis/AffineStructures.h"
 #include "pmlc/util/logging.h"
 
 namespace pmlc::util {

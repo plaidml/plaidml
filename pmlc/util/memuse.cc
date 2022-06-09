@@ -17,10 +17,10 @@ MemUse getMemoryUses(Value def) {
     userMemInterface.getEffectsOnValue(def, userEffects);
     for (auto &userEffectInstance : userEffects) {
       auto *userEffect = userEffectInstance.getEffect();
-      if (userEffect && isa<MemoryEffects::Read>(userEffect)) {
+      if (isa_and_nonnull<MemoryEffects::Read>(userEffect)) {
         useBits |= static_cast<uint64_t>(util::MemUse::read_only);
       }
-      if (userEffect && isa<MemoryEffects::Write>(userEffect)) {
+      if (isa_and_nonnull<MemoryEffects::Write>(userEffect)) {
         useBits |= static_cast<uint64_t>(util::MemUse::write_only);
       }
     }

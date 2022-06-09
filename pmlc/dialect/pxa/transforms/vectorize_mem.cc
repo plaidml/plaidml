@@ -2,16 +2,15 @@
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/IR/AffineValueMap.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
-#include "mlir/Dialect/Vector/VectorOps.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/Support/DebugStringHelper.h"
 #include "pmlc/dialect/pxa/analysis/strides.h"
-#include "pmlc/dialect/pxa/transforms/tile.h"
-
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/dialect/pxa/transforms/pass_detail.h"
+#include "pmlc/dialect/pxa/transforms/tile.h"
 #include "pmlc/dialect/stdx/ir/ops.h"
 #include "pmlc/util/logging.h"
 
@@ -41,7 +40,7 @@ using namespace mlir; // NOLINT[build/namespaces]
 //  %1 = affine.parallel (%arg1) = (0) to (16) step (8) {
 //    %2 = pxa.vector_load %arg0[%arg1, 0] : memref<16x16xf32>, vector<128xf32>
 //    %3 = affine.parallel (%arg2) = (%arg1) to (%arg1 + 8) {
-//      %4 = subi %arg2, %arg1 : index
+//      %4 = arith.subi %arg2, %arg1 : index
 //      %5 = vector.extract_map %2[%4 : 8] : vector<128xf32> to vector<16xf32>
 //      %6 = pxa.reduce assign
 //      affine.yield %6
@@ -61,7 +60,7 @@ using namespace mlir; // NOLINT[build/namespaces]
 //    %2 = memref.alloc() : memref<128xf32>
 //    %3 = affine.parallel (%arg2) = (%arg1) to (%arg1 + 8) {
 //      %4 = pxa.load
-//      %5 = subi %arg2, %arg1 : index
+//      %5 = arith.subi %arg2, %arg1 : index
 //      %6 = vector.insert_map %4, %5, 8 : vector<16xf32> to vector<128xf32>
 //      %7 = pxa.vector_reduce assign %6, %2[%c0_1] : memref<128xf32>,
 //      vector<128xf32> affine.yield %7
@@ -96,8 +95,7 @@ struct VectorizeMemImpl {
   };
 
   // Apply checks for vector ops, qualify those for vectorization
-  template <typename T>
-  LogicalResult checkMemOp(T memOp) {
+  template <typename T> LogicalResult checkMemOp(T memOp) {
     auto defOp = memOp.getMemRef().getDefiningOp();
     // Check if vector_load reads from global memory. Currently it is not
     // allowed to use block ops on in-kernel memory
@@ -112,7 +110,7 @@ struct VectorizeMemImpl {
     if (!maybeSI) {
       return failure();
     }
-    IVLOG(3, "StrideInfo: " << debugString(*maybeSI));
+    // IVLOG(3, "StrideInfo: " << debugString(*maybeSI));
 
     // Check if read op uses parallel op IV for a single dimension
     for (auto ba : loopOp.getIVs()) {
@@ -175,7 +173,7 @@ struct VectorizeMemImpl {
     auto vectorReduceOp =
         dyn_cast_or_null<PxaVectorReduceOp>(memOp.getOperation());
     if (vectorReduceOp &&
-        (vectorReduceOp.getAgg() != AtomicRMWKind::assign ||
+        (vectorReduceOp.getAgg() != arith::AtomicRMWKind::assign ||
          loopOp.results().size() != 1 ||
          (tileSize == loopVectorSize &&
           loopOp->getParentOfType<AffineParallelOp>() &&
@@ -231,7 +229,7 @@ struct VectorizeMemImpl {
     // loop we are extracting from, in case the loop was not tiled.
     // If it was tiled then it will be removed later on.
     OpBuilder builder(loopOp);
-    auto const0 = builder.create<ConstantIndexOp>(loopOp.getLoc(), 0);
+    auto const0 = builder.create<arith::ConstantIndexOp>(loopOp.getLoc(), 0);
 
     // Replace the IV except for the orginal operation that would become
     // vector.extractelement later. In case of no tiling it would be 0,
@@ -276,8 +274,8 @@ struct VectorizeMemImpl {
     builder.setInsertionPoint(vectorLoad);
     Value const1Result;
     if (tileSize != loopVectorSize) {
-      auto const1 =
-          builder.create<SubIOp>(vectorLoad.getLoc(), blockArg, tiledBlockArg);
+      auto const1 = builder.create<arith::SubIOp>(vectorLoad.getLoc(), blockArg,
+                                                  tiledBlockArg);
       const1Result = const1.getResult();
     }
     AffineMap identityMap = AffineMap::getMultiDimIdentityMap(
@@ -309,15 +307,15 @@ struct VectorizeMemImpl {
         MemRefType::get(vectorType.getShape(), vectorType.getElementType());
     auto newAllocOp =
         builder.create<memref::AllocOp>(loopOp.getLoc(), newMemrefType);
-    auto const0 = builder.create<ConstantIndexOp>(loopOp.getLoc(), 0);
+    auto const0 = builder.create<arith::ConstantIndexOp>(loopOp.getLoc(), 0);
     AffineMap identityMap = AffineMap::getMultiDimIdentityMap(
         /*numDims=*/1, vectorReduce.getContext());
 
     builder.setInsertionPoint(vectorReduce);
     Value const1Result;
     if (tileSize != loopVectorSize) {
-      auto const1 = builder.create<SubIOp>(vectorReduce.getLoc(), blockArg,
-                                           tiledBlockArg);
+      auto const1 = builder.create<arith::SubIOp>(vectorReduce.getLoc(),
+                                                  blockArg, tiledBlockArg);
       const1Result = const1.getResult();
     }
 
@@ -337,7 +335,7 @@ struct VectorizeMemImpl {
       }
     }
     auto newReduceOp = builder.create<PxaVectorReduceOp>(
-        vectorReduce.getLoc(), AtomicRMWKind::assign,
+        vectorReduce.getLoc(), arith::AtomicRMWKind::assign,
         newInsertMapOp.getResult(), newAllocOp, identityMap,
         ValueRange{const0.getResult()});
     builder.setInsertionPointAfter(loopOp);
@@ -345,9 +343,9 @@ struct VectorizeMemImpl {
         vectorReduce.getLoc(), vectorType, newAllocOp, identityMap,
         ValueRange{const0.getResult()});
     auto newReduceOuterOp = builder.create<PxaVectorReduceOp>(
-        vectorReduce.getLoc(), AtomicRMWKind::assign, newLoadOp.getResult(),
-        vectorReduce.memref(), vectorReduce.getAffineMap(),
-        vectorReduce.idxs());
+        vectorReduce.getLoc(), arith::AtomicRMWKind::assign,
+        newLoadOp.getResult(), vectorReduce.memref(),
+        vectorReduce.getAffineMap(), vectorReduce.idxs());
     for (auto res : results) {
       res.replaceAllUsesWith(newReduceOuterOp.getResult());
     }
@@ -412,7 +410,7 @@ struct VectorizeMemImpl {
   VectorizeMemOpsPlan memOpsPlan;
 };
 
-void getGlobalMemory(FuncOp f, std::list<Operation *> &globalAllocList) {
+void getGlobalMemory(func::FuncOp f, std::list<Operation *> &globalAllocList) {
   for (auto allocOp : f.getOps<memref::AllocOp>()) {
     globalAllocList.push_back(allocOp.getOperation());
   }
@@ -422,8 +420,8 @@ void getGlobalMemory(FuncOp f, std::list<Operation *> &globalAllocList) {
 }
 
 struct VectorizeMemPass : public VectorizeMemBase<VectorizeMemPass> {
-  void runOnFunction() final {
-    FuncOp f = getFunction();
+  void runOnOperation() final {
+    func::FuncOp f = getOperation();
 
     // Get global memory
     std::list<Operation *> globalAllocList;

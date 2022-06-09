@@ -4,7 +4,6 @@
 #include <string>
 
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Support/DebugStringHelper.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -19,8 +18,7 @@ namespace pmlc::dialect::pxa {
 
 namespace {
 
-template <typename T>
-static void printStrideInfo(T op) {
+template <typename T> static void printStrideInfo(T op) {
   auto info = computeStrideInfo(op);
   llvm::outs() << "strides: ";
   if (!info) {

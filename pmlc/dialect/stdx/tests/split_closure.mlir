@@ -6,7 +6,7 @@ func @main(%arg0: memref<16x16xf32> {stdx.const}, %arg1: memref<16x16xf32> {stdx
     affine.for %arg3 = 0 to 16 {
       %1 = affine.load %arg0[%arg2, %arg3] : memref<16x16xf32>
       %2 = affine.load %arg1[%arg2, %arg3] : memref<16x16xf32>
-      %3 = addf %1, %2 : f32
+      %3 = arith.addf %1, %2 : f32
       affine.store %3, %0[%arg2, %arg3] : memref<16x16xf32>
     }
   }
@@ -16,7 +16,7 @@ func @main(%arg0: memref<16x16xf32> {stdx.const}, %arg1: memref<16x16xf32> {stdx
       affine.for %arg5 = 0 to 16 {
         %1 = affine.load %arg2[%arg4, %arg5] : memref<16x16xf32>
         %2 = affine.load %0[%arg4, %arg5] : memref<16x16xf32>
-        %3 = addf %1, %2 : f32
+        %3 = arith.addf %1, %2 : f32
         affine.store %3, %arg3[%arg4, %arg5] : memref<16x16xf32>
       }
     }
@@ -64,7 +64,7 @@ func @main(%arg0: memref<16x16xf32> {stdx.const}, %arg1: memref<16x16xf32> {stdx
       affine.for %arg5 = 0 to 16 {
         %1 = affine.load %arg0[%arg4, %arg5] : memref<16x16xf32>
         %2 = affine.load %arg1[%arg4, %arg5] : memref<16x16xf32>
-        %3 = addf %1, %2 : f32
+        %3 = arith.addf %1, %2 : f32
         affine.store %3, %arg2[%arg4, %arg5] : memref<16x16xf32>
       }
     }
@@ -129,7 +129,7 @@ func @main(%arg0: memref<1x3xi32> {stdx.const}) {
 func private @print(index)
 
 func @main() {
-  %c3 = constant 3 : index
+  %c3 = arith.constant 3 : index
   stdx.closure() {
     call @print(%c3) : (index) -> ()
     stdx.yield
@@ -138,13 +138,13 @@ func @main() {
 }
 
 // CHECK: func @init() -> tuple<> {
-// CHECK:   %c3 = constant 3 : index
+// CHECK:   %c3 = arith.constant 3 : index
 // CHECK:   %0 = stdx.pack() : () -> tuple<>
 // CHECK:   return %0 : tuple<>
 
 // CHECK: func @main(%[[main_arg0:.*]]: tuple<>) {
 // CHECK:   stdx.unpack(%[[main_arg0]]) : (tuple<>) -> ()
-// CHECK:   %c3 = constant 3 : index
+// CHECK:   %c3 = arith.constant 3 : index
 // CHECK:   call @print(%c3) : (index) -> ()
 // CHECK:   return
 

@@ -1,9 +1,9 @@
 // Copyright 2020 Intel Corporation
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/DebugStringHelper.h"
-
 #include "pmlc/dialect/pxa/ir/matchers.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/dialect/pxa/transforms/autotile.h"
@@ -40,25 +40,12 @@ struct GemmOperand {
   }
 };
 
-double getStride(ArrayRef<int64_t> tileSizes, int tiledIdxCount,
-                 DenseMap<mlir::BlockArgument, int64_t> strides,
-                 SmallVector<mlir::BlockArgument, 8> indexes) {
-  for (size_t j = 0; j < tiledIdxCount; j++) {
-    for (const auto &kvp : strides) {
-      if (indexes[j] == kvp.first) {
-        return static_cast<double>(kvp.second);
-      }
-    }
-  }
-  return 0.0;
-}
-
 bool isLocallyDefined(AffineParallelOp op, Value source) {
   if (!source.isa<BlockArgument>()) {
     // If the definition of load's source is in "op", it is too complex to
     // stencil
     auto defOp = source.getDefiningOp();
-    while (!isa<FuncOp>(defOp)) {
+    while (!isa<func::FuncOp>(defOp)) {
       if (defOp == op.getOperation())
         return true;
       defOp = defOp->getParentOp();
@@ -80,7 +67,7 @@ private:
 
     auto pattern = m_Op<AffineYieldOp>(m_Capture(
         &reduce, pxa::m_PxaReduceOp(
-                     AtomicRMWKind::assign,
+                     arith::AtomicRMWKind::assign,
                      m_Op<OpTy>(m_Capture(&load1, m_Op<pxa::PxaLoadOp>()),
                                 m_Capture(&load2, m_Op<pxa::PxaLoadOp>())),
                      m_Any())));
@@ -105,16 +92,16 @@ private:
   Optional<pxa::StencilCapture> capture() {
     Optional<pxa::StencilCapture> ret;
 
-    maybeCaptureGeneric<AddFOp>(ret, "tpp_add");
-    maybeCaptureGeneric<MulFOp>(ret, "tpp_mul");
-    maybeCaptureGeneric<SubFOp>(ret, "tpp_sub");
-    maybeCaptureGeneric<DivFOp>(ret, "tpp_div");
+    maybeCaptureGeneric<arith::AddFOp>(ret, "tpp_add");
+    maybeCaptureGeneric<arith::MulFOp>(ret, "tpp_mul");
+    maybeCaptureGeneric<arith::SubFOp>(ret, "tpp_sub");
+    maybeCaptureGeneric<arith::DivFOp>(ret, "tpp_div");
 
     return ret;
   }
 
-  double getCost(const pxa::StencilOption &stencil,
-                 ArrayRef<int64_t> tileSizes) {
+  std::pair<double, double> getCost(const pxa::StencilOption &stencil,
+                                    ArrayRef<int64_t> tileSizes) {
     int64_t tiledIdxCount = getTiledIdxCount();
     double inputStride1 =
         getStride(tileSizes, tiledIdxCount,
@@ -126,7 +113,7 @@ private:
         getStride(tileSizes, tiledIdxCount,
                   stencil.values[0].strideInfo.strides, stencil.indexes);
 
-    return (inputStride1 + inputStride2 + outputStride);
+    return std::make_pair((inputStride1 + inputStride2 + outputStride), 0.0);
   }
 
   void transform(const pxa::StencilOption &stencil,
@@ -226,8 +213,8 @@ public:
 
 struct StencilTppBinaryPass
     : public StencilTppBinaryBase<StencilTppBinaryPass> {
-  void runOnFunction() final {
-    getFunction().walk([](AffineParallelOp op) {
+  void runOnOperation() final {
+    getOperation().walk([](AffineParallelOp op) {
       if (op.getIVs().size() >= 2) {
         StencilImpl stencil(op);
         stencil.performStenciling();

@@ -28,14 +28,18 @@ static void fillStructuredOpRegion(
 
   // TODO: atm all operands go through getElementTypeOrSelf,
   // reconsider when we have evidence we need to.
+  // TODO: find a way to pass proper location.
   SmallVector<Type, 8> argTypes;
+  SmallVector<Location> locations;
   for (auto containers : {inputTypes, outputTypes})
-    for (auto t : containers)
+    for (auto t : containers) {
       argTypes.push_back(getElementTypeOrSelf(t));
+      locations.push_back(opBuilder.getUnknownLoc());
+    }
 
   // RAII.
   OpBuilder::InsertionGuard guard(opBuilder);
-  Block *body = opBuilder.createBlock(&region, /*insertPt=*/{}, argTypes);
+  Block *body = opBuilder.createBlock(&region, /*insertPt=*/{}, argTypes, locations);
   unsigned actual = body->getNumArguments();
   unsigned expected = NamedStructuredOpType::getNumRegionArgs();
   if (expected != actual) {
@@ -90,7 +94,7 @@ ArrayAttr CopyOp::iterator_types() {
           SmallVector<StringRef, 8>(numLoops, getParallelIteratorTypeName()));
 }
 
-void CopyOp::regionBuilder(ImplicitLocOpBuilder &b, Block &block) {
+void CopyOp::regionBuilder(ImplicitLocOpBuilder &b, Block &block, llvm::ArrayRef<NamedAttribute> attrs = {}) {
   assert(block.getNumArguments() == 2 && "CopyOp regionBuilder expects 2 args");
   b.create<linalg::YieldOp>(block.getArgument(0));
 }
@@ -106,34 +110,34 @@ ParseResult parseCopyOpRegion(OpAsmParser &parser, Region &region,
 /// CopyOp region is elided when printing.
 void printCopyOpRegion(OpAsmPrinter &, Operation *, Region &, Type, Type) {}
 
-static LogicalResult verifyCopyOp(CopyOp op) {
-  OpOperand *output = op.getOutputOperand(0);
-  OpOperand *input = op.getInputOperand(0);
+LogicalResult CopyOp::verify() {
+  OpOperand *output = getOutputOperand(0);
+  OpOperand *input = getInputOperand(0);
   if (getElementTypeOrSelf(input->get()) != getElementTypeOrSelf(output->get()))
-    return op.emitOpError("expects views of the same element type");
+    return emitOpError("expects views of the same element type");
   // if (op.getRank(input) != op.getRank(output))
   //   return op.emitOpError("expects views of the same rank");
-  auto rank = op.getNumParallelLoops();
-  auto inputMap = op.inputMap();
-  if (inputMap) {
-    if (inputMap->getNumInputs() != rank)
-      return op.emitOpError("expects optional input_map of rank ") << rank;
+  auto rank = getNumParallelLoops();
+  auto inMap = inputMap();
+  if (inMap) {
+    if (inMap->getNumInputs() != rank)
+      return emitOpError("expects optional input_map of rank ") << rank;
     // if (!inputMap->isPermutation())
     //   return op.emitOpError(
     //       "expects optional input_map to be a permutation");
   }
-  auto outputMap = op.outputMap();
-  if (outputMap) {
-    if (outputMap->getNumInputs() != rank)
-      return op.emitOpError("expects optional output_map of rank ") << rank;
+  auto outMap = outputMap();
+  if (outMap) {
+    if (outMap->getNumInputs() != rank)
+      return emitOpError("expects optional output_map of rank ") << rank;
     // if (!outputMap->isPermutation())
     //   return op.emitOpError(
     //       "expects optional output_map to be a permutation");
   }
-  if (rank == 0 && inputMap)
-    return op.emitOpError("expected no input map when rank == 0");
-  if (rank == 0 && outputMap)
-    return op.emitOpError("expected no output map when rank == 0");
+  if (rank == 0 && inMap)
+    return emitOpError("expected no input map when rank == 0");
+  if (rank == 0 && outMap)
+    return emitOpError("expected no output map when rank == 0");
   return success();
 }
 

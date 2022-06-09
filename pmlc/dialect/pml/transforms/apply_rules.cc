@@ -1,7 +1,7 @@
 // Copyright 2021 Intel Corporation
 
 #include "pmlc/dialect/pml/transforms/pass_detail.h"
-
+#include "mlir/IR/BuiltinOps.h"
 #include "pmlc/dialect/pml/ir/dialect.h"
 
 using namespace mlir; // NOLINT
@@ -23,8 +23,8 @@ struct ApplyRulesPass : public ApplyRulesBase<ApplyRulesPass> {
 
     ArrayAttr rules;
     for (NamedAttribute attr : source->getDialectAttrs()) {
-      if (attr.first.strref() == "pml.rules") {
-        rules = attr.second.dyn_cast_or_null<ArrayAttr>();
+      if (attr.getName().strref() == "pml.rules") {
+        rules = attr.getValue().dyn_cast_or_null<ArrayAttr>();
         break;
       }
     }
@@ -51,12 +51,12 @@ struct ApplyRulesPass : public ApplyRulesBase<ApplyRulesPass> {
 
       DictionaryAttr opAttrs = op->getAttrDictionary();
       for (NamedAttribute kvp : pattern.getDict()) {
-        if (opAttrs.get(kvp.first) != kvp.second)
+        if (opAttrs.get(kvp.getName()) != kvp.getValue())
           return;
       }
 
       for (NamedAttribute kvp : apply.getDict()) {
-        op->setAttr(kvp.first, kvp.second);
+        op->setAttr(kvp.getName(), kvp.getValue());
       }
     });
   }

@@ -32,11 +32,11 @@ pml_cc_library(
     pmlc::conversion::pxa_to_affine
     pmlc::conversion::stdx_to_llvm
     pmlc::conversion::tile_to_linalg
-    pmlc::conversion::tile_to_pxa
     pmlc::dialect::affinex::transforms
     pmlc::dialect::layer::ir
     pmlc::dialect::layer::transforms
     pmlc::dialect::linalgx::ir
+    pmlc::dialect::linalgx::transforms
     pmlc::dialect::pml::ir
     pmlc::dialect::pml::transforms
     pmlc::dialect::pxa::ir

@@ -1,43 +1,59 @@
 // RUN: pmlc-opt %s \
 // RUN:     -convert-linalg-to-loops \
-// RUN:     -x86-convert-pxa-to-affine \
-// RUN:     -lower-affine \
-// RUN:     -canonicalize \
-// RUN:     -convert-scf-to-std \
-// RUN:     -x86-convert-std-to-llvm \
+// RUN:     -x86-convert-pxa-to-affine -canonicalize \
+// RUN:     -lower-affine -canonicalize \
+// RUN:     -convert-scf-to-openmp -canonicalize \
+// RUN:     -convert-arith-to-llvm -canonicalize \
+// RUN:     -convert-scf-to-cf -canonicalize \
+// RUN:     -convert-memref-to-llvm -canonicalize \
+// RUN:     -convert-openmp-to-llvm -canonicalize \
+// RUN:     -x86-convert-std-to-llvm -canonicalize \
+// RUN:     -reconcile-unrealized-casts \  
 // RUN:   | pmlc-jit -e baseline | FileCheck %s
 // RUN: pmlc-opt %s \
 // RUN:     -convert-linalg-to-loops \
-// RUN:     -x86-convert-pxa-to-affine \
-// RUN:     -lower-affine \
-// RUN:     -canonicalize \
-// RUN:     -convert-scf-to-std \
-// RUN:     -x86-convert-std-to-llvm \
+// RUN:     -x86-convert-pxa-to-affine -canonicalize \
+// RUN:     -lower-affine -canonicalize \
+// RUN:     -convert-scf-to-openmp -canonicalize \
+// RUN:     -convert-arith-to-llvm -canonicalize \
+// RUN:     -convert-scf-to-cf -canonicalize \
+// RUN:     -convert-memref-to-llvm -canonicalize \
+// RUN:     -convert-openmp-to-llvm -canonicalize \
+// RUN:     -x86-convert-std-to-llvm -canonicalize \
+// RUN:     -reconcile-unrealized-casts \ 
 // RUN:   | pmlc-jit -e tiled | FileCheck %s
 // RUN: pmlc-opt %s \
 // RUN:     -convert-linalg-to-loops \
-// RUN:     -x86-convert-pxa-to-affine \
-// RUN:     -lower-affine \
-// RUN:     -canonicalize \
-// RUN:     -convert-scf-to-std \
-// RUN:     -x86-convert-std-to-llvm \
+// RUN:     -x86-convert-pxa-to-affine -canonicalize \
+// RUN:     -lower-affine -canonicalize \
+// RUN:     -convert-scf-to-openmp -canonicalize \
+// RUN:     -convert-arith-to-llvm -canonicalize \
+// RUN:     -convert-scf-to-cf -canonicalize \
+// RUN:     -convert-memref-to-llvm -canonicalize \
+// RUN:     -convert-openmp-to-llvm -canonicalize \
+// RUN:     -x86-convert-std-to-llvm -canonicalize \
+// RUN:     -reconcile-unrealized-casts \ 
 // RUN:   | pmlc-jit -e xsmm | FileCheck %s
 // RUN: pmlc-opt %s \
 // RUN:     -convert-linalg-to-loops \
-// RUN:     -x86-convert-pxa-to-affine \
-// RUN:     -lower-affine \
-// RUN:     -canonicalize \
-// RUN:     -convert-scf-to-std \
-// RUN:     -x86-convert-std-to-llvm \
+// RUN:     -x86-convert-pxa-to-affine -canonicalize \
+// RUN:     -lower-affine -canonicalize \
+// RUN:     -convert-scf-to-openmp -canonicalize \
+// RUN:     -convert-arith-to-llvm -canonicalize \
+// RUN:     -convert-scf-to-cf -canonicalize \
+// RUN:     -convert-memref-to-llvm -canonicalize \
+// RUN:     -convert-openmp-to-llvm -canonicalize \
+// RUN:     -x86-convert-std-to-llvm -canonicalize \
+// RUN:     -reconcile-unrealized-casts \ 
 // RUN:   | pmlc-jit -e xsmm_brgemm_offs | FileCheck %s
 
 !I_memref = type memref<1x6x5x7xf32>
 !K_memref = type memref<1x1x7x11xf32>
 !O_memref = type memref<1x6x5x11xf32>
 
-func private @print_memref_f32(memref<*xf32>)
+func private @printMemrefF32(memref<*xf32>) attributes {llvm.emit_c_interface}
 
-func @baseline() {
+func @baseline() attributes {llvm.emit_c_interface} {
   %dot = constant @dot : (memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()
   call @test_dot(%dot) : ((memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()) -> ()
 
@@ -47,7 +63,7 @@ func @baseline() {
   return
 }
 
-func @tiled() {
+func @tiled() attributes {llvm.emit_c_interface} {
   %dot = constant @dot_tiled : (memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()
   call @test_dot(%dot) : ((memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()) -> ()
 
@@ -57,7 +73,7 @@ func @tiled() {
   return
 }
 
-func @xsmm() {
+func @xsmm() attributes {llvm.emit_c_interface} {
   %dot = constant @dot : (memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()
   call @test_dot(%dot) : ((memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()) -> ()
 
@@ -67,7 +83,7 @@ func @xsmm() {
   return
 }
 
-func @xsmm_brgemm_offs() {
+func @xsmm_brgemm_offs() attributes {llvm.emit_c_interface} {
   %dot = constant @dot : (memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()
   call @test_dot(%dot) : ((memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()) -> ()
 
@@ -78,33 +94,33 @@ func @xsmm_brgemm_offs() {
 }
 
 func @fill_2d(%buf : memref<?x?xf32>, %alt : i1) {
-  %c0 = constant 0 : index
-  %c1 = constant 1 : index
-  %c5 = constant 5 : index
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c5 = arith.constant 5 : index
   %X = memref.dim %buf, %c0 : memref<?x?xf32>
   %Y = memref.dim %buf, %c1 : memref<?x?xf32>
   affine.parallel (%x, %y) = (0, 0) to (%X, %Y) {
     // i = linear offset
     %i = affine.apply affine_map<(x, y)[Y] -> (x * Y + y)>(%x, %y)[%Y]
     // t = alt ? i : 0
-    %t = select %alt, %i, %c0 : index
+    %t = arith.select %alt, %i, %c0 : index
     // v = x + y + t - 5
-    %1 = addi %x, %y : index
-    %2 = addi %1, %t : index
-    %v = subi %2, %c5 : index
-    %v_i64 = index_cast %v : index to i64
-    %v_f32 = sitofp %v_i64 : i64 to f32
+    %1 = arith.addi %x, %y : index
+    %2 = arith.addi %1, %t : index
+    %v = arith.subi %2, %c5 : index
+    %v_i64 = arith.index_cast %v : index to i64
+    %v_f32 = arith.sitofp %v_i64 : i64 to f32
     memref.store %v_f32, %buf[%x, %y] : memref<?x?xf32>
   }
   return
 }
 
 func @fill_4d(%buf : memref<?x?x?x?xf32>, %alt : i1) {
-  %c0 = constant 0 : index
-  %c1 = constant 1 : index
-  %c2 = constant 2 : index
-  %c3 = constant 3 : index
-  %c5 = constant 5 : index
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c2 = arith.constant 2 : index
+  %c3 = arith.constant 3 : index
+  %c5 = arith.constant 5 : index
   %X = memref.dim %buf, %c0 : memref<?x?x?x?xf32>
   %Y = memref.dim %buf, %c1 : memref<?x?x?x?xf32>
   %Z = memref.dim %buf, %c2 : memref<?x?x?x?xf32>
@@ -113,22 +129,22 @@ func @fill_4d(%buf : memref<?x?x?x?xf32>, %alt : i1) {
     // i = linear offset
     %i = affine.apply affine_map<(x, y, z, w)[Y, Z, W] -> (x * Y + y * W + z * W + w)>(%x, %y, %z, %w)[%Y, %Z, %W]
     // t = alt ? i : 0
-    %t = select %alt, %i, %c0 : index
+    %t = arith.select %alt, %i, %c0 : index
     %j = affine.apply affine_map<(x, y, z, w) -> (x + y + z + w)>(%x, %y, %z, %w)
     // v = j + t - 5
-    %2 = addi %j, %t : index
-    %v = subi %2, %c5 : index
-    %v_i64 = index_cast %v : index to i64
-    %v_f32 = sitofp %v_i64 : i64 to f32
+    %2 = arith.addi %j, %t : index
+    %v = arith.subi %2, %c5 : index
+    %v_i64 = arith.index_cast %v : index to i64
+    %v_f32 = arith.sitofp %v_i64 : i64 to f32
     memref.store %v_f32, %buf[%x, %y, %z, %w] : memref<?x?x?x?xf32>
   }
   return
 }
 
 func @test_dot(%impl : (memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()) {
-  %false = constant 0 : i1
-  %true = constant 1 : i1
-  %f0 = constant 0.0 : f32
+  %false = arith.constant 0 : i1
+  %true = arith.constant 1 : i1
+  %f0 = arith.constant 0.0 : f32
   %A = memref.alloc() : memref<8x8xf32>
   %A_2d = memref.cast %A : memref<8x8xf32> to memref<?x?xf32>
   %A_ud = memref.cast %A : memref<8x8xf32> to memref<*xf32>
@@ -141,9 +157,9 @@ func @test_dot(%impl : (memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()
   %C_2d = memref.cast %C : memref<8x8xf32> to memref<?x?xf32>
   %C_ud = memref.cast %C : memref<8x8xf32> to memref<*xf32>
 
-  linalg.fill(%f0, %C) : f32, memref<8x8xf32>
+  linalg.fill ins(%f0 : f32) outs(%C : memref<8x8xf32>)
   call_indirect %impl(%A_2d, %B_2d, %C_2d) : (memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()
-  call @print_memref_f32(%C_ud) : (memref<*xf32>) -> ()
+  call @printMemrefF32(%C_ud) : (memref<*xf32>) -> ()
   // CHECK:  [60,   36,   12,   -12,   -36,   -60,   -84,   -108],
   // CHECK:  [272,   264,   256,   248,   240,   232,   224,   216],
   // CHECK:  [484,   492,   500,   508,   516,   524,   532,   540],
@@ -160,23 +176,23 @@ func @test_dot(%impl : (memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>) -> ()
 }
 
 func @dot(%A: memref<?x?xf32>, %B: memref<?x?xf32>, %C: memref<?x?xf32>) {
-  %c0 = constant 0 : index
-  %c1 = constant 1 : index
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
   %M = memref.dim %C, %c0 : memref<?x?xf32>
   %N = memref.dim %C, %c1 : memref<?x?xf32>
   %K = memref.dim %A, %c1 : memref<?x?xf32>
   affine.parallel (%i, %j, %k) = (0, 0, 0) to (%M, %N, %K) {
     %0 = affine.load %A[%i, %k] : memref<?x?xf32>
     %1 = affine.load %B[%k, %j] : memref<?x?xf32>
-    %2 = mulf %0, %1 : f32
+    %2 = arith.mulf %0, %1 : f32
     pxa.reduce addf %2, %C[%i, %j] : memref<?x?xf32>
   }
   return
 }
 
 func @dot_tiled(%A: memref<?x?xf32>, %B: memref<?x?xf32>, %C: memref<?x?xf32>) {
-  %c0 = constant 1 : index
-  %c1 = constant 1 : index
+  %c0 = arith.constant 1 : index
+  %c1 = arith.constant 1 : index
   %M = memref.dim %C, %c0 : memref<?x?xf32>
   %N = memref.dim %C, %c1 : memref<?x?xf32>
   %K = memref.dim %A, %c1 : memref<?x?xf32>
@@ -184,7 +200,7 @@ func @dot_tiled(%A: memref<?x?xf32>, %B: memref<?x?xf32>, %C: memref<?x?xf32>) {
     affine.parallel (%i1, %j1, %k1) = (%i0, %j0, %k0) to (%i0 + 2, %j0 + 2, %k0 + 2) {
       %0 = affine.load %A[%i1, %k1] : memref<?x?xf32>
       %1 = affine.load %B[%k1, %j1] : memref<?x?xf32>
-      %2 = mulf %0, %1 : f32
+      %2 = arith.mulf %0, %1 : f32
       pxa.reduce addf %2, %C[%i1, %j1] : memref<?x?xf32>
     }
   }
@@ -192,9 +208,9 @@ func @dot_tiled(%A: memref<?x?xf32>, %B: memref<?x?xf32>, %C: memref<?x?xf32>) {
 }
 
 func @test_conv2(%impl : (!I_memref, !K_memref, !O_memref) -> ()) {
-  %false = constant 0 : i1
-  %true = constant 1 : i1
-  %f0 = constant 0.0 : f32
+  %false = arith.constant 0 : i1
+  %true = arith.constant 1 : i1
+  %f0 = arith.constant 0.0 : f32
   %I = memref.alloc() : !I_memref
   %I_2d = memref.cast %I : !I_memref to memref<?x?x?x?xf32>
   %I_ud = memref.cast %I : !I_memref to memref<*xf32>
@@ -207,9 +223,9 @@ func @test_conv2(%impl : (!I_memref, !K_memref, !O_memref) -> ()) {
   %O_2d = memref.cast %O : !O_memref to memref<?x?x?x?xf32>
   %O_ud = memref.cast %O : !O_memref to memref<*xf32>
 
-  linalg.fill(%f0, %O) : f32, !O_memref
+  linalg.fill ins(%f0 : f32) outs(%O : !O_memref)
   call_indirect %impl(%I, %K, %O) : (!I_memref, !K_memref, !O_memref) -> ()
-  call @print_memref_f32(%O_ud) : (memref<*xf32>) -> ()
+  call @printMemrefF32(%O_ud) : (memref<*xf32>) -> ()
   // CHECK: [-98,     -126,     -154,     -182,     -210,     -238,     -266,     -294,     -322,     -350,     -378],
   // CHECK: [119,     105,     91,     77,     63,     49,     35,     21,     7,     -7,     -21],
   // CHECK: [336,     336,     336,     336,     336,     336,     336,     336,     336,     336,     336],
@@ -248,9 +264,9 @@ func @test_conv2(%impl : (!I_memref, !K_memref, !O_memref) -> ()) {
 }
 
 func @conv2(%I: !I_memref, %K: !K_memref, %O: !O_memref) {
-  %c1 = constant 1 : index
-  %c2 = constant 2 : index
-  %c3 = constant 3 : index
+  %c1 = arith.constant 1 : index
+  %c2 = arith.constant 2 : index
+  %c3 = arith.constant 3 : index
   %X = memref.dim %I, %c1 : !I_memref
   %Y = memref.dim %I, %c2 : !I_memref
   %CI = memref.dim %I, %c3 : !I_memref
@@ -258,16 +274,16 @@ func @conv2(%I: !I_memref, %K: !K_memref, %O: !O_memref) {
   affine.parallel (%x, %y, %ci, %co) = (0, 0, 0, 0) to (%X, %Y, %CI, %CO) {
     %0 = affine.load %I[0, %x, %y, %ci] : !I_memref
     %1 = affine.load %K[0, 0, %ci, %co] : !K_memref
-    %2 = mulf %0, %1 : f32
+    %2 = arith.mulf %0, %1 : f32
     pxa.reduce addf %2, %O[0, %x, %y, %co] : !O_memref
   }
   return
 }
 
 func @conv2_tiled(%I: !I_memref, %K: !K_memref, %O: !O_memref) {
-  %c1 = constant 1 : index
-  %c2 = constant 2 : index
-  %c3 = constant 3 : index
+  %c1 = arith.constant 1 : index
+  %c2 = arith.constant 2 : index
+  %c3 = arith.constant 3 : index
   %X = memref.dim %I, %c1 : !I_memref
   %Y = memref.dim %I, %c2 : !I_memref
   %CI = memref.dim %I, %c3 : !I_memref
@@ -276,7 +292,7 @@ func @conv2_tiled(%I: !I_memref, %K: !K_memref, %O: !O_memref) {
     affine.parallel (%x1, %ci, %co) = (%x0, 0, 0) to (%x0 + 2, %CI, %CO) {
       %0 = affine.load %I[0, %x1, %y, %ci] : !I_memref
       %1 = affine.load %K[0, 0, %ci, %co] : !K_memref
-      %2 = mulf %0, %1 : f32
+      %2 = arith.mulf %0, %1 : f32
       pxa.reduce addf %2, %O[0, %x1, %y, %co] : !O_memref
     }
   }
@@ -284,10 +300,10 @@ func @conv2_tiled(%I: !I_memref, %K: !K_memref, %O: !O_memref) {
 }
 
 func @conv2_xsmm(%I: !I_memref, %K: !K_memref, %O: !O_memref) {
-  %c0 = constant 0 : index
-  %c1 = constant 1 : index
-  %c2 = constant 2 : index
-  %c3 = constant 3 : index
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c2 = arith.constant 2 : index
+  %c3 = arith.constant 3 : index
   %X = memref.dim %I, %c1 : !I_memref
   %Y = memref.dim %I, %c2 : !I_memref
   %CI = memref.dim %I, %c3 : !I_memref
@@ -301,19 +317,18 @@ func @conv2_xsmm(%I: !I_memref, %K: !K_memref, %O: !O_memref) {
 }
 
 func @conv2_xsmm_brgemm_offs(%I: !I_memref, %K: !K_memref, %O: !O_memref) {
-  %c0 = constant 0 : index
-  %c1 = constant 1 : index
-  %c2 = constant 2 : index
-  %c3 = constant 3 : index
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c2 = arith.constant 2 : index
+  %c3 = arith.constant 3 : index
   %X = memref.dim %I, %c1 : !I_memref
   %Y = memref.dim %I, %c2 : !I_memref
   %CI = memref.dim %I, %c3 : !I_memref
   %CO = memref.dim %O, %c3 : !O_memref
   %ptr = xsmm.brgemm.offs.dispatch.f32 [2, 11, 1], [35, 11, 55]
   affine.parallel (%x, %y) = (0, 0) to (%X, %Y) step (2, 1) {
-    xsmm.brgemm.offs.invoke.f32 %ptr, %O[%c0, %x, %y, %c0] = %I[%c0, %x, %y, %c0], %K[%c0, %c0, %c0, %c0], 7,
-      [0,  4,  8,  12,  16,  20,  24],
-      [0, 44, 88, 132, 176, 220, 264] : (!I_memref, !K_memref) -> !O_memref
+    xsmm.brgemm.offs.invoke.f32 %ptr, %O[%c0, %x, %y, %c0] = %I[%c0, %x, %y, %c0], %K[%c0, %c0, %c0, %c0],    aOffsets = [0,  4,  8,  12,  16,  20,  24],
+     bOffsets = [0, 44, 88, 132, 176, 220, 264], numBatches = 7 : (!I_memref, !K_memref) -> !O_memref
   }
   return
 }

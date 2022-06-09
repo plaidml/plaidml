@@ -1,5 +1,7 @@
 // Copyright 2019, Intel Corporation
 
+#include <limits>
+
 #include "pmlc/util/util.h"
 
 #include "mlir/IR/BuiltinOps.h"
@@ -79,7 +81,8 @@ void wrapFunctionAndPackArguments(llvm::Module *module, StringRef funcName,
   for (auto &indexedArg : llvm::enumerate(func->args())) {
     llvm::Value *argIndex = llvm::Constant::getIntegerValue(
         builder.getInt64Ty(), APInt(64, indexedArg.index()));
-    llvm::Value *argPtrPtr = builder.CreateGEP(argList, argIndex);
+    llvm::Value *argPtrPtr =
+        builder.CreateGEP(builder.getInt8PtrTy(), argList, argIndex);
     llvm::Value *argPtr = builder.CreateLoad(builder.getInt8PtrTy(), argPtrPtr);
     llvm::Type *dstType = indexedArg.value().getType();
     llvm::Value *arg = dstType->isIntegerTy()
@@ -109,6 +112,13 @@ void splitAffineMaps(AffineMap from, SmallVectorImpl<AffineMap> &into) {
     into.push_back(
         AffineMap::get(from.getNumDims(), from.getNumSymbols(), expr));
   }
+}
+
+unsigned dimPosition(AffineExpr expr) {
+  if (auto dimExpr = expr.dyn_cast<AffineDimExpr>()) {
+    return dimExpr.getPosition();
+  }
+  return std::numeric_limits<unsigned>::max();
 }
 
 } // namespace pmlc::util

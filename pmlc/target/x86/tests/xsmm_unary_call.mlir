@@ -1,40 +1,47 @@
 // RUN: pmlc-opt %s \
 // RUN:     -x86-convert-pxa-to-affine \
 // RUN:     -lower-affine \
+// RUN:     -convert-scf-to-openmp \
+// RUN:     -convert-arith-to-llvm \ 
+// RUN:     -convert-memref-to-llvm \ 
+// RUN:     -convert-openmp-to-llvm \
 // RUN:     -canonicalize \
-// RUN:     -convert-scf-to-std \
-// RUN:     -x86-convert-std-to-llvm \
+// RUN:     -x86-convert-std-to-llvm \ 
+// RUN:     -canonicalize -reconcile-unrealized-casts \
 // RUN:   | pmlc-jit | FileCheck %s
 
 !eltwise = type memref<8x3xf32>
 
-func private @print_memref_f32(memref<*xf32>)
+func private @printMemrefF32(memref<*xf32>) attributes { llvm.emit_c_interface }
 
-func @fill_2d(%buf : memref<?x?xf32>, %alt : i1) {
-  %c0 = constant 0 : index
-  %c1 = constant 1 : index
-  %c5 = constant 5 : index
-  %X = memref.dim %buf, %c0 : memref<?x?xf32>
-  %Y = memref.dim %buf, %c1 : memref<?x?xf32>
-  affine.parallel (%x, %y) = (0, 0) to (%X, %Y) {
-    // i = linear offset
-    %i = affine.apply affine_map<(x, y)[Y] -> (x * Y + y)>(%x, %y)[%Y]
-    // t = alt ? i : 0
-    %t = select %alt, %i, %c0 : index
-    // v = x + y + t - 5
-    %1 = addi %x, %y : index
-    %2 = addi %1, %t : index
-    %v = subi %2, %c5 : index
-    %v_i64 = index_cast %v : index to i64
-    %v_f32 = sitofp %v_i64 : i64 to f32
-    memref.store %v_f32, %buf[%x, %y] : memref<?x?xf32>
-  }
-  return
+func @fill_2d(%arg0: memref<?x?xf32>, %arg1: i1) {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    %c5 = arith.constant 5 : index
+    %0 = memref.dim %arg0, %c0 : memref<?x?xf32>
+    %1 = memref.dim %arg0, %c1 : memref<?x?xf32>
+    %c0_0 = arith.constant 0 : index
+    %c0_1 = arith.constant 0 : index
+    %c1_2 = arith.constant 1 : index
+    %c1_3 = arith.constant 1 : index
+    scf.parallel (%arg2, %arg3) = (%c0_0, %c0_1) to (%0, %1) step (%c1_2, %c1_3) {
+      %2 = arith.muli %arg2, %1 : index
+      %3 = arith.addi %2, %arg3 : index
+      %4 = arith.select %arg1, %3, %c0 : index
+      %5 = arith.addi %arg2, %arg3 : index
+      %6 = arith.addi %5, %4 : index
+      %7 = arith.subi %6, %c5 : index
+      %8 = arith.index_cast %7 : index to i64
+      %9 = arith.sitofp %8 : i64 to f32
+      memref.store %9, %arg0[%arg2, %arg3] : memref<?x?xf32>
+      scf.yield
+    }
+    return
 }
 
-func @main() {
-  %false = constant 0 : i1
-  %true = constant 1 : i1
+func @main() attributes { llvm.emit_c_interface } {
+  %false = arith.constant 0 : i1
+  %true = arith.constant 1 : i1
   %A = memref.alloc() : !eltwise
   %A_2d = memref.cast %A : !eltwise to memref<?x?xf32>
   %A_ud = memref.cast %A : !eltwise to memref<*xf32>
@@ -43,7 +50,7 @@ func @main() {
   %B_2d = memref.cast %B : !eltwise to memref<?x?xf32>
   %B_ud = memref.cast %B : !eltwise to memref<*xf32>
   call @fill_2d(%B_2d, %true) : (memref<?x?xf32>, i1) -> ()
-  call @print_memref_f32(%A_ud) : (memref<*xf32>) -> ()
+  call @printMemrefF32(%A_ud) : (memref<*xf32>) -> ()
   // CHECK:  [-5,   -4,   -3],
   // CHECK:  [-4,   -3,   -2],
   // CHECK:  [-3,   -2,   -1],
@@ -52,7 +59,7 @@ func @main() {
   // CHECK:  [0,   1,   2],
   // CHECK:  [1,   2,   3],
   // CHECK:  [2,   3,   4]
-  call @print_memref_f32(%B_ud) : (memref<*xf32>) -> ()
+  call @printMemrefF32(%B_ud) : (memref<*xf32>) -> ()
   // CHECK:  [-5,   -3,   -1],
   // CHECK:  [-1,   1,   3],
   // CHECK:  [3,   5,   7],
@@ -62,7 +69,7 @@ func @main() {
   // CHECK:  [19,   21,   23],
   // CHECK:  [23,   25,   27]
   call @exp_xsmm(%A, %B) : (!eltwise, !eltwise) -> ()
-  call @print_memref_f32(%B_ud) : (memref<*xf32>) -> ()
+  call @printMemrefF32(%B_ud) : (memref<*xf32>) -> ()
   // CHECK:  [-5,   0.0183152,   0.0497804],
   // CHECK:  [-1,   0.0497804,   0.135335],
   // CHECK:  [3,   0.135335,   0.367705],
@@ -72,7 +79,7 @@ func @main() {
   // CHECK:  [19,   7.38904,   20.0837],
   // CHECK:  [23,   20.0837,   54.5965]
   call @relu_xsmm(%B, %B) : (!eltwise, !eltwise) -> ()
-  call @print_memref_f32(%B_ud) : (memref<*xf32>) -> ()
+  call @printMemrefF32(%B_ud) : (memref<*xf32>) -> ()
   // CHECK:  [-5,   0.0183152,   0.0497804],
   // CHECK:  [0,   0.0497804,   0.135335],
   // CHECK:  [3,   0.135335,   0.367705],
@@ -87,16 +94,16 @@ func @main() {
 }
 
 func @exp_xsmm(%I: !eltwise, %O: !eltwise) {
-  %c0 = constant 0 : index
-  %c1 = constant 1 : index
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
   %exp = xsmm.unary.dispatch EXP(f32, [8, 2], 3, 3, 0) : (f32) -> f32
   xsmm.unary.invoke %O[%c0, %c1] = %exp(%I[%c0, %c1]) : (!eltwise) -> !eltwise
   return
 }
 
 func @relu_xsmm(%I: !eltwise, %O: !eltwise) {
-  %c0 = constant 0 : index
-  %c1 = constant 1 : index
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
   %relu = xsmm.unary.dispatch RELU(f32, [7, 3], 3, 3, 0) : (f32) -> f32
   xsmm.unary.invoke %O[%c1, %c0] = %relu(%I[%c1, %c0]) : (!eltwise) -> !eltwise
   return

@@ -13,15 +13,15 @@ def LinalgX_Dialect : Dialect {
   let cppNamespace = "pmlc::dialect::linalgx";
 }
 
-class LinalgX_Op<string mnemonic, list<OpTrait> traits = []> :
+class LinalgX_Op<string mnemonic, list<Trait> traits = []> :
     Op<LinalgX_Dialect, mnemonic, traits> {
-  let printer = [{ print$cppClass(p, *this); }];
-  let parser = [{ return parse$cppClass(parser, result); }];
-  let verifier = [{ return verify$cppClass(*this); }];
+  let hasCustomAssemblyFormat = 1;
+  let hasVerifier = 1;
 }
 
 def CopyOp : LinalgX_Op<"copy", [
   CopyOpInterface,
+  SingleBlockImplicitTerminator<"mlir::linalg::YieldOp">,
   LinalgStructuredInterface,
   NoSideEffect
 ]> {
@@ -59,8 +59,10 @@ def CopyOp : LinalgX_Op<"copy", [
     mlir::ArrayAttr indexing_maps();
     mlir::ArrayAttr iterator_types();
 
-    static void regionBuilder(mlir::ImplicitLocOpBuilder &b, mlir::Block &block);
-    static std::function<void(mlir::ImplicitLocOpBuilder &b, mlir::Block &block)>
+    static void regionBuilder(mlir::ImplicitLocOpBuilder &b, mlir::Block &block, 
+                              llvm::ArrayRef<mlir::NamedAttribute> attrs);
+    static std::function<void(mlir::ImplicitLocOpBuilder &b, mlir::Block &block, 
+                              llvm::ArrayRef<mlir::NamedAttribute> attrs)>
     getRegionBuilder() { return &regionBuilder; }
     static unsigned getNumRegionArgs() { return 2; }
 

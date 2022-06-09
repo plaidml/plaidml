@@ -1,8 +1,9 @@
 // Copyright 2020 Intel Corporation
 
 #include "pmlc/dialect/pxa/transforms/autotile.h"
-
 #include "pmlc/dialect/pxa/transforms/pass_detail.h"
+
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 namespace pmlc::dialect::pxa {
 
@@ -29,8 +30,8 @@ std::vector<int64_t> EvenTilingGenerator::operator()(int64_t range) const {
 }
 
 struct AutoTileExamplePass : public AutoTileExampleBase<AutoTileExamplePass> {
-  void runOnFunction() final {
-    auto func = getFunction();
+  void runOnOperation() final {
+    auto func = getOperation();
     FixedTileSizeGenerator always10(10);
     // Autotile only the outermost loops
     for (auto &op : func.getBody().front()) {

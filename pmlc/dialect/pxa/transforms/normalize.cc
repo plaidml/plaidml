@@ -9,6 +9,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/IR/AffineValueMap.h"
 #include "mlir/Dialect/Affine/Utils.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/PatternMatch.h"
 
 #include "pmlc/dialect/pxa/transforms/pass_detail.h"
@@ -129,9 +130,9 @@ void denestLoops(mlir::AffineParallelOp op) {
   newRanges.insert(newRanges.end(), outerRanges.begin(), outerRanges.end());
   newRanges.insert(newRanges.end(), innerRanges.begin(), innerRanges.end());
   // Extract reductions
-  SmallVector<AtomicRMWKind, 8> reductions;
+  SmallVector<arith::AtomicRMWKind, 8> reductions;
   for (APInt value : op.reductions().getAsValueRange<IntegerAttr>()) {
-    reductions.push_back(*symbolizeAtomicRMWKind(value.getZExtValue()));
+    reductions.push_back(*arith::symbolizeAtomicRMWKind(value.getZExtValue()));
   }
   // Make a new AffineParallel right before the current op
   OpBuilder builder(op);
@@ -159,14 +160,14 @@ struct AffineNormalizePass : public AffineNormalizeBase<AffineNormalizePass> {
     this->promote = promote;
     this->denest = denest;
   }
-  void runOnFunction() override {
-    getFunction().walk(normalizeAffineParallel);
-    getFunction().walk(elideSingleIterationIndexes);
+  void runOnOperation() override {
+    getOperation().walk(normalizeAffineParallel);
+    getOperation().walk(elideSingleIterationIndexes);
     if (promote.getValue()) {
-      getFunction().walk(promoteIfEmptyIVs);
+      getOperation().walk(promoteIfEmptyIVs);
     }
     if (denest.getValue()) {
-      getFunction().walk(denestLoops);
+      getOperation().walk(denestLoops);
     }
   }
 };

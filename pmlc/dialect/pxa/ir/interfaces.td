@@ -253,7 +253,7 @@ def PxaReduceOpInterface : OpInterface<"PxaReduceOpInterface"> {
     >,
     InterfaceMethod<
       /*desc=*/"Returns the agg.",
-      /*retTy=*/"::mlir::AtomicRMWKind",
+      /*retTy=*/"::mlir::arith::AtomicRMWKind",
       /*methodName=*/"getAgg",
       /*args=*/(ins),
       /*methodBody=*/[{}],

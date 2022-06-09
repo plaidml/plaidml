@@ -1,6 +1,7 @@
 // Copyright 2020 Intel Corporation
 
 #include "pmlc/dialect/pxa/transforms/tile.h"
+#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 
 using namespace mlir; // NOLINT
 
@@ -30,10 +31,10 @@ AffineParallelOp performTiling(AffineParallelOp op,
   }
   auto outerIdxs = outerBody->getArguments();
   // Make the inner parallel for (above all other code);
-  SmallVector<AtomicRMWKind, 8> reductions;
+  SmallVector<arith::AtomicRMWKind, 8> reductions;
   for (Attribute attr : op.reductions()) {
     auto intAttr = attr.dyn_cast<IntegerAttr>();
-    reductions.push_back(*symbolizeAtomicRMWKind(intAttr.getInt()));
+    reductions.push_back(*arith::symbolizeAtomicRMWKind(intAttr.getInt()));
   }
   auto inner = builder.create<AffineParallelOp>(
       op.getLoc(), op.getResultTypes(), reductions, lbMaps, outerIdxs, ubMaps,

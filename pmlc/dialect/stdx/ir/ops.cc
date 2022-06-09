@@ -14,6 +14,8 @@ namespace pmlc::dialect::stdx {
 
 Value ReshapeOp::getViewSource() { return tensor(); }
 
+LogicalResult ReshapeOp::verify() { return success(); }
+
 // ---- SubgroupBlockReadINTELOp ----
 
 void SubgroupBlockReadINTELOp::build(OpBuilder &builder, OperationState &result,
@@ -24,10 +26,10 @@ void SubgroupBlockReadINTELOp::build(OpBuilder &builder, OperationState &result,
   result.addTypes(memrefType.getElementType());
 }
 
-static LogicalResult
-verifySubgroupBlockReadINTELOp(SubgroupBlockReadINTELOp op) {
-  if (op.getNumOperands() != 1 + op.getMemRefType().getRank())
-    return op.emitOpError("incorrect number of indices for memory ref");
+LogicalResult
+SubgroupBlockReadINTELOp::verify() {
+  if (getNumOperands() != 1 + getMemRefType().getRank())
+    return emitOpError("incorrect number of indices for memory ref");
   return success();
 }
 
@@ -40,10 +42,10 @@ void SubgroupBlockWriteINTELOp::build(OpBuilder &builder,
   result.addOperands(memref);
 }
 
-static LogicalResult
-verifySubgroupBlockWriteINTELOp(SubgroupBlockWriteINTELOp op) {
-  if (op.getNumOperands() != 2 + op.getMemRefType().getRank())
-    return op.emitOpError("subgroup block write index operand"
+LogicalResult
+SubgroupBlockWriteINTELOp::verify() {
+  if (getNumOperands() != 2 + getMemRefType().getRank())
+    return emitOpError("subgroup block write index operand"
                           " count not equal to memref rank");
 
   return success();
@@ -51,20 +53,17 @@ verifySubgroupBlockWriteINTELOp(SubgroupBlockWriteINTELOp op) {
 
 // ---- ClosureOp ----
 
-static ParseResult parseClosureOp(OpAsmParser &parser, OperationState &result) {
+ParseResult ClosureOp::parse(OpAsmParser &parser, OperationState &result) {
   MLIRContext *ctx = result.getContext();
   Builder &builder = parser.getBuilder();
 
-  SmallVector<OpAsmParser::OperandType, 4> args;
-  SmallVector<NamedAttrList, 4> argAttrs;
-  SmallVector<NamedAttrList, 4> resultAttrs;
-  SmallVector<Type, 4> argTypes;
-  SmallVector<Type, 4> resultTypes;
+  SmallVector<OpAsmParser::Argument> entryArgs;
+  SmallVector<DictionaryAttr> resultAttrs;
+  SmallVector<Type> resultTypes;
+  bool isVariadic;
 
-  bool isVariadic = false;
-  if (function_like_impl::parseFunctionSignature(
-          parser, /*allowVariadic=*/false, args, argTypes, argAttrs, isVariadic,
-          resultTypes, resultAttrs))
+  if (failed(function_interface_impl::parseFunctionSignature(
+          parser, /*allowVariadic=*/false, entryArgs, isVariadic, resultTypes, resultAttrs)))
     return failure();
 
   // Parse operation attributes.
@@ -72,49 +71,48 @@ static ParseResult parseClosureOp(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOptionalAttrDictWithKeyword(attrs))
     return failure();
 
+  SmallVector<Type> argTypes;
+  for (auto &arg : entryArgs)
+    argTypes.push_back(arg.type);
+  
   result.addAttributes(attrs);
   result.addAttribute(
       "type", TypeAttr::get(builder.getFunctionType(argTypes, resultTypes)));
 
   Region *body = result.addRegion();
-  if (parser.parseRegion(*body, /*arguments=*/{args},
-                         /*argTypes=*/{argTypes},
+  if (parser.parseRegion(*body, /*arguments=*/entryArgs, 
                          /*enableNameShadowing=*/false))
     return failure();
   return success();
 }
 
-static void printClosureOp(OpAsmPrinter &p, ClosureOp op) {
-  FunctionType type = op.getType();
-  function_like_impl::printFunctionSignature(p, op, type.getInputs(),
+void ClosureOp::print(OpAsmPrinter &p) {
+  FunctionType type = getFunctionType();
+  function_interface_impl::printFunctionSignature(p, *this, type.getInputs(),
                                              /*isVariadic=*/false,
                                              type.getResults());
-  p.printOptionalAttrDictWithKeyword(op->getAttrs(), {"type"});
-  p.printRegion(op.body(), /*printEntryBlockArgs=*/false,
+  p.printOptionalAttrDictWithKeyword((*this)->getAttrs(), {"type"});
+  p.printRegion(body(), /*printEntryBlockArgs=*/false,
                 /*printBlockTerminators=*/true);
 }
 
 Region &ClosureOp::getLoopBody() { return body(); }
 
-bool ClosureOp::isDefinedOutsideOfLoop(Value value) {
-  return !body().isAncestor(value.getParentRegion());
-}
-
-LogicalResult ClosureOp::moveOutOfLoop(ArrayRef<Operation *> ops) {
-  for (Operation *op : ops)
-    op->moveBefore(*this);
-  return success();
-}
-
-static LogicalResult verifyClosureOp(ClosureOp op) {
+LogicalResult ClosureOp::verify() {
   // TODO
   return success();
 }
 
 // ---- YieldOp ----
 
-static LogicalResult verifyYieldOp(YieldOp op) {
+LogicalResult YieldOp::verify() {
   // TODO
+  return success();
+}
+
+// ---- SubgroupBroadcastOp ----
+
+LogicalResult SubgroupBroadcastOp::verify() {
   return success();
 }
 

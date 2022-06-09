@@ -1,8 +1,6 @@
 // Copyright 2020 Intel Corporation
 
 #include "pmlc/dialect/pxa/analysis/uses.h"
-
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "llvm/ADT/TypeSwitch.h"
 
 #include "pmlc/dialect/layer/ir/ops.h"

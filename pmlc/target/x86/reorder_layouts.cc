@@ -1,12 +1,14 @@
 // Copyright 2021, Intel Corporation
 
-#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/Support/DebugStringHelper.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
+#include "pmlc/dialect/linalgx/analysis/convolution.h"
 #include "pmlc/target/x86/pass_detail.h"
 #include "pmlc/target/x86/passes.h"
 #include "pmlc/util/env.h"
@@ -22,84 +24,6 @@ namespace pmlc::target::x86 {
 namespace linalgx = dialect::linalgx;
 
 namespace {
-
-struct ConvOperand {
-  Value value;
-  RankedTensorType type;
-  AffineMap idxMap;
-
-  ConvOperand(ValueRange values, ArrayRef<AffineMap> idxMaps, int64_t i)
-      : value(values[i]), type(value.getType().cast<RankedTensorType>()),
-        idxMap(idxMaps[i]) {}
-};
-
-struct ConvCapture {
-  ConvOperand input;
-  ConvOperand filter;
-  ConvOperand output;
-
-  ConvCapture(ValueRange values, ArrayRef<AffineMap> idxMaps,
-              ArrayRef<int64_t> order)
-      : input(values, idxMaps, order[0]), filter(values, idxMaps, order[1]),
-        output(values, idxMaps, order[2]) {}
-
-  RankedTensorType getBlockedInputType(int64_t blockSize) {
-    ArrayRef<int64_t> shape = input.type.getShape();
-    return RankedTensorType::get({shape[0],             //
-                                  shape[3] / blockSize, //
-                                  shape[1],             //
-                                  shape[2],             //
-                                  blockSize},
-                                 input.type.getElementType());
-  }
-
-  RankedTensorType getBlockedFilterType(int64_t blockSize) {
-    ArrayRef<int64_t> shape = filter.type.getShape();
-    return RankedTensorType::get({shape[2] / blockSize, //
-                                  shape[3] / blockSize, //
-                                  shape[0],             //
-                                  shape[1],             //
-                                  blockSize,            //
-                                  blockSize},
-                                 filter.type.getElementType());
-  }
-
-  RankedTensorType getBlockedOutputType(int64_t blockSize) {
-    ArrayRef<int64_t> shape = output.type.getShape();
-    return RankedTensorType::get({shape[0],             //
-                                  shape[3] / blockSize, //
-                                  shape[1],             //
-                                  shape[2],             //
-                                  blockSize},
-                                 input.type.getElementType());
-  }
-};
-
-static Optional<ConvCapture> detectConv(linalg::GenericOp op) {
-  if (op.getNumInputs() != 2 || op.getNumOutputs() != 1)
-    return None;
-
-  Block *block = op.getBody();
-  Block::BlockArgListType args = block->getArguments();
-  if (args.size() != 3)
-    return None;
-
-  ValueRange values = op.getOperands();
-  SmallVector<AffineMap> idxMaps = op.getIndexingMaps();
-
-  Operation *yieldOp = block->getTerminator();
-  if (matchPattern(
-          yieldOp,
-          m_Op<linalg::YieldOp>(m_Op<AddFOp>(
-              m_Val(args[2]), m_Op<MulFOp>(m_Val(args[0]), m_Val(args[1]))))) ||
-      matchPattern(yieldOp,
-                   m_Op<linalg::YieldOp>(m_Op<AddFOp>(m_Op<MulFOp>(
-                                             m_Val(args[0]), m_Val(args[1]))),
-                                         m_Val(args[2]))))
-    return ConvCapture{values, idxMaps, {0, 1, 2}};
-
-  return None;
-}
 
 static AffineExpr getBlockedExpr(MLIRContext *context, int64_t highDim,
                                  int64_t lowDim, int64_t blockSize) {
@@ -140,16 +64,44 @@ static SmallVector<int64_t, 4> extractVector(ArrayAttr arrayAttr) {
                       [](IntegerAttr attr) { return attr.getInt(); }));
 }
 
+// check that we have (channels-last logical ordering):
+// (n, h, w, c), (r, s, c, k) -> (n, h, w, k) or
+// (n, h, w, c), (r, s, c, 1) -> (n, h, w, c)
+bool testChannels(AffineExpr cin, AffineExpr cout, AffineExpr fin,
+                  AffineExpr fout) {
+  if (cin != fin) {
+    return false;
+  }
+  if (cout == fout) {
+    return true;
+  }
+  if (cin == cout && fout == getAffineConstantExpr(1, fout.getContext())) {
+    return true;
+  }
+  return false;
+}
+
+// Return AffineConstantExpr(1) if expr's range is 1.
+// Otherwise, return expr directly.
+AffineExpr isSizeOne(AffineExpr expr, SmallVector<int64_t, 4> &ranges) {
+  if (auto dim = expr.dyn_cast<AffineDimExpr>()) {
+    if (ranges[dim.getPosition()] == 1) {
+      return getAffineConstantExpr(1, expr.getContext());
+    }
+  }
+  return expr;
+}
+
 // Forward a reorder thru linalg.pad_tensor operations.
 struct PropagateReorderThruPadTensorOpPattern
-    : public OpRewritePattern<linalg::PadTensorOp> {
-  using OpRewritePattern<linalg::PadTensorOp>::OpRewritePattern;
+    : public OpRewritePattern<tensor::PadOp> {
+  using OpRewritePattern<tensor::PadOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(linalg::PadTensorOp op,
+  LogicalResult matchAndRewrite(tensor::PadOp op,
                                 PatternRewriter &rewriter) const final {
     Optional<ReorderInfo> info = getReorderInfo(&op->getOpOperand(0));
     if (!info) {
-      IVLOG(1, "Unrecognized PadTensorOp: " << debugString(op));
+      IVLOG(1, "Unrecognized PadOp: " << debugString(op));
       return failure();
     }
 
@@ -163,19 +115,20 @@ struct PropagateReorderThruPadTensorOpPattern
     lower.insert(lower.begin() + 1, 0);
     upper.insert(upper.begin() + 1, 0);
 
-    auto newOp =
-        rewriter.create<linalg::PadTensorOp>(op->getLoc(),
-                                             /*source=*/info->sourceValue,
-                                             /*staticLow=*/lower,
-                                             /*staticHigh=*/upper,
-                                             /*low=*/ValueRange{},
-                                             /*high=*/ValueRange{});
+    auto newOp = rewriter.create<tensor::PadOp>(op->getLoc(),
+                                                /*source=*/info->sourceValue,
+                                                /*staticLow=*/lower,
+                                                /*staticHigh=*/upper,
+                                                /*low=*/ValueRange{},
+                                                /*high=*/ValueRange{});
     SmallVector<Type, 4> padArgs(lower.size(), rewriter.getIndexType());
+    SmallVector<Location, 4> locs(lower.size(), op->getLoc());
     {
       OpBuilder::InsertionGuard guard(rewriter);
-      rewriter.createBlock(&newOp.region(), newOp.region().begin(), padArgs);
-      rewriter.create<linalg::YieldOp>(
-          op->getLoc(), ValueRange{op.getConstantPaddingValue()});
+      rewriter.createBlock(&newOp.region(), newOp.region().begin(), padArgs,
+                           locs);
+      rewriter.create<tensor::YieldOp>(op->getLoc(),
+                                       op.getConstantPaddingValue());
     }
 
     RankedTensorType resultType = op.getResultType();
@@ -409,8 +362,8 @@ struct FoldBroadcastReordersPattern : public OpRewritePattern<linalgx::CopyOp> {
 };
 
 struct ReorderLayoutsPass : public ReorderLayoutsBase<ReorderLayoutsPass> {
-  void runOnFunction() final {
-    FuncOp func = getFunction();
+  void runOnOperation() final {
+    func::FuncOp func = getOperation();
     MLIRContext *context = func.getContext();
 
     func.walk([&](linalg::GenericOp op) { reorderConvolution(op); });
@@ -426,13 +379,7 @@ struct ReorderLayoutsPass : public ReorderLayoutsBase<ReorderLayoutsPass> {
   }
 
   void reorderConvolution(linalg::GenericOp op) {
-    int64_t blockSize = 32;
-    std::string blockSizeStr = util::getEnvVar("PLAIDML_BLOCK_SIZE");
-    if (!blockSizeStr.empty()) {
-      blockSize = std::stoi(blockSizeStr);
-    }
-
-    Optional<ConvCapture> conv = detectConv(op);
+    Optional<linalgx::ConvCapture> conv = linalgx::detectConv(op);
     if (!conv) {
       IVLOG(3, "Cannot reorder: not a convolution. " << debugString(op));
       return;
@@ -462,10 +409,25 @@ struct ReorderLayoutsPass : public ReorderLayoutsBase<ReorderLayoutsPass> {
       return;
     }
 
-    if (ranges->size() != 7 ||           //
-        (*ranges)[3] % blockSize != 0 || // C
-        (*ranges)[6] % blockSize != 0)   // K
-    {
+    if (ranges->size() != 7) {
+      IVLOG(1, "Cannot reorder: number of indexes is not 7.");
+      return;
+    }
+
+    SmallVector<int64_t, 4> feasibleSizes = {32, 16};
+    int64_t blockSize = 0;
+    std::string blockSizeStr = util::getEnvVar("PLAIDML_BLOCK_SIZE");
+    if (!blockSizeStr.empty()) {
+      blockSize = std::stoi(blockSizeStr);
+    }
+    for (int64_t size : feasibleSizes) {
+      if ((*ranges)[3] % size == 0 && (*ranges)[6] % size == 0) {
+        blockSize = size;
+        break;
+      }
+    }
+
+    if (blockSize == 0) {
       IVLOG(1, "Cannot reorder: incompatible layout. op: " << debugString(op));
       return;
     }
@@ -580,8 +542,8 @@ struct ReorderLayoutsPass : public ReorderLayoutsBase<ReorderLayoutsPass> {
         /*doc=*/"",
         /*libraryCall=*/"",
         [](OpBuilder &builder, Location loc, ValueRange args) {
-          auto mul = builder.create<MulFOp>(loc, args[0], args[1]);
-          auto add = builder.create<AddFOp>(loc, args[2], mul);
+          auto mul = builder.create<arith::MulFOp>(loc, args[0], args[1]);
+          auto add = builder.create<arith::AddFOp>(loc, args[2], mul);
           builder.create<linalg::YieldOp>(loc, ValueRange{add});
         });
 
@@ -604,21 +566,15 @@ struct ReorderLayoutsPass : public ReorderLayoutsBase<ReorderLayoutsPass> {
 
 struct ReorderWeightLayoutsPass
     : public ReorderWeightLayoutsBase<ReorderWeightLayoutsPass> {
-  void runOnFunction() final {
-    FuncOp func = getFunction();
+  void runOnOperation() final {
+    func::FuncOp func = getOperation();
     MLIRContext *context = func.getContext();
 
     func.walk([&](linalg::GenericOp op) { reorderConvolution(op); });
   }
 
   void reorderConvolution(linalg::GenericOp op) {
-    int64_t blockSize = 32;
-    std::string blockSizeStr = util::getEnvVar("PLAIDML_BLOCK_SIZE");
-    if (!blockSizeStr.empty()) {
-      blockSize = std::stoi(blockSizeStr);
-    }
-
-    Optional<ConvCapture> conv = detectConv(op);
+    Optional<linalgx::ConvCapture> conv = linalgx::detectConv(op);
     if (!conv)
       return;
 
@@ -630,14 +586,6 @@ struct ReorderWeightLayoutsPass
       return;
     }
 
-    // check that we have (channels-last logical ordering):
-    // (n, h, w, c), (r, s, c, k) -> (n, h, w, k)
-    if (conv->input.idxMap.getResult(3) != conv->filter.idxMap.getResult(2) ||
-        conv->filter.idxMap.getResult(3) != conv->output.idxMap.getResult(3)) {
-      IVLOG(1, "Cannot reorder: expected channels-last logical ordering.");
-      return;
-    }
-
     // dims: (n, h, w, c, r, s, k)
     Optional<SmallVector<int64_t, 4>> ranges = op.getStaticLoopRanges();
     if (!ranges) {
@@ -645,10 +593,41 @@ struct ReorderWeightLayoutsPass
       return;
     }
 
-    if (ranges->size() != 7 ||           //
-        (*ranges)[3] % blockSize != 0 || // C
-        (*ranges)[6] % blockSize != 0)   // K
+    if (ranges->size() != 7) {
+      IVLOG(1, "Cannot reorder: number of indexes is not 7.");
       return;
+    }
+
+    // check that we have (channels-last logical ordering):
+    if (!testChannels(conv->input.idxMap.getResult(3),
+                      conv->output.idxMap.getResult(3),
+                      conv->filter.idxMap.getResult(2),
+                      isSizeOne(conv->filter.idxMap.getResult(3), *ranges))) {
+      IVLOG(1, "Cannot reorder: expected channels-last logical ordering.");
+      return;
+    }
+
+    SmallVector<int64_t, 4> feasibleSizes = {32, 16};
+    int64_t blockSize = 0;
+    std::string blockSizeStr = util::getEnvVar("PLAIDML_BLOCK_SIZE");
+    if (!blockSizeStr.empty()) {
+      blockSize = std::stoi(blockSizeStr);
+    }
+    for (int64_t size : feasibleSizes) {
+      if ((*ranges)[3] % size == 0 &&
+          ((*ranges)[6] % size == 0 || (*ranges)[6] == 1)) {
+        blockSize = size;
+        break;
+      }
+    }
+
+    if (blockSize == 0) {
+      IVLOG(1, "Cannot reorder: incompatible layout. op: " << debugString(op));
+      return;
+    }
+
+    bool depthwise = (*ranges)[6] == 1 && conv->input.idxMap.getResult(3) ==
+                                              conv->output.idxMap.getResult(3);
 
     MLIRContext *context = &getContext();
     ImplicitLocOpBuilder builder(op->getLoc(), op);
@@ -666,7 +645,8 @@ struct ReorderWeightLayoutsPass
                            getAffineDimExpr(2, context),
                            getAffineDimExpr(3, context),
                            getBlockedExpr(context, 0, 4, blockSize),
-                           getBlockedExpr(context, 1, 5, blockSize),
+                           depthwise ? getAffineDimExpr(5, context)
+                                     : getBlockedExpr(context, 1, 5, blockSize),
                        },
                        context);
 
@@ -680,7 +660,7 @@ struct ReorderWeightLayoutsPass
     // Adjust convolution
     RankedTensorType blockedOutputType = conv->getBlockedOutputType(blockSize);
 
-    // oldInput = (n, h, w, c0, r, s, k0) -> (n, h + r, w + s, k0)
+    // oldInput = (n, h, w, c, r, s, k) -> (n, h + r, w + s, k)
     // newInput = (n, h, w, c0, r, s, k0, c1, k1) ->
     //            (n, h + r, w + s, k1 * B + k0)
     AffineMap newInputMap =
@@ -689,7 +669,8 @@ struct ReorderWeightLayoutsPass
                            conv->input.idxMap.getResult(0),
                            conv->input.idxMap.getResult(1),
                            conv->input.idxMap.getResult(2),
-                           getBlockedExpr(context, 8, 6, blockSize),
+                           depthwise ? getBlockedExpr(context, 7, 3, blockSize)
+                                     : getBlockedExpr(context, 8, 6, blockSize),
                        },
                        context);
 
@@ -698,8 +679,10 @@ struct ReorderWeightLayoutsPass
     AffineMap newFilterMap =
         AffineMap::get(9, 0,
                        ArrayRef<AffineExpr>{
-                           getAffineDimExpr(8, context),
-                           getAffineDimExpr(7, context),
+                           depthwise ? getAffineDimExpr(7, context)
+                                     : getAffineDimExpr(8, context),
+                           depthwise ? getAffineDimExpr(8, context)
+                                     : getAffineDimExpr(7, context),
                            conv->filter.idxMap.getResult(0),
                            conv->filter.idxMap.getResult(1),
                            conv->filter.idxMap.getResult(2),
@@ -738,8 +721,8 @@ struct ReorderWeightLayoutsPass
         /*doc=*/"",
         /*libraryCall=*/"",
         [](OpBuilder &builder, Location loc, ValueRange args) {
-          auto mul = builder.create<MulFOp>(loc, args[0], args[1]);
-          auto add = builder.create<AddFOp>(loc, args[2], mul);
+          auto mul = builder.create<arith::MulFOp>(loc, args[0], args[1]);
+          auto add = builder.create<arith::AddFOp>(loc, args[2], mul);
           builder.create<linalg::YieldOp>(loc, ValueRange{add});
         });
 

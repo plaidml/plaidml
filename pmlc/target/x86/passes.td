@@ -3,7 +3,7 @@
 
 include "mlir/Pass/PassBase.td"
 
-def CollapseParallelLoops : FunctionPass<"x86-collapse-scf-parallel"> {
+def CollapseParallelLoops : Pass<"x86-collapse-scf-parallel", "mlir::func::FuncOp"> {
   let summary = "Collapse parallel loops to use a single induction variable";
   let constructor = "pmlc::target::x86::createCollapseParallelLoopsPass()";
 }
@@ -23,7 +23,7 @@ def ConvertStandardToLLVM : Pass<"x86-convert-std-to-llvm", "mlir::ModuleOp"> {
   let dependentDialects = ["mlir::LLVM::LLVMDialect"];
 }
 
-def FoldConstantCast : FunctionPass<"x86-fold-constant-cast"> {
+def FoldConstantCast : Pass<"x86-fold-constant-cast", "mlir::func::FuncOp"> {
   let summary = "Materialize casts of constants to target type";
   let constructor = "pmlc::target::x86::createFoldConstantCastPass()";
 }
@@ -43,7 +43,7 @@ def PRNGLinking : Pass<"x86-prng-linking", "mlir::ModuleOp"> {
   let constructor = "pmlc::target::x86::createPRNGLinkingPass()";
 }
 
-def ReorderLayouts : FunctionPass<"x86-reorder-layouts"> {
+def ReorderLayouts : Pass<"x86-reorder-layouts", "mlir::func::FuncOp"> {
   let summary = "Optimize data layouts for efficient reading";
   let constructor = "pmlc::target::x86::createReorderLayoutsPass()";
   let options = [
@@ -55,7 +55,7 @@ def ReorderLayouts : FunctionPass<"x86-reorder-layouts"> {
   ];
 }
 
-def ReorderWeightLayouts : FunctionPass<"x86-reorder-weight-layouts"> {
+def ReorderWeightLayouts : Pass<"x86-reorder-weight-layouts", "mlir::func::FuncOp"> {
   let summary = "Optimize weight layouts for efficient reading";
   let constructor = "pmlc::target::x86::createReorderWeightLayoutsPass()";
   let options = [
@@ -67,7 +67,7 @@ def ReorderWeightLayouts : FunctionPass<"x86-reorder-weight-layouts"> {
   ];
 }
 
-def StencilTppGemm : FunctionPass<"x86-stencil-tpp-gemm"> {
+def StencilTppGemm : Pass<"x86-stencil-tpp-gemm", "mlir::func::FuncOp"> {
   let summary = "Find a stencil for TPP GEMM ops";
   let constructor = "pmlc::target::x86::createStencilTppGemmPass()";
   let options = [
@@ -78,14 +78,19 @@ def StencilTppGemm : FunctionPass<"x86-stencil-tpp-gemm"> {
   ];
 }
 
-def StencilTppUnary : FunctionPass<"x86-stencil-tpp-unary"> {
+def StencilTppUnary : Pass<"x86-stencil-tpp-unary", "mlir::func::FuncOp"> {
   let summary = "Find a stencil for TPP unary ops";
   let constructor = "pmlc::target::x86::createStencilTppUnaryPass()";
 }
 
-def StencilTppBinary : FunctionPass<"x86-stencil-tpp-binary"> {
+def StencilTppBinary : Pass<"x86-stencil-tpp-binary", "mlir::func::FuncOp"> {
   let summary = "Find a stencil for TPP binary ops";
   let constructor = "pmlc::target::x86::createStencilTppBinaryPass()";
+}
+
+def StencilSplit : Pass<"x86-stencil-tpp-split", "mlir::func::FuncOp"> {
+  let summary = "Split back to back unary/binary stencils";
+  let constructor = "pmlc::target::x86::createStencilSplitPass()";
 }
 
 def TraceLinking : Pass<"x86-trace-linking", "mlir::ModuleOp"> {

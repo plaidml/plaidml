@@ -4,6 +4,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/DebugStringHelper.h"
 #include "mlir/Transforms/InliningUtils.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 #include "pmlc/dialect/layer/ir/ops.h"
 #include "pmlc/dialect/layer/transforms/pass_detail.h"
@@ -47,8 +48,8 @@ struct InlinerImpl : InlinerInterface {
 };
 
 struct InlineLayersPass : public InlineLayersBase<InlineLayersPass> {
-  void runOnFunction() final {
-    auto func = getFunction();
+  void runOnOperation() final {
+    auto func = getOperation();
     InlinerImpl inliner(&getContext());
     func.walk([&](BoxOp op) {
       if (failed(inlineRegion(/*interface=*/inliner,

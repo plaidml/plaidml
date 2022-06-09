@@ -59,8 +59,7 @@ namespace std {
 
 inline string to_string(const string &x) { return x; }
 
-template <class T>
-string to_string(const vector<T> &x) {
+template <class T> string to_string(const vector<T> &x) {
   std::stringstream ss;
   stringify_collection(ss, x.begin(), x.end());
   return ss.str();

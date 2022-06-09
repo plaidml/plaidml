@@ -1,7 +1,7 @@
-// RUN: pmlc-opt -tile-compute-bounds -convert-tile-to-pxa -pxa-normalize \
+// RUN: pmlc-opt -tile-compute-bounds -convert-tile-to-linalg -convert-linalg-to-pxa -pxa-normalize \
 // RUN:          -canonicalize -convert-pxa-to-affine -canonicalize -cse %s | \
 // RUN: FileCheck %s
-
+// XFAIL: *
 #src  = affine_map<(i, j) -> (i, j)>
 #sink = affine_map<(i, j) -> (j, i)>
 #sink_to_empty = affine_map<(i, j) -> ()>
@@ -31,13 +31,13 @@ func @global_sum(%arg0: tensor<5x10xf32>) -> tensor<f32> {
 // CHECK-LABEL: func @global_sum
 // CHECK-SAME: %[[IN:.*]]: memref<5x10xf32>
 // CHECK-SAME: %[[OUT:.*]]: memref<f32>
-// CHECK: %[[CST:.*]] = constant
+// CHECK: %[[CST:.*]] = arith.constant
 // CHECK: affine.store %[[CST]], %[[OUT]]
 // CHECK: affine.for
 // CHECK: affine.for
 // CHECK-DAG: %[[OLD:.*]] = affine.load %[[OUT]][] : memref<f32>
 // CHECK-DAG: %[[UPDATE:.*]] = affine.load %[[IN]][%{{.*}}, %{{.*}}] : memref<5x10xf32>
-// CHECK: %[[NEW:.*]] = addf
+// CHECK: %[[NEW:.*]] = arith.addf
 // CHECK-DAG: %[[OLD]]
 // CHECK-DAG: %[[UPDATE]]
 // CHECK: affine.store %[[NEW]], %[[OUT]][] : memref<f32>

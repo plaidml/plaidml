@@ -7,7 +7,7 @@
 #include <utility>
 #include <vector>
 
-#include "mlir/Analysis/AffineStructures.h"
+#include "mlir/Dialect/Affine/Analysis/AffineStructures.h"
 #include "mlir/Pass/Pass.h"
 #include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/dialect/pxa/transforms/tile.h"
@@ -40,10 +40,9 @@ struct FixedTileSizeGenerator {
 };
 
 // Produces the union of multiple generators
-template <typename Head, typename... Rest>
-class UnionGenerator {
+template <typename Head, typename... Rest> class UnionGenerator {
 public:
-  explicit UnionGenerator(Head &&head, const Rest &&... rest)
+  explicit UnionGenerator(Head &&head, const Rest &&...rest)
       : head(std::forward<Head>(head)), rest(std::forward<Rest...>(rest...)) {}
   std::vector<int64_t> operator()(int64_t range) const {
     auto v1 = head(range);
@@ -59,8 +58,7 @@ private:
   UnionGenerator<Rest...> rest;
 };
 
-template <typename Single>
-class UnionGenerator<Single> {
+template <typename Single> class UnionGenerator<Single> {
 public:
   explicit UnionGenerator(Single &&single)
       : single(std::forward<Single>(single)) {}

@@ -2,7 +2,7 @@
 
 // CHECK-LABEL: func @bit_not
 func @bit_not(%arg0: tensor<10x20xsi32>) -> tensor<10x20xsi32> {
-  // CHECK: %[[negOne:.*]] = constant -1 : i32
+  // CHECK: %[[negOne:.*]] = arith.constant -1 : i32
   // CHECK: linalg.init_tensor
   // CHECK: linalg.generic
   // CHECK:   subi %[[negOne]], %{{.*}}
@@ -13,7 +13,7 @@ func @bit_not(%arg0: tensor<10x20xsi32>) -> tensor<10x20xsi32> {
 
 // CHECK-LABEL: func @neg_i32
 func @neg_i32(%arg0: tensor<10x20xsi32>) -> tensor<10x20xsi32> {
-  // CHECK: %[[c0:.*]] = constant 0 : i32
+  // CHECK: %[[c0:.*]] = arith.constant 0 : i32
   // CHECK: linalg.init_tensor
   // CHECK: linalg.generic
   // CHECK:   subi %[[c0]], %{{.*}}
@@ -46,7 +46,7 @@ func @asin_f32(%arg0: tensor<8x9xf32>) -> tensor<8x9xf32> {
 func @atan_f32(%arg0: tensor<8x9xf32>) -> tensor<8x9xf32> {
   // CHECK: linalg.init_tensor
   // CHECK: linalg.generic
-  // CHECK:   stdx.atan({{.*}}) : (f32) -> f32
+  // CHECK:   math.atan {{.*}} : f32
   // CHECK:   linalg.yield
   %0 = tile.atan %arg0 : (tensor<8x9xf32>) -> tensor<8x9xf32>
   return %0 : tensor<8x9xf32>
@@ -66,7 +66,7 @@ func @cosh_f32(%arg0: tensor<8x9xf32>) -> tensor<8x9xf32> {
 func @erf_f32(%arg0: tensor<8x9xf32>) -> tensor<8x9xf32> {
   // CHECK: linalg.init_tensor
   // CHECK: linalg.generic
-  // CHECK:   stdx.erf({{.*}}) : (f32) -> f32
+  // CHECK:   math.erf {{.*}} : f32
   // CHECK:   linalg.yield
   %0 = tile.erf %arg0 : (tensor<8x9xf32>) -> tensor<8x9xf32>
   return %0 : tensor<8x9xf32>
@@ -76,7 +76,7 @@ func @erf_f32(%arg0: tensor<8x9xf32>) -> tensor<8x9xf32> {
 func @floor_f32(%arg0: tensor<8x9xf32>) -> tensor<8x9xf32> {
   // CHECK: linalg.init_tensor
   // CHECK: linalg.generic
-  // CHECK:   stdx.floor({{.*}}) : (f32) -> f32
+  // CHECK:   math.floor {{.*}} : f32
   // CHECK:   linalg.yield
   %0 = tile.floor %arg0 : (tensor<8x9xf32>) -> tensor<8x9xf32>
   return %0 : tensor<8x9xf32>
@@ -86,7 +86,7 @@ func @floor_f32(%arg0: tensor<8x9xf32>) -> tensor<8x9xf32> {
 func @pow_f32(%arg0: tensor<8x9xf32>, %arg1: tensor<8x9xf32>) -> tensor<8x9xf32> {
   // CHECK: linalg.init_tensor
   // CHECK: linalg.generic
-  // CHECK:   stdx.pow({{.*}}, {{.*}}) : (f32, f32) -> f32
+  // CHECK:   math.powf {{.*}}, {{.*}} : f32
   // CHECK:   linalg.yield
   %0 = tile.pow %arg0, %arg1 : (tensor<8x9xf32>, tensor<8x9xf32>) -> tensor<8x9xf32>
   return %0 : tensor<8x9xf32>
@@ -97,7 +97,7 @@ func @pow_f32_to_si32(%arg0: tensor<8x9xf32>, %arg1: tensor<8x9xsi32>) -> tensor
   // CHECK: linalg.init_tensor
   // CHECK: linalg.generic
   // CHECK:   sitofp
-  // CHECK:   stdx.pow({{.*}}, {{.*}}) : (f32, f32) -> f32
+  // CHECK:   math.powf {{.*}}, {{.*}} : f32
   // CHECK:   linalg.yield
   %0 = tile.pow %arg0, %arg1 : (tensor<8x9xf32>, tensor<8x9xsi32>) -> tensor<8x9xf32>
   return %0 : tensor<8x9xf32>

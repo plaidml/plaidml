@@ -1,10 +1,10 @@
 // RUN: pmlc-opt -split-input-file -pxa-dealloc-placement %s | FileCheck %s
 
 func @double_for(%arg0: memref<16x16xf32>, %arg1: memref<16x16xf32>) -> memref<16x16xf32> {
-  %cst = constant 0.0 : f32
-  %c0 = constant 0 : index
-  %c1 = constant 1 : index
-  %c4 = constant 4 : index
+  %cst = arith.constant 0.0 : f32
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c4 = arith.constant 4 : index
   %0 = scf.for %arg2 = %c0 to %c4 step %c1 iter_args(%arg3 = %arg0) -> (memref<16x16xf32>) {
     %1 = scf.for %arg4 = %c0 to %c4 step %c1 iter_args(%arg5 = %arg3) -> (memref<16x16xf32>) {
       %2 = memref.alloc() : memref<16x16xf32>
@@ -15,7 +15,7 @@ func @double_for(%arg0: memref<16x16xf32>, %arg1: memref<16x16xf32>) -> memref<1
       %4 = affine.parallel (%arg6, %arg7, %arg8) = (0, 0, 0) to (16, 16, 16) reduce ("assign") -> (memref<16x16xf32>) {
         %5 = pxa.load %arg5[%arg6, %arg8] : memref<16x16xf32>
         %6 = pxa.load %arg0[%arg8, %arg7] : memref<16x16xf32>
-        %7 = mulf %5, %6 : f32
+        %7 = arith.mulf %5, %6 : f32
         %8 = pxa.reduce addf %7, %3[%arg6, %arg7] : memref<16x16xf32>
         affine.yield %8 : memref<16x16xf32>
       }
@@ -48,10 +48,10 @@ func @double_for(%arg0: memref<16x16xf32>, %arg1: memref<16x16xf32>) -> memref<1
 // -----
 
 func @matrix_power(%arg0: memref<16x16xf32>, %arg1: memref<16x16xf32>) -> memref<16x16xf32> {
-  %cst = constant 0.0 : f32
-  %c0 = constant 0 : index
-  %c1 = constant 1 : index
-  %c4 = constant 4 : index
+  %cst = arith.constant 0.0 : f32
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c4 = arith.constant 4 : index
   %0 = scf.for %arg2 = %c0 to %c4 step %c1 iter_args(%arg3 = %arg0) -> (memref<16x16xf32>) {
     %1 = memref.alloc() : memref<16x16xf32>
     %2 = affine.parallel (%arg4, %arg5) = (0, 0) to (16, 16) reduce ("assign") -> (memref<16x16xf32>) {
@@ -61,7 +61,7 @@ func @matrix_power(%arg0: memref<16x16xf32>, %arg1: memref<16x16xf32>) -> memref
     %3 = affine.parallel (%arg4, %arg5, %arg6) = (0, 0, 0) to (16, 16, 16) reduce ("assign") -> (memref<16x16xf32>) {
       %7 = pxa.load %arg3[%arg4, %arg6] : memref<16x16xf32>
       %8 = pxa.load %arg0[%arg6, %arg5] : memref<16x16xf32>
-      %9 = mulf %7, %8 : f32
+      %9 = arith.mulf %7, %8 : f32
       %10 = pxa.reduce addf %9, %2[%arg4, %arg5] : memref<16x16xf32>
       affine.yield %10 : memref<16x16xf32>
     }
@@ -73,7 +73,7 @@ func @matrix_power(%arg0: memref<16x16xf32>, %arg1: memref<16x16xf32>) -> memref
     %6 = affine.parallel (%arg4, %arg5, %arg6) = (0, 0, 0) to (16, 16, 16) reduce ("assign") -> (memref<16x16xf32>) {
       %7 = pxa.load %3[%arg4, %arg6] : memref<16x16xf32>
       %8 = pxa.load %arg0[%arg6, %arg5] : memref<16x16xf32>
-      %9 = mulf %7, %8 : f32
+      %9 = arith.mulf %7, %8 : f32
       %10 = pxa.reduce addf %9, %5[%arg4, %arg5] : memref<16x16xf32>
       affine.yield %10 : memref<16x16xf32>
     }

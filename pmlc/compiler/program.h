@@ -48,7 +48,7 @@ struct Program {
   std::string entry;
   std::string tileIR;
   std::unique_ptr<mlir::MLIRContext> context;
-  mlir::OwningModuleRef module;
+  mlir::OwningOpRef<mlir::ModuleOp> module;
   std::vector<mlir::Type> inputs;
   std::vector<mlir::Type> outputs;
   std::vector<ConstantArgument> constants;

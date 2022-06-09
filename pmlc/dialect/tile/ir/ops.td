@@ -70,21 +70,22 @@ def ContractionOp : TileOp<"contract", [
     void setSources(mlir::ArrayRef<mlir::AffineMap> srcs);
     void setConstraints(mlir::IntegerSet cons);
 
-    mlir::RankedTensorType getResultType() { return result().getType().cast<mlir::RankedTensorType>(); }
+    mlir::RankedTensorType getResultType() { 
+      return result().getType().cast<mlir::RankedTensorType>(); 
+    }
 
     mlir::LogicalResult materializeOperands(mlir::OpBuilder& builder);
   }];
 
-  let printer = [{ print$cppClass(&p, *this); }];
-  let parser = [{ return parse$cppClass(&parser, result); }];
-  let verifier = [{ return verify$cppClass(*this); }];
+  let hasCustomAssemblyFormat = 1;
+  let hasVerifier = 1;
   let hasCanonicalizer = 1;
 }
 
-class SpecialOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
+class SpecialOp<string mnemonic, list<Trait> traits = [NoSideEffect]> :
     Op<TileDialect, mnemonic, traits>;
 
-class MaterializeOp<string mnemonic, list<OpTrait> traits = [NoSideEffect]> :
+class MaterializeOp<string mnemonic, list<Trait> traits = [NoSideEffect]> :
   Op<TileDialect, mnemonic, !listconcat(traits, [
     MaterializeOperandsOpInterface
   ])> {
@@ -162,7 +163,7 @@ def ReshapeOp : MaterializeOp<"reshape">,
   let assemblyFormat = [{
     $tensor attr-dict `:` functional-type($tensor, $result)
   }];
-  let verifier = [{ return verify$cppClass(*this); }];
+  let hasVerifier = 1;
 }
 
 def ScatterOp : MaterializeOp<"scatter"> {

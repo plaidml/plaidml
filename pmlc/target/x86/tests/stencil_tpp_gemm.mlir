@@ -18,7 +18,7 @@ func @no_gemm_mul_reduce_operation(%arg0: memref<100x100xf32>, %arg1: memref<100
   %ret = affine.parallel (%i, %j, %k) = (0, 0, 0) to (100, 100, 100) reduce ("assign") -> (memref<100x100xf32>) {
     %0 = pxa.load %arg1[%i, %k] : memref<100x100xf32>
     %1 = pxa.load %arg0[%k, %j] : memref<100x100xf32>
-    %2 = mulf %0, %1 : f32
+    %2 = arith.mulf %0, %1 : f32
     %3 = pxa.reduce mulf %2, %out[%i, %j] : memref<100x100xf32>
     affine.yield %3 : memref<100x100xf32>
   }
@@ -35,7 +35,7 @@ func @no_gemm_no_mul_before_reduce_operation(%arg0: memref<100x100xf32>, %arg1: 
   %ret = affine.parallel (%i, %j, %k) = (0, 0, 0) to (100, 100, 100) reduce ("assign") -> (memref<100x100xf32>) {
     %0 = pxa.load %arg1[%i, %k] : memref<100x100xf32>
     %1 = pxa.load %arg0[%k, %j] : memref<100x100xf32>
-    %2 = addf %0, %1 : f32
+    %2 = arith.addf %0, %1 : f32
     %3 = pxa.reduce addf %2, %out[%i, %j] : memref<100x100xf32>
     affine.yield %3 : memref<100x100xf32>
   }
@@ -52,8 +52,8 @@ func @no_gemm_mul_params_not_affine_loads(%arg0: memref<100x100xf32>, %arg1: mem
   %ret = affine.parallel (%i, %j, %k) = (0, 0, 0) to (100, 100, 100) reduce ("assign") -> (memref<100x100xf32>) {
     %0 = pxa.load %arg1[%i, %k] : memref<100x100xf32>
     %1 = pxa.load %arg0[%k, %j] : memref<100x100xf32>
-    %2 = addf %0, %1 : f32
-    %3 = mulf %0, %2 : f32
+    %2 = arith.addf %0, %1 : f32
+    %3 = arith.mulf %0, %2 : f32
     %4 = pxa.reduce addf %3, %out[%i, %j] : memref<100x100xf32>
     affine.yield %4 : memref<100x100xf32>
   }
@@ -70,8 +70,8 @@ func @no_gemm_no_stride_one_1(%arg0: memref<100x100xf32>, %arg1: memref<100x100x
   %ret = affine.parallel (%i, %j, %k) = (0, 0, 0) to (100, 100, 100) reduce ("assign") -> (memref<100x100xf32>) {
     %0 = pxa.load %arg1[%k, %i] : memref<100x100xf32>
     %1 = pxa.load %arg0[%k, %j] : memref<100x100xf32>
-    %2 = addf %0, %1 : f32
-    %3 = mulf %0, %2 : f32
+    %2 = arith.addf %0, %1 : f32
+    %3 = arith.mulf %0, %2 : f32
     %4 = pxa.reduce addf %3, %out[%i, %j] : memref<100x100xf32>
     affine.yield %4 : memref<100x100xf32>
   }
@@ -88,8 +88,8 @@ func @no_gemm_no_stride_one_2(%arg0: memref<100x100xf32>, %arg1: memref<100x100x
   %ret = affine.parallel (%i, %j, %k) = (0, 0, 0) to (100, 100, 100) reduce ("assign") -> (memref<100x100xf32>) {
     %0 = pxa.load %arg1[%k, %i] : memref<100x100xf32>
     %1 = pxa.load %arg0[%k, 2*%j] : memref<100x100xf32>
-    %2 = addf %0, %1 : f32
-    %3 = mulf %0, %2 : f32
+    %2 = arith.addf %0, %1 : f32
+    %3 = arith.mulf %0, %2 : f32
     %4 = pxa.reduce addf %3, %out[%i, %j] : memref<100x100xf32>
     affine.yield %4 : memref<100x100xf32>
   }
@@ -106,7 +106,7 @@ func @gemm_operation_rewrite_f32(%arg0: memref<100x100xf32>, %arg1: memref<100x1
   %ret = affine.parallel (%i, %j, %k) = (0, 0, 0) to (100, 100, 100) reduce ("assign") -> (memref<100x100xf32>) {
     %0 = pxa.load %arg1[%i, %k] : memref<100x100xf32>
     %1 = pxa.load %arg0[%k, %j] : memref<100x100xf32>
-    %2 = mulf %0, %1 : f32
+    %2 = arith.mulf %0, %1 : f32
     %3 = pxa.reduce addf %2, %out[%i, %j] : memref<100x100xf32>
     affine.yield %3 : memref<100x100xf32>
   }
@@ -122,7 +122,7 @@ func @conv1(%arg0: memref<1x230x230x3xf32>, %arg1: memref<7x7x3x64xf32>, %arg2: 
   %2 = affine.parallel (%arg5, %arg6, %arg7, %arg8, %arg9, %arg10, %arg11) = (0, 0, 0, 0, 0, 0, 0) to (1, 112, 112, 64, 7, 7, 3) reduce ("assign") -> (memref<1x112x112x64xf32>) {
     %6 = pxa.load %arg0[%arg5, %arg6 * 2 + %arg9, %arg7 * 2 + %arg10, %arg11] : memref<1x230x230x3xf32>
     %7 = pxa.load %arg1[%arg9, %arg10, %arg11, %arg8] : memref<7x7x3x64xf32>
-    %8 = mulf %6, %7 : f32
+    %8 = arith.mulf %6, %7 : f32
     %9 = pxa.reduce addf %8, %arg2[%arg5, %arg6, %arg7, %arg8] : memref<1x112x112x64xf32>
     affine.yield %9 : memref<1x112x112x64xf32>
   }
@@ -138,7 +138,7 @@ func @res2a_branch2a(%arg0: memref<1x56x56x64xf32>, %arg1: memref<1x1x64x64xf32>
   %2 = affine.parallel (%arg5, %arg6, %arg7, %arg8, %arg9, %arg10, %arg11) = (0, 0, 0, 0, 0, 0, 0) to (1, 56, 56, 64, 1, 1, 64) reduce ("assign") -> (memref<1x56x56x64xf32>) {
     %6 = pxa.load %arg0[%arg5, %arg6 + %arg9, %arg7 + %arg10, %arg11] : memref<1x56x56x64xf32>
     %7 = pxa.load %arg1[%arg9, %arg10, %arg11, %arg8] : memref<1x1x64x64xf32>
-    %8 = mulf %6, %7 : f32
+    %8 = arith.mulf %6, %7 : f32
     %9 = pxa.reduce addf %8, %arg2[%arg5, %arg6, %arg7, %arg8] : memref<1x56x56x64xf32>
     affine.yield %9 : memref<1x56x56x64xf32>
   }
@@ -158,7 +158,7 @@ func @use_schedule(%arg0: memref<1x56x56x64xf32>, %arg1: memref<1x1x64x64xf32>, 
   %2 = affine.parallel (%n, %h, %w, %k, %r, %s, %c) = (0, 0, 0, 0, 0, 0, 0) to (1, 56, 56, 64, 1, 1, 64) reduce ("assign") -> (memref<1x56x56x64xf32>) {
     %6 = pxa.load %arg0[%n, %h + %r, %w + %s, %c] : memref<1x56x56x64xf32>
     %7 = pxa.load %arg1[%r, %s, %c, %k] : memref<1x1x64x64xf32>
-    %8 = mulf %6, %7 : f32
+    %8 = arith.mulf %6, %7 : f32
     %9 = pxa.reduce addf %8, %arg2[%n, %h, %w, %k] : memref<1x56x56x64xf32>
     affine.yield %9 : memref<1x56x56x64xf32>
   } {schedule = #schedule}
@@ -178,7 +178,7 @@ func @partial_schedule(%arg0: memref<1x56x56x64xf32>, %arg1: memref<1x1x64x64xf3
   %2 = affine.parallel (%n, %h, %w, %k, %r, %s, %c) = (0, 0, 0, 0, 0, 0, 0) to (1, 56, 56, 64, 1, 1, 64) reduce ("assign") -> (memref<1x56x56x64xf32>) {
     %6 = pxa.load %arg0[%n, %h + %r, %w + %s, %c] : memref<1x56x56x64xf32>
     %7 = pxa.load %arg1[%r, %s, %c, %k] : memref<1x1x64x64xf32>
-    %8 = mulf %6, %7 : f32
+    %8 = arith.mulf %6, %7 : f32
     %9 = pxa.reduce addf %8, %arg2[%n, %h, %w, %k] : memref<1x56x56x64xf32>
     affine.yield %9 : memref<1x56x56x64xf32>
   } {schedule = #schedule}

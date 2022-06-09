@@ -3,7 +3,7 @@ channels:
 dependencies:
   - ccache=4.1
   - cffi=1.14.4
-  - cmake=3.13.4
+  - cmake=3.15.0
   - cython=0.29.22
   - doxygen=1.9.1
   - git=2.32.0
@@ -28,6 +28,7 @@ dependencies:
       - nbstripout==0.3.9
       - opencv-python-headless==4.5.3.56
       - pcpp==1.20.1
+      - protobuf==3.20.1
       - sphinx-rtd-theme==0.5.1
       - sphinxcontrib-katex==0.7.1
       - sphinxcontrib-napoleon==0.7

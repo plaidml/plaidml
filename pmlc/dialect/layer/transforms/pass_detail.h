@@ -4,6 +4,12 @@
 
 #include "mlir/Pass/Pass.h"
 
+namespace mlir {
+namespace func {
+class FuncOp;
+} // end namespace func
+} // end namespace mlir
+
 namespace pmlc::dialect::layer {
 
 #define GEN_PASS_CLASSES
