@@ -415,6 +415,21 @@ TEST_F(CppEdsl, DISABLED_ConstCast) {
   checkExact(program, {}, {expected});
 }
 
+TEST_F(CppEdsl, HighDimDot) {
+  const int64_t M = 8;
+  const int64_t N = 32;
+  const int64_t K = 16;
+  const int64_t X = 5;
+  const int64_t Y = 4;
+  const int64_t Z = 4;
+
+  auto A = Placeholder(DType::FLOAT32, {X, Y, Z, M, K});
+  auto B = Placeholder(DType::FLOAT32, {X, Y, Z, K, N});
+  TensorIndex m, n, k, x, y, z;
+  Tensor C = Contraction().outShape(X, Y, Z, M, N).outAccess(x, y, z, m, n).sum(A(x, y, z, m, k) * B(x, y, z, k, n));
+  auto program = makeProgram("highdim_dot", {A, B}, {C});
+}
+
 TEST_F(CppEdsl, Dot) {
   const int64_t M = 8;
   const int64_t N = 32;
