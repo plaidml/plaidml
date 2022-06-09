@@ -180,6 +180,8 @@ extern "C" int64_t plaidml_rt_xsmm_unary_dispatch(
     unary_flags = LIBXSMM_MELTW_FLAG_UNARY_BCAST_SCALAR;
   }
 
+  libxsmm_meltw_unary_type unary_type =
+      static_cast<libxsmm_meltw_unary_type>(type);
   if (unary_type == LIBXSMM_MELTW_TYPE_UNARY_REDUCE_X_OP_ADD ||
       unary_type == LIBXSMM_MELTW_TYPE_UNARY_REDUCE_X_OP_MUL ||
       unary_type == LIBXSMM_MELTW_TYPE_UNARY_REDUCE_X_OP_MAX) {
@@ -198,8 +200,7 @@ extern "C" int64_t plaidml_rt_xsmm_unary_dispatch(
   unary_shape.ldo = ldo_int;
 
   libxsmm_meltwfunction_unary kernel = libxsmm_dispatch_meltw_unary_v2(
-      static_cast<libxsmm_meltw_unary_type>(type), unary_shape,
-      static_cast<libxsmm_bitfield>(unary_flags));
+      unary_type, unary_shape, static_cast<libxsmm_bitfield>(unary_flags));
 
   return reinterpret_cast<int64_t>(kernel);
 }

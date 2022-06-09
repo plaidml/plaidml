@@ -144,7 +144,7 @@ private:
   }
 
   void maybeCaptureReduceOp(Optional<pxa::StencilCapture> &capture,
-                            StringRef inName, AtomicRMWKind agg) {
+                            StringRef inName, arith::AtomicRMWKind agg) {
     if (capture)
       return;
     AffineValueMap ranges = util::getRangesValueMap(op);
@@ -172,7 +172,7 @@ private:
       // If the definition of load's source is in "op", it is too complex to
       // stencil
       auto defOp = source.getDefiningOp();
-      while (!isa<FuncOp>(defOp)) {
+      while (!isa<func::FuncOp>(defOp)) {
         if (defOp == op.getOperation())
           return;
         defOp = defOp->getParentOp();
@@ -194,9 +194,9 @@ private:
     maybeCaptureGeneric<math::TanhOp>(ret, "tpp_tanh");
     maybeCaptureGeneric<math::ExpOp>(ret, "tpp_exp");
     maybeCaptureIdentityOp(ret, "tpp_identity");
-    maybeCaptureReduceOp(ret, "tpp_add_reduce", AtomicRMWKind::addf);
-    maybeCaptureReduceOp(ret, "tpp_mul_reduce", AtomicRMWKind::mulf);
-    maybeCaptureReduceOp(ret, "tpp_max_reduce", AtomicRMWKind::maxf);
+    maybeCaptureReduceOp(ret, "tpp_add_reduce", arith::AtomicRMWKind::addf);
+    maybeCaptureReduceOp(ret, "tpp_mul_reduce", arith::AtomicRMWKind::mulf);
+    maybeCaptureReduceOp(ret, "tpp_max_reduce", arith::AtomicRMWKind::maxf);
     return ret;
   }
 
@@ -318,7 +318,7 @@ void addSingleIteration(AffineParallelOp op) {
     newSteps.push_back(1);
     groups.push_back(1);
     // Keep the original args
-    body->addArguments(body->getArguments()[0].getType());
+    body->addArguments(body->getArguments()[0].getType(), op.getLoc());
     for (unsigned i = 0, e = steps.size(); i < e; ++i) {
       int64_t step = steps[i];
       newLowerBounds.push_back(op.lowerBoundsMap().getResult(i));
