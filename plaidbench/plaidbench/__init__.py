@@ -33,6 +33,7 @@ SUPPORTED_NETWORKS = {
         'resnet50',
         'toy_parallel_conv',
         'toy_gemms',
+        'toy_xcp',
         'vgg16',
         'vgg19',
         'xception',

@@ -40,6 +40,7 @@ pml_py_library(
     plaidbench/networks/keras/resnet50.py
     plaidbench/networks/keras/toy_gemms.py
     plaidbench/networks/keras/toy_parallel_conv.py
+    plaidbench/networks/keras/toy_xcp.py
     plaidbench/networks/keras/vgg16.py
     plaidbench/networks/keras/vgg19.py
     plaidbench/networks/keras/xception.py
