@@ -25,6 +25,7 @@ pml_py_library(
     plaidbench/golden/nasnet_large/infer,bs-1.npy
     plaidbench/golden/mobilenet/infer,bs-1.npy
     plaidbench/golden/mobilenet/train,bs-1.npy
+    plaidbench/golden/toy_parallel_conv/infer,bs-1.npy
     plaidbench/imdb16.npy
     plaidbench/networks/keras/densenet121.py
     plaidbench/networks/keras/densenet169.py
@@ -40,6 +41,7 @@ pml_py_library(
     plaidbench/networks/keras/resnet50.py
     plaidbench/networks/keras/toy_gemms.py
     plaidbench/networks/keras/toy_parallel_conv.py
+    plaidbench/networks/keras/toy_parallel_conv.h5
     plaidbench/networks/keras/toy_xcp.py
     plaidbench/networks/keras/vgg16.py
     plaidbench/networks/keras/vgg19.py

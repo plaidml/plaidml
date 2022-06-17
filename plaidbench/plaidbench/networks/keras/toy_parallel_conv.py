@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+
 
 def scale_dataset(x_train):
     import numpy as np
@@ -30,5 +32,9 @@ def build_model():
     l2b = Activation('relu')(Conv2D(256, 3, strides=2, padding='same')(l1))
     outp = Activation('relu')(k_add([l2a, l2b]))
     model = Model(inp, outp)
+
+    this_dir = os.path.dirname(os.path.abspath(__file__))
+    weights_path = os.path.join(this_dir, 'networks', 'keras', 'toy_parallel_conv.h5')
+    model.load_weights(weights_path)
 
     return model
