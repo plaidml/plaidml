@@ -726,6 +726,17 @@ struct ReorderWeightLayoutsPass
           builder.create<linalg::YieldOp>(loc, ValueRange{add});
         });
 
+    if (!newConv.getShapesToLoopsMap()) {
+      IVLOG(1, "Cannot reorder: LinAlg unable to infer ShapesToLoopsMap. op: "
+                   << debugString(op));
+      IVLOG(2, "    note: attempted reordered op: " << debugString(newConv));
+
+      // Back out the reordered op
+      newConv.erase();
+      reorderFilter.erase();
+      return;
+    }
+
     op.getResult(0).replaceAllUsesWith(newConv.getResult(0));
     op.erase();
   }
