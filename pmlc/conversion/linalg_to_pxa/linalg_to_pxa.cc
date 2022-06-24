@@ -8,7 +8,6 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "pmlc/conversion/linalg_to_pxa/pass_detail.h"
-#include "pmlc/conversion/tile_to_pxa/pass_detail.h"
 #include "pmlc/dialect/pxa/analysis/uses.h"
 #include "pmlc/dialect/tile/ir/ops.h"
 #include "pmlc/util/matchers.h"

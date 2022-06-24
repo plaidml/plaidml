@@ -100,29 +100,39 @@ ParseResult BRGemmOffsInvokeF32Op::parse(OpAsmParser &parser,
   IntegerAttr numBatchesAttr;
   FunctionType funcType;
   OpAsmParser::UnresolvedOperand ptr;
-  return failure(
-      parser.parseOperand(ptr) || parser.parseComma() ||
+
+  if (parser.parseOperand(ptr) || parser.parseComma() ||
       parser.parseOperand(c.memref) ||
       parser.parseOperandList(c.indices, OpAsmParser::Delimiter::Square) ||
       parser.parseEqual() || parser.parseOperand(a.memref) ||
       parser.parseOperandList(a.indices, OpAsmParser::Delimiter::Square) ||
       parser.parseComma() || parser.parseOperand(b.memref) ||
-      parser.parseOperandList(b.indices, OpAsmParser::Delimiter::Square) ||
-      parser.parseComma() ||
-      parser.parseAttribute(numBatchesAttr, i64Type, "numBatches",
-                            result.attributes) ||
-      parser.parseComma() ||
+      parser.parseOperandList(b.indices, OpAsmParser::Delimiter::Square))
+    return failure();
+
+  if (parser.parseComma() || parser.parseKeyword("aOffsets") ||
+      parser.parseEqual() ||
       parser.parseAttribute(aOffs, i64Type, "aOffsets", result.attributes) ||
-      parser.parseComma() ||
-      parser.parseAttribute(bOffs, i64Type, "bOffsets", result.attributes) ||
-      parser.parseColonType(funcType) ||
+      parser.parseComma() || parser.parseKeyword("bOffsets") ||
+      parser.parseEqual() ||
+      parser.parseAttribute(aOffs, i64Type, "bOffsets", result.attributes) ||
+      parser.parseComma() || parser.parseKeyword("numBatches") ||
+      parser.parseEqual() ||
+      parser.parseAttribute(numBatchesAttr, i64Type, "numBatches",
+                            result.attributes))
+    return failure();
+
+  if (parser.parseColonType(funcType) ||
       parser.resolveOperand(ptr, i64Type, result.operands) ||
       parser.resolveOperand(c.memref, funcType.getResult(0), result.operands) ||
       parser.resolveOperand(a.memref, funcType.getInput(0), result.operands) ||
       parser.resolveOperand(b.memref, funcType.getInput(1), result.operands) ||
       parser.resolveOperands(c.indices, indexType, result.operands) ||
       parser.resolveOperands(a.indices, indexType, result.operands) ||
-      parser.resolveOperands(b.indices, indexType, result.operands));
+      parser.resolveOperands(b.indices, indexType, result.operands))
+    return failure();
+
+  return success();
 }
 
 BRGemmOffsInvokeF32Op::operand_range BRGemmOffsInvokeF32Op::getOperandsForA() {
@@ -154,10 +164,11 @@ void BRGemmOffsInvokeF32Op::print(OpAsmPrinter &p) {
   p.printOperands(getOperandsForA());
   p << "], " << b() << '[';
   p.printOperands(getOperandsForB());
-  p << "] : " << funcType;
-  p << " aOffsets = " << aOffsets();
-  p << " bOffsets = " << bOffsets();
-  p << " numBatches = " << numBatches();
+  p << "], "
+    << "aOffsets = " << aOffsets();
+  p << ", bOffsets = " << bOffsets();
+  p << ", numBatches = " << numBatches();
+  p << " : " << funcType;
 }
 
 //
@@ -258,26 +269,6 @@ static std::string stringfy(BinaryKind kind) {
     return "pack";
   }
   llvm_unreachable("kind not right");
-}
-
-void BinaryDispatchOp::print(OpAsmPrinter &p) {
-  p << '{';
-  p << ' ' << "bcastType1 = " << bcastType1();
-  p << ' ' << "bcastType2 = " << bcastType2();
-  p << ' ' << "compute_type = " << compute_type();
-  p << ' ' << "func_type = " << func_type();
-  p << ' ' << "kind = " << stringfy(kind());
-  p << ' ' << "ldi1 = " << ldi1();
-  p << ' ' << "ldi2 = " << ldi2();
-  p << ' ' << "ldo = " << ldo();
-  p << ' ' << "tile = " << tile();
-  p << '}';
-}
-
-ParseResult BinaryDispatchOp::parse(OpAsmParser &parser,
-                                    OperationState &result) {
-  assert(0 && "implement me");
-  return failure();
 }
 
 //

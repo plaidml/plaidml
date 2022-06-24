@@ -327,9 +327,8 @@ func @conv2_xsmm_brgemm_offs(%I: !I_memref, %K: !K_memref, %O: !O_memref) {
   %CO = memref.dim %O, %c3 : !O_memref
   %ptr = xsmm.brgemm.offs.dispatch.f32 [2, 11, 1], [35, 11, 55]
   affine.parallel (%x, %y) = (0, 0) to (%X, %Y) step (2, 1) {
-    xsmm.brgemm.offs.invoke.f32 %ptr, %O[%c0, %x, %y, %c0] = %I[%c0, %x, %y, %c0], %K[%c0, %c0, %c0, %c0], 7,
-      [0,  4,  8,  12,  16,  20,  24],
-      [0, 44, 88, 132, 176, 220, 264] : (!I_memref, !K_memref) -> !O_memref
+    xsmm.brgemm.offs.invoke.f32 %ptr, %O[%c0, %x, %y, %c0] = %I[%c0, %x, %y, %c0], %K[%c0, %c0, %c0, %c0],    aOffsets = [0,  4,  8,  12,  16,  20,  24],
+     bOffsets = [0, 44, 88, 132, 176, 220, 264], numBatches = 7 : (!I_memref, !K_memref) -> !O_memref
   }
   return
 }

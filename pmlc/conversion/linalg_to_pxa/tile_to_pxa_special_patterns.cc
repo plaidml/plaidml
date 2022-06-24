@@ -1,8 +1,15 @@
-// Copyright 2021, Intel Corporation
-
-#include "pmlc/conversion/tile_to_pxa/pass_detail.h"
+#include "pmlc/conversion/linalg_to_pxa/special_utils.h"
+#include "pmlc/dialect/layer/ir/ops.h"
+#include "pmlc/dialect/pxa/ir/ops.h"
 #include "pmlc/dialect/tile/ir/ops.h"
+#include "pmlc/dialect/tile/transforms/padding.h"
 #include "pmlc/util/logging.h"
+
+#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Math/IR/Math.h"
+#include "mlir/Dialect/SCF/SCF.h"
+#include "mlir/IR/PatternMatch.h"
+#include "mlir/Transforms/DialectConversion.h"
 
 namespace pmlc::conversion::tile_to_pxa {
 
@@ -519,16 +526,14 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
 
     // Calculate coefficients of g0 and g1
     Value floorF =
-        rewriter.create<mlir::math::FloorOp>(loc, elementType, idx).getResult();
-    Value c0 =
-        rewriter.create<mlir::arith::SubFOp>(loc, idx, floorF).getResult();
-    Value c1 = rewriter.create<mlir::arith::SubFOp>(loc, cst1F, c0).getResult();
+        rewriter.create<math::FloorOp>(loc, elementType, idx).getResult();
+    Value c0 = rewriter.create<arith::SubFOp>(loc, idx, floorF).getResult();
+    Value c1 = rewriter.create<arith::SubFOp>(loc, cst1F, c0).getResult();
 
     // Return interpolation result (result = c0*g0 + c1*g1)
-    Value p0 = rewriter.create<mlir::arith::MulFOp>(loc, c0, g0).getResult();
-    Value p1 = rewriter.create<mlir::arith::MulFOp>(loc, c1, g1).getResult();
-    Value result =
-        rewriter.create<mlir::arith::AddFOp>(loc, p0, p1).getResult();
+    Value p0 = rewriter.create<arith::MulFOp>(loc, c0, g0).getResult();
+    Value p1 = rewriter.create<arith::MulFOp>(loc, c1, g1).getResult();
+    Value result = rewriter.create<arith::AddFOp>(loc, p0, p1).getResult();
     result = processOutOfBoundsMode(loc, rewriter, result, idx, bounds,
                                     elementType, outOfBoundsMode);
     return result;
@@ -589,8 +594,8 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
     SmallVector<Value, 4> g;
     for (size_t i = 0; i < x.size(); i++) {
       x[i] = checkIntOutOfBounds(loc, rewriter, x[i], bounds);
-      x[i] = rewriter.create<mlir::arith::IndexCastOp>(loc, idxType, x[i])
-                 .getResult();
+      x[i] =
+          rewriter.create<arith::IndexCastOp>(loc, idxType, x[i]).getResult();
       srcOps.at(axis) = x[i];
       auto loadOp = rewriter.create<memref::LoadOp>(loc, tensor, srcOps);
       g.push_back(loadOp.getResult());
@@ -598,15 +603,14 @@ struct GatherOpConversion : public OpConversionPattern<tile::GatherOp> {
 
     // Calculate intermediate terms
     SmallVector<Value, 4> p;
-    Value floorF = rewriter.create<mlir::math::FloorOp>(loc, idx.getType(), idx)
-                       .getResult();
-    Value s =
-        rewriter.create<mlir::arith::SubFOp>(loc, idx, floorF).getResult();
-    Value s2 = rewriter.create<mlir::arith::MulFOp>(loc, s, s).getResult();
-    Value s3 = rewriter.create<mlir::arith::MulFOp>(loc, s2, s).getResult();
-    Value s_a = rewriter.create<mlir::arith::MulFOp>(loc, a, s).getResult();
-    Value s2_a = rewriter.create<mlir::arith::MulFOp>(loc, a, s2).getResult();
-    Value s3_a = rewriter.create<mlir::arith::MulFOp>(loc, a, s3).getResult();
+    Value floorF =
+        rewriter.create<math::FloorOp>(loc, idx.getType(), idx).getResult();
+    Value s = rewriter.create<arith::SubFOp>(loc, idx, floorF).getResult();
+    Value s2 = rewriter.create<arith::MulFOp>(loc, s, s).getResult();
+    Value s3 = rewriter.create<arith::MulFOp>(loc, s2, s).getResult();
+    Value s_a = rewriter.create<arith::MulFOp>(loc, a, s).getResult();
+    Value s2_a = rewriter.create<arith::MulFOp>(loc, a, s2).getResult();
+    Value s3_a = rewriter.create<arith::MulFOp>(loc, a, s3).getResult();
     Value s3_a2 =
         rewriter.create<mlir::arith::AddFOp>(loc, a, cstF[2]).getResult();
     s3_a2 = rewriter.create<mlir::arith::MulFOp>(loc, s3_a2, s3).getResult();
