@@ -116,10 +116,6 @@ LogicalResult SubgroupBroadcastOp::verify() {
   return success();
 }
 
-LogicalResult PowOp::verify() {
-  return success();
-}
-
 // ---- StdXDialect ----
 
 void StdXDialect::initialize() {

@@ -122,11 +122,13 @@ struct PropagateReorderThruPadTensorOpPattern
                                                 /*low=*/ValueRange{},
                                                 /*high=*/ValueRange{});
     SmallVector<Type, 4> padArgs(lower.size(), rewriter.getIndexType());
+    SmallVector<Location, 4> locs(lower.size(), op->getLoc());
     {
       OpBuilder::InsertionGuard guard(rewriter);
-      rewriter.createBlock(&newOp.region(), newOp.region().begin(), padArgs);
-      rewriter.create<linalg::YieldOp>(
-          op->getLoc(), ValueRange{op.getConstantPaddingValue()});
+      rewriter.createBlock(&newOp.region(), newOp.region().begin(), padArgs,
+                           locs);
+      rewriter.create<tensor::YieldOp>(op->getLoc(),
+                                       op.getConstantPaddingValue());
     }
 
     RankedTensorType resultType = op.getResultType();
@@ -723,6 +725,17 @@ struct ReorderWeightLayoutsPass
           auto add = builder.create<arith::AddFOp>(loc, args[2], mul);
           builder.create<linalg::YieldOp>(loc, ValueRange{add});
         });
+
+    if (!newConv.getShapesToLoopsMap()) {
+      IVLOG(1, "Cannot reorder: LinAlg unable to infer ShapesToLoopsMap. op: "
+                   << debugString(op));
+      IVLOG(2, "    note: attempted reordered op: " << debugString(newConv));
+
+      // Back out the reordered op
+      newConv.erase();
+      reorderFilter.erase();
+      return;
+    }
 
     op.getResult(0).replaceAllUsesWith(newConv.getResult(0));
     op.erase();
