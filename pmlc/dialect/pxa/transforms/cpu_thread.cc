@@ -53,6 +53,21 @@ struct CPUThreadPass : public CPUThreadBase<CPUThreadPass> {
     auto func = getOperation();
     // Nest outermost loops into 'blocks' and 'threads'
     func.walk<WalkOrder::PreOrder>([&](AffineParallelOp op) {
+      for (auto bodyItr = op.getBody()->begin(); bodyItr != op.getBody()->end();
+           bodyItr++) {
+        if (isa<mlir::memref::AllocOp>(bodyItr)) {
+          auto allocOp = cast<mlir::memref::AllocOp>(bodyItr);
+          OpBuilder builder(allocOp);
+          auto memRefType = MemRefType::get(
+              allocOp.getType().getShape(), allocOp.getType().getElementType(),
+              MemRefLayoutAttrInterface(), allocOp.getType().getMemorySpace());
+          auto allocaOp = builder.create<mlir::memref::AllocaOp>(
+              op.getBody()->getParentOp()->getParentOp()->getLoc(), memRefType);
+          allocOp.replaceAllUsesWith(allocaOp.getResult());
+          allocOp.erase();
+        }
+      }
+
       processOp(op);
       return WalkResult::skip();
     });
@@ -65,22 +80,31 @@ struct CPUThreadPass : public CPUThreadBase<CPUThreadPass> {
       return;
     }
 
-    SmallVector<int64_t> strides(op.getNumDims(), 0);
-    if (auto lastWriter =
-            dyn_cast_or_null<PxaReduceOp>(getPrevWriter(op.getResult(0)))) {
-      if (Optional<StrideInfo> si = computeStrideInfo(lastWriter)) {
-        for (BlockArgument arg : op.getIVs()) {
-          strides[arg.getArgNumber()] = si->strides[arg];
+    /*  SmallVector<int64_t> strides(op.getNumDims(), 0);
+      if (auto lastWriter =
+              dyn_cast_or_null<PxaReduceOp>(getPrevWriter(op.getResult(0)))) {
+        if (Optional<StrideInfo> si = computeStrideInfo(lastWriter)) {
+          for (BlockArgument arg : op.getIVs()) {
+            strides[arg.getArgNumber()] = si->strides[arg];
+          }
         }
       }
-    }
 
-    CostModel model(threads, strides);
-    auto tileSize =
-        findBestTileSize(EvenTilingGenerator(), model, *maybeRanges);
-    // Invert tiling (we want 'threads' on the outer loop
-    for (size_t i = 0; i < tileSize.size(); i++) {
-      tileSize[i] = (*maybeRanges)[i] / tileSize[i];
+      CostModel model(threads, strides);
+      auto tileSize =
+          findBestTileSize(EvenTilingGenerator(), model, *maybeRanges);
+      // Invert tiling (we want 'threads' on the outer loop
+      for (size_t i = 0; i < tileSize.size(); i++) {
+        tileSize[i] = (*maybeRanges)[i] / tileSize[i];
+      }
+  */
+    SmallVector<int64_t, 8> tileSize;
+    for (int i = 0; i < op.getNumDims(); i++) {
+      if ((*maybeRanges)[i] == threads) {
+        tileSize.push_back(1);
+      } else {
+        tileSize.push_back((*maybeRanges)[i]);
+      }
     }
     // Tile and tag
     performTiling(op, tileSize);
