@@ -5,6 +5,7 @@
     passes.h
   SRCS
     autotile.cc
+    alloca_conversion.cc
     cache.cc
     convert_mem_op.cc
     cpu_thread.cc
