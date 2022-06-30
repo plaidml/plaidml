@@ -38,6 +38,7 @@ set(API_SYMBOLS
   plaidml_version
   # edsl/ffi.h
   plaidml_build
+  plaidml_build_from_mlir_moduleop
   plaidml_contraction_add_constraint
   plaidml_contraction_add_operand
   plaidml_contraction_build

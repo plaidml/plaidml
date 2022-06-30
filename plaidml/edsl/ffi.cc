@@ -18,6 +18,7 @@
 #include "pmlc/ast/ast.h"
 #include "pmlc/ast/builder.h"
 #include "pmlc/ast/eval.h"
+#include "pmlc/compiler/program.h"
 #include "pmlc/compiler/registry.h"
 #include "pmlc/util/enums.h"
 #include "pmlc/util/env.h"
@@ -790,6 +791,13 @@ plaidml_program* plaidml_build(  //
     }
     return new plaidml_program{ast::buildProgram(name, args)};
   });
+}
+
+plaidml_program* plaidml_build_from_mlir_moduleop(
+  void* mlir_module_op_ptr) {
+  plaidml_program* program = new plaidml_program(
+    std::make_shared<pmlc::compiler::Program>(
+      *(std::reinterpret_cast<mlir::ModuleOp*>(mlir_module_op_ptr)));
 }
 
 void plaidml_exprs_free(  //

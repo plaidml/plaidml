@@ -1,4 +1,4 @@
-// Copyright 2019 Intel Corporation.
+f// Copyright 2019 Intel Corporation.
 
 #pragma once
 
@@ -360,6 +360,10 @@ plaidml_program* plaidml_build(  //
     plaidml_shape** shapes,      //
     size_t noutputs,             //
     plaidml_expr** outputs);
+
+plaidml_program* plaidml_build_from_mlir_moduleop(
+    void* mlir_module_op_ptr
+);
 
 #ifdef __cplusplus
 }  // extern "C"
