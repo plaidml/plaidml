@@ -62,6 +62,17 @@ void getLdi(util::StrideArray inputs, int32_t ldo, int32_t &ldi,
   }
 }
 
+void getReduceType(util::StrideArray inputs, int32_t &ldi,
+                   int32_t &reduceType) {
+  if (inputs.strides[1] == 1) {
+    reduceType = 1; // reduce over rows
+    ldi = inputs.strides[0];
+  } else {
+    reduceType = 2; // reduce over cols
+    ldi = inputs.strides[1];
+  }
+}
+
 SmallVector<util::StrideArray> getStrideArrays(ValueRange operands,
                                                ArrayAttr tileMapsAttr) {
   SmallVector<util::StrideArray> result;
@@ -367,8 +378,12 @@ struct UnaryPxaGenericOpConversion
         getStrideArrays(adaptor.outputs(), op.outputTileMaps());
     IndicesCollector collector(loc, rewriter);
     int32_t ldo = outputs[0].strides[0];
-    int32_t ldi, bcastType;
+    int32_t ldi, bcastType, reduceType = 0;
     getLdi(inputs[0], ldo, ldi, bcastType);
+    if (kind == xsmm::UnaryKind::REDUCE_X_OP_ADD ||
+        kind == xsmm::UnaryKind::REDUCE_X_OP_MAX ||
+        kind == xsmm::UnaryKind::REDUCE_X_OP_MUL)
+      getReduceType(inputs[0], ldi, reduceType);
 
     if (!collector.collect(op.outputAccessMaps(), adaptor.outputIndices()) ||
         !collector.collect(op.inputAccessMaps(), adaptor.inputIndices()))
@@ -386,7 +401,8 @@ struct UnaryPxaGenericOpConversion
                                                /*ldi=*/ldi,
                                                /*ldo=*/ldo,
                                                /*func_type=*/funcType,
-                                               /*bcast_type=*/bcastType);
+                                               /*bcast_type=*/bcastType,
+                                               /*reduce_type*/ reduceType);
 
     rewriter.create<xsmm::UnaryInvokeOp>(loc, ArrayRef<Type>(),
                                          /*ptr=*/dispatchOp,
@@ -960,6 +976,10 @@ struct XSMMUnaryDispatchLowering
     callOperands.push_back(
         rewriter.create<LLVM::ConstantOp>(loc, int32Type, op.bcastTypeAttr()));
 
+    // reduce type
+    callOperands.push_back(
+        rewriter.create<LLVM::ConstantOp>(loc, int32Type, op.reduceTypeAttr()));
+
     rewriter.replaceOpWithNewOp<LLVM::CallOp>(
         op, int64Type, SymbolRefAttr::get(func), callOperands);
 
@@ -992,6 +1012,7 @@ struct XSMMUnaryDispatchLowering
                                         int32Type, // out_type
                                         int32Type, // type
                                         int32Type, // bcastType
+                                        int32Type, // reduceType
                                     },
                                     /*isVarArg=*/false));
   }
