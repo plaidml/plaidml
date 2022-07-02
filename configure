@@ -114,43 +114,25 @@ class Configure:
             sys.exit(1)
         run([pre_commit, 'install'], check=True)
 
+    def configure_compiler(self, args):
+        cmake_compiler_flags = []
+
+        cc = args.cc
+        if cc is None:
+            cc = os.getenv('CC')
+        cxx = args.cxx
+        if (cxx is None):
+            cxx = os.getenv('CXX')
+
+        if cc:
+            cmake_compiler_flags.append(f'-DCMAKE_C_COMPILER={cc}')
+        if cxx:
+            cmake_compiler_flags.append(f'-DCMAKE_CXX_COMPILER={cxx}')
+
+        return cmake_compiler_flags
+
     def configure_cmake(self, args):
         build_dir = pathlib.Path(f'build-{args.target}').resolve() / args.type
-
-        if not args.no_openvino:
-            openvino_dir = build_dir / '_deps/openvino-build'
-            if args.temp:
-                temp_dir = args.temp / args.target
-                fc_dir = temp_dir / 'fc'
-
-            cmd = [
-                'cmake',
-                '-Svendor/openvino',
-                f'-B{openvino_dir}',
-                '-GNinja',
-                f'-DCMAKE_BUILD_TYPE={args.type}',
-                '-DCMAKE_C_COMPILER_LAUNCHER=ccache',
-                '-DCMAKE_CXX_COMPILER_LAUNCHER=ccache',
-                '-DCMAKE_CXX_FLAGS=-w',
-                '-DENABLE_CLDNN=OFF',
-                '-DENABLE_DATA=OFF',
-                '-DENABLE_FUNCTIONAL_TESTS=ON',
-                '-DENABLE_GNA=OFF',
-                '-DENABLE_MKL_DNN=OFF',
-                '-DENABLE_MYRIAD=OFF',
-                '-DENABLE_PYTHON=ON',
-                '-DENABLE_SPEECH_DEMO=OFF',
-                '-DENABLE_TESTS=ON',
-                '-DENABLE_VPU=OFF',
-                '-DFETCHCONTENT_QUIET=OFF',
-                f'-DOUTPUT_ROOT={build_dir}',
-            ]
-            if args.temp:
-                cmd.append(f'-DFETCHCONTENT_BASE_DIR={fc_dir}')
-            run(cmd, check=True)
-
-            run(['ninja', '-C', openvino_dir], check=True)
-
         cmd = [
             'cmake',
             '-S.',
@@ -160,20 +142,17 @@ class Configure:
             '-DCMAKE_C_COMPILER_LAUNCHER=ccache',
             '-DCMAKE_CXX_COMPILER_LAUNCHER=ccache',
             '-DFETCHCONTENT_QUIET=OFF',
+            '-DPML_OPENVINO_BRIDGE=OFF',
         ]
-        if args.no_openvino:
-            cmd += ['-DPML_OPENVINO_BRIDGE=OFF']
-        else:
-            cmd += [
-                '-DPML_OPENVINO_BRIDGE=ON',
-                f'-DInferenceEngineDeveloperPackage_DIR={openvino_dir}',
-            ]
         if args.temp:
+            temp_dir = args.temp / args.target
+            fc_dir = temp_dir / 'fc'
             cmd.append(f'-DFETCHCONTENT_BASE_DIR={fc_dir}')
         if args.local_llvm:
             cmd.append('-DLOCAL_LLVM_DIR={}'.format(args.local_llvm))
         else:
             cmd.append('-ULOCAL_LLVM_DIR')
+        cmd.extend(self.configure_compiler(args))
         run(cmd, check=True)
 
 
@@ -198,7 +177,12 @@ def main():
     parser.add_argument('--temp',
                         type=pathlib.Path,
                         help='Configures the temporary directory for cached assets.')
-    parser.add_argument('--no_openvino', action='store_true')
+    parser.add_argument('--cc',
+                        type=pathlib.Path,
+                        help='Path/name of the C compiler.')
+    parser.add_argument('--cxx',
+                        type=pathlib.Path,
+                        help='Path/name of the C++ compiler.')
     args = parser.parse_args()
 
     print("Configuring PlaidML build environment")
