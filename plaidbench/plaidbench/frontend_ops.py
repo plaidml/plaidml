@@ -86,9 +86,12 @@ class Model(core.Model):
         return (None, res)
 
     def run_plaid(self, loops):
+        stop_watch = core.StopWatch(False)
+        stop_watch.start()
         self.model.predict(x=self.op.get_dataset()[:loops * self.params.batch_size],
                            batch_size=self.params.batch_size)
-        return (None, {})
+        stop_watch.stop()
+        return stop_watch.elapsed()
 
     def run_tc(self, loops):
         import torch
