@@ -1,4 +1,4 @@
-f// Copyright 2019 Intel Corporation.
+// Copyright 2019 Intel Corporation.
 
 #pragma once
 

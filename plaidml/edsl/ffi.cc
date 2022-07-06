@@ -795,9 +795,11 @@ plaidml_program* plaidml_build(  //
 
 plaidml_program* plaidml_build_from_mlir_moduleop(
   void* mlir_module_op_ptr) {
-  plaidml_program* program = new plaidml_program(
-    std::make_shared<pmlc::compiler::Program>(
-      *(std::reinterpret_cast<mlir::ModuleOp*>(mlir_module_op_ptr)));
+  plaidml_program plaidml_program_obj = { std::make_shared<pmlc::compiler::Program>(
+    *(reinterpret_cast<mlir::ModuleOp*>(mlir_module_op_ptr))) };
+  std::cout << "MLIR context fromm ffi:" << std::hex
+    << (reinterpret_cast<mlir::ModuleOp*>(mlir_module_op_ptr))->getContext() << std::endl;
+  return new plaidml_program(plaidml_program_obj);
 }
 
 void plaidml_exprs_free(  //
