@@ -362,6 +362,8 @@ plaidml_program* plaidml_build(  //
     plaidml_expr** outputs);
 
 plaidml_program* plaidml_build_from_mlir_moduleop(
+    plaidml_error* err,
+    const char* file_name,
     void* mlir_module_op_ptr
 );
 

@@ -794,12 +794,35 @@ plaidml_program* plaidml_build(  //
 }
 
 plaidml_program* plaidml_build_from_mlir_moduleop(
-  void* mlir_module_op_ptr) {
-  plaidml_program plaidml_program_obj = { std::make_shared<pmlc::compiler::Program>(
-    *(reinterpret_cast<mlir::ModuleOp*>(mlir_module_op_ptr))) };
-  std::cout << "MLIR context fromm ffi:" << std::hex
-    << (reinterpret_cast<mlir::ModuleOp*>(mlir_module_op_ptr))->getContext() << std::endl;
-  return new plaidml_program(plaidml_program_obj);
+    plaidml_error* err,
+    const char* file_name,
+    void* mlir_module_op_ptr) {
+  
+  #if 1
+  return ffi_wrap<plaidml_program*>(err, nullptr, [&] {
+    plaidml_program plaidml_program_obj = { std::make_shared<pmlc::compiler::Program>(
+      *(reinterpret_cast<mlir::ModuleOp*>(mlir_module_op_ptr))) };
+    std::cout << "MLIR context from ffi:" << std::hex
+      << reinterpret_cast<void*>((reinterpret_cast<mlir::ModuleOp*>(mlir_module_op_ptr))->getContext()) << std::endl;
+    return new plaidml_program(plaidml_program_obj);
+  });
+  #endif
+
+  #if 0
+  return ffi_wrap<plaidml_program*>(err, nullptr, [&] {
+    std::string errorMessage;
+    auto file = openInputFile(file_name, &errorMessage);
+    DialectRegistry registry;
+    mlir::registerAllDialects(registry);
+    //pmlc::registerAllDialects(registry);
+
+    auto context = std::make_unique<MLIRContext>(registry);
+    auto program = std::make_shared<Program>(std::move(context), std::move(file),
+                                              options.mainFuncName.getValue());
+    plaidml_program plaidml_program_obj = {program};
+    return new plaidml_program(plaidml_program_obj);
+  });
+  #endif
 }
 
 void plaidml_exprs_free(  //
