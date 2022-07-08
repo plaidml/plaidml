@@ -9,7 +9,7 @@ from plaidbench.networks.ops import op
 
 class Conv2d(op.Op):
 
-    def __init__(self, params, ci, h, w, co, i, j):
+    def __init__(self, params, ci, h, w, co, i, j, stride_i=1, stride_j=1):
         super(Conv2d, self).__init__(params)
         self.ci = ci
         self.h = h
@@ -17,10 +17,13 @@ class Conv2d(op.Op):
         self.co = co
         self.i = i
         self.j = j
+        self.stride_i = stride_i
+        self.stride_j = stride_j
         self.bs = params.batch_size
 
     def flops(self):
-        flops = (self.i * self.j * self.co * 2) * ((self.h - self.i) * (self.w - self.j)) * self.ci
+        flops = (self.i * self.j * self.co * 2) * ((self.h - self.i) / self.stride_i) * (
+            (self.w - self.j) / self.stride_j) * self.ci
         return flops
 
     def create_dataset_plaid(self):
@@ -32,7 +35,10 @@ class Conv2d(op.Op):
         from keras.models import Model
         inp = Input(name='data', shape=(self.h, self.w, self.ci))
         # No bias cause TVM doesn't support it
-        op = Conv2D(self.co, (self.i, self.j), data_format='channels_last', use_bias=False)(inp)
+        op = Conv2D(self.co, (self.i, self.j),
+                    strides=(self.stride_i, self.stride_j),
+                    data_format='channels_last',
+                    use_bias=False)(inp)
         return Model(inp, op, name=self.get_key())
 
     def get_key(self):
