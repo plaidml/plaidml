@@ -130,7 +130,8 @@ class Frontend(core.Frontend):
         if backend == 'plaid':
             try:
                 self.configuration['plaid'] = importlib.import_module('plaidml').__version__
-                importlib.import_module('plaidml.bridge.keras')
+                os.environ['KERAS_BACKEND'] = 'plaidml.bridge.keras'
+                importlib.import_module('keras.backend')
             except ImportError:
                 raise core.ExtrasNeeded(['plaidml-keras'])
         elif backend == 'tc':
