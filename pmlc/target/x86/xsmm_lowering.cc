@@ -62,14 +62,16 @@ void getLdi(util::StrideArray inputs, int32_t ldo, int32_t &ldi,
   }
 }
 
-void getReduceType(util::StrideArray inputs, int32_t &ldi,
-                   int32_t &reduceType) {
+void getReduceType(SmallVector<int64_t> &tileSizes, util::StrideArray inputs,
+                   int32_t &ldi, int32_t &reduceType) {
+  int64_t m = tileSizes[1];
+  int64_t n = tileSizes[0];
   if (inputs.strides[1] == 1) {
     reduceType = 1; // reduce over rows
-    ldi = inputs.strides[0];
+    ldi = std::max(m, inputs.strides[0]);
   } else {
     reduceType = 2; // reduce over cols
-    ldi = inputs.strides[1];
+    ldi = std::max(n, inputs.strides[1]);
   }
 }
 
@@ -382,8 +384,10 @@ struct UnaryPxaGenericOpConversion
     getLdi(inputs[0], ldo, ldi, bcastType);
     if (kind == xsmm::UnaryKind::REDUCE_X_OP_ADD ||
         kind == xsmm::UnaryKind::REDUCE_X_OP_MAX ||
-        kind == xsmm::UnaryKind::REDUCE_X_OP_MUL)
-      getReduceType(inputs[0], ldi, reduceType);
+        kind == xsmm::UnaryKind::REDUCE_X_OP_MUL) {
+      SmallVector<int64_t> tileSizes = getIntegerValues(op.tile());
+      getReduceType(tileSizes, inputs[0], ldi, reduceType);
+    }
 
     if (!collector.collect(op.outputAccessMaps(), adaptor.outputIndices()) ||
         !collector.collect(op.inputAccessMaps(), adaptor.inputIndices()))

@@ -148,8 +148,7 @@ private:
     if (op.getIVs().size() > 2)
       return;
     AffineValueMap ranges = util::getRangesValueMap(op);
-    auto constExpr =
-        ranges.getResult(op.getIVs().size() - 2).dyn_cast<AffineConstantExpr>();
+    auto constExpr = ranges.getResult(0).dyn_cast<AffineConstantExpr>();
     if (constExpr && constExpr.getValue() > 1)
       return;
 
@@ -180,7 +179,7 @@ private:
 
     // TODO: remove the constraint of memRefType
     auto type = cast<pxa::PxaReduceOp>(reduce.getDefiningOp()).getMemRefType();
-    if (type.getShape().size() < 2)
+    if (type.getShape().size() != 2 && type.getShape().size() != 4)
       return;
 
     capture = pxa::StencilCapture{{reduce}, {load}};
@@ -194,8 +193,8 @@ private:
     maybeCaptureGeneric<math::ExpOp>(ret, "tpp_exp");
     maybeCaptureIdentityOp(ret, "tpp_identity");
     maybeCaptureReduceOp(ret, "tpp_add_reduce", arith::AtomicRMWKind::addf);
-    maybeCaptureReduceOp(ret, "tpp_mul_reduce", arith::AtomicRMWKind::mulf);
     maybeCaptureReduceOp(ret, "tpp_max_reduce", arith::AtomicRMWKind::maxf);
+    // maybeCaptureReduceOp(ret, "tpp_mul_reduce", arith::AtomicRMWKind::mulf);
     return ret;
   }
 
@@ -313,12 +312,12 @@ void splitReducePattern(AffineParallelOp op) {
       &reduce,
       pxa::m_PxaReduceOp(arith::AtomicRMWKind::maxf,
                          m_Capture(&load, m_Op<pxa::PxaLoadOp>()), m_Any())));
-  auto mul_pattern = m_Op<AffineYieldOp>(m_Capture(
-      &reduce,
-      pxa::m_PxaReduceOp(arith::AtomicRMWKind::mulf,
-                         m_Capture(&load, m_Op<pxa::PxaLoadOp>()), m_Any())));
-  if (!matchPattern(yield, add_pattern) && !matchPattern(yield, max_pattern) &&
-      !matchPattern(yield, mul_pattern))
+  // auto mul_pattern = m_Op<AffineYieldOp>(m_Capture(
+  //     &reduce,
+  //     pxa::m_PxaReduceOp(arith::AtomicRMWKind::mulf,
+  //                        m_Capture(&load, m_Op<pxa::PxaLoadOp>()),
+  //                        m_Any())));
+  if (!matchPattern(yield, add_pattern) && !matchPattern(yield, max_pattern))
     return;
 
   // Make builder
