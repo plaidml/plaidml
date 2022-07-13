@@ -16,6 +16,8 @@ pml_cc_library(
     plaidml::core
     pmlc::ast
     pmlc::util
+    pmlc::dialect::tile::ir
+    pmlc::dialect::tile::transforms
     LLVMSupport
   COMPONENTS
     devkit
@@ -30,6 +32,8 @@ pml_cc_library(
     plaidml::core::obj
     pmlc::ast
     pmlc::util
+    pmlc::dialect::tile::ir
+    pmlc::dialect::tile::transforms
     LLVMSupport
 )
 

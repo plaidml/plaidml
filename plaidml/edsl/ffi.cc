@@ -11,9 +11,31 @@
 
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/FormatVariadic.h"
+#include "llvm/Support/CommandLine.h"
+#include "llvm/Support/InitLLVM.h"
+#include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/Process.h"
+#include "llvm/Support/TargetSelect.h"
+#include "llvm/Support/raw_ostream.h"
+
+#include "mlir/IR/DialectRegistry.h"
+#include "mlir/ExecutionEngine/OptUtils.h"
+//#include "mlir/InitAllDialects.h"
+#include "mlir/Support/FileUtilities.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Math/IR/Math.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/Shape/IR/Shape.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/IR/Dialect.h"
 
 #include "plaidml/core/internal.h"
+#include "plaidml/core/core.h"
 #include "pmlc/util/logging.h"
+#include "pmlc/dialect/tile/ir/ops.h"
 
 #include "pmlc/ast/ast.h"
 #include "pmlc/ast/builder.h"
@@ -22,16 +44,18 @@
 #include "pmlc/compiler/registry.h"
 #include "pmlc/util/enums.h"
 #include "pmlc/util/env.h"
+#include "pmlc/all_dialects.h"
 
 using plaidml::core::convertFromDataType;
 using plaidml::core::convertIntoDataType;
 using plaidml::core::ffi_vector;
 using plaidml::core::ffi_wrap;
 using plaidml::core::ffi_wrap_void;
-using pmlc::compiler::Program;
 using pmlc::util::AggregationKind;
 using pmlc::util::CombinationKind;
 using pmlc::util::TensorShape;
+using namespace mlir;
+using llvm::Error;
 
 namespace ast = pmlc::ast;
 
@@ -798,7 +822,10 @@ plaidml_program* plaidml_build_from_mlir_moduleop(
     const char* file_name,
     void* mlir_module_op_ptr) {
   
-  #if 1
+  #if 0
+  std::cout << "MLIR moduleop at entry to ffi:" << std::endl;
+  (reinterpret_cast<mlir::ModuleOp*>(mlir_module_op_ptr))->dump();
+
   return ffi_wrap<plaidml_program*>(err, nullptr, [&] {
     plaidml_program plaidml_program_obj = { std::make_shared<pmlc::compiler::Program>(
       *(reinterpret_cast<mlir::ModuleOp*>(mlir_module_op_ptr))) };
@@ -808,19 +835,42 @@ plaidml_program* plaidml_build_from_mlir_moduleop(
   });
   #endif
 
-  #if 0
+  #if 1
   return ffi_wrap<plaidml_program*>(err, nullptr, [&] {
     std::string errorMessage;
     auto file = openInputFile(file_name, &errorMessage);
-    DialectRegistry registry;
-    mlir::registerAllDialects(registry);
-    //pmlc::registerAllDialects(registry);
+    
+    mlir::DialectRegistry* registry = new mlir::DialectRegistry();
+    registry->insert<AffineDialect,
+                    mlir::func::FuncDialect,
+                    linalg::LinalgDialect,
+                    math::MathDialect,
+                    memref::MemRefDialect,
+                    vector::VectorDialect,
+                    pmlc::dialect::tile::TileDialect>();
+    //mlir::registerAllDialects(registry);
+    //pmlc::registerAllDialects(*registry);
 
-    auto context = std::make_unique<MLIRContext>(registry);
-    auto program = std::make_shared<Program>(std::move(context), std::move(file),
-                                              options.mainFuncName.getValue());
-    plaidml_program plaidml_program_obj = {program};
-    return new plaidml_program(plaidml_program_obj);
+    auto context = std::make_unique<MLIRContext>(*registry);
+    context->loadDialect<pmlc::dialect::tile::TileDialect>();
+    //auto program = std::make_shared<Program>(std::move(context), std::move(file),
+    //                                         "main");
+    //program->module.get().dump();
+    //Program* program = new Program(std::move(context), std::move(file), "main");
+
+    plaidml_program* plaidml_program_ptr = new plaidml_program();
+    plaidml_program_ptr->program = std::make_shared<pmlc::compiler::Program>(
+                                        std::move(context),
+//                                      std::make_unique<MLIRContext>(*registry),
+                                        std::move(file), "main");
+
+    std::cout << "dumping from plaidml_build_from_mlir_moduleop:" << std::endl;
+    plaidml_program_ptr->program->module.get().dump();
+
+    //plaidml::Program* plaidml_cpp_program = new plaidml::Program(plaidml_program_ptr);
+    //plaidml_cpp_program->compile("llvm_cpu");
+
+    return plaidml_program_ptr;
   });
   #endif
 }
