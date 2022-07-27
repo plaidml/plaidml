@@ -28,6 +28,8 @@ std::unique_ptr<mlir::Pass> createProfileLinkingPass();
 
 std::unique_ptr<mlir::Pass> createPRNGLinkingPass();
 
+std::unique_ptr<mlir::Pass> createShapeAnalysisPass();
+
 std::unique_ptr<mlir::Pass> createReorderLayoutsPass();
 
 std::unique_ptr<mlir::Pass> createReorderWeightLayoutsPass();
