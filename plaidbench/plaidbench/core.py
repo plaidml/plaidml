@@ -266,7 +266,8 @@ def _inner_run(reports,
 
         # Record stopwatch times
         execution_duration = overrides.get('time', exec_stop_watch.elapsed())
-        exec_per_example = overrides.get('lastExecTimeInNS', execution_duration / params.examples)
+        exec_per_example = overrides.get('lastExecTimeInNS',
+                                         execution_duration / params.examples) / params.batch_size
         compile_duration = compile_stop_watch.elapsed()
         flops = overrides.get('flops', None)
         gflops = None

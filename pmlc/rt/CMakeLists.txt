@@ -48,6 +48,12 @@ set_property(SOURCE xsmm.cc
     LIBXSMM_DEFAULT_CONFIG
 )
 
+set_property(SOURCE instrument.cc
+  PROPERTY COMPILE_DEFINITIONS
+    __BLAS=0
+    LIBXSMM_DEFAULT_CONFIG
+)
+
 set(_RT_DEFINES "")
 set(_RT_DEPS
   ::rt
