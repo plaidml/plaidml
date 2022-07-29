@@ -821,27 +821,18 @@ plaidml_program* plaidml_build_from_mlir_moduleop(
     plaidml_error* err,
     const char* file_name,
     void* mlir_module_op_ptr) {
-  
-  #if 0
-  std::cout << "MLIR moduleop at entry to ffi:" << std::endl;
-  (reinterpret_cast<mlir::ModuleOp*>(mlir_module_op_ptr))->dump();
-
-  return ffi_wrap<plaidml_program*>(err, nullptr, [&] {
-    plaidml_program plaidml_program_obj = { std::make_shared<pmlc::compiler::Program>(
-      *(reinterpret_cast<mlir::ModuleOp*>(mlir_module_op_ptr))) };
-    std::cout << "MLIR context from ffi:" << std::hex
-      << reinterpret_cast<void*>((reinterpret_cast<mlir::ModuleOp*>(mlir_module_op_ptr))->getContext()) << std::endl;
-    return new plaidml_program(plaidml_program_obj);
-  });
-  #endif
-
-  #if 1
+  // std::cout << "File name is: " << file_name << std::endl;
   return ffi_wrap<plaidml_program*>(err, nullptr, [&] {
     std::string errorMessage;
     auto file = openInputFile(file_name, &errorMessage);
-    
-    mlir::DialectRegistry* registry = new mlir::DialectRegistry();
-    registry->insert<AffineDialect,
+    if (!file) {
+      std::string error = std::string(file_name) + " is not valid: " + errorMessage;
+      throw std::invalid_argument(error.c_str());
+    }
+    // std::cout << "file contents:" << file->getBuffer().str() << std::endl;
+
+    mlir::DialectRegistry registry; //= new mlir::DialectRegistry();
+    registry.insert<AffineDialect,
                     mlir::func::FuncDialect,
                     linalg::LinalgDialect,
                     math::MathDialect,
@@ -850,29 +841,19 @@ plaidml_program* plaidml_build_from_mlir_moduleop(
                     pmlc::dialect::tile::TileDialect>();
     //mlir::registerAllDialects(registry);
     //pmlc::registerAllDialects(*registry);
-
-    auto context = std::make_unique<MLIRContext>(*registry);
+    auto context = std::make_unique<MLIRContext>(registry);
     context->loadDialect<pmlc::dialect::tile::TileDialect>();
-    //auto program = std::make_shared<Program>(std::move(context), std::move(file),
-    //                                         "main");
-    //program->module.get().dump();
-    //Program* program = new Program(std::move(context), std::move(file), "main");
 
     plaidml_program* plaidml_program_ptr = new plaidml_program();
     plaidml_program_ptr->program = std::make_shared<pmlc::compiler::Program>(
                                         std::move(context),
-//                                      std::make_unique<MLIRContext>(*registry),
                                         std::move(file), "main");
 
     std::cout << "dumping from plaidml_build_from_mlir_moduleop:" << std::endl;
     plaidml_program_ptr->program->module.get().dump();
 
-    //plaidml::Program* plaidml_cpp_program = new plaidml::Program(plaidml_program_ptr);
-    //plaidml_cpp_program->compile("llvm_cpu");
-
     return plaidml_program_ptr;
   });
-  #endif
 }
 
 void plaidml_exprs_free(  //
