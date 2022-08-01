@@ -457,20 +457,21 @@ struct ReorderLayoutsPass : public ReorderLayoutsBase<ReorderLayoutsPass> {
                         inputSourceMap, inputSinkMap);
 
     // Reorder filter
-    RankedTensorType blockedFilterType = conv->getBlockedFilterType(blockSize);
+    RankedTensorType blockedFilterType =
+        conv->getBlockedFilterTypeFlipped(blockSize);
 
-    // (k1, c1, r, s, k0, c0) -> (r, s, k1 * B + k0, c1 * B + c0)
+    // (k1, c1, r, s, c0, k0) -> (r, s, c1 * B + c0, k1 * B + k0)
     AffineMap filterSourceMap =
         AffineMap::get(6, 0,
                        ArrayRef<AffineExpr>{
                            getAffineDimExpr(2, context),
                            getAffineDimExpr(3, context),
-                           getBlockedExpr(context, 0, 4, blockSize),
-                           getBlockedExpr(context, 1, 5, blockSize),
+                           getBlockedExpr(context, 1, 4, blockSize),
+                           getBlockedExpr(context, 0, 5, blockSize),
                        },
                        context);
 
-    // (k1, c1, r, s, k0, c0) -> (k1, c1, r, s, k0, c0)
+    // (k1, c1, r, s, c0, k0) -> (k1, c1, r, s, k0, c0)
     AffineMap filterSinkMap = AffineMap::getMultiDimIdentityMap(6, context);
 
     linalgx::CopyOp reorderFilter =
@@ -497,8 +498,8 @@ struct ReorderLayoutsPass : public ReorderLayoutsBase<ReorderLayoutsPass> {
     AffineMap newFilterMap =
         AffineMap::get(9, 0,
                        ArrayRef<AffineExpr>{
-                           getAffineDimExpr(8, context),
                            getAffineDimExpr(7, context),
+                           getAffineDimExpr(8, context),
                            conv->filter.idxMap.getResult(0),
                            conv->filter.idxMap.getResult(1),
                            conv->filter.idxMap.getResult(2),
@@ -507,7 +508,7 @@ struct ReorderLayoutsPass : public ReorderLayoutsBase<ReorderLayoutsPass> {
                        context);
 
     // oldOutput = (n, h, w, c, r, s, k) -> (n, h, w, c)
-    // newOutput = (n, h, w, c0, r, s, k0, c1, k1) -> (n, c1, h, w, c0)
+    // newOutput = (n, h, w, c0, r, s, c1, k0, k1) -> (n, c1, h, w, c0)
     AffineMap newOutputMap =
         AffineMap::get(9, 0,
                        ArrayRef<AffineExpr>{
@@ -535,8 +536,8 @@ struct ReorderLayoutsPass : public ReorderLayoutsBase<ReorderLayoutsPass> {
             getParallelIteratorTypeName(),  // C0
             getReductionIteratorTypeName(), // R
             getReductionIteratorTypeName(), // S
-            getReductionIteratorTypeName(), // K0
-            getParallelIteratorTypeName(),  // C1
+            getReductionIteratorTypeName(), // C1
+            getParallelIteratorTypeName(),  // K0
             getReductionIteratorTypeName(), // K1
         },
         /*doc=*/"",

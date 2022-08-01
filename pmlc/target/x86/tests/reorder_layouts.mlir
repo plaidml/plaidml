@@ -47,10 +47,10 @@ func @main(%arg0: tensor<1x56x56x64xf32>, %arg1: tensor<1x1x64x64xf32> {stdx.con
 
 // CHECK: #[[map0:.*]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d3, d1 * 32 + d4)>
 // CHECK: #[[map1:.*]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>
-// CHECK: #[[map2:.*]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d2, d3, d0 * 32 + d4, d1 * 32 + d5)>
+// CHECK: #[[map2:.*]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d2, d3, d1 * 32 + d4, d0 * 32 + d5)>
 // CHECK: #[[map3:.*]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3, d4, d5)>
 // CHECK: #[[map4:.*]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d8, d1 + d4, d2 + d5, d6)>
-// CHECK: #[[map5:.*]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d8, d7, d4, d5, d6, d3)>
+// CHECK: #[[map5:.*]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d7, d8, d4, d5, d6, d3)>
 // CHECK: #[[map6:.*]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d7, d1, d2, d3)>
 // CHECK: #[[map7:.*]] = affine_map<(d0, d1, d2, d3, d4) -> (d1 * 32 + d4)>
 
