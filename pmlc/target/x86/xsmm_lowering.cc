@@ -5,6 +5,7 @@
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/IR/AttributeSupport.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Support/DebugStringHelper.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -194,10 +195,15 @@ struct GemmLowering {
   }
 
   LogicalResult callBatchedGemm(int64_t kBatches) {
+    auto stride_a =
+        (tileAttr.getValue()[2].cast<IntegerAttr>().getInt()) * sizeof(float);
+    auto stride_b =
+        stride_a * (leadingDimsAttr.getValue()[1].cast<IntegerAttr>().getInt());
     auto dispatch = rewriter.create<xsmm::BRGemmDispatchF32Op>(
         loc, resultType,
         /*tile=*/tileAttr,
-        /*leadingDims=*/leadingDimsAttr);
+        /*leadingDims=*/leadingDimsAttr, rewriter.getI64IntegerAttr(stride_a),
+        rewriter.getI64IntegerAttr(stride_b));
 
     rewriter.create<xsmm::BRGemmInvokeF32Op>(
         loc, ArrayRef<Type>(),
@@ -250,25 +256,55 @@ struct GemmLowering {
     computeBRGemmOffsets(batches, stepSizes, aStrides, bStrides, aOffsets,
                          bOffsets);
 
-    auto dispatch = rewriter.create<xsmm::BRGemmOffsDispatchF32Op>(
-        loc, resultType,
-        /*tile=*/tileAttr,
-        /*leadingDims=*/leadingDimsAttr);
+    bool staticAOffset = true;
+    auto a_diff = aOffsets[1] - aOffsets[0];
+    for (int i = 1; i < aOffsets.size(); i++) {
+      if (aOffsets[i] != a_diff * i + aOffsets[0]) {
+        staticAOffset = false;
+        break;
+      }
+    }
+    bool staticBOffset = true;
+    auto b_diff = bOffsets[1] - bOffsets[0];
+    for (int i = 1; i < bOffsets.size(); i++) {
+      if (bOffsets[i] != b_diff * i + bOffsets[0]) {
+        staticBOffset = false;
+        break;
+      }
+    }
 
-    rewriter.create<xsmm::BRGemmOffsInvokeF32Op>(
-        loc, ArrayRef<Type>(),
-        /*ptr=*/dispatch,
-        /*c=*/adaptor.outputs()[0],
-        /*a=*/adaptor.inputs()[0],
-        /*b=*/adaptor.inputs()[1],
-        /*numBatches=*/rewriter.getI64IntegerAttr(numSteps),
-        /*aOffsets=*/rewriter.getI64ArrayAttr(aOffsets),
-        /*bOffsets=*/rewriter.getI64ArrayAttr(bOffsets),
-        /*indices=*/collector.indices);
+    if (staticAOffset && staticBOffset) {
+      auto dispatch = rewriter.create<xsmm::BRGemmDispatchF32Op>(
+          loc, resultType, tileAttr, leadingDimsAttr, a_diff, b_diff);
 
+      rewriter.create<xsmm::BRGemmInvokeF32Op>(
+          loc, ArrayRef<Type>(),
+          /*ptr=*/dispatch,
+          /*c=*/adaptor.outputs()[0],
+          /*a=*/adaptor.inputs()[0],
+          /*b=*/adaptor.inputs()[1],
+          /*numBatches=*/rewriter.getI64IntegerAttr(numSteps),
+          /*indices=*/collector.indices);
+
+    } else {
+      auto dispatch = rewriter.create<xsmm::BRGemmOffsDispatchF32Op>(
+          loc, resultType,
+          /*tile=*/tileAttr,
+          /*leadingDims=*/leadingDimsAttr);
+
+      rewriter.create<xsmm::BRGemmOffsInvokeF32Op>(
+          loc, ArrayRef<Type>(),
+          /*ptr=*/dispatch,
+          /*c=*/adaptor.outputs()[0],
+          /*a=*/adaptor.inputs()[0],
+          /*b=*/adaptor.inputs()[1],
+          /*numBatches=*/rewriter.getI64IntegerAttr(numSteps),
+          /*aOffsets=*/rewriter.getI64ArrayAttr(aOffsets),
+          /*bOffsets=*/rewriter.getI64ArrayAttr(bOffsets),
+          /*indices=*/collector.indices);
+    }
     op.replaceAllUsesWith(adaptor.outputs());
     rewriter.eraseOp(op);
-
     return success();
   }
 
@@ -608,6 +644,14 @@ struct XSMMBRGemmDispatchF32Lowering
           rewriter.create<LLVM::ConstantOp>(op->getLoc(), int32Type, attr));
     }
 
+    // stride_a_hint
+    callOperands.push_back(rewriter.create<LLVM::ConstantOp>(
+        op->getLoc(), int64Type, rewriter.getI64IntegerAttr(op.strideA())));
+
+    // stride_b_hint=ldb*k*sizeof(float)
+    callOperands.push_back(rewriter.create<LLVM::ConstantOp>(
+        op->getLoc(), int64Type, rewriter.getI64IntegerAttr(op.strideB())));
+
     rewriter.replaceOpWithNewOp<LLVM::CallOp>(
         op, int64Type, SymbolRefAttr::get(func), callOperands);
     return success();
@@ -634,7 +678,9 @@ struct XSMMBRGemmDispatchF32Lowering
                                                    int32Type,  // ldc
                                                    int32Type,  // m
                                                    int32Type,  // n
-                                                   int32Type}, // k
+                                                   int32Type,  // k
+                                                   int64Type,  // stride_a_hint
+                                                   int64Type}, // stride_b_hint
                                     /*isVarArg=*/false));
   }
 };
