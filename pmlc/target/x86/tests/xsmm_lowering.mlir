@@ -82,3 +82,25 @@ func @conv_pad(%I: memref<1x16x16x16xf32>, %K: memref<3x3x16x16xf32>, %O: memref
     }
     return %1 : memref<1x14x14x16xf32>
 }
+
+
+// -----
+
+
+#map0 = affine_map<(m, n, k) -> (0, m, 0, n)>
+#map1 = affine_map<(m, n, k, a, b) -> (0, a + m, b, k)>
+#map2 = affine_map<(m, n, k, a, b) -> (a, b, k, n)>
+
+// CHECK-LABEL: func @conv_brgemm_strided
+//       CHECK:   xsmm.brgemm.dispatch.f32 [9, 16, 16], [256, 16, 256] {strideA = 1024 : i64, strideB = 1024 : i64}
+//       CHECK:   affine.for
+//       CHECK:     xsmm.brgemm.invoke.f32
+//  CHECK-SAME:       numBatches = 2
+func @conv_brgemm_strided(%I: memref<1x16x16x16xf32>, %K: memref<2x1x16x16xf32>, %O: memref<1x16x16x16xf32>) -> memref<1x16x16x16xf32> {
+    %1 = affine.parallel (%x) = (0) to (16) reduce ("assign") -> (memref<1x16x16x16xf32>) {
+      %2 = pxa.generic (%O[0, 0, %x, 0]:#map0) <addf> @tpp_gemm(%I[0, 0, %x, 0]:#map1, %K[0, 0, 0, 0]:#map2) tile: [9, 16, 16, 1, 2, 1]
+        : (memref<1x16x16x16xf32>, memref<2x1x16x16xf32>) -> memref<1x16x16x16xf32>
+      affine.yield %2 : memref<1x16x16x16xf32>
+    }
+    return %1 : memref<1x16x16x16xf32>
+}
