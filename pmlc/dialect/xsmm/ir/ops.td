@@ -119,7 +119,7 @@ def XSMM_GemmInvokeF32Op : XSMM_Op<"gemm.invoke.f32"> {
 
 def XSMM_BRGemmDispatchF32Op : XSMM_Op<"brgemm.dispatch.f32", [NoSideEffect]> {
   let summary = "query LIBXSMM's code registry based on GEMM shape";
-  let arguments = (ins I64ArrayAttr:$tile, I64ArrayAttr:$tileld);
+  let arguments = (ins I64ArrayAttr:$tile, I64ArrayAttr:$tileld, I64Attr:$strideA, I64Attr:$strideB);
   let results = (outs I64:$ptr);
   let assemblyFormat = "$tile `,` $tileld attr-dict";
 }

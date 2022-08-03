@@ -18,9 +18,9 @@ extern "C" void plaidml_rt_xsmm_gemm_invoke_f32(int64_t funcAddr, float *a,
                                                 float *b, float *c) {
   libxsmm_xmmfunction sgemm;
   libxsmm_gemm_param gemm_param;
-  gemm_param.a.primary = (void *)b;
-  gemm_param.b.primary = (void *)a;
-  gemm_param.c.primary = (void *)c;
+  gemm_param.a.primary = reinterpret_cast<void *>(b);
+  gemm_param.b.primary = reinterpret_cast<void *>(a);
+  gemm_param.c.primary = reinterpret_cast<void *>(c);
   sgemm.gemm = reinterpret_cast<libxsmm_gemmfunction>(funcAddr);
   sgemm.gemm(&gemm_param);
 }
@@ -62,24 +62,26 @@ extern "C" void plaidml_rt_xsmm_brgemm_invoke_f32(int64_t funcAddr, float *a,
   libxsmm_gemm_param gemm_param;
   sgemm.gemm = reinterpret_cast<libxsmm_gemmfunction>(funcAddr);
   unsigned long long numBatchesVar = numBatches; // NOLINT
-  gemm_param.a.primary = (void *)b;
-  gemm_param.b.primary = (void *)a;
-  gemm_param.c.primary = (void *)c;
-  gemm_param.op.tertiary = (void *)&numBatchesVar;
+  gemm_param.a.primary = reinterpret_cast<void *>(b);
+  gemm_param.b.primary = reinterpret_cast<void *>(a);
+  gemm_param.c.primary = reinterpret_cast<void *>(c);
+  gemm_param.op.tertiary = reinterpret_cast<void *>(&numBatchesVar);
   sgemm.gemm(&gemm_param);
 }
 
 extern "C" int64_t plaidml_rt_xsmm_brgemm_dispatch_f32(int32_t lda, int32_t ldb,
                                                        int32_t ldc, int32_t m,
-                                                       int32_t n, int32_t k) {
+                                                       int32_t n, int32_t k,
+                                                       int64_t stride_a_hint,
+                                                       int64_t stride_b_hint) {
   libxsmm_blasint lda_int = lda;
   libxsmm_blasint ldb_int = ldb;
   libxsmm_blasint ldc_int = ldc;
   libxsmm_blasint m_int = m;
   libxsmm_blasint n_int = n;
   libxsmm_blasint k_int = k;
-  libxsmm_blasint stride_a = k * sizeof(float);
-  libxsmm_blasint stride_b = ldb * k * sizeof(float);
+  libxsmm_blasint stride_a = stride_a_hint;
+  libxsmm_blasint stride_b = stride_b_hint;
 
   libxsmm_gemm_shape l_shape;
   libxsmm_bitfield l_flags = LIBXSMM_GEMM_FLAGS('N', 'N');
@@ -117,12 +119,12 @@ extern "C" void plaidml_rt_xsmm_brgemm_offs_invoke_f32(
   auto *l_a_offs = reinterpret_cast<unsigned long long *>(a_offsets); // NOLINT
   auto *l_b_offs = reinterpret_cast<unsigned long long *>(b_offsets); // NOLINT
 
-  gemm_param.a.secondary = (void *)l_b_offs;
-  gemm_param.b.secondary = (void *)l_a_offs;
-  gemm_param.a.primary = (void *)b;
-  gemm_param.b.primary = (void *)a;
-  gemm_param.c.primary = (void *)c;
-  gemm_param.op.tertiary = (void *)&numBatchesVar;
+  gemm_param.a.secondary = reinterpret_cast<void *>(l_b_offs);
+  gemm_param.b.secondary = reinterpret_cast<void *>(l_a_offs);
+  gemm_param.a.primary = reinterpret_cast<void *>(b);
+  gemm_param.b.primary = reinterpret_cast<void *>(a);
+  gemm_param.c.primary = reinterpret_cast<void *>(c);
+  gemm_param.op.tertiary = reinterpret_cast<void *>(&numBatchesVar);
   sgemm.gemm(&gemm_param);
 }
 

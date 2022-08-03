@@ -274,9 +274,38 @@ static std::string stringfy(BinaryKind kind) {
 //
 // --- BRGemmInvokeF32Op ---
 //
+BRGemmInvokeF32Op::operand_range BRGemmInvokeF32Op::getOperandsForA() {
+  auto aType = a().getType().cast<MemRefType>();
+  auto cType = c().getType().cast<MemRefType>();
+  return getOperands().slice(4 + cType.getRank(), aType.getRank());
+}
+
+BRGemmInvokeF32Op::operand_range BRGemmInvokeF32Op::getOperandsForB() {
+  auto aType = a().getType().cast<MemRefType>();
+  auto bType = b().getType().cast<MemRefType>();
+  auto cType = c().getType().cast<MemRefType>();
+  return getOperands().slice(4 + cType.getRank() + aType.getRank(),
+                             bType.getRank());
+}
+
+BRGemmInvokeF32Op::operand_range BRGemmInvokeF32Op::getOperandsForC() {
+  auto cType = c().getType().cast<MemRefType>();
+  return getOperands().slice(4, cType.getRank());
+}
 
 void BRGemmInvokeF32Op::print(OpAsmPrinter &p) {
-  // assert(0 && "implement me");
+  auto funcType = FunctionType::get(
+      getContext(), {a().getType(), b().getType()}, {c().getType()});
+  p << ' ' << ptr() << ", ";
+  p << c() << '[';
+  p.printOperands(getOperandsForC());
+  p << "] = " << a() << '[';
+  p.printOperands(getOperandsForA());
+  p << "], " << b() << '[';
+  p.printOperands(getOperandsForB());
+  p << "], ";
+  p << "numBatches = " << numBatches();
+  p << " : " << funcType;
 }
 
 ParseResult BRGemmInvokeF32Op::parse(OpAsmParser &parser,
