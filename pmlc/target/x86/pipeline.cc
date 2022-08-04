@@ -345,6 +345,7 @@ void pipelineBuilderStage2(OpPassManager &pm, const Options &options) {
   pm.addPass(createCSEPass());
 
   pm.addNestedPass<func::FuncOp>(createStencilSplitPass());
+  pm.addNestedPass<func::FuncOp>(pxa::createResizeTmpsPass());
   pm.addNestedPass<func::FuncOp>(createStencilTppUnaryPass());
   pm.addNestedPass<func::FuncOp>(createStencilTppBinaryPass());
   pm.addNestedPass<func::FuncOp>(pxa::createAffineNormalizePass());
