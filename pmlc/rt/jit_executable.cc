@@ -408,8 +408,10 @@ public:
       std::copy(preParams.begin(), preParams.end(),
                 std::back_inserter(initPtrs));
       for (const compiler::ConstantArgument &arg : program->constants) {
-        initDescriptors.emplace_back(arg.buffer->data(), arg.type);
-        initPtrs.push_back(initDescriptors.back().ptr());
+        if (arg.buffer->shape().sizes.size() != 1) {
+          initDescriptors.emplace_back(arg.buffer->data(), arg.type);
+          initPtrs.push_back(initDescriptors.back().ptr());
+        }
       }
       rt::initInstrument();
       initPack = jitInit(initPtrs.data());
@@ -420,6 +422,13 @@ public:
         descriptors.emplace_back(nullptr, type);
         ptrs.push_back(descriptors.back().ptr());
       }
+      for (const compiler::ConstantArgument &arg : program->constants) {
+        if (arg.buffer->shape().sizes.size() == 1) {
+          descriptors.emplace_back(arg.buffer->data(), arg.type);
+          ptrs.push_back(descriptors.back().ptr());
+        }
+      }
+
       for (Type type : program->outputs) {
         descriptors.emplace_back(nullptr, type);
         ptrs.push_back(descriptors.back().ptr());
@@ -434,6 +443,7 @@ public:
         descriptors.emplace_back(arg.buffer->data(), arg.type);
         ptrs.push_back(descriptors.back().ptr());
       }
+
       for (Type type : program->outputs) {
         descriptors.emplace_back(nullptr, type);
         ptrs.push_back(descriptors.back().ptr());
@@ -495,6 +505,11 @@ public:
     if (jitInit) {
       for (util::BufferPtr buffer : inputBuffers) {
         descriptors[i++].set(buffer->data());
+      }
+      for (compiler::ConstantArgument &arg : program->constants) {
+        if (arg.buffer->shape().sizes.size() == 1) {
+          i++;
+        }
       }
       for (util::BufferPtr buffer : outputBuffers) {
         descriptors[i++].set(buffer->data());
