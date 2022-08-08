@@ -528,7 +528,10 @@ struct ProgramBuilder {
                                                kEntrypoint, funcType, {});
     size_t numInputs = inputTypes.size() - program->constants.size();
     for (size_t i = 0; i < program->constants.size(); i++) {
-      funcOp.setArgAttr(numInputs + i, "stdx.const", builder.getUnitAttr());
+      auto constant = program->constants[i];
+      if (constant.buffer->shape().sizes.size() != 1) {
+        funcOp.setArgAttr(numInputs + i, "stdx.const", builder.getUnitAttr());
+      }
     }
     Block *body = funcOp.addEntryBlock();
     builder.setInsertionPointToStart(body);
