@@ -1,4 +1,3 @@
 [submodule "vendor/mlir-hlo"]
 	path = vendor/mlir-hlo
-	url = https://github.com/plaidml/mlir-hlo.git
-  branch = plaidml
+	url = https://github.com/tensorflow/mlir-hlo.git
