@@ -12,6 +12,7 @@
 #include "pmlc/dialect/pxa/transforms/pass_detail.h"
 #include "pmlc/dialect/pxa/transforms/tile.h"
 #include "pmlc/dialect/stdx/ir/ops.h"
+#include "pmlc/util/env.h"
 #include "pmlc/util/tags.h"
 
 using namespace mlir; // NOLINT
@@ -59,31 +60,33 @@ struct CPUThreadPass : public CPUThreadBase<CPUThreadPass> {
   }
 
   void processOp(AffineParallelOp op) {
-    auto maybeRanges = op.getConstantRanges();
-    if (!maybeRanges) {
-      // Fail if we can't compute the ranges at compile time
-      return;
-    }
+    if (!util::getEnvVar("PLAIDML_PARALLEL_OUTER_DISABLE").empty()) {
+      auto maybeRanges = op.getConstantRanges();
+      if (!maybeRanges) {
+        // Fail if we can't compute the ranges at compile time
+        return;
+      }
 
-    SmallVector<int64_t> strides(op.getNumDims(), 0);
-    if (auto lastWriter =
-            dyn_cast_or_null<PxaReduceOp>(getPrevWriter(op.getResult(0)))) {
-      if (Optional<StrideInfo> si = computeStrideInfo(lastWriter)) {
-        for (BlockArgument arg : op.getIVs()) {
-          strides[arg.getArgNumber()] = si->strides[arg];
+      SmallVector<int64_t> strides(op.getNumDims(), 0);
+      if (auto lastWriter =
+              dyn_cast_or_null<PxaReduceOp>(getPrevWriter(op.getResult(0)))) {
+        if (Optional<StrideInfo> si = computeStrideInfo(lastWriter)) {
+          for (BlockArgument arg : op.getIVs()) {
+            strides[arg.getArgNumber()] = si->strides[arg];
+          }
         }
       }
-    }
 
-    CostModel model(threads, strides);
-    auto tileSize =
-        findBestTileSize(EvenTilingGenerator(), model, *maybeRanges);
-    // Invert tiling (we want 'threads' on the outer loop
-    for (size_t i = 0; i < tileSize.size(); i++) {
-      tileSize[i] = (*maybeRanges)[i] / tileSize[i];
+      CostModel model(threads, strides);
+      auto tileSize =
+          findBestTileSize(EvenTilingGenerator(), model, *maybeRanges);
+      // Invert tiling (we want 'threads' on the outer loop
+      for (size_t i = 0; i < tileSize.size(); i++) {
+        tileSize[i] = (*maybeRanges)[i] / tileSize[i];
+      }
+      // Tile and tag
+      performTiling(op, tileSize);
     }
-    // Tile and tag
-    performTiling(op, tileSize);
     setUnitTag(op, kCpuThreadTag);
   }
 };
