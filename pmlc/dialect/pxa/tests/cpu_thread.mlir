@@ -20,6 +20,5 @@ func @basic(%arg0: memref<100x100xf32>, %arg1: memref<100x100xf32>) -> (memref<1
 }
 
 // CHECK-LABEL: func @basic
-//       CHECK:   affine.parallel ({{.*}}, {{.*}}) = (0, 0) to (2, 25)
-//       CHECK:     affine.parallel ({{.*}}, {{.*}}) = (0, 0) to (50, 4)
-//       CHECK:       affine.parallel ({{.*}}) = (0) to (100)
+//       CHECK:   affine.parallel ({{.*}}, {{.*}}) = (0, 0) to (100, 100)
+//	 CHECK:     affine.parallel ({{.*}}) = (0) to (100)
