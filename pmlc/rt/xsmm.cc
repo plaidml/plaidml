@@ -55,6 +55,183 @@ extern "C" int64_t plaidml_rt_xsmm_gemm_dispatch_f32(int32_t lda, int32_t ldb,
   return reinterpret_cast<int64_t>(sgemm);
 }
 
+extern "C" void plaidml_rt_xsmm_gemm_relu_invoke_f32(int64_t funcAddr, float *a,
+                                                     float *b, float *c,
+                                                     float *d) {
+  libxsmm_xmmfunction sgemm;
+  libxsmm_gemm_ext_param gemm_param;
+  gemm_param.a.primary = reinterpret_cast<void *>(b);
+  gemm_param.b.primary = reinterpret_cast<void *>(a);
+  gemm_param.c.primary = reinterpret_cast<void *>(c);
+  gemm_param.d.primary = reinterpret_cast<void *>(d);
+  sgemm.gemm_ext = reinterpret_cast<libxsmm_gemmfunction_ext>(funcAddr);
+  sgemm.gemm_ext(&gemm_param);
+}
+
+extern "C" int64_t
+plaidml_rt_xsmm_gemm_relu_dispatch_f32(int32_t lda, int32_t ldb, int32_t ldc,
+                                       int32_t m, int32_t n, int32_t k) {
+  libxsmm_blasint lda_int = lda;
+  libxsmm_blasint ldb_int = ldb;
+  libxsmm_blasint ldc_int = ldc;
+  libxsmm_blasint m_int = m;
+  libxsmm_blasint n_int = n;
+  libxsmm_blasint k_int = k;
+
+  libxsmm_gemm_shape l_shape;
+  libxsmm_bitfield l_flags =
+      LIBXSMM_GEMM_FLAGS('N', 'N') | LIBXSMM_GEMM_FLAG_BETA_0;
+  libxsmm_bitfield l_prefetch_flags = 0;
+
+  l_shape.m = n_int;
+  l_shape.n = m_int;
+  l_shape.k = k_int;
+  l_shape.lda = ldb_int;
+  l_shape.ldb = lda_int;
+  l_shape.ldc = ldc_int;
+  l_shape.a_in_type = LIBXSMM_DATATYPE_F32;
+  l_shape.b_in_type = LIBXSMM_DATATYPE_F32;
+  l_shape.out_type = LIBXSMM_DATATYPE_F32;
+  l_shape.comp_type = LIBXSMM_DATATYPE_F32;
+
+  libxsmm_gemm_batch_reduce_config l_brconfig;
+  l_brconfig.br_type = LIBXSMM_GEMM_BATCH_REDUCE_NONE;
+
+  libxsmm_gemm_ext_unary_argops l_argops;
+  memset(&l_argops, 0, sizeof(libxsmm_gemm_ext_unary_argops));
+  l_argops.ldcp = ldc;
+  l_argops.cp_unary_type = LIBXSMM_MELTW_TYPE_UNARY_RELU;
+
+  libxsmm_gemm_ext_binary_postops l_postops;
+  memset(&l_postops, 0, sizeof(libxsmm_gemm_ext_binary_postops));
+  l_postops.d_in_type = LIBXSMM_DATATYPE_F32;
+  l_postops.d_binary_flags = LIBXSMM_MELTW_FLAG_BINARY_BCAST_COL_IN_0;
+  l_postops.d_binary_type = LIBXSMM_MELTW_TYPE_BINARY_ADD;
+  l_postops.ldd = ldc;
+
+  auto sgemm = libxsmm_dispatch_brgemm_ext_v2(
+      l_shape, l_flags, l_prefetch_flags, l_brconfig, l_argops, l_postops);
+
+  return reinterpret_cast<int64_t>(sgemm);
+}
+
+extern "C" void plaidml_rt_xsmm_gemm_bias_invoke_f32(int64_t funcAddr, float *a,
+                                                     float *b, float *c,
+                                                     float *d) {
+  libxsmm_xmmfunction sgemm;
+  libxsmm_gemm_ext_param gemm_param;
+  gemm_param.a.primary = reinterpret_cast<void *>(b);
+  gemm_param.b.primary = reinterpret_cast<void *>(a);
+  gemm_param.c.primary = reinterpret_cast<void *>(c);
+  gemm_param.d.primary = reinterpret_cast<void *>(d);
+  sgemm.gemm_ext = reinterpret_cast<libxsmm_gemmfunction_ext>(funcAddr);
+  sgemm.gemm_ext(&gemm_param);
+}
+
+extern "C" int64_t
+plaidml_rt_xsmm_gemm_bias_dispatch_f32(int32_t lda, int32_t ldb, int32_t ldc,
+                                       int32_t m, int32_t n, int32_t k) {
+  libxsmm_blasint lda_int = lda;
+  libxsmm_blasint ldb_int = ldb;
+  libxsmm_blasint ldc_int = ldc;
+  libxsmm_blasint m_int = m;
+  libxsmm_blasint n_int = n;
+  libxsmm_blasint k_int = k;
+
+  libxsmm_gemm_shape l_shape;
+  libxsmm_bitfield l_flags =
+      LIBXSMM_GEMM_FLAGS('N', 'N') | LIBXSMM_GEMM_FLAG_BETA_0;
+  libxsmm_bitfield l_prefetch_flags = 0;
+
+  l_shape.m = n_int;
+  l_shape.n = m_int;
+  l_shape.k = k_int;
+  l_shape.lda = ldb_int;
+  l_shape.ldb = lda_int;
+  l_shape.ldc = ldc_int;
+  l_shape.a_in_type = LIBXSMM_DATATYPE_F32;
+  l_shape.b_in_type = LIBXSMM_DATATYPE_F32;
+  l_shape.out_type = LIBXSMM_DATATYPE_F32;
+  l_shape.comp_type = LIBXSMM_DATATYPE_F32;
+
+  libxsmm_gemm_batch_reduce_config l_brconfig;
+  l_brconfig.br_type = LIBXSMM_GEMM_BATCH_REDUCE_NONE;
+
+  libxsmm_gemm_ext_unary_argops l_argops;
+  memset(&l_argops, 0, sizeof(libxsmm_gemm_ext_unary_argops));
+  l_argops.ldcp = ldc;
+
+  libxsmm_gemm_ext_binary_postops l_postops;
+  memset(&l_postops, 0, sizeof(libxsmm_gemm_ext_binary_postops));
+  l_postops.d_in_type = LIBXSMM_DATATYPE_F32;
+  l_postops.d_binary_flags = LIBXSMM_MELTW_FLAG_BINARY_BCAST_COL_IN_0;
+  l_postops.d_binary_type = LIBXSMM_MELTW_TYPE_BINARY_ADD;
+  l_postops.ldd = ldc;
+
+  auto sgemm = libxsmm_dispatch_brgemm_ext_v2(
+      l_shape, l_flags, l_prefetch_flags, l_brconfig, l_argops, l_postops);
+
+  return reinterpret_cast<int64_t>(sgemm);
+}
+
+extern "C" void plaidml_rt_xsmm_gemm_relu_beta1_invoke_f32(int64_t funcAddr,
+                                                           float *a, float *b,
+                                                           float *c, float *d) {
+  libxsmm_xmmfunction sgemm;
+  libxsmm_gemm_ext_param gemm_param;
+  gemm_param.a.primary = reinterpret_cast<void *>(b);
+  gemm_param.b.primary = reinterpret_cast<void *>(a);
+  gemm_param.c.primary = reinterpret_cast<void *>(c);
+  gemm_param.d.primary = reinterpret_cast<void *>(d);
+  sgemm.gemm_ext = reinterpret_cast<libxsmm_gemmfunction_ext>(funcAddr);
+  sgemm.gemm_ext(&gemm_param);
+}
+
+extern "C" int64_t plaidml_rt_xsmm_gemm_relu_beta1_dispatch_f32(
+    int32_t lda, int32_t ldb, int32_t ldc, int32_t m, int32_t n, int32_t k) {
+  libxsmm_blasint lda_int = lda;
+  libxsmm_blasint ldb_int = ldb;
+  libxsmm_blasint ldc_int = ldc;
+  libxsmm_blasint m_int = m;
+  libxsmm_blasint n_int = n;
+  libxsmm_blasint k_int = k;
+
+  libxsmm_gemm_shape l_shape;
+  libxsmm_bitfield l_flags = LIBXSMM_GEMM_FLAGS('N', 'N');
+  libxsmm_bitfield l_prefetch_flags = 0;
+
+  l_shape.m = n_int;
+  l_shape.n = m_int;
+  l_shape.k = k_int;
+  l_shape.lda = ldb_int;
+  l_shape.ldb = lda_int;
+  l_shape.ldc = ldc_int;
+  l_shape.a_in_type = LIBXSMM_DATATYPE_F32;
+  l_shape.b_in_type = LIBXSMM_DATATYPE_F32;
+  l_shape.out_type = LIBXSMM_DATATYPE_F32;
+  l_shape.comp_type = LIBXSMM_DATATYPE_F32;
+
+  libxsmm_gemm_batch_reduce_config l_brconfig;
+  l_brconfig.br_type = LIBXSMM_GEMM_BATCH_REDUCE_NONE;
+
+  libxsmm_gemm_ext_unary_argops l_argops;
+  memset(&l_argops, 0, sizeof(libxsmm_gemm_ext_unary_argops));
+  l_argops.ldcp = ldc;
+  l_argops.cp_unary_type = LIBXSMM_MELTW_TYPE_UNARY_RELU;
+
+  libxsmm_gemm_ext_binary_postops l_postops;
+  memset(&l_postops, 0, sizeof(libxsmm_gemm_ext_binary_postops));
+  l_postops.d_in_type = LIBXSMM_DATATYPE_F32;
+  l_postops.d_binary_flags = LIBXSMM_MELTW_FLAG_BINARY_BCAST_COL_IN_0;
+  l_postops.d_binary_type = LIBXSMM_MELTW_TYPE_BINARY_ADD;
+  l_postops.ldd = ldc;
+
+  auto sgemm = libxsmm_dispatch_brgemm_ext_v2(
+      l_shape, l_flags, l_prefetch_flags, l_brconfig, l_argops, l_postops);
+
+  return reinterpret_cast<int64_t>(sgemm);
+}
+
 extern "C" void plaidml_rt_xsmm_brgemm_invoke_f32(int64_t funcAddr, float *a,
                                                   float *b, float *c,
                                                   int64_t numBatches) {
@@ -277,6 +454,407 @@ extern "C" void plaidml_rt_xsmm_binary_invoke(int64_t addr, void *input1,
   kernel(&param);
 }
 
+extern "C" void plaidml_rt_xsmm_brgemm_relu_invoke_f32(int64_t funcAddr,
+                                                       float *a, float *b,
+                                                       float *c, float *d,
+                                                       int64_t numBatches) {
+  libxsmm_xmmfunction sgemm;
+  libxsmm_gemm_ext_param gemm_param;
+  sgemm.gemm_ext = reinterpret_cast<libxsmm_gemmfunction_ext>(funcAddr);
+  unsigned long long numBatchesVar = numBatches; // NOLINT
+  gemm_param.a.primary = reinterpret_cast<void *>(b);
+  gemm_param.b.primary = reinterpret_cast<void *>(a);
+  gemm_param.c.primary = reinterpret_cast<void *>(c);
+  gemm_param.d.primary = reinterpret_cast<void *>(d);
+  gemm_param.op.tertiary = reinterpret_cast<void *>(&numBatchesVar);
+  sgemm.gemm_ext(&gemm_param);
+}
+
+extern "C" void plaidml_rt_xsmm_brgemm_bias_invoke_f32(int64_t funcAddr,
+                                                       float *a, float *b,
+                                                       float *c, float *d,
+                                                       int64_t numBatches) {
+  libxsmm_xmmfunction sgemm;
+  libxsmm_gemm_ext_param gemm_param;
+  sgemm.gemm_ext = reinterpret_cast<libxsmm_gemmfunction_ext>(funcAddr);
+  unsigned long long numBatchesVar = numBatches; // NOLINT
+  gemm_param.a.primary = reinterpret_cast<void *>(b);
+  gemm_param.b.primary = reinterpret_cast<void *>(a);
+  gemm_param.c.primary = reinterpret_cast<void *>(c);
+  gemm_param.d.primary = reinterpret_cast<void *>(d);
+  gemm_param.op.tertiary = reinterpret_cast<void *>(&numBatchesVar);
+  sgemm.gemm_ext(&gemm_param);
+}
+
+extern "C" void
+plaidml_rt_xsmm_brgemm_relu_beta1_invoke_f32(int64_t funcAddr, float *a,
+                                             float *b, float *c, float *d,
+                                             int64_t numBatches) {
+  libxsmm_xmmfunction sgemm;
+  libxsmm_gemm_ext_param gemm_param;
+  sgemm.gemm_ext = reinterpret_cast<libxsmm_gemmfunction_ext>(funcAddr);
+  unsigned long long numBatchesVar = numBatches; // NOLINT
+  gemm_param.a.primary = reinterpret_cast<void *>(b);
+  gemm_param.b.primary = reinterpret_cast<void *>(a);
+  gemm_param.c.primary = reinterpret_cast<void *>(c);
+  gemm_param.d.primary = reinterpret_cast<void *>(d);
+  gemm_param.op.tertiary = reinterpret_cast<void *>(&numBatchesVar);
+  sgemm.gemm_ext(&gemm_param);
+}
+
+extern "C" int64_t plaidml_rt_xsmm_brgemm_relu_dispatch_f32(
+    int32_t lda, int32_t ldb, int32_t ldc, int32_t m, int32_t n, int32_t k,
+    int64_t stride_a_hint, int64_t stride_b_hint) {
+  libxsmm_blasint lda_int = lda;
+  libxsmm_blasint ldb_int = ldb;
+  libxsmm_blasint ldc_int = ldc;
+  libxsmm_blasint m_int = m;
+  libxsmm_blasint n_int = n;
+  libxsmm_blasint k_int = k;
+  libxsmm_blasint stride_a = stride_a_hint;
+  libxsmm_blasint stride_b = stride_b_hint;
+
+  libxsmm_gemm_shape l_shape;
+  libxsmm_bitfield l_flags =
+      LIBXSMM_GEMM_FLAGS('N', 'N') | LIBXSMM_GEMM_FLAG_BETA_0;
+  libxsmm_bitfield l_prefetch_flags = 0;
+  libxsmm_gemm_batch_reduce_config l_brconfig;
+
+  l_shape.m = n_int;
+  l_shape.n = m_int;
+  l_shape.k = k_int;
+  l_shape.lda = ldb_int;
+  l_shape.ldb = lda_int;
+  l_shape.ldc = ldc_int;
+  l_shape.a_in_type = LIBXSMM_DATATYPE_F32;
+  l_shape.b_in_type = LIBXSMM_DATATYPE_F32;
+  l_shape.out_type = LIBXSMM_DATATYPE_F32;
+  l_shape.comp_type = LIBXSMM_DATATYPE_F32;
+  l_brconfig.br_type = LIBXSMM_GEMM_BATCH_REDUCE_STRIDE;
+  l_brconfig.br_stride_a_hint = stride_b;
+  l_brconfig.br_stride_b_hint = stride_a;
+  l_brconfig.br_unroll_hint = 0;
+
+  libxsmm_gemm_ext_unary_argops l_argops;
+  memset(&l_argops, 0, sizeof(libxsmm_gemm_ext_unary_argops));
+  l_argops.ldcp = ldc;
+  l_argops.cp_unary_type = LIBXSMM_MELTW_TYPE_UNARY_RELU;
+
+  libxsmm_gemm_ext_binary_postops l_postops;
+  memset(&l_postops, 0, sizeof(libxsmm_gemm_ext_binary_postops));
+  l_postops.d_in_type = LIBXSMM_DATATYPE_F32;
+  l_postops.d_binary_flags = LIBXSMM_MELTW_FLAG_BINARY_BCAST_COL_IN_0;
+  l_postops.d_binary_type = LIBXSMM_MELTW_TYPE_BINARY_ADD;
+  l_postops.ldd = ldc;
+
+  auto sgemm = libxsmm_dispatch_brgemm_ext_v2(
+      l_shape, l_flags, l_prefetch_flags, l_brconfig, l_argops, l_postops);
+
+  return reinterpret_cast<int64_t>(sgemm);
+}
+
+extern "C" int64_t plaidml_rt_xsmm_brgemm_bias_dispatch_f32(
+    int32_t lda, int32_t ldb, int32_t ldc, int32_t m, int32_t n, int32_t k,
+    int64_t stride_a_hint, int64_t stride_b_hint) {
+  libxsmm_blasint lda_int = lda;
+  libxsmm_blasint ldb_int = ldb;
+  libxsmm_blasint ldc_int = ldc;
+  libxsmm_blasint m_int = m;
+  libxsmm_blasint n_int = n;
+  libxsmm_blasint k_int = k;
+  libxsmm_blasint stride_a = stride_a_hint;
+  libxsmm_blasint stride_b = stride_b_hint;
+
+  libxsmm_gemm_shape l_shape;
+  libxsmm_bitfield l_flags =
+      LIBXSMM_GEMM_FLAGS('N', 'N') | LIBXSMM_GEMM_FLAG_BETA_0;
+  libxsmm_bitfield l_prefetch_flags = 0;
+  libxsmm_gemm_batch_reduce_config l_brconfig;
+
+  l_shape.m = n_int;
+  l_shape.n = m_int;
+  l_shape.k = k_int;
+  l_shape.lda = ldb_int;
+  l_shape.ldb = lda_int;
+  l_shape.ldc = ldc_int;
+  l_shape.a_in_type = LIBXSMM_DATATYPE_F32;
+  l_shape.b_in_type = LIBXSMM_DATATYPE_F32;
+  l_shape.out_type = LIBXSMM_DATATYPE_F32;
+  l_shape.comp_type = LIBXSMM_DATATYPE_F32;
+  l_brconfig.br_type = LIBXSMM_GEMM_BATCH_REDUCE_STRIDE;
+  l_brconfig.br_stride_a_hint = stride_b;
+  l_brconfig.br_stride_b_hint = stride_a;
+  l_brconfig.br_unroll_hint = 0;
+
+  libxsmm_gemm_ext_unary_argops l_argops;
+  memset(&l_argops, 0, sizeof(libxsmm_gemm_ext_unary_argops));
+  l_argops.ldcp = ldc;
+
+  libxsmm_gemm_ext_binary_postops l_postops;
+  memset(&l_postops, 0, sizeof(libxsmm_gemm_ext_binary_postops));
+  l_postops.d_in_type = LIBXSMM_DATATYPE_F32;
+  l_postops.d_binary_flags = LIBXSMM_MELTW_FLAG_BINARY_BCAST_COL_IN_0;
+  l_postops.d_binary_type = LIBXSMM_MELTW_TYPE_BINARY_ADD;
+  l_postops.ldd = ldc;
+
+  auto sgemm = libxsmm_dispatch_brgemm_ext_v2(
+      l_shape, l_flags, l_prefetch_flags, l_brconfig, l_argops, l_postops);
+
+  return reinterpret_cast<int64_t>(sgemm);
+}
+
+extern "C" int64_t plaidml_rt_xsmm_brgemm_relu_beta1_dispatch_f32(
+    int32_t lda, int32_t ldb, int32_t ldc, int32_t m, int32_t n, int32_t k,
+    int64_t stride_a_hint, int64_t stride_b_hint) {
+  libxsmm_blasint lda_int = lda;
+  libxsmm_blasint ldb_int = ldb;
+  libxsmm_blasint ldc_int = ldc;
+  libxsmm_blasint m_int = m;
+  libxsmm_blasint n_int = n;
+  libxsmm_blasint k_int = k;
+  libxsmm_blasint stride_a = stride_a_hint;
+  libxsmm_blasint stride_b = stride_b_hint;
+
+  libxsmm_gemm_shape l_shape;
+  libxsmm_bitfield l_flags = LIBXSMM_GEMM_FLAGS('N', 'N');
+  libxsmm_bitfield l_prefetch_flags = 0;
+  libxsmm_gemm_batch_reduce_config l_brconfig;
+
+  l_shape.m = n_int;
+  l_shape.n = m_int;
+  l_shape.k = k_int;
+  l_shape.lda = ldb_int;
+  l_shape.ldb = lda_int;
+  l_shape.ldc = ldc_int;
+  l_shape.a_in_type = LIBXSMM_DATATYPE_F32;
+  l_shape.b_in_type = LIBXSMM_DATATYPE_F32;
+  l_shape.out_type = LIBXSMM_DATATYPE_F32;
+  l_shape.comp_type = LIBXSMM_DATATYPE_F32;
+  l_brconfig.br_type = LIBXSMM_GEMM_BATCH_REDUCE_STRIDE;
+  l_brconfig.br_stride_a_hint = stride_b;
+  l_brconfig.br_stride_b_hint = stride_a;
+  l_brconfig.br_unroll_hint = 0;
+
+  libxsmm_gemm_ext_unary_argops l_argops;
+  memset(&l_argops, 0, sizeof(libxsmm_gemm_ext_unary_argops));
+  l_argops.ldcp = ldc;
+  l_argops.cp_unary_type = LIBXSMM_MELTW_TYPE_UNARY_RELU;
+
+  libxsmm_gemm_ext_binary_postops l_postops;
+  memset(&l_postops, 0, sizeof(libxsmm_gemm_ext_binary_postops));
+  l_postops.d_in_type = LIBXSMM_DATATYPE_F32;
+  l_postops.d_binary_flags = LIBXSMM_MELTW_FLAG_BINARY_BCAST_COL_IN_0;
+  l_postops.d_binary_type = LIBXSMM_MELTW_TYPE_BINARY_ADD;
+  l_postops.ldd = ldc;
+
+  auto sgemm = libxsmm_dispatch_brgemm_ext_v2(
+      l_shape, l_flags, l_prefetch_flags, l_brconfig, l_argops, l_postops);
+
+  return reinterpret_cast<int64_t>(sgemm);
+}
+
+extern "C" void plaidml_rt_xsmm_brgemm_offs_relu_invoke_f32(
+    int64_t funcAddr, float *a, float *b, float *c, float *d,
+    int64_t numBatches, uint64_t *a_offsets, uint64_t *b_offsets) {
+  libxsmm_xmmfunction sgemm;
+  libxsmm_gemm_ext_param gemm_param;
+  sgemm.gemm_ext = reinterpret_cast<libxsmm_gemmfunction_ext>(funcAddr);
+  unsigned long long numBatchesVar = numBatches;                      // NOLINT
+  auto *l_a_offs = reinterpret_cast<unsigned long long *>(a_offsets); // NOLINT
+  auto *l_b_offs = reinterpret_cast<unsigned long long *>(b_offsets); // NOLINT
+
+  gemm_param.a.secondary = reinterpret_cast<void *>(l_b_offs);
+  gemm_param.b.secondary = reinterpret_cast<void *>(l_a_offs);
+  gemm_param.a.primary = reinterpret_cast<void *>(b);
+  gemm_param.b.primary = reinterpret_cast<void *>(a);
+  gemm_param.c.primary = reinterpret_cast<void *>(c);
+  gemm_param.d.primary = reinterpret_cast<void *>(d);
+  gemm_param.op.tertiary = reinterpret_cast<void *>(&numBatchesVar);
+  sgemm.gemm_ext(&gemm_param);
+}
+
+extern "C" void plaidml_rt_xsmm_brgemm_offs_bias_invoke_f32(
+    int64_t funcAddr, float *a, float *b, float *c, float *d,
+    int64_t numBatches, uint64_t *a_offsets, uint64_t *b_offsets) {
+  libxsmm_xmmfunction sgemm;
+  libxsmm_gemm_ext_param gemm_param;
+  sgemm.gemm_ext = reinterpret_cast<libxsmm_gemmfunction_ext>(funcAddr);
+  unsigned long long numBatchesVar = numBatches;                      // NOLINT
+  auto *l_a_offs = reinterpret_cast<unsigned long long *>(a_offsets); // NOLINT
+  auto *l_b_offs = reinterpret_cast<unsigned long long *>(b_offsets); // NOLINT
+
+  gemm_param.a.secondary = reinterpret_cast<void *>(l_b_offs);
+  gemm_param.b.secondary = reinterpret_cast<void *>(l_a_offs);
+  gemm_param.a.primary = reinterpret_cast<void *>(b);
+  gemm_param.b.primary = reinterpret_cast<void *>(a);
+  gemm_param.c.primary = reinterpret_cast<void *>(c);
+  gemm_param.d.primary = reinterpret_cast<void *>(d);
+  gemm_param.op.tertiary = reinterpret_cast<void *>(&numBatchesVar);
+  sgemm.gemm_ext(&gemm_param);
+}
+
+extern "C" void plaidml_rt_xsmm_brgemm_offs_relu_beta1_invoke_f32(
+    int64_t funcAddr, float *a, float *b, float *c, float *d,
+    int64_t numBatches, uint64_t *a_offsets, uint64_t *b_offsets) {
+  libxsmm_xmmfunction sgemm;
+  libxsmm_gemm_ext_param gemm_param;
+  sgemm.gemm_ext = reinterpret_cast<libxsmm_gemmfunction_ext>(funcAddr);
+  unsigned long long numBatchesVar = numBatches;                      // NOLINT
+  auto *l_a_offs = reinterpret_cast<unsigned long long *>(a_offsets); // NOLINT
+  auto *l_b_offs = reinterpret_cast<unsigned long long *>(b_offsets); // NOLINT
+
+  gemm_param.a.secondary = reinterpret_cast<void *>(l_b_offs);
+  gemm_param.b.secondary = reinterpret_cast<void *>(l_a_offs);
+  gemm_param.a.primary = reinterpret_cast<void *>(b);
+  gemm_param.b.primary = reinterpret_cast<void *>(a);
+  gemm_param.c.primary = reinterpret_cast<void *>(c);
+  gemm_param.d.primary = reinterpret_cast<void *>(d);
+  gemm_param.op.tertiary = reinterpret_cast<void *>(&numBatchesVar);
+  sgemm.gemm_ext(&gemm_param);
+}
+
+extern "C" int64_t plaidml_rt_xsmm_brgemm_offs_relu_dispatch_f32(
+    int32_t lda, int32_t ldb, int32_t ldc, int32_t m, int32_t n, int32_t k) {
+  libxsmm_blasint lda_int = lda;
+  libxsmm_blasint ldb_int = ldb;
+  libxsmm_blasint ldc_int = ldc;
+  libxsmm_blasint m_int = m;
+  libxsmm_blasint n_int = n;
+  libxsmm_blasint k_int = k;
+
+  libxsmm_gemm_shape l_shape;
+  libxsmm_bitfield l_flags =
+      LIBXSMM_GEMM_FLAGS('N', 'N') | LIBXSMM_GEMM_FLAG_BETA_0;
+  libxsmm_bitfield l_prefetch_flags = 0;
+  libxsmm_gemm_batch_reduce_config l_brconfig;
+
+  l_shape.m = n_int;
+  l_shape.n = m_int;
+  l_shape.k = k_int;
+  l_shape.lda = ldb_int;
+  l_shape.ldb = lda_int;
+  l_shape.ldc = ldc_int;
+  l_shape.a_in_type = LIBXSMM_DATATYPE_F32;
+  l_shape.b_in_type = LIBXSMM_DATATYPE_F32;
+  l_shape.out_type = LIBXSMM_DATATYPE_F32;
+  l_shape.comp_type = LIBXSMM_DATATYPE_F32;
+  l_brconfig.br_type = LIBXSMM_GEMM_BATCH_REDUCE_OFFSET;
+  l_brconfig.br_stride_a_hint = 0;
+  l_brconfig.br_stride_b_hint = 0;
+  l_brconfig.br_unroll_hint = 0;
+
+  libxsmm_gemm_ext_unary_argops l_argops;
+  memset(&l_argops, 0, sizeof(libxsmm_gemm_ext_unary_argops));
+  l_argops.ldcp = ldc;
+  l_argops.cp_unary_type = LIBXSMM_MELTW_TYPE_UNARY_RELU;
+
+  libxsmm_gemm_ext_binary_postops l_postops;
+  memset(&l_postops, 0, sizeof(libxsmm_gemm_ext_binary_postops));
+  l_postops.d_in_type = LIBXSMM_DATATYPE_F32;
+  l_postops.d_binary_flags = LIBXSMM_MELTW_FLAG_BINARY_BCAST_COL_IN_0;
+  l_postops.d_binary_type = LIBXSMM_MELTW_TYPE_BINARY_ADD;
+  l_postops.ldd = ldc;
+
+  auto sgemm = libxsmm_dispatch_brgemm_ext_v2(
+      l_shape, l_flags, l_prefetch_flags, l_brconfig, l_argops, l_postops);
+
+  return reinterpret_cast<int64_t>(sgemm);
+}
+
+extern "C" int64_t plaidml_rt_xsmm_brgemm_offs_bias_dispatch_f32(
+    int32_t lda, int32_t ldb, int32_t ldc, int32_t m, int32_t n, int32_t k) {
+  libxsmm_blasint lda_int = lda;
+  libxsmm_blasint ldb_int = ldb;
+  libxsmm_blasint ldc_int = ldc;
+  libxsmm_blasint m_int = m;
+  libxsmm_blasint n_int = n;
+  libxsmm_blasint k_int = k;
+
+  libxsmm_gemm_shape l_shape;
+  libxsmm_bitfield l_flags =
+      LIBXSMM_GEMM_FLAGS('N', 'N') | LIBXSMM_GEMM_FLAG_BETA_0;
+  libxsmm_bitfield l_prefetch_flags = 0;
+  libxsmm_gemm_batch_reduce_config l_brconfig;
+
+  l_shape.m = n_int;
+  l_shape.n = m_int;
+  l_shape.k = k_int;
+  l_shape.lda = ldb_int;
+  l_shape.ldb = lda_int;
+  l_shape.ldc = ldc_int;
+  l_shape.a_in_type = LIBXSMM_DATATYPE_F32;
+  l_shape.b_in_type = LIBXSMM_DATATYPE_F32;
+  l_shape.out_type = LIBXSMM_DATATYPE_F32;
+  l_shape.comp_type = LIBXSMM_DATATYPE_F32;
+  l_brconfig.br_type = LIBXSMM_GEMM_BATCH_REDUCE_OFFSET;
+  l_brconfig.br_stride_a_hint = 0;
+  l_brconfig.br_stride_b_hint = 0;
+  l_brconfig.br_unroll_hint = 0;
+
+  libxsmm_gemm_ext_unary_argops l_argops;
+  memset(&l_argops, 0, sizeof(libxsmm_gemm_ext_unary_argops));
+  l_argops.ldcp = ldc;
+
+  libxsmm_gemm_ext_binary_postops l_postops;
+  memset(&l_postops, 0, sizeof(libxsmm_gemm_ext_binary_postops));
+  l_postops.d_in_type = LIBXSMM_DATATYPE_F32;
+  l_postops.d_binary_flags = LIBXSMM_MELTW_FLAG_BINARY_BCAST_COL_IN_0;
+  l_postops.d_binary_type = LIBXSMM_MELTW_TYPE_BINARY_ADD;
+  l_postops.ldd = ldc;
+
+  auto sgemm = libxsmm_dispatch_brgemm_ext_v2(
+      l_shape, l_flags, l_prefetch_flags, l_brconfig, l_argops, l_postops);
+
+  return reinterpret_cast<int64_t>(sgemm);
+}
+
+extern "C" int64_t plaidml_rt_xsmm_brgemm_offs_relu_beta1_dispatch_f32(
+    int32_t lda, int32_t ldb, int32_t ldc, int32_t m, int32_t n, int32_t k) {
+  libxsmm_blasint lda_int = lda;
+  libxsmm_blasint ldb_int = ldb;
+  libxsmm_blasint ldc_int = ldc;
+  libxsmm_blasint m_int = m;
+  libxsmm_blasint n_int = n;
+  libxsmm_blasint k_int = k;
+
+  libxsmm_gemm_shape l_shape;
+  libxsmm_bitfield l_flags = LIBXSMM_GEMM_FLAGS('N', 'N');
+  libxsmm_bitfield l_prefetch_flags = 0;
+  libxsmm_gemm_batch_reduce_config l_brconfig;
+
+  l_shape.m = n_int;
+  l_shape.n = m_int;
+  l_shape.k = k_int;
+  l_shape.lda = ldb_int;
+  l_shape.ldb = lda_int;
+  l_shape.ldc = ldc_int;
+  l_shape.a_in_type = LIBXSMM_DATATYPE_F32;
+  l_shape.b_in_type = LIBXSMM_DATATYPE_F32;
+  l_shape.out_type = LIBXSMM_DATATYPE_F32;
+  l_shape.comp_type = LIBXSMM_DATATYPE_F32;
+  l_brconfig.br_type = LIBXSMM_GEMM_BATCH_REDUCE_OFFSET;
+  l_brconfig.br_stride_a_hint = 0;
+  l_brconfig.br_stride_b_hint = 0;
+  l_brconfig.br_unroll_hint = 0;
+
+  libxsmm_gemm_ext_unary_argops l_argops;
+  memset(&l_argops, 0, sizeof(libxsmm_gemm_ext_unary_argops));
+  l_argops.ldcp = ldc;
+  l_argops.cp_unary_type = LIBXSMM_MELTW_TYPE_UNARY_RELU;
+
+  libxsmm_gemm_ext_binary_postops l_postops;
+  memset(&l_postops, 0, sizeof(libxsmm_gemm_ext_binary_postops));
+  l_postops.d_in_type = LIBXSMM_DATATYPE_F32;
+  l_postops.d_binary_flags = LIBXSMM_MELTW_FLAG_BINARY_BCAST_COL_IN_0;
+  l_postops.d_binary_type = LIBXSMM_MELTW_TYPE_BINARY_ADD;
+  l_postops.ldd = ldc;
+
+  auto sgemm = libxsmm_dispatch_brgemm_ext_v2(
+      l_shape, l_flags, l_prefetch_flags, l_brconfig, l_argops, l_postops);
+
+  return reinterpret_cast<int64_t>(sgemm);
+}
+
 namespace pmlc::rt {
 
 void registerXsmm() {
@@ -284,10 +862,28 @@ void registerXsmm() {
 
   REGISTER_SYMBOL(plaidml_rt_xsmm_gemm_invoke_f32);
   REGISTER_SYMBOL(plaidml_rt_xsmm_gemm_dispatch_f32);
+  REGISTER_SYMBOL(plaidml_rt_xsmm_gemm_relu_invoke_f32);
+  REGISTER_SYMBOL(plaidml_rt_xsmm_gemm_relu_dispatch_f32);
+  REGISTER_SYMBOL(plaidml_rt_xsmm_gemm_bias_invoke_f32);
+  REGISTER_SYMBOL(plaidml_rt_xsmm_gemm_bias_dispatch_f32);
+  REGISTER_SYMBOL(plaidml_rt_xsmm_gemm_relu_beta1_invoke_f32);
+  REGISTER_SYMBOL(plaidml_rt_xsmm_gemm_relu_beta1_dispatch_f32);
   REGISTER_SYMBOL(plaidml_rt_xsmm_brgemm_invoke_f32);
   REGISTER_SYMBOL(plaidml_rt_xsmm_brgemm_dispatch_f32);
+  REGISTER_SYMBOL(plaidml_rt_xsmm_brgemm_relu_invoke_f32);
+  REGISTER_SYMBOL(plaidml_rt_xsmm_brgemm_relu_dispatch_f32);
+  REGISTER_SYMBOL(plaidml_rt_xsmm_brgemm_bias_invoke_f32);
+  REGISTER_SYMBOL(plaidml_rt_xsmm_brgemm_bias_dispatch_f32);
+  REGISTER_SYMBOL(plaidml_rt_xsmm_brgemm_relu_beta1_invoke_f32);
+  REGISTER_SYMBOL(plaidml_rt_xsmm_brgemm_relu_beta1_dispatch_f32);
   REGISTER_SYMBOL(plaidml_rt_xsmm_brgemm_offs_invoke_f32);
   REGISTER_SYMBOL(plaidml_rt_xsmm_brgemm_offs_dispatch_f32);
+  REGISTER_SYMBOL(plaidml_rt_xsmm_brgemm_offs_relu_invoke_f32);
+  REGISTER_SYMBOL(plaidml_rt_xsmm_brgemm_offs_relu_dispatch_f32);
+  REGISTER_SYMBOL(plaidml_rt_xsmm_brgemm_offs_bias_invoke_f32);
+  REGISTER_SYMBOL(plaidml_rt_xsmm_brgemm_offs_bias_dispatch_f32);
+  REGISTER_SYMBOL(plaidml_rt_xsmm_brgemm_offs_relu_beta1_invoke_f32);
+  REGISTER_SYMBOL(plaidml_rt_xsmm_brgemm_offs_relu_beta1_dispatch_f32);
   REGISTER_SYMBOL(plaidml_rt_xsmm_unary_dispatch);
   REGISTER_SYMBOL(plaidml_rt_xsmm_unary_invoke);
   REGISTER_SYMBOL(plaidml_rt_xsmm_binary_dispatch);

@@ -40,6 +40,8 @@ std::unique_ptr<mlir::Pass> createStencilTppBinaryPass();
 
 std::unique_ptr<mlir::Pass> createStencilSplitPass();
 
+std::unique_ptr<mlir::Pass> createTppCombinePass();
+
 std::unique_ptr<mlir::Pass> createTraceLinkingPass();
 
 std::unique_ptr<mlir::Pass> createXSMMLoweringPass();

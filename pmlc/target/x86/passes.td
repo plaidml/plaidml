@@ -93,6 +93,11 @@ def StencilSplit : Pass<"x86-stencil-tpp-split", "mlir::func::FuncOp"> {
   let constructor = "pmlc::target::x86::createStencilSplitPass()";
 }
 
+def TppCombine : Pass<"x86-tpp-combine", "mlir::func::FuncOp"> {
+  let summary = "Combine identity->gemm->relu pattern";
+  let constructor = "pmlc::target::x86::createTppCombinePass()";
+}
+
 def TraceLinking : Pass<"x86-trace-linking", "mlir::ModuleOp"> {
   let summary = "Link trace ops to runtime functions";
   let constructor = "pmlc::target::x86::createTraceLinkingPass()";

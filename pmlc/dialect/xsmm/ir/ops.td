@@ -116,6 +116,77 @@ def XSMM_GemmInvokeF32Op : XSMM_Op<"gemm.invoke.f32"> {
   }];
 }
 
+def XSMM_Gemm_ReluDispatchF32Op : XSMM_Op<"gemm.relu.dispatch.f32", [NoSideEffect]> {
+  let summary = "query LIBXSMM's code registry based on GEMM and relu shape";
+  let arguments = (ins I64ArrayAttr:$tile, I64ArrayAttr:$tileld);
+  let results = (outs I64:$ptr);
+  let assemblyFormat = "$tile `,` $tileld attr-dict";
+}
+
+def XSMM_Gemm_ReluInvokeF32Op : XSMM_Op<"gemm.relu.invoke.f32"> {
+  let summary = "invoke a previously queried LIBXSMM kernel";
+  let arguments = (ins I64:$ptr,
+    Arg<F32MemRef, "the C memref to store to", [MemWrite]>:$c,
+    Arg<F32MemRef, "the A memref to load from", [MemRead]>:$a,
+    Arg<F32MemRef, "the B memref to load from", [MemRead]>:$b,
+    Arg<F32MemRef, "the D memref to add bias to C from", [MemRead]>:$d,
+   Variadic<Index>:$indices);
+
+  let extraClassDeclaration = [{
+    operand_range getOperandsForA();
+    operand_range getOperandsForB();
+    operand_range getOperandsForC();
+    operand_range getOperandsForD();
+ }];
+}
+
+def XSMM_Gemm_Relu_Beta1DispatchF32Op : XSMM_Op<"gemm.relu.beta.dispatch.f32", [NoSideEffect]> {
+  let summary = "query LIBXSMM's code registry based on GEMM and relu shape";
+  let arguments = (ins I64ArrayAttr:$tile, I64ArrayAttr:$tileld);
+  let results = (outs I64:$ptr);
+  let assemblyFormat = "$tile `,` $tileld attr-dict";
+}
+
+def XSMM_Gemm_Relu_Beta1InvokeF32Op : XSMM_Op<"gemm.relu.beta.invoke.f32"> {
+  let summary = "invoke a previously queried LIBXSMM kernel";
+  let arguments = (ins I64:$ptr,
+    Arg<F32MemRef, "the C memref to store to", [MemWrite]>:$c,
+    Arg<F32MemRef, "the A memref to load from", [MemRead]>:$a,
+    Arg<F32MemRef, "the B memref to load from", [MemRead]>:$b,
+    Arg<F32MemRef, "the D memref to add bias to C from", [MemRead]>:$d,
+   Variadic<Index>:$indices);
+
+  let extraClassDeclaration = [{
+    operand_range getOperandsForA();
+    operand_range getOperandsForB();
+    operand_range getOperandsForC();
+    operand_range getOperandsForD();
+ }];
+}
+
+def XSMM_Gemm_BiasDispatchF32Op : XSMM_Op<"gemm.bias.dispatch.f32", [NoSideEffect]> {
+  let summary = "query LIBXSMM's code registry based on GEMM and relu shape";
+  let arguments = (ins I64ArrayAttr:$tile, I64ArrayAttr:$tileld);
+  let results = (outs I64:$ptr);
+  let assemblyFormat = "$tile `,` $tileld attr-dict";
+}
+
+def XSMM_Gemm_BiasInvokeF32Op : XSMM_Op<"gemm.bias.invoke.f32"> {
+  let summary = "invoke a previously queried LIBXSMM kernel";
+  let arguments = (ins I64:$ptr,
+    Arg<F32MemRef, "the C memref to store to", [MemWrite]>:$c,
+    Arg<F32MemRef, "the A memref to load from", [MemRead]>:$a,
+    Arg<F32MemRef, "the B memref to load from", [MemRead]>:$b,
+    Arg<F32MemRef, "the D memref to add bias to C from", [MemRead]>:$d,
+   Variadic<Index>:$indices);
+
+  let extraClassDeclaration = [{
+    operand_range getOperandsForA();
+    operand_range getOperandsForB();
+    operand_range getOperandsForC();
+    operand_range getOperandsForD();
+ }];
+}
 
 def XSMM_BRGemmDispatchF32Op : XSMM_Op<"brgemm.dispatch.f32", [NoSideEffect]> {
   let summary = "query LIBXSMM's code registry based on GEMM shape";
@@ -140,6 +211,86 @@ def XSMM_BRGemmInvokeF32Op : XSMM_Op<"brgemm.invoke.f32"> {
     operand_range getOperandsForC();
   }];
 }
+
+
+def XSMM_BRGemm_ReluDispatchF32Op : XSMM_Op<"brgemm.relu.dispatch.f32", [NoSideEffect]> {
+  let summary = "query LIBXSMM's code registry based on GEMM shape";
+  let arguments = (ins I64ArrayAttr:$tile, I64ArrayAttr:$tileld, I64Attr:$strideA, I64Attr:$strideB);
+  let results = (outs I64:$ptr);
+  let assemblyFormat = "$tile `,` $tileld attr-dict";
+}
+
+def XSMM_BRGemm_Relu_Beta1DispatchF32Op : XSMM_Op<"brgemm.beta.dispatch.f32", [NoSideEffect]> {
+  let summary = "query LIBXSMM's code registry based on GEMM shape";
+  let arguments = (ins I64ArrayAttr:$tile, I64ArrayAttr:$tileld, I64Attr:$strideA, I64Attr:$strideB);
+  let results = (outs I64:$ptr);
+  let assemblyFormat = "$tile `,` $tileld attr-dict";
+}
+
+def XSMM_BRGemm_BiasDispatchF32Op : XSMM_Op<"brgemm.bias.dispatch.f32", [NoSideEffect]> {
+  let summary = "query LIBXSMM's code registry based on GEMM shape";
+  let arguments = (ins I64ArrayAttr:$tile, I64ArrayAttr:$tileld, I64Attr:$strideA, I64Attr:$strideB);
+  let results = (outs I64:$ptr);
+  let assemblyFormat = "$tile `,` $tileld attr-dict";
+}
+
+def XSMM_BRGemm_ReluInvokeF32Op : XSMM_Op<"brgemm.relu.invoke.f32"> {
+  let summary = "invoke a previously queried LIBXSMM kernel";
+  let arguments = (ins I64:$ptr,
+    Arg<F32MemRef, "the C memref to store to", [MemWrite]>:$c,
+    Arg<F32MemRef, "the A memref to load from", [MemRead]>:$a,
+    Arg<F32MemRef, "the B memref to load from", [MemRead]>:$b,
+    Arg<F32MemRef, "the D memref to load bias to add to D from", [MemRead]>:$d,
+    I64Attr:$numBatches,
+    Variadic<Index>:$indices);
+
+
+  let extraClassDeclaration = [{
+    operand_range getOperandsForA();
+    operand_range getOperandsForB();
+    operand_range getOperandsForC();
+    operand_range getOperandsForD();
+  }];
+}
+
+def XSMM_BRGemm_Relu_Beta1InvokeF32Op : XSMM_Op<"brgemm.relu.beta.invoke.f32"> {
+  let summary = "invoke a previously queried LIBXSMM kernel";
+  let arguments = (ins I64:$ptr,
+    Arg<F32MemRef, "the C memref to store to", [MemWrite]>:$c,
+    Arg<F32MemRef, "the A memref to load from", [MemRead]>:$a,
+    Arg<F32MemRef, "the B memref to load from", [MemRead]>:$b,
+    Arg<F32MemRef, "the D memref to load bias to add to D from", [MemRead]>:$d,
+    I64Attr:$numBatches,
+    Variadic<Index>:$indices);
+
+
+  let extraClassDeclaration = [{
+    operand_range getOperandsForA();
+    operand_range getOperandsForB();
+    operand_range getOperandsForC();
+    operand_range getOperandsForD();
+  }];
+}
+
+def XSMM_BRGemm_BiasInvokeF32Op : XSMM_Op<"brgemm.bias.invoke.f32"> {
+  let summary = "invoke a previously queried LIBXSMM kernel";
+  let arguments = (ins I64:$ptr,
+    Arg<F32MemRef, "the C memref to store to", [MemWrite]>:$c,
+    Arg<F32MemRef, "the A memref to load from", [MemRead]>:$a,
+    Arg<F32MemRef, "the B memref to load from", [MemRead]>:$b,
+    Arg<F32MemRef, "the D memref to load bias to add to D from", [MemRead]>:$d,
+    I64Attr:$numBatches,
+    Variadic<Index>:$indices);
+
+
+  let extraClassDeclaration = [{
+    operand_range getOperandsForA();
+    operand_range getOperandsForB();
+    operand_range getOperandsForC();
+    operand_range getOperandsForD();
+  }];
+}
+
 
 def XSMM_BRGemmOffsDispatchF32Op : XSMM_Op<"brgemm.offs.dispatch.f32", [NoSideEffect]> {
   let summary = "query LIBXSMM's code registry based on GEMM shape";
@@ -166,6 +317,87 @@ def XSMM_BRGemmOffsInvokeF32Op : XSMM_Op<"brgemm.offs.invoke.f32"> {
   }];
 }
 
+def XSMM_BRGemmOffs_ReluDispatchF32Op : XSMM_Op<"brgemm.offs.relu.dispatch.f32", [NoSideEffect]> {
+  let summary = "query LIBXSMM's code registry based on GEMM shape";
+  let arguments = (ins I64ArrayAttr:$tile, I64ArrayAttr:$tileld);
+  let results = (outs I64:$ptr);
+  let assemblyFormat = "$tile `,` $tileld attr-dict";
+}
+
+def XSMM_BRGemmOffs_BiasDispatchF32Op : XSMM_Op<"brgemm.offs.bias.dispatch.f32", [NoSideEffect]> {
+  let summary = "query LIBXSMM's code registry based on GEMM shape";
+  let arguments = (ins I64ArrayAttr:$tile, I64ArrayAttr:$tileld);
+  let results = (outs I64:$ptr);
+  let assemblyFormat = "$tile `,` $tileld attr-dict";
+}
+
+def XSMM_BRGemmOffs_Relu_Beta1DispatchF32Op : XSMM_Op<"brgemm.offs.relu.beta1.dispatch.f32", [NoSideEffect]> {
+  let summary = "query LIBXSMM's code registry based on GEMM shape";
+  let arguments = (ins I64ArrayAttr:$tile, I64ArrayAttr:$tileld);
+  let results = (outs I64:$ptr);
+  let assemblyFormat = "$tile `,` $tileld attr-dict";
+}
+
+
+def XSMM_BRGemmOffs_ReluInvokeF32Op : XSMM_Op<"brgemm.offs.relu.invoke.f32"> {
+  let summary = "invoke a previously queried LIBXSMM kernel";
+  let arguments = (ins I64:$ptr,
+    Arg<F32MemRef, "the C memref to store to", [MemWrite]>:$c,
+    Arg<F32MemRef, "the A memref to load from", [MemRead]>:$a,
+    Arg<F32MemRef, "the B memref to load from", [MemRead]>:$b,
+    Arg<F32MemRef, "the D memref to load bias to add to C from", [MemRead]>:$d,
+    I64Attr:$numBatches,
+    I64ArrayAttr:$aOffsets,
+    I64ArrayAttr:$bOffsets,
+    Variadic<Index>:$indices);
+
+  let extraClassDeclaration = [{
+    operand_range getOperandsForA();
+    operand_range getOperandsForB();
+    operand_range getOperandsForC();
+    operand_range getOperandsForD();
+  }];
+}
+
+def XSMM_BRGemmOffs_Relu_Beta1InvokeF32Op : XSMM_Op<"brgemm.offs.relu.beta1.invoke.f32"> {
+  let summary = "invoke a previously queried LIBXSMM kernel";
+  let arguments = (ins I64:$ptr,
+    Arg<F32MemRef, "the C memref to store to", [MemWrite]>:$c,
+    Arg<F32MemRef, "the A memref to load from", [MemRead]>:$a,
+    Arg<F32MemRef, "the B memref to load from", [MemRead]>:$b,
+    Arg<F32MemRef, "the D memref to load bias to add to C from", [MemRead]>:$d,
+    I64Attr:$numBatches,
+    I64ArrayAttr:$aOffsets,
+    I64ArrayAttr:$bOffsets,
+    Variadic<Index>:$indices);
+
+  let extraClassDeclaration = [{
+    operand_range getOperandsForA();
+    operand_range getOperandsForB();
+    operand_range getOperandsForC();
+    operand_range getOperandsForD();
+  }];
+}
+
+def XSMM_BRGemmOffs_BiasInvokeF32Op : XSMM_Op<"brgemm.offs.bias.invoke.f32"> {
+  let summary = "invoke a previously queried LIBXSMM kernel";
+  let arguments = (ins I64:$ptr,
+    Arg<F32MemRef, "the C memref to store to", [MemWrite]>:$c,
+    Arg<F32MemRef, "the A memref to load from", [MemRead]>:$a,
+    Arg<F32MemRef, "the B memref to load from", [MemRead]>:$b,
+    Arg<F32MemRef, "the D memref to load bias to add to C from", [MemRead]>:$d,
+    I64Attr:$numBatches,
+    I64ArrayAttr:$aOffsets,
+    I64ArrayAttr:$bOffsets,
+    Variadic<Index>:$indices);
+
+  let extraClassDeclaration = [{
+    operand_range getOperandsForA();
+    operand_range getOperandsForB();
+    operand_range getOperandsForC();
+    operand_range getOperandsForD();
+  }];
+}
 
 def XSMM_UnaryDispatchOp : XSMM_Op<"unary.dispatch", [NoSideEffect]> {
   let summary = "Generate a unary kernel for a specific tile size.";

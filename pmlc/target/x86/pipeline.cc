@@ -356,6 +356,7 @@ void pipelineBuilderStage2(OpPassManager &pm, const Options &options) {
   pm.addPass(createCSEPass());
 
   pm.addPass(createPRNGLinkingPass());
+  pm.addNestedPass<func::FuncOp>(createTppCombinePass());
 }
 
 void pipelineBuilderStage3(OpPassManager &pm) {
