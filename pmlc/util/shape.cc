@@ -37,17 +37,17 @@ static DataType convertFromType(mlir::Type type) {
     return DataType::i1;
   if (type.isSignedInteger(8))
     return DataType::si8;
-  if (type.isUnsignedInteger(8))
+  if (type.isUnsignedInteger(8) || type.isSignlessInteger(8))
     return DataType::ui8;
   if (type.isSignedInteger(16))
     return DataType::si16;
-  if (type.isUnsignedInteger(16))
+  if (type.isUnsignedInteger(16) || type.isSignlessInteger(16))
     return DataType::ui16;
-  if (type.isSignedInteger(32))
+  if (type.isSignedInteger(32) || type.isSignlessInteger(32))
     return DataType::si32;
   if (type.isUnsignedInteger(32))
     return DataType::ui32;
-  if (type.isSignedInteger(64))
+  if (type.isSignedInteger(64) || type.isSignlessInteger(64))
     return DataType::si64;
   if (type.isUnsignedInteger(64))
     return DataType::ui64;

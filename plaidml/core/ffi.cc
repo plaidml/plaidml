@@ -188,12 +188,16 @@ plaidml_shape* plaidml_shape_alloc(  //
     const int64_t* sizes,            //
     const int64_t* strides) {
   return ffi_wrap<plaidml_shape*>(err, nullptr, [&] {
-    auto vecSizes = llvm::makeArrayRef(sizes, rank).vec();
-    llvm::ArrayRef<int64_t> vecStrides;
-    if (strides) {
-      vecStrides = llvm::makeArrayRef(strides, rank).vec();
+    if (sizes) {
+      auto vecSizes = llvm::makeArrayRef(sizes, rank).vec();
+      llvm::ArrayRef<int64_t> vecStrides;
+      if (strides) {
+        vecStrides = llvm::makeArrayRef(strides, rank).vec();
+      }
+      return new plaidml_shape{TensorShape(convertFromDataType(dtype), vecSizes, vecStrides)};
+    } else {
+      return new plaidml_shape{TensorShape(convertFromDataType(dtype))};
     }
-    return new plaidml_shape{TensorShape(convertFromDataType(dtype), vecSizes, vecStrides)};
   });
 }
 

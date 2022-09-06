@@ -821,7 +821,6 @@ plaidml_program* plaidml_build_from_mlir_moduleop(
     plaidml_error* err,
     const char* file_name,
     void* mlir_module_op_ptr) {
-  // std::cout << "File name is: " << file_name << std::endl;
   return ffi_wrap<plaidml_program*>(err, nullptr, [&] {
     std::string errorMessage;
     auto file = openInputFile(file_name, &errorMessage);
@@ -829,7 +828,6 @@ plaidml_program* plaidml_build_from_mlir_moduleop(
       std::string error = std::string(file_name) + " is not valid: " + errorMessage;
       throw std::invalid_argument(error.c_str());
     }
-    // std::cout << "file contents:" << file->getBuffer().str() << std::endl;
 
     mlir::DialectRegistry registry; //= new mlir::DialectRegistry();
     registry.insert<AffineDialect,
@@ -848,6 +846,13 @@ plaidml_program* plaidml_build_from_mlir_moduleop(
     plaidml_program_ptr->program = std::make_shared<pmlc::compiler::Program>(
                                         std::move(context),
                                         std::move(file), "main");
+
+    auto dup_file = openInputFile(file_name, &errorMessage);
+    if (!dup_file) {
+      std::string error = std::string(file_name) + " is not valid: " + errorMessage;
+      throw std::invalid_argument(error.c_str());
+    }
+    plaidml_program_ptr->program->parseIOTypes(std::move(dup_file));
 
     std::cout << "dumping from plaidml_build_from_mlir_moduleop:" << std::endl;
     plaidml_program_ptr->program->module.get().dump();
