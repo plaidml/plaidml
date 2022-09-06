@@ -361,11 +361,9 @@ plaidml_program* plaidml_build(  //
     size_t noutputs,             //
     plaidml_expr** outputs);
 
-plaidml_program* plaidml_build_from_mlir_moduleop(
+plaidml_program* plaidml_build_from_mlir_module(
     plaidml_error* err,
-    const char* file_name,
-    void* mlir_module_op_ptr
-);
+    const char* file_name);
 
 #ifdef __cplusplus
 }  // extern "C"

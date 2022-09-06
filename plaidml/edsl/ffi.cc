@@ -817,10 +817,9 @@ plaidml_program* plaidml_build(  //
   });
 }
 
-plaidml_program* plaidml_build_from_mlir_moduleop(
+plaidml_program* plaidml_build_from_mlir_module(
     plaidml_error* err,
-    const char* file_name,
-    void* mlir_module_op_ptr) {
+    const char* file_name) {
   return ffi_wrap<plaidml_program*>(err, nullptr, [&] {
     std::string errorMessage;
     auto file = openInputFile(file_name, &errorMessage);
@@ -854,8 +853,8 @@ plaidml_program* plaidml_build_from_mlir_moduleop(
     }
     plaidml_program_ptr->program->parseIOTypes(std::move(dup_file));
 
-    std::cout << "dumping from plaidml_build_from_mlir_moduleop:" << std::endl;
-    plaidml_program_ptr->program->module.get().dump();
+    //std::cout << "dumping from plaidml_build_from_mlir_moduleop:" << std::endl;
+    //plaidml_program_ptr->program->module.get().dump();
 
     return plaidml_program_ptr;
   });
