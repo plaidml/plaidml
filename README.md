@@ -139,7 +139,7 @@ One of the great things about Keras is how easy it is to play with state of the
 art networks. Here's all the code you need to run VGG-19:
 
 ```python
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import numpy as np
 import os

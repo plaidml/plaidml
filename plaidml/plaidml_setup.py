@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """Creates a plaidml user configuration file."""
 from __future__ import print_function
 
