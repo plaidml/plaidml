@@ -123,6 +123,7 @@ class Configure:
         cxx = args.cxx
         if (cxx is None):
             cxx = os.getenv('CXX').split(' ', 1)
+        ld = args.ld
 
         if cc:
             cmake_compiler_flags.append(f'-DCMAKE_C_COMPILER={cc[0]}')
@@ -136,6 +137,9 @@ class Configure:
                 toolchain = cxx[1].split('=', 1)
                 if '--gcc-toolchain' == toolchain[0] and 2 == len(toolchain):
                     cmake_compiler_flags.append(f'-DCMAKE_CXX_COMPILER_EXTERNAL_TOOLCHAIN={toolchain[1]}')
+
+        if ld:
+            cmake_compiler_flags.append(f'-DLLVM_USE_LINKER={ld}')
 
         return cmake_compiler_flags
 
@@ -192,6 +196,9 @@ def main():
     parser.add_argument('--cxx',
                         type=pathlib.Path,
                         help='Path/name of the C++ compiler.')
+    parser.add_argument('--ld',
+                        type=pathlib.Path,
+                        help='Path/name of the linker.')
     args = parser.parse_args()
 
     print("Configuring PlaidML build environment")
