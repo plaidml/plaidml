@@ -138,6 +138,7 @@ class Configure:
             '-S.',
             f'-B{build_dir}',
             '-GNinja',
+            '-Wno-dev',
             f'-DCMAKE_BUILD_TYPE={args.type}',
             '-DCMAKE_C_COMPILER_LAUNCHER=ccache',
             '-DCMAKE_CXX_COMPILER_LAUNCHER=ccache',
