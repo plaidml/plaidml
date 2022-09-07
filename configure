@@ -119,15 +119,23 @@ class Configure:
 
         cc = args.cc
         if cc is None:
-            cc = os.getenv('CC')
+            cc = os.getenv('CC').split(' ', 1)
         cxx = args.cxx
         if (cxx is None):
-            cxx = os.getenv('CXX')
+            cxx = os.getenv('CXX').split(' ', 1)
 
         if cc:
-            cmake_compiler_flags.append(f'-DCMAKE_C_COMPILER={cc}')
+            cmake_compiler_flags.append(f'-DCMAKE_C_COMPILER={cc[0]}')
+            if 2 == len(cc):
+                toolchain = cc[1].split('=', 1)
+                if '--gcc-toolchain' == toolchain[0] and 2 == len(toolchain):
+                    cmake_compiler_flags.append(f'-DCMAKE_C_COMPILER_EXTERNAL_TOOLCHAIN={toolchain[1]}')
         if cxx:
-            cmake_compiler_flags.append(f'-DCMAKE_CXX_COMPILER={cxx}')
+            cmake_compiler_flags.append(f'-DCMAKE_CXX_COMPILER={cxx[0]}')
+            if 2 == len(cxx):
+                toolchain = cxx[1].split('=', 1)
+                if '--gcc-toolchain' == toolchain[0] and 2 == len(toolchain):
+                    cmake_compiler_flags.append(f'-DCMAKE_CXX_COMPILER_EXTERNAL_TOOLCHAIN={toolchain[1]}')
 
         return cmake_compiler_flags
 
