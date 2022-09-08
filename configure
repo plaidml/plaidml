@@ -146,7 +146,7 @@ class Configure:
         return cmake_compiler_flags
 
     def configure_cmake(self, args):
-        build_dir = pathlib.Path(f'build-{args.target}').resolve() / args.type
+        build_dir = pathlib.Path(f'{args.build_prefix}/build-{args.target}').resolve() / args.type
         cmd = [
             'cmake',
             '-S.',
@@ -154,20 +154,20 @@ class Configure:
             '-GNinja',
             '-Wno-dev',
             f'-DCMAKE_BUILD_TYPE={args.type}',
-            '-DCMAKE_C_COMPILER_LAUNCHER=ccache',
-            '-DCMAKE_CXX_COMPILER_LAUNCHER=ccache',
             '-DFETCHCONTENT_QUIET=OFF',
             '-DPML_OPENVINO_BRIDGE=OFF',
         ]
-
-        if args.temp:
-            temp_dir = args.temp / args.target
+        if args.temp_dir:
+            temp_dir = args.temp_dir / args.target
             fc_dir = temp_dir / 'fc'
             cmd.append(f'-DFETCHCONTENT_BASE_DIR={fc_dir}')
         if args.local_llvm:
-            cmd.append('-DLOCAL_LLVM_DIR={}'.format(args.local_llvm))
+            cmd.append(f'-DLOCAL_LLVM_DIR={args.local_llvm}')
         else:
             cmd.append('-ULOCAL_LLVM_DIR')
+        if args.launcher and '.' != str(args.launcher):
+            cmd.append(f'-DCMAKE_CXX_COMPILER_LAUNCHER={args.launcher}')
+            cmd.append(f'-DCMAKE_C_COMPILER_LAUNCHER={args.launcher}')
         cmd.extend(self.configure_compiler(args))
         run(cmd, check=True)
 
@@ -190,9 +190,16 @@ def main():
                         choices=['aarch64', 'x86_64'],
                         default='x86_64',
                         help='set the target')
-    parser.add_argument('--temp',
+    parser.add_argument('--build-prefix',
                         type=pathlib.Path,
-                        help='Configures the temporary directory for cached assets.')
+                        help='Configures a prefix for an absolute build directory.')
+    parser.add_argument('--temp-dir',
+                        type=pathlib.Path,
+                        help='Configures a temporary directory for cached assets.')
+    parser.add_argument('--launcher',
+                        type=pathlib.Path,
+                        default='ccache',
+                        help='Path/name of a compiler launcher.')
     parser.add_argument('--cc',
                         type=pathlib.Path,
                         help='Path/name of the C compiler.')
