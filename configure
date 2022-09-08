@@ -48,6 +48,7 @@ class Configure:
         self.conda = pathlib.Path(conda)
         self.this_dir = pathlib.Path(__file__).absolute().parent
         self.cenv_dir = (args.temp_dir if args.temp_dir else self.this_dir) / '.cenv'
+        self.build_dir = (pathlib.Path(f'{args.build_prefix}') / f'build-{args.target}' / args.type).resolve()
         print('conda found at: {}'.format(self.conda))
 
         if args.ci:
@@ -63,9 +64,9 @@ class Configure:
 
             print()
             print("Your build is configured.")
-            print("Use the following to run all unit tests:")
+            print("Use the following to run unit tests:")
             print()
-            print("ninja -C build-x86_64/Release setup check-smoke")
+            print(f"ninja -C {self.build_dir} setup check-smoke")
             print()
 
 
@@ -165,11 +166,10 @@ class Configure:
         return cmake_compiler_flags
 
     def configure_cmake(self):
-        build_dir = pathlib.Path(f'{self.args.build_prefix}') / f'build-{self.args.target}' / self.args.type
         cmd = [
             'cmake',
             '-S.',
-            f'-B{build_dir.resolve()}',
+            f'-B{self.build_dir}',
             '-GNinja',
             '-Wno-dev',
             f'-DCMAKE_BUILD_TYPE={self.args.type}',
