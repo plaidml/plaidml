@@ -36,3 +36,4 @@ dependencies:
       - sphinx-tabs==1.3.0
       - tensorflow==1.15.5
       - theano==1.0.5
+      - click==8.1.3
