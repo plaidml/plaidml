@@ -5,6 +5,7 @@
 #include "mlir/Support/DebugStringHelper.h"
 #include "mlir/Transforms/InliningUtils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/IR/BlockAndValueMapping.h"
 
 #include "pmlc/dialect/layer/ir/ops.h"
 #include "pmlc/dialect/layer/transforms/pass_detail.h"
