@@ -121,9 +121,8 @@ class Configure:
         if cc is None:
             cc = os.getenv('CC').split(' ', 1)
         cxx = args.cxx
-        if (cxx is None):
+        if cxx is None:
             cxx = os.getenv('CXX').split(' ', 1)
-        ld = args.ld
 
         if cc:
             cmake_compiler_flags.append(f'-DCMAKE_C_COMPILER={cc[0]}')
@@ -138,8 +137,11 @@ class Configure:
                 if '--gcc-toolchain' == toolchain[0] and 2 == len(toolchain):
                     cmake_compiler_flags.append(f'-DCMAKE_CXX_COMPILER_EXTERNAL_TOOLCHAIN={toolchain[1]}')
 
-        if ld:
-            cmake_compiler_flags.append(f'-DLLVM_USE_LINKER={ld}')
+        if args.cxx_std:
+            cmake_compiler_flags.append(f'-DCMAKE_CXX_STANDARD={args.cxx_std}')
+
+        if args.ld:
+            cmake_compiler_flags.append(f'-DLLVM_USE_LINKER={args.ld}')
 
         return cmake_compiler_flags
 
@@ -157,6 +159,7 @@ class Configure:
             '-DFETCHCONTENT_QUIET=OFF',
             '-DPML_OPENVINO_BRIDGE=OFF',
         ]
+
         if args.temp:
             temp_dir = args.temp / args.target
             fc_dir = temp_dir / 'fc'
@@ -196,6 +199,9 @@ def main():
     parser.add_argument('--cxx',
                         type=pathlib.Path,
                         help='Path/name of the C++ compiler.')
+    parser.add_argument('--cxx-std',
+                        type=int,
+                        help='C++ standard version, e.g., 20.')
     parser.add_argument('--ld',
                         type=pathlib.Path,
                         help='Path/name of the linker.')
