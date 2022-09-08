@@ -36,7 +36,6 @@ def run(cmd, **kwargs):
 
 
 class Configure:
-
     def __init__(self):
         conda = shutil.which('mamba')
         if not conda:
@@ -67,38 +66,38 @@ class Configure:
         ] + sys.argv
         run(cmd, check=True, env=env)
 
-    def configure_conda(self, skip_cenv=None):
+    def configure_conda(self, args):
         if is_windows():
             env_file = self.this_dir / 'environment-windows.yml'
         else:
             env_file = self.this_dir / 'environment.yml'
 
         if self.cenv_dir.exists():
-            print('Updating conda environment from: {}'.format(env_file))
-            cmd = [
-                str(self.conda),
-                'env',
-                'update',
-                '-f',
-                str(env_file),
-                '-p',
-                str(self.cenv_dir),
-                '--prune',
-            ]
-            run(cmd, check=True, stdout=subprocess.DEVNULL)
-        else:
-            if not skip_cenv:
-                print('Creating conda environment from: {}'.format(env_file))
+            if not args.skip_conda_update:
+                print('Updating conda environment from: {}'.format(env_file))
                 cmd = [
                     str(self.conda),
                     'env',
-                    'create',
+                    'update',
                     '-f',
                     str(env_file),
                     '-p',
                     str(self.cenv_dir),
+                    '--prune',
                 ]
                 run(cmd, check=True, stdout=subprocess.DEVNULL)
+        elif not args.skip_conda_env:
+            print('Creating conda environment from: {}'.format(env_file))
+            cmd = [
+                str(self.conda),
+                'env',
+                'create',
+                '-f',
+                str(env_file),
+                '-p',
+                str(self.cenv_dir),
+            ]
+            run(cmd, check=True, stdout=subprocess.DEVNULL)
 
     def configure_precommit(self):
         if is_windows():
@@ -146,11 +145,11 @@ class Configure:
         return cmake_compiler_flags
 
     def configure_cmake(self, args):
-        build_dir = pathlib.Path(f'{args.build_prefix}/build-{args.target}').resolve() / args.type
+        build_dir = pathlib.Path(f'{args.build_prefix}') / f'build-{args.target}' / args.type
         cmd = [
             'cmake',
             '-S.',
-            f'-B{build_dir}',
+            f'-B{build_dir.resolve()}',
             '-GNinja',
             '-Wno-dev',
             f'-DCMAKE_BUILD_TYPE={args.type}',
@@ -175,12 +174,15 @@ class Configure:
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--ci', action='store_true', help='Enable CI mode')
+    parser.add_argument('--skip_conda_update',
+                        action='store_true',
+                        help='Skip updating the conda environment.')
     parser.add_argument('--skip_conda_env',
                         action='store_true',
-                        help='Skip the conda environment creation step?')
+                        help='Skip the conda environment creation step.')
     parser.add_argument('--skip_precommit',
                         action='store_true',
-                        help='Skip the precommit configuration step?')
+                        help='Skip the precommit configuration step.')
     parser.add_argument('--local_llvm', help='Configure LOCAL_LLVML_DIR', type=pathlib.Path)
     parser.add_argument('--type',
                         choices=['Debug', 'Release', 'RelWithDebInfo'],
@@ -223,8 +225,7 @@ def main():
         cfg.configure_cmake(args)
     else:
         if not cfg.is_activated():
-            if not args.skip_conda_env:
-                cfg.configure_conda()
+            cfg.configure_conda(args)
             cfg.activate_conda(args)
         else:
             if not args.skip_precommit:
