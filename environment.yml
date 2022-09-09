@@ -1,38 +1,38 @@
 channels:
   - conda-forge
 dependencies:
-  - ccache=4.1
-  - cffi=1.14.4
-  - cmake=3.15.0
-  - cython=0.29.22
-  - doxygen=1.9.1
+  - ccache=3.7.9
+  - cffi=1.15.1
+  - cmake=3.24.1
+  - cython=0.29.32
+  - doxygen=1.9.5
   - git=2.32.0
-  - matplotlib=3.4.1
-  - ninja=1.10.2
-  - numpy=1.18.5
-  - pip=21.0.1
-  - pre_commit=2.11.1
+  - matplotlib=3.5.3
+  - ninja=1.11.0
+  - numpy=1.21.6
+  - pip=22.2.2
+  - pre_commit=2.20.0
   - python=3.7
-  - pystache=0.5.4
-  - pyyaml=5.4.1
-  - yapf=0.27
-  - gperftools=2.9.1
+  - pyyaml=6.0
+  - yapf=0.32.0
+  - gperftools=2.10
   - pip:
       - asq==1.3
-      - breathe==4.28.0
-      - clang-format==9.0.0
-      - cpplint==1.4.4
-      - keras==2.2.4
+      - breathe==4.34.0
+      - clang-format==14.0.0
+      - cpplint==1.6.1
+      - keras==2.10.0
       - keras-applications==1.0.8
       - livereload==2.6.3
-      - nbstripout==0.3.9
-      - opencv-python-headless==4.5.3.56
-      - pcpp==1.20.1
-      - protobuf==3.20.1
-      - sphinx-rtd-theme==0.5.1
-      - sphinxcontrib-katex==0.7.1
+      - nbstripout==0.6.0
+      - opencv-python-headless==4.6.0.66
+      - pcpp==1.30
+      - protobuf==4.21.5
+      - sphinx-rtd-theme==1.0.0
+      - sphinxcontrib-katex==0.9.0
       - sphinxcontrib-napoleon==0.7
-      - sphinx-tabs==1.3.0
+      - sphinx-tabs==3.3.1
       - tensorflow==1.15.5
       - theano==1.0.5
       - click==8.1.3
+      - pystache==0.6.0
