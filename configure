@@ -65,19 +65,23 @@ class Configure:
             print()
             print("Your build is configured.")
             print()
-            print("Build PlaidML:")
-            print(f"$ ninja -C {self.build_dir}")
-            print("Install PlaidML packages:")
-            print(f"$ pip install -U {self.build_dir}/*.whl")
-            print("Setup a PlaidML device interactively:")
-            print(f"$ ninja -C {self.build_dir} setup")
-            print("Setup a PlaidML device non-interactively:")
-            print("$ export PLAIDML_DEVICE_IDS=llvm_cpu.0")
-            print("$ export PLAIDML_EXPERIMENTAL=1")
-            print("Run all unit tests:")
-            print(f"$ ninja -C {self.build_dir} check-smoke")
-            print("Build plaidbench:")
-            print(f"$ ninja -C {self.build_dir} plaidbench_py")
+            print("1) Build PlaidML:")
+            print(f"   $ ninja -C {self.build_dir}")
+            print()
+            print("2) Install built packages:")
+            print(f"   $ pip install -U {self.build_dir}/*.whl")
+            print()
+            print("3) Setup a device:")
+            print(f"   $ ninja -C {self.build_dir} setup")
+            print("   non-interactively:")
+            print("   $ export PLAIDML_DEVICE_IDS=llvm_cpu.0")
+            print("   $ export PLAIDML_EXPERIMENTAL=1")
+            print()
+            print("4) Run all unit tests:")
+            print(f"   $ ninja -C {self.build_dir} check-smoke")
+            print()
+            print("5) Build plaidbench:")
+            print(f"   $ ninja -C {self.build_dir} plaidbench_py")
             print()
 
 
@@ -157,16 +161,19 @@ class Configure:
 
         if cc:
             cmake_compiler_flags.append(f'-DCMAKE_C_COMPILER={cc[0]}')
-            if 2 == len(cc):
-                toolchain = cc[1].split('=', 1)
-                if '--gcc-toolchain' == toolchain[0] and 2 == len(toolchain):
-                    cmake_compiler_flags.append(f'-DCMAKE_C_COMPILER_EXTERNAL_TOOLCHAIN={toolchain[1]}')
+            if 'clang' in os.path.basename(cc[0]):
+                if 2 == len(cc):
+                    toolchain = cc[1].split('=', 1)
+                    if '--gcc-toolchain' == toolchain[0] and 2 == len(toolchain):
+                        cmake_compiler_flags.append(f'-DCMAKE_C_COMPILER_EXTERNAL_TOOLCHAIN={toolchain[1]}')
         if cxx:
             cmake_compiler_flags.append(f'-DCMAKE_CXX_COMPILER={cxx[0]}')
-            if 2 == len(cxx):
-                toolchain = cxx[1].split('=', 1)
-                if '--gcc-toolchain' == toolchain[0] and 2 == len(toolchain):
-                    cmake_compiler_flags.append(f'-DCMAKE_CXX_COMPILER_EXTERNAL_TOOLCHAIN={toolchain[1]}')
+            if 'clang++' in os.path.basename(cxx[0]):
+                #cmake_compiler_flags.append('-DCMAKE_CXX_FLAGS=-w')
+                if 2 == len(cxx):
+                    toolchain = cxx[1].split('=', 1)
+                    if '--gcc-toolchain' == toolchain[0] and 2 == len(toolchain):
+                        cmake_compiler_flags.append(f'-DCMAKE_CXX_COMPILER_EXTERNAL_TOOLCHAIN={toolchain[1]}')
 
         if self.args.cxx_std:
             cmake_compiler_flags.append(f'-DCMAKE_CXX_STANDARD={self.args.cxx_std}')
