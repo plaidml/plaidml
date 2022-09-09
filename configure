@@ -210,47 +210,36 @@ class Configure:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--ci', action='store_true', help='Enable CI mode')
-    parser.add_argument('--skip_conda_update',
-                        action='store_true',
+    parser.add_argument('--ci', action='store_true',
+                        help='Enable CI mode')
+    parser.add_argument('--skip_conda_update', action='store_true',
                         help='Skip updating the conda environment.')
-    parser.add_argument('--skip_conda_env',
-                        action='store_true',
+    parser.add_argument('--skip_conda_env', action='store_true',
                         help='Skip the conda environment creation step.')
-    parser.add_argument('--skip_precommit',
-                        action='store_true',
+    parser.add_argument('--skip_precommit', action='store_true',
                         help='Skip the precommit configuration step.')
-    parser.add_argument('--local_llvm', help='Configure LOCAL_LLVML_DIR', type=pathlib.Path)
-    parser.add_argument('--type',
+    parser.add_argument('--local_llvm', type=pathlib.Path,
+                        help='Avoid fetching LLVM source (LOCAL_LLVML_DIR).')
+    parser.add_argument('--type', default='Release',
                         choices=['Debug', 'Release', 'RelWithDebInfo'],
-                        default='Release',
                         help='Configures CMAKE_BUILD_TYPE')
-    parser.add_argument('--target',
+    parser.add_argument('--target', default='x86_64',
                         choices=['aarch64', 'x86_64'],
-                        default='x86_64',
-                        help='set the target')
-    parser.add_argument('--build-prefix',
-                        type=pathlib.Path,
-                        help='Configures a prefix for an absolute build directory.')
-    parser.add_argument('--temp-dir',
-                        type=pathlib.Path,
-                        help='Configures a temporary directory for cached assets.')
-    parser.add_argument('--launcher',
-                        type=pathlib.Path,
-                        default='ccache',
+                        help='Set the target architecture.')
+    parser.add_argument('--build-prefix', type=pathlib.Path,
+                        help='Turn build directory into an absolute path.')
+    parser.add_argument('--temp-dir', type=pathlib.Path,
+                        help='Temporary directory for cached assets.')
+    parser.add_argument('--launcher', type=pathlib.Path, default='ccache',
                         help='Path/name of a compiler launcher.')
-    parser.add_argument('--cc',
-                        type=pathlib.Path,
+    parser.add_argument('--cc', type=pathlib.Path,
                         help='Path/name of the C compiler.')
-    parser.add_argument('--cxx',
-                        type=pathlib.Path,
+    parser.add_argument('--cxx', type=pathlib.Path,
                         help='Path/name of the C++ compiler.')
-    parser.add_argument('--cxx-std',
-                        type=int,
-                        help='C++ standard version, e.g., 20.')
-    parser.add_argument('--ld',
-                        type=pathlib.Path,
-                        help='Path/name of the linker.')
+    parser.add_argument('--cxx-std', type=int,
+                        help='C++ standard version, e.g., 20 for C++20.')
+    parser.add_argument('--ld', type=pathlib.Path,
+                        help='Path/name of the linker, e.g., mold.')
     args = parser.parse_args()
 
     print("Configuring PlaidML build environment")
