@@ -11,6 +11,9 @@ static constexpr unsigned int NO_BCAST = 0;
 static constexpr unsigned int ROW_BCAST = 1;
 static constexpr unsigned int COL_BCAST = 2;
 static constexpr unsigned int SCALAR_BCAST = 3;
+static constexpr unsigned int NO_REDUCE = 0;
+static constexpr unsigned int REEDUCE_ROWS = 1;
+static constexpr unsigned int REEDUCE_COLS = 2;
 
 using FunctionPtr = void (*)(const void *, const void *, void *);
 
@@ -341,12 +344,17 @@ plaidml_rt_xsmm_brgemm_offs_dispatch_f32(int32_t lda, int32_t ldb, int32_t ldc,
   return reinterpret_cast<int64_t>(sgemm);
 }
 
-extern "C" int64_t plaidml_rt_xsmm_unary_dispatch(
-    int32_t m, int32_t n, int32_t ldi, int32_t ldo, int32_t in_type,
-    int32_t compute_type, int32_t out_type, int32_t type, int32_t bcast_type) {
+extern "C" int64_t
+plaidml_rt_xsmm_unary_dispatch(int32_t m, int32_t n, int32_t ldi, int32_t ldo,
+                               int32_t in_type, int32_t compute_type,
+                               int32_t out_type, int32_t type,
+                               int32_t bcast_type, int32_t reduce_type) {
+  libxsmm_blasint m_int = m;
+  libxsmm_blasint n_int = n;
   libxsmm_blasint ldi_int = ldi;
   libxsmm_blasint ldo_int = ldo;
   unsigned int use_bcast = (unsigned int)bcast_type;
+  unsigned int use_reduce = (unsigned int)reduce_type;
   libxsmm_meltw_unary_flags unary_flags = LIBXSMM_MELTW_FLAG_UNARY_NONE;
 
   libxsmm_meltw_unary_shape unary_shape;
@@ -359,8 +367,22 @@ extern "C" int64_t plaidml_rt_xsmm_unary_dispatch(
     unary_flags = LIBXSMM_MELTW_FLAG_UNARY_BCAST_SCALAR;
   }
 
-  unary_shape.m = static_cast<libxsmm_blasint>(n);
-  unary_shape.n = static_cast<libxsmm_blasint>(m);
+  if (reduce_type == REEDUCE_ROWS) {
+    unary_flags = static_cast<libxsmm_meltw_unary_flags>(
+        static_cast<int>(LIBXSMM_MELTW_FLAG_UNARY_REDUCE_ROWS) |
+        static_cast<int>(LIBXSMM_MELTW_FLAG_UNARY_REDUCE_INIT_ACC));
+    ldo = ldi;
+  } else if (reduce_type == REEDUCE_COLS) {
+    m_int = n;
+    n_int = m;
+    unary_flags = static_cast<libxsmm_meltw_unary_flags>(
+        static_cast<int>(LIBXSMM_MELTW_FLAG_UNARY_REDUCE_COLS) |
+        static_cast<int>(LIBXSMM_MELTW_FLAG_UNARY_REDUCE_INIT_ACC));
+    ldo = ldi;
+  }
+
+  unary_shape.m = n_int;
+  unary_shape.n = m_int;
   unary_shape.in0_type = static_cast<libxsmm_datatype>(in_type);
   unary_shape.comp_type = static_cast<libxsmm_datatype>(compute_type);
   unary_shape.out_type = static_cast<libxsmm_datatype>(out_type);

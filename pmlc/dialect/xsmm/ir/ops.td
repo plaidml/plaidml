@@ -408,11 +408,12 @@ def XSMM_UnaryDispatchOp : XSMM_Op<"unary.dispatch", [NoSideEffect]> {
     I64Attr:$ldi,
     I64Attr:$ldo,
     FuncTypeAttr:$func_type,
-    I32Attr:$bcastType
+    I32Attr:$bcastType,
+    I32Attr:$reduceType
   );
   let results = (outs I64:$ptr);
   let assemblyFormat = [{
-    $kind `(` $compute_type `,` $tile `,` $ldi `,` $ldo `,` $bcastType `)`
+    $kind `(` $compute_type `,` $tile `,` $ldi `,` $ldo `,` $bcastType `,` $reduceType `)`
     `:` $func_type attr-dict
   }];
 }

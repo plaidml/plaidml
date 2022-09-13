@@ -96,7 +96,7 @@ func @main() attributes { llvm.emit_c_interface } {
 func @exp_xsmm(%I: !eltwise, %O: !eltwise) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
-  %exp = xsmm.unary.dispatch EXP(f32, [8, 2], 3, 3, 0) : (f32) -> f32
+  %exp = xsmm.unary.dispatch EXP(f32, [8, 2], 3, 3, 0, 0) : (f32) -> f32
   xsmm.unary.invoke %O[%c0, %c1] = %exp(%I[%c0, %c1]) : (!eltwise) -> !eltwise
   return
 }
@@ -104,7 +104,7 @@ func @exp_xsmm(%I: !eltwise, %O: !eltwise) {
 func @relu_xsmm(%I: !eltwise, %O: !eltwise) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
-  %relu = xsmm.unary.dispatch RELU(f32, [7, 3], 3, 3, 0) : (f32) -> f32
+  %relu = xsmm.unary.dispatch RELU(f32, [7, 3], 3, 3, 0, 0) : (f32) -> f32
   xsmm.unary.invoke %O[%c1, %c0] = %relu(%I[%c1, %c0]) : (!eltwise) -> !eltwise
   return
 }

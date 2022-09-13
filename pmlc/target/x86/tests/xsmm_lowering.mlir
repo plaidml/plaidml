@@ -48,7 +48,7 @@ func @res2a_branch2a(%I: memref<1x56x56x64xf32>, %K: memref<1x1x64x64xf32>, %O: 
 #tile = affine_map<(x, y) -> (0, x, 0, y)>
 
 // CHECK-LABEL: func @relu
-//       CHECK:   xsmm.unary.dispatch RELU(f32, [4, 64], 3584, 3584, 0) : (f32) -> f32
+//       CHECK:   xsmm.unary.dispatch RELU(f32, [4, 64], 3584, 3584, 0, 0) : (f32) -> f32
 //       CHECK:   affine.for
 //       CHECK:     affine.for
 //       CHECK:       xsmm.unary.invoke
