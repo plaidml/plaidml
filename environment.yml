@@ -16,6 +16,7 @@ dependencies:
   - numpy=1.21.6
   - opencv-python-headless=4.5.4.58
   - pip
+  - pre_commit
   - protobuf=4.21.5
   - python
   - pyyaml=6.0
