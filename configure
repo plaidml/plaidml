@@ -58,6 +58,7 @@ class Configure:
                 self.configure_conda()
                 self.activate_conda()
             else:
+                printf('Skipping environment update since Conda is already activated')
                 if not args.skip_precommit:
                     self.configure_precommit()
                 self.configure_cmake()
