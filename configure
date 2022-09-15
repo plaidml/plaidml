@@ -98,7 +98,7 @@ class Configure:
             '--no-capture-output',
             '-p',
             self.cenv_dir,
-            'python',
+            'python3',
         ] + sys.argv
         run(cmd, check=True, env=env)
 
