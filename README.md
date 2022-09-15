@@ -13,7 +13,7 @@ src="docs/assets/images/plaid-final.png" height="200"></a><br>
 </div>
 
 [![License]](https://github.com/plaidml/plaidml/blob/master/LICENSE)
-[![Build status]](https://buildkite.com/plaidml/plaidml-plaidml)
+[![Build status](https://badge.buildkite.com/87cb87799399a2e27c6f99b1839a66e9101b6f132b46d36089.svg)](https://buildkite.com/intel/tpp-plaidml)
 
 # To Our Users
 
