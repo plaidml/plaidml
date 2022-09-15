@@ -50,7 +50,6 @@ class Configure:
         self.cenv_dir = (args.temp_dir if args.temp_dir else self.this_dir) / '.cenv'
         self.build_dir = (pathlib.Path(f'{args.build_prefix}') / f'build-{args.target}' / args.type).resolve()
         print('conda found at: {}'.format(self.conda))
-
         if args.ci:
             self.configure_cmake()
         else:
@@ -62,15 +61,15 @@ class Configure:
                 if not args.skip_precommit:
                     self.configure_precommit()
                 self.configure_cmake()
-
             print()
             print("Your build is configured.")
             print()
-            print("1) Build PlaidML:")
-            print(f"   $ ninja -C {self.build_dir}")
+            print("1) Activate Conda environment:")
+            print(F"   $ conda activate {self.cenv_dir}")
             print()
-            print("2) Install built packages:")
-            print(f"   $ pip install -U {self.build_dir}/*.whl")
+            print("2) Build PlaidML and plaidbench:")
+            print(f"   $ ninja -C {self.build_dir}")
+            print(f"   $ ninja -C {self.build_dir} plaidbench_py")
             print()
             print("3) Setup a device:")
             print(f"   $ ninja -C {self.build_dir} setup")
@@ -78,13 +77,12 @@ class Configure:
             print("   $ export PLAIDML_DEVICE_IDS=llvm_cpu.0")
             print("   $ export PLAIDML_EXPERIMENTAL=1")
             print()
-            print("4) Run all unit tests:")
+            print("4) Run unit tests:")
             print(f"   $ ninja -C {self.build_dir} check-smoke")
             print()
-            print("5) Build plaidbench:")
-            print(f"   $ ninja -C {self.build_dir} plaidbench_py")
+            print("5) Install built packages:")
+            print(f"   $ python3 -m pip install --no-deps --force-reinstall {self.build_dir}/*.whl")
             print()
-
 
     def is_activated(self):
         return os.getenv('CONDA_PREFIX') == str(self.cenv_dir)
@@ -108,7 +106,6 @@ class Configure:
             env_file = self.this_dir / 'environment-windows.yml'
         else:
             env_file = self.this_dir / 'environment.yml'
-
         if self.cenv_dir.exists():
             if not self.args.skip_conda_update:
                 print('Updating conda environment from: {}'.format(env_file))
@@ -152,10 +149,8 @@ class Configure:
 
     def configure_compiler(self):
         cmake_compiler_flags = []
-
         cxx = os.getenv('CXX') if self.args.cxx is None else self.args.cxx.split(' ', 1)
         cc  = os.getenv('CC') if self.args.cc is None else self.args.cc.split(' ', 1)
-
         if cc:
             cmake_compiler_flags.append(f'-DCMAKE_C_COMPILER={cc[0]}')
             if 'clang' in os.path.basename(cc[0]):
@@ -171,13 +166,10 @@ class Configure:
                     toolchain = cxx[1].split('=', 1)
                     if '--gcc-toolchain' == toolchain[0] and 2 == len(toolchain):
                         cmake_compiler_flags.append(f'-DCMAKE_CXX_COMPILER_EXTERNAL_TOOLCHAIN={toolchain[1]}')
-
         if self.args.cxx_std:
             cmake_compiler_flags.append(f'-DCMAKE_CXX_STANDARD={self.args.cxx_std}')
-
         if self.args.ld:
             cmake_compiler_flags.append(f'-DLLVM_USE_LINKER={self.args.ld}')
-
         return cmake_compiler_flags
 
     def configure_cmake(self):
