@@ -152,8 +152,8 @@ class Configure:
     def configure_compiler(self):
         cmake_compiler_flags = []
 
-        cc  = os.getenv('CC' ) if self.args.cc  is None else str(self.args.cc ).split(' ', 1)
-        cxx = os.getenv('CXX') if self.args.cxx is None else str(self.args.cxx).split(' ', 1)
+        cxx = os.getenv('CXX') if self.args.cxx is None else self.args.cxx.split(' ', 1)
+        cc  = os.getenv('CC') if self.args.cc is None else self.args.cc.split(' ', 1)
 
         if cc:
             cmake_compiler_flags.append(f'-DCMAKE_C_COMPILER={cc[0]}')
@@ -197,7 +197,7 @@ class Configure:
             cmd.append(f'-DLOCAL_LLVM_DIR={self.args.local_llvm}')
         else:
             cmd.append('-ULOCAL_LLVM_DIR')
-        if self.args.launcher and '.' != str(self.args.launcher):
+        if self.args.launcher:
             cmd.append(f'-DCMAKE_CXX_COMPILER_LAUNCHER={self.args.launcher}')
             cmd.append(f'-DCMAKE_C_COMPILER_LAUNCHER={self.args.launcher}')
         cmd.extend(self.configure_compiler())
@@ -226,16 +226,16 @@ def main():
                         help='Turn build directory into an absolute path.')
     parser.add_argument('--temp-dir', type=pathlib.Path,
                         help='Temporary directory for cached assets.')
-    parser.add_argument('--launcher', type=pathlib.Path, default='ccache',
-                        help='Path/name of a compiler launcher.')
-    parser.add_argument('--cc', type=pathlib.Path,
-                        help='Path/name of the C compiler.')
-    parser.add_argument('--cxx', type=pathlib.Path,
-                        help='Path/name of the C++ compiler.')
+    parser.add_argument('--launcher', type=str, default='ccache',
+                        help='Path/command of a compiler launcher.')
+    parser.add_argument('--cc', type=str,
+                        help='Path/command of the C compiler.')
+    parser.add_argument('--cxx', type=str,
+                        help='Path/command of the C++ compiler.')
     parser.add_argument('--cxx-std', type=int,
                         help='C++ standard version, e.g., 20 for C++20.')
-    parser.add_argument('--ld', type=pathlib.Path,
-                        help='Path/name of the linker, e.g., mold.')
+    parser.add_argument('--ld', type=str,
+                        help='Path/command of the linker, e.g., mold.')
     args = parser.parse_args()
 
     print("Configuring PlaidML build environment")
