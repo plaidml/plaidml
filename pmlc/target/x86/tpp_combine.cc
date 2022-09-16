@@ -420,26 +420,31 @@ struct TppCombinePass : public TppCombineBase<TppCombinePass> {
             } else {
               addBuffer = addOp.getOperand(0);
             }
-            Value reluBuffer = addBuffer;
-            while (true) {
-              Value *prevReluOp = new Value();
-              auto opPattern = m_Op<AffineYieldOp>(
-                  m_Capture(prevReluOp, m_Op<pxa::PxaGenericOp>()));
-              auto prevOp = cast<AffineParallelOp>(reluBuffer.getDefiningOp());
-              auto affineYield = prevOp.getBody()->getTerminator();
-              assert(matchPattern(affineYield, opPattern));
-              pxa::PxaGenericOp prevPxaReluOp =
-                  dyn_cast<pxa::PxaGenericOp>(prevReluOp->getDefiningOp());
-              if (prevPxaReluOp.kernel() == "tpp_relu") {
-                reluBuffer = prevPxaReluOp.getOperand(1);
-              } else if (prevPxaReluOp.kernel() == "tpp_gemm_relu" ||
-                         prevPxaReluOp.kernel() == "tpp_gemm_relu_beta1" ||
-                         prevPxaReluOp.kernel() == "tpp_gemm_bias") {
-                reluBuffer = prevPxaReluOp.getOperand(3);
+            auto shape1 = addBuffer.getType().cast<MemRefType>().getShape();
+            auto shape2 =
+                reluOp.getResult(0).getType().cast<MemRefType>().getShape();
+            bool shapeMatch = false;
+            if (shape1.size() == shape2.size()) {
+              shapeMatch = true;
+              for (int i = 0; i < shape1.size(); i++) {
+                if (shape1[i] != shape2[i]) {
+                  shapeMatch = false;
+                  break;
+                }
               }
-              if (isa<pxa::PxaGenericOp>(reluBuffer.getDefiningOp())) {
-                prevPxaReluOp =
-                    cast<pxa::PxaGenericOp>(reluBuffer.getDefiningOp());
+            }
+            if (shapeMatch) {
+              Value reluBuffer = addBuffer;
+              while (true) {
+                Value *prevReluOp = new Value();
+                auto opPattern = m_Op<AffineYieldOp>(
+                    m_Capture(prevReluOp, m_Op<pxa::PxaGenericOp>()));
+                auto prevOp =
+                    cast<AffineParallelOp>(reluBuffer.getDefiningOp());
+                auto affineYield = prevOp.getBody()->getTerminator();
+                assert(matchPattern(affineYield, opPattern));
+                pxa::PxaGenericOp prevPxaReluOp =
+                    dyn_cast<pxa::PxaGenericOp>(prevReluOp->getDefiningOp());
                 if (prevPxaReluOp.kernel() == "tpp_relu") {
                   reluBuffer = prevPxaReluOp.getOperand(1);
                 } else if (prevPxaReluOp.kernel() == "tpp_gemm_relu" ||
@@ -447,87 +452,100 @@ struct TppCombinePass : public TppCombineBase<TppCombinePass> {
                            prevPxaReluOp.kernel() == "tpp_gemm_bias") {
                   reluBuffer = prevPxaReluOp.getOperand(3);
                 }
+                if (isa<pxa::PxaGenericOp>(reluBuffer.getDefiningOp())) {
+                  prevPxaReluOp =
+                      cast<pxa::PxaGenericOp>(reluBuffer.getDefiningOp());
+                  if (prevPxaReluOp.kernel() == "tpp_relu") {
+                    reluBuffer = prevPxaReluOp.getOperand(1);
+                  } else if (prevPxaReluOp.kernel() == "tpp_gemm_relu" ||
+                             prevPxaReluOp.kernel() == "tpp_gemm_relu_beta1" ||
+                             prevPxaReluOp.kernel() == "tpp_gemm_bias") {
+                    reluBuffer = prevPxaReluOp.getOperand(3);
+                  }
+                }
+                if (isa<memref::AllocOp>(reluBuffer.getDefiningOp())) {
+                  break;
+                }
               }
-              if (isa<memref::AllocOp>(reluBuffer.getDefiningOp())) {
-                break;
+              OpBuilder builder(reluOp);
+
+              SmallVector<Value> inputIndices0;
+              SmallVector<AffineMap> inputAccessMaps0;
+              SmallVector<AffineValueMap> inputValueMaps0;
+              inputValueMaps0.reserve(gemmOp0.getNumInputs());
+              gemmOp0.getAffineValueMaps(gemmOp0.inputAccessMaps(),
+                                         gemmOp0.inputIndices(),
+                                         inputValueMaps0);
+
+              for (AffineValueMap &valueMap : inputValueMaps0) {
+                inputAccessMaps0.push_back(valueMap.getAffineMap());
+                inputIndices0.append(valueMap.getOperands().begin(),
+                                     valueMap.getOperands().end());
               }
-            }
-            OpBuilder builder(reluOp);
+              inputValueMaps0.clear();
+              identityOp0.getAffineValueMaps(identityOp0.inputAccessMaps(),
+                                             identityOp0.inputIndices(),
+                                             inputValueMaps0);
+              for (AffineValueMap &valueMap : inputValueMaps0) {
+                inputAccessMaps0.push_back(valueMap.getAffineMap());
+                inputIndices0.append(valueMap.getOperands().begin(),
+                                     valueMap.getOperands().end());
+              }
+              SmallVector<AffineMap> inputTileMaps0;
+              for (auto &tileMap : gemmOp0.inputTileMaps()) {
+                auto tile = tileMap.cast<AffineMapAttr>().getValue();
+                inputTileMaps0.push_back(tile);
+              }
 
-            SmallVector<Value> inputIndices0;
-            SmallVector<AffineMap> inputAccessMaps0;
-            SmallVector<AffineValueMap> inputValueMaps0;
-            inputValueMaps0.reserve(gemmOp0.getNumInputs());
-            gemmOp0.getAffineValueMaps(gemmOp0.inputAccessMaps(),
-                                       gemmOp0.inputIndices(), inputValueMaps0);
-
-            for (AffineValueMap &valueMap : inputValueMaps0) {
-              inputAccessMaps0.push_back(valueMap.getAffineMap());
-              inputIndices0.append(valueMap.getOperands().begin(),
-                                   valueMap.getOperands().end());
+              for (auto &tileMap : identityOp0.inputTileMaps()) {
+                auto tile = tileMap.cast<AffineMapAttr>().getValue();
+                inputTileMaps0.push_back(tile);
+              }
+              auto genericOp0 = builder.create<pxa::PxaGenericOp>(
+                  gemmOp0.getLoc(), reluOp.getResult(0).getType(),
+                  /*inputs=*/
+                  ArrayRef<Value>{gemmOp0.getOperand(0), gemmOp0.getOperand(1),
+                                  identityOp0.getOperand(0)},
+                  /*outputs=*/ArrayRef<Value>{addBuffer},
+                  /*inputIndices=*/inputIndices0,
+                  /*outputIndices=*/reluOp.outputIndices(),
+                  /*inputAccessMaps=*/
+                  builder.getAffineMapArrayAttr(inputAccessMaps0),
+                  /*inputTileMaps=*/
+                  builder.getAffineMapArrayAttr(inputTileMaps0),
+                  /*outputAccessMaps=*/reluOp.outputAccessMaps(),
+                  /*outputTileMaps=*/reluOp.outputTileMaps(),
+                  /*kernel=*/builder.getStringAttr("tpp_gemm_relu_beta1"),
+                  /*tile=*/gemmOp0.tile(),
+                  /*reductions=*/
+                  builder.getI64ArrayAttr(
+                      {static_cast<int64_t>(arith::AtomicRMWKind::assign)}));
+              reluOp.getResult(0).replaceAllUsesWith(genericOp0.getResult(0));
+              reluOp.erase();
+              addOp.erase();
+              gemmOp0.erase();
+              identityOp0.erase();
+              auto allocOp0 = identityOp0.getOperand(1).getDefiningOp();
+              if (isa<memref::AllocOp>(allocOp0)) {
+                auto deallocOp0 = pmlc::util::findDeallocPair(allocOp0);
+                deallocOp0->erase();
+                allocOp0->erase();
+              }
+              auto allocOp1 = addOp.getOperand(2).getDefiningOp();
+              if (isa<memref::AllocOp>(allocOp1)) {
+                auto deallocOp1 = pmlc::util::findDeallocPair(allocOp1);
+                deallocOp1->erase();
+                allocOp1->erase();
+              }
+              auto deallocForReluBuffer =
+                  pmlc::util::findDeallocPair(reluBuffer.getDefiningOp());
+              auto deallocForAddOperand = pmlc::util::findDeallocPair(
+                  reluOp.getOperand(1).getDefiningOp());
+              deallocForAddOperand->replaceUsesOfWith(reluOp.getOperand(1),
+                                                      reluBuffer);
+              reluOp.getOperand(1).getDefiningOp()->erase();
+              deallocForReluBuffer->erase();
             }
-            inputValueMaps0.clear();
-            identityOp0.getAffineValueMaps(identityOp0.inputAccessMaps(),
-                                           identityOp0.inputIndices(),
-                                           inputValueMaps0);
-            for (AffineValueMap &valueMap : inputValueMaps0) {
-              inputAccessMaps0.push_back(valueMap.getAffineMap());
-              inputIndices0.append(valueMap.getOperands().begin(),
-                                   valueMap.getOperands().end());
-            }
-            SmallVector<AffineMap> inputTileMaps0;
-            for (auto &tileMap : gemmOp0.inputTileMaps()) {
-              auto tile = tileMap.cast<AffineMapAttr>().getValue();
-              inputTileMaps0.push_back(tile);
-            }
-
-            for (auto &tileMap : identityOp0.inputTileMaps()) {
-              auto tile = tileMap.cast<AffineMapAttr>().getValue();
-              inputTileMaps0.push_back(tile);
-            }
-            auto genericOp0 = builder.create<pxa::PxaGenericOp>(
-                gemmOp0.getLoc(), reluOp.getResult(0).getType(),
-                /*inputs=*/
-                ArrayRef<Value>{gemmOp0.getOperand(0), gemmOp0.getOperand(1),
-                                identityOp0.getOperand(0)},
-                /*outputs=*/ArrayRef<Value>{addBuffer},
-                /*inputIndices=*/inputIndices0,
-                /*outputIndices=*/reluOp.outputIndices(),
-                /*inputAccessMaps=*/
-                builder.getAffineMapArrayAttr(inputAccessMaps0),
-                /*inputTileMaps=*/builder.getAffineMapArrayAttr(inputTileMaps0),
-                /*outputAccessMaps=*/reluOp.outputAccessMaps(),
-                /*outputTileMaps=*/reluOp.outputTileMaps(),
-                /*kernel=*/builder.getStringAttr("tpp_gemm_relu_beta1"),
-                /*tile=*/gemmOp0.tile(),
-                /*reductions=*/
-                builder.getI64ArrayAttr(
-                    {static_cast<int64_t>(arith::AtomicRMWKind::assign)}));
-            reluOp.getResult(0).replaceAllUsesWith(genericOp0.getResult(0));
-            reluOp.erase();
-            addOp.erase();
-            gemmOp0.erase();
-            identityOp0.erase();
-            auto allocOp0 = identityOp0.getOperand(1).getDefiningOp();
-            if (isa<memref::AllocOp>(allocOp0)) {
-              auto deallocOp0 = pmlc::util::findDeallocPair(allocOp0);
-              deallocOp0->erase();
-              allocOp0->erase();
-            }
-            auto allocOp1 = addOp.getOperand(2).getDefiningOp();
-            if (isa<memref::AllocOp>(allocOp1)) {
-              auto deallocOp1 = pmlc::util::findDeallocPair(allocOp1);
-              deallocOp1->erase();
-              allocOp1->erase();
-            }
-            auto deallocForReluBuffer =
-                pmlc::util::findDeallocPair(reluBuffer.getDefiningOp());
-            auto deallocForAddOperand = pmlc::util::findDeallocPair(
-                reluOp.getOperand(1).getDefiningOp());
-            deallocForAddOperand->replaceUsesOfWith(reluOp.getOperand(1),
-                                                    reluBuffer);
-            reluOp.getOperand(1).getDefiningOp()->erase();
-            deallocForReluBuffer->erase();
           }
         }
       }
