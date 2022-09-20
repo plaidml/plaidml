@@ -151,8 +151,8 @@ class Configure:
 
     def configure_compiler(self):
         cmake_compiler_flags = []
-        cxx = os.getenv('CXX') if self.args.cxx is None else self.args.cxx.split(' ', 1)
-        cc  = os.getenv('CC') if self.args.cc is None else self.args.cc.split(' ', 1)
+        cxx = (os.getenv('CXX') if self.args.cxx is None else self.args.cxx).split(' ', 1)
+        cc  = (os.getenv('CC') if self.args.cc is None else self.args.cc).split(' ', 1)
         if cc:
             cmake_compiler_flags.append(f'-DCMAKE_C_COMPILER={cc[0]}')
             if 'clang' in os.path.basename(cc[0]):
