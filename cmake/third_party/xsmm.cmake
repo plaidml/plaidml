@@ -36,7 +36,7 @@ target_compile_definitions(xsmm PUBLIC
 target_compile_definitions(xsmm PRIVATE
   __BLAS=0
 )
-add_definitions(-U_DEBUG)
+add_compile_definitions(-U_DEBUG)
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
