@@ -176,14 +176,13 @@ class Configure:
 
     def configure_cmake(self):
         cmd = [
-            'cmake',
-            '-S.',
+            'cmake', '-S.',
             f'-B{self.build_dir}',
-            '-GNinja',
-            '-Wno-dev',
+            '-GNinja', '-Wno-dev',
             f'-DCMAKE_BUILD_TYPE={self.args.type}',
-            '-DFETCHCONTENT_QUIET=OFF',
+            '-DCMAKE_BUILD_WITH_INSTALL_RPATH=ON',
             '-DPML_OPENVINO_BRIDGE=OFF',
+            '-DFETCHCONTENT_QUIET=OFF',
         ]
         if self.args.temp_dir:
             fc_dir = self.args.temp_dir / f'fc-{self.args.target}'
