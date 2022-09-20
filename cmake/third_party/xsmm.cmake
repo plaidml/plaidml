@@ -13,8 +13,8 @@ else()
 
   FetchContent_Declare(
     xsmm
-    URL https://github.com/libxsmm/libxsmm/archive/9a0c707384f76bf4a304a4998be9c6c5e7c41400.tar.gz
-    URL_HASH SHA256=bc17bc0d07e4210ec4cdb7790a67cf1226c93dc82862e5d89d93e83d81233532
+    URL https://github.com/libxsmm/libxsmm/archive/62957fff702e89dee61ef9a895716ff455b18aef.tar.gz
+    URL_HASH SHA256=e4b0240c7fd3270b982475baedd01a444230f151c4fb8ea409c00648d54c180b
   )
 
   FetchContent_GetProperties(xsmm)
@@ -38,8 +38,18 @@ target_compile_definitions(xsmm PRIVATE
 )
 add_definitions(-U_DEBUG)
 
-target_link_libraries(xsmm PUBLIC pthread)
-target_link_libraries(xsmm PUBLIC rt)
-target_link_libraries(xsmm PUBLIC dl)
-target_link_libraries(xsmm PUBLIC m)
-target_link_libraries(xsmm PUBLIC c)
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
+target_link_libraries(xsmm PUBLIC Threads::Threads)
+target_link_libraries(xsmm PUBLIC ${CMAKE_DL_LIBS})
+
+include(CheckLibraryExists)
+check_library_exists(m sqrt "" XSMM_LIBM)
+if(XSMM_LIBM)
+  target_link_libraries(xsmm PUBLIC m)
+endif()
+check_library_exists(rt sched_yield "" XSMM_LIBRT)
+if(XSMM_LIBRT)
+  target_link_libraries(xsmm PUBLIC rt)
+endif()
+#target_link_libraries(xsmm PUBLIC c)
