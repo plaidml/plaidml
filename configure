@@ -48,7 +48,7 @@ class Configure:
         self.conda = pathlib.Path(conda)
         self.this_dir = pathlib.Path(__file__).absolute().parent
         self.cenv_dir = (args.temp_dir if args.temp_dir else self.this_dir) / '.cenv'
-        self.build_dir = (pathlib.Path(f'{args.build_prefix}') / f'build-{args.target}' / args.type).resolve()
+        self.build_dir = (args.build_prefix / f'build-{args.target}' / args.type).resolve()
         print('conda found at: {}'.format(self.conda))
         if args.ci:
             self.configure_cmake()
@@ -217,7 +217,7 @@ def main():
     parser.add_argument('--target', default='x86_64',
                         choices=['aarch64', 'x86_64'],
                         help='Set the target architecture.')
-    parser.add_argument('--build-prefix', type=pathlib.Path,
+    parser.add_argument('--build-prefix', type=pathlib.Path, default='.',
                         help='Turn build directory into an absolute path.')
     parser.add_argument('--temp-dir', type=pathlib.Path,
                         help='Temporary directory for cached assets.')
