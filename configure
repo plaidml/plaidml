@@ -48,7 +48,7 @@ class Configure:
         self.args = args
         self.conda = pathlib.Path(conda)
         self.this_dir = pathlib.Path(__file__).absolute().parent
-        self.cenv_dir = (args.temp_dir if args.temp_dir else self.this_dir) / '.cenv'
+        self.cenv_dir = (args.build_prefix if args.build_prefix else self.this_dir) / '.cenv'
         self.build_dir = (args.build_prefix / f'build-{args.target}' / args.type).resolve()
         print('conda found at: {}'.format(self.conda))
         if args.ci:
