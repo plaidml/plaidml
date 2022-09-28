@@ -86,6 +86,7 @@ class Configure:
             print(f"   $ cd {self.build_dir}")
             print("   $ export OMP_PROC_BIND=TRUE OMP_NUM_THREADS=8")
             print(f"   $ LD_PRELOAD={self.cenv_dir}/lib/libtcmalloc.so \\")
+            print("     PYTHONPATH=${PWD} \\")
             print("     python plaidbench/plaidbench.py -n128 keras resnet50")
             print()
             print()
