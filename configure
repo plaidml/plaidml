@@ -9,18 +9,6 @@ import subprocess
 import sys
 
 
-def is_linux():
-    return platform.system() == 'Linux'
-
-
-def is_macos():
-    return platform.system() == 'Darwin'
-
-
-def is_windows():
-    return platform.system() == 'Windows'
-
-
 def printf(*args, **kwargs):
     excludes_env = {key: kwargs[key] for key in kwargs if key not in ['env']}
     if excludes_env:
@@ -48,7 +36,9 @@ class Configure:
         self.args = args
         self.conda = pathlib.Path(conda)
         self.this_dir = pathlib.Path(__file__).absolute().parent
-        self.cenv_dir = (args.build_prefix if args.build_prefix else self.this_dir) / '.cenv'
+        # cenv_dir must be resolved since comparison with CONDA_PREFIX determines if configure is reinvoked
+        self.cenv_dir = ((args.build_prefix if args.build_prefix else self.this_dir) /
+                         '.cenv').resolve()
         self.build_dir = (args.build_prefix / f'build-{args.target}' / args.type).resolve()
         print('conda found at: {}'.format(self.conda))
         if args.ci:
@@ -96,6 +86,7 @@ class Configure:
             print()
 
     def is_activated(self):
+        print("DEBUG: {} {}".format(os.getenv('CONDA_PREFIX'), str(self.cenv_dir)))
         return os.getenv('CONDA_PREFIX') == str(self.cenv_dir)
 
     def activate_conda(self):
@@ -113,7 +104,7 @@ class Configure:
         run(cmd, check=True, env=env)
 
     def configure_conda(self):
-        if is_windows():
+        if platform.system() == 'Windows':
             env_file = self.this_dir / 'environment-windows.yml'
         else:
             env_file = self.this_dir / 'environment.yml'
@@ -145,7 +136,7 @@ class Configure:
             run(cmd, check=True, stdout=subprocess.DEVNULL)
 
     def configure_precommit(self):
-        if is_windows():
+        if platform.system() == 'Windows':
             search_path = self.cenv_dir / 'Scripts'
         else:
             search_path = self.cenv_dir / 'bin'
@@ -213,7 +204,7 @@ class Configure:
 
 
 def main():
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description='Configuring PlaidML build environment')
     parser.add_argument('--ci', action='store_true', help='Enable CI mode')
     parser.add_argument('--skip_conda_update',
                         action='store_true',
@@ -252,7 +243,7 @@ def main():
     parser.add_argument('--ld', type=str, help='Path/command of the linker, e.g., mold.')
     args = parser.parse_args()
 
-    print("Configuring PlaidML build environment")
+    print(parser.description)
     print(args)
 
     cfg = Configure(args)
