@@ -151,7 +151,7 @@ correctness as part of our continuous integration system.
 [nGraph]: https://github.com/NervanaSystems/ngraph
 [License]: https://img.shields.io/badge/License-Apache%202.0-blue.svg
 [Build status]: https://badge.buildkite.com/5c9add6b89a14fd498e69a5035062368480e688c4c74cbfab3.svg?branch=master
-[Plaidbench]: https://github.com/plaidml/plaidml/tree/master/plaidbench
+[Plaidbench]: https://github.com/plaidml/plaidml/tree/plaidml-v1/plaidbench
 [EDSL]: https://plaidml.github.io/plaidml/docs/edsl
 [MLIR]: https://mlir.llvm.org/
 [Stripe]: https://arxiv.org/abs/1903.06498
