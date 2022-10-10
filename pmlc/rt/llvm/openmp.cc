@@ -18,6 +18,8 @@ void registerOpenMP() {
   REGISTER_SYMBOL(__kmpc_barrier);
   REGISTER_SYMBOL(__kmpc_flush);
   REGISTER_SYMBOL(__kmpc_for_static_init_8u);
+  REGISTER_SYMBOL(__kmpc_dispatch_next_8u);
+  REGISTER_SYMBOL(__kmpc_dispatch_init_8u);
   REGISTER_SYMBOL(__kmpc_for_static_fini);
   REGISTER_SYMBOL(__kmpc_fork_call);
   REGISTER_SYMBOL(__kmpc_global_thread_num);

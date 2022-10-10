@@ -37,8 +37,8 @@ else()
   message(STATUS "Fetching LLVM")
   FetchContent_Declare(
     llvm-project
-    URL https://github.com/plaidml/llvm-project/archive/14732dd95a9eff28d4afbbb2a52083c9773fa350.tar.gz
-    URL_HASH SHA256=6caf34fbb54d77b21706fa5ccfac6bf4d27be6bc5208aba6f896bb69b7f5aa42
+    URL https://github.com/plaidml/llvm-project/archive/f6ccc1f38accc2d0f4867fba331989f21fe55660.tar.gz
+    URL_HASH SHA256=42902a85b41ef8cb8af9b9b380be571fcbbef2676e51a4238e3c55d026200c7d
   )
   # Check if population has already been performed
   FetchContent_GetProperties(llvm-project)

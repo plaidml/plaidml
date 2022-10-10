@@ -9,9 +9,7 @@ PlaidML
 .. toctree::
    :maxdepth: 2
 
-   usage/getting_started
    usage/edsl_ops
    usage/edsl_types
    usage/edsl_examples
-   usage/troubleshooting
    api/index
