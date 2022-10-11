@@ -1,0 +1,38 @@
+channels:
+  - conda-forge
+dependencies:
+  - ccache
+  - cffi
+  - clang-format
+  - click
+  - cmake
+  - cython
+  - doxygen
+  - git
+  - gperftools
+  - keras-applications
+  - matplotlib
+  - ninja
+  - numpy=1.21.6
+  - pip
+  - pre_commit
+  - protobuf
+  - python
+  - pyyaml
+  - tensorflow>=1.15,<1.16 # fixed
+  - theano
+  - yapf
+  - pip:
+    - asq
+    - breathe
+    - cpplint
+    - keras==2.2.4 # fixed
+    - livereload
+    - nbstripout
+    - opencv-python-headless
+    - pcpp==1.20.1 # fixed
+    - pystache
+    - sphinx-rtd-theme
+    - sphinx-tabs
+    - sphinxcontrib-katex
+    - sphinxcontrib-napoleon
