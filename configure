@@ -86,7 +86,6 @@ class Configure:
             print()
 
     def is_activated(self):
-        print("DEBUG: {} {}".format(os.getenv('CONDA_PREFIX'), str(self.cenv_dir)))
         return os.getenv('CONDA_PREFIX') == str(self.cenv_dir)
 
     def activate_conda(self):
