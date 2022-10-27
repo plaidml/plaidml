@@ -173,8 +173,6 @@ class Configure:
             cmake_compiler_flags.append(f'-DCMAKE_CXX_STANDARD={self.args.cxx_std}')
         if self.args.ld:
             cmake_compiler_flags.append(f'-DLLVM_USE_LINKER={self.args.ld}')
-        elif not 'clang' in os.path.basename(cc[0]) and not 'clang' in os.path.basename(cxx[0]):
-            cmake_compiler_flags.append('-DLLVM_ENABLE_LLD=OFF')
         return cmake_compiler_flags
 
     def configure_cmake(self):
