@@ -7,7 +7,7 @@ if(LIBXSMMROOT AND NOT LIBXSMMFETCH)
   message(STATUS "Found LIBXSMM (${LIBXSMMROOT})")
   file(GLOB XSMM_SRCS LIST_DIRECTORIES false CONFIGURE_DEPENDS ${LIBXSMMROOT}/include/libxsmm/*.c)
 
-  if(${XSMM_SRCS})
+  if(XSMM_SRCS)
     list(REMOVE_ITEM XSMM_SRCS ${LIBXSMMROOT}/include/libxsmm/libxsmm_generator_gemm_driver.c)
   else()
     file(GLOB XSMM_SRCS LIST_DIRECTORIES false CONFIGURE_DEPENDS ${LIBXSMMROOT}/src/*.c)
