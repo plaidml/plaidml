@@ -6,21 +6,15 @@ set(LIBXSMMFETCH $ENV{LIBXSMMFETCH})
 if(LIBXSMMROOT AND NOT LIBXSMMFETCH)
   message(STATUS "Found LIBXSMM (${LIBXSMMROOT})")
   file(GLOB XSMM_SRCS LIST_DIRECTORIES false CONFIGURE_DEPENDS ${LIBXSMMROOT}/include/libxsmm/*.c)
-
-  if(XSMM_SRCS)
-    list(REMOVE_ITEM XSMM_SRCS ${LIBXSMMROOT}/include/libxsmm/libxsmm_generator_gemm_driver.c)
-  else()
-    file(GLOB XSMM_SRCS LIST_DIRECTORIES false CONFIGURE_DEPENDS ${LIBXSMMROOT}/src/*.c)
-    list(REMOVE_ITEM XSMM_SRCS ${LIBXSMMROOT}/src/libxsmm_generator_gemm_driver.c)
-  endif()
+  list(REMOVE_ITEM XSMM_SRCS ${LIBXSMMROOT}/include/libxsmm/libxsmm_generator_gemm_driver.c)
 else()
   message(STATUS "Fetching LIBXSMM")
   include(FetchContent)
 
   FetchContent_Declare(
     xsmm
-    URL https://github.com/libxsmm/libxsmm/archive/e6eedc0ef1f34aa640375b93bd9e964e4823abd8.tar.gz
-    URL_HASH SHA256=fa6615a4ed6dc35cf344301acd868165ae4416eaff81614f12a8c384b7c1e84d
+    URL https://github.com/libxsmm/libxsmm/archive/efa1502f13f7ed0c447351496c66abd0e729e80c.tar.gz
+    URL_HASH SHA256=ca5a508c6127d78ea068a73c632035a30583bba96dd5f0514238d249c60dedfc
   )
 
   FetchContent_GetProperties(xsmm)
@@ -29,9 +23,13 @@ else()
   endif()
 
   set(LIBXSMMROOT ${xsmm_SOURCE_DIR})
+endif()
+
+if(NOT XSMM_SRCS)
   file(GLOB XSMM_SRCS LIST_DIRECTORIES false CONFIGURE_DEPENDS ${LIBXSMMROOT}/src/*.c)
   list(REMOVE_ITEM XSMM_SRCS ${LIBXSMMROOT}/src/libxsmm_generator_gemm_driver.c)
 endif()
+
 set(XSMM_INCLUDE_DIRS ${LIBXSMMROOT}/include)
 
 add_library(xsmm STATIC ${XSMM_SRCS})
