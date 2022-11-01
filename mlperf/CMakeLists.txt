@@ -54,7 +54,7 @@ pml_py_wheel(
   VERSION 1.1
   ABI cp37m
   PY_VER cp37
-  PLATFORM "manylinux2014_x86_64" # TODO: support other platforms
+  PLATFORM "manylinux2014_${CMAKE_HOST_SYSTEM_PROCESSOR}"
   DEPS mlperf_loadgen
   PY_DEPS ::py
 )
