@@ -109,7 +109,9 @@ class Configure:
                 env_file = self.this_dir / self.args.env
                 if not env_file.exists():
                     env_file = self.this_dir / f"{self.args.env}.yml"
-        if not env_file:
+        else:
+            env_file = None
+        if not env_file or not env_file.exists():
             if platform.system() == 'Windows':
                 env_file = self.this_dir / 'environment-windows.yml'
             else:
