@@ -15,7 +15,7 @@ env:
   build_root: build-x86_64
   system: Linux
   version: "1.0.0"
-  python_arch: manylinux1_x86_64
+  python_arch: manylinux2014_x86_64
 
 jobs:
   #build-linux_x86_64-debug:

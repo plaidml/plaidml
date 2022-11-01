@@ -98,7 +98,7 @@ pml_py_wheel(
   NAME wheel
   PKG_NAME "plaidml"
   VERSION ${PLAIDML_VERSION}
-  PLATFORM "manylinux1_x86_64" # TODO: support other platforms
+  PLATFORM "manylinux2014_x86_64" # TODO: support other platforms
   DEPS ::plaidml
   PY_DEPS
     ::py

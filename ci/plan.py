@@ -145,7 +145,7 @@ PARAMS:
   build:
     linux_x86_64:
       vars:
-        arch: manylinux1_x86_64
+        arch: manylinux2014_x86_64
         build_emoji: ":linux:"
         build_root: build-x86_64
   cfg:
@@ -210,11 +210,11 @@ SETTINGS:
         actions = list(plan.get_actions(selector, root=Path('tmp')))
         self.assertSequenceEqual([x.cmds for x in actions], [
             [
-                'buildkite-agent artifact download build-x86_64/Release/plaidml-1.0.0-py3-none-manylinux1_x86_64.whl .',
+                'buildkite-agent artifact download build-x86_64/Release/plaidml-1.0.0-py3-none-manylinux2014_x86_64.whl .',
                 'python ci/runners/plaidbench.py --examples=64 --batch-size=1 --results=tmp/pml-llvm-cpu/infer/inception_v3/bs=1 keras inception_v3',
             ],
             [
-                'buildkite-agent artifact download build-x86_64/Release/plaidml-1.0.0-py3-none-manylinux1_x86_64.whl .',
+                'buildkite-agent artifact download build-x86_64/Release/plaidml-1.0.0-py3-none-manylinux2014_x86_64.whl .',
                 'python ci/runners/plaidbench.py --examples=1024 --batch-size=1 --results=tmp/pml-llvm-cpu/infer/mobilenet/bs=1 keras mobilenet',
             ],
         ])

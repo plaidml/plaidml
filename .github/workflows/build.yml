@@ -20,7 +20,7 @@ env:
   check: ${{inputs.check}}
   system: Linux
   version: "1.0.0"
-  python_arch: manylinux1_x86_64
+  python_arch: manylinux2014_x86_64
 
 jobs:
   build:
