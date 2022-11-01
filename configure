@@ -194,6 +194,7 @@ class Configure:
             f'-DCMAKE_BUILD_TYPE={self.args.type}',
             '-DCMAKE_CXX_FLAGS=-D__STDC_FORMAT_MACROS',
             '-DCMAKE_BUILD_WITH_INSTALL_RPATH=ON',
+            '-DLLVM_TARGETS_TO_BUILD="AArch64;X86;AMDGPU;NVPTX"',
             '-DPML_OPENVINO_BRIDGE=OFF',
             '-DFETCHCONTENT_QUIET=OFF',
         ]
