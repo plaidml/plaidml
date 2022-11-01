@@ -251,7 +251,6 @@ def main():
     parser.add_argument('--cxx', type=str, help='Path/command of the C++ compiler.')
     parser.add_argument('--cxx-std',
                         type=int,
-                        default=14,
                         help='C++ standard, e.g., 20 for C++20 or 0 for none.')
     parser.add_argument('--ld', type=str, help='Path/command of the linker, e.g., mold.')
     args = parser.parse_args()
