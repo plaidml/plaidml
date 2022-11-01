@@ -103,10 +103,17 @@ class Configure:
         run(cmd, check=True, env=env)
 
     def configure_conda(self):
-        if platform.system() == 'Windows':
-            env_file = self.this_dir / 'environment-windows.yml'
-        else:
-            env_file = self.this_dir / 'environment.yml'
+        if self.args.env:
+            env_file = pathlib.Path(self.args.env)
+            if not env_file.exists():
+                env_file = self.this_dir / self.args.env
+                if not env_file.exists():
+                    env_file = self.this_dir / f"{self.args.env}.yml"
+        if not env_file:
+            if platform.system() == 'Windows':
+                env_file = self.this_dir / 'environment-windows.yml'
+            else:
+                env_file = self.this_dir / 'environment.yml'
         if self.cenv_dir.exists():
             if not self.args.skip_conda_update:
                 print('Updating conda environment from: {}'.format(env_file))
@@ -169,7 +176,7 @@ class Configure:
                     if '--gcc-toolchain' == toolchain[0] and 2 == len(toolchain):
                         cmake_compiler_flags.append(
                             f'-DCMAKE_CXX_COMPILER_EXTERNAL_TOOLCHAIN={toolchain[1]}')
-        if self.args.cxx_std:
+        if self.args.cxx_std and 0 < self.args.cxx_std:
             cmake_compiler_flags.append(f'-DCMAKE_CXX_STANDARD={self.args.cxx_std}')
         if self.args.ld:
             cmake_compiler_flags.append(f'-DLLVM_USE_LINKER={self.args.ld}')
@@ -236,9 +243,13 @@ def main():
                         type=str,
                         default='ccache',
                         help='Path/command of a compiler launcher.')
+    parser.add_argument('--env', type=str, help='YAML environment file (.yml).')
     parser.add_argument('--cc', type=str, help='Path/command of the C compiler.')
     parser.add_argument('--cxx', type=str, help='Path/command of the C++ compiler.')
-    parser.add_argument('--cxx-std', type=int, help='C++ standard version, e.g., 20 for C++20.')
+    parser.add_argument('--cxx-std',
+                        type=int,
+                        default=14,
+                        help='C++ standard, e.g., 20 for C++20 or 0 for none.')
     parser.add_argument('--ld', type=str, help='Path/command of the linker, e.g., mold.')
     args = parser.parse_args()
 
