@@ -53,36 +53,36 @@ class Configure:
                     self.configure_precommit()
                 self.configure_cmake()
             print()
-            print("Your build is configured.")
+            print('Your build is configured.')
             print()
-            print("1) Activate Conda environment (if not already enabled):")
-            print(f"   $ conda activate {self.cenv_dir}")
+            print('1) Activate Conda environment (if not already enabled):')
+            print(f'   $ conda activate {self.cenv_dir}')
             print()
-            print("2) Build PlaidML and Plaidbench:")
-            print(f"   $ cd {self.build_dir}")
-            print("   $ ninja && ninja plaidbench_py")
+            print('2) Build PlaidML and Plaidbench:')
+            print(f'   $ cd {self.build_dir}')
+            print('   $ ninja && ninja plaidbench_py')
             print()
-            print("3) Setup a device:")
-            print(f"   $ ninja -C {self.build_dir} setup")
-            print("   Non-interactive:")
-            print("   $ export PLAIDML_DEVICE_IDS=llvm_cpu.0")
-            print("   $ export PLAIDML_EXPERIMENTAL=1")
+            print('3) Setup a device:')
+            print(f'   $ ninja -C {self.build_dir} setup')
+            print('   Non-interactive:')
+            print('   $ export PLAIDML_DEVICE_IDS=llvm_cpu.0')
+            print('   $ export PLAIDML_EXPERIMENTAL=1')
             print()
-            print("4) Run unit tests (check build):")
-            print(f"   $ cd {self.build_dir}")
-            print(f"   $ ninja check-smoke")
+            print('4) Run unit tests (check build):')
+            print(f'   $ cd {self.build_dir}')
+            print(f'   $ ninja check-smoke')
             print()
-            print("5) Benchmark (keras: resnet50, vgg16, vgg19, xception):")
-            print(f"   $ cd {self.build_dir}")
-            print("   $ export OMP_PROC_BIND=TRUE OMP_NUM_THREADS=8")
-            print(f"   $ LD_PRELOAD={self.cenv_dir}/lib/libtcmalloc.so \\")
-            print("     PYTHONPATH=${PWD} \\")
-            print("     python3 plaidbench/plaidbench.py -n128 keras resnet50")
+            print('5) Benchmark (keras: resnet50, vgg16, vgg19, xception):')
+            print(f'   $ cd {self.build_dir}')
+            print('   $ export OMP_PROC_BIND=TRUE OMP_NUM_THREADS=8')
+            print(f'   $ LD_PRELOAD={self.cenv_dir}/lib/libtcmalloc.so \\')
+            print('     PYTHONPATH=${PWD} \\')
+            print('     python3 plaidbench/plaidbench.py -n128 keras resnet50')
             print()
             print()
-            print("Install packages (another environment):")
-            print("   $ # consider pip-flags --no-deps --force-reinstall")
-            print(f"   $ python3 -m pip install {self.build_dir}/*.whl")
+            print('Install packages (another environment):')
+            print('   $ # consider pip-flags --no-deps --force-reinstall')
+            print(f'   $ python3 -m pip install {self.build_dir}/*.whl')
             print()
 
     def is_activated(self):
@@ -108,7 +108,7 @@ class Configure:
             if not env_file.exists():
                 env_file = self.this_dir / self.args.env
                 if not env_file.exists():
-                    env_file = self.this_dir / f"{self.args.env}.yml"
+                    env_file = self.this_dir / f'{self.args.env}.yml'
         else:
             env_file = None
         if not env_file or not env_file.exists():
@@ -185,6 +185,7 @@ class Configure:
         return cmake_compiler_flags
 
     def configure_cmake(self):
+        targets = 'AArch64;X86;AMDGPU;NVPTX'
         cmd = [
             'cmake',
             '-S.',
@@ -194,7 +195,8 @@ class Configure:
             f'-DCMAKE_BUILD_TYPE={self.args.type}',
             '-DCMAKE_CXX_FLAGS=-D__STDC_FORMAT_MACROS',
             '-DCMAKE_BUILD_WITH_INSTALL_RPATH=ON',
-            '-DLLVM_TARGETS_TO_BUILD="AArch64;X86;AMDGPU;NVPTX"',
+            f'-DLLVM_TARGETS_TO_BUILD={targets}',
+            f'-DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD={targets}',
             '-DPML_OPENVINO_BRIDGE=OFF',
             '-DFETCHCONTENT_QUIET=OFF',
         ]
