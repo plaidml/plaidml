@@ -205,10 +205,9 @@ function(pml_py_wheel)
 
   pml_package_name(_PACKAGE_NAME)
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
+  set(_WHEEL_FILE ${_RULE_PKG_NAME}-${_RULE_VERSION}-${_RULE_PY_VER}-${_RULE_ABI}-${_RULE_PLATFORM}.whl)
 
   configure_file(setup.in.py setup.py)
-
-  set(_WHEEL_FILE ${_RULE_PKG_NAME}-${_RULE_VERSION}-${_RULE_PY_VER}-${_RULE_ABI}-${_RULE_PLATFORM}.whl)
 
   add_custom_target(${_NAME} ALL
     DEPENDS ${_WHEEL_FILE}
