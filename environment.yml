@@ -17,7 +17,7 @@ dependencies:
   - pip
   - pre_commit
   - protobuf=4.21.5
-  - python>=3.7,<3.8 # fixed
+  - python>=3.7,<3.8
   - pyyaml=6.0
   - tensorflow=1.14.0
   - theano=1.0.5

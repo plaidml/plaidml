@@ -10,6 +10,7 @@ dependencies:
   - doxygen
   - git
   - gperftools
+  - h5py
   - keras-applications
   - matplotlib
   - ninja
