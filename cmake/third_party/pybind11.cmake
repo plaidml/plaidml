@@ -1,8 +1,8 @@
 message("Fetching pybind11")
 FetchContent_Declare(
   pybind11
-  URL      https://github.com/pybind/pybind11/archive/refs/tags/v2.7.1.tar.gz
-  URL_HASH SHA256=616d1c42e4cf14fa27b2a4ff759d7d7b33006fdc5ad8fd603bb2c22622f27020
+  URL      https://github.com/pybind/pybind11/archive/refs/tags/v2.10.1.tar.gz
+  URL_HASH SHA256=111014b516b625083bef701df7880f78c2243835abdb263065b6b59b960b6bad
 )
 
 FetchContent_GetProperties(pybind11)
