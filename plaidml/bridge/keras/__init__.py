@@ -974,9 +974,9 @@ def in_train_phase(x, alt, training=None):
     cx = x() if callable(x) else x
     calt = alt() if callable(alt) else alt
 
-    if training is 1 or training is True:
+    if training == 1 or training is True:
         return cx
-    elif training is 0 or training is False:
+    elif training == 0 or training is False:
         return calt
     else:
         o = switch(training, cx, calt)
