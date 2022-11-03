@@ -17,7 +17,7 @@ dependencies:
   - pip
   - pre_commit
   - protobuf
-  - python
+  - python>=3.7,<3.8 # fixed
   - pyyaml
   - tensorflow>=1.15,<1.16 # fixed
   - theano
