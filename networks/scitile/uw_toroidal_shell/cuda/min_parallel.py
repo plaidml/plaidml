@@ -1,6 +1,7 @@
 import math
 import numpy as np
 from numba import jit, cuda, float32
+
 EPS = 1.0e-8  # Threshold for trivial gradient
 RAD = 1  # stencil radius
 

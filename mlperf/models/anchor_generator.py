@@ -260,7 +260,8 @@ class MultipleGridAnchorGenerator(object):
             [isinstance(list_item, list) for list_item in box_specs_list]):
             self._box_specs = box_specs_list
         else:
-            raise ValueError('box_specs_list is expected to be a ' 'list of lists of pairs')
+            raise ValueError('box_specs_list is expected to be a '
+                             'list of lists of pairs')
         if base_anchor_size is None:
             base_anchor_size = torch.tensor([256, 256], dtype=torch.float32)
         self._base_anchor_size = base_anchor_size
@@ -273,7 +274,8 @@ class MultipleGridAnchorGenerator(object):
         self._aspect_ratios = []
         for box_spec in self._box_specs:
             if not all([isinstance(entry, tuple) and len(entry) == 2 for entry in box_spec]):
-                raise ValueError('box_specs_list is expected to be a ' 'list of lists of pairs')
+                raise ValueError('box_specs_list is expected to be a '
+                                 'list of lists of pairs')
             scales, aspect_ratios = zip(*box_spec)
             self._scales.append(scales)
             self._aspect_ratios.append(aspect_ratios)

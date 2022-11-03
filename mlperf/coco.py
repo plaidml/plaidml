@@ -157,11 +157,11 @@ class PostProcessCoco:
         self.results.extend(results)
 
     def __call__(
-            self,
-            results,
-            ids,
-            expected=None,
-            result_dict=None,
+        self,
+        results,
+        ids,
+        expected=None,
+        result_dict=None,
     ):
         # results come as:
         #   tensorflow, ssd-mobilenet: num_detections,detection_boxes,detection_scores,detection_classes

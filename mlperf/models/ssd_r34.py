@@ -60,13 +60,15 @@ class Encoder(object):
 
         for i, score in enumerate(scores_in.split(1, 1)):
             # skip background
-            if i == 0: continue
+            if i == 0:
+                continue
 
             score = score.squeeze(1)
             mask = score > 0.05
 
             bboxes, score = bboxes_in[mask, :], score[mask]
-            if score.size(0) == 0: continue
+            if score.size(0) == 0:
+                continue
 
             score_sorted, score_idx_sorted = score.sort(dim=0)
 
@@ -205,8 +207,10 @@ class DefaultBoxes(object):
         return self.scale_wh_
 
     def __call__(self, order="ltrb"):
-        if order == "ltrb": return self.dboxes_ltrb
-        if order == "xywh": return self.dboxes
+        if order == "ltrb":
+            return self.dboxes_ltrb
+        if order == "xywh":
+            return self.dboxes
 
 
 def dboxes_R34_coco(figsize, strides):
@@ -341,7 +345,8 @@ class SSD_R34(nn.Module):
 
         for layer in layers:
             for param in layer.parameters():
-                if param.dim() > 1: nn.init.xavier_uniform_(param)
+                if param.dim() > 1:
+                    nn.init.xavier_uniform_(param)
 
     # Shape the classifier to the view of bboxes
     def bbox_view(self, src, loc, conf, extract_shapes=False):

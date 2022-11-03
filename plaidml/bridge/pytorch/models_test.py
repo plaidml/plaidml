@@ -57,14 +57,14 @@ class BasicBlock(nn.Module):
     expansion = 1
 
     def __init__(
-            self,
-            inplanes,
-            planes,
-            stride=1,
-            downsample=None,
-            groups=1,
-            base_width=64,
-            norm_layer=None,
+        self,
+        inplanes,
+        planes,
+        stride=1,
+        downsample=None,
+        groups=1,
+        base_width=64,
+        norm_layer=None,
     ):
         super(BasicBlock, self).__init__()
         if norm_layer is None:
@@ -103,14 +103,14 @@ class Bottleneck(nn.Module):
     expansion = 4
 
     def __init__(
-            self,
-            inplanes,
-            planes,
-            stride=1,
-            downsample=None,
-            groups=1,
-            base_width=64,
-            norm_layer=None,
+        self,
+        inplanes,
+        planes,
+        stride=1,
+        downsample=None,
+        groups=1,
+        base_width=64,
+        norm_layer=None,
     ):
         super(Bottleneck, self).__init__()
         if norm_layer is None:
@@ -153,14 +153,14 @@ class Bottleneck(nn.Module):
 class ResNet(nn.Module):
 
     def __init__(
-            self,
-            block,
-            layers,
-            num_classes=1000,
-            zero_init_residual=False,
-            groups=1,
-            width_per_group=64,
-            norm_layer=None,
+        self,
+        block,
+        layers,
+        num_classes=1000,
+        zero_init_residual=False,
+        groups=1,
+        width_per_group=64,
+        norm_layer=None,
     ):
         super(ResNet, self).__init__()
         if norm_layer is None:
