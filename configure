@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 
-import argparse
-import os
-import pathlib
-import platform
-import shutil
 import subprocess
+import platform
+import argparse
+import pathlib
+import shutil
 import sys
+import os
 
 
 def printf(*args, **kwargs):
-    excludes_env = {key: kwargs[key] for key in kwargs if key not in ['env']}
+    excludes_env = {key: kwargs[key] for key in kwargs if key not in ["env"]}
     if excludes_env:
         print(*args, excludes_env)
     else:
@@ -26,21 +26,23 @@ def run(cmd, **kwargs):
 class Configure:
 
     def __init__(self, args):
-        conda = shutil.which('mamba')
+        install = ("https://docs.conda.io/projects/conda/en/latest/user-guide/install")
+        conda = shutil.which("mamba")
         if not conda:
-            conda = shutil.which('conda')
+            conda = shutil.which("conda")
             if not conda:
-                print('Please install conda.')
-                print('See: https://docs.conda.io/projects/conda/en/latest/user-guide/install')
+                print("Please install conda.")
+                print(f"See: {install}")
                 sys.exit(1)
         self.args = args
         self.conda = pathlib.Path(conda)
         self.this_dir = pathlib.Path(__file__).absolute().parent
-        # cenv_dir must be resolved since comparison with CONDA_PREFIX determines if configure is reinvoked
+        # cenv_dir must be resolved since comparison with CONDA_PREFIX
+        # determines if configuration is reinvoked
         self.cenv_dir = ((args.build_prefix if args.build_prefix else self.this_dir) /
-                         '.cenv').resolve()
-        self.build_dir = (args.build_prefix / f'build-{args.target}' / args.type).resolve()
-        print('conda found at: {}'.format(self.conda))
+                         ".cenv").resolve()
+        self.build_dir = (args.build_prefix / f"build-{args.target}" / args.type).resolve()
+        print("conda found at: {}".format(self.conda))
         if args.ci:
             self.configure_cmake()
         else:
@@ -48,57 +50,61 @@ class Configure:
                 self.configure_conda()
                 self.activate_conda()
             else:
-                printf('Skipping environment update since Conda is already activated')
+                printf("Skipping environment update since "
+                       "Conda is already activated")
                 if not args.skip_precommit:
                     self.configure_precommit()
                 self.configure_cmake()
             print()
-            print('Your build is configured.')
+            print("Your build is configured.")
             print()
-            print('1) Activate Conda environment (if not already enabled):')
-            print(f'   $ conda activate {self.cenv_dir}')
+            print("1) Activate Conda environment (if not already enabled):")
+            print(f"   $ conda activate {self.cenv_dir}")
+            print("   $ # consider to restore original $CC and $CXX")
+            print(f'   $ export CXX={os.getenv("CXX")}')
+            print(f'   $ export CC={os.getenv("CC")}')
             print()
-            print('2) Build PlaidML and Plaidbench:')
-            print(f'   $ cd {self.build_dir}')
-            print('   $ ninja && ninja plaidbench_py')
+            print("2) Build PlaidML and Plaidbench:")
+            print(f"   $ cd {self.build_dir}")
+            print("   $ ninja && ninja plaidbench_py")
             print()
-            print('3) Setup a device:')
-            print(f'   $ ninja -C {self.build_dir} setup')
-            print('   Non-interactive:')
-            print('   $ export PLAIDML_DEVICE_IDS=llvm_cpu.0')
-            print('   $ export PLAIDML_EXPERIMENTAL=1')
+            print("3) Setup a device:")
+            print(f"   $ ninja -C {self.build_dir} setup")
+            print("   Non-interactive:")
+            print("   $ export PLAIDML_DEVICE_IDS=llvm_cpu.0")
+            print("   $ export PLAIDML_EXPERIMENTAL=1")
             print()
-            print('4) Run unit tests (check build):')
-            print(f'   $ cd {self.build_dir}')
-            print(f'   $ ninja check-smoke')
+            print("4) Run unit tests (check build):")
+            print(f"   $ cd {self.build_dir}")
+            print("   $ ninja check-smoke")
             print()
-            print('5) Benchmark (keras: resnet50, vgg16, vgg19, xception):')
-            print(f'   $ cd {self.build_dir}')
-            print('   $ export OMP_PROC_BIND=TRUE OMP_NUM_THREADS=8')
-            print(f'   $ LD_PRELOAD={self.cenv_dir}/lib/libtcmalloc.so \\')
-            print('     PYTHONPATH=${PWD} \\')
-            print('     python3 plaidbench/plaidbench.py -n128 keras resnet50')
+            print("5) Benchmark (keras: resnet50, vgg16, vgg19, xception):")
+            print(f"   $ cd {self.build_dir}")
+            print("   $ export OMP_PROC_BIND=TRUE OMP_NUM_THREADS=8")
+            print(f"   $ LD_PRELOAD={self.cenv_dir}/lib/libtcmalloc.so \\")
+            print("     PYTHONPATH=${PWD} \\")
+            print("     python3 plaidbench/plaidbench.py -n128 keras resnet50")
             print()
             print()
-            print('Install packages (another environment):')
-            print('   $ # consider pip-flags --no-deps --force-reinstall')
-            print(f'   $ python3 -m pip install {self.build_dir}/*.whl')
+            print("Install packages (another environment):")
+            print("   $ # consider pip-flags --no-deps --force-reinstall")
+            print(f"   $ python3 -m pip install {self.build_dir}/*.whl")
             print()
 
     def is_activated(self):
-        return os.getenv('CONDA_PREFIX') == str(self.cenv_dir)
+        return os.getenv("CONDA_PREFIX") == str(self.cenv_dir)
 
     def activate_conda(self):
-        printf('Activating conda environment')
+        printf("Activating conda environment")
         env = os.environ.copy()
-        env['SKIP_BOOTSTRAP'] = '1'
+        env["SKIP_BOOTSTRAP"] = "1"
         cmd = [
             self.conda,
-            'run',
-            '--no-capture-output',
-            '-p',
+            "run",
+            "--no-capture-output",
+            "-p",
             self.cenv_dir,
-            'python3',
+            "python3",
         ] + sys.argv
         run(cmd, check=True, env=env)
 
@@ -108,162 +114,182 @@ class Configure:
             if not env_file.exists():
                 env_file = self.this_dir / self.args.env
                 if not env_file.exists():
-                    env_file = self.this_dir / f'{self.args.env}.yml'
+                    env_file = self.this_dir / f"{self.args.env}.yml"
         else:
             env_file = None
         if not env_file or not env_file.exists():
-            if platform.system() == 'Windows':
-                env_file = self.this_dir / 'environment-windows.yml'
+            if platform.system() == "Windows":
+                env_file = self.this_dir / "environment-windows.yml"
             else:
-                env_file = self.this_dir / 'environment.yml'
+                env_file = self.this_dir / "environment.yml"
         if self.cenv_dir.exists():
             if not self.args.skip_conda_update:
-                print('Updating conda environment from: {}'.format(env_file))
+                print("Updating conda environment from: {}".format(env_file))
                 cmd = [
                     str(self.conda),
-                    'env',
-                    'update',
-                    '-f',
+                    "env",
+                    "update",
+                    "-f",
                     str(env_file),
-                    '-p',
+                    "-p",
                     str(self.cenv_dir),
-                    '--prune',
+                    "--prune",
                 ]
                 run(cmd, check=True, stdout=subprocess.DEVNULL)
         elif not self.args.skip_conda_env:
-            print('Creating conda environment from: {}'.format(env_file))
+            print("Creating conda environment from: {}".format(env_file))
             cmd = [
                 str(self.conda),
-                'env',
-                'create',
-                '-f',
+                "env",
+                "create",
+                "-f",
                 str(env_file),
-                '-p',
+                "-p",
                 str(self.cenv_dir),
             ]
             run(cmd, check=True, stdout=subprocess.DEVNULL)
 
     def configure_precommit(self):
-        if platform.system() == 'Windows':
-            search_path = self.cenv_dir / 'Scripts'
+        if platform.system() == "Windows":
+            search_path = self.cenv_dir / "Scripts"
         else:
-            search_path = self.cenv_dir / 'bin'
+            search_path = self.cenv_dir / "bin"
         print()
-        print('Searching for pre-commit in: {}'.format(search_path))
-        pre_commit = shutil.which('pre-commit', path=str(search_path))
+        print("Searching for pre-commit in: {}".format(search_path))
+        pre_commit = shutil.which("pre-commit", path=str(search_path))
         if not pre_commit:
-            print('pre-commit could not be found.')
-            print('Is your conda environment created and up to date?')
+            print("pre-commit could not be found.")
+            print("Is your conda environment created and up to date?")
             sys.exit(1)
-        run([pre_commit, 'install'], check=True)
+        run([pre_commit, "install"], check=True)
 
     def configure_compiler(self):
         cmake_compiler_flags = []
-        cxx = (os.getenv('CXX') if self.args.cxx is None else self.args.cxx).split(' ', 1)
-        cc = (os.getenv('CC') if self.args.cc is None else self.args.cc).split(' ', 1)
+        cxx = (os.getenv("CXX") if self.args.cxx is None else self.args.cxx).split(" ", 1)
+        cc = (os.getenv("CC") if self.args.cc is None else self.args.cc).split(" ", 1)
         if cc:
-            cmake_compiler_flags.append(f'-DCMAKE_C_COMPILER={cc[0]}')
-            if 'clang' in os.path.basename(cc[0]):
+            cmake_compiler_flags.append(f"-DCMAKE_C_COMPILER={cc[0]}")
+            if "clang" in os.path.basename(cc[0]):
                 if 2 == len(cc):
-                    toolchain = cc[1].split('=', 1)
-                    if '--gcc-toolchain' == toolchain[0] and 2 == len(toolchain):
-                        cmake_compiler_flags.append(
-                            f'-DCMAKE_C_COMPILER_EXTERNAL_TOOLCHAIN={toolchain[1]}')
+                    toolchain = cc[1].split("=", 1)
+                    if "--gcc-toolchain" == toolchain[0] and 2 == len(toolchain):
+                        envar = "CMAKE_C_COMPILER_EXTERNAL_TOOLCHAIN"
+                        cmake_compiler_flags.append(f"-D{envar}={toolchain[1]}")
         if cxx:
-            cmake_compiler_flags.append(f'-DCMAKE_CXX_COMPILER={cxx[0]}')
-            if 'clang++' in os.path.basename(cxx[0]):
-                #cmake_compiler_flags.append('-DCMAKE_CXX_FLAGS=-w')
+            cmake_compiler_flags.append(f"-DCMAKE_CXX_COMPILER={cxx[0]}")
+            if "clang++" in os.path.basename(cxx[0]):
+                # cmake_compiler_flags.append('-DCMAKE_CXX_FLAGS=-w')
                 if 2 == len(cxx):
-                    toolchain = cxx[1].split('=', 1)
-                    if '--gcc-toolchain' == toolchain[0] and 2 == len(toolchain):
-                        cmake_compiler_flags.append(
-                            f'-DCMAKE_CXX_COMPILER_EXTERNAL_TOOLCHAIN={toolchain[1]}')
+                    toolchain = cxx[1].split("=", 1)
+                    if "--gcc-toolchain" == toolchain[0] and 2 == len(toolchain):
+                        envar = "CMAKE_CXX_COMPILER_EXTERNAL_TOOLCHAIN"
+                        cmake_compiler_flags.append(f"-D{envar}={toolchain[1]}")
         if self.args.cxx_std and 0 < self.args.cxx_std:
-            cmake_compiler_flags.append(f'-DCMAKE_CXX_STANDARD={self.args.cxx_std}')
+            cmake_compiler_flags.append(f"-DCMAKE_CXX_STANDARD={self.args.cxx_std}")
         if self.args.ld:
-            cmake_compiler_flags.append(f'-DLLVM_USE_LINKER={self.args.ld}')
+            cmake_compiler_flags.append(f"-DLLVM_USE_LINKER={self.args.ld}")
         return cmake_compiler_flags
 
     def configure_cmake(self):
-        targets = 'AArch64;X86;AMDGPU;NVPTX'
+        targets = "AArch64;X86;AMDGPU;NVPTX"
         cmd = [
-            'cmake',
-            '-S.',
-            f'-B{self.build_dir}',
-            '-GNinja',
-            '-Wno-dev',
-            f'-DCMAKE_BUILD_TYPE={self.args.type}',
-            '-DCMAKE_CXX_FLAGS=-D__STDC_FORMAT_MACROS',
-            '-DCMAKE_BUILD_WITH_INSTALL_RPATH=ON',
-            f'-DLLVM_TARGETS_TO_BUILD={targets}',
-            f'-DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD={targets}',
-            '-DPML_OPENVINO_BRIDGE=OFF',
-            '-DFETCHCONTENT_QUIET=OFF',
+            "cmake",
+            "-S.",
+            f"-B{self.build_dir}",
+            "-GNinja",
+            "-Wno-dev",
+            f"-DCMAKE_BUILD_TYPE={self.args.type}",
+            "-DCMAKE_CXX_FLAGS=-D__STDC_FORMAT_MACROS",
+            "-DCMAKE_BUILD_WITH_INSTALL_RPATH=ON",
+            f"-DLLVM_TARGETS_TO_BUILD={targets}",
+            f"-DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD={targets}",
+            "-DPML_OPENVINO_BRIDGE=OFF",
+            "-DFETCHCONTENT_QUIET=OFF",
         ]
         if self.args.temp_dir:
-            fc_dir = self.args.temp_dir / f'fc-{self.args.target}'
-            cmd.append(f'-DFETCHCONTENT_BASE_DIR={fc_dir}')
+            fc_dir = self.args.temp_dir / f"fc-{self.args.target}"
+            cmd.append(f"-DFETCHCONTENT_BASE_DIR={fc_dir}")
         if self.args.local_llvm:
-            cmd.append(f'-DLOCAL_LLVM_DIR={self.args.local_llvm}')
+            cmd.append(f"-DLOCAL_LLVM_DIR={self.args.local_llvm}")
         else:
-            cmd.append('-ULOCAL_LLVM_DIR')
+            cmd.append("-ULOCAL_LLVM_DIR")
         if self.args.launcher:
-            cmd.append(f'-DCMAKE_CXX_COMPILER_LAUNCHER={self.args.launcher}')
-            cmd.append(f'-DCMAKE_C_COMPILER_LAUNCHER={self.args.launcher}')
+            cmd.append(f"-DCMAKE_CXX_COMPILER_LAUNCHER={self.args.launcher}")
+            cmd.append(f"-DCMAKE_C_COMPILER_LAUNCHER={self.args.launcher}")
         cmd.extend(self.configure_compiler())
         run(cmd, check=True)
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Configuring PlaidML build environment')
-    parser.add_argument('--ci', action='store_true', help='Enable CI mode')
-    parser.add_argument('--skip_conda_update',
-                        action='store_true',
-                        help='Skip updating the conda environment.')
-    parser.add_argument('--skip_conda_env',
-                        action='store_true',
-                        help='Skip the conda environment creation step.')
-    parser.add_argument('--skip_precommit',
-                        action='store_true',
-                        help='Skip the precommit configuration step.')
-    parser.add_argument('--local_llvm',
-                        type=pathlib.Path,
-                        help='Avoid fetching LLVM source (LOCAL_LLVML_DIR).')
-    parser.add_argument('--type',
-                        default='Release',
-                        choices=['Debug', 'Release', 'RelWithDebInfo'],
-                        help='Configures CMAKE_BUILD_TYPE')
-    parser.add_argument('--target',
-                        default='x86_64',
-                        choices=['aarch64', 'x86_64'],
-                        help='Set the target architecture.')
-    parser.add_argument('--build-prefix',
-                        type=pathlib.Path,
-                        default='.',
-                        help='Turn build directory into an absolute path.')
-    parser.add_argument('--temp-dir',
-                        type=pathlib.Path,
-                        help='Temporary directory for cached assets.')
-    parser.add_argument('--launcher',
-                        type=str,
-                        default='ccache',
-                        help='Path/command of a compiler launcher.')
-    parser.add_argument('--env', type=str, help='YAML environment file (.yml).')
-    parser.add_argument('--cc', type=str, help='Path/command of the C compiler.')
-    parser.add_argument('--cxx', type=str, help='Path/command of the C++ compiler.')
-    parser.add_argument('--cxx-std',
-                        type=int,
-                        help='C++ standard, e.g., 20 for C++20 or 0 for none.')
-    parser.add_argument('--ld', type=str, help='Path/command of the linker, e.g., mold.')
+    parser = argparse.ArgumentParser(description="Configuring PlaidML build environment")
+    parser.add_argument("--ci", action="store_true", help="Enable CI mode")
+    parser.add_argument(
+        "--skip_conda_update",
+        action="store_true",
+        help="Skip updating the conda environment.",
+    )
+    parser.add_argument(
+        "--skip_conda_env",
+        action="store_true",
+        help="Skip the conda environment creation step.",
+    )
+    parser.add_argument(
+        "--skip_precommit",
+        action="store_true",
+        help="Skip the precommit configuration step.",
+    )
+    parser.add_argument(
+        "--local_llvm",
+        type=pathlib.Path,
+        help="Avoid fetching LLVM source (LOCAL_LLVML_DIR).",
+    )
+    parser.add_argument(
+        "--type",
+        default="Release",
+        choices=["Debug", "Release", "RelWithDebInfo"],
+        help="Configures CMAKE_BUILD_TYPE",
+    )
+    parser.add_argument(
+        "--target",
+        default="x86_64",
+        choices=["aarch64", "x86_64"],
+        help="Set the target architecture.",
+    )
+    parser.add_argument(
+        "--build-prefix",
+        type=pathlib.Path,
+        default=".",
+        help="Turn build directory into an absolute path.",
+    )
+    parser.add_argument(
+        "--temp-dir",
+        type=pathlib.Path,
+        help="Temporary directory for cached assets.",
+    )
+    parser.add_argument(
+        "--launcher",
+        type=str,
+        default=shutil.which("ccache"),
+        help="Path/command of a compiler launcher.",
+    )
+    parser.add_argument("--env", type=str, help="YAML environment file (.yml).")
+    parser.add_argument("--cc", type=str, help="Path/command of the C compiler.")
+    parser.add_argument("--cxx", type=str, help="Path/command of the C++ compiler.")
+    parser.add_argument(
+        "--cxx-std",
+        type=int,
+        help="C++ standard, e.g., 20 for C++20 or 0 for none.",
+    )
+    parser.add_argument("--ld", type=str, help="Path/command of the linker, e.g., mold.")
     args = parser.parse_args()
 
     print(parser.description)
     print(args)
 
-    cfg = Configure(args)
+    Configure(args)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
