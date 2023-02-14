@@ -57,6 +57,10 @@ def main():
             'plaidml.op',
         ],
         url='https://www.intel.ai/plaidml',
+        project_urls = {
+            "Source Code": "https://github.com/plaidml/plaidml",
+            "Bug Tracker": "https://github.com/plaidml/plaidml/issues",
+        },
         zip_safe=False,
     )
 
