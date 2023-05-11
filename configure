@@ -294,5 +294,15 @@ def main():
 if __name__ == "__main__":
     try:
         main()
+    except subprocess.CalledProcessError:
+        print()
+        print("Configuration failed. Suggested checks:")
+        print("* Try minimize the prerequisites and requirements,")
+        print("  e.g., run the following configuration:")
+        print('  ./configure --skip_precommit --launcher="" \\')
+        print("              --env=environment-minimal-restrictive.yml")
+        print("* Ensure your repository is fully checked out:")
+        print("  git submodule update --init --recursive")
+        print()
     except KeyboardInterrupt:
         pass
