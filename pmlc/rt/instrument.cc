@@ -5,6 +5,9 @@
 #include <chrono>
 
 #include "libxsmm.h" // NOLINT [build/include_subdir]
+#if !defined(LIBXSMM_TIMER_H)
+# include "utils/libxsmm_timer.h" // NOLINT [build/include_subdir]
+#endif
 #include "llvm/Support/Format.h"
 #include "llvm/Support/raw_ostream.h"
 
