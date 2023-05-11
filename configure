@@ -178,12 +178,14 @@ class Configure:
         if cxx:
             cmake_compiler_flags.append(f"-DCMAKE_CXX_COMPILER={cxx[0]}")
             if "clang++" in os.path.basename(cxx[0]):
-                # cmake_compiler_flags.append('-DCMAKE_CXX_FLAGS=-w')
+                # cmake_compiler_flags.append("-DCMAKE_CXX_FLAGS=-w")
                 if 2 == len(cxx):
                     toolchain = cxx[1].split("=", 1)
                     if "--gcc-toolchain" == toolchain[0] and 2 == len(toolchain):
                         envar = "CMAKE_CXX_COMPILER_EXTERNAL_TOOLCHAIN"
                         cmake_compiler_flags.append(f"-D{envar}={toolchain[1]}")
+        else:  # support newer GCC (reduced implicit header dependencies)
+            cmake_compiler_flags.append("-DCMAKE_CXX_FLAGS=-include cstdint")
         if self.args.cxx_std and 0 < self.args.cxx_std:
             cmake_compiler_flags.append(f"-DCMAKE_CXX_STANDARD={self.args.cxx_std}")
         if self.args.ld:
