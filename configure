@@ -177,7 +177,8 @@ class Configure:
                         cmake_compiler_flags.append(f"-D{envar}={toolchain[1]}")
         if cxx:
             cmake_compiler_flags.append(f"-DCMAKE_CXX_COMPILER={cxx[0]}")
-            cmake_compiler_flags.append("-DCMAKE_CXX_FLAGS=-D__STDC_FORMAT_MACROS")
+            # support newer GCC/compilers with potentially fewer implicit header dependencies (-include)
+            cmake_compiler_flags.append("-DCMAKE_CXX_FLAGS=-D__STDC_FORMAT_MACROS -include cstdint")
             if "clang++" in os.path.basename(cxx[0]):
                 # cmake_compiler_flags.append("-DCMAKE_CXX_FLAGS=-w")
                 if 2 == len(cxx):
