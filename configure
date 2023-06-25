@@ -109,6 +109,7 @@ class Configure:
         run(cmd, check=True, env=env)
 
     def configure_conda(self):
+        run([str(self.conda), "init", "bash"], check=True, stdout=subprocess.DEVNULL)
         if self.args.env:
             env_file = pathlib.Path(self.args.env)
             if not env_file.exists():
@@ -178,7 +179,8 @@ class Configure:
         if cxx:
             cmake_compiler_flags.append(f"-DCMAKE_CXX_COMPILER={cxx[0]}")
             # support newer GCC/compilers with potentially fewer implicit header dependencies (-include)
-            cmake_compiler_flags.append("-DCMAKE_CXX_FLAGS=-D__STDC_FORMAT_MACROS -include cstdint")
+            cmake_compiler_flags.append(
+                "-DCMAKE_CXX_FLAGS=-D__STDC_FORMAT_MACROS -include cstdint")
             if "clang++" in os.path.basename(cxx[0]):
                 # cmake_compiler_flags.append("-DCMAKE_CXX_FLAGS=-w")
                 if 2 == len(cxx):
