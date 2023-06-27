@@ -109,7 +109,6 @@ class Configure:
         run(cmd, check=True, env=env)
 
     def configure_conda(self):
-        run([str(self.conda), "init", "bash"], check=True, stdout=subprocess.DEVNULL)
         if self.args.env:
             env_file = pathlib.Path(self.args.env)
             if not env_file.exists():
