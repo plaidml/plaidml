@@ -13,8 +13,8 @@ else()
 
   FetchContent_Declare(
     xsmm
-    URL https://github.com/libxsmm/libxsmm/archive/490018893a40dbdfeaf577ee8f1f62ea93a2f3c8.tar.gz
-    URL_HASH SHA256=4972fc03c952370230e8c8d7fd527942fcc3e8a3a0b30a9986cb9685185c4f11
+    URL https://github.com/libxsmm/libxsmm/archive/087c91435cdf0fa8aa023c2e19fe7ae55d04808e.tar.gz
+    URL_HASH SHA256=d5047880a29bd2367cd7c65e45cfcc2652d2c6548af3deaab8fad5c0fe80c679
   )
 
   FetchContent_GetProperties(xsmm)
@@ -34,13 +34,10 @@ set(XSMM_INCLUDE_DIRS ${LIBXSMMROOT}/include)
 
 add_library(xsmm STATIC ${XSMM_SRCS})
 target_include_directories(xsmm PUBLIC ${XSMM_INCLUDE_DIRS})
-target_compile_definitions(xsmm PUBLIC
-  LIBXSMM_DEFAULT_CONFIG
-)
 target_compile_definitions(xsmm PRIVATE
   __BLAS=0
 )
-add_definitions(-U_DEBUG)
+add_definitions(-DLIBXSMM_DEFAULT_CONFIG -U_DEBUG)
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
