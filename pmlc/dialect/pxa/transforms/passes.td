@@ -114,6 +114,11 @@ def Localize : Pass<"pxa-localize", "mlir::func::FuncOp"> {
   let constructor = "pmlc::dialect::pxa::createLocalizePass()";
 }
 
+def AllocaConversion : Pass<"pxa-alloca-conversion", "mlir::func::FuncOp"> {
+  let summary = "Convert local allocs to alloca";
+  let constructor = "pmlc::dialect::pxa::createAllocaConversionPass()";
+}
+
 def MemRefDataFlowOpt : Pass<"pxa-dataflow-opt", "mlir::func::FuncOp"> {
   let summary = "Perform reduce/load forwarding for memrefs";
   let constructor = "pmlc::dialect::pxa::createMemRefDataFlowOptPass()";
