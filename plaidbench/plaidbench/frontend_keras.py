@@ -109,6 +109,7 @@ class Model(core.Model):
         new_layers = []
         by_name = {}
         passthru = {}
+        saved_weights = {}
         saved_kernels = {}
         saved_pointwise = {}
         saved_biases = {}
@@ -132,10 +133,6 @@ class Model(core.Model):
             prev_name = cur['inbound_nodes'][0][0][0]
             prev = model.get_layer(prev_name)
             prev_js = by_name[prev_name]
-            if prev_js['class_name'] == 'SeparableConv2D':
-                # TODO: Fix the since it slows down xception
-                new_layers.append(cur)
-                continue
             passthru[cur_name] = prev_name
             if prev_js['class_name'] not in allowed_layers:
                 raise Exception("Can only fold BN to Conv2d right now, got: " +
@@ -146,6 +143,7 @@ class Model(core.Model):
                 saved_kernels[prev_name] = np.reshape(m, (m.shape[0], 1)) * K.get_value(
                     prev.weights[0])
             elif prev_js['class_name'] == 'SeparableConv2D':
+                saved_weights[prev_name] = K.get_value(prev.weights[0])
                 saved_kernels[prev_name] = m * K.get_value(prev.weights[1])
                 bias_offset = 2
             else:
@@ -175,6 +173,7 @@ class Model(core.Model):
                     K.set_value(layer.weights[0], saved_kernels[name])
                     K.set_value(layer.weights[1], saved_biases[name])
                 else:
+                    K.set_value(layer.weights[0], saved_weights[name])
                     K.set_value(layer.weights[1], saved_kernels[name])
                     K.set_value(layer.weights[2], saved_biases[name])
 
